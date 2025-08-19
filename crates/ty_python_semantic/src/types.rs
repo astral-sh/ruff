@@ -184,7 +184,7 @@ pub(crate) type IsDisjointVisitor<'db> = PairVisitor<'db, IsDisjoint, bool>;
 pub(crate) struct IsDisjoint;
 
 /// A [`PairVisitor`] that is used in `is_equivalent` methods.
-pub(crate) type IsEquivalentVisitor<'db> = PairVisitor<'db, IsEquivalent, bool>;
+pub(crate) type IsEquivalentVisitor<'db, C> = PairVisitor<'db, IsEquivalent, C>;
 pub(crate) struct IsEquivalent;
 
 /// A [`TypeTransformer`] that is used in `normalized` methods.
@@ -1496,8 +1496,7 @@ impl<'db> Type<'db> {
             (left, Type::AlwaysTruthy) => C::from_bool(db, left.bool(db).is_always_true()),
             // Currently, the only supertype of `AlwaysFalsy` and `AlwaysTruthy` is the universal set (object instance).
             (Type::AlwaysFalsy | Type::AlwaysTruthy, _) => {
-                // XXX
-                C::from_bool(db, target.is_equivalent_to(db, Type::object(db)))
+                target.when_equivalent_to(db, Type::object(db))
             }
 
             // These clauses handle type variants that include function literals. A function
@@ -1634,10 +1633,7 @@ impl<'db> Type<'db> {
 
             (Type::Callable(_), _) => C::never(db),
 
-            // XXX
-            (Type::BoundSuper(_), Type::BoundSuper(_)) => {
-                C::from_bool(db, self.is_equivalent_to(db, target))
-            }
+            (Type::BoundSuper(_), Type::BoundSuper(_)) => self.when_equivalent_to(db, target),
             (Type::BoundSuper(_), _) => KnownClass::Super
                 .to_instance(db)
                 .has_relation_to_impl(db, target, relation, visitor),
@@ -1770,27 +1766,31 @@ impl<'db> Type<'db> {
     ///
     /// [equivalent to]: https://typing.python.org/en/latest/spec/glossary.html#term-equivalent
     pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Type<'db>) -> bool {
-        self.is_equivalent_to_impl(db, other, &IsEquivalentVisitor::new(true))
+        self.when_equivalent_to(db, other)
     }
 
-    pub(crate) fn is_equivalent_to_impl(
+    fn when_equivalent_to<C: Constraints<'db>>(self, db: &'db dyn Db, other: Type<'db>) -> C {
+        self.is_equivalent_to_impl(db, other, &IsEquivalentVisitor::new(C::always(db)))
+    }
+
+    pub(crate) fn is_equivalent_to_impl<C: Constraints<'db>>(
         self,
         db: &'db dyn Db,
         other: Type<'db>,
-        visitor: &IsEquivalentVisitor<'db>,
-    ) -> bool {
+        visitor: &IsEquivalentVisitor<'db, C>,
+    ) -> C {
         if self == other {
-            return true;
+            return C::always(db);
         }
 
         match (self, other) {
-            (Type::Dynamic(_), Type::Dynamic(_)) => true,
+            (Type::Dynamic(_), Type::Dynamic(_)) => C::always(db),
 
             (Type::SubclassOf(first), Type::SubclassOf(second)) => {
                 match (first.subclass_of(), second.subclass_of()) {
-                    (first, second) if first == second => true,
-                    (SubclassOfInner::Dynamic(_), SubclassOfInner::Dynamic(_)) => true,
-                    _ => false,
+                    (first, second) if first == second => C::always(db),
+                    (SubclassOfInner::Dynamic(_), SubclassOfInner::Dynamic(_)) => C::always(db),
+                    _ => C::never(db),
                 }
             }
 
@@ -1809,45 +1809,49 @@ impl<'db> Type<'db> {
             }
 
             (Type::NominalInstance(first), Type::NominalInstance(second)) => {
-                first.is_equivalent_to(db, second)
+                first.is_equivalent_to_impl(db, second, visitor)
             }
 
-            (Type::Union(first), Type::Union(second)) => first.is_equivalent_to(db, second),
+            (Type::Union(first), Type::Union(second)) => {
+                first.is_equivalent_to_impl(db, second, visitor)
+            }
 
             (Type::Intersection(first), Type::Intersection(second)) => {
-                first.is_equivalent_to(db, second)
+                first.is_equivalent_to_impl(db, second, visitor)
             }
 
             (Type::FunctionLiteral(self_function), Type::FunctionLiteral(target_function)) => {
-                self_function.is_equivalent_to(db, target_function)
+                self_function.is_equivalent_to_impl(db, target_function, visitor)
             }
             (Type::BoundMethod(self_method), Type::BoundMethod(target_method)) => {
-                self_method.is_equivalent_to(db, target_method)
+                self_method.is_equivalent_to_impl(db, target_method, visitor)
             }
             (Type::MethodWrapper(self_method), Type::MethodWrapper(target_method)) => {
-                self_method.is_equivalent_to(db, target_method)
+                self_method.is_equivalent_to_impl(db, target_method, visitor)
             }
-            (Type::Callable(first), Type::Callable(second)) => first.is_equivalent_to(db, second),
+            (Type::Callable(first), Type::Callable(second)) => {
+                first.is_equivalent_to_impl(db, second, visitor)
+            }
 
             (Type::ProtocolInstance(first), Type::ProtocolInstance(second)) => {
-                first.is_equivalent_to(db, second)
+                first.is_equivalent_to_impl(db, second, visitor)
             }
             (Type::ProtocolInstance(protocol), nominal @ Type::NominalInstance(n))
             | (nominal @ Type::NominalInstance(n), Type::ProtocolInstance(protocol)) => {
-                n.is_object(db) && protocol.normalized(db) == nominal
+                C::from_bool(db, n.is_object(db) && protocol.normalized(db) == nominal)
             }
             // An instance of an enum class is equivalent to an enum literal of that class,
             // if that enum has only has one member.
             (Type::NominalInstance(instance), Type::EnumLiteral(literal))
             | (Type::EnumLiteral(literal), Type::NominalInstance(instance)) => {
                 if literal.enum_class_instance(db) != Type::NominalInstance(instance) {
-                    return false;
+                    return C::never(db);
                 }
 
                 let class_literal = instance.class(db).class_literal(db).0;
-                is_single_member_enum(db, class_literal)
+                C::from_bool(db, is_single_member_enum(db, class_literal))
             }
-            _ => false,
+            _ => C::never(db),
         }
     }
 
@@ -8514,11 +8518,19 @@ impl<'db> BoundMethodType<'db> {
             })
     }
 
-    fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
-        self.function(db).is_equivalent_to(db, other.function(db))
-            && other
-                .self_instance(db)
-                .is_equivalent_to(db, self.self_instance(db))
+    fn is_equivalent_to_impl<C: Constraints<'db>>(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        visitor: &IsEquivalentVisitor<'db, C>,
+    ) -> C {
+        self.function(db)
+            .is_equivalent_to_impl(db, other.function(db), visitor)
+            .and(db, || {
+                other
+                    .self_instance(db)
+                    .is_equivalent_to_impl(db, self.self_instance(db), visitor)
+            })
     }
 }
 
@@ -8657,15 +8669,20 @@ impl<'db> CallableType<'db> {
     /// Check whether this callable type is equivalent to another callable type.
     ///
     /// See [`Type::is_equivalent_to`] for more details.
-    fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+    fn is_equivalent_to_impl<C: Constraints<'db>>(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        visitor: &IsEquivalentVisitor<'db, C>,
+    ) -> C {
         if self == other {
-            return true;
+            return C::always(db);
         }
 
-        self.is_function_like(db) == other.is_function_like(db)
-            && self
-                .signatures(db)
-                .is_equivalent_to(db, other.signatures(db))
+        C::from_bool(db, self.is_function_like(db) == other.is_function_like(db)).and(db, || {
+            self.signatures(db)
+                .is_equivalent_to_impl(db, other.signatures(db), visitor)
+        })
     }
 }
 
@@ -8754,22 +8771,27 @@ impl<'db> MethodWrapperKind<'db> {
         }
     }
 
-    fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+    fn is_equivalent_to_impl<C: Constraints<'db>>(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        visitor: &IsEquivalentVisitor<'db, C>,
+    ) -> C {
         match (self, other) {
             (
                 MethodWrapperKind::FunctionTypeDunderGet(self_function),
                 MethodWrapperKind::FunctionTypeDunderGet(other_function),
-            ) => self_function.is_equivalent_to(db, other_function),
+            ) => self_function.is_equivalent_to_impl(db, other_function, visitor),
 
             (
                 MethodWrapperKind::FunctionTypeDunderCall(self_function),
                 MethodWrapperKind::FunctionTypeDunderCall(other_function),
-            ) => self_function.is_equivalent_to(db, other_function),
+            ) => self_function.is_equivalent_to_impl(db, other_function, visitor),
 
             (MethodWrapperKind::PropertyDunderGet(_), MethodWrapperKind::PropertyDunderGet(_))
             | (MethodWrapperKind::PropertyDunderSet(_), MethodWrapperKind::PropertyDunderSet(_))
             | (MethodWrapperKind::StrStartswith(_), MethodWrapperKind::StrStartswith(_)) => {
-                self == other
+                C::from_bool(db, self == other)
             }
 
             (
@@ -8783,7 +8805,7 @@ impl<'db> MethodWrapperKind<'db> {
                 | MethodWrapperKind::PropertyDunderGet(_)
                 | MethodWrapperKind::PropertyDunderSet(_)
                 | MethodWrapperKind::StrStartswith(_),
-            ) => false,
+            ) => C::never(db),
         }
     }
 
@@ -9284,26 +9306,30 @@ impl<'db> UnionType<'db> {
         UnionType::new(db, new_elements.into_boxed_slice())
     }
 
-    /// Return `true` if `self` represents the exact same sets of possible runtime objects as `other`
-    pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+    pub(crate) fn is_equivalent_to_impl<C: Constraints<'db>>(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        _visitor: &IsEquivalentVisitor<'db, C>,
+    ) -> C {
         if self == other {
-            return true;
+            return C::always(db);
         }
 
         let self_elements = self.elements(db);
         let other_elements = other.elements(db);
 
         if self_elements.len() != other_elements.len() {
-            return false;
+            return C::never(db);
         }
 
         let sorted_self = self.normalized(db);
 
         if sorted_self == other {
-            return true;
+            return C::always(db);
         }
 
-        sorted_self == other.normalized(db)
+        C::from_bool(db, sorted_self == other.normalized(db))
     }
 }
 
@@ -9371,32 +9397,37 @@ impl<'db> IntersectionType<'db> {
     }
 
     /// Return `true` if `self` represents exactly the same set of possible runtime objects as `other`
-    pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+    pub(crate) fn is_equivalent_to_impl<C: Constraints<'db>>(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        _visitor: &IsEquivalentVisitor<'db, C>,
+    ) -> C {
         if self == other {
-            return true;
+            return C::always(db);
         }
 
         let self_positive = self.positive(db);
         let other_positive = other.positive(db);
 
         if self_positive.len() != other_positive.len() {
-            return false;
+            return C::never(db);
         }
 
         let self_negative = self.negative(db);
         let other_negative = other.negative(db);
 
         if self_negative.len() != other_negative.len() {
-            return false;
+            return C::never(db);
         }
 
         let sorted_self = self.normalized(db);
 
         if sorted_self == other {
-            return true;
+            return C::always(db);
         }
 
-        sorted_self == other.normalized(db)
+        C::from_bool(db, sorted_self == other.normalized(db))
     }
 
     /// Returns an iterator over the positive elements of the intersection. If

@@ -27,10 +27,10 @@ use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signatu
 use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
     ApplyTypeMappingVisitor, BareTypeAliasType, Binding, BoundSuperError, BoundSuperType,
-    CallableType, DataclassParams, DeprecatedInstance, HasRelationToVisitor, KnownInstanceType,
-    NormalizedVisitor, PropertyInstanceType, StringLiteralType, TypeAliasType, TypeMapping,
-    TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, declaration_type,
-    infer_definition_types, todo_type,
+    CallableType, DataclassParams, DeprecatedInstance, HasRelationToVisitor, IsEquivalentVisitor,
+    KnownInstanceType, NormalizedVisitor, PropertyInstanceType, StringLiteralType, TypeAliasType,
+    TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind,
+    declaration_type, infer_definition_types, todo_type,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet, Program,
@@ -541,21 +541,29 @@ impl<'db> ClassType<'db> {
         })
     }
 
-    pub(super) fn is_equivalent_to(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
+    pub(super) fn is_equivalent_to_impl<C: Constraints<'db>>(
+        self,
+        db: &'db dyn Db,
+        other: ClassType<'db>,
+        visitor: &IsEquivalentVisitor<'db, C>,
+    ) -> C {
         if self == other {
-            return true;
+            return C::always(db);
         }
 
         match (self, other) {
             // A non-generic class is never equivalent to a generic class.
             // Two non-generic classes are only equivalent if they are equal (handled above).
-            (ClassType::NonGeneric(_), _) | (_, ClassType::NonGeneric(_)) => false,
+            (ClassType::NonGeneric(_), _) | (_, ClassType::NonGeneric(_)) => C::never(db),
 
             (ClassType::Generic(this), ClassType::Generic(other)) => {
-                this.origin(db) == other.origin(db)
-                    && this
-                        .specialization(db)
-                        .is_equivalent_to(db, other.specialization(db))
+                C::from_bool(db, this.origin(db) == other.origin(db)).and(db, || {
+                    this.specialization(db).is_equivalent_to_impl(
+                        db,
+                        other.specialization(db),
+                        visitor,
+                    )
+                })
             }
         }
     }

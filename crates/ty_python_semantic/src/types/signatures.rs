@@ -20,8 +20,8 @@ use crate::semantic_index::definition::Definition;
 use crate::types::constraints::{Constraints, IteratorConstraintsExtension};
 use crate::types::generics::{GenericContext, walk_generic_context};
 use crate::types::{
-    BindingContext, BoundTypeVarInstance, HasRelationToVisitor, KnownClass, NormalizedVisitor,
-    TypeMapping, TypeRelation, todo_type,
+    BindingContext, BoundTypeVarInstance, HasRelationToVisitor, IsEquivalentVisitor, KnownClass,
+    NormalizedVisitor, TypeMapping, TypeRelation, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -117,11 +117,15 @@ impl<'db> CallableSignature<'db> {
     ///
     /// See [`Type::is_subtype_of`] for more details.
     pub(crate) fn is_subtype_of(&self, db: &'db dyn Db, other: &Self) -> bool {
+        self.is_subtype_of_impl(db, other)
+    }
+
+    fn is_subtype_of_impl<C: Constraints<'db>>(&self, db: &'db dyn Db, other: &Self) -> C {
         self.has_relation_to_impl(
             db,
             other,
             TypeRelation::Subtyping,
-            &HasRelationToVisitor::new(true),
+            &HasRelationToVisitor::new(C::always(db)),
         )
     }
 
@@ -200,18 +204,24 @@ impl<'db> CallableSignature<'db> {
     /// Check whether this callable type is equivalent to another callable type.
     ///
     /// See [`Type::is_equivalent_to`] for more details.
-    pub(crate) fn is_equivalent_to(&self, db: &'db dyn Db, other: &Self) -> bool {
+    pub(crate) fn is_equivalent_to_impl<C: Constraints<'db>>(
+        &self,
+        db: &'db dyn Db,
+        other: &Self,
+        visitor: &IsEquivalentVisitor<'db, C>,
+    ) -> C {
         match (self.overloads.as_slice(), other.overloads.as_slice()) {
             ([self_signature], [other_signature]) => {
                 // Common case: both callable types contain a single signature, use the custom
                 // equivalence check instead of delegating it to the subtype check.
-                self_signature.is_equivalent_to(db, other_signature)
+                self_signature.is_equivalent_to_impl(db, other_signature, visitor)
             }
             (_, _) => {
                 if self == other {
-                    return true;
+                    return C::always(db);
                 }
-                self.is_subtype_of(db, other) && other.is_subtype_of(db, self)
+                self.is_subtype_of_impl::<C>(db, other)
+                    .and(db, || other.is_subtype_of_impl(db, self))
             }
         }
     }
@@ -491,23 +501,30 @@ impl<'db> Signature<'db> {
     /// Return `true` if `self` has exactly the same set of possible static materializations as
     /// `other` (if `self` represents the same set of possible sets of possible runtime objects as
     /// `other`).
-    pub(crate) fn is_equivalent_to(&self, db: &'db dyn Db, other: &Signature<'db>) -> bool {
-        let check_types = |self_type: Option<Type<'db>>, other_type: Option<Type<'db>>| {
-            self_type
-                .unwrap_or(Type::unknown())
-                .is_equivalent_to(db, other_type.unwrap_or(Type::unknown()))
-        };
+    pub(crate) fn is_equivalent_to_impl<C: Constraints<'db>>(
+        &self,
+        db: &'db dyn Db,
+        other: &Signature<'db>,
+        visitor: &IsEquivalentVisitor<'db, C>,
+    ) -> C {
+        let mut result = C::always(db);
+        let mut types_inconsistent =
+            |self_type: Option<Type<'db>>, other_type: Option<Type<'db>>| {
+                let self_type = self_type.unwrap_or(Type::unknown());
+                let other_type = other_type.unwrap_or(Type::unknown());
+                result.intersect(db, self_type.is_equivalent_to_impl(db, other_type, visitor))
+            };
 
         if self.parameters.is_gradual() != other.parameters.is_gradual() {
-            return false;
+            return C::never(db);
         }
 
         if self.parameters.len() != other.parameters.len() {
-            return false;
+            return C::never(db);
         }
 
-        if !check_types(self.return_ty, other.return_ty) {
-            return false;
+        if types_inconsistent(self.return_ty, other.return_ty) {
+            return result;
         }
 
         for (self_parameter, other_parameter) in self.parameters.iter().zip(&other.parameters) {
@@ -551,18 +568,18 @@ impl<'db> Signature<'db> {
 
                 (ParameterKind::KeywordVariadic { .. }, ParameterKind::KeywordVariadic { .. }) => {}
 
-                _ => return false,
+                _ => return C::never(db),
             }
 
-            if !check_types(
+            if types_inconsistent(
                 self_parameter.annotated_type(),
                 other_parameter.annotated_type(),
             ) {
-                return false;
+                return result;
             }
         }
 
-        true
+        result
     }
 
     /// Implementation of subtyping and assignability for signature.

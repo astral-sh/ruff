@@ -13,7 +13,7 @@ use crate::types::protocol_class::walk_protocol_interface;
 use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
     ApplyTypeMappingVisitor, ClassBase, DynamicType, HasRelationToVisitor, IsDisjointVisitor,
-    NormalizedVisitor, TypeMapping, TypeRelation,
+    IsEquivalentVisitor, NormalizedVisitor, TypeMapping, TypeRelation,
 };
 use crate::{Db, FxOrderSet};
 
@@ -286,16 +286,21 @@ impl<'db> NominalInstanceType<'db> {
         }
     }
 
-    pub(super) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+    pub(super) fn is_equivalent_to_impl<C: Constraints<'db>>(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        visitor: &IsEquivalentVisitor<'db, C>,
+    ) -> C {
         match (self.0, other.0) {
             (
                 NominalInstanceInner::ExactTuple(tuple1),
                 NominalInstanceInner::ExactTuple(tuple2),
-            ) => tuple1.is_equivalent_to(db, tuple2),
+            ) => tuple1.is_equivalent_to_impl(db, tuple2, visitor),
             (NominalInstanceInner::NonTuple(class1), NominalInstanceInner::NonTuple(class2)) => {
-                class1.is_equivalent_to(db, class2)
+                class1.is_equivalent_to_impl(db, class2, visitor)
             }
-            _ => false,
+            _ => C::never(db),
         }
     }
 
@@ -524,15 +529,20 @@ impl<'db> ProtocolInstanceType<'db> {
     /// Return `true` if this protocol type is equivalent to the protocol `other`.
     ///
     /// TODO: consider the types of the members as well as their existence
-    pub(super) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+    pub(super) fn is_equivalent_to_impl<C: Constraints<'db>>(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        _visitor: &IsEquivalentVisitor<'db, C>,
+    ) -> C {
         if self == other {
-            return true;
+            return C::always(db);
         }
         let self_normalized = self.normalized(db);
         if self_normalized == Type::ProtocolInstance(other) {
-            return true;
+            return C::always(db);
         }
-        self_normalized == other.normalized(db)
+        C::from_bool(db, self_normalized == other.normalized(db))
     }
 
     /// Return `true` if this protocol type is disjoint from the protocol `other`.

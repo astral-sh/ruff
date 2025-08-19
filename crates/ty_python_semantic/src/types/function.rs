@@ -78,8 +78,9 @@ use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::any_over_type;
 use crate::types::{
     BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, ClassType,
-    DeprecatedInstance, DynamicType, HasRelationToVisitor, KnownClass, NormalizedVisitor,
-    Truthiness, Type, TypeMapping, TypeRelation, UnionBuilder, all_members, walk_type_mapping,
+    DeprecatedInstance, DynamicType, HasRelationToVisitor, IsEquivalentVisitor, KnownClass,
+    NormalizedVisitor, Truthiness, Type, TypeMapping, TypeRelation, UnionBuilder, all_members,
+    walk_type_mapping,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -896,16 +897,21 @@ impl<'db> FunctionType<'db> {
             && self.signature(db).is_assignable_to(db, other.signature(db))
     }
 
-    pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+    pub(crate) fn is_equivalent_to_impl<C: Constraints<'db>>(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        visitor: &IsEquivalentVisitor<'db, C>,
+    ) -> C {
         if self.normalized(db) == other.normalized(db) {
-            return true;
+            return C::always(db);
         }
         if self.literal(db) != other.literal(db) {
-            return false;
+            return C::never(db);
         }
         let self_signature = self.signature(db);
         let other_signature = other.signature(db);
-        self_signature.is_equivalent_to(db, other_signature)
+        self_signature.is_equivalent_to_impl(db, other_signature, visitor)
     }
 
     pub(crate) fn find_legacy_typevars(
