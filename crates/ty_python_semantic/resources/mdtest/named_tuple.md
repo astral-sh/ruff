@@ -102,15 +102,33 @@ reveal_type(alice2.name)  # revealed: @Todo(functional `NamedTuple` syntax)
 
 ### Definition
 
-TODO: Fields without default values should come before fields with.
+<!-- snapshot-diagnostics -->
+
+Fields without default values must come before fields with.
 
 ```py
 from typing import NamedTuple
 
 class Location(NamedTuple):
     altitude: float = 0.0
-    latitude: float  # this should be an error
+    # error: [invalid-named-tuple] "NamedTuple field without default value cannot follow field(s) with default value(s): Field `latitude` defined here without a default value"
+    latitude: float
+    # error: [invalid-named-tuple] "NamedTuple field without default value cannot follow field(s) with default value(s): Field `longitude` defined here without a default value"
     longitude: float
+
+class StrangeLocation(NamedTuple):
+    altitude: float
+    altitude: float = 0.0
+    altitude: float
+    altitude: float = 0.0
+    latitude: float  # error: [invalid-named-tuple]
+    longitude: float  # error: [invalid-named-tuple]
+
+class VeryStrangeLocation(NamedTuple):
+    altitude: float = 0.0
+    latitude: float  # error: [invalid-named-tuple]
+    longitude: float  # error: [invalid-named-tuple]
+    altitude: float = 0.0
 ```
 
 ### Multiple Inheritance
