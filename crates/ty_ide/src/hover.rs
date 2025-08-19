@@ -262,7 +262,10 @@ mod tests {
         );
 
         assert_snapshot!(test.hover(), @r"
-        def my_func(a, b) -> Unknown
+        def my_func(
+            a,
+            b
+        ) -> Unknown
         ---------------------------------------------
         This is such a great func!!
 
@@ -272,7 +275,10 @@ mod tests {
 
         ---------------------------------------------
         ```python
-        def my_func(a, b) -> Unknown
+        def my_func(
+            a,
+            b
+        ) -> Unknown
         ```
         ---
         ```text
