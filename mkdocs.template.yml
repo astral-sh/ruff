@@ -4,16 +4,16 @@ theme:
   logo: assets/bolt.svg
   favicon: assets/favicon.ico
   features:
-    - navigation.instant
-    - navigation.instant.prefetch
-    - navigation.tracking
     - content.code.annotate
-    - toc.integrate
-    - toc.follow
-    - navigation.path
-    - navigation.top
     - content.code.copy
     - content.tabs.link
+    - navigation.footer
+    - navigation.instant
+    - navigation.instant.prefetch
+    - navigation.path
+    - navigation.top
+    - navigation.tracking
+    - toc.follow
   palette:
     # Note: Using the system theme works with the insiders version
     # https://squidfunk.github.io/mkdocs-material/setup/changing-the-colors/#automatic-light-dark-mode
