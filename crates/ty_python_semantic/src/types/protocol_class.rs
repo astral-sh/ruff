@@ -304,6 +304,7 @@ impl<'db> ProtocolInterface<'db> {
 impl<'db> VarianceInferable<'db> for ProtocolInterface<'db> {
     fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
         self.members(db)
+            // TODO do we need to switch on member kind?
             .map(|member| member.ty().variance_of(db, typevar))
             .collect()
     }

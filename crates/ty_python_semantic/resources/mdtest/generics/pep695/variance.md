@@ -643,11 +643,15 @@ This holds likewise for dataclasses with synthesized `__init__`:
 ```py
 from dataclasses import dataclass
 
-@dataclass(init=True)
-class D[T]: ...
+@dataclass(init=True, frozen=True)
+class D[T]:
+    x: T
+
+# Covariant due to the read-only T-typed attribute; the `__init__` is ignored and doesn't make it
+# invariant:
 
 static_assert(is_subtype_of(D[B], D[A]))
-static_assert(is_subtype_of(D[A], D[B]))
+static_assert(not is_subtype_of(D[A], D[B]))
 ```
 
 ## Union Types
