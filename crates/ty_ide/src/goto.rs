@@ -599,6 +599,7 @@ impl GotoTarget<'_> {
                     // Find the containing call expression from the ancestor chain
                     let call_expression = covering_node
                         .ancestors()
+                        .rev()
                         .find_map(ruff_python_ast::AnyNodeRef::expr_call)?;
                     Some(GotoTarget::KeywordArgument {
                         keyword,

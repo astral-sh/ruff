@@ -650,13 +650,11 @@ my_func(my_other_func(ab=5, y=2), 0)
 
         assert_snapshot!(test.goto_definition(), @r"
         info[goto-definition]: Definition
-         --> main.py:3:19
+         --> main.py:2:13
           |
         2 | def my_func(ab, y, z = None): ...
+          |             ^^
         3 | def my_other_func(ab, y): ...
-          |                   ^^
-        4 |
-        5 | my_other_func(my_func(ab=5, y=2), 0)
           |
         info: Source
          --> main.py:5:23
@@ -690,11 +688,13 @@ my_func(my_other_func(a<CURSOR>b=5, y=2), 0)
 
         assert_snapshot!(test.goto_definition(), @r"
         info[goto-definition]: Definition
-         --> main.py:2:13
+         --> main.py:3:19
           |
         2 | def my_func(ab, y, z = None): ...
-          |             ^^
         3 | def my_other_func(ab, y): ...
+          |                   ^^
+        4 |
+        5 | my_other_func(my_func(ab=5, y=2), 0)
           |
         info: Source
          --> main.py:6:23
@@ -726,13 +726,11 @@ my_func(my_other_func(ab=5, y=2), 0)
 
         assert_snapshot!(test.goto_definition(), @r"
         info[goto-definition]: Definition
-         --> main.py:3:19
+         --> main.py:2:13
           |
         2 | def my_func(ab, y): ...
+          |             ^^
         3 | def my_other_func(ab, y): ...
-          |                   ^^
-        4 |
-        5 | my_other_func(my_func(ab=5, y=2), 0)
           |
         info: Source
          --> main.py:5:23
@@ -766,11 +764,13 @@ my_func(my_other_func(a<CURSOR>b=5, y=2), 0)
 
         assert_snapshot!(test.goto_definition(), @r"
         info[goto-definition]: Definition
-         --> main.py:2:13
+         --> main.py:3:19
           |
         2 | def my_func(ab, y): ...
-          |             ^^
         3 | def my_other_func(ab, y): ...
+          |                   ^^
+        4 |
+        5 | my_other_func(my_func(ab=5, y=2), 0)
           |
         info: Source
          --> main.py:6:23
