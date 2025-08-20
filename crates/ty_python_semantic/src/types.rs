@@ -485,6 +485,10 @@ bitflags! {
         const KW_ONLY = 0b0000_1000_0000;
         const SLOTS = 0b0001_0000_0000;
         const WEAKREF_SLOT = 0b0010_0000_0000;
+        // This is not an actual argument from `dataclass(...)` but a flag signaling that no
+        // `field_specifiers` was specified for the `dataclass_transform`, see [1].
+        // [1]: https://typing.python.org/en/latest/spec/dataclasses.html#dataclass-transform-parameters
+        const NO_FIELD_SPECIFIERS = 0b0100_0000_0000;
     }
 }
 
@@ -515,6 +519,11 @@ impl From<DataclassTransformerParams> for DataclassParams {
         result.set(
             Self::FROZEN,
             params.contains(DataclassTransformerParams::FROZEN_DEFAULT),
+        );
+
+        result.set(
+            Self::NO_FIELD_SPECIFIERS,
+            !params.contains(DataclassTransformerParams::FIELD_SPECIFIERS),
         );
 
         result

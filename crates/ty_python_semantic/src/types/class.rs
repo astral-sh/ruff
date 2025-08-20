@@ -2344,8 +2344,18 @@ impl<'db> ClassLiteral<'db> {
                 let mut kw_only = None;
                 if let Some(Type::KnownInstance(KnownInstanceType::Field(field))) = default_ty {
                     default_ty = Some(field.default_type(db));
-                    init = field.init(db);
-                    kw_only = field.kw_only(db);
+                    if self
+                        .dataclass_params(db)
+                        .map(|params| params.contains(DataclassParams::NO_FIELD_SPECIFIERS))
+                        .unwrap_or(false)
+                    {
+                        // This happens when constructing a `dataclass` with a `dataclass_transform`
+                        // without defining the `field_specifiers`, meaning it should ignore
+                        // `dataclasses.field` and `dataclasses.Field`.
+                    } else {
+                        init = field.init(db);
+                        kw_only = field.kw_only(db);
+                    }
                 }
 
                 attributes.insert(
