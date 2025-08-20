@@ -10,7 +10,6 @@ use ruff_notebook::NotebookIndex;
 use ruff_source_file::{LineColumn, OneIndexed};
 
 use crate::fs::relativize_path;
-use crate::message::diff::calculate_print_width;
 use crate::message::{Emitter, EmitterContext};
 use crate::settings::types::UnsafeFixes;
 
@@ -53,8 +52,8 @@ impl Emitter for GroupedEmitter {
                 max_column_length = max_column_length.max(message.start_location.column);
             }
 
-            let row_length = calculate_print_width(max_row_length);
-            let column_length = calculate_print_width(max_column_length);
+            let row_length = max_row_length.print_width();
+            let column_length = max_column_length.print_width();
 
             // Print the filename.
             writeln!(writer, "{}:", relativize_path(&*filename).underline())?;
@@ -131,8 +130,8 @@ impl Display for DisplayGroupedMessage<'_> {
         write!(
             f,
             "  {row_padding}",
-            row_padding = " "
-                .repeat(self.row_length.get() - calculate_print_width(start_location.line).get())
+            row_padding =
+                " ".repeat(self.row_length.get() - start_location.line.print_width().get())
         )?;
 
         // Check if we're working on a jupyter notebook and translate positions with cell accordingly
@@ -159,9 +158,8 @@ impl Display for DisplayGroupedMessage<'_> {
             f,
             "{row}{sep}{col}{col_padding} {code_and_body}",
             sep = ":".cyan(),
-            col_padding = " ".repeat(
-                self.column_length.get() - calculate_print_width(start_location.column).get()
-            ),
+            col_padding =
+                " ".repeat(self.column_length.get() - start_location.column.print_width().get()),
             code_and_body = RuleCodeAndBody {
                 message,
                 show_fix_status: self.show_fix_status,
