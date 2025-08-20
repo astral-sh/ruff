@@ -646,10 +646,20 @@ def f(**kwargs: int) -> C: ...
 def f(x: A, /, **kwargs: int) -> A: ...
 @overload
 def f(x: B, /, **kwargs: int) -> B: ...
+
+class Foo:
+    @overload
+    def f(self) -> None: ...
+    @overload
+    def f(self, **kwargs: int) -> C: ...
+    @overload
+    def f(self, x: A, /, **kwargs: int) -> A: ...
+    @overload
+    def f(self, x: B, /, **kwargs: int) -> B: ...
 ```
 
 ```py
-from overloaded import A, B, C, f
+from overloaded import A, B, C, Foo, f
 from typing_extensions import reveal_type
 
 def _(ab: A | B, a=1):
@@ -706,6 +716,86 @@ def _(ab: A | B, a=1):
     reveal_type(
         # revealed: A | B
         f(
+            ab,
+            a1=a,
+            a2=a,
+            a3=a,
+            a4=a,
+            a5=a,
+            a6=a,
+            a7=a,
+            a8=a,
+            a9=a,
+            a10=a,
+            a11=a,
+            a12=a,
+            a13=a,
+            a14=a,
+            a15=a,
+            a16=a,
+            a17=a,
+            a18=a,
+            a19=a,
+            a20=a,
+            a21=a,
+            a22=a,
+            a23=a,
+            a24=a,
+            a25=a,
+            a26=a,
+            a27=a,
+            a28=a,
+            a29=a,
+            a30=a,
+        )
+    )
+
+def _(foo: Foo, ab: A | B, a=1):
+    reveal_type(foo.f(a1=a, a2=a, a3=a))  # revealed: C
+    reveal_type(foo.f(A(), a1=a, a2=a, a3=a))  # revealed: A
+    reveal_type(foo.f(B(), a1=a, a2=a, a3=a))  # revealed: B
+
+    reveal_type(
+        # error: [no-matching-overload]
+        # revealed: Unknown
+        foo.f(
+            C(),
+            a1=a,
+            a2=a,
+            a3=a,
+            a4=a,
+            a5=a,
+            a6=a,
+            a7=a,
+            a8=a,
+            a9=a,
+            a10=a,
+            a11=a,
+            a12=a,
+            a13=a,
+            a14=a,
+            a15=a,
+            a16=a,
+            a17=a,
+            a18=a,
+            a19=a,
+            a20=a,
+            a21=a,
+            a22=a,
+            a23=a,
+            a24=a,
+            a25=a,
+            a26=a,
+            a27=a,
+            a28=a,
+            a29=a,
+            a30=a,
+        )
+    )
+
+    reveal_type(
+        # revealed: A | B
+        foo.f(
             ab,
             a1=a,
             a2=a,
