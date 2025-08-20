@@ -624,6 +624,24 @@ impl OneIndexed {
     }
 
     /// Calculate the number of digits in `self`.
+    ///
+    /// This is primarily intended for computing the length of the string representation for
+    /// formatted printing.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ruff_source_file::OneIndexed;
+    ///
+    /// let one = OneIndexed::new(1).unwrap();
+    /// assert_eq!(one.digits().get(), 1);
+    ///
+    /// let hundred = OneIndexed::new(100).unwrap();
+    /// assert_eq!(hundred.digits().get(), 3);
+    ///
+    /// let thousand = OneIndexed::new(1000).unwrap();
+    /// assert_eq!(thousand.digits().get(), 4);
+    /// ```
     pub const fn digits(self) -> NonZeroUsize {
         // Safety: the 1+ ensures this is always non-zero, and
         // `usize::MAX.ilog10()` << `usize::MAX`, so the result is always safe
