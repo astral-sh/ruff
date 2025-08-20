@@ -2424,9 +2424,21 @@ impl<'db> ClassLiteral<'db> {
                     kw_only_sentinel_field_seen = true;
                 }
 
-                // If no explicit kw_only setting and we've seen KW_ONLY sentinel, mark as keyword-only
-                if field.kw_only.is_none() && kw_only_sentinel_field_seen {
-                    field.kw_only = Some(true);
+                // If no explicit field-level "kw_only" setting,
+                // we check for KW_ONLY sentinel or class-level settings
+                if field.kw_only.is_none() {
+                    if kw_only_sentinel_field_seen {
+                        // KW_ONLY sentinel makes subsequent fields keyword-only
+                        field.kw_only = Some(true);
+                    } else if self
+                        .dataclass_params(db)
+                        .is_some_and(|params| params.contains(DataclassParams::KW_ONLY))
+                    {
+                        // `@dataclass(kw_only=True)` or `@dataclass_transform(kw_only_default=True)`
+                        // (`DataclassTransformerParams` -> `DataclassParams` conversion is done
+                        // before so it's ok to only check `DataclassParams`)
+                        field.kw_only = Some(true);
+                    }
                 }
 
                 attributes.insert(symbol.name().clone(), field);
