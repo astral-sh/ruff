@@ -1,4 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_literal::format::FormatConversion;
 
 use crate::{AlwaysFixableViolation, Violation};
 
@@ -383,12 +384,23 @@ impl Violation for LoggingFString {
 /// - [Python documentation: `logging`](https://docs.python.org/3/library/logging.html)
 /// - [Python documentation: Optimization](https://docs.python.org/3/howto/logging.html#optimization)
 #[derive(ViolationMetadata)]
-pub(crate) struct LoggingPreFormat;
+pub(crate) struct LoggingPreFormat {
+    pub(crate) format_conversion: FormatConversion,
+}
 
 impl Violation for LoggingPreFormat {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Logging statement pre-formats parameters as strings".to_string()
+        let LoggingPreFormat { format_conversion } = self;
+        let (format_str, call_arg) = match format_conversion {
+            FormatConversion::Str => ("%s", "str()"),
+            FormatConversion::Repr => ("%r", "repr()"),
+            FormatConversion::Ascii => ("%a", "ascii()"),
+            FormatConversion::Bytes => ("%b", "bytes()"),
+        };
+        format!(
+            "Unnecessary cast `{call_arg}` in logging values when formatting with `{format_str}`"
+        )
     }
 }
 

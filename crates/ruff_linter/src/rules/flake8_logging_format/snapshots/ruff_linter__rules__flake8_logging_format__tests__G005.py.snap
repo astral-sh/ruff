@@ -2,86 +2,82 @@
 source: crates/ruff_linter/src/rules/flake8_logging_format/mod.rs
 assertion_line: 50
 ---
-G005 Logging statement pre-formats parameters as strings
- --> G005.py:3:26
-  |
-1 | import logging
-2 |
-3 | logging.info("Hello %s", str("World!"))
-  |                          ^^^^^^^^^^^^^
-4 | logging.info("Hello %s", repr("World!"))
-5 | logging.log(logging.INFO, "Hello %s", str("World!"))
-  |
-
-G005 Logging statement pre-formats parameters as strings
+G005 Unnecessary cast `str()` in logging values when formatting with `%s`
  --> G005.py:4:26
   |
-3 | logging.info("Hello %s", str("World!"))
-4 | logging.info("Hello %s", repr("World!"))
-  |                          ^^^^^^^^^^^^^^
+3 | # %s + str()
+4 | logging.info("Hello %s", str("World!"))
+  |                          ^^^^^^^^^^^^^
 5 | logging.log(logging.INFO, "Hello %s", str("World!"))
-6 | logging.log(logging.INFO, "Hello %s", repr("World!"))
   |
 
-G005 Logging statement pre-formats parameters as strings
+G005 Unnecessary cast `str()` in logging values when formatting with `%s`
  --> G005.py:5:39
   |
-3 | logging.info("Hello %s", str("World!"))
-4 | logging.info("Hello %s", repr("World!"))
+3 | # %s + str()
+4 | logging.info("Hello %s", str("World!"))
 5 | logging.log(logging.INFO, "Hello %s", str("World!"))
   |                                       ^^^^^^^^^^^^^
-6 | logging.log(logging.INFO, "Hello %s", repr("World!"))
+6 |
+7 | # %s + repr()
   |
 
-G005 Logging statement pre-formats parameters as strings
- --> G005.py:6:39
-  |
-4 | logging.info("Hello %s", repr("World!"))
-5 | logging.log(logging.INFO, "Hello %s", str("World!"))
-6 | logging.log(logging.INFO, "Hello %s", repr("World!"))
-  |                                       ^^^^^^^^^^^^^^
-7 |
-8 | from logging import info, log
-  |
-
-G005 Logging statement pre-formats parameters as strings
-  --> G005.py:10:18
+G005 Unnecessary cast `repr()` in logging values when formatting with `%r`
+  --> G005.py:16:26
    |
- 8 | from logging import info, log
- 9 |
-10 | info("Hello %s", str("World!"))
+15 | # %r + repr()
+16 | logging.info("Hello %r", repr("World!"))
+   |                          ^^^^^^^^^^^^^^
+17 | logging.log(logging.INFO, "Hello %r", repr("World!"))
+   |
+
+G005 Unnecessary cast `repr()` in logging values when formatting with `%r`
+  --> G005.py:17:39
+   |
+15 | # %r + repr()
+16 | logging.info("Hello %r", repr("World!"))
+17 | logging.log(logging.INFO, "Hello %r", repr("World!"))
+   |                                       ^^^^^^^^^^^^^^
+18 |
+19 | from logging import info, log
+   |
+
+G005 Unnecessary cast `str()` in logging values when formatting with `%s`
+  --> G005.py:22:18
+   |
+21 | # %s + str()
+22 | info("Hello %s", str("World!"))
    |                  ^^^^^^^^^^^^^
-11 | info("Hello %s", repr("World!"))
-12 | log(logging.INFO, "Hello %s", str("World!"))
+23 | log(logging.INFO, "Hello %s", str("World!"))
    |
 
-G005 Logging statement pre-formats parameters as strings
-  --> G005.py:11:18
+G005 Unnecessary cast `str()` in logging values when formatting with `%s`
+  --> G005.py:23:31
    |
-10 | info("Hello %s", str("World!"))
-11 | info("Hello %s", repr("World!"))
-   |                  ^^^^^^^^^^^^^^
-12 | log(logging.INFO, "Hello %s", str("World!"))
-13 | log(logging.INFO, "Hello %s", repr("World!"))
-   |
-
-G005 Logging statement pre-formats parameters as strings
-  --> G005.py:12:31
-   |
-10 | info("Hello %s", str("World!"))
-11 | info("Hello %s", repr("World!"))
-12 | log(logging.INFO, "Hello %s", str("World!"))
+21 | # %s + str()
+22 | info("Hello %s", str("World!"))
+23 | log(logging.INFO, "Hello %s", str("World!"))
    |                               ^^^^^^^^^^^^^
-13 | log(logging.INFO, "Hello %s", repr("World!"))
+24 |
+25 | # %s + repr()
    |
 
-G005 Logging statement pre-formats parameters as strings
-  --> G005.py:13:31
+G005 Unnecessary cast `repr()` in logging values when formatting with `%r`
+  --> G005.py:34:18
    |
-11 | info("Hello %s", repr("World!"))
-12 | log(logging.INFO, "Hello %s", str("World!"))
-13 | log(logging.INFO, "Hello %s", repr("World!"))
+33 | # %r + repr()
+34 | info("Hello %r", repr("World!"))
+   |                  ^^^^^^^^^^^^^^
+35 | log(logging.INFO, "Hello %r", repr("World!"))
+   |
+
+G005 Unnecessary cast `repr()` in logging values when formatting with `%r`
+  --> G005.py:35:31
+   |
+33 | # %r + repr()
+34 | info("Hello %r", repr("World!"))
+35 | log(logging.INFO, "Hello %r", repr("World!"))
    |                               ^^^^^^^^^^^^^^
-14 |
-15 | def str(s): return f"str = {s}"
+36 |
+37 | def str(s): return f"str = {s}"
    |
