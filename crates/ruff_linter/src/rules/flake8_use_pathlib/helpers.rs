@@ -185,9 +185,16 @@ pub(crate) fn check_os_pathlib_two_arg_calls(
     }
 }
 
-pub(crate) fn has_unknown_keywords(arguments: &ast::Arguments, allowed: &[&str]) -> bool {
-    arguments
-        .keywords
-        .iter()
-        .any(|kw| kw.arg.as_deref().is_none_or(|arg| !allowed.contains(&arg)))
+pub(crate) fn has_unknown_keywords_or_starred_expr(
+    arguments: &ast::Arguments,
+    allowed: &[&str],
+) -> bool {
+    if arguments.args.iter().any(Expr::is_starred_expr) {
+        return true;
+    }
+
+    arguments.keywords.iter().any(|kw| match &kw.arg {
+        Some(arg) => !allowed.contains(&arg.as_str()),
+        None => true,
+    })
 }
