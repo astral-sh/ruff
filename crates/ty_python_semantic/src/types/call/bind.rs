@@ -1337,7 +1337,8 @@ impl<'db> CallableBinding<'db> {
         // This heuristic needs to be applied after restoring the bindings state to the one before
         // type checking as argument type expansion would evaluate it from that point on.
         for (argument_index, (argument, argument_type)) in argument_types.iter().enumerate() {
-            if matches!(argument, Argument::Synthetic) {
+            // TODO: Remove `Keywords` once `**kwargs` support is added
+            if matches!(argument, Argument::Synthetic | Argument::Keywords) {
                 continue;
             }
             let Some(argument_type) = argument_type else {
