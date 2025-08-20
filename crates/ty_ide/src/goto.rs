@@ -159,6 +159,28 @@ pub(crate) enum DefinitionsOrTargets<'db> {
 }
 
 impl<'db> DefinitionsOrTargets<'db> {
+    pub(crate) fn from_ty(db: &'db dyn crate::Db, ty: Type<'db>) -> Option<Self> {
+        let ty_def = ty.definition(db)?;
+        let resolved = match ty_def {
+            ty_python_semantic::types::TypeDefinition::Module(module) => {
+                ResolvedDefinition::Module(module.file(db)?)
+            }
+            ty_python_semantic::types::TypeDefinition::Class(definition) => {
+                ResolvedDefinition::Definition(definition)
+            }
+            ty_python_semantic::types::TypeDefinition::Function(definition) => {
+                ResolvedDefinition::Definition(definition)
+            }
+            ty_python_semantic::types::TypeDefinition::TypeVar(definition) => {
+                ResolvedDefinition::Definition(definition)
+            }
+            ty_python_semantic::types::TypeDefinition::TypeAlias(definition) => {
+                ResolvedDefinition::Definition(definition)
+            }
+        };
+        Some(DefinitionsOrTargets::Definitions(vec![resolved]))
+    }
+
     /// Get the "goto-declaration" interpretation of this definition
     ///
     /// In this case it basically returns exactly what was found.

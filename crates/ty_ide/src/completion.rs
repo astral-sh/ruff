@@ -8,9 +8,11 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_python_semantic::{Completion, NameKind, SemanticModel};
 
 use crate::Db;
+use crate::docstring::Docstring;
 use crate::find_node::covering_node;
+use crate::goto::DefinitionsOrTargets;
 
-pub fn completion(db: &dyn Db, file: File, offset: TextSize) -> Vec<Completion<'_>> {
+pub fn completion(db: &dyn Db, file: File, offset: TextSize) -> Vec<DetailedCompletion<'_>> {
     let parsed = parsed_module(db, file).load(db);
 
     let Some(target_token) = CompletionTargetTokens::find(&parsed, offset) else {
@@ -40,6 +42,27 @@ pub fn completion(db: &dyn Db, file: File, offset: TextSize) -> Vec<Completion<'
     completions.sort_by(compare_suggestions);
     completions.dedup_by(|c1, c2| c1.name == c2.name);
     completions
+        .into_iter()
+        .map(|completion| {
+            let definition = DefinitionsOrTargets::from_ty(db, completion.ty);
+            let documentation = definition.and_then(|def| def.docstring(db));
+            DetailedCompletion {
+                inner: completion,
+                documentation,
+            }
+        })
+        .collect()
+}
+
+pub struct DetailedCompletion<'db> {
+    pub inner: Completion<'db>,
+    pub documentation: Option<Docstring>,
+}
+impl<'db> std::ops::Deref for DetailedCompletion<'db> {
+    type Target = Completion<'db>;
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
 }
 
 /// The kind of tokens identified under the cursor.
@@ -478,9 +501,8 @@ fn compare_suggestions(c1: &Completion, c2: &Completion) -> Ordering {
 mod tests {
     use insta::assert_snapshot;
     use ruff_python_parser::{Mode, ParseOptions, TokenKind, Tokens};
-    use ty_python_semantic::Completion;
 
-    use crate::completion;
+    use crate::completion::{DetailedCompletion, completion};
     use crate::tests::{CursorTest, cursor_test};
 
     use super::token_suffix_by_kinds;
@@ -3022,14 +3044,14 @@ from os.<CURSOR>
             )
         }
 
-        fn completions_if(&self, predicate: impl Fn(&Completion) -> bool) -> String {
+        fn completions_if(&self, predicate: impl Fn(&DetailedCompletion) -> bool) -> String {
             self.completions_if_snapshot(predicate, |c| c.name.as_str().to_string())
         }
 
         fn completions_if_snapshot(
             &self,
-            predicate: impl Fn(&Completion) -> bool,
-            snapshot: impl Fn(&Completion) -> String,
+            predicate: impl Fn(&DetailedCompletion) -> bool,
+            snapshot: impl Fn(&DetailedCompletion) -> String,
         ) -> String {
             let completions = completion(&self.db, self.cursor.file, self.cursor.offset);
             if completions.is_empty() {
