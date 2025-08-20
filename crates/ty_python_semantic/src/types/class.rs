@@ -1405,6 +1405,19 @@ impl<'db> ClassSingletonType<'db> {
             Self::NewType(new_type) => new_type.dataclass_transformer_params(db),
         }
     }
+
+    pub(super) fn is_subclass_of(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+        other: ClassType<'db>,
+    ) -> bool {
+        match self {
+            Self::Literal(literal) => literal.is_subclass_of(db, specialization, other),
+            // A NewType can't be specialized.
+            Self::NewType(new_type) => new_type.is_subclass_of(db, other),
+        }
+    }
 }
 
 impl<'db> From<ClassSingletonType<'db>> for Type<'db> {
@@ -3249,7 +3262,7 @@ pub struct NewTypeClass<'db> {
     #[returns(ref)]
     name: Name,
 
-    parent: Box<ClassType<'db>>,
+    parent: ClassType<'db>,
 }
 
 impl<'db> NewTypeClass<'db> {
@@ -3331,6 +3344,15 @@ impl<'db> NewTypeClass<'db> {
         db: &'db dyn Db,
     ) -> Option<DataclassTransformerParams> {
         self.parent(db).dataclass_transformer_params(db)
+    }
+
+    pub(super) fn is_subclass_of(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
+        let parent = self.parent(db);
+        if parent == other {
+            true
+        } else {
+            parent.is_subclass_of(db, other)
+        }
     }
 }
 
