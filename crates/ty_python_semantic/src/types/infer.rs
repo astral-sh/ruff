@@ -7129,7 +7129,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
         let fallback_place = value_type.member(db, &attr.id);
-        if !fallback_place.place.is_definitely_bound() {
+        if !fallback_place.place.is_definitely_bound()
+            || fallback_place
+                .qualifiers
+                .contains(TypeQualifiers::NOT_BOUND)
+        {
             self.all_definitely_bound = false;
         }
 
@@ -8664,6 +8668,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // If `value` is a valid reference, we attempt type narrowing by assignment.
         if !value_ty.is_unknown() {
             if let Some(expr) = PlaceExpr::try_from_expr(subscript) {
+                // TODO: Should we set all_definitely_bound here? Currently it breaks
+                // mdtest/statically_known_branches.md with python2
                 let (place, keys) = self.infer_place_load(
                     PlaceExprRef::from(&expr),
                     ast::ExprRef::Subscript(subscript),
@@ -11622,7 +11628,7 @@ mod tests {
                 })
                 .collect::<Vec<_>>()
         });
-        assert_eq!(cycles.len(), 2414);
+        assert_eq!(cycles.len(), 2530);
     }
 
     #[test]

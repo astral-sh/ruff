@@ -2524,19 +2524,12 @@ impl<'db> ClassLiteral<'db> {
                 }
 
                 let annotation = declaration_type(db, declaration);
-                let annotation = match reachability {
-                    Truthiness::AlwaysTrue => {
-                        Place::bound(annotation.inner).with_qualifiers(annotation.qualifiers)
-                    }
-                    Truthiness::Ambiguous => {
-                        // TODO: This fixes the fully bound problem
-                        // Place::bound(annotation.inner).with_qualifiers(annotation.qualifiers)
-                        Place::p_bound(annotation.inner).with_qualifiers(annotation.qualifiers)
-                    }
-                    // Shouldn't happen checked above.
-                    Truthiness::AlwaysFalse => todo!(),
-                };
+                let mut annotation =
+                    Place::bound(annotation.inner).with_qualifiers(annotation.qualifiers);
 
+                if reachability.is_ambiguous() {
+                    annotation.qualifiers |= TypeQualifiers::NOT_BOUND;
+                }
                 if let Some(all_qualifiers) = annotation.is_bare_final() {
                     if let Some(value) = assignment.value(&module) {
                         // If we see an annotated assignment with a bare `Final` as in
