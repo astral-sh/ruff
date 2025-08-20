@@ -18,7 +18,7 @@ use crate::{
     types::{
         BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, IsDisjointVisitor,
         KnownFunction, NormalizedVisitor, PropertyInstanceType, Signature, Type, TypeMapping,
-        TypeQualifiers, TypeRelation, TypeTransformer,
+        TypeQualifiers, TypeRelation, TypeTransformer, VarianceInferable,
         signatures::{Parameter, Parameters},
     },
 };
@@ -298,6 +298,15 @@ impl<'db> ProtocolInterface<'db> {
             db,
             interface: self,
         }
+    }
+}
+
+impl<'db> VarianceInferable<'db> for ProtocolInterface<'db> {
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+        self.members(db)
+            // TODO do we need to switch on member kind?
+            .map(|member| member.ty().variance_of(db, typevar))
+            .collect()
     }
 }
 
