@@ -6336,7 +6336,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         &self.context,
                         typed_dict,
                         &provided_fields,
-                        call_expression.into(),
+                        func.as_ref().into(),
                     );
 
                     // Validate that each field is assigned a type that is compatible with the field's type
@@ -6349,8 +6349,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 typed_dict,
                                 arg_name.as_str(),
                                 arg_type,
-                                call_expression,
-                                call_expression,
+                                func.as_ref(),
+                                keyword,
                                 &keyword.value,
                                 TypedDictAssignmentKind::Constructor,
                             );
