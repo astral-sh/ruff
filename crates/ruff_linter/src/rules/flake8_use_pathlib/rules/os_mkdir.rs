@@ -91,7 +91,7 @@ pub(crate) fn os_mkdir(checker: &Checker, call: &ExprCall, segments: &[&str]) {
         return;
     }
 
-    if call.arguments.args.len() > 2 {
+    if call.arguments.len() > 2 {
         return;
     }
 

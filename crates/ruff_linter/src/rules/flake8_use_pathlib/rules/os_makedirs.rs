@@ -87,7 +87,7 @@ pub(crate) fn os_makedirs(checker: &Checker, call: &ExprCall, segments: &[&str])
     // ```
     // We should not offer autofixes if there are more arguments
     // than in the original signature
-    if call.arguments.args.len() > 3 {
+    if call.arguments.len() > 3 {
         return;
     }
     // We should not offer autofixes if there are keyword arguments
