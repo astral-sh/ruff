@@ -85,6 +85,7 @@ mod tests {
     #[test_case(Path::new("import_as.py"))]
     #[test_case(Path::new("import_from_as.py"))]
     #[test_case(Path::new("import_from.py"))]
+    #[test_case(Path::new("PTH211.py"))]
     fn preview_rules(path: &Path) -> Result<()> {
         let snapshot = format!("preview_{}", path.to_string_lossy());
         let diagnostics = test_path(
@@ -116,6 +117,7 @@ mod tests {
                     Rule::OsPathSamefile,
                     Rule::OsPathSplitext,
                     Rule::BuiltinOpen,
+                    Rule::OsSymlink,
                 ])
             },
         )?;
@@ -129,6 +131,7 @@ mod tests {
     #[test_case(Rule::OsPathGetatime, Path::new("PTH203.py"))]
     #[test_case(Rule::OsPathGetmtime, Path::new("PTH204.py"))]
     #[test_case(Rule::OsPathGetctime, Path::new("PTH205.py"))]
+    #[test_case(Rule::OsSymlink, Path::new("PTH211.py"))]
     fn preview_flake8_use_pathlib(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",
