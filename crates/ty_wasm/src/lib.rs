@@ -422,6 +422,9 @@ impl Workspace {
             .map(|completion| Completion {
                 kind: completion.kind(&self.db).map(CompletionKind::from),
                 name: completion.inner.name.into(),
+                documentation: completion
+                    .documentation
+                    .map(|documentation| documentation.render_plaintext()),
             })
             .collect())
     }
@@ -908,6 +911,8 @@ pub struct Completion {
     #[wasm_bindgen(getter_with_clone)]
     pub name: String,
     pub kind: Option<CompletionKind>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub documentation: Option<String>,
 }
 
 #[wasm_bindgen]
