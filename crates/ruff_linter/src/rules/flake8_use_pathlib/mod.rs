@@ -85,7 +85,6 @@ mod tests {
     #[test_case(Path::new("import_as.py"))]
     #[test_case(Path::new("import_from_as.py"))]
     #[test_case(Path::new("import_from.py"))]
-    #[test_case(Path::new("PTH211.py"))]
     fn preview_rules(path: &Path) -> Result<()> {
         let snapshot = format!("preview_{}", path.to_string_lossy());
         let diagnostics = test_path(
@@ -117,7 +116,6 @@ mod tests {
                     Rule::OsPathSamefile,
                     Rule::OsPathSplitext,
                     Rule::BuiltinOpen,
-                    Rule::OsSymlink,
                 ])
             },
         )?;
