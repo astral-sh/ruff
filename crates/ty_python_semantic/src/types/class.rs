@@ -1343,6 +1343,13 @@ impl<'db> ClassSingletonType<'db> {
             }
         }
     }
+
+    fn own_instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
+        match self {
+            Self::Literal(literal) => literal.own_instance_member(db, name),
+            Self::NewType(new_type) => new_type.own_instance_member(db, name),
+        }
+    }
 }
 
 impl<'db> From<ClassSingletonType<'db>> for Type<'db> {
@@ -3243,6 +3250,10 @@ impl<'db> NewTypeClass<'db> {
 
     pub(super) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
         self.parent(db).instance_member(db, name)
+    }
+
+    fn own_instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
+        self.parent(db).own_instance_member(db, name)
     }
 }
 
