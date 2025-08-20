@@ -1328,6 +1328,21 @@ impl<'db> ClassSingletonType<'db> {
             }
         }
     }
+
+    pub(super) fn instance_member(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+        name: &str,
+    ) -> PlaceAndQualifiers<'db> {
+        match self {
+            Self::Literal(literal) => literal.instance_member(db, specialization, name),
+            Self::NewType(new_type) => {
+                // A NewType can't be specialized.
+                new_type.instance_member(db, name)
+            }
+        }
+    }
 }
 
 impl<'db> From<ClassSingletonType<'db>> for Type<'db> {
@@ -3224,6 +3239,10 @@ impl<'db> NewTypeClass<'db> {
     ) -> PlaceAndQualifiers<'db> {
         self.parent(db)
             .own_class_member(db, inherited_generic_context, name)
+    }
+
+    pub(super) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
+        self.parent(db).instance_member(db, name)
     }
 }
 
