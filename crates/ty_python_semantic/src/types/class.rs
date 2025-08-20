@@ -552,6 +552,18 @@ impl<'db> ClassType<'db> {
         }
     }
 
+    pub(super) fn try_metaclass(
+        self,
+        db: &'db dyn Db,
+    ) -> Result<(Type<'db>, Option<DataclassTransformerParams>), MetaclassError<'db>> {
+        let (singleton, specialization) = self.class_singleton(db);
+        let (type_, dataclass_transformer_params) = singleton.try_metaclass(db)?;
+        Ok((
+            type_.apply_optional_specialization(db, specialization),
+            dataclass_transformer_params,
+        ))
+    }
+
     /// Return the metaclass of this class, or `type[Unknown]` if the metaclass cannot be inferred.
     pub(super) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
         let (singleton, specialization) = self.class_singleton(db);
@@ -1156,6 +1168,11 @@ impl<'db> ClassType<'db> {
         let (singleton, _) = self.class_singleton(db);
         singleton.dataclass_transformer_params(db)
     }
+
+    pub(super) fn explicit_bases(self, db: &'db dyn Db) -> &[Type<'db>] {
+        let (singleton, _) = self.class_singleton(db);
+        singleton.explicit_bases(db)
+    }
 }
 
 impl<'db> From<GenericAlias<'db>> for ClassType<'db> {
@@ -1305,6 +1322,16 @@ impl<'db> ClassSingletonType<'db> {
         }
     }
 
+    pub(super) fn try_metaclass(
+        self,
+        db: &'db dyn Db,
+    ) -> Result<(Type<'db>, Option<DataclassTransformerParams>), MetaclassError<'db>> {
+        match self {
+            Self::Literal(literal) => literal.try_metaclass(db),
+            Self::NewType(new_type) => new_type.try_metaclass(db),
+        }
+    }
+
     pub(super) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
         match self {
             Self::Literal(literal) => literal.metaclass(db),
@@ -1416,6 +1443,13 @@ impl<'db> ClassSingletonType<'db> {
             Self::Literal(literal) => literal.is_subclass_of(db, specialization, other),
             // A NewType can't be specialized.
             Self::NewType(new_type) => new_type.is_subclass_of(db, other),
+        }
+    }
+
+    pub(super) fn explicit_bases(self, db: &'db dyn Db) -> &[Type<'db>] {
+        match self {
+            Self::Literal(literal) => literal.explicit_bases(db),
+            Self::NewType(new_type) => new_type.explicit_bases(db),
         }
     }
 }
@@ -3353,6 +3387,17 @@ impl<'db> NewTypeClass<'db> {
         } else {
             parent.is_subclass_of(db, other)
         }
+    }
+
+    pub(super) fn try_metaclass(
+        self,
+        db: &'db dyn Db,
+    ) -> Result<(Type<'db>, Option<DataclassTransformerParams>), MetaclassError<'db>> {
+        self.parent(db).try_metaclass(db)
+    }
+
+    pub(super) fn explicit_bases(self, db: &'db dyn Db) -> &[Type<'db>] {
+        self.parent(db).explicit_bases(db)
     }
 }
 
