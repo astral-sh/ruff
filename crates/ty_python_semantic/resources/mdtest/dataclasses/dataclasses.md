@@ -565,6 +565,23 @@ a = A(1, 2)
 a = A(x=1, y=2)
 ```
 
+All fields participate in positional field ordering checks:
+
+```py
+from dataclasses import dataclass, field
+
+@dataclass(kw_only=True)
+class KwOnlyClassGood:
+    x: int = 1
+    y: str
+
+@dataclass(kw_only=True)
+class KwOnlyClassAlsoGood:
+    x: int
+    y: str = "default"
+    z: float
+```
+
 The class-level parameter can be overridden per-field.
 
 ```py
@@ -576,6 +593,15 @@ class A:
     b: int = 0
 
 A("hi")
+```
+
+```py
+@dataclass(kw_only=True)
+class KwOnlyClassWithPositionalField:
+    x: int = 1
+    y: str = field(kw_only=False, default="hello")
+    # error: [dataclass-field-order] "Required field `z` cannot be defined after fields with default values"
+    z: float = field(kw_only=False)
 ```
 
 If some fields are `kw_only`, they should appear after all positional fields in the `__init__`
