@@ -29,7 +29,7 @@
 use smallvec::{SmallVec, smallvec};
 
 use crate::Db;
-use crate::types::{IntersectionType, Type, TypeVarInstance, UnionType};
+use crate::types::{BoundTypeVarInstance, IntersectionType, Type, UnionType};
 
 /// Encodes the constraints under which a type property (e.g. assignability) holds.
 pub(crate) trait Constraints<'db>: Clone + Sized {
@@ -159,6 +159,11 @@ where
 /// This is called a "set of constraint sets", and denoted _𝒮_, in [[POPL2015][]].
 ///
 /// [POPL2015]: https://doi.org/10.1145/2676726.2676991
+///
+/// ### Invariants
+///
+/// - No clause in the set subsumes another. (That is, there is no clause in the set that is a
+///   "subclause" of another.)
 #[derive(Clone, Debug)]
 pub(crate) struct ConstraintSet<'db> {
     clauses: SmallVec<[ConstraintClause<'db>; 2]>,
@@ -177,8 +182,8 @@ impl<'db> ConstraintSet<'db> {
         }
     }
 
-    /// Adds a new clause to this set, ensuring that no clause in the set subsumes another.
-    fn add(&mut self, db: &'db dyn Db, clause: ConstraintClause<'db>) {
+    /// Updates this set to be the union of itself and a clause.
+    fn union_clause(&mut self, db: &'db dyn Db, clause: ConstraintClause<'db>) {
         for existing in &mut self.clauses {
             // If there is an existing constraint set that subsumes (or is subsumed by) the new
             // one, we want to keep the _subsumed_ constraint set.
@@ -190,6 +195,23 @@ impl<'db> ConstraintSet<'db> {
             }
         }
         self.clauses.push(clause);
+    }
+
+    /// Updates this set to be the union of itself and another set.
+    fn union_set(&mut self, db: &'db dyn Db, other: Self) {
+        for clause in other.clauses {
+            self.union_clause(db, clause);
+        }
+    }
+
+    /// Updates this set to be the intersection of itself and another set.
+    fn intersect_set(&mut self, db: &'db dyn Db, other: &Self) {
+        let self_clauses = std::mem::take(&mut self.clauses);
+        for self_clause in &self_clauses {
+            for other_clause in &other.clauses {
+                self.union_set(db, self_clause.intersect_clause(db, other_clause));
+            }
+        }
     }
 }
 
@@ -211,28 +233,19 @@ impl<'db> Constraints<'db> for ConstraintSet<'db> {
     }
 
     fn union(&mut self, db: &'db dyn Db, other: Self) -> &Self {
-        for clause in other.clauses {
-            self.add(db, clause);
-        }
+        self.union_set(db, other);
         self
     }
 
     fn intersect(&mut self, db: &'db dyn Db, other: Self) -> &Self {
-        let self_clauses = std::mem::take(&mut self.clauses);
-        for self_clause in self_clauses {
-            for other_clause in &other.clauses {
-                let mut new_clause = self_clause.clone();
-                new_clause.combine(db, other_clause);
-                self.add(db, new_clause);
-            }
-        }
+        self.intersect_set(db, &other);
         self
     }
 
     fn negate(self, db: &'db dyn Db) -> Self {
         let mut result = Self::always_satisfiable(db);
-        for clause in &self.clauses {
-            result.intersect(db, clause.negate(db));
+        for clause in self.clauses {
+            result.intersect_set(db, &clause.negate(db));
         }
         result
     }
@@ -245,6 +258,10 @@ impl<'db> Constraints<'db> for ConstraintSet<'db> {
 /// This is called a "constraint set", and denoted _C_, in [[POPL2015][]].
 ///
 /// [POPL2015]: https://doi.org/10.1145/2676726.2676991
+///
+/// ### Invariants
+///
+/// - No two constraints in the clause will constrain the same typevar.
 #[derive(Clone, Debug)]
 pub(crate) struct ConstraintClause<'db> {
     constraints: SmallVec<[AtomicConstraint<'db>; 1]>,
@@ -265,25 +282,87 @@ impl<'db> ConstraintClause<'db> {
 
     /// Adds a new constraint to this clause, ensuring that no constraint in the clause subsumes
     /// another, and that no two constraints in the set have the same typevar.
-    fn add(&mut self, db: &'db dyn Db, constraint: AtomicConstraint<'db>) {
-        for existing in &mut self.constraints {
-            if constraint.typevar == existing.typevar {
-                existing.merge(db, constraint);
-                return;
+    ///
+    /// Because atomic constraints can be negated, the intersection of the new and existing atomic
+    /// constraints (for the same typevar) might be the union of two atomic constraints. If that
+    /// occurs, we update this clause to contain one element of the intersection, and return a new
+    /// clause that contains the other.
+    fn intersect_constraint(
+        &mut self,
+        db: &'db dyn Db,
+        constraint: AtomicConstraint<'db>,
+    ) -> IntersectionResult<(), Self> {
+        let Some((index, existing)) = (self.constraints.iter().enumerate())
+            .find(|(_, existing)| existing.typevar == constraint.typevar)
+        else {
+            self.constraints.push(constraint);
+            return IntersectionResult::One(());
+        };
+
+        match existing.intersect(db, constraint) {
+            // If the intersected constraint cannot be satisfied, that causes this whole clause to
+            // be unsatisfiable too. (X ∩ 0 == 0)
+            IntersectionResult::Never => IntersectionResult::Never,
+
+            // If the intersected result is always satisfied, then the constraint no longer
+            // contributes anything to the clause, and can be removed. (X ∩ 1 == X)
+            IntersectionResult::Always => {
+                self.constraints.swap_remove(index);
+                if self.constraints.is_empty() {
+                    // If there are no further constraints in the clause, the clause is now always
+                    // satisfied.
+                    IntersectionResult::Always
+                } else {
+                    IntersectionResult::One(())
+                }
+            }
+
+            // If the intersection is a single constraint, we can reuse the existing constraint's
+            // place in the clause's constraint list.
+            IntersectionResult::One(constraint) => {
+                self.constraints[index] = constraint;
+                IntersectionResult::One(())
+            }
+
+            // If the intersection is a union of two constraints, we can reuse the existing
+            // constraint's place in the clause's constraint list for one of the union elements;
+            // and we must create a new clause to hold the second union eleme
+            IntersectionResult::Two(first, second) => {
+                let mut extra = self.clone();
+                self.constraints[index] = first;
+                extra.constraints[index] = second;
+                IntersectionResult::Two((), extra)
             }
         }
-        self.constraints.push(constraint);
     }
 
-    /// Combines two constraint clauses, merging any constraints that share the same typevar.
-    fn combine(&mut self, db: &'db dyn Db, other: &Self) {
+    /// Returns the intersection of this clause with another. The result is a full constraint set,
+    /// since the intersection of each constraint in the clause might result in a union of
+    /// constraints.
+    fn intersect_clause(&self, db: &'db dyn Db, other: &Self) -> ConstraintSet<'db> {
+        let mut prev = ConstraintSet::empty();
+        let mut next = ConstraintSet::singleton(self.clone());
         for constraint in &other.constraints {
-            self.add(db, *constraint);
+            std::mem::swap(&mut prev, &mut next);
+            for mut clause in prev.clauses.drain(..) {
+                match clause.intersect_constraint(db, *constraint) {
+                    IntersectionResult::Never => {}
+                    IntersectionResult::Always | IntersectionResult::One(()) => {
+                        next.union_clause(db, clause);
+                    }
+                    IntersectionResult::Two((), extra) => {
+                        next.union_clause(db, clause);
+                        next.union_clause(db, extra);
+                    }
+                }
+            }
         }
+        next
     }
 
     /// Returns whether this constraint set subsumes `other` — if every constraint in `other` is
-    /// subsumed by some constraint in `self`.
+    /// subsumed by some constraint in `self`. (Or equivalently, if the intersection of `self` and
+    /// `other` is `self`.)
     fn subsumes(&self, db: &'db dyn Db, other: &Self) -> bool {
         other.constraints.iter().all(|other_constraint| {
             self.constraints
@@ -292,59 +371,222 @@ impl<'db> ConstraintClause<'db> {
         })
     }
 
+    /// Returns the negation of this clause.
     fn negate(&self, db: &'db dyn Db) -> ConstraintSet<'db> {
         let mut result = ConstraintSet::empty();
         for constraint in &self.constraints {
-            constraint.negate_into(db, &mut result);
+            result.union_clause(db, ConstraintClause::singleton(constraint.negate()));
         }
         result
     }
 }
 
-/// A constraint that the type `s` must be a subtype of the type `t`. Tallying will find all
-/// substitutions of any type variables in `s` and `t` that ensure that this subtyping holds.
+/// A constraint on a single typevar.
+///
+/// ### Invariants
+///
+/// - The bounds must be ordered correctly: `lower ≤: upper`. (A constraint `upper <: lower` does
+///   _not_ mean that the typevar can only specialize to `Never`; it means that there is no
+///   concrete type that the typevar can specialize to.)
+///
+/// - The bounds must actually constrain the typevar: `lower` must not be `Never` or `upper` must
+///   not be `object`. (A positive constraint `Never ≤: T ≤: object` doesn't constrain the typevar
+///   at all, and so we don't need a constraint in the corresponding constraint clause. A negative
+///   constraint `not(Never ≤: T ≤: object)` means that there is no concrete type the typevar can
+///   specialize to.)
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct AtomicConstraint<'db> {
-    pub(crate) lower: Type<'db>,
-    pub(crate) typevar: TypeVarInstance<'db>,
-    pub(crate) upper: Type<'db>,
+    sign: ConstraintSign,
+    typevar: BoundTypeVarInstance<'db>,
+    lower: Type<'db>,
+    upper: Type<'db>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum ConstraintSign {
+    Positive,
+    Negative,
 }
 
 impl<'db> AtomicConstraint<'db> {
-    /// Returns whether this constraint subsumes `other` — if it constrains the same typevar and
-    /// has tighter bounds.
-    fn subsumes(self, db: &'db dyn Db, other: Self) -> bool {
-        self.typevar == other.typevar
-            && other.lower.is_assignable_to(db, self.lower)
-            && self.upper.is_assignable_to(db, other.upper)
-    }
-
-    /// Merges another constraint into this one. Panics if the two constraints have different
-    /// typevars.
-    fn merge(&mut self, db: &'db dyn Db, other: Self) {
-        debug_assert!(self.typevar == other.typevar);
-        self.lower = UnionType::from_elements(db, [self.lower, other.lower]);
-        self.upper = IntersectionType::from_elements(db, [self.upper, other.upper]);
-    }
-
-    fn negate_into(self, db: &'db dyn Db, set: &mut ConstraintSet<'db>) {
-        if !self.lower.is_never() {
-            let negated_lower = AtomicConstraint {
-                lower: Type::Never,
-                typevar: self.typevar,
-                // TODO: <: not ≤:
-                upper: self.lower,
-            };
-            set.add(db, ConstraintClause::singleton(negated_lower));
+    /// Returns a new positive atomic constraint, ensuring that all invariants are held.
+    fn positive(
+        db: &'db dyn Db,
+        typevar: BoundTypeVarInstance<'db>,
+        lower: Type<'db>,
+        upper: Type<'db>,
+    ) -> Satisfiable<Self> {
+        if !lower.is_assignable_to(db, upper) {
+            return Satisfiable::Never;
         }
-        if !self.upper.is_object(db) {
-            let negated_upper = AtomicConstraint {
-                // TODO: <: not ≤:
-                lower: self.upper,
-                typevar: self.typevar,
-                upper: Type::object(db),
-            };
-            set.add(db, ConstraintClause::singleton(negated_upper));
+        if lower.is_never() && upper.is_object(db) {
+            return Satisfiable::Always;
+        }
+        Satisfiable::Constrained(Self {
+            sign: ConstraintSign::Positive,
+            typevar,
+            lower,
+            upper,
+        })
+    }
+
+    /// Returns a new negative atomic constraint, ensuring that all invariants are held.
+    fn negative(
+        db: &'db dyn Db,
+        typevar: BoundTypeVarInstance<'db>,
+        lower: Type<'db>,
+        upper: Type<'db>,
+    ) -> Satisfiable<Self> {
+        if !lower.is_assignable_to(db, upper) {
+            return Satisfiable::Always;
+        }
+        if lower.is_never() && upper.is_object(db) {
+            return Satisfiable::Never;
+        }
+        Satisfiable::Constrained(Self {
+            sign: ConstraintSign::Negative,
+            typevar,
+            lower,
+            upper,
+        })
+    }
+
+    /// Returns the negation of this atomic constraint.
+    fn negate(mut self) -> Self {
+        self.sign = match self.sign {
+            ConstraintSign::Positive => ConstraintSign::Negative,
+            ConstraintSign::Negative => ConstraintSign::Positive,
+        };
+        self
+    }
+
+    /// Returns whether `self` has tighter bounds than `other` — that is, if the intersection of
+    /// `self` and `other` is `self`.
+    fn subsumes(self, db: &'db dyn Db, other: Self) -> bool {
+        debug_assert!(self.typevar == other.typevar);
+        match (self.sign, other.sign) {
+            (ConstraintSign::Positive, ConstraintSign::Positive) => {
+                other.lower.is_assignable_to(db, self.lower)
+                    && self.upper.is_assignable_to(db, other.upper)
+            }
+
+            (ConstraintSign::Negative, ConstraintSign::Negative) => {
+                self.lower.is_assignable_to(db, other.lower)
+                    && other.upper.is_assignable_to(db, self.upper)
+            }
+
+            (ConstraintSign::Positive, ConstraintSign::Negative) => {
+                self.upper.is_assignable_to(db, other.lower)
+            }
+
+            (ConstraintSign::Negative, ConstraintSign::Positive) => false,
+        }
+    }
+
+    /// Returns the intersection of this atomic constraint and another. Because constraint bounds
+    /// can be negated, the result might be unsatisfiable; always satisfiable; or the union of one
+    /// or two atomic constraints.
+    ///
+    /// Panics if the two constraints have different typevars.
+    fn intersect(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+    ) -> IntersectionResult<AtomicConstraint<'db>, AtomicConstraint<'db>> {
+        debug_assert!(self.typevar == other.typevar);
+        match (self.sign, other.sign) {
+            (ConstraintSign::Positive, ConstraintSign::Positive) => {
+                IntersectionResult::from_one(Self::positive(
+                    db,
+                    self.typevar,
+                    UnionType::from_elements(db, [self.lower, other.lower]),
+                    IntersectionType::from_elements(db, [self.upper, other.upper]),
+                ))
+            }
+
+            (ConstraintSign::Negative, ConstraintSign::Negative) => IntersectionResult::from_two(
+                Self::negative(
+                    db,
+                    self.typevar,
+                    IntersectionType::from_elements(db, [self.lower, other.lower]),
+                    UnionType::from_elements(db, [self.upper, other.upper]),
+                ),
+                Self::positive(
+                    db,
+                    self.typevar,
+                    IntersectionType::from_elements(db, [self.upper, other.upper]),
+                    UnionType::from_elements(db, [self.lower, other.lower]),
+                ),
+            ),
+
+            (ConstraintSign::Positive, ConstraintSign::Negative) => IntersectionResult::from_two(
+                Self::positive(
+                    db,
+                    self.typevar,
+                    self.lower,
+                    IntersectionType::from_elements(db, [other.lower, self.upper]),
+                ),
+                Self::positive(
+                    db,
+                    self.typevar,
+                    UnionType::from_elements(db, [self.lower, other.upper]),
+                    self.upper,
+                ),
+            ),
+
+            (ConstraintSign::Negative, ConstraintSign::Positive) => IntersectionResult::from_two(
+                Self::positive(
+                    db,
+                    self.typevar,
+                    other.lower,
+                    IntersectionType::from_elements(db, [self.lower, other.upper]),
+                ),
+                Self::positive(
+                    db,
+                    self.typevar,
+                    UnionType::from_elements(db, [other.lower, self.upper]),
+                    other.upper,
+                ),
+            ),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+enum Satisfiable<T> {
+    Never,
+    Always,
+    Constrained(T),
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum IntersectionResult<T1, T2> {
+    Never,
+    Always,
+    One(T1),
+    Two(T1, T2),
+}
+
+impl<T1, T2> IntersectionResult<T1, T2> {
+    fn from_one(constraint: Satisfiable<T1>) -> Self {
+        match constraint {
+            Satisfiable::Never => IntersectionResult::Never,
+            Satisfiable::Always => IntersectionResult::Always,
+            Satisfiable::Constrained(constraint) => IntersectionResult::One(constraint),
+        }
+    }
+}
+
+impl<T> IntersectionResult<T, T> {
+    fn from_two(first: Satisfiable<T>, second: Satisfiable<T>) -> Self {
+        match (first, second) {
+            (Satisfiable::Never, _) | (_, Satisfiable::Never) => IntersectionResult::Never,
+            (Satisfiable::Always, Satisfiable::Always) => IntersectionResult::Always,
+            (Satisfiable::Constrained(one), Satisfiable::Always)
+            | (Satisfiable::Always, Satisfiable::Constrained(one)) => IntersectionResult::One(one),
+            (Satisfiable::Constrained(first), Satisfiable::Constrained(second)) => {
+                IntersectionResult::Two(first, second)
+            }
         }
     }
 }
