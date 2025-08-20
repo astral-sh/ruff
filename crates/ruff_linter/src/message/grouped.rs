@@ -52,8 +52,8 @@ impl Emitter for GroupedEmitter {
                 max_column_length = max_column_length.max(message.start_location.column);
             }
 
-            let row_length = max_row_length.print_width();
-            let column_length = max_column_length.print_width();
+            let row_length = max_row_length.digits();
+            let column_length = max_column_length.digits();
 
             // Print the filename.
             writeln!(writer, "{}:", relativize_path(&*filename).underline())?;
@@ -130,8 +130,7 @@ impl Display for DisplayGroupedMessage<'_> {
         write!(
             f,
             "  {row_padding}",
-            row_padding =
-                " ".repeat(self.row_length.get() - start_location.line.print_width().get())
+            row_padding = " ".repeat(self.row_length.get() - start_location.line.digits().get())
         )?;
 
         // Check if we're working on a jupyter notebook and translate positions with cell accordingly
@@ -159,7 +158,7 @@ impl Display for DisplayGroupedMessage<'_> {
             "{row}{sep}{col}{col_padding} {code_and_body}",
             sep = ":".cyan(),
             col_padding =
-                " ".repeat(self.column_length.get() - start_location.column.print_width().get()),
+                " ".repeat(self.column_length.get() - start_location.column.digits().get()),
             code_and_body = RuleCodeAndBody {
                 message,
                 show_fix_status: self.show_fix_status,

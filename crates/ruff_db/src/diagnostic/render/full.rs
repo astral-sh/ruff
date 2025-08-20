@@ -139,7 +139,7 @@ impl std::fmt::Display for Diff<'_> {
             .map(|op| (op.old_range().start, op.new_range().start))
             .unwrap_or_default();
 
-        let digit_with = OneIndexed::from_zero_indexed(largest_new.max(largest_old)).print_width();
+        let digit_with = OneIndexed::from_zero_indexed(largest_new.max(largest_old)).digits();
 
         for (idx, group) in diff.grouped_ops(3).iter().enumerate() {
             if idx > 0 {

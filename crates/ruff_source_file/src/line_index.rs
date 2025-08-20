@@ -623,8 +623,8 @@ impl OneIndexed {
         self.0.get().checked_sub(rhs.get()).and_then(Self::new)
     }
 
-    /// Calculate the length of the string representation of `self`.
-    pub const fn print_width(self) -> NonZeroUsize {
+    /// Calculate the number of digits in `self`.
+    pub const fn digits(self) -> NonZeroUsize {
         // Safety: the 1+ ensures this is always non-zero, and
         // `usize::MAX.ilog10()` << `usize::MAX`, so the result is always safe
         // to cast to a usize, even though it's returned as a u32
