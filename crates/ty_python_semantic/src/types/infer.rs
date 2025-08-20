@@ -6324,36 +6324,77 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if class_literal.is_typed_dict(self.db()) {
                 let typed_dict_type = Type::typed_dict(ClassType::NonGeneric(class_literal));
                 if let Some(typed_dict) = typed_dict_type.into_typed_dict() {
-                    // Validate keyword arguments for `TypedDict` constructor
+                    // First, check if there's only one positional dict argument
+                    // for syntax `Pokemon({ "name": "Pikachu", "type": "electric" })`
+                    let has_positional_dict =
+                        arguments.args.len() == 1 && arguments.args[0].is_dict_expr();
+                    if has_positional_dict {
+                        if let ast::Expr::Dict(dict_expr) = &arguments.args[0] {
+                            let mut provided_fields = OrderSet::new();
 
-                    // Validate that all required fields are provided
-                    let provided_fields: OrderSet<&str> = arguments
-                        .keywords
-                        .iter()
-                        .filter_map(|kw| kw.arg.as_ref().map(|arg| arg.id.as_str()))
-                        .collect();
-                    validate_typed_dict_required_fields(
-                        &self.context,
-                        typed_dict,
-                        &provided_fields,
-                        func.as_ref().into(),
-                    );
+                            for dict_item in &dict_expr.items {
+                                if let Some(ref key_expr) = dict_item.key {
+                                    if let ast::Expr::StringLiteral(ast::ExprStringLiteral {
+                                        value: key_value,
+                                        ..
+                                    }) = key_expr
+                                    {
+                                        let key_str = key_value.to_str();
+                                        provided_fields.insert(key_str);
 
-                    // Validate that each field is assigned a type that is compatible with the field's type
-                    for keyword in &arguments.keywords {
-                        if let Some(arg_name) = &keyword.arg {
-                            // Get the already-inferred argument type
-                            let arg_type = self.expression_type(&keyword.value);
-                            validate_typed_dict_key_assignment(
+                                        // Get the already-inferred argument type
+                                        let value_type = self.expression_type(&dict_item.value);
+                                        validate_typed_dict_key_assignment(
+                                            &self.context,
+                                            typed_dict,
+                                            key_str,
+                                            value_type,
+                                            func.as_ref(),
+                                            key_expr,
+                                            &dict_item.value,
+                                            TypedDictAssignmentKind::Constructor,
+                                        );
+                                    }
+                                }
+                            }
+
+                            validate_typed_dict_required_fields(
                                 &self.context,
                                 typed_dict,
-                                arg_name.as_str(),
-                                arg_type,
-                                func.as_ref(),
-                                keyword,
-                                &keyword.value,
-                                TypedDictAssignmentKind::Constructor,
+                                &provided_fields,
+                                func.as_ref().into(),
                             );
+                        }
+                    } else {
+                        // Handle keyword arguments: `Pokemon(name="Pikachu", type="electric")`
+                        let provided_fields: OrderSet<&str> = arguments
+                            .keywords
+                            .iter()
+                            .filter_map(|kw| kw.arg.as_ref().map(|arg| arg.id.as_str()))
+                            .collect();
+                        validate_typed_dict_required_fields(
+                            &self.context,
+                            typed_dict,
+                            &provided_fields,
+                            func.as_ref().into(),
+                        );
+
+                        // Validate that each field is assigned a type that is compatible with the field's type
+                        for keyword in &arguments.keywords {
+                            if let Some(arg_name) = &keyword.arg {
+                                // Get the already-inferred argument type
+                                let arg_type = self.expression_type(&keyword.value);
+                                validate_typed_dict_key_assignment(
+                                    &self.context,
+                                    typed_dict,
+                                    arg_name.as_str(),
+                                    arg_type,
+                                    func.as_ref(),
+                                    keyword,
+                                    &keyword.value,
+                                    TypedDictAssignmentKind::Constructor,
+                                );
+                            }
                         }
                     }
                 }
