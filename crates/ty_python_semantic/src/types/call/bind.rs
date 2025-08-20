@@ -1329,6 +1329,13 @@ impl<'db> CallableBinding<'db> {
         snapshotter.restore(self, pre_evaluation_snapshot);
 
         // At this point, there's at least one argument that can be expanded.
+        //
+        // This heuristic tries to detect if there's any need to perform argument type expansion or
+        // not by checking whether there are any non-expandable argument type that cannot be
+        // assigned to any of the remaining overloads.
+        //
+        // This heuristic needs to be applied after restoring the bindings state to the one before
+        // type checking as argument type expansion would evaluate it from that point on.
         for (argument_index, (argument, argument_type)) in argument_types.iter().enumerate() {
             if matches!(argument, Argument::Synthetic) {
                 continue;

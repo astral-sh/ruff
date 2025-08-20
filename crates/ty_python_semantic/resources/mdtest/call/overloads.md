@@ -653,15 +653,58 @@ def f(x: B, /, **kwargs: int) -> B: ...
 ```py
 from overloaded import A, B, C, f
 
-def _(a=1):
+def _(ab: A | B, a=1):
     reveal_type(f(a1=a, a2=a, a3=a))  # revealed: C
     reveal_type(f(A(), a1=a, a2=a, a3=a))  # revealed: A
     reveal_type(f(B(), a1=a, a2=a, a3=a))  # revealed: B
 
+    # Here, the arity check filters out the first and second overload, type checking fails on the
+    # remaining overloads, so ty moves on to argument type expansion. But, the first argument (`C`)
+    # isn't assignable to any of the remaining overloads (3 and 4), so there's no point in expanding
+    # the other 30 arguments of type `Unknown | Literal[1]` which would result in allocating a
+    # vector containing 2**30 argument lists after expanding all of the arguments.
     # error: [no-matching-overload]
     # revealed: Unknown
     reveal_type(f(
         C(),
+        a1=a,
+        a2=a,
+        a3=a,
+        a4=a,
+        a5=a,
+        a6=a,
+        a7=a,
+        a8=a,
+        a9=a,
+        a10=a,
+        a11=a,
+        a12=a,
+        a13=a,
+        a14=a,
+        a15=a,
+        a16=a,
+        a17=a,
+        a18=a,
+        a19=a,
+        a20=a,
+        a21=a,
+        a22=a,
+        a23=a,
+        a24=a,
+        a25=a,
+        a26=a,
+        a27=a,
+        a28=a,
+        a29=a,
+        a30=a,
+    ))
+
+    # Here, the heuristics won't come into play because all arguments can be expanded but expanding
+    # the first argument resutls in a successful evaluation of the call, so there's no exponential
+    # growth of the number of argument lists.
+    # revealed: A | B
+    reveal_type(f(
+        ab,
         a1=a,
         a2=a,
         a3=a,
