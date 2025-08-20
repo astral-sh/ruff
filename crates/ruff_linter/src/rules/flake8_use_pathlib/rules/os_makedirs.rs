@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::ExprCall;
+use ruff_python_ast::{ArgOrKeyword, ExprCall};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -109,31 +109,30 @@ pub(crate) fn os_makedirs(checker: &Checker, call: &ExprCall, segments: &[&str])
             Applicability::Safe
         };
 
-        let name_code = checker.locator().slice(name.range());
+        let locator = checker.locator();
 
-        let mkdir_args = if call.arguments.args.len() == 3 && call.arguments.keywords.is_empty() {
-            format!(
-                "{}, True, {}",
-                checker.locator().slice(call.arguments.args[1].range()),
-                checker.locator().slice(call.arguments.args[2].range()),
-            )
-        } else {
-            itertools::join(
-                call.arguments
-                    .args
-                    .iter()
-                    .skip(1)
-                    .map(|expr| checker.locator().slice(expr.range()).to_string())
-                    .chain(call.arguments.keywords.iter().filter_map(|kw| {
-                        kw.arg.as_ref().and_then(|arg| {
-                            (arg != "name").then(|| {
-                                format!("{arg}={}", checker.locator().slice(kw.value.range()))
-                            })
-                        })
-                    }))
-                    .chain(std::iter::once("parents=True".to_string())),
-                ", ",
-            )
+        let name_code = locator.slice(name.range());
+
+        let mode = call.arguments.find_argument("mode", 1);
+        let exist_ok = call.arguments.find_argument("exist_ok", 2);
+
+        let mkdir_args = match (mode, exist_ok) {
+            // Default to a keyword argument when alone.
+            (None, None) => "parents=True".to_string(),
+            // If either argument is missing, it's safe to add `parents` at the end.
+            (None, Some(arg)) | (Some(arg), None) => {
+                format!("{}, parents=True", locator.slice(arg))
+            }
+            // If they're all positional, `parents` has to be positional too.
+            (Some(ArgOrKeyword::Arg(mode)), Some(ArgOrKeyword::Arg(exist_ok))) => {
+                format!("{}, True, {}", locator.slice(mode), locator.slice(exist_ok))
+            }
+            // If either argument is a keyword, we can put `parents` at the end again.
+            (Some(mode), Some(exist_ok)) => format!(
+                "{}, {}, parents=True",
+                locator.slice(mode),
+                locator.slice(exist_ok)
+            ),
         };
 
         let replacement = if is_pathlib_path_call(checker, name) {
