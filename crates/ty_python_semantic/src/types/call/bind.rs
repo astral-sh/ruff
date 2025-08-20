@@ -1497,9 +1497,17 @@ impl<'db> CallableBinding<'db> {
                         }
                         // TODO: For an unannotated `self` / `cls` parameter, the type should be
                         // `typing.Self` / `type[typing.Self]`
-                        let parameter_type = overload.signature.parameters()[*parameter_index]
+                        let mut parameter_type = overload.signature.parameters()[*parameter_index]
                             .annotated_type()
                             .unwrap_or(Type::unknown());
+                        if let Some(specialization) = overload.specialization {
+                            parameter_type =
+                                parameter_type.apply_specialization(db, specialization);
+                        }
+                        if let Some(inherited_specialization) = overload.inherited_specialization {
+                            parameter_type =
+                                parameter_type.apply_specialization(db, inherited_specialization);
+                        }
                         current_parameter_types.push(parameter_type);
                     }
                 }
