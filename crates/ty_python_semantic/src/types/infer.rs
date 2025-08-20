@@ -90,7 +90,7 @@ use crate::semantic_index::{
     ApplicableConstraints, EnclosingSnapshotResult, SemanticIndex, place_table, semantic_index,
 };
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
-use crate::types::class::{CodeGeneratorKind, Field, MetaclassErrorKind};
+use crate::types::class::{CodeGeneratorKind, MetaclassErrorKind};
 use crate::types::diagnostic::{
     self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS,
     CYCLIC_CLASS_DEFINITION, DATACLASS_FIELD_ORDER, DIVISION_BY_ZERO, DUPLICATE_KW_ONLY,
@@ -105,6 +105,7 @@ use crate::types::diagnostic::{
     report_invalid_arguments_to_callable, report_invalid_assignment,
     report_invalid_attribute_assignment, report_invalid_generator_function_return_type,
     report_invalid_key_on_typed_dict, report_invalid_return_type,
+    report_namedtuple_field_without_default_after_field_with_default,
     report_possibly_unbound_attribute,
 };
 use crate::types::enums::is_enum_class;
@@ -123,8 +124,8 @@ use crate::types::{
     MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm,
     Parameters, SpecialFormType, SubclassOfType, Truthiness, Type, TypeAliasType,
     TypeAndQualifiers, TypeIsType, TypeQualifiers, TypeVarBoundOrConstraintsEvaluation,
-    TypeVarDefaultEvaluation, TypeVarInstance, TypeVarKind, TypeVarVariance, UnionBuilder,
-    UnionType, binding_type, todo_type,
+    TypeVarDefaultEvaluation, TypeVarInstance, TypeVarKind, UnionBuilder, UnionType, binding_type,
+    todo_type,
 };
 use crate::unpack::{EvaluationMode, Unpack, UnpackPosition};
 use crate::util::diagnostics::format_enumeration;
@@ -1110,11 +1111,34 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 continue;
             }
 
-            let is_protocol = class.is_protocol(self.db());
             let is_named_tuple = CodeGeneratorKind::NamedTuple.matches(self.db(), class);
+
+            // (2) If it's a `NamedTuple` class, check that no field without a default value
+            // appears after a field with a default value.
+            if is_named_tuple {
+                let mut field_with_default_encountered = None;
+
+                for (field_name, field) in class.own_fields(self.db(), None) {
+                    if field.default_ty.is_some() {
+                        field_with_default_encountered = Some(field_name);
+                    } else if let Some(field_with_default) = field_with_default_encountered.as_ref()
+                    {
+                        report_namedtuple_field_without_default_after_field_with_default(
+                            &self.context,
+                            class,
+                            self.index,
+                            &field_name,
+                            field_with_default,
+                        );
+                    }
+                }
+            }
+
+            let is_protocol = class.is_protocol(self.db());
+
             let mut solid_bases = IncompatibleBases::default();
 
-            // (2) Iterate through the class's explicit bases to check for various possible errors:
+            // (3) Iterate through the class's explicit bases to check for various possible errors:
             //     - Check for inheritance from plain `Generic`,
             //     - Check for inheritance from a `@final` classes
             //     - If the class is a protocol class: check for inheritance from a non-protocol class
@@ -1208,7 +1232,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            // (3) Check that the class's MRO is resolvable
+            // (4) Check that the class's MRO is resolvable
             match class.try_mro(self.db(), None) {
                 Err(mro_error) => match mro_error.reason() {
                     MroErrorKind::DuplicateBases(duplicates) => {
@@ -1279,7 +1303,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            // (4) Check that the class's metaclass can be determined without error.
+            // (5) Check that the class's metaclass can be determined without error.
             if let Err(metaclass_error) = class.try_metaclass(self.db()) {
                 match metaclass_error.reason() {
                     MetaclassErrorKind::Cycle => {
@@ -1376,54 +1400,33 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            // (5) Check that a dataclass does not have more than one `KW_ONLY`
+            // (6) Check that a dataclass does not have more than one `KW_ONLY`
             // and that required fields are defined before default fields.
             if let Some(field_policy @ CodeGeneratorKind::DataclassLike) =
                 CodeGeneratorKind::from_class(self.db(), class)
             {
                 let specialization = None;
-                let mut kw_only_field_names = vec![];
+
+                let mut kw_only_sentinel_fields = vec![];
                 let mut required_after_default_field_names = vec![];
                 let mut has_seen_default_field = false;
-                let mut kw_only_sentinel_seen = false;
 
-                for (
-                    name,
-                    Field {
-                        declared_ty: field_ty,
-                        default_ty,
-                        init,
-                        kw_only,
-                        ..
-                    },
-                ) in class.fields(self.db(), specialization, field_policy)
-                {
-                    // Check for fields after KW_ONLY sentinel
-                    if let Some(instance) = field_ty.into_nominal_instance() {
-                        if instance
-                            .class(self.db())
-                            .is_known(self.db(), KnownClass::KwOnly)
-                        {
-                            kw_only_field_names.push(name.clone());
-                            kw_only_sentinel_seen = true;
-                        }
-                    }
-
-                    // Check field ordering - only for fields that participate in positional `__init__` args
-                    // Skip `init=False` fields (don't appear in `__init__`)
-                    // Skip `kw_only` fields (go at end of `__init__` signature, not positional)
-                    // Skip fields that come after a `KW_ONLY` sentinel (they're keyword-only)
-                    if !init || kw_only == Some(true) || kw_only_sentinel_seen {
+                for (name, field) in class.fields(self.db(), specialization, field_policy) {
+                    if field.is_kw_only_sentinel(self.db()) {
+                        kw_only_sentinel_fields.push(name);
                         continue;
                     }
-                    if default_ty.is_some() {
+                    if !field.init || field.kw_only == Some(true) {
+                        continue;
+                    }
+                    if field.default_ty.is_some() {
                         has_seen_default_field = true;
                     } else if has_seen_default_field {
                         required_after_default_field_names.push(name);
                     }
                 }
 
-                if kw_only_field_names.len() > 1 {
+                if kw_only_sentinel_fields.len() > 1 {
                     // TODO: The fields should be displayed in a subdiagnostic.
                     if let Some(builder) = self
                         .context
@@ -1435,7 +1438,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                         diagnostic.info(format_args!(
                             "`KW_ONLY` fields: {}",
-                            kw_only_field_names
+                            kw_only_sentinel_fields
                                 .iter()
                                 .map(|name| format!("`{name}`"))
                                 .join(", ")
@@ -1474,6 +1477,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                     }
                 }
+            }
+
+            if let Some(protocol) = class.into_protocol_class(self.db()) {
+                protocol.validate_members(&self.context, self.index);
             }
         }
     }
@@ -3507,7 +3514,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             &name.id,
             Some(definition),
             bound_or_constraint,
-            TypeVarVariance::Invariant, // TODO: infer this
+            None,
             default.as_deref().map(|_| TypeVarDefaultEvaluation::Lazy),
             TypeVarKind::Pep695,
         )));
@@ -8069,6 +8076,48 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // language spec.
         // - `[ast::CompOp::Is]`: return `false` if unequal, `bool` if equal
         // - `[ast::CompOp::IsNot]`: return `true` if unequal, `bool` if equal
+        let db = self.db();
+        let try_dunder = |inference: &mut TypeInferenceBuilder<'db, '_>,
+                          policy: MemberLookupPolicy| {
+            let rich_comparison = |op| inference.infer_rich_comparison(left, right, op, policy);
+            let membership_test_comparison = |op, range: TextRange| {
+                inference.infer_membership_test_comparison(left, right, op, range)
+            };
+
+            match op {
+                ast::CmpOp::Eq => rich_comparison(RichCompareOperator::Eq),
+                ast::CmpOp::NotEq => rich_comparison(RichCompareOperator::Ne),
+                ast::CmpOp::Lt => rich_comparison(RichCompareOperator::Lt),
+                ast::CmpOp::LtE => rich_comparison(RichCompareOperator::Le),
+                ast::CmpOp::Gt => rich_comparison(RichCompareOperator::Gt),
+                ast::CmpOp::GtE => rich_comparison(RichCompareOperator::Ge),
+                ast::CmpOp::In => {
+                    membership_test_comparison(MembershipTestCompareOperator::In, range)
+                }
+                ast::CmpOp::NotIn => {
+                    membership_test_comparison(MembershipTestCompareOperator::NotIn, range)
+                }
+                ast::CmpOp::Is => {
+                    if left.is_disjoint_from(db, right) {
+                        Ok(Type::BooleanLiteral(false))
+                    } else if left.is_singleton(db) && left.is_equivalent_to(db, right) {
+                        Ok(Type::BooleanLiteral(true))
+                    } else {
+                        Ok(KnownClass::Bool.to_instance(db))
+                    }
+                }
+                ast::CmpOp::IsNot => {
+                    if left.is_disjoint_from(db, right) {
+                        Ok(Type::BooleanLiteral(true))
+                    } else if left.is_singleton(db) && left.is_equivalent_to(db, right) {
+                        Ok(Type::BooleanLiteral(false))
+                    } else {
+                        Ok(KnownClass::Bool.to_instance(db))
+                    }
+                }
+            }
+        };
+
         let comparison_result = match (left, right) {
             (Type::Union(union), other) => {
                 let mut builder = UnionBuilder::new(self.db());
@@ -8283,12 +8332,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (Type::EnumLiteral(literal_1), Type::EnumLiteral(literal_2))
                 if op == ast::CmpOp::Eq =>
             {
-                Some(Ok(Type::BooleanLiteral(literal_1 == literal_2)))
+                Some(Ok(match try_dunder(self, MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK) {
+                    Ok(ty) => ty,
+                    Err(_) => Type::BooleanLiteral(literal_1 == literal_2),
+                }))
             }
             (Type::EnumLiteral(literal_1), Type::EnumLiteral(literal_2))
                 if op == ast::CmpOp::NotEq =>
             {
-                Some(Ok(Type::BooleanLiteral(literal_1 != literal_2)))
+                Some(Ok(match try_dunder(self, MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK) {
+                    Ok(ty) => ty,
+                    Err(_) => Type::BooleanLiteral(literal_1 != literal_2),
+                }))
             }
 
             (
@@ -8370,39 +8425,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         // Final generalized fallback: lookup the rich comparison `__dunder__` methods
-        let rich_comparison = |op| self.infer_rich_comparison(left, right, op);
-        let membership_test_comparison =
-            |op, range: TextRange| self.infer_membership_test_comparison(left, right, op, range);
-        match op {
-            ast::CmpOp::Eq => rich_comparison(RichCompareOperator::Eq),
-            ast::CmpOp::NotEq => rich_comparison(RichCompareOperator::Ne),
-            ast::CmpOp::Lt => rich_comparison(RichCompareOperator::Lt),
-            ast::CmpOp::LtE => rich_comparison(RichCompareOperator::Le),
-            ast::CmpOp::Gt => rich_comparison(RichCompareOperator::Gt),
-            ast::CmpOp::GtE => rich_comparison(RichCompareOperator::Ge),
-            ast::CmpOp::In => membership_test_comparison(MembershipTestCompareOperator::In, range),
-            ast::CmpOp::NotIn => {
-                membership_test_comparison(MembershipTestCompareOperator::NotIn, range)
-            }
-            ast::CmpOp::Is => {
-                if left.is_disjoint_from(self.db(), right) {
-                    Ok(Type::BooleanLiteral(false))
-                } else if left.is_singleton(self.db()) && left.is_equivalent_to(self.db(), right) {
-                    Ok(Type::BooleanLiteral(true))
-                } else {
-                    Ok(KnownClass::Bool.to_instance(self.db()))
-                }
-            }
-            ast::CmpOp::IsNot => {
-                if left.is_disjoint_from(self.db(), right) {
-                    Ok(Type::BooleanLiteral(true))
-                } else if left.is_singleton(self.db()) && left.is_equivalent_to(self.db(), right) {
-                    Ok(Type::BooleanLiteral(false))
-                } else {
-                    Ok(KnownClass::Bool.to_instance(self.db()))
-                }
-            }
-        }
+        try_dunder(self, MemberLookupPolicy::default())
     }
 
     /// Rich comparison in Python are the operators `==`, `!=`, `<`, `<=`, `>`, and `>=`. Their
@@ -8414,14 +8437,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         left: Type<'db>,
         right: Type<'db>,
         op: RichCompareOperator,
+        policy: MemberLookupPolicy,
     ) -> Result<Type<'db>, CompareUnsupportedError<'db>> {
         let db = self.db();
         // The following resource has details about the rich comparison algorithm:
         // https://snarky.ca/unravelling-rich-comparison-operators/
         let call_dunder = |op: RichCompareOperator, left: Type<'db>, right: Type<'db>| {
-            left.try_call_dunder(db, op.dunder(), CallArguments::positional([right]))
-                .map(|outcome| outcome.return_type(db))
-                .ok()
+            left.try_call_dunder_with_policy(
+                db,
+                op.dunder(),
+                &mut CallArguments::positional([right]),
+                policy,
+            )
+            .map(|outcome| outcome.return_type(db))
+            .ok()
         };
 
         // The reflected dunder has priority if the right-hand side is a strict subclass of the left-hand side.
@@ -8434,7 +8463,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // When no appropriate method returns any value other than NotImplemented,
             // the `==` and `!=` operators will fall back to `is` and `is not`, respectively.
             // refer to `<https://docs.python.org/3/reference/datamodel.html#object.__eq__>`
-            if matches!(op, RichCompareOperator::Eq | RichCompareOperator::Ne) {
+            if matches!(op, RichCompareOperator::Eq | RichCompareOperator::Ne)
+                // This branch implements specific behavior of the `__eq__` and `__ne__` methods
+                // on `object`, so it does not apply if we skip looking up attributes on `object`.
+                && !policy.mro_no_object_fallback()
+            {
                 Some(KnownClass::Bool.to_instance(db))
             } else {
                 None
@@ -10222,6 +10255,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     Type::ClassLiteral(class_literal) => {
                         if class_literal.is_known(self.db(), KnownClass::Any) {
                             SubclassOfType::subclass_of_any()
+                        } else if class_literal.is_protocol(self.db()) {
+                            SubclassOfType::from(
+                                self.db(),
+                                todo_type!("type[T] for protocols").expect_dynamic(),
+                            )
                         } else {
                             SubclassOfType::from(
                                 self.db(),

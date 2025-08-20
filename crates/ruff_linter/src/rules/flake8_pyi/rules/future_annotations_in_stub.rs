@@ -16,7 +16,7 @@ use crate::{checkers::ast::Checker, fix};
 /// statement has no effect and should be omitted.
 ///
 /// ## References
-/// - [Static Typing with Python: Type Stubs](https://typing.python.org/en/latest/source/stubs.html)
+/// - [Typing Style Guide](https://typing.python.org/en/latest/guides/writing_stubs.html#language-features)
 #[derive(ViolationMetadata)]
 pub(crate) struct FutureAnnotationsInStub;
 

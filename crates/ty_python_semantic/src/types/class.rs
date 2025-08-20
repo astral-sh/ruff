@@ -11,8 +11,13 @@ use super::{
 use crate::FxOrderMap;
 use crate::module_resolver::KnownModule;
 use crate::semantic_index::definition::{Definition, DefinitionState};
+use crate::semantic_index::place::ScopedPlaceId;
 use crate::semantic_index::scope::NodeWithScopeKind;
-use crate::semantic_index::{DeclarationWithConstraint, SemanticIndex, attribute_declarations};
+use crate::semantic_index::symbol::Symbol;
+use crate::semantic_index::{
+    BindingWithConstraints, DeclarationWithConstraint, SemanticIndex, attribute_declarations,
+    attribute_scopes,
+};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{INVALID_LEGACY_TYPE_VARIABLE, INVALID_TYPE_ALIAS_TYPE};
 use crate::types::enums::enum_metadata;
@@ -25,8 +30,8 @@ use crate::types::{
     ApplyTypeMappingVisitor, BareTypeAliasType, Binding, BoundSuperError, BoundSuperType,
     CallableType, DataclassParams, DeprecatedInstance, HasRelationToVisitor, KnownInstanceType,
     NormalizedVisitor, PropertyInstanceType, StringLiteralType, TypeAliasType, TypeMapping,
-    TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, declaration_type,
-    infer_definition_types, todo_type,
+    TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, VarianceInferable,
+    declaration_type, infer_definition_types, todo_type,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet, Program,
@@ -308,6 +313,51 @@ impl<'db> GenericAlias<'db> {
 impl<'db> From<GenericAlias<'db>> for Type<'db> {
     fn from(alias: GenericAlias<'db>) -> Type<'db> {
         Type::GenericAlias(alias)
+    }
+}
+
+#[salsa::tracked]
+impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
+    #[salsa::tracked]
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+        let origin = self.origin(db);
+
+        let specialization = self.specialization(db);
+
+        // if the class is the thing defining the variable, then it can
+        // reference it without it being applied to the specialization
+        std::iter::once(origin.variance_of(db, typevar))
+            .chain(
+                specialization
+                    .generic_context(db)
+                    .variables(db)
+                    .iter()
+                    .zip(specialization.types(db))
+                    .map(|(generic_typevar, ty)| {
+                        if let Some(explicit_variance) =
+                            generic_typevar.typevar(db).explicit_variance(db)
+                        {
+                            ty.with_polarity(explicit_variance).variance_of(db, typevar)
+                        } else {
+                            // `with_polarity` composes the passed variance with the
+                            // inferred one. The inference is done lazily, as we can
+                            // sometimes determine the result just from the passed
+                            // variance. This operation is commutative, so we could
+                            // infer either first.  We choose to make the `ClassLiteral`
+                            // variance lazy, as it is known to be expensive, requiring
+                            // that we traverse all members.
+                            //
+                            // If salsa let us look at the cache, we could check first
+                            // to see if the class literal query was already run.
+
+                            let typevar_variance_in_substituted_type = ty.variance_of(db, typevar);
+                            origin
+                                .with_polarity(typevar_variance_in_substituted_type)
+                                .variance_of(db, *generic_typevar)
+                        }
+                    }),
+            )
+            .collect()
     }
 }
 
@@ -1133,6 +1183,15 @@ impl<'db> From<ClassType<'db>> for Type<'db> {
     }
 }
 
+impl<'db> VarianceInferable<'db> for ClassType<'db> {
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+        match self {
+            Self::NonGeneric(class) => class.variance_of(db, typevar),
+            Self::Generic(generic) => generic.variance_of(db, typevar),
+        }
+    }
+}
+
 /// A filter that describes which methods are considered when looking for implicit attribute assignments
 /// in [`ClassLiteral::implicit_attribute`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -1174,6 +1233,16 @@ pub(crate) struct Field<'db> {
 
     /// Whether or not this field can only be passed as a keyword argument to `__init__`.
     pub(crate) kw_only: Option<bool>,
+}
+
+impl<'db> Field<'db> {
+    /// Returns true if this field is a `dataclasses.KW_ONLY` sentinel.
+    /// <https://docs.python.org/3/library/dataclasses.html#dataclasses.KW_ONLY>
+    pub(crate) fn is_kw_only_sentinel(&self, db: &'db dyn Db) -> bool {
+        self.declared_ty
+            .into_nominal_instance()
+            .is_some_and(|instance| instance.class(db).is_known(db, KnownClass::KwOnly))
+    }
 }
 
 /// Representation of a class definition statement in the AST: either a non-generic class, or a
@@ -1929,10 +1998,9 @@ impl<'db> ClassLiteral<'db> {
             Type::instance(db, self.apply_optional_specialization(db, specialization));
 
         let signature_from_fields = |mut parameters: Vec<_>, return_ty: Option<Type<'db>>| {
-            let mut kw_only_field_seen = false;
             for (
                 field_name,
-                Field {
+                field @ Field {
                     declared_ty: mut field_ty,
                     mut default_ty,
                     init_only: _,
@@ -1946,14 +2014,10 @@ impl<'db> ClassLiteral<'db> {
                     continue;
                 }
 
-                if field_ty
-                    .into_nominal_instance()
-                    .is_some_and(|instance| instance.class(db).is_known(db, KnownClass::KwOnly))
-                {
+                if field.is_kw_only_sentinel(db) {
                     // Attributes annotated with `dataclass.KW_ONLY` are not present in the synthesized
                     // `__init__` method; they are used to indicate that the following parameters are
                     // keyword-only.
-                    kw_only_field_seen = true;
                     continue;
                 }
 
@@ -2003,9 +2067,7 @@ impl<'db> ClassLiteral<'db> {
                 }
 
                 let is_kw_only = name == "__replace__"
-                    || kw_only.unwrap_or(
-                        has_dataclass_param(DataclassParams::KW_ONLY) || kw_only_field_seen,
-                    );
+                    || kw_only.unwrap_or(has_dataclass_param(DataclassParams::KW_ONLY));
 
                 let mut parameter = if is_kw_only {
                     Parameter::keyword_only(field_name)
@@ -2304,6 +2366,7 @@ impl<'db> ClassLiteral<'db> {
         let table = place_table(db, class_body_scope);
 
         let use_def = use_def_map(db, class_body_scope);
+        let mut kw_only_sentinel_field_seen = false;
         for (symbol_id, declarations) in use_def.all_end_of_scope_symbol_declarations() {
             // Here, we exclude all declarations that are not annotated assignments. We need this because
             // things like function definitions and nested classes would otherwise be considered dataclass
@@ -2348,16 +2411,25 @@ impl<'db> ClassLiteral<'db> {
                     kw_only = field.kw_only(db);
                 }
 
-                attributes.insert(
-                    symbol.name().clone(),
-                    Field {
-                        declared_ty: attr_ty.apply_optional_specialization(db, specialization),
-                        default_ty,
-                        init_only: attr.is_init_var(),
-                        init,
-                        kw_only,
-                    },
-                );
+                let mut field = Field {
+                    declared_ty: attr_ty.apply_optional_specialization(db, specialization),
+                    default_ty,
+                    init_only: attr.is_init_var(),
+                    init,
+                    kw_only,
+                };
+
+                // Check if this is a KW_ONLY sentinel and mark subsequent fields as keyword-only
+                if field.is_kw_only_sentinel(db) {
+                    kw_only_sentinel_field_seen = true;
+                }
+
+                // If no explicit kw_only setting and we've seen KW_ONLY sentinel, mark as keyword-only
+                if field.kw_only.is_none() && kw_only_sentinel_field_seen {
+                    field.kw_only = Some(true);
+                }
+
+                attributes.insert(symbol.name().clone(), field);
             }
         }
 
@@ -2982,6 +3054,54 @@ impl<'db> ClassLiteral<'db> {
                 .unwrap_or_else(|| class_name.end()),
         )
     }
+
+    pub(super) fn declarations_of_name(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        index: &'db SemanticIndex<'db>,
+    ) -> Option<impl Iterator<Item = DeclarationWithConstraint<'db>>> {
+        let class_body_scope = self.body_scope(db).file_scope_id(db);
+        let symbol_id = index.place_table(class_body_scope).symbol_id(name)?;
+        let use_def = index.use_def_map(class_body_scope);
+        Some(use_def.end_of_scope_declarations(ScopedPlaceId::Symbol(symbol_id)))
+    }
+
+    pub(super) fn first_declaration_of_name(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        index: &'db SemanticIndex<'db>,
+    ) -> Option<DeclarationWithConstraint<'db>> {
+        self.declarations_of_name(db, name, index)
+            .into_iter()
+            .flatten()
+            .next()
+    }
+
+    pub(super) fn bindings_of_name(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        index: &'db SemanticIndex<'db>,
+    ) -> Option<impl Iterator<Item = BindingWithConstraints<'db, 'db>>> {
+        let class_body_scope = self.body_scope(db).file_scope_id(db);
+        let symbol_id = index.place_table(class_body_scope).symbol_id(name)?;
+        let use_def = index.use_def_map(class_body_scope);
+        Some(use_def.end_of_scope_bindings(ScopedPlaceId::Symbol(symbol_id)))
+    }
+
+    pub(super) fn first_binding_of_name(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        index: &'db SemanticIndex<'db>,
+    ) -> Option<BindingWithConstraints<'db, 'db>> {
+        self.bindings_of_name(db, name, index)
+            .into_iter()
+            .flatten()
+            .next()
+    }
 }
 
 impl<'db> From<ClassLiteral<'db>> for Type<'db> {
@@ -2993,6 +3113,126 @@ impl<'db> From<ClassLiteral<'db>> for Type<'db> {
 impl<'db> From<ClassLiteral<'db>> for ClassType<'db> {
     fn from(class: ClassLiteral<'db>) -> ClassType<'db> {
         ClassType::NonGeneric(class)
+    }
+}
+
+#[salsa::tracked]
+impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
+    #[salsa::tracked(cycle_fn=crate::types::variance_cycle_recover, cycle_initial=crate::types::variance_cycle_initial)]
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+        let typevar_in_generic_context = self
+            .generic_context(db)
+            .is_some_and(|generic_context| generic_context.variables(db).contains(&typevar));
+
+        if !typevar_in_generic_context {
+            return TypeVarVariance::Bivariant;
+        }
+        let class_body_scope = self.body_scope(db);
+
+        let file = class_body_scope.file(db);
+        let index = semantic_index(db, file);
+
+        let explicit_bases_variances = self
+            .explicit_bases(db)
+            .iter()
+            .map(|class| class.variance_of(db, typevar));
+
+        let default_attribute_variance = {
+            let is_namedtuple = CodeGeneratorKind::NamedTuple.matches(db, self);
+            // Python 3.13 introduced a synthesized `__replace__` method on dataclasses which uses
+            // their field types in contravariant position, thus meaning a frozen dataclass must
+            // still be invariant in its field types. Other synthesized methods on dataclasses are
+            // not considered here, since they don't use field types in their signatures. TODO:
+            // ideally we'd have a single source of truth for information about synthesized
+            // methods, so we just look them up normally and don't hardcode this knowledge here.
+            let is_frozen_dataclass = Program::get(db).python_version(db) <= PythonVersion::PY312
+                && self
+                    .dataclass_params(db)
+                    .is_some_and(|params| params.contains(DataclassParams::FROZEN));
+            if is_namedtuple || is_frozen_dataclass {
+                TypeVarVariance::Covariant
+            } else {
+                TypeVarVariance::Invariant
+            }
+        };
+
+        let init_name: &Name = &"__init__".into();
+        let new_name: &Name = &"__new__".into();
+
+        let use_def_map = index.use_def_map(class_body_scope.file_scope_id(db));
+        let table = place_table(db, class_body_scope);
+        let attribute_places_and_qualifiers =
+            use_def_map
+                .all_end_of_scope_symbol_declarations()
+                .map(|(symbol_id, declarations)| {
+                    let place_and_qual =
+                        place_from_declarations(db, declarations).ignore_conflicting_declarations();
+                    (symbol_id, place_and_qual)
+                })
+                .chain(use_def_map.all_end_of_scope_symbol_bindings().map(
+                    |(symbol_id, bindings)| (symbol_id, place_from_bindings(db, bindings).into()),
+                ))
+                .filter_map(|(symbol_id, place_and_qual)| {
+                    if let Some(name) = table.place(symbol_id).as_symbol().map(Symbol::name) {
+                        (![init_name, new_name].contains(&name))
+                            .then_some((name.to_string(), place_and_qual))
+                    } else {
+                        None
+                    }
+                });
+
+        // Dataclasses can have some additional synthesized methods (`__eq__`, `__hash__`,
+        // `__lt__`, etc.) but none of these will have field types type variables in their signatures, so we
+        // don't need to consider them for variance.
+
+        let attribute_names = attribute_scopes(db, self.body_scope(db))
+            .flat_map(|function_scope_id| {
+                index
+                    .place_table(function_scope_id)
+                    .members()
+                    .filter_map(|member| member.as_instance_attribute())
+                    .filter(|name| *name != init_name && *name != new_name)
+                    .map(std::string::ToString::to_string)
+                    .collect::<Vec<_>>()
+            })
+            .dedup();
+
+        let attribute_variances = attribute_names
+            .map(|name| {
+                let place_and_quals = self.own_instance_member(db, &name);
+                (name, place_and_quals)
+            })
+            .chain(attribute_places_and_qualifiers)
+            .dedup()
+            .filter_map(|(name, place_and_qual)| {
+                place_and_qual.place.ignore_possibly_unbound().map(|ty| {
+                    let variance = if place_and_qual
+                        .qualifiers
+                        // `CLASS_VAR || FINAL` is really `all()`, but
+                        // we want to be robust against new qualifiers
+                        .intersects(TypeQualifiers::CLASS_VAR | TypeQualifiers::FINAL)
+                        // We don't allow mutation of methods or properties
+                        || ty.is_function_literal()
+                        || ty.is_property_instance()
+                        // Underscore-prefixed attributes are assumed not to be externally mutated
+                        || name.starts_with('_')
+                    {
+                        // CLASS_VAR: class vars generally shouldn't contain the
+                        // type variable, but they could if it's a
+                        // callable type. They can't be mutated on instances.
+                        //
+                        // FINAL: final attributes are immutable, and thus covariant
+                        TypeVarVariance::Covariant
+                    } else {
+                        default_attribute_variance
+                    };
+                    ty.with_polarity(variance).variance_of(db, typevar)
+                })
+            });
+
+        attribute_variances
+            .chain(explicit_bases_variances)
+            .collect()
     }
 }
 
@@ -4609,7 +4849,7 @@ impl KnownClass {
                         &target.id,
                         Some(containing_assignment),
                         bound_or_constraint,
-                        variance,
+                        Some(variance),
                         default.map(Into::into),
                         TypeVarKind::Legacy,
                     ),

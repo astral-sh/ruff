@@ -876,8 +876,7 @@ def _(list_int: list[int], list_str: list[str], list_any: list[Any], any: Any):
     # TODO: revealed: A
     reveal_type(f(*(list_int,)))  # revealed: Unknown
 
-    # TODO: Should be `str`
-    reveal_type(f(list_str))  # revealed: Unknown
+    reveal_type(f(list_str))  # revealed: str
     # TODO: Should be `str`
     reveal_type(f(*(list_str,)))  # revealed: Unknown
 

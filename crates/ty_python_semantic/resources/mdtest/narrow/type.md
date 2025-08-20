@@ -217,10 +217,21 @@ class B: ...
 
 def _[T](x: A | B):
     if type(x) is A[str]:
-        # `type()` never returns a generic alias, so `type(x)` cannot be `A[str]`
-        reveal_type(x)  # revealed: Never
+        # TODO: `type()` never returns a generic alias, so `type(x)` cannot be `A[str]`
+        reveal_type(x)  # revealed: A[int] | B
     else:
         reveal_type(x)  # revealed: A[int] | B
+```
+
+## Narrowing for tuple
+
+An early version of <https://github.com/astral-sh/ruff/pull/19920> caused us to crash on this:
+
+```py
+def _(val):
+    if type(val) is tuple:
+        # TODO: better would be `Unknown & tuple[object, ...]`
+        reveal_type(val)  # revealed: Unknown & tuple[Unknown, ...]
 ```
 
 ## Limitations

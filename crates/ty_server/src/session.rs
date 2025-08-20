@@ -3,13 +3,14 @@
 use anyhow::{Context, anyhow};
 use index::DocumentQueryError;
 use lsp_server::{Message, RequestId};
-use lsp_types::notification::{Exit, Notification};
+use lsp_types::notification::{DidChangeWatchedFiles, Exit, Notification};
 use lsp_types::request::{
     DocumentDiagnosticRequest, RegisterCapability, Rename, Request, Shutdown, UnregisterCapability,
     WorkspaceDiagnosticRequest,
 };
 use lsp_types::{
-    DiagnosticRegistrationOptions, DiagnosticServerCapabilities, Registration, RegistrationParams,
+    DiagnosticRegistrationOptions, DiagnosticServerCapabilities,
+    DidChangeWatchedFilesRegistrationOptions, FileSystemWatcher, Registration, RegistrationParams,
     TextDocumentContentChangeEvent, Unregistration, UnregistrationParams, Url,
 };
 use options::GlobalOptions;
@@ -308,6 +309,14 @@ impl Session {
         &self.project_state(path).db
     }
 
+    /// Returns an iterator, in arbitrary order, over all project databases
+    /// in this session.
+    pub(crate) fn project_dbs(&self) -> impl Iterator<Item = &ProjectDatabase> {
+        self.projects
+            .values()
+            .map(|project_state| &project_state.db)
+    }
+
     /// Returns a mutable reference to the project's [`ProjectDatabase`] in which the given `path`
     /// belongs.
     ///
@@ -600,6 +609,7 @@ impl Session {
     fn register_capabilities(&mut self, client: &Client) {
         static DIAGNOSTIC_REGISTRATION_ID: &str = "ty/textDocument/diagnostic";
         static RENAME_REGISTRATION_ID: &str = "ty/textDocument/rename";
+        static FILE_WATCHER_REGISTRATION_ID: &str = "ty/workspace/didChangeWatchedFiles";
 
         let mut registrations = vec![];
         let mut unregistrations = vec![];
@@ -665,6 +675,20 @@ impl Session {
             }
         }
 
+        if let Some(register_options) = self.file_watcher_registration_options() {
+            if self.registrations.contains(DidChangeWatchedFiles::METHOD) {
+                unregistrations.push(Unregistration {
+                    id: FILE_WATCHER_REGISTRATION_ID.into(),
+                    method: DidChangeWatchedFiles::METHOD.into(),
+                });
+            }
+            registrations.push(Registration {
+                id: FILE_WATCHER_REGISTRATION_ID.into(),
+                method: DidChangeWatchedFiles::METHOD.into(),
+                register_options: Some(serde_json::to_value(register_options).unwrap()),
+            });
+        }
+
         // First, unregister any existing capabilities and then register or re-register them.
         self.unregister_dynamic_capability(client, unregistrations);
         self.register_dynamic_capability(client, registrations);
@@ -717,6 +741,82 @@ impl Session {
                 tracing::debug!("Unregistered dynamic capabilities");
             },
         );
+    }
+
+    /// Try to register the file watcher provided by the client if the client supports it.
+    ///
+    /// Note that this should be called *after* workspaces/projects have been initialized.
+    /// This is required because the globs we use for registering file watching take
+    /// project search paths into account.
+    fn file_watcher_registration_options(
+        &self,
+    ) -> Option<DidChangeWatchedFilesRegistrationOptions> {
+        fn make_watcher(glob: &str) -> FileSystemWatcher {
+            FileSystemWatcher {
+                glob_pattern: lsp_types::GlobPattern::String(glob.into()),
+                kind: Some(lsp_types::WatchKind::all()),
+            }
+        }
+
+        fn make_relative_watcher(relative_to: &SystemPath, glob: &str) -> FileSystemWatcher {
+            let base_uri = Url::from_file_path(relative_to.as_std_path())
+                .expect("system path must be a valid URI");
+            let glob_pattern = lsp_types::GlobPattern::Relative(lsp_types::RelativePattern {
+                base_uri: lsp_types::OneOf::Right(base_uri),
+                pattern: glob.to_string(),
+            });
+            FileSystemWatcher {
+                glob_pattern,
+                kind: Some(lsp_types::WatchKind::all()),
+            }
+        }
+
+        if !self.client_capabilities().supports_file_watcher() {
+            tracing::warn!(
+                "Your LSP client doesn't support file watching: \
+                 You may see stale results when files change outside the editor"
+            );
+            return None;
+        }
+
+        // We also want to watch everything in the search paths as
+        // well. But this seems to require "relative" watcher support.
+        // I had trouble getting this working without using a base uri.
+        //
+        // Specifically, I tried this for each search path:
+        //
+        //     make_watcher(&format!("{path}/**"))
+        //
+        // But while this seemed to work for the project root, it
+        // simply wouldn't result in any file notifications for changes
+        // to files outside of the project root.
+        #[allow(clippy::if_not_else)] // no! it reads better this way ---AG
+        let watchers = if !self.client_capabilities().supports_relative_file_watcher() {
+            tracing::warn!(
+                "Your LSP client doesn't support file watching outside of project: \
+                 You may see stale results when dependencies change"
+            );
+            // Initialize our list of watchers with the standard globs relative
+            // to the project root if we can't use relative globs.
+            vec![make_watcher("**")]
+        } else {
+            // Gather up all of our project roots and all of the corresponding
+            // project root system paths, then deduplicate them relative to
+            // one another. Then listen to everything.
+            let roots = self.project_dbs().map(|db| db.project().root(db));
+            let paths = self
+                .project_dbs()
+                .flat_map(|db| {
+                    ty_python_semantic::system_module_search_paths(db).map(move |path| (db, path))
+                })
+                .filter(|(db, path)| !path.starts_with(db.project().root(*db)))
+                .map(|(_, path)| path)
+                .chain(roots);
+            ruff_db::system::deduplicate_nested_paths(paths)
+                .map(|path| make_relative_watcher(path, "**"))
+                .collect()
+        };
+        Some(DidChangeWatchedFilesRegistrationOptions { watchers })
     }
 
     /// Creates a document snapshot with the URL referencing the document to snapshot.

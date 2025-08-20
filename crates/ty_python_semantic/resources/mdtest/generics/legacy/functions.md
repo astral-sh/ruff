@@ -455,3 +455,45 @@ def overloaded_outer(t: T | None = None) -> None:
     if t is not None:
         inner(t)
 ```
+
+## Unpacking a TypeVar
+
+We can infer precise heterogeneous types from the result of an unpacking operation applied to a type
+variable if the type variable's upper bound is a type with a precise tuple spec:
+
+```py
+from dataclasses import dataclass
+from typing import NamedTuple, Final, TypeVar, Generic
+
+T = TypeVar("T", bound=tuple[int, str])
+
+def f(x: T) -> T:
+    a, b = x
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: str
+    return x
+
+@dataclass
+class Team(Generic[T]):
+    employees: list[T]
+
+def x(team: Team[T]) -> Team[T]:
+    age, name = team.employees[0]
+    reveal_type(age)  # revealed: int
+    reveal_type(name)  # revealed: str
+    return team
+
+class Age(int): ...
+class Name(str): ...
+
+class Employee(NamedTuple):
+    age: Age
+    name: Name
+
+EMPLOYEES: Final = (Employee(name=Name("alice"), age=Age(42)),)
+team = Team(employees=list(EMPLOYEES))
+reveal_type(team.employees)  # revealed: list[Employee]
+age, name = team.employees[0]
+reveal_type(age)  # revealed: Age
+reveal_type(name)  # revealed: Name
+```

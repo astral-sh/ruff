@@ -6,14 +6,19 @@ use super::{
     add_inferred_python_version_hint_to_diagnostic,
 };
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
+use crate::semantic_index::SemanticIndex;
+use crate::semantic_index::definition::Definition;
+use crate::semantic_index::place::{PlaceTable, ScopedPlaceId};
 use crate::suppression::FileSuppressionId;
-use crate::types::LintDiagnosticGuard;
 use crate::types::class::{Field, SolidBase, SolidBaseKind};
 use crate::types::function::KnownFunction;
 use crate::types::string_annotation::{
     BYTE_STRING_TYPE_ANNOTATION, ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION, FSTRING_TYPE_ANNOTATION,
     IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION, INVALID_SYNTAX_IN_FORWARD_ANNOTATION,
     RAW_STRING_TYPE_ANNOTATION,
+};
+use crate::types::{
+    DynamicType, LintDiagnosticGuard, Protocol, ProtocolInstanceType, SubclassOfInner, binding_type,
 };
 use crate::types::{SpecialFormType, Type, protocol_class::ProtocolClassLiteral};
 use crate::util::diagnostics::format_enumeration;
@@ -28,6 +33,7 @@ use std::fmt::Formatter;
 
 /// Registers all known type check lints.
 pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
+    registry.register_lint(&AMBIGUOUS_PROTOCOL_MEMBER);
     registry.register_lint(&CALL_NON_CALLABLE);
     registry.register_lint(&POSSIBLY_UNBOUND_IMPLICIT_CALL);
     registry.register_lint(&CONFLICTING_ARGUMENT_FORMS);
@@ -450,7 +456,7 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks for invalidly defined protocol classes.
+    /// Checks for protocol classes that will raise `TypeError` at runtime.
     ///
     /// ## Why is this bad?
     /// An invalidly defined protocol class may lead to the type checker inferring
@@ -473,6 +479,41 @@ declare_lint! {
         summary: "detects invalid protocol class definitions",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for protocol classes with members that will lead to ambiguous interfaces.
+    ///
+    /// ## Why is this bad?
+    /// Assigning to an undeclared variable in a protocol class leads to an ambiguous
+    /// interface which may lead to the type checker inferring unexpected things. It's
+    /// recommended to ensure that all members of a protocol class are explicitly declared.
+    ///
+    /// ## Examples
+    ///
+    /// ```py
+    /// from typing import Protocol
+    ///
+    /// class BaseProto(Protocol):
+    ///     a: int                               # fine (explicitly declared as `int`)
+    ///     def method_member(self) -> int: ...  # fine: a method definition using `def` is considered a declaration
+    ///     c = "some variable"                  # error: no explicit declaration, leading to ambiguity
+    ///     b = method_member                    # error: no explicit declaration, leading to ambiguity
+    ///
+    ///     # error: this creates implicit assignments of `d` and `e` in the protocol class body.
+    ///     # Were they really meant to be considered protocol members?
+    ///     for d, e in enumerate(range(42)):
+    ///         pass
+    ///
+    /// class SubProto(BaseProto, Protocol):
+    ///     a = 42  # fine (declared in superclass)
+    /// ```
+    pub(crate) static AMBIGUOUS_PROTOCOL_MEMBER = {
+        summary: "detects protocol classes with ambiguous interfaces",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Warn,
     }
 }
 
@@ -2482,6 +2523,95 @@ pub(crate) fn report_attempted_protocol_instantiation(
     diagnostic.sub(class_def_diagnostic);
 }
 
+pub(crate) fn report_undeclared_protocol_member(
+    context: &InferContext,
+    definition: Definition,
+    protocol_class: ProtocolClassLiteral,
+    class_symbol_table: &PlaceTable,
+) {
+    /// We want to avoid suggesting an annotation for e.g. `x = None`,
+    /// because the user almost certainly doesn't want to write `x: None = None`.
+    /// We also want to avoid suggesting invalid syntax such as `x: <class 'int'> = int`.
+    fn should_give_hint<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+        let class = match ty {
+            Type::ProtocolInstance(ProtocolInstanceType {
+                inner: Protocol::FromClass(_),
+                ..
+            }) => return true,
+            Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
+                SubclassOfInner::Class(class) => class,
+                SubclassOfInner::Dynamic(DynamicType::Any) => return true,
+                SubclassOfInner::Dynamic(_) => return false,
+            },
+            Type::NominalInstance(instance) => instance.class(db),
+            _ => return false,
+        };
+
+        !matches!(
+            class.known(db),
+            Some(KnownClass::NoneType | KnownClass::EllipsisType)
+        )
+    }
+
+    let db = context.db();
+
+    let Some(builder) = context.report_lint(
+        &AMBIGUOUS_PROTOCOL_MEMBER,
+        definition.full_range(db, context.module()),
+    ) else {
+        return;
+    };
+
+    let ScopedPlaceId::Symbol(symbol_id) = definition.place(db) else {
+        return;
+    };
+
+    let symbol_name = class_symbol_table.symbol(symbol_id).name();
+    let class_name = protocol_class.name(db);
+
+    let mut diagnostic = builder
+        .into_diagnostic("Cannot assign to undeclared variable in the body of a protocol class");
+
+    if definition.kind(db).is_unannotated_assignment() {
+        let binding_type = binding_type(db, definition);
+
+        let suggestion = binding_type
+            .literal_fallback_instance(db)
+            .unwrap_or(binding_type);
+
+        if should_give_hint(db, suggestion) {
+            diagnostic.set_primary_message(format_args!(
+                "Consider adding an annotation, e.g. `{symbol_name}: {} = ...`",
+                suggestion.display(db)
+            ));
+        } else {
+            diagnostic.set_primary_message(format_args!(
+                "Consider adding an annotation for `{symbol_name}`"
+            ));
+        }
+    } else {
+        diagnostic.set_primary_message(format_args!(
+            "`{symbol_name}` is not declared as a protocol member"
+        ));
+    }
+
+    let mut class_def_diagnostic = SubDiagnostic::new(
+        SubDiagnosticSeverity::Info,
+        "Assigning to an undeclared variable in a protocol class \
+    leads to an ambiguous interface",
+    );
+    class_def_diagnostic.annotate(
+        Annotation::primary(protocol_class.header_span(db))
+            .message(format_args!("`{class_name}` declared as a protocol here",)),
+    );
+    diagnostic.sub(class_def_diagnostic);
+
+    diagnostic.info(format_args!(
+        "No declarations found for `{symbol_name}` \
+        in the body of `{class_name}` or any of its superclasses"
+    ));
+}
+
 pub(crate) fn report_duplicate_bases(
     context: &InferContext,
     class: ClassLiteral,
@@ -2700,6 +2830,60 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
                 slice_ty.display(db),
             )),
         };
+    }
+}
+
+pub(super) fn report_namedtuple_field_without_default_after_field_with_default<'db>(
+    context: &InferContext<'db, '_>,
+    class: ClassLiteral<'db>,
+    index: &'db SemanticIndex<'db>,
+    field_name: &str,
+    field_with_default: &str,
+) {
+    let db = context.db();
+    let module = context.module();
+
+    let diagnostic_range = class
+        .first_declaration_of_name(db, field_name, index)
+        .and_then(|definition| definition.declaration.definition())
+        .map(|definition| definition.kind(db).full_range(module))
+        .unwrap_or_else(|| class.header_range(db));
+
+    let Some(builder) = context.report_lint(&INVALID_NAMED_TUPLE, diagnostic_range) else {
+        return;
+    };
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "NamedTuple field without default value cannot follow field(s) with default value(s)",
+    ));
+
+    diagnostic.set_primary_message(format_args!(
+        "Field `{field_name}` defined here without a default value"
+    ));
+
+    let Some(field_with_default_range) = class
+        .first_binding_of_name(db, field_with_default, index)
+        .and_then(|definition| definition.binding.definition())
+        .map(|definition| definition.kind(db).full_range(module))
+    else {
+        return;
+    };
+
+    // If the end-of-scope definition in the class scope of the field-with-a-default-value
+    // occurs after the range of the field-without-a-default-value,
+    // avoid adding a subdiagnostic that points to the definition of the
+    // field-with-a-default-value. It's confusing to talk about a field "before" the
+    // field without the default value but then point to a definition that actually
+    // occurs after the field without-a-default-value.
+    if field_with_default_range.end() < diagnostic_range.start() {
+        diagnostic.annotate(
+            Annotation::secondary(context.span(field_with_default_range)).message(format_args!(
+                "Earlier field `{field_with_default}` defined here with a default value",
+            )),
+        );
+    } else {
+        diagnostic.info(format_args!(
+            "Earlier field `{field_with_default}` was defined with a default value"
+        ));
     }
 }
 

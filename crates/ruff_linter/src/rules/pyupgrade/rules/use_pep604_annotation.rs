@@ -2,7 +2,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::PythonVersion;
 use ruff_python_ast::helpers::{pep_604_optional, pep_604_union};
 use ruff_python_ast::{self as ast, Expr};
-use ruff_python_semantic::analyze::typing::Pep604Operator;
+use ruff_python_semantic::analyze::typing::{Pep604Operator, to_pep604_operator};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -171,10 +171,22 @@ pub(crate) fn non_pep604_annotation(
                         // Invalid type annotation.
                     }
                     _ => {
+                        // Unwrap all nested Optional[...] and wrap once as `X | None`.
+                        let mut inner = slice;
+                        while let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = inner {
+                            if let Some(Pep604Operator::Optional) =
+                                to_pep604_operator(value, slice, checker.semantic())
+                            {
+                                inner = slice;
+                            } else {
+                                break;
+                            }
+                        }
+
                         diagnostic.set_fix(Fix::applicable_edit(
                             Edit::range_replacement(
                                 pad(
-                                    checker.generator().expr(&pep_604_optional(slice)),
+                                    checker.generator().expr(&pep_604_optional(inner)),
                                     expr.range(),
                                     checker.locator(),
                                 ),

@@ -15,8 +15,11 @@ pub use program::{
     PythonVersionWithSource, SearchPathSettings,
 };
 pub use python_platform::PythonPlatform;
-pub use semantic_model::{Completion, CompletionKind, HasType, NameKind, SemanticModel};
+pub use semantic_model::{
+    Completion, CompletionKind, HasDefinition, HasType, NameKind, SemanticModel,
+};
 pub use site_packages::{PythonEnvironment, SitePackagesPaths, SysPrefixPathOrigin};
+pub use types::DisplaySettings;
 pub use types::ide_support::{
     ImportAliasResolution, ResolvedDefinition, definitions_for_attribute,
     definitions_for_imported_symbol, definitions_for_name, map_stub_definition,
