@@ -620,6 +620,81 @@ def _(ab: A | B, ac: A | C, cd: C | D):
     reveal_type(f(*(cd,)))  # revealed: Unknown
 ```
 
+### Performance
+
+Argument type expansion could lead to exponential growth of the number of argument lists that needs
+to be evaluated, so ty deploys some heuristics to prevent this from happening.
+
+#### Avoid argument type expansion
+
+Heuristic: If an argument type that cannot be expanded and cannot be assighned to any of the
+remaining overloads before argument type expansion, then even with argument type expansion, it won't
+lead to a successful evaluation of the call.
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+class A: ...
+class B: ...
+class C: ...
+
+@overload
+def f() -> None: ...
+@overload
+def f(**kwargs: int) -> C: ...
+@overload
+def f(x: A, /, **kwargs: int) -> A: ...
+@overload
+def f(x: B, /, **kwargs: int) -> B: ...
+```
+
+```py
+from overloaded import A, B, C, f
+
+def _(a=1):
+    reveal_type(f(a1=a, a2=a, a3=a))  # revealed: C
+    reveal_type(f(A(), a1=a, a2=a, a3=a))  # revealed: A
+    reveal_type(f(B(), a1=a, a2=a, a3=a))  # revealed: B
+
+    # error: [no-matching-overload]
+    # revealed: Unknown
+    reveal_type(f(
+        C(),
+        a1=a,
+        a2=a,
+        a3=a,
+        a4=a,
+        a5=a,
+        a6=a,
+        a7=a,
+        a8=a,
+        a9=a,
+        a10=a,
+        a11=a,
+        a12=a,
+        a13=a,
+        a14=a,
+        a15=a,
+        a16=a,
+        a17=a,
+        a18=a,
+        a19=a,
+        a20=a,
+        a21=a,
+        a22=a,
+        a23=a,
+        a24=a,
+        a25=a,
+        a26=a,
+        a27=a,
+        a28=a,
+        a29=a,
+        a30=a,
+    ))
+```
+
 ## Filtering based on `Any` / `Unknown`
 
 This is the step 5 of the overload call evaluation algorithm which specifies that:
