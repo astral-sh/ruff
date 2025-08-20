@@ -184,16 +184,17 @@ impl<'db> ConstraintSet<'db> {
 
     /// Updates this set to be the union of itself and a clause.
     fn union_clause(&mut self, db: &'db dyn Db, clause: ConstraintClause<'db>) {
-        for existing in &mut self.clauses {
-            // If there is an existing constraint set that subsumes (or is subsumed by) the new
-            // one, we want to keep the _subsumed_ constraint set.
-            if clause.subsumes(db, existing) {
-                return;
-            } else if existing.subsumes(db, &clause) {
-                *existing = clause;
-                return;
-            }
+        // If there is an existing clause that is subsumed by (i.e., is bigger than) the new one,
+        // then the new clause doesn't provide any useful additional information, and we don't have
+        // to add it.
+        if (self.clauses.iter()).any(|existing| clause.subsumes(db, existing)) {
+            return;
         }
+
+        // If there are any existing clauses that subsume (i.e., are smaller than) the new one, we
+        // should delete them, since the new clause provides strictly more useful information.
+        self.clauses
+            .retain(|existing| !existing.subsumes(db, &clause));
         self.clauses.push(clause);
     }
 
@@ -251,9 +252,7 @@ impl<'db> Constraints<'db> for ConstraintSet<'db> {
     }
 }
 
-/// A set of merged constraints, representing the intersection of those constraints. We guarantee
-/// that no constraint in the set subsumes another, and that no two constraints in the set have the
-/// same typevar.
+/// The intersection of a list of atomic constraints.
 ///
 /// This is called a "constraint set", and denoted _C_, in [[POPL2015][]].
 ///
@@ -280,8 +279,7 @@ impl<'db> ConstraintClause<'db> {
         }
     }
 
-    /// Adds a new constraint to this clause, ensuring that no constraint in the clause subsumes
-    /// another, and that no two constraints in the set have the same typevar. Because atomic
+    /// Returns the intersection of this clause and an atomic constraint. Because atomic
     /// constraints can be negated, the intersection of the new and existing atomic constraints
     /// (for the same typevar) might be the union of two atomic constraints.
     fn intersect_constraint(
