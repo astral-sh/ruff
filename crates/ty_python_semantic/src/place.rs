@@ -62,9 +62,6 @@ impl<'db> Place<'db> {
     pub(crate) fn bound(ty: impl Into<Type<'db>>) -> Self {
         Place::Type(ty.into(), Boundness::Bound)
     }
-    pub(crate) fn p_bound(ty: impl Into<Type<'db>>) -> Self {
-        Place::Type(ty.into(), Boundness::PossiblyUnbound)
-    }
 
     /// Constructor that creates a [`Place`] with a [`crate::types::TodoType`] type
     /// and boundness [`Boundness::Bound`].
@@ -140,10 +137,7 @@ impl<'db> Place<'db> {
     }
 
     pub(crate) fn is_definitely_bound(&self) -> bool {
-        match self {
-            Place::Type(_, Boundness::Bound) => true,
-            _ => false,
-        }
+        matches!(self, Place::Type(_, Boundness::Bound))
     }
 }
 

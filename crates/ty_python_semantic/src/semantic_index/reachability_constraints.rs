@@ -195,9 +195,7 @@
 
 use std::cmp::Ordering;
 
-use ruff_db::parsed::parsed_module;
 use ruff_index::{Idx, IndexVec};
-use ruff_python_ast::HasNodeIndex;
 use rustc_hash::FxHashMap;
 
 use crate::Db;
@@ -802,14 +800,8 @@ impl ReachabilityConstraints {
     fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
         match predicate.node {
             PredicateNode::Expression(test_expr) => {
-                let expression = &test_expr;
-                let file = expression.file(db);
-                let module = parsed_module(db, file).load(db);
-                let node = expression.node_ref(db, &module);
                 let ty = infer_expression_if_definitely_bound(db, test_expr);
-                let t = ty.bool(db).negate_if(!predicate.is_positive);
-
-                t
+                ty.bool(db).negate_if(!predicate.is_positive)
             }
             PredicateNode::ReturnsNever(CallableAndCallExpr {
                 callable,

@@ -331,17 +331,17 @@ fn single_expression_cycle_initial<'db>(
 }
 
 /// I tried several attempts of this function:
-/// 1. infer_expression similar to infer_expression_type. It calls infer_expression_types
-///    internally and returns ExpressionInference. The problem I faced was that the return type of
-///    this function could not be &ExpressionInference because infer_expression_types itself is
-///    returning &ExpressionInference.
-/// 2. infer_expression_and_binding: return both type and definitely_bound. In order to overcome
-///    the problem that I cannot have two salsa::tracked functions calling each other and both
-///    returning &ExpressionInference. It did not help with the cycle because before we get the
-///    type we need to abort if it's not definitely_bound.
-/// 3. infer_expression_if_definitely_bound: returns Type::Unknown if the expression is not definitely_bound.
+/// 1. `infer_expression` similar to `infer_expression_type`. It calls `infer_expression_types`
+///    internally and returns `ExpressionInference`. The problem I faced was that the return type of
+///    this function could not be &`ExpressionInference` because `infer_expression_types` itself is
+///    returning &`ExpressionInference`.
+/// 2. `infer_expression_and_binding`: return both type and `definitely_bound`. In order to overcome
+///    the problem that I cannot have two `salsa::tracked` functions calling each other and both
+///    returning &`ExpressionInference`. It did not help with the cycle because before we get the
+///    type we need to abort if it's not `definitely_bound`.
+/// 3. `infer_expression_if_definitely_bound`: returns `Type::Unknown` if the expression is not `definitely_bound`.
 ///    it worked but it did not reduce the number of cycles as much as other way.
-///    This works for the analyze_cycles_gridout test case but causes panic for others
+///    This works for the `analyze_cycles_gridout` test case but causes panic for others
 #[salsa::tracked(cycle_fn=single_expression_cycle_recover, cycle_initial=single_expression_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
 pub(crate) fn infer_expression_if_definitely_bound<'db>(
     db: &'db dyn Db,
@@ -11474,8 +11474,7 @@ mod tests {
     use ruff_db::files::{File, system_path_to_file};
     use ruff_db::system::DbWithWritableSystem as _;
     use ruff_db::testing::{
-        assert_function_query_was_not_run, assert_function_query_was_run, setup_logging,
-        setup_logging_with_filter,
+        assert_function_query_was_not_run, assert_function_query_was_run, setup_logging_with_filter,
     };
 
     use super::*;
