@@ -1144,6 +1144,11 @@ impl<'db> ClassType<'db> {
         }
     }
 
+    pub(crate) fn dataclass_params(&self, db: &'db dyn Db) -> Option<DataclassParams> {
+        let (singleton, _) = self.class_singleton(db);
+        singleton.dataclass_params(db)
+    }
+
     pub(crate) fn dataclass_transformer_params(
         &self,
         db: &'db dyn Db,
@@ -1381,6 +1386,13 @@ impl<'db> ClassSingletonType<'db> {
         match self {
             Self::Literal(literal) => literal.own_instance_member(db, name),
             Self::NewType(new_type) => new_type.own_instance_member(db, name),
+        }
+    }
+
+    pub(crate) fn dataclass_params(&self, db: &'db dyn Db) -> Option<DataclassParams> {
+        match self {
+            Self::Literal(literal) => literal.dataclass_params(db),
+            Self::NewType(new_type) => new_type.dataclass_params(db),
         }
     }
 
@@ -3308,6 +3320,10 @@ impl<'db> NewTypeClass<'db> {
 
     fn own_instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
         self.parent(db).own_instance_member(db, name)
+    }
+
+    pub(crate) fn dataclass_params(&self, db: &'db dyn Db) -> Option<DataclassParams> {
+        self.parent(db).dataclass_params(db)
     }
 
     pub(crate) fn dataclass_transformer_params(
