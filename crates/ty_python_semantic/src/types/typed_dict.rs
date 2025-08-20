@@ -1,4 +1,5 @@
 use bitflags::bitflags;
+use ruff_python_ast::Arguments;
 use ruff_python_ast::{self as ast, AnyNodeRef, StmtClassDef, name::Name};
 
 use super::class::{ClassType, CodeGeneratorKind, Field};
@@ -216,4 +217,151 @@ pub(super) fn validate_typed_dict_required_fields<'db, 'ast>(
             missing_field,
         );
     }
+}
+
+pub(super) fn validate_typed_dict_constructor<'db, 'ast>(
+    context: &InferContext<'db, 'ast>,
+    typed_dict: TypedDictType<'db>,
+    arguments: &'ast Arguments,
+    error_node: AnyNodeRef<'ast>,
+    expression_type_fn: impl Fn(&ast::Expr) -> Type<'db>,
+) {
+    let has_positional_dict = arguments.args.len() == 1 && arguments.args[0].is_dict_expr();
+
+    let provided_fields = if has_positional_dict {
+        validate_from_dict_literal(
+            context,
+            typed_dict,
+            arguments,
+            error_node,
+            &expression_type_fn,
+        )
+    } else {
+        validate_from_keywords(
+            context,
+            typed_dict,
+            arguments,
+            error_node,
+            &expression_type_fn,
+        )
+    };
+
+    validate_typed_dict_required_fields(context, typed_dict, &provided_fields, error_node);
+}
+
+/// Validates a `TypedDict` constructor call with a single positional dictionary argument
+/// e.g. `Person({"name": "Alice", "age": 30})`
+fn validate_from_dict_literal<'db, 'ast>(
+    context: &InferContext<'db, 'ast>,
+    typed_dict: TypedDictType<'db>,
+    arguments: &'ast Arguments,
+    error_node: AnyNodeRef<'ast>,
+    expression_type_fn: &impl Fn(&ast::Expr) -> Type<'db>,
+) -> OrderSet<&'ast str> {
+    let mut provided_fields = OrderSet::new();
+
+    if let ast::Expr::Dict(dict_expr) = &arguments.args[0] {
+        // Validate dict entries
+        for dict_item in &dict_expr.items {
+            if let Some(ref key_expr) = dict_item.key {
+                if let ast::Expr::StringLiteral(ast::ExprStringLiteral {
+                    value: key_value, ..
+                }) = key_expr
+                {
+                    let key_str = key_value.to_str();
+                    provided_fields.insert(key_str);
+
+                    // Get the already-inferred argument type
+                    let value_type = expression_type_fn(&dict_item.value);
+                    validate_typed_dict_key_assignment(
+                        context,
+                        typed_dict,
+                        key_str,
+                        value_type,
+                        error_node,
+                        key_expr,
+                        &dict_item.value,
+                        TypedDictAssignmentKind::Constructor,
+                    );
+                }
+            }
+        }
+    }
+
+    provided_fields
+}
+
+/// Validates a `TypedDict` constructor call with keywords
+/// e.g. `Person(name="Alice", age=30)`
+fn validate_from_keywords<'db, 'ast>(
+    context: &InferContext<'db, 'ast>,
+    typed_dict: TypedDictType<'db>,
+    arguments: &'ast Arguments,
+    error_node: AnyNodeRef<'ast>,
+    expression_type_fn: &impl Fn(&ast::Expr) -> Type<'db>,
+) -> OrderSet<&'ast str> {
+    let provided_fields: OrderSet<&str> = arguments
+        .keywords
+        .iter()
+        .filter_map(|kw| kw.arg.as_ref().map(|arg| arg.id.as_str()))
+        .collect();
+
+    // Validate that each field is assigned a type that is compatible with the field's type
+    for keyword in &arguments.keywords {
+        if let Some(arg_name) = &keyword.arg {
+            // Get the already-inferred argument type
+            let arg_type = expression_type_fn(&keyword.value);
+            validate_typed_dict_key_assignment(
+                context,
+                typed_dict,
+                arg_name.as_str(),
+                arg_type,
+                error_node,
+                keyword,
+                &keyword.value,
+                TypedDictAssignmentKind::Constructor,
+            );
+        }
+    }
+
+    provided_fields
+}
+
+/// Validates a `TypedDict` dictionary literal assignment
+/// e.g. `person: Person = {"name": "Alice", "age": 30}`
+pub(super) fn validate_typed_dict_dict_literal<'db, 'ast>(
+    context: &InferContext<'db, 'ast>,
+    typed_dict: TypedDictType<'db>,
+    dict_expr: &'ast ast::ExprDict,
+    error_node: AnyNodeRef<'ast>,
+    expression_type_fn: impl Fn(&ast::Expr) -> Type<'db>,
+) -> OrderSet<&'ast str> {
+    let mut provided_fields = OrderSet::new();
+
+    // Validate each key-value pair in the dictionary literal
+    for item in &dict_expr.items {
+        if let Some(key_expr) = &item.key {
+            if let ast::Expr::StringLiteral(key_literal) = key_expr {
+                let key_str = key_literal.value.to_str();
+                provided_fields.insert(key_str);
+
+                let value_type = expression_type_fn(&item.value);
+                validate_typed_dict_key_assignment(
+                    context,
+                    typed_dict,
+                    key_str,
+                    value_type,
+                    error_node,
+                    key_expr,
+                    &item.value,
+                    TypedDictAssignmentKind::Constructor,
+                );
+            }
+        }
+    }
+
+    // Validate that all required fields are provided
+    validate_typed_dict_required_fields(context, typed_dict, &provided_fields, error_node);
+
+    provided_fields
 }

@@ -37,7 +37,6 @@
 //! be considered a bug.)
 
 use itertools::{Either, Itertools};
-use ordermap::OrderSet;
 use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity};
 use ruff_db::files::File;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
@@ -119,8 +118,8 @@ use crate::types::mro::MroErrorKind;
 use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::tuple::{Tuple, TupleSpec, TupleSpecBuilder, TupleType};
 use crate::types::typed_dict::{
-    TypedDictAssignmentKind, validate_typed_dict_key_assignment,
-    validate_typed_dict_required_fields,
+    TypedDictAssignmentKind, validate_typed_dict_constructor, validate_typed_dict_dict_literal,
+    validate_typed_dict_key_assignment,
 };
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
@@ -4710,42 +4709,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // Validate `TypedDict` dictionary literal assignments
             if let Some(typed_dict) = declared.inner_type().into_typed_dict() {
                 if let Some(dict_expr) = value.as_dict_expr() {
-                    // Validate each key-value pair in the dictionary literal
-                    for item in &dict_expr.items {
-                        if let Some(key_expr) = &item.key {
-                            if let ast::Expr::StringLiteral(key_literal) = key_expr {
-                                let key_str = key_literal.value.to_str();
-                                let value_type = self.expression_type(&item.value);
-                                validate_typed_dict_key_assignment(
-                                    &self.context,
-                                    typed_dict,
-                                    key_str,
-                                    value_type,
-                                    target,
-                                    key_expr,
-                                    &item.value,
-                                    TypedDictAssignmentKind::Constructor,
-                                );
-                            }
-                        }
-                    }
-
-                    // Validate that all required fields are provided
-                    let provided_fields: OrderSet<&str> = dict_expr
-                        .items
-                        .iter()
-                        .filter_map(|item| {
-                            item.key
-                                .as_ref()?
-                                .as_string_literal_expr()
-                                .map(|key| key.value.to_str())
-                        })
-                        .collect();
-                    validate_typed_dict_required_fields(
+                    validate_typed_dict_dict_literal(
                         &self.context,
                         typed_dict,
-                        &provided_fields,
+                        dict_expr,
                         target.into(),
+                        |expr| self.expression_type(expr),
                     );
 
                     // Override the inferred type of the dict literal to be the `TypedDict` type
@@ -6324,79 +6293,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if class_literal.is_typed_dict(self.db()) {
                 let typed_dict_type = Type::typed_dict(ClassType::NonGeneric(class_literal));
                 if let Some(typed_dict) = typed_dict_type.into_typed_dict() {
-                    // First, check if there's only one positional dict argument
-                    // for syntax `Pokemon({ "name": "Pikachu", "type": "electric" })`
-                    let has_positional_dict =
-                        arguments.args.len() == 1 && arguments.args[0].is_dict_expr();
-                    if has_positional_dict {
-                        if let ast::Expr::Dict(dict_expr) = &arguments.args[0] {
-                            let mut provided_fields = OrderSet::new();
-
-                            for dict_item in &dict_expr.items {
-                                if let Some(ref key_expr) = dict_item.key {
-                                    if let ast::Expr::StringLiteral(ast::ExprStringLiteral {
-                                        value: key_value,
-                                        ..
-                                    }) = key_expr
-                                    {
-                                        let key_str = key_value.to_str();
-                                        provided_fields.insert(key_str);
-
-                                        // Get the already-inferred argument type
-                                        let value_type = self.expression_type(&dict_item.value);
-                                        validate_typed_dict_key_assignment(
-                                            &self.context,
-                                            typed_dict,
-                                            key_str,
-                                            value_type,
-                                            func.as_ref(),
-                                            key_expr,
-                                            &dict_item.value,
-                                            TypedDictAssignmentKind::Constructor,
-                                        );
-                                    }
-                                }
-                            }
-
-                            validate_typed_dict_required_fields(
-                                &self.context,
-                                typed_dict,
-                                &provided_fields,
-                                func.as_ref().into(),
-                            );
-                        }
-                    } else {
-                        // Handle keyword arguments: `Pokemon(name="Pikachu", type="electric")`
-                        let provided_fields: OrderSet<&str> = arguments
-                            .keywords
-                            .iter()
-                            .filter_map(|kw| kw.arg.as_ref().map(|arg| arg.id.as_str()))
-                            .collect();
-                        validate_typed_dict_required_fields(
-                            &self.context,
-                            typed_dict,
-                            &provided_fields,
-                            func.as_ref().into(),
-                        );
-
-                        // Validate that each field is assigned a type that is compatible with the field's type
-                        for keyword in &arguments.keywords {
-                            if let Some(arg_name) = &keyword.arg {
-                                // Get the already-inferred argument type
-                                let arg_type = self.expression_type(&keyword.value);
-                                validate_typed_dict_key_assignment(
-                                    &self.context,
-                                    typed_dict,
-                                    arg_name.as_str(),
-                                    arg_type,
-                                    func.as_ref(),
-                                    keyword,
-                                    &keyword.value,
-                                    TypedDictAssignmentKind::Constructor,
-                                );
-                            }
-                        }
-                    }
+                    validate_typed_dict_constructor(
+                        &self.context,
+                        typed_dict,
+                        arguments,
+                        func.as_ref().into(),
+                        |expr| self.expression_type(expr),
+                    );
                 }
             }
         }
