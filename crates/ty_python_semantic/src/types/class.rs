@@ -657,6 +657,18 @@ impl<'db> ClassType<'db> {
         singleton.class_member_inner(db, specialization, name, policy)
     }
 
+    pub(super) fn class_member_from_mro(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        policy: MemberLookupPolicy,
+        mro_iter: impl Iterator<Item = ClassBase<'db>>,
+    ) -> PlaceAndQualifiers<'db> {
+        // TODO: Is this correct?
+        let (singleton, _) = self.class_singleton(db);
+        singleton.class_member_from_mro(db, name, policy, mro_iter)
+    }
+
     /// Returns the inferred type of the class member named `name`. Only bound members
     /// or those marked as `ClassVars` are considered.
     ///
@@ -1309,6 +1321,19 @@ impl<'db> ClassSingletonType<'db> {
         }
 
         self.class_member_from_mro(db, name, policy, self.iter_mro(db, specialization))
+    }
+
+    pub(super) fn class_member_from_mro(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        policy: MemberLookupPolicy,
+        mro_iter: impl Iterator<Item = ClassBase<'db>>,
+    ) -> PlaceAndQualifiers<'db> {
+        match self {
+            Self::Literal(literal) => literal.class_member_from_mro(db, name, policy, mro_iter),
+            Self::NewType(new_type) => new_type.class_member_from_mro(db, name, policy, mro_iter),
+        }
     }
 
     pub(super) fn own_class_member(
@@ -3236,6 +3261,17 @@ impl<'db> NewTypeClass<'db> {
     ) -> PlaceAndQualifiers<'db> {
         self.parent(db)
             .class_member_inner(db, specialization, name, policy)
+    }
+
+    pub(super) fn class_member_from_mro(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        policy: MemberLookupPolicy,
+        mro_iter: impl Iterator<Item = ClassBase<'db>>,
+    ) -> PlaceAndQualifiers<'db> {
+        self.parent(db)
+            .class_member_from_mro(db, name, policy, mro_iter)
     }
 
     pub(super) fn own_class_member(
