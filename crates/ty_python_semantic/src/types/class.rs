@@ -1143,6 +1143,14 @@ impl<'db> ClassType<'db> {
             }
         }
     }
+
+    pub(crate) fn dataclass_transformer_params(
+        &self,
+        db: &'db dyn Db,
+    ) -> Option<DataclassTransformerParams> {
+        let (singleton, _) = self.class_singleton(db);
+        singleton.dataclass_transformer_params(db)
+    }
 }
 
 impl<'db> From<GenericAlias<'db>> for ClassType<'db> {
@@ -1373,6 +1381,16 @@ impl<'db> ClassSingletonType<'db> {
         match self {
             Self::Literal(literal) => literal.own_instance_member(db, name),
             Self::NewType(new_type) => new_type.own_instance_member(db, name),
+        }
+    }
+
+    pub(crate) fn dataclass_transformer_params(
+        &self,
+        db: &'db dyn Db,
+    ) -> Option<DataclassTransformerParams> {
+        match self {
+            Self::Literal(literal) => literal.dataclass_transformer_params(db),
+            Self::NewType(new_type) => new_type.dataclass_transformer_params(db),
         }
     }
 }
@@ -1837,12 +1855,12 @@ impl<'db> ClassLiteral<'db> {
 
         let explicit_metaclass = self.explicit_metaclass(db, &module);
         let (metaclass, class_metaclass_was_from) = if let Some(metaclass) = explicit_metaclass {
-            (metaclass, self)
+            (metaclass, self.into())
         } else if let Some(base_class) = base_classes.next() {
             let (base_class_singleton, _) = base_class.class_singleton(db);
             (base_class.metaclass(db), base_class_singleton)
         } else {
-            (KnownClass::Type.to_class_singleton(db), self)
+            (KnownClass::Type.to_class_singleton(db), self.into())
         };
 
         let mut candidate = if let Some(metaclass_ty) = metaclass.to_class_type(db) {
@@ -3290,6 +3308,13 @@ impl<'db> NewTypeClass<'db> {
 
     fn own_instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
         self.parent(db).own_instance_member(db, name)
+    }
+
+    pub(crate) fn dataclass_transformer_params(
+        &self,
+        db: &'db dyn Db,
+    ) -> Option<DataclassTransformerParams> {
+        self.parent(db).dataclass_transformer_params(db)
     }
 }
 
