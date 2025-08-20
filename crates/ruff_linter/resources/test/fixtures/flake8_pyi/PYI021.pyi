@@ -22,3 +22,8 @@ class Baz:
 def bar():
     x = 1
     """foo"""  # OK, not a doc string
+
+
+def check_isolation_level(mode: int) -> None:
+    """Shouldn't try to fix either."""  # ERROR PYI021
+    ...  # ERROR PIE790
