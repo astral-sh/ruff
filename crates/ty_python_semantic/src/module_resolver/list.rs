@@ -17,7 +17,7 @@ use super::resolver::{
 pub fn list_modules(db: &dyn Db) -> Vec<Module<'_>> {
     let mut modules = BTreeMap::new();
     for search_path in search_paths(db, ModuleResolveMode::StubsAllowed) {
-        for module in list_modules_in(db, SearchPathIngredient::new(db, search_path.clone())) {
+        for module in list_modules_in(db, (), search_path) {
             match modules.entry(module.name(db)) {
                 Entry::Vacant(entry) => {
                     entry.insert(module);
@@ -39,20 +39,15 @@ pub fn list_modules(db: &dyn Db) -> Vec<Module<'_>> {
     modules.into_values().collect()
 }
 
-#[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
-struct SearchPathIngredient<'db> {
-    #[returns(ref)]
-    path: SearchPath,
-}
-
 /// List all available top-level modules in the given `SearchPath`.
 #[salsa::tracked]
 fn list_modules_in<'db>(
     db: &'db dyn Db,
-    search_path: SearchPathIngredient<'db>,
+    _dummy: (),
+    search_path: &'db SearchPath,
 ) -> Vec<Module<'db>> {
-    let mut lister = Lister::new(db, search_path.path(db));
-    match search_path.path(db).as_path() {
+    let mut lister = Lister::new(db, search_path);
+    match search_path.as_path() {
         SystemOrVendoredPathRef::System(system_search_path) => {
             // Read the revision on the corresponding file root to
             // register an explicit dependency on this directory. When
