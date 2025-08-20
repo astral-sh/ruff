@@ -164,6 +164,7 @@ bitflags! {
         const ORDER_DEFAULT = 1 << 1;
         const KW_ONLY_DEFAULT = 1 << 2;
         const FROZEN_DEFAULT = 1 << 3;
+        const FIELD_SPECIFIERS= 1 << 4;
     }
 }
 

@@ -900,7 +900,7 @@ impl<'db> Bindings<'db> {
                                 order_default,
                                 kw_only_default,
                                 frozen_default,
-                                _field_specifiers,
+                                field_specifiers,
                                 _kwargs,
                             ] = overload.parameter_types()
                             {
@@ -917,6 +917,16 @@ impl<'db> Bindings<'db> {
                                 }
                                 if to_bool(frozen_default, false) {
                                     params |= DataclassTransformerParams::FROZEN_DEFAULT;
+                                }
+
+                                if let Some(field_specifiers_type) = field_specifiers {
+                                    // For now, we'll do a simple check: if field_specifiers is not
+                                    // None/empty, we assume it might contain dataclasses.field
+                                    // TODO: Implement proper parsing to check for
+                                    //   dataclasses.field/Field specifically
+                                    if !field_specifiers_type.is_none(db) {
+                                        params |= DataclassTransformerParams::FIELD_SPECIFIERS;
+                                    }
                                 }
 
                                 overload.set_return_type(Type::DataclassTransformer(params));
