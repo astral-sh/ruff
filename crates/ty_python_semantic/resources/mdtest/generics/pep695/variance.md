@@ -449,6 +449,39 @@ static_assert(is_subtype_of(C[B], C[A]))
 static_assert(not is_subtype_of(C[A], C[B]))
 ```
 
+#### Underscore-prefixed attributes
+
+Underscore-prefixed instance attributes are considered private, and thus are assumed not externally
+mutated.
+
+```py
+from ty_extensions import is_subtype_of, static_assert
+
+class A: ...
+class B(A): ...
+
+class C[T]:
+    _x: T
+
+    @property
+    def x(self) -> T:
+        return self._x
+
+static_assert(is_subtype_of(C[B], C[A]))
+static_assert(not is_subtype_of(C[A], C[B]))
+
+class D[T]:
+    def __init__(self, x: T):
+        self._x = x
+
+    @property
+    def x(self) -> T:
+        return self._x
+
+static_assert(is_subtype_of(D[B], D[A]))
+static_assert(not is_subtype_of(D[A], D[B]))
+```
+
 #### Frozen dataclasses in Python 3.12 and earlier
 
 ```py

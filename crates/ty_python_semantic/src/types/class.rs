@@ -3173,12 +3173,12 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
                     |(symbol_id, bindings)| (symbol_id, place_from_bindings(db, bindings).into()),
                 ))
                 .filter_map(|(symbol_id, place_and_qual)| {
-                    table
-                        .place(symbol_id)
-                        .as_symbol()
-                        .map(Symbol::name)
-                        .is_some_and(|name| ![init_name, new_name].contains(&name))
-                        .then_some(place_and_qual)
+                    if let Some(name) = table.place(symbol_id).as_symbol().map(Symbol::name) {
+                        (![init_name, new_name].contains(&name))
+                            .then_some((name.to_string(), place_and_qual))
+                    } else {
+                        None
+                    }
                 });
 
         // Dataclasses can have some additional synthesized methods (`__eq__`, `__hash__`,
@@ -3198,21 +3198,24 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
             .dedup();
 
         let attribute_variances = attribute_names
-            .map(|name| self.own_instance_member(db, &name))
+            .map(|name| {
+                let place_and_quals = self.own_instance_member(db, &name);
+                (name, place_and_quals)
+            })
             .chain(attribute_places_and_qualifiers)
             .dedup()
-            .filter_map(|place_and_qual| {
+            .filter_map(|(name, place_and_qual)| {
                 place_and_qual.place.ignore_possibly_unbound().map(|ty| {
                     let variance = if place_and_qual
                         .qualifiers
                         // `CLASS_VAR || FINAL` is really `all()`, but
                         // we want to be robust against new qualifiers
                         .intersects(TypeQualifiers::CLASS_VAR | TypeQualifiers::FINAL)
-                        // We don't allow mutation of methods
+                        // We don't allow mutation of methods or properties
                         || ty.is_function_literal()
-                        // Properties are only mutable in their type variables
-                        // if they have setters
                         || ty.is_property_instance()
+                        // Underscore-prefixed attributes are assumed not to be externally mutated
+                        || name.starts_with('_')
                     {
                         // CLASS_VAR: class vars generally shouldn't contain the
                         // type variable, but they could if it's a
