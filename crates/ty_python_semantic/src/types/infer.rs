@@ -11473,9 +11473,7 @@ mod tests {
     use ruff_db::diagnostic::Diagnostic;
     use ruff_db::files::{File, system_path_to_file};
     use ruff_db::system::DbWithWritableSystem as _;
-    use ruff_db::testing::{
-        assert_function_query_was_not_run, assert_function_query_was_run, setup_logging_with_filter,
-    };
+    use ruff_db::testing::{assert_function_query_was_not_run, assert_function_query_was_run};
 
     use super::*;
 

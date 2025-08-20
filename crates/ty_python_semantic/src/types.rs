@@ -6581,7 +6581,7 @@ bitflags! {
         const FINAL     = 1 << 1;
         /// `dataclasses.InitVar`
         const INIT_VAR  = 1 << 2;
-        /// HACK to determine if this place was not bound but we consider it bound
+        /// HACK to determine if a place was not bound but we consider it bound
         const NOT_BOUND = 1 << 3;
     }
 }

@@ -2293,12 +2293,18 @@ An attribute definition can be guarded by a condition involving that attribute:
 ```py
 from typing import Literal
 
+def check(x) -> Literal[False]:
+    return False
+
 class Toggle:
     def __init__(self: "Toggle"):
         if not self.x:
             self.x: Literal[True] = True
+        if check(self.y):
+            self.y = True
 
 reveal_type(Toggle().x)  # revealed: Literal[True]
+reveal_type(Toggle().y)  # revealed:  Unknown | Literal[True]
 ```
 
 ### Builtin types attributes

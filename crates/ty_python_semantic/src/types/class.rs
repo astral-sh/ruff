@@ -2604,8 +2604,12 @@ impl<'db> ClassLiteral<'db> {
                     .is_binding_reachable(db, &attribute_assignment)
                     .and(is_method_reachable)
                 {
-                    Truthiness::AlwaysTrue | Truthiness::Ambiguous => {
+                    Truthiness::AlwaysTrue => {
                         is_attribute_bound = true;
+                    }
+                    Truthiness::Ambiguous => {
+                        is_attribute_bound = true;
+                        qualifiers |= TypeQualifiers::NOT_BOUND;
                     }
                     Truthiness::AlwaysFalse => {
                         continue;
