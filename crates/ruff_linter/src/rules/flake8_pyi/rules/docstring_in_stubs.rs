@@ -61,6 +61,10 @@ pub(crate) fn docstring_in_stubs(
         Edit::range_deletion(docstring_range)
     };
 
-    let mut diagnostic = checker.report_diagnostic(DocstringInStub, docstring_range);
-    diagnostic.set_fix(Fix::unsafe_edit(edit));
+    let isolation_level = Checker::isolation(checker.semantic().current_statement_id());
+    let fix = Fix::unsafe_edit(edit).isolate(isolation_level);
+
+    checker
+        .report_diagnostic(DocstringInStub, docstring_range)
+        .set_fix(fix);
 }
