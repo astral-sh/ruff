@@ -421,7 +421,7 @@ impl Workspace {
             .into_iter()
             .map(|completion| Completion {
                 kind: completion.kind(&self.db).map(CompletionKind::from),
-                name: completion.name.into(),
+                name: completion.inner.name.into(),
             })
             .collect())
     }
