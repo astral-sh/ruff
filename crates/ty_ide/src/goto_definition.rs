@@ -630,6 +630,158 @@ class MyClass: ...
         ");
     }
 
+    /// goto-definition on a nested call using a keyword arg where both funcs have that arg name
+    ///
+    /// In this case they ultimately have different signatures.
+    #[test]
+    fn goto_definition_nested_keyword_arg1() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+def my_func(ab, y, z = None): ...
+def my_other_func(ab, y): ...
+
+my_other_func(my_func(a<CURSOR>b=5, y=2), 0)
+my_func(my_other_func(ab=5, y=2), 0)
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Definition
+         --> main.py:3:19
+          |
+        2 | def my_func(ab, y, z = None): ...
+        3 | def my_other_func(ab, y): ...
+          |                   ^^
+        4 |
+        5 | my_other_func(my_func(ab=5, y=2), 0)
+          |
+        info: Source
+         --> main.py:5:23
+          |
+        3 | def my_other_func(ab, y): ...
+        4 |
+        5 | my_other_func(my_func(ab=5, y=2), 0)
+          |                       ^^
+        6 | my_func(my_other_func(ab=5, y=2), 0)
+          |
+        ");
+    }
+
+    /// goto-definition on a nested call using a keyword arg where both funcs have that arg name
+    ///
+    /// In this case they ultimately have different signatures.
+    #[test]
+    fn goto_definition_nested_keyword_arg2() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+def my_func(ab, y, z = None): ...
+def my_other_func(ab, y): ...
+
+my_other_func(my_func(ab=5, y=2), 0)
+my_func(my_other_func(a<CURSOR>b=5, y=2), 0)
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Definition
+         --> main.py:2:13
+          |
+        2 | def my_func(ab, y, z = None): ...
+          |             ^^
+        3 | def my_other_func(ab, y): ...
+          |
+        info: Source
+         --> main.py:6:23
+          |
+        5 | my_other_func(my_func(ab=5, y=2), 0)
+        6 | my_func(my_other_func(ab=5, y=2), 0)
+          |                       ^^
+          |
+        ");
+    }
+
+    /// goto-definition on a nested call using a keyword arg where both funcs have that arg name
+    ///
+    /// In this case they have identical signatures.
+    #[test]
+    fn goto_definition_nested_keyword_arg3() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+def my_func(ab, y): ...
+def my_other_func(ab, y): ...
+
+my_other_func(my_func(a<CURSOR>b=5, y=2), 0)
+my_func(my_other_func(ab=5, y=2), 0)
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Definition
+         --> main.py:3:19
+          |
+        2 | def my_func(ab, y): ...
+        3 | def my_other_func(ab, y): ...
+          |                   ^^
+        4 |
+        5 | my_other_func(my_func(ab=5, y=2), 0)
+          |
+        info: Source
+         --> main.py:5:23
+          |
+        3 | def my_other_func(ab, y): ...
+        4 |
+        5 | my_other_func(my_func(ab=5, y=2), 0)
+          |                       ^^
+        6 | my_func(my_other_func(ab=5, y=2), 0)
+          |
+        ");
+    }
+
+    /// goto-definition on a nested call using a keyword arg where both funcs have that arg name
+    ///
+    /// In this case they have identical signatures.
+    #[test]
+    fn goto_definition_nested_keyword_arg4() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+def my_func(ab, y): ...
+def my_other_func(ab, y): ...
+
+my_other_func(my_func(ab=5, y=2), 0)
+my_func(my_other_func(a<CURSOR>b=5, y=2), 0)
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Definition
+         --> main.py:2:13
+          |
+        2 | def my_func(ab, y): ...
+          |             ^^
+        3 | def my_other_func(ab, y): ...
+          |
+        info: Source
+         --> main.py:6:23
+          |
+        5 | my_other_func(my_func(ab=5, y=2), 0)
+        6 | my_func(my_other_func(ab=5, y=2), 0)
+          |                       ^^
+          |
+        ");
+    }
+
     impl CursorTest {
         fn goto_definition(&self) -> String {
             let Some(targets) = goto_definition(&self.db, self.cursor.file, self.cursor.offset)
