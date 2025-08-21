@@ -1,3 +1,7 @@
+"""
+opcode module - potentially shared between dis and other modules which
+operate on bytecodes (e.g. peephole optimizers).
+"""
 import sys
 from typing import Final, Literal
 
@@ -44,4 +48,6 @@ opmap: Final[dict[str, int]]
 HAVE_ARGUMENT: Final = 43
 EXTENDED_ARG: Final = 69
 
-def stack_effect(opcode: int, oparg: int | None = None, /, *, jump: bool | None = None) -> int: ...
+def stack_effect(opcode: int, oparg: int | None = None, /, *, jump: bool | None = None) -> int:
+    """Compute the stack effect of the opcode.
+"""
