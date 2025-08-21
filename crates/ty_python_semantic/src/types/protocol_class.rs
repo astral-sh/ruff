@@ -14,7 +14,7 @@ use crate::{
     },
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral,
-        ClassType, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
+        ClassType, FindLegacyTypeVarsVisitor, HasDivergentTypeVisitor, HasRelationToVisitor,
         InstanceFallbackShadowsNonDataDescriptor, IsDisjointVisitor, KnownFunction,
         MemberLookupPolicy, NormalizedVisitor, PropertyInstanceType, Signature, Type, TypeMapping,
         TypeQualifiers, TypeRelation, TypeVarVariance, VarianceInferable,
@@ -513,6 +513,15 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
             ProtocolMemberKind::Property(property) => Type::PropertyInstance(*property),
             ProtocolMemberKind::Other(ty) => *ty,
         }
+    }
+
+    pub(super) fn has_divergent_type_impl(
+        &self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        visitor: &HasDivergentTypeVisitor<'db>,
+    ) -> bool {
+        self.ty().has_divergent_type_impl(db, div, visitor)
     }
 
     pub(super) fn has_disjoint_type_from(

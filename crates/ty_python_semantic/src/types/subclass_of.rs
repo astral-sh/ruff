@@ -4,9 +4,9 @@ use crate::types::constraints::ConstraintSet;
 use crate::types::variance::VarianceInferable;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, DynamicType,
-    FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, KnownClass,
-    MaterializationKind, MemberLookupPolicy, NormalizedVisitor, SpecialFormType, Type, TypeMapping,
-    TypeRelation,
+    FindLegacyTypeVarsVisitor, HasDivergentTypeVisitor, HasRelationToVisitor, IsDisjointVisitor,
+    KnownClass, MaterializationKind, MemberLookupPolicy, NormalizedVisitor, SpecialFormType, Type,
+    TypeMapping, TypeRelation,
 };
 use crate::{Db, FxOrderSet};
 
@@ -192,6 +192,18 @@ impl<'db> SubclassOfType<'db> {
         self.subclass_of
             .into_class()
             .is_some_and(|class| class.class_literal(db).0.is_typed_dict(db))
+    }
+
+    pub(super) fn has_divergent_type_impl(
+        self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        visitor: &HasDivergentTypeVisitor<'db>,
+    ) -> bool {
+        match self.subclass_of {
+            SubclassOfInner::Class(class) => class.has_divergent_type_impl(db, div, visitor),
+            SubclassOfInner::Dynamic(_) => false,
+        }
     }
 }
 
