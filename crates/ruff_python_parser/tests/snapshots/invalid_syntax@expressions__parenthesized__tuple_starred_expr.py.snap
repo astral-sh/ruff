@@ -462,9 +462,7 @@ Module(
                                                 parameters: Some(
                                                     Parameters {
                                                         range: 296..297,
-                                                        node_index: AtomicNodeIndex(
-                                                            0,
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         posonlyargs: [],
                                                         args: [
                                                             ParameterWithDefault {
@@ -520,9 +518,7 @@ Module(
                                                 parameters: Some(
                                                     Parameters {
                                                         range: 313..314,
-                                                        node_index: AtomicNodeIndex(
-                                                            0,
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         posonlyargs: [],
                                                         args: [
                                                             ParameterWithDefault {
@@ -1102,9 +1098,7 @@ Module(
                                                 parameters: Some(
                                                     Parameters {
                                                         range: 491..492,
-                                                        node_index: AtomicNodeIndex(
-                                                            0,
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         posonlyargs: [],
                                                         args: [
                                                             ParameterWithDefault {
@@ -1160,9 +1154,7 @@ Module(
                                                 parameters: Some(
                                                     Parameters {
                                                         range: 508..509,
-                                                        node_index: AtomicNodeIndex(
-                                                            0,
-                                                        ),
+                                                        node_index: AtomicNodeIndex(..),
                                                         posonlyargs: [],
                                                         args: [
                                                             ParameterWithDefault {

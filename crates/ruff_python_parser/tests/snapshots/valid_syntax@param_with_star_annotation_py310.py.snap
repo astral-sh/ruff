@@ -60,9 +60,7 @@ Module(
                     type_params: None,
                     parameters: Parameters {
                         range: 214..225,
-                        node_index: AtomicNodeIndex(
-                            0,
-                        ),
+                        node_index: AtomicNodeIndex(..),
                         posonlyargs: [],
                         args: [],
                         vararg: Some(
@@ -120,9 +118,7 @@ Module(
                     type_params: None,
                     parameters: Parameters {
                         range: 238..290,
-                        node_index: AtomicNodeIndex(
-                            0,
-                        ),
+                        node_index: AtomicNodeIndex(..),
                         posonlyargs: [],
                         args: [],
                         vararg: Some(
@@ -207,9 +203,7 @@ Module(
                     type_params: None,
                     parameters: Parameters {
                         range: 303..362,
-                        node_index: AtomicNodeIndex(
-                            0,
-                        ),
+                        node_index: AtomicNodeIndex(..),
                         posonlyargs: [],
                         args: [],
                         vararg: Some(
@@ -312,9 +306,7 @@ Module(
                     type_params: None,
                     parameters: Parameters {
                         range: 375..400,
-                        node_index: AtomicNodeIndex(
-                            0,
-                        ),
+                        node_index: AtomicNodeIndex(..),
                         posonlyargs: [],
                         args: [],
                         vararg: Some(
@@ -392,9 +384,7 @@ Module(
                     type_params: None,
                     parameters: Parameters {
                         range: 415..426,
-                        node_index: AtomicNodeIndex(
-                            0,
-                        ),
+                        node_index: AtomicNodeIndex(..),
                         posonlyargs: [],
                         args: [],
                         vararg: Some(

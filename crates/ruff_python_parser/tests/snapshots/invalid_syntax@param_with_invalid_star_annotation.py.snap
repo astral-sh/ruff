@@ -24,9 +24,7 @@ Module(
                     type_params: None,
                     parameters: Parameters {
                         range: 7..17,
-                        node_index: AtomicNodeIndex(
-                            0,
-                        ),
+                        node_index: AtomicNodeIndex(..),
                         posonlyargs: [],
                         args: [],
                         vararg: Some(
@@ -91,9 +89,7 @@ Module(
                     type_params: None,
                     parameters: Parameters {
                         range: 30..52,
-                        node_index: AtomicNodeIndex(
-                            0,
-                        ),
+                        node_index: AtomicNodeIndex(..),
                         posonlyargs: [],
                         args: [],
                         vararg: Some(
@@ -173,9 +169,7 @@ Module(
                     type_params: None,
                     parameters: Parameters {
                         range: 65..85,
-                        node_index: AtomicNodeIndex(
-                            0,
-                        ),
+                        node_index: AtomicNodeIndex(..),
                         posonlyargs: [],
                         args: [],
                         vararg: Some(
@@ -257,9 +251,7 @@ Module(
                     type_params: None,
                     parameters: Parameters {
                         range: 98..115,
-                        node_index: AtomicNodeIndex(
-                            0,
-                        ),
+                        node_index: AtomicNodeIndex(..),
                         posonlyargs: [],
                         args: [],
                         vararg: Some(

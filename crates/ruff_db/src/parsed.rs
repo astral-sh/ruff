@@ -92,14 +92,14 @@ impl ParsedModule {
         self.inner.store(None);
     }
 
-    /// Returns a pointer for this [`ParsedModule`].
+    /// Returns the pointer address of this [`ParsedModule`].
     ///
     /// The pointer uniquely identifies the module within the current Salsa revision,
     /// regardless of whether particular [`ParsedModuleRef`] instances are garbage collected.
-    pub fn as_ptr(&self) -> *const () {
+    pub fn addr(&self) -> usize {
         // Note that the outer `Arc` in `inner` is stable across garbage collection, while the inner
         // `Arc` within the `ArcSwap` may change.
-        Arc::as_ptr(&self.inner).cast()
+        Arc::as_ptr(&self.inner).addr()
     }
 }
 

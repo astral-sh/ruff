@@ -1,3 +1,4 @@
+use std::num::NonZeroU32;
 use std::sync::atomic::{AtomicU32, Ordering};
 
 /// An AST node that has an index.
@@ -19,19 +20,18 @@ where
 ///
 /// This type is interiorly mutable to allow assigning node indices
 /// on-demand after parsing.
-#[derive(Default)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct AtomicNodeIndex(AtomicU32);
 
 impl AtomicNodeIndex {
     /// Returns a placeholder `AtomicNodeIndex`.
     pub const fn dummy() -> AtomicNodeIndex {
-        AtomicNodeIndex(AtomicU32::new(u32::MAX))
+        AtomicNodeIndex(AtomicU32::new(u32::MAX - 1))
     }
 
     /// Load the current value of the `AtomicNodeIndex`.
     pub fn load(&self) -> NodeIndex {
-        NodeIndex(self.0.load(Ordering::Relaxed))
+        NodeIndex::from(self.0.load(Ordering::Relaxed))
     }
 
     /// Set the value of the `AtomicNodeIndex`.
@@ -40,30 +40,30 @@ impl AtomicNodeIndex {
     }
 }
 
+impl Default for AtomicNodeIndex {
+    fn default() -> Self {
+        Self::dummy()
+    }
+}
+
 /// A unique index for a node within an AST.
 #[derive(PartialEq, Eq, Debug, PartialOrd, Ord, Clone, Copy, Hash)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct NodeIndex(u32);
+pub struct NodeIndex(NonZeroU32);
 
 impl NodeIndex {
     pub fn as_usize(self) -> usize {
-        self.0 as _
+        self.as_u32() as _
     }
 
     pub fn as_u32(self) -> u32 {
-        self.0
+        self.0.get() - 1
     }
 }
 
 impl From<u32> for NodeIndex {
     fn from(value: u32) -> Self {
-        NodeIndex(value)
-    }
-}
-
-impl From<u32> for AtomicNodeIndex {
-    fn from(value: u32) -> Self {
-        AtomicNodeIndex(AtomicU32::from(value))
+        NodeIndex(NonZeroU32::new(value + 1).unwrap())
     }
 }
 

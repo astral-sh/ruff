@@ -57,9 +57,7 @@ Module(
                     ),
                     parameters: Parameters {
                         range: 817..819,
-                        node_index: AtomicNodeIndex(
-                            0,
-                        ),
+                        node_index: AtomicNodeIndex(..),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -130,9 +128,7 @@ Module(
                     ),
                     parameters: Parameters {
                         range: 855..857,
-                        node_index: AtomicNodeIndex(
-                            0,
-                        ),
+                        node_index: AtomicNodeIndex(..),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -203,9 +199,7 @@ Module(
                     ),
                     parameters: Parameters {
                         range: 889..891,
-                        node_index: AtomicNodeIndex(
-                            0,
-                        ),
+                        node_index: AtomicNodeIndex(..),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -263,9 +257,7 @@ Module(
                     ),
                     parameters: Parameters {
                         range: 931..933,
-                        node_index: AtomicNodeIndex(
-                            0,
-                        ),
+                        node_index: AtomicNodeIndex(..),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -323,9 +315,7 @@ Module(
                     ),
                     parameters: Parameters {
                         range: 976..976,
-                        node_index: AtomicNodeIndex(
-                            0,
-                        ),
+                        node_index: AtomicNodeIndex(..),
                         posonlyargs: [],
                         args: [],
                         vararg: None,

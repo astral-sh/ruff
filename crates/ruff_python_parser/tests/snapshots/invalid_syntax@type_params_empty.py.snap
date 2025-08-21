@@ -30,9 +30,7 @@ Module(
                     ),
                     parameters: Parameters {
                         range: 9..11,
-                        node_index: AtomicNodeIndex(
-                            0,
-                        ),
+                        node_index: AtomicNodeIndex(..),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
