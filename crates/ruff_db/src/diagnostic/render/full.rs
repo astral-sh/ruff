@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::num::NonZeroUsize;
 
 use anstyle::Style;
-use similar::{ChangeTag, TextDiff};
+use similar::{ChangeTag, InlineChange, TextDiff};
 
 use ruff_annotate_snippets::Renderer as AnnotateRenderer;
 use ruff_diagnostics::{Applicability, Fix};
@@ -120,6 +120,8 @@ impl std::fmt::Display for Diff<'_> {
 
         let diff = TextDiff::from_lines(source_text, &output);
 
+        let mut display_lines = Vec::new();
+
         let message = match self.fix.applicability() {
             // TODO(zanieb): Adjust this messaging once it's user-facing
             Applicability::Safe => "Safe fix",
@@ -131,7 +133,10 @@ impl std::fmt::Display for Diff<'_> {
         // we're getting rid of this soon anyway, so I didn't think it was worth adding another
         // style to the stylesheet temporarily. The color doesn't appear at all in the snapshot
         // tests, which is the only place these are currently used.
-        writeln!(f, "ℹ {}", fmt_styled(message, self.stylesheet.separator))?;
+        display_lines.push(DisplayLine::Header {
+            message,
+            style: self.stylesheet.separator,
+        });
 
         let (largest_old, largest_new) = diff
             .ops()
@@ -143,7 +148,7 @@ impl std::fmt::Display for Diff<'_> {
 
         for (idx, group) in diff.grouped_ops(3).iter().enumerate() {
             if idx > 0 {
-                writeln!(f, "{:-^1$}", "-", 80)?;
+                display_lines.push(DisplayLine::Hline);
             }
             for op in group {
                 for change in diff.iter_inline_changes(op) {
@@ -158,37 +163,26 @@ impl std::fmt::Display for Diff<'_> {
                     let old_index = change.old_index().map(OneIndexed::from_zero_indexed);
                     let new_index = change.new_index().map(OneIndexed::from_zero_indexed);
 
-                    write!(
-                        f,
-                        "{} {} |{}",
-                        Line {
+                    display_lines.push(DisplayLine::Diff {
+                        old: Line {
                             index: old_index,
-                            width: digit_with
+                            width: digit_with,
                         },
-                        Line {
+                        new: Line {
                             index: new_index,
-                            width: digit_with
+                            width: digit_with,
                         },
-                        fmt_styled(line_style.apply_to(sign), self.stylesheet.emphasis),
-                    )?;
-
-                    for (emphasized, value) in change.iter_strings_lossy() {
-                        let value = show_nonprinting(&value);
-                        if emphasized {
-                            write!(
-                                f,
-                                "{}",
-                                fmt_styled(line_style.apply_to(&value), self.stylesheet.underline)
-                            )?;
-                        } else {
-                            write!(f, "{}", line_style.apply_to(&value))?;
-                        }
-                    }
-                    if change.missing_newline() {
-                        writeln!(f)?;
-                    }
+                        sign,
+                        change,
+                        style: line_style,
+                        emphasis: self.stylesheet.emphasis,
+                    });
                 }
             }
+        }
+
+        for line in display_lines {
+            write!(f, "{line}")?;
         }
 
         Ok(())
@@ -235,6 +229,60 @@ impl std::fmt::Display for Line {
             }
             Some(idx) => write!(f, "{:<width$}", idx, width = self.width.get()),
         }
+    }
+}
+
+enum DisplayLine<'a> {
+    /// A header line like `ℹ Safe fix`.
+    Header { message: &'static str, style: Style },
+    /// A horizontal line, used for separating groups.
+    Hline,
+    Diff {
+        old: Line,
+        new: Line,
+        sign: &'static str,
+        change: InlineChange<'a, str>,
+        style: LineStyle,
+        emphasis: Style,
+    },
+}
+
+impl std::fmt::Display for DisplayLine<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DisplayLine::Header { message, style } => {
+                writeln!(f, "ℹ {}", fmt_styled(message, *style))?
+            }
+            DisplayLine::Hline => writeln!(f, "{:-^1$}", "-", 80)?,
+            DisplayLine::Diff {
+                old,
+                new,
+                sign,
+                change,
+                style,
+                emphasis,
+            } => {
+                write!(
+                    f,
+                    "{old} {new} |{sign}",
+                    sign = fmt_styled(style.apply_to(sign), *emphasis),
+                )?;
+
+                for (emphasized, value) in change.iter_strings_lossy() {
+                    let value = show_nonprinting(&value);
+                    if emphasized {
+                        write!(f, "{}", fmt_styled(style.apply_to(&value), *emphasis))?;
+                    } else {
+                        write!(f, "{}", style.apply_to(&value))?;
+                    }
+                }
+                if change.missing_newline() {
+                    writeln!(f)?;
+                }
+            }
+        }
+
+        Ok(())
     }
 }
 
