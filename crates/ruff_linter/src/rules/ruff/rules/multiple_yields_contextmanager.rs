@@ -2,7 +2,10 @@ use ast::{Expr, StmtFunctionDef};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::helpers::map_callable;
-use ruff_python_ast::{self as ast, visitor::source_order};
+use ruff_python_ast::{
+    self as ast,
+    visitor::source_order::{self, SourceOrderVisitor},
+};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 
@@ -185,6 +188,12 @@ impl<'a> YieldTracker<'a> {
 
     fn push_scope(&mut self, scope: YieldScope<'a>) {
         self.scopes.push(scope);
+    }
+
+    fn handle_loop(&mut self, body: &'a [ast::Stmt], orelse: &'a [ast::Stmt]) {
+        self.visit_body(body);
+        self.push_scope(YieldScope::new());
+        self.visit_body(orelse);
     }
 
     // For exclusive branches propagate maximum yield count
@@ -425,20 +434,15 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldTracker<'a> {
             }
             ast::Stmt::While(loop_stmt @ ast::StmtWhile { body, orelse, .. }) => {
                 let node = ruff_python_ast::AnyNodeRef::StmtWhile(loop_stmt);
-
                 if self.enter_node(node).is_traverse() {
-                    self.visit_body(body);
-                    self.push_scope(YieldScope::new());
-                    self.visit_body(orelse);
+                    self.handle_loop(body, orelse);
                     self.leave_node(node);
                 }
             }
             ast::Stmt::For(loop_stmt @ ast::StmtFor { body, orelse, .. }) => {
                 let node = ruff_python_ast::AnyNodeRef::StmtFor(loop_stmt);
                 if self.enter_node(node).is_traverse() {
-                    self.visit_body(body);
-                    self.push_scope(YieldScope::new());
-                    self.visit_body(orelse);
+                    self.handle_loop(body, orelse);
                     self.leave_node(node);
                 }
             }
