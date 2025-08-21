@@ -622,6 +622,33 @@ impl OneIndexed {
     pub fn checked_sub(self, rhs: Self) -> Option<Self> {
         self.0.get().checked_sub(rhs.get()).and_then(Self::new)
     }
+
+    /// Calculate the number of digits in `self`.
+    ///
+    /// This is primarily intended for computing the length of the string representation for
+    /// formatted printing.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ruff_source_file::OneIndexed;
+    ///
+    /// let one = OneIndexed::new(1).unwrap();
+    /// assert_eq!(one.digits().get(), 1);
+    ///
+    /// let hundred = OneIndexed::new(100).unwrap();
+    /// assert_eq!(hundred.digits().get(), 3);
+    ///
+    /// let thousand = OneIndexed::new(1000).unwrap();
+    /// assert_eq!(thousand.digits().get(), 4);
+    /// ```
+    pub const fn digits(self) -> NonZeroUsize {
+        // Safety: the 1+ ensures this is always non-zero, and
+        // `usize::MAX.ilog10()` << `usize::MAX`, so the result is always safe
+        // to cast to a usize, even though it's returned as a u32
+        // (u64::MAX.ilog10() is 19).
+        NonZeroUsize::new(1 + self.0.get().ilog10() as usize).unwrap()
+    }
 }
 
 impl Default for OneIndexed {

@@ -6,6 +6,7 @@ use lsp_types::{
     CompletionItem, CompletionItemKind, CompletionParams, CompletionResponse, Documentation, Url,
 };
 use ruff_db::source::{line_index, source_text};
+use ruff_source_file::OneIndexed;
 use ty_ide::completion;
 use ty_project::ProjectDatabase;
 use ty_python_semantic::CompletionKind;
@@ -59,7 +60,8 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
             return Ok(None);
         }
 
-        let max_index_len = completions.len().saturating_sub(1).to_string().len();
+        // Safety: we just checked that completions is not empty.
+        let max_index_len = OneIndexed::new(completions.len()).unwrap().digits().get();
         let items: Vec<CompletionItem> = completions
             .into_iter()
             .enumerate()
