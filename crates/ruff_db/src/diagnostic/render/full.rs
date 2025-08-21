@@ -62,9 +62,11 @@ impl<'a> FullRenderer<'a> {
 
             if self.config.show_fix_diff {
                 if let Some(diff) = Diff::from_diagnostic(diag, &stylesheet, self.resolver) {
-                    writeln!(f, "{diff}")?;
+                    write!(f, "{diff}")?;
                 }
             }
+
+            writeln!(f)?;
         }
 
         Ok(())
