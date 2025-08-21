@@ -139,7 +139,7 @@ impl<'a> YieldTracker<'a> {
     }
 
     fn emit_multiple_violations(&mut self, yields: &[&'a Expr]) {
-        // Only report the second to last violations
+        // The first yield conforms to the protocol
         for &yield_expr in yields.iter().skip(1) {
             self.emit_violation(yield_expr);
         }
