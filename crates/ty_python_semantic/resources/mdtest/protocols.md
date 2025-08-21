@@ -482,6 +482,8 @@ reveal_type(get_protocol_members(Baz2))
 
 ## Protocol members in statically known branches
 
+<!-- snapshot-diagnostics -->
+
 The list of protocol members does not include any members declared in branches that are statically
 known to be unreachable:
 
@@ -492,7 +494,7 @@ python-version = "3.9"
 
 ```py
 import sys
-from typing_extensions import Protocol, get_protocol_members
+from typing_extensions import Protocol, get_protocol_members, reveal_type
 
 class Foo(Protocol):
     if sys.version_info >= (3, 10):
@@ -501,7 +503,7 @@ class Foo(Protocol):
         def c(self) -> None: ...
     else:
         d: int
-        e = 56
+        e = 56  # error: [ambiguous-protocol-member]
         def f(self) -> None: ...
 
 reveal_type(get_protocol_members(Foo))  # revealed: frozenset[Literal["d", "e", "f"]]
@@ -797,9 +799,9 @@ def f(arg: HasXWithDefault):
 ```
 
 Assignments in a class body of a protocol -- of any kind -- are not permitted by ty unless the
-symbol being assigned to is also explicitly declared in the protocol's class body. Note that this is
-stricter validation of protocol members than many other type checkers currently apply (as of
-2025/04/21).
+symbol being assigned to is also explicitly declared in the body of the protocol class or one of its
+superclasses. Note that this is stricter validation of protocol members than many other type
+checkers currently apply (as of 2025/04/21).
 
 The reason for this strict validation is that undeclared variables in the class body would lead to
 an ambiguous interface being declared by the protocol.
@@ -823,24 +825,75 @@ class LotsOfBindings(Protocol):
 
     class Nested: ...  # also weird, but we should also probably allow it
     class NestedProtocol(Protocol): ...  # same here...
-    e = 72  # TODO: this should error with `[invalid-protocol]` (`e` is not declared)
+    e = 72  # error: [ambiguous-protocol-member]
 
-    f, g = (1, 2)  # TODO: this should error with `[invalid-protocol]` (`f` and `g` are not declared)
+    # error: [ambiguous-protocol-member] "Consider adding an annotation, e.g. `f: int = ...`"
+    # error: [ambiguous-protocol-member] "Consider adding an annotation, e.g. `g: int = ...`"
+    f, g = (1, 2)
 
-    h: int = (i := 3)  # TODO: this should error with `[invalid-protocol]` (`i` is not declared)
+    h: int = (i := 3)  # error: [ambiguous-protocol-member]
 
-    for j in range(42):  # TODO: this should error with `[invalid-protocol]` (`j` is not declared)
+    for j in range(42):  # error: [ambiguous-protocol-member]
         pass
 
-    with MyContext() as k:  # TODO: this should error with `[invalid-protocol]` (`k` is not declared)
+    with MyContext() as k:  # error: [ambiguous-protocol-member]
         pass
 
     match object():
-        case l:  # TODO: this should error with `[invalid-protocol]` (`l` is not declared)
+        case l:  # error: [ambiguous-protocol-member]
             ...
 
 # revealed: frozenset[Literal["Nested", "NestedProtocol", "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l"]]
 reveal_type(get_protocol_members(LotsOfBindings))
+
+class Foo(Protocol):
+    a: int
+
+class Bar(Foo, Protocol):
+    a = 42  # fine, because it's declared in the superclass
+
+reveal_type(get_protocol_members(Bar))  # revealed: frozenset[Literal["a"]]
+```
+
+A binding-without-declaration will not be reported if it occurs in a branch that we can statically
+determine to be unreachable. The reason is that we don't consider it to be a protocol member at all
+if all definitions for the variable are in unreachable blocks:
+
+```py
+import sys
+
+class Protocol694(Protocol):
+    if sys.version_info > (3, 694):
+        x = 42  # no error!
+```
+
+If there are multiple bindings of the variable in the class body, however, and at least one of the
+bindings occurs in a block of code that is understood to be (possibly) reachable, a diagnostic will
+be reported. The diagnostic will be attached to the first binding that occurs in the class body,
+even if that first definition occurs in an unreachable block:
+
+```py
+class Protocol695(Protocol):
+    if sys.version_info > (3, 695):
+        x = 42
+    else:
+        x = 42
+
+    x = 56  # error: [ambiguous-protocol-member]
+```
+
+In order for the variable to be considered declared, the declaration of the variable must also take
+place in a block of code that is understood to be (possibly) reachable:
+
+```py
+class Protocol696(Protocol):
+    if sys.version_info > (3, 696):
+        x: int
+    else:
+        x = 42  # error: [ambiguous-protocol-member]
+        y: int
+
+    y = 56  # no error
 ```
 
 Attribute members are allowed to have assignments in methods on the protocol class, just like
@@ -941,6 +994,40 @@ or a subtype of:
 ```py
 static_assert(not is_assignable_to(HasX, Foo))
 static_assert(not is_subtype_of(HasX, Foo))
+```
+
+## Diagnostics for protocols with invalid attribute members
+
+This is a short appendix to the previous section with the `snapshot-diagnostics` directive enabled
+(enabling snapshots for the previous section in its entirety would lead to a huge snapshot, since
+it's a large section).
+
+<!-- snapshot-diagnostics -->
+
+```py
+from typing import Protocol
+
+def coinflip() -> bool:
+    return True
+
+class A(Protocol):
+    # The `x` and `y` members attempt to use Python-2-style type comments
+    # to indicate that the type should be `int | None` and `str` respectively,
+    # but we don't support those
+
+    # error: [ambiguous-protocol-member]
+    a = None  # type: int
+    # error: [ambiguous-protocol-member]
+    b = ...  # type: str
+
+    if coinflip():
+        c = 1  # error: [ambiguous-protocol-member]
+    else:
+        c = 2
+
+    # error: [ambiguous-protocol-member]
+    for d in range(42):
+        pass
 ```
 
 ## Equivalence of protocols

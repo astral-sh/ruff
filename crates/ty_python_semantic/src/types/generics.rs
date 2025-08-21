@@ -550,12 +550,7 @@ impl<'db> Specialization<'db> {
             .into_iter()
             .zip(self.types(db))
             .map(|(bound_typevar, vartype)| {
-                let variance = match bound_typevar.typevar(db).variance(db) {
-                    TypeVarVariance::Invariant => TypeVarVariance::Invariant,
-                    TypeVarVariance::Covariant => variance,
-                    TypeVarVariance::Contravariant => variance.flip(),
-                    TypeVarVariance::Bivariant => unreachable!(),
-                };
+                let variance = bound_typevar.variance_with_polarity(db, variance);
                 vartype.materialize(db, variance)
             })
             .collect();
@@ -601,7 +596,7 @@ impl<'db> Specialization<'db> {
             //   - contravariant: verify that other_type <: self_type
             //   - invariant: verify that self_type <: other_type AND other_type <: self_type
             //   - bivariant: skip, can't make subtyping/assignability false
-            let compatible = match bound_typevar.typevar(db).variance(db) {
+            let compatible = match bound_typevar.variance(db) {
                 TypeVarVariance::Invariant => match relation {
                     TypeRelation::Subtyping => self_type.when_equivalent_to(db, *other_type),
                     TypeRelation::Assignability => C::from_bool(
@@ -648,7 +643,7 @@ impl<'db> Specialization<'db> {
             //   - contravariant: verify that other_type == self_type
             //   - invariant: verify that self_type == other_type
             //   - bivariant: skip, can't make equivalence false
-            let compatible = match bound_typevar.typevar(db).variance(db) {
+            let compatible = match bound_typevar.variance(db) {
                 TypeVarVariance::Invariant
                 | TypeVarVariance::Covariant
                 | TypeVarVariance::Contravariant => {

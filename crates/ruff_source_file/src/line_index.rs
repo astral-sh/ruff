@@ -562,11 +562,11 @@ pub struct OneIndexed(NonZeroUsize);
 
 impl OneIndexed {
     /// The largest value that can be represented by this integer type
-    pub const MAX: Self = unwrap(Self::new(usize::MAX));
+    pub const MAX: Self = Self::new(usize::MAX).unwrap();
     // SAFETY: These constants are being initialized with non-zero values
     /// The smallest value that can be represented by this integer type.
-    pub const MIN: Self = unwrap(Self::new(1));
-    pub const ONE: NonZeroUsize = unwrap(NonZeroUsize::new(1));
+    pub const MIN: Self = Self::new(1).unwrap();
+    pub const ONE: NonZeroUsize = NonZeroUsize::new(1).unwrap();
 
     /// Creates a non-zero if the given value is not zero.
     pub const fn new(value: usize) -> Option<Self> {
@@ -633,15 +633,6 @@ impl Default for OneIndexed {
 impl fmt::Display for OneIndexed {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         std::fmt::Debug::fmt(&self.0.get(), f)
-    }
-}
-
-/// A const `Option::unwrap` without nightly features:
-/// [Tracking issue](https://github.com/rust-lang/rust/issues/67441)
-const fn unwrap<T: Copy>(option: Option<T>) -> T {
-    match option {
-        Some(value) => value,
-        None => panic!("unwrapping None"),
     }
 }
 

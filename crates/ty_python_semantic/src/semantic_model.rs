@@ -6,7 +6,7 @@ use ruff_source_file::LineIndex;
 
 use crate::Db;
 use crate::module_name::ModuleName;
-use crate::module_resolver::{KnownModule, Module, resolve_module};
+use crate::module_resolver::{KnownModule, Module, list_modules, resolve_module};
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::FileScopeId;
 use crate::semantic_index::semantic_index;
@@ -41,8 +41,24 @@ impl<'db> SemanticModel<'db> {
         resolve_module(self.db, module_name)
     }
 
+    /// Returns completions for symbols available in a `import <CURSOR>` context.
+    pub fn import_completions(&self) -> Vec<Completion<'db>> {
+        list_modules(self.db)
+            .into_iter()
+            .map(|module| {
+                let builtin = module.is_known(self.db, KnownModule::Builtins);
+                let ty = Type::module_literal(self.db, self.file, module);
+                Completion {
+                    name: Name::new(module.name(self.db).as_str()),
+                    ty,
+                    builtin,
+                }
+            })
+            .collect()
+    }
+
     /// Returns completions for symbols available in a `from module import <CURSOR>` context.
-    pub fn import_completions(
+    pub fn from_import_completions(
         &self,
         import: &ast::StmtImportFrom,
         _name: Option<usize>,
@@ -61,6 +77,79 @@ impl<'db> SemanticModel<'db> {
         self.module_completions(&module_name)
     }
 
+    /// Returns completions only for submodules for the module
+    /// identified by `name` in `import`.
+    ///
+    /// For example, `import re, os.<CURSOR>, zlib`.
+    pub fn import_submodule_completions(
+        &self,
+        import: &ast::StmtImport,
+        name: usize,
+    ) -> Vec<Completion<'db>> {
+        let module_ident = &import.names[name].name;
+        let Some((parent_ident, _)) = module_ident.rsplit_once('.') else {
+            return vec![];
+        };
+        let module_name =
+            match ModuleName::from_identifier_parts(self.db, self.file, Some(parent_ident), 0) {
+                Ok(module_name) => module_name,
+                Err(err) => {
+                    tracing::debug!(
+                        "Could not extract module name from `{module:?}`: {err:?}",
+                        module = module_ident,
+                    );
+                    return vec![];
+                }
+            };
+        self.import_submodule_completions_for_name(&module_name)
+    }
+
+    /// Returns completions only for submodules for the module
+    /// used in a `from module import attribute` statement.
+    ///
+    /// For example, `from os.<CURSOR>`.
+    pub fn from_import_submodule_completions(
+        &self,
+        import: &ast::StmtImportFrom,
+    ) -> Vec<Completion<'db>> {
+        let level = import.level;
+        let Some(module_ident) = import.module.as_deref() else {
+            return vec![];
+        };
+        let Some((parent_ident, _)) = module_ident.rsplit_once('.') else {
+            return vec![];
+        };
+        let module_name = match ModuleName::from_identifier_parts(
+            self.db,
+            self.file,
+            Some(parent_ident),
+            level,
+        ) {
+            Ok(module_name) => module_name,
+            Err(err) => {
+                tracing::debug!(
+                    "Could not extract module name from `{module:?}` with level {level}: {err:?}",
+                    module = import.module,
+                    level = import.level,
+                );
+                return vec![];
+            }
+        };
+        self.import_submodule_completions_for_name(&module_name)
+    }
+
+    /// Returns submodule-only completions for the given module.
+    fn import_submodule_completions_for_name(
+        &self,
+        module_name: &ModuleName,
+    ) -> Vec<Completion<'db>> {
+        let Some(module) = resolve_module(self.db, module_name) else {
+            tracing::debug!("Could not resolve module from `{module_name:?}`");
+            return vec![];
+        };
+        self.submodule_completions(&module)
+    }
+
     /// Returns completions for symbols available in the given module as if
     /// it were imported by this model's `File`.
     fn module_completions(&self, module_name: &ModuleName) -> Vec<Completion<'db>> {
@@ -75,11 +164,20 @@ impl<'db> SemanticModel<'db> {
         for crate::types::Member { name, ty } in crate::types::all_members(self.db, ty) {
             completions.push(Completion { name, ty, builtin });
         }
+        completions.extend(self.submodule_completions(&module));
+        completions
+    }
+
+    /// Returns completions for submodules of the given module.
+    fn submodule_completions(&self, module: &Module<'db>) -> Vec<Completion<'db>> {
+        let builtin = module.is_known(self.db, KnownModule::Builtins);
+
+        let mut completions = vec![];
         for submodule_basename in module.all_submodules(self.db) {
             let Some(basename) = ModuleName::new(submodule_basename.as_str()) else {
                 continue;
             };
-            let mut submodule_name = module_name.clone();
+            let mut submodule_name = module.name(self.db).clone();
             submodule_name.extend(&basename);
 
             let Some(submodule) = resolve_module(self.db, &submodule_name) else {

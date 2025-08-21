@@ -39,7 +39,7 @@ PTH101 `os.chmod()` should be replaced by `Path.chmod()`
    |
 help: Replace with `Path(...).chmod(...)`
 
-PTH102 `os.mkdir()` should be replaced by `Path.mkdir()`
+PTH102 [*] `os.mkdir()` should be replaced by `Path.mkdir()`
   --> import_from.py:11:7
    |
  9 | a = abspath(p)
@@ -49,8 +49,26 @@ PTH102 `os.mkdir()` should be replaced by `Path.mkdir()`
 12 | makedirs(p)
 13 | rename(p)
    |
+help: Replace with `Path(...).mkdir()`
 
-PTH103 `os.makedirs()` should be replaced by `Path.mkdir(parents=True)`
+ℹ Safe fix
+2  2  | from os import remove, unlink, getcwd, readlink, stat
+3  3  | from os.path import abspath, exists, expanduser, isdir, isfile, islink
+4  4  | from os.path import isabs, join, basename, dirname, samefile, splitext
+   5  |+import pathlib
+5  6  | 
+6  7  | p = "/foo"
+7  8  | q = "bar"
+8  9  | 
+9  10 | a = abspath(p)
+10 11 | aa = chmod(p)
+11    |-aaa = mkdir(p)
+   12 |+aaa = pathlib.Path(p).mkdir()
+12 13 | makedirs(p)
+13 14 | rename(p)
+14 15 | replace(p)
+
+PTH103 [*] `os.makedirs()` should be replaced by `Path.mkdir(parents=True)`
   --> import_from.py:12:1
    |
 10 | aa = chmod(p)
@@ -60,6 +78,25 @@ PTH103 `os.makedirs()` should be replaced by `Path.mkdir(parents=True)`
 13 | rename(p)
 14 | replace(p)
    |
+help: Replace with `Path(...).mkdir(parents=True)`
+
+ℹ Safe fix
+2  2  | from os import remove, unlink, getcwd, readlink, stat
+3  3  | from os.path import abspath, exists, expanduser, isdir, isfile, islink
+4  4  | from os.path import isabs, join, basename, dirname, samefile, splitext
+   5  |+import pathlib
+5  6  | 
+6  7  | p = "/foo"
+7  8  | q = "bar"
+--------------------------------------------------------------------------------
+9  10 | a = abspath(p)
+10 11 | aa = chmod(p)
+11 12 | aaa = mkdir(p)
+12    |-makedirs(p)
+   13 |+pathlib.Path(p).mkdir(parents=True)
+13 14 | rename(p)
+14 15 | replace(p)
+15 16 | rmdir(p)
 
 PTH104 `os.rename()` should be replaced by `Path.rename()`
   --> import_from.py:13:1

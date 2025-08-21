@@ -3,6 +3,7 @@ use ruff_python_ast::name::Name;
 use crate::place::PlaceAndQualifiers;
 use crate::semantic_index::definition::Definition;
 use crate::types::constraints::Constraints;
+use crate::types::variance::VarianceInferable;
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, ClassType, DynamicType,
     HasRelationToVisitor, IsDisjointVisitor, KnownClass, MemberLookupPolicy, NormalizedVisitor,
@@ -104,7 +105,7 @@ impl<'db> SubclassOfType<'db> {
                                 )
                                 .into(),
                             ),
-                            variance,
+                            Some(variance),
                             None,
                             TypeVarKind::Pep695,
                         ),
@@ -220,6 +221,15 @@ impl<'db> SubclassOfType<'db> {
         self.subclass_of
             .into_class()
             .is_some_and(|class| class.class_literal(db).0.is_typed_dict(db))
+    }
+}
+
+impl<'db> VarianceInferable<'db> for SubclassOfType<'db> {
+    fn variance_of(self, db: &dyn Db, typevar: BoundTypeVarInstance<'_>) -> TypeVarVariance {
+        match self.subclass_of {
+            SubclassOfInner::Dynamic(_) => TypeVarVariance::Bivariant,
+            SubclassOfInner::Class(class) => class.variance_of(db, typevar),
+        }
     }
 }
 

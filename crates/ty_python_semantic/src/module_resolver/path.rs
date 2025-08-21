@@ -37,6 +37,26 @@ impl ModulePath {
         )
     }
 
+    /// Returns true if this is a path to a "stub file."
+    ///
+    /// i.e., A module whose file extension is `pyi`.
+    #[must_use]
+    pub(crate) fn is_stub_file(&self) -> bool {
+        self.relative_path.extension() == Some("pyi")
+    }
+
+    /// Returns true if this is a path to a "stub package."
+    ///
+    /// i.e., A module whose top-most parent package corresponds to a
+    /// directory with a `-stubs` suffix in its name.
+    #[must_use]
+    pub(crate) fn is_stub_package(&self) -> bool {
+        let Some(first) = self.relative_path.components().next() else {
+            return false;
+        };
+        first.as_str().ends_with("-stubs")
+    }
+
     pub(crate) fn push(&mut self, component: &str) {
         if let Some(component_extension) = camino::Utf8Path::new(component).extension() {
             assert!(
@@ -231,6 +251,10 @@ impl ModulePath {
 
     #[must_use]
     pub(crate) fn to_module_name(&self) -> Option<ModuleName> {
+        fn strip_stubs(component: &str) -> &str {
+            component.strip_suffix("-stubs").unwrap_or(component)
+        }
+
         let ModulePath {
             search_path: _,
             relative_path,
@@ -239,13 +263,28 @@ impl ModulePath {
             stdlib_path_to_module_name(relative_path)
         } else {
             let parent = relative_path.parent()?;
+            let name = relative_path.file_stem()?;
+            if parent.as_str().is_empty() {
+                // Stubs should only be stripped when there is no
+                // extension. e.g., `foo-stubs` should be stripped
+                // by not `foo-stubs.pyi`. In the latter case,
+                // `ModuleName::new` will fail (which is what we want).
+                return ModuleName::new(if relative_path.extension().is_some() {
+                    name
+                } else {
+                    strip_stubs(relative_path.as_str())
+                });
+            }
+
             let parent_components = parent.components().enumerate().map(|(index, component)| {
                 let component = component.as_str();
 
-                // For stub packages, strip the `-stubs` suffix from the first component
-                // because it isn't a valid module name part AND the module name is the name without the `-stubs`.
+                // For stub packages, strip the `-stubs` suffix from
+                // the first component because it isn't a valid module
+                // name part AND the module name is the name without
+                // the `-stubs`.
                 if index == 0 {
-                    component.strip_suffix("-stubs").unwrap_or(component)
+                    strip_stubs(component)
                 } else {
                     component
                 }
@@ -256,7 +295,7 @@ impl ModulePath {
             if skip_final_part {
                 ModuleName::from_components(parent_components)
             } else {
-                ModuleName::from_components(parent_components.chain(relative_path.file_stem()))
+                ModuleName::from_components(parent_components.chain([name]))
             }
         }
     }
@@ -621,28 +660,44 @@ impl SearchPath {
     }
 
     #[must_use]
-    pub(crate) fn as_system_path(&self) -> Option<&SystemPath> {
-        match &*self.0 {
-            SearchPathInner::Extra(path)
-            | SearchPathInner::FirstParty(path)
-            | SearchPathInner::StandardLibraryCustom(path)
-            | SearchPathInner::StandardLibraryReal(path)
-            | SearchPathInner::SitePackages(path)
-            | SearchPathInner::Editable(path) => Some(path),
-            SearchPathInner::StandardLibraryVendored(_) => None,
+    pub(super) fn as_path(&self) -> SystemOrVendoredPathRef<'_> {
+        match *self.0 {
+            SearchPathInner::Extra(ref path)
+            | SearchPathInner::FirstParty(ref path)
+            | SearchPathInner::StandardLibraryCustom(ref path)
+            | SearchPathInner::StandardLibraryReal(ref path)
+            | SearchPathInner::SitePackages(ref path)
+            | SearchPathInner::Editable(ref path) => SystemOrVendoredPathRef::System(path),
+            SearchPathInner::StandardLibraryVendored(ref path) => {
+                SystemOrVendoredPathRef::Vendored(path)
+            }
         }
     }
 
     #[must_use]
+    pub(crate) fn as_system_path(&self) -> Option<&SystemPath> {
+        self.as_path().as_system_path()
+    }
+
+    #[must_use]
     pub(crate) fn as_vendored_path(&self) -> Option<&VendoredPath> {
-        match &*self.0 {
-            SearchPathInner::StandardLibraryVendored(path) => Some(path),
-            SearchPathInner::Extra(_)
-            | SearchPathInner::FirstParty(_)
-            | SearchPathInner::StandardLibraryCustom(_)
-            | SearchPathInner::StandardLibraryReal(_)
-            | SearchPathInner::SitePackages(_)
-            | SearchPathInner::Editable(_) => None,
+        self.as_path().as_vendored_path()
+    }
+
+    /// Returns a succinct string representing the *internal kind* of this
+    /// search path. This is useful in snapshot tests where one wants to
+    /// capture this specific detail about search paths.
+    #[cfg(test)]
+    #[must_use]
+    pub(crate) fn debug_kind(&self) -> &'static str {
+        match *self.0 {
+            SearchPathInner::Extra(_) => "extra",
+            SearchPathInner::FirstParty(_) => "first-party",
+            SearchPathInner::StandardLibraryCustom(_) => "std-custom",
+            SearchPathInner::StandardLibraryReal(_) => "std-real",
+            SearchPathInner::SitePackages(_) => "site-packages",
+            SearchPathInner::Editable(_) => "editable",
+            SearchPathInner::StandardLibraryVendored(_) => "std-vendored",
         }
     }
 }
@@ -731,6 +786,13 @@ impl<'db> SystemOrVendoredPathRef<'db> {
         }
     }
 
+    pub(super) fn extension(&self) -> Option<&str> {
+        match self {
+            Self::System(system) => system.extension(),
+            Self::Vendored(vendored) => vendored.extension(),
+        }
+    }
+
     pub(super) fn parent<'a>(&'a self) -> Option<SystemOrVendoredPathRef<'a>>
     where
         'a: 'db,
@@ -739,6 +801,32 @@ impl<'db> SystemOrVendoredPathRef<'db> {
             Self::System(system) => system.parent().map(Self::System),
             Self::Vendored(vendored) => vendored.parent().map(Self::Vendored),
         }
+    }
+
+    fn as_system_path(&self) -> Option<&'db SystemPath> {
+        match self {
+            SystemOrVendoredPathRef::System(path) => Some(path),
+            SystemOrVendoredPathRef::Vendored(_) => None,
+        }
+    }
+
+    fn as_vendored_path(&self) -> Option<&'db VendoredPath> {
+        match self {
+            SystemOrVendoredPathRef::Vendored(path) => Some(path),
+            SystemOrVendoredPathRef::System(_) => None,
+        }
+    }
+}
+
+impl<'a> From<&'a SystemPath> for SystemOrVendoredPathRef<'a> {
+    fn from(path: &'a SystemPath) -> SystemOrVendoredPathRef<'a> {
+        SystemOrVendoredPathRef::System(path)
+    }
+}
+
+impl<'a> From<&'a VendoredPath> for SystemOrVendoredPathRef<'a> {
+    fn from(path: &'a VendoredPath) -> SystemOrVendoredPathRef<'a> {
+        SystemOrVendoredPathRef::Vendored(path)
     }
 }
 
@@ -1231,5 +1319,48 @@ mod tests {
         assert_eq!(xml_etree.to_file(&resolver), None);
         assert!(!xml_etree.is_directory(&resolver));
         assert!(!xml_etree.is_regular_package(&resolver));
+    }
+
+    #[test]
+    fn strip_not_top_level_stubs_suffix() {
+        let TestCase { db, src, .. } = TestCaseBuilder::new().build();
+        let sp = SearchPath::first_party(db.system(), src).unwrap();
+        let mut mp = sp.to_module_path();
+        mp.push("foo-stubs");
+        mp.push("quux");
+        assert_eq!(
+            mp.to_module_name(),
+            Some(ModuleName::new_static("foo.quux").unwrap())
+        );
+    }
+
+    /// Tests that a module path of just `foo-stubs` will correctly be
+    /// converted to a module name of just `foo`.
+    ///
+    /// This is a regression test where this conversion ended up
+    /// treating the module path as invalid and returning `None` from
+    /// `ModulePath::to_module_name` instead.
+    #[test]
+    fn strip_top_level_stubs_suffix() {
+        let TestCase { db, src, .. } = TestCaseBuilder::new().build();
+        let sp = SearchPath::first_party(db.system(), src).unwrap();
+        let mut mp = sp.to_module_path();
+        mp.push("foo-stubs");
+        assert_eq!(
+            mp.to_module_name(),
+            Some(ModuleName::new_static("foo").unwrap())
+        );
+    }
+
+    /// Tests that paths like `foo-stubs.pyi` don't have `-stubs`
+    /// stripped. (And this leads to failing to create a `ModuleName`,
+    /// which is what we want.)
+    #[test]
+    fn no_strip_with_extension() {
+        let TestCase { db, src, .. } = TestCaseBuilder::new().build();
+        let sp = SearchPath::first_party(db.system(), src).unwrap();
+        let mut mp = sp.to_module_path();
+        mp.push("foo-stubs.pyi");
+        assert_eq!(mp.to_module_name(), None);
     }
 }

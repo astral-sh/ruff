@@ -433,13 +433,16 @@ pub(crate) fn dynamic_resolution_paths<'db>(
         let site_packages_dir = site_packages_search_path
             .as_system_path()
             .expect("Expected site package path to be a system path");
+        let site_packages_dir = system
+            .canonicalize_path(site_packages_dir)
+            .unwrap_or_else(|_| site_packages_dir.to_path_buf());
 
-        if !existing_paths.insert(Cow::Borrowed(site_packages_dir)) {
+        if !existing_paths.insert(Cow::Owned(site_packages_dir.clone())) {
             continue;
         }
 
         let site_packages_root = files
-            .root(db, site_packages_dir)
+            .root(db, &site_packages_dir)
             .expect("Site-package root to have been created");
 
         // This query needs to be re-executed each time a `.pth` file
@@ -457,7 +460,7 @@ pub(crate) fn dynamic_resolution_paths<'db>(
         // containing a (relative or absolute) path.
         // Each of these paths may point to an editable install of a package,
         // so should be considered an additional search path.
-        let pth_file_iterator = match PthFileIterator::new(db, site_packages_dir) {
+        let pth_file_iterator = match PthFileIterator::new(db, &site_packages_dir) {
             Ok(iterator) => iterator,
             Err(error) => {
                 tracing::warn!(
@@ -656,7 +659,7 @@ struct ModuleNameIngredient<'db> {
 /// This includes "builtin" modules, which can never be shadowed at runtime either, as well as the
 /// `types` module, which tends to be imported early in Python startup, so can't be consistently
 /// shadowed, and is important to type checking.
-fn is_non_shadowable(minor_version: u8, module_name: &str) -> bool {
+pub(super) fn is_non_shadowable(minor_version: u8, module_name: &str) -> bool {
     module_name == "types" || ruff_python_stdlib::sys::is_builtin_module(minor_version, module_name)
 }
 
@@ -723,8 +726,7 @@ fn resolve_name(db: &dyn Db, name: &ModuleName, mode: ModuleResolveMode) -> Opti
                          `{name}` but it is a namespace package, keep going."
                     );
                     // stub exists, but the module doesn't. But this is a namespace package,
-                    // keep searching the next search path for a stub package with the same name.
-                    continue;
+                    // fall through to looking for a non-stub package
                 }
             }
         }
@@ -891,7 +893,10 @@ fn resolve_name_in_search_path(
 ///
 /// `.pyi` files take priority, as they always have priority when
 /// resolving modules.
-fn resolve_file_module(module: &ModulePath, resolver_state: &ResolverContext) -> Option<File> {
+pub(super) fn resolve_file_module(
+    module: &ModulePath,
+    resolver_state: &ResolverContext,
+) -> Option<File> {
     // Stubs have precedence over source files
     let stub_file = if resolver_state.mode.stubs_allowed() {
         module.with_pyi_extension().to_file(resolver_state)
@@ -1143,6 +1148,64 @@ mod tests {
         assert_eq!(ModuleKind::Module, foo_module.kind(&db));
 
         let expected_foo_path = src.join("foo.py");
+        assert_eq!(&expected_foo_path, foo_module.file(&db).unwrap().path(&db));
+        assert_eq!(
+            Some(foo_module),
+            path_to_module(&db, &FilePath::System(expected_foo_path))
+        );
+    }
+
+    #[test]
+    fn stubs_over_module_source() {
+        let TestCase { db, src, .. } = TestCaseBuilder::new()
+            .with_src_files(&[("foo.py", ""), ("foo.pyi", "")])
+            .build();
+
+        let foo_module_name = ModuleName::new_static("foo").unwrap();
+        let foo_module = resolve_module(&db, &foo_module_name).unwrap();
+
+        assert_eq!(
+            Some(&foo_module),
+            resolve_module(&db, &foo_module_name).as_ref()
+        );
+
+        assert_eq!("foo", foo_module.name(&db));
+        assert_eq!(&src, foo_module.search_path(&db).unwrap());
+        assert_eq!(ModuleKind::Module, foo_module.kind(&db));
+
+        let expected_foo_path = src.join("foo.pyi");
+        assert_eq!(&expected_foo_path, foo_module.file(&db).unwrap().path(&db));
+        assert_eq!(
+            Some(foo_module),
+            path_to_module(&db, &FilePath::System(expected_foo_path))
+        );
+    }
+
+    /// Tests precedence when there is a package and a sibling stub file.
+    ///
+    /// NOTE: I am unsure if this is correct. I wrote this test to match
+    /// behavior while implementing "list modules." Notably, in this case, the
+    /// regular source file gets priority. But in `stubs_over_module_source`
+    /// above, the stub file gets priority.
+    #[test]
+    fn stubs_over_package_source() {
+        let TestCase { db, src, .. } = TestCaseBuilder::new()
+            .with_src_files(&[("foo/__init__.py", ""), ("foo.pyi", "")])
+            .build();
+
+        let foo_module_name = ModuleName::new_static("foo").unwrap();
+        let foo_module = resolve_module(&db, &foo_module_name).unwrap();
+
+        assert_eq!(
+            Some(&foo_module),
+            resolve_module(&db, &foo_module_name).as_ref()
+        );
+
+        assert_eq!("foo", foo_module.name(&db));
+        assert_eq!(&src, foo_module.search_path(&db).unwrap());
+        assert_eq!(ModuleKind::Package, foo_module.kind(&db));
+
+        let expected_foo_path = src.join("foo/__init__.py");
         assert_eq!(&expected_foo_path, foo_module.file(&db).unwrap().path(&db));
         assert_eq!(
             Some(foo_module),
