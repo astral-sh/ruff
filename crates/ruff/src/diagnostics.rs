@@ -10,40 +10,45 @@ use std::path::Path;
 use anyhow::{Context, Result};
 use colored::Colorize;
 use log::{debug, warn};
-use rustc_hash::FxHashMap;
-
-use ruff_linter::OldDiagnostic;
+use ruff_db::diagnostic::Diagnostic;
 use ruff_linter::codes::Rule;
 use ruff_linter::linter::{FixTable, FixerResult, LinterResult, ParseSource, lint_fix, lint_only};
-use ruff_linter::message::Message;
+use ruff_linter::message::create_syntax_error_diagnostic;
 use ruff_linter::package::PackageRoot;
 use ruff_linter::pyproject_toml::lint_pyproject_toml;
 use ruff_linter::settings::types::UnsafeFixes;
 use ruff_linter::settings::{LinterSettings, flags};
 use ruff_linter::source_kind::{SourceError, SourceKind};
-use ruff_linter::{IOError, fs};
-use ruff_notebook::{Notebook, NotebookError, NotebookIndex};
+use ruff_linter::{IOError, Violation, fs};
+use ruff_notebook::{NotebookError, NotebookIndex};
 use ruff_python_ast::{PySourceType, SourceType, TomlSourceType};
 use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::TextRange;
 use ruff_workspace::Settings;
+use rustc_hash::FxHashMap;
 
-use crate::cache::{Cache, FileCacheKey, LintCacheData};
+use crate::cache::{Cache, FileCache, FileCacheKey};
 
+/// A collection of [`Diagnostic`]s and additional information needed to render them.
+///
+/// Note that `notebook_indexes` may be empty if there are no diagnostics because the
+/// `NotebookIndex` isn't cached in this case. This isn't a problem for any current uses as of
+/// 2025-08-12, which are all related to diagnostic rendering, but could be surprising if used
+/// differently in the future.
 #[derive(Debug, Default, PartialEq)]
 pub(crate) struct Diagnostics {
-    pub(crate) messages: Vec<Message>,
+    pub(crate) inner: Vec<Diagnostic>,
     pub(crate) fixed: FixMap,
     pub(crate) notebook_indexes: FxHashMap<String, NotebookIndex>,
 }
 
 impl Diagnostics {
     pub(crate) fn new(
-        messages: Vec<Message>,
+        diagnostics: Vec<Diagnostic>,
         notebook_indexes: FxHashMap<String, NotebookIndex>,
     ) -> Self {
         Self {
-            messages,
+            inner: diagnostics,
             fixed: FixMap::default(),
             notebook_indexes,
         }
@@ -63,16 +68,12 @@ impl Diagnostics {
                     let name = path.map_or_else(|| "-".into(), Path::to_string_lossy);
                     let source_file = SourceFileBuilder::new(name, "").finish();
                     Self::new(
-                        vec![Message::from_diagnostic(
-                            OldDiagnostic::new(
-                                IOError {
-                                    message: err.to_string(),
-                                },
-                                TextRange::default(),
-                                &source_file,
-                            ),
-                            None,
-                        )],
+                        vec![
+                            IOError {
+                                message: err.to_string(),
+                            }
+                            .into_diagnostic(TextRange::default(), &source_file),
+                        ],
                         FxHashMap::default(),
                     )
                 } else {
@@ -102,7 +103,11 @@ impl Diagnostics {
                 let name = path.map_or_else(|| "-".into(), Path::to_string_lossy);
                 let dummy = SourceFileBuilder::new(name, "").finish();
                 Self::new(
-                    vec![Message::syntax_error(err, TextRange::default(), dummy)],
+                    vec![create_syntax_error_diagnostic(
+                        dummy,
+                        err,
+                        TextRange::default(),
+                    )],
                     FxHashMap::default(),
                 )
             }
@@ -121,7 +126,7 @@ impl Add for Diagnostics {
 
 impl AddAssign for Diagnostics {
     fn add_assign(&mut self, other: Self) {
-        self.messages.extend(other.messages);
+        self.inner.extend(other.inner);
         self.fixed += other.fixed;
         self.notebook_indexes.extend(other.notebook_indexes);
     }
@@ -194,19 +199,9 @@ pub(crate) fn lint_path(
             let cache_key = FileCacheKey::from_path(path).context("Failed to create cache key")?;
             let cached_diagnostics = cache
                 .get(relative_path, &cache_key)
-                .and_then(|entry| entry.to_diagnostics(path));
-            if let Some(diagnostics) = cached_diagnostics {
-                // `FixMode::Generate` and `FixMode::Diff` rely on side-effects (writing to disk,
-                // and writing the diff to stdout, respectively). If a file has diagnostics, we
-                // need to avoid reading from and writing to the cache in these modes.
-                if match fix_mode {
-                    flags::FixMode::Generate => true,
-                    flags::FixMode::Apply | flags::FixMode::Diff => {
-                        diagnostics.messages.is_empty() && diagnostics.fixed.is_empty()
-                    }
-                } {
-                    return Ok(diagnostics);
-                }
+                .is_some_and(FileCache::linted);
+            if cached_diagnostics {
+                return Ok(Diagnostics::default());
             }
 
             // Stash the file metadata for later so when we update the cache it reflects the prerun
@@ -222,7 +217,7 @@ pub(crate) fn lint_path(
         Some(source_type) => source_type,
         None => match SourceType::from(path) {
             SourceType::Toml(TomlSourceType::Pyproject) => {
-                let messages = if settings
+                let diagnostics = if settings
                     .rules
                     .iter_enabled()
                     .any(|rule_code| rule_code.lint_source().is_pyproject_toml())
@@ -240,7 +235,7 @@ pub(crate) fn lint_path(
                     vec![]
                 };
                 return Ok(Diagnostics {
-                    messages,
+                    inner: diagnostics,
                     ..Diagnostics::default()
                 });
             }
@@ -323,31 +318,21 @@ pub(crate) fn lint_path(
             (result, transformed, fixed)
         };
 
-    let has_error = result.has_syntax_errors();
-    let messages = result.messages;
+    let diagnostics = result.diagnostics;
 
     if let Some((cache, relative_path, key)) = caching {
-        // We don't cache parsing errors.
-        if !has_error {
-            // `FixMode::Apply` and `FixMode::Diff` rely on side-effects (writing to disk,
-            // and writing the diff to stdout, respectively). If a file has diagnostics, we
-            // need to avoid reading from and writing to the cache in these modes.
-            if match fix_mode {
-                flags::FixMode::Generate => true,
-                flags::FixMode::Apply | flags::FixMode::Diff => {
-                    messages.is_empty() && fixed.is_empty()
-                }
-            } {
-                cache.update_lint(
-                    relative_path.to_owned(),
-                    &key,
-                    LintCacheData::from_messages(
-                        &messages,
-                        transformed.as_ipy_notebook().map(Notebook::index).cloned(),
-                    ),
-                );
-            }
-        }
+        // `FixMode::Apply` and `FixMode::Diff` rely on side-effects (writing to disk,
+        // and writing the diff to stdout, respectively). If a file has diagnostics
+        // with fixes, we need to avoid reading from and writing to the cache in these
+        // modes.
+        let use_fixes = match fix_mode {
+            flags::FixMode::Generate => true,
+            flags::FixMode::Apply | flags::FixMode::Diff => fixed.is_empty(),
+        };
+
+        // We don't cache files with diagnostics.
+        let linted = diagnostics.is_empty() && use_fixes;
+        cache.set_linted(relative_path.to_owned(), &key, linted);
     }
 
     let notebook_indexes = if let SourceKind::IpyNotebook(notebook) = transformed {
@@ -357,7 +342,7 @@ pub(crate) fn lint_path(
     };
 
     Ok(Diagnostics {
-        messages,
+        inner: diagnostics,
         fixed: FixMap::from_iter([(fs::relativize_path(path), fixed)]),
         notebook_indexes,
     })
@@ -396,7 +381,7 @@ pub(crate) fn lint_stdin(
                 }
 
                 return Ok(Diagnostics {
-                    messages: lint_pyproject_toml(&source_file, &settings.linter),
+                    inner: lint_pyproject_toml(&source_file, &settings.linter),
                     fixed: FixMap::from_iter([(fs::relativize_path(path), FixTable::default())]),
                     notebook_indexes: FxHashMap::default(),
                 });
@@ -417,7 +402,7 @@ pub(crate) fn lint_stdin(
     };
 
     // Lint the inputs.
-    let (LinterResult { messages, .. }, transformed, fixed) =
+    let (LinterResult { diagnostics, .. }, transformed, fixed) =
         if matches!(fix_mode, flags::FixMode::Apply | flags::FixMode::Diff) {
             if let Ok(FixerResult {
                 result,
@@ -501,7 +486,7 @@ pub(crate) fn lint_stdin(
     };
 
     Ok(Diagnostics {
-        messages,
+        inner: diagnostics,
         fixed: FixMap::from_iter([(
             fs::relativize_path(path.unwrap_or_else(|| Path::new("-"))),
             fixed,

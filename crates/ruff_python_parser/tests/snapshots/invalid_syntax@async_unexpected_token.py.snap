@@ -1,31 +1,35 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/async_unexpected_token.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: AtomicNodeIndex(..),
         range: 0..116,
         body: [
             ClassDef(
                 StmtClassDef {
+                    node_index: AtomicNodeIndex(..),
                     range: 6..20,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("Foo"),
                         range: 12..15,
+                        node_index: AtomicNodeIndex(..),
                     },
                     type_params: None,
                     arguments: None,
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: AtomicNodeIndex(..),
                                 range: 17..20,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 17..20,
                                     },
                                 ),
@@ -36,9 +40,11 @@ Module(
             ),
             While(
                 StmtWhile {
+                    node_index: AtomicNodeIndex(..),
                     range: 27..42,
                     test: Name(
                         ExprName {
+                            node_index: AtomicNodeIndex(..),
                             range: 33..37,
                             id: Name("test"),
                             ctx: Load,
@@ -47,9 +53,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: AtomicNodeIndex(..),
                                 range: 39..42,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 39..42,
                                     },
                                 ),
@@ -61,10 +69,12 @@ Module(
             ),
             Assign(
                 StmtAssign {
+                    node_index: AtomicNodeIndex(..),
                     range: 49..54,
                     targets: [
                         Name(
                             ExprName {
+                                node_index: AtomicNodeIndex(..),
                                 range: 49..50,
                                 id: Name("x"),
                                 ctx: Store,
@@ -73,6 +83,7 @@ Module(
                     ],
                     value: NumberLiteral(
                         ExprNumberLiteral {
+                            node_index: AtomicNodeIndex(..),
                             range: 53..54,
                             value: Int(
                                 1,
@@ -83,16 +94,21 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: AtomicNodeIndex(..),
                     range: 61..81,
                     is_async: true,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("foo"),
                         range: 71..74,
+                        node_index: AtomicNodeIndex(..),
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 74..76,
+                        node_index: AtomicNodeIndex(
+                            0,
+                        ),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -103,9 +119,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: AtomicNodeIndex(..),
                                 range: 78..81,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 78..81,
                                     },
                                 ),
@@ -116,9 +134,11 @@ Module(
             ),
             Match(
                 StmtMatch {
+                    node_index: AtomicNodeIndex(..),
                     range: 88..115,
                     subject: Name(
                         ExprName {
+                            node_index: AtomicNodeIndex(..),
                             range: 94..98,
                             id: Name("test"),
                             ctx: Load,
@@ -127,9 +147,11 @@ Module(
                     cases: [
                         MatchCase {
                             range: 104..115,
+                            node_index: AtomicNodeIndex(..),
                             pattern: MatchAs(
                                 PatternMatchAs {
                                     range: 109..110,
+                                    node_index: AtomicNodeIndex(..),
                                     pattern: None,
                                     name: None,
                                 },
@@ -138,9 +160,11 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 112..115,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 112..115,
                                             },
                                         ),

@@ -6,7 +6,7 @@ use ruff_python_semantic::Modules;
 use crate::Violation;
 use crate::checkers::ast::Checker;
 
-use super::helpers::{self, DatetimeModuleAntipattern};
+use crate::rules::flake8_datetimez::helpers::{self, DatetimeModuleAntipattern};
 
 /// ## What it does
 /// Checks for usages of `datetime.datetime.now()` that do not specify a timezone.
@@ -67,6 +67,7 @@ impl Violation for CallDatetimeNowWithoutTzinfo {
     }
 }
 
+/// DTZ005
 pub(crate) fn call_datetime_now_without_tzinfo(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::DATETIME) {
         return;

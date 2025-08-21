@@ -278,3 +278,30 @@ def f():
     for i in src:
         if lambda: 0:
             dst.append(i)
+
+def f():
+    i = "xyz"
+    result = []
+    for i in range(3):
+        result.append(x for x in [i])
+
+def f():
+    i = "xyz"
+    result = []
+    for i in range(3):
+        result.append((x for x in [i]))
+
+G_INDEX = None
+def f():
+    global G_INDEX
+    result = []
+    for G_INDEX in range(3):
+        result.append(G_INDEX)
+
+def f():
+    NL_INDEX = None
+    def x():
+        nonlocal NL_INDEX
+        result = []
+        for NL_INDEX in range(3):
+            result.append(NL_INDEX)

@@ -74,7 +74,11 @@ impl<'a> GlobalsVisitor<'a> {
 impl<'a> StatementVisitor<'a> for GlobalsVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
-            Stmt::Global(ast::StmtGlobal { names, range: _ }) => {
+            Stmt::Global(ast::StmtGlobal {
+                names,
+                range: _,
+                node_index: _,
+            }) => {
                 for name in names {
                     self.0.insert(name.as_str(), name.range());
                 }

@@ -5,10 +5,9 @@ use ruff_text_size::TextRange;
 
 use crate::Locator;
 use crate::checkers::ast::LintContext;
-use crate::settings::LinterSettings;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
-use super::super::detection::comment_contains_code;
+use crate::rules::eradicate::detection::comment_contains_code;
 
 /// ## What it does
 /// Checks for commented-out Python code.
@@ -51,7 +50,6 @@ pub(crate) fn commented_out_code(
     context: &LintContext,
     locator: &Locator,
     comment_ranges: &CommentRanges,
-    settings: &LinterSettings,
 ) {
     let mut comments = comment_ranges.into_iter().peekable();
     // Iterate over all comments in the document.
@@ -65,12 +63,16 @@ pub(crate) fn commented_out_code(
         }
 
         // Verify that the comment is on its own line, and that it contains code.
-        if is_own_line_comment(line) && comment_contains_code(line, &settings.task_tags[..]) {
-            context
-                .report_diagnostic(CommentedOutCode, range)
-                .set_fix(Fix::display_only_edit(Edit::range_deletion(
+        if is_own_line_comment(line)
+            && comment_contains_code(line, &context.settings().task_tags[..])
+        {
+            if let Some(mut diagnostic) =
+                context.report_diagnostic_if_enabled(CommentedOutCode, range)
+            {
+                diagnostic.set_fix(Fix::display_only_edit(Edit::range_deletion(
                     locator.full_lines_range(range),
                 )));
+            }
         }
     }
 }

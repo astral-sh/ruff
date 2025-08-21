@@ -1,6 +1,5 @@
 use crate::server::Result;
-use crate::server::client::{Notifier, Requester};
-use crate::session::Session;
+use crate::session::{Client, Session};
 use lsp_types as types;
 use lsp_types::notification as notif;
 
@@ -13,8 +12,7 @@ impl super::NotificationHandler for DidChangeConfiguration {
 impl super::SyncNotificationHandler for DidChangeConfiguration {
     fn run(
         _session: &mut Session,
-        _notifier: Notifier,
-        _requester: &mut Requester,
+        _client: &Client,
         _params: types::DidChangeConfigurationParams,
     ) -> Result<()> {
         // TODO(jane): get this wired up after the pre-release

@@ -369,6 +369,7 @@ impl SourceOrderVisitor<'_> for NarrowRange<'_> {
                 subject: _,
                 cases,
                 range: _,
+                node_index: _,
             }) => {
                 if let Some(saved_state) = self.enter_level(cases.first().map(AnyNodeRef::from)) {
                     for match_case in cases {
@@ -387,6 +388,7 @@ impl SourceOrderVisitor<'_> for NarrowRange<'_> {
                 finalbody,
                 is_star: _,
                 range: _,
+                node_index: _,
             }) => {
                 self.visit_body(body);
                 if let Some(except_handler_saved) =

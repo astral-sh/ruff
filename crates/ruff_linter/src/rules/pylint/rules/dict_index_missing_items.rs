@@ -45,7 +45,6 @@ use crate::checkers::ast::Checker;
 /// for instrument, section in ORCHESTRA.items():
 ///     print(f"{instrument}: {section}")
 /// ```
-
 #[derive(ViolationMetadata)]
 pub(crate) struct DictIndexMissingItems;
 

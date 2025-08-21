@@ -1,14 +1,14 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
-snapshot_kind: text
 ---
-UP047.py:12:5: UP047 [*] Generic function `f` should use type parameters
+UP047 [*] Generic function `f` should use type parameters
+  --> UP047.py:12:5
    |
 12 | def f(t: T) -> T:
-   |     ^^^^^^^ UP047
+   |     ^^^^^^^
 13 |     return t
    |
-   = help: Use type parameters
+help: Use type parameters
 
 ℹ Unsafe fix
 9  9  | P = ParamSpec("P")
@@ -20,13 +20,14 @@ UP047.py:12:5: UP047 [*] Generic function `f` should use type parameters
 14 14 | 
 15 15 | 
 
-UP047.py:16:5: UP047 [*] Generic function `g` should use type parameters
+UP047 [*] Generic function `g` should use type parameters
+  --> UP047.py:16:5
    |
 16 | def g(ts: tuple[*Ts]) -> tuple[*Ts]:
-   |     ^^^^^^^^^^^^^^^^^ UP047
+   |     ^^^^^^^^^^^^^^^^^
 17 |     return ts
    |
-   = help: Use type parameters
+help: Use type parameters
 
 ℹ Unsafe fix
 13 13 |     return t
@@ -38,7 +39,8 @@ UP047.py:16:5: UP047 [*] Generic function `g` should use type parameters
 18 18 | 
 19 19 | 
 
-UP047.py:20:5: UP047 [*] Generic function `h` should use type parameters
+UP047 [*] Generic function `h` should use type parameters
+  --> UP047.py:20:5
    |
 20 |   def h(
    |  _____^
@@ -47,10 +49,10 @@ UP047.py:20:5: UP047 [*] Generic function `h` should use type parameters
 23 | |     another_param,
 24 | |     and_another,
 25 | | ) -> Callable[P, T]:
-   | |_^ UP047
+   | |_^
 26 |       return p
    |
-   = help: Use type parameters
+help: Use type parameters
 
 ℹ Unsafe fix
 17 17 |     return ts
@@ -62,13 +64,14 @@ UP047.py:20:5: UP047 [*] Generic function `h` should use type parameters
 22 22 |     # Comment in the middle of a parameter list should be preserved
 23 23 |     another_param,
 
-UP047.py:29:5: UP047 [*] Generic function `i` should use type parameters
+UP047 [*] Generic function `i` should use type parameters
+  --> UP047.py:29:5
    |
 29 | def i(s: S) -> S:
-   |     ^^^^^^^ UP047
+   |     ^^^^^^^
 30 |     return s
    |
-   = help: Use type parameters
+help: Use type parameters
 
 ℹ Unsafe fix
 26 26 |     return p
@@ -80,15 +83,16 @@ UP047.py:29:5: UP047 [*] Generic function `i` should use type parameters
 31 31 | 
 32 32 | 
 
-UP047.py:39:5: UP047 [*] Generic function `broken_fix` should use type parameters
+UP047 [*] Generic function `broken_fix` should use type parameters
+  --> UP047.py:39:5
    |
 37 | # TypeVars with the new-style generic syntax and will be rejected by type
 38 | # checkers
 39 | def broken_fix(okay: T, bad: Something) -> tuple[T, Something]:
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP047
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 40 |     return (okay, bad)
    |
-   = help: Use type parameters
+help: Use type parameters
 
 ℹ Unsafe fix
 36 36 | # generic type parameter. This leads to code that mixes old-style standalone
@@ -100,13 +104,14 @@ UP047.py:39:5: UP047 [*] Generic function `broken_fix` should use type parameter
 41 41 | 
 42 42 | 
 
-UP047.py:43:5: UP047 [*] Generic function `any_str_param` should use type parameters
+UP047 [*] Generic function `any_str_param` should use type parameters
+  --> UP047.py:43:5
    |
 43 | def any_str_param(s: AnyStr) -> AnyStr:
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^ UP047
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^
 44 |     return s
    |
-   = help: Use type parameters
+help: Use type parameters
 
 ℹ Unsafe fix
 40 40 |     return (okay, bad)

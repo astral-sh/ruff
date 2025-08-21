@@ -24,6 +24,7 @@ use std::str::FromStr;
     PartialOrd,
     Ord,
     strum_macros::EnumString,
+    get_size2::GetSize,
 )]
 pub enum SpecialFormType {
     /// The symbol `typing.Annotated` (which can also be found as `typing_extensions.Annotated`)
@@ -116,6 +117,11 @@ pub enum SpecialFormType {
     /// Note that instances of subscripted `typing.Generic` are not represented by this type;
     /// see also [`super::KnownInstanceType::SubscriptedGeneric`].
     Generic,
+
+    /// The symbol `typing.NamedTuple` (which can also be found as `typing_extensions.NamedTuple`).
+    /// Typeshed defines this symbol as a class, but this isn't accurate: it's actually a factory function
+    /// at runtime. We therefore represent it as a special form internally.
+    NamedTuple,
 }
 
 impl SpecialFormType {
@@ -162,6 +168,8 @@ impl SpecialFormType {
             | Self::OrderedDict => KnownClass::StdlibAlias,
 
             Self::Unknown | Self::AlwaysTruthy | Self::AlwaysFalsy => KnownClass::Object,
+
+            Self::NamedTuple => KnownClass::FunctionType,
         }
     }
 
@@ -170,7 +178,7 @@ impl SpecialFormType {
     /// For example, the symbol `typing.Literal` is an instance of `typing._SpecialForm`,
     /// so `SpecialFormType::Literal.instance_fallback(db)`
     /// returns `Type::NominalInstance(NominalInstanceType { class: <typing._SpecialForm> })`.
-    pub(super) fn instance_fallback(self, db: &dyn Db) -> Type {
+    pub(super) fn instance_fallback(self, db: &dyn Db) -> Type<'_> {
         self.class().to_instance(db)
     }
 
@@ -186,7 +194,7 @@ impl SpecialFormType {
     ) -> Option<Self> {
         let candidate = Self::from_str(symbol_name).ok()?;
         candidate
-            .check_module(file_to_module(db, file)?.known()?)
+            .check_module(file_to_module(db, file)?.known(db)?)
             .then_some(candidate)
     }
 
@@ -229,6 +237,7 @@ impl SpecialFormType {
             | Self::TypeIs
             | Self::TypingSelf
             | Self::Protocol
+            | Self::NamedTuple
             | Self::ReadOnly => {
                 matches!(module, KnownModule::Typing | KnownModule::TypingExtensions)
             }
@@ -243,8 +252,62 @@ impl SpecialFormType {
         }
     }
 
-    pub(super) fn to_meta_type(self, db: &dyn Db) -> Type {
+    pub(super) fn to_meta_type(self, db: &dyn Db) -> Type<'_> {
         self.class().to_class_literal(db)
+    }
+
+    /// Return true if this special form is callable at runtime.
+    /// Most special forms are not callable (they are type constructors that are subscripted),
+    /// but some like `TypedDict` and collection constructors can be called.
+    pub(super) const fn is_callable(self) -> bool {
+        match self {
+            // TypedDict can be called as a constructor to create TypedDict types
+            Self::TypedDict
+            // Collection constructors are callable
+            // TODO actually implement support for calling them
+            | Self::ChainMap
+            | Self::Counter
+            | Self::DefaultDict
+            | Self::Deque
+            | Self::NamedTuple
+            | Self::OrderedDict => true,
+
+            // All other special forms are not callable
+            Self::Annotated
+            | Self::Literal
+            | Self::LiteralString
+            | Self::Optional
+            | Self::Union
+            | Self::NoReturn
+            | Self::Never
+            | Self::Tuple
+            | Self::List
+            | Self::Dict
+            | Self::Set
+            | Self::FrozenSet
+            | Self::Type
+            | Self::Unknown
+            | Self::AlwaysTruthy
+            | Self::AlwaysFalsy
+            | Self::Not
+            | Self::Intersection
+            | Self::TypeOf
+            | Self::CallableTypeOf
+            | Self::Callable
+            | Self::TypingSelf
+            | Self::Final
+            | Self::ClassVar
+            | Self::Concatenate
+            | Self::Unpack
+            | Self::Required
+            | Self::NotRequired
+            | Self::TypeAlias
+            | Self::TypeGuard
+            | Self::TypeIs
+            | Self::ReadOnly
+            | Self::Protocol
+            | Self::Generic => false,
+        }
     }
 
     /// Return the repr of the symbol at runtime
@@ -290,6 +353,7 @@ impl SpecialFormType {
             SpecialFormType::CallableTypeOf => "ty_extensions.CallableTypeOf",
             SpecialFormType::Protocol => "typing.Protocol",
             SpecialFormType::Generic => "typing.Generic",
+            SpecialFormType::NamedTuple => "typing.NamedTuple",
         }
     }
 }

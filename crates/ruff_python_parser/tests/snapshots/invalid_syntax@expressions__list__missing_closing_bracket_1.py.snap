@@ -7,20 +7,25 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/list/missing
 ```
 Module(
     ModModule {
+        node_index: AtomicNodeIndex(..),
         range: 0..133,
         body: [
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 125..133,
                     value: List(
                         ExprList {
+                            node_index: AtomicNodeIndex(..),
                             range: 125..133,
                             elts: [
                                 BinOp(
                                     ExprBinOp {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 128..133,
                                         left: Name(
                                             ExprName {
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 128..129,
                                                 id: Name("x"),
                                                 ctx: Load,
@@ -29,6 +34,7 @@ Module(
                                         op: Add,
                                         right: Name(
                                             ExprName {
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 132..133,
                                                 id: Name("y"),
                                                 ctx: Load,

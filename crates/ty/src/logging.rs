@@ -12,6 +12,7 @@ use tracing_subscriber::filter::LevelFilter;
 use tracing_subscriber::fmt::format::Writer;
 use tracing_subscriber::fmt::{FmtContext, FormatEvent, FormatFields};
 use tracing_subscriber::registry::LookupSpan;
+use ty_static::EnvVars;
 
 /// Logging flags to `#[command(flatten)]` into your CLI
 #[derive(clap::Args, Debug, Clone, Default)]
@@ -23,15 +24,33 @@ pub(crate) struct Verbosity {
         help = "Use verbose output (or `-vv` and `-vvv` for more verbose output)",
         action = clap::ArgAction::Count,
         global = true,
+        overrides_with = "quiet",
     )]
     verbose: u8,
+
+    #[arg(
+        long,
+        short,
+        help = "Use quiet output (or `-qq` for silent output)",
+        action = clap::ArgAction::Count,
+        global = true,
+        overrides_with = "verbose",
+    )]
+    quiet: u8,
 }
 
 impl Verbosity {
-    /// Returns the verbosity level based on the number of `-v` flags.
+    /// Returns the verbosity level based on the number of `-v` and `-q` flags.
     ///
     /// Returns `None` if the user did not specify any verbosity flags.
     pub(crate) fn level(&self) -> VerbosityLevel {
+        // `--quiet` and `--verbose` are mutually exclusive in Clap, so we can just check one first.
+        match self.quiet {
+            0 => {}
+            1 => return VerbosityLevel::Quiet,
+            _ => return VerbosityLevel::Silent,
+        }
+
         match self.verbose {
             0 => VerbosityLevel::Default,
             1 => VerbosityLevel::Verbose,
@@ -41,9 +60,17 @@ impl Verbosity {
     }
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default)]
 pub(crate) enum VerbosityLevel {
+    /// Silent output. Does not show any logging output or summary information.
+    Silent,
+
+    /// Quiet output.  Only shows Ruff and ty events up to the [`ERROR`](tracing::Level::ERROR).
+    /// Silences output except for summary information.
+    Quiet,
+
     /// Default output level. Only shows Ruff and ty events up to the [`WARN`](tracing::Level::WARN).
+    #[default]
     Default,
 
     /// Enables verbose output. Emits Ruff and ty events up to the [`INFO`](tracing::Level::INFO).
@@ -61,6 +88,8 @@ pub(crate) enum VerbosityLevel {
 impl VerbosityLevel {
     const fn level_filter(self) -> LevelFilter {
         match self {
+            VerbosityLevel::Silent => LevelFilter::OFF,
+            VerbosityLevel::Quiet => LevelFilter::ERROR,
             VerbosityLevel::Default => LevelFilter::WARN,
             VerbosityLevel::Verbose => LevelFilter::INFO,
             VerbosityLevel::ExtraVerbose => LevelFilter::DEBUG,
@@ -84,7 +113,7 @@ pub(crate) fn setup_tracing(
     use tracing_subscriber::prelude::*;
 
     // The `TY_LOG` environment variable overrides the default log level.
-    let filter = if let Ok(log_env_variable) = std::env::var("TY_LOG") {
+    let filter = if let Ok(log_env_variable) = std::env::var(EnvVars::TY_LOG) {
         EnvFilter::builder()
             .parse(log_env_variable)
             .context("Failed to parse directives specified in TY_LOG environment variable.")?
@@ -165,7 +194,7 @@ fn setup_profile<S>() -> (
 where
     S: Subscriber + for<'span> LookupSpan<'span>,
 {
-    if let Ok("1" | "true") = std::env::var("TY_LOG_PROFILE").as_deref() {
+    if let Ok("1" | "true") = std::env::var(EnvVars::TY_LOG_PROFILE).as_deref() {
         let (layer, guard) = tracing_flame::FlameLayer::with_file("tracing.folded")
             .expect("Flame layer to be created");
         (Some(layer), Some(guard))

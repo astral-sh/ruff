@@ -59,7 +59,12 @@ pub(crate) fn non_empty_stub_body(checker: &Checker, body: &[Stmt]) {
     }
 
     // Ignore `...` (the desired case).
-    if let Stmt::Expr(ast::StmtExpr { value, range: _ }) = stmt {
+    if let Stmt::Expr(ast::StmtExpr {
+        value,
+        range: _,
+        node_index: _,
+    }) = stmt
+    {
         if value.is_ellipsis_literal_expr() {
             return;
         }

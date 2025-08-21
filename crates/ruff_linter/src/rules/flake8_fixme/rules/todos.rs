@@ -120,19 +120,19 @@ pub(crate) fn todos(context: &LintContext, directive_ranges: &[TodoComment]) {
         match directive.kind {
             // FIX001
             TodoDirectiveKind::Fixme => {
-                context.report_diagnostic(LineContainsFixme, directive.range);
+                context.report_diagnostic_if_enabled(LineContainsFixme, directive.range);
             }
             // FIX002
             TodoDirectiveKind::Hack => {
-                context.report_diagnostic(LineContainsHack, directive.range);
+                context.report_diagnostic_if_enabled(LineContainsHack, directive.range);
             }
             // FIX003
             TodoDirectiveKind::Todo => {
-                context.report_diagnostic(LineContainsTodo, directive.range);
+                context.report_diagnostic_if_enabled(LineContainsTodo, directive.range);
             }
             // FIX004
             TodoDirectiveKind::Xxx => {
-                context.report_diagnostic(LineContainsXxx, directive.range);
+                context.report_diagnostic_if_enabled(LineContainsXxx, directive.range);
             }
         }
     }

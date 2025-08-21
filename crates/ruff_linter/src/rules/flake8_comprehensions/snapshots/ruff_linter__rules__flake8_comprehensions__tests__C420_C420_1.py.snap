@@ -1,12 +1,13 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
 ---
-C420_1.py:1:1: C420 [*] Unnecessary dict comprehension for iterable; use `dict.fromkeys` instead
+C420 [*] Unnecessary dict comprehension for iterable; use `dict.fromkeys` instead
+ --> C420_1.py:1:1
   |
 1 | {x: NotImplemented for x in "XY"}
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C420
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   |
-  = help: Replace with `dict.fromkeys(iterable)`)
+help: Replace with `dict.fromkeys(iterable)`)
 
 ℹ Safe fix
 1   |-{x: NotImplemented for x in "XY"}

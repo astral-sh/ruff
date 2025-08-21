@@ -27,6 +27,7 @@ impl FormatNodeRule<ExprSubscript> for FormatExprSubscript {
     fn fmt_fields(&self, item: &ExprSubscript, f: &mut PyFormatter) -> FormatResult<()> {
         let ExprSubscript {
             range: _,
+            node_index: _,
             value,
             slice,
             ctx: _,

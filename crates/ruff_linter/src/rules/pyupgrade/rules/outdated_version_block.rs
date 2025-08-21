@@ -14,6 +14,7 @@ use crate::checkers::ast::Checker;
 use crate::fix::edits::{adjust_indentation, delete_stmt};
 use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::PythonVersion;
+use ruff_python_semantic::SemanticModel;
 
 /// ## What it does
 /// Checks for conditional blocks gated on `sys.version_info` comparisons
@@ -93,6 +94,7 @@ pub(crate) fn outdated_version_block(checker: &Checker, stmt_if: &StmtIf) {
             ops,
             comparators,
             range: _,
+            node_index: _,
         }) = &branch.test
         else {
             continue;
@@ -102,14 +104,7 @@ pub(crate) fn outdated_version_block(checker: &Checker, stmt_if: &StmtIf) {
             continue;
         };
 
-        // Detect `sys.version_info`, along with slices (like `sys.version_info[:2]`).
-        if !checker
-            .semantic()
-            .resolve_qualified_name(map_subscript(left))
-            .is_some_and(|qualified_name| {
-                matches!(qualified_name.segments(), ["sys", "version_info"])
-            })
-        {
+        if !is_valid_version_info(checker.semantic(), left) {
             continue;
         }
 
@@ -453,6 +448,21 @@ fn extract_version(elts: &[Expr]) -> Option<Vec<Int>> {
         version.push(int.clone());
     }
     Some(version)
+}
+
+/// Returns `true` if the expression is related to `sys.version_info`.
+///
+/// This includes:
+/// - Direct access: `sys.version_info`
+/// - Subscript access: `sys.version_info[:2]`, `sys.version_info[0]`
+/// - Major version attribute: `sys.version_info.major`
+fn is_valid_version_info(semantic: &SemanticModel, left: &Expr) -> bool {
+    semantic
+        .resolve_qualified_name(map_subscript(left))
+        .is_some_and(|name| matches!(name.segments(), ["sys", "version_info"]))
+        || semantic
+            .resolve_qualified_name(left)
+            .is_some_and(|name| matches!(name.segments(), ["sys", "version_info", "major"]))
 }
 
 #[cfg(test)]

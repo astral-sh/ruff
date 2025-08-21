@@ -1,15 +1,13 @@
 use crate::config::Log;
+use crate::db::Db;
 use crate::parser::{BacktickOffsets, EmbeddedFileSourceMap};
 use camino::Utf8Path;
 use colored::Colorize;
 use config::SystemKind;
 use parser as test_parser;
-use ruff_db::Upcast;
-use ruff_db::diagnostic::{
-    Diagnostic, DisplayDiagnosticConfig, create_parse_diagnostic,
-    create_unsupported_syntax_diagnostic,
-};
-use ruff_db::files::{File, system_path_to_file};
+use ruff_db::Db as _;
+use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig};
+use ruff_db::files::{File, FileRootKind, system_path_to_file};
 use ruff_db::panic::catch_unwind;
 use ruff_db::parsed::parsed_module;
 use ruff_db::system::{DbWithWritableSystem as _, SystemPath, SystemPathBuf};
@@ -17,10 +15,12 @@ use ruff_db::testing::{setup_logging, setup_logging_with_filter};
 use ruff_source_file::{LineIndex, OneIndexed};
 use std::backtrace::BacktraceStatus;
 use std::fmt::Write;
+use ty_python_semantic::pull_types::pull_types;
 use ty_python_semantic::types::check_types;
 use ty_python_semantic::{
-    Program, ProgramSettings, PythonPath, PythonPlatform, PythonVersionSource,
-    PythonVersionWithSource, SearchPathSettings, SysPrefixPathOrigin,
+    Module, Program, ProgramSettings, PythonEnvironment, PythonPlatform, PythonVersionSource,
+    PythonVersionWithSource, SearchPath, SearchPathSettings, SysPrefixPathOrigin, list_modules,
+    resolve_module,
 };
 
 mod assertion;
@@ -30,7 +30,7 @@ mod diagnostic;
 mod matcher;
 mod parser;
 
-const MDTEST_TEST_FILTER: &str = "MDTEST_TEST_FILTER";
+use ty_static::EnvVars;
 
 /// Run `path` as a markdown test suite with given `title`.
 ///
@@ -54,12 +54,12 @@ pub fn run(
 
     let mut db = db::Db::setup();
 
-    let filter = std::env::var(MDTEST_TEST_FILTER).ok();
+    let filter = std::env::var(EnvVars::MDTEST_TEST_FILTER).ok();
     let mut any_failures = false;
     for test in suite.tests() {
         if filter
             .as_ref()
-            .is_some_and(|f| !test.uncontracted_name().contains(f))
+            .is_some_and(|f| !(test.uncontracted_name().contains(f) || test.name() == *f))
         {
             continue;
         }
@@ -69,13 +69,16 @@ pub fn run(
             Log::Filter(filter) => setup_logging_with_filter(filter),
         });
 
+        let failures = run_test(&mut db, relative_fixture_path, snapshot_path, &test);
+        let inconsistencies = run_module_resolution_consistency_test(&db);
+        let this_test_failed = failures.is_err() || inconsistencies.is_err();
+        any_failures = any_failures || this_test_failed;
+
+        if this_test_failed && output_format.is_cli() {
+            println!("\n{}\n", test.name().bold().underline());
+        }
+
         if let Err(failures) = run_test(&mut db, relative_fixture_path, snapshot_path, &test) {
-            any_failures = true;
-
-            if output_format.is_cli() {
-                println!("\n{}\n", test.name().bold().underline());
-            }
-
             let md_index = LineIndex::from_source_text(&source);
 
             for test_failures in failures {
@@ -101,17 +104,32 @@ pub fn run(
                     }
                 }
             }
-
-            let escaped_test_name = test.name().replace('\'', "\\'");
-
-            if output_format.is_cli() {
-                println!(
-                    "\nTo rerun this specific test, set the environment variable: {MDTEST_TEST_FILTER}='{escaped_test_name}'",
-                );
-                println!(
-                    "{MDTEST_TEST_FILTER}='{escaped_test_name}' cargo test -p ty_python_semantic --test mdtest -- {test_name}",
-                );
+        }
+        if let Err(inconsistencies) = run_module_resolution_consistency_test(&db) {
+            any_failures = true;
+            for inconsistency in inconsistencies {
+                match output_format {
+                    OutputFormat::Cli => {
+                        let info = relative_fixture_path.to_string().cyan();
+                        println!("  {info} {inconsistency}");
+                    }
+                    OutputFormat::GitHub => {
+                        println!("::error file={absolute_fixture_path}::{inconsistency}");
+                    }
+                }
             }
+        }
+
+        if this_test_failed && output_format.is_cli() {
+            let escaped_test_name = test.name().replace('\'', "\\'");
+            println!(
+                "\nTo rerun this specific test, set the environment variable: {}='{escaped_test_name}'",
+                EnvVars::MDTEST_TEST_FILTER,
+            );
+            println!(
+                "{}='{escaped_test_name}' cargo test -p ty_python_semantic --test mdtest -- {test_name}",
+                EnvVars::MDTEST_TEST_FILTER,
+            );
         }
     }
 
@@ -166,6 +184,8 @@ fn run_test(
     let project_root = SystemPathBuf::from("/src");
     db.create_directory_all(&project_root)
         .expect("Creating the project root to succeed");
+    db.files()
+        .try_add_root(db, &project_root, FileRootKind::Project);
 
     let src_path = project_root.clone();
     let custom_typeshed_path = test.configuration().typeshed();
@@ -237,6 +257,8 @@ fn run_test(
 
     // Create a custom typeshed `VERSIONS` file if none was provided.
     if let Some(typeshed_path) = custom_typeshed_path {
+        db.files()
+            .try_add_root(db, typeshed_path, FileRootKind::LibrarySearchPath);
         if !has_custom_versions_file {
             let versions_file = typeshed_path.join("stdlib/VERSIONS");
             let contents = typeshed_files
@@ -257,11 +279,23 @@ fn run_test(
 
     let configuration = test.configuration();
 
+    let site_packages_paths = if let Some(python) = configuration.python() {
+        let environment =
+            PythonEnvironment::new(python, SysPrefixPathOrigin::PythonCliFlag, db.system())
+                .expect("Python environment to point to a valid path");
+        environment
+            .site_packages_paths(db.system())
+            .expect("Python environment to be valid")
+            .into_vec()
+    } else {
+        vec![]
+    };
+
     let settings = ProgramSettings {
-        python_version: Some(PythonVersionWithSource {
+        python_version: PythonVersionWithSource {
             version: python_version,
             source: PythonVersionSource::Cli,
-        }),
+        },
         python_platform: configuration
             .python_platform()
             .unwrap_or(PythonPlatform::Identifier("linux".to_string())),
@@ -269,103 +303,102 @@ fn run_test(
             src_roots: vec![src_path],
             extra_paths: configuration.extra_paths().unwrap_or_default().to_vec(),
             custom_typeshed: custom_typeshed_path.map(SystemPath::to_path_buf),
-            python_path: configuration
-                .python()
-                .map(|sys_prefix| {
-                    PythonPath::IntoSysPrefix(
-                        sys_prefix.to_path_buf(),
-                        SysPrefixPathOrigin::PythonCliFlag,
-                    )
-                })
-                .unwrap_or(PythonPath::KnownSitePackages(vec![])),
-        },
+            site_packages_paths,
+            real_stdlib_path: None,
+        }
+        .to_search_paths(db.system(), db.vendored())
+        .expect("Failed to resolve search path settings"),
     };
 
-    match Program::try_get(db) {
-        Some(program) => program.update_from_settings(db, settings),
-        None => Program::from_settings(db, settings).map(|_| ()),
-    }
-    .expect("Failed to update Program settings in TestDb");
+    Program::init_or_update(db, settings);
 
     // When snapshot testing is enabled, this is populated with
     // all diagnostics. Otherwise it remains empty.
     let mut snapshot_diagnostics = vec![];
 
-    let failures: Failures = test_files
-        .into_iter()
+    let mut any_pull_types_failures = false;
+
+    let mut failures: Failures = test_files
+        .iter()
         .filter_map(|test_file| {
+            let pull_types_result = attempt_test(
+                db,
+                pull_types,
+                test_file,
+                "\"pull types\"",
+                Some(
+                    "Note: either fix the panic or add the `<!-- pull-types:skip -->` \
+                    directive to this test",
+                ),
+            );
+            match pull_types_result {
+                Ok(()) => {}
+                Err(failures) => {
+                    any_pull_types_failures = true;
+                    if !test.should_skip_pulling_types() {
+                        return Some(failures);
+                    }
+                }
+            }
+
             let parsed = parsed_module(db, test_file.file).load(db);
 
             let mut diagnostics: Vec<Diagnostic> = parsed
                 .errors()
                 .iter()
-                .map(|error| create_parse_diagnostic(test_file.file, error))
+                .map(|error| Diagnostic::invalid_syntax(test_file.file, &error.error, error))
                 .collect();
 
             diagnostics.extend(
                 parsed
                     .unsupported_syntax_errors()
                     .iter()
-                    .map(|error| create_unsupported_syntax_diagnostic(test_file.file, error)),
+                    .map(|error| Diagnostic::invalid_syntax(test_file.file, error, error)),
             );
 
-            let type_diagnostics = match catch_unwind(|| check_types(db, test_file.file)) {
-                Ok(type_diagnostics) => type_diagnostics,
-                Err(info) => {
-                    let mut by_line = matcher::FailuresByLine::default();
-                    let mut messages = vec![];
-                    match info.location {
-                        Some(location) => messages.push(format!("panicked at {location}")),
-                        None => messages.push("panicked at unknown location".to_string()),
-                    }
-                    match info.payload.as_str() {
-                        Some(message) => messages.push(message.to_string()),
-                        // Mimic the default panic hook's rendering of the panic payload if it's
-                        // not a string.
-                        None => messages.push("Box<dyn Any>".to_string()),
-                    }
-                    if let Some(backtrace) = info.backtrace {
-                        match backtrace.status() {
-                            BacktraceStatus::Disabled => {
-                                let msg = "run with `RUST_BACKTRACE=1` environment variable to display a backtrace";
-                                messages.push(msg.to_string());
-                            }
-                            BacktraceStatus::Captured => {
-                                messages.extend(backtrace.to_string().split('\n').map(String::from));
-                            }
-                            _ => {}
-                        }
-                    }
-
-                    if let Some(backtrace) = info.salsa_backtrace {
-                        salsa::attach(db, || {
-                            messages.extend(format!("{backtrace:#}").split('\n').map(String::from));
-                        });
-                    }
-
-                    by_line.push(OneIndexed::from_zero_indexed(0), messages);
-                    return Some(FileFailures {
-                        backtick_offsets: test_file.backtick_offsets,
-                        by_line,
-                    });
-                }
+            let mdtest_result = attempt_test(db, check_types, test_file, "run mdtest", None);
+            let type_diagnostics = match mdtest_result {
+                Ok(diagnostics) => diagnostics,
+                Err(failures) => return Some(failures),
             };
-            diagnostics.extend(type_diagnostics.into_iter().cloned());
-            diagnostics.sort_by(|left, right|left.rendering_sort_key(db).cmp(&right.rendering_sort_key(db)));
+
+            diagnostics.extend(type_diagnostics);
+            diagnostics.sort_by(|left, right| {
+                left.rendering_sort_key(db)
+                    .cmp(&right.rendering_sort_key(db))
+            });
 
             let failure = match matcher::match_file(db, test_file.file, &diagnostics) {
                 Ok(()) => None,
                 Err(line_failures) => Some(FileFailures {
-                    backtick_offsets: test_file.backtick_offsets,
+                    backtick_offsets: test_file.backtick_offsets.clone(),
                     by_line: line_failures,
                 }),
             };
             if test.should_snapshot_diagnostics() {
                 snapshot_diagnostics.extend(diagnostics);
             }
+
             failure
         })
         .collect();
+
+    if test.should_skip_pulling_types() && !any_pull_types_failures {
+        let mut by_line = matcher::FailuresByLine::default();
+        by_line.push(
+            OneIndexed::from_zero_indexed(0),
+            vec![
+                "Remove the `<!-- pull-types:skip -->` directive from this test: pulling types \
+                 succeeded for all files in the test."
+                    .to_string(),
+            ],
+        );
+        let failure = FileFailures {
+            backtick_offsets: test_files[0].backtick_offsets.clone(),
+            by_line,
+        };
+        failures.push(failure);
+    }
 
     if snapshot_diagnostics.is_empty() && test.should_snapshot_diagnostics() {
         panic!(
@@ -391,6 +424,92 @@ fn run_test(
         Ok(())
     } else {
         Err(failures)
+    }
+}
+
+/// Reports an inconsistency between "list modules" and "resolve module."
+///
+/// Values of this type are only constructed when `from_list` and
+/// `from_resolve` are not equivalent.
+struct ModuleInconsistency<'db> {
+    db: &'db db::Db,
+    /// The module returned from `list_module`.
+    from_list: Module<'db>,
+    /// The module returned, if any, from `resolve_module`.
+    from_resolve: Option<Module<'db>>,
+}
+
+/// Tests that "list modules" is consistent with "resolve module."
+///
+/// This only checks that everything returned by `list_module` is the
+/// identical module we get back from `resolve_module`. It does not
+/// check that all possible outputs of `resolve_module` are captured by
+/// `list_module`.
+fn run_module_resolution_consistency_test(db: &db::Db) -> Result<(), Vec<ModuleInconsistency<'_>>> {
+    let mut errs = vec![];
+    for from_list in list_modules(db) {
+        errs.push(match resolve_module(db, from_list.name(db)) {
+            None => ModuleInconsistency {
+                db,
+                from_list,
+                from_resolve: None,
+            },
+            Some(from_resolve) if from_list != from_resolve => ModuleInconsistency {
+                db,
+                from_list,
+                from_resolve: Some(from_resolve),
+            },
+            _ => continue,
+        });
+    }
+    if errs.is_empty() { Ok(()) } else { Err(errs) }
+}
+
+impl std::fmt::Display for ModuleInconsistency<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        fn fmt_module(
+            db: &db::Db,
+            f: &mut std::fmt::Formatter,
+            module: &Module<'_>,
+        ) -> std::fmt::Result {
+            let name = module.name(db);
+            let path = module
+                .file(db)
+                .map(|file| file.path(db).to_string())
+                .unwrap_or_else(|| "N/A".to_string());
+            let search_path = module
+                .search_path(db)
+                .map(SearchPath::to_string)
+                .unwrap_or_else(|| "N/A".to_string());
+            let known = module
+                .known(db)
+                .map(|known| known.to_string())
+                .unwrap_or_else(|| "N/A".to_string());
+            write!(
+                f,
+                "Module(\
+                   name={name}, \
+                   file={path}, \
+                   kind={kind:?}, \
+                   search_path={search_path}, \
+                   known={known}\
+                 )",
+                kind = module.kind(db),
+            )
+        }
+        write!(f, "Found ")?;
+        fmt_module(self.db, f, &self.from_list)?;
+        match self.from_resolve {
+            None => write!(
+                f,
+                " when listing modules, but `resolve_module` returned `None`",
+            )?,
+            Some(ref got) => {
+                write!(f, " when listing modules, but `resolve_module` returned ",)?;
+                fmt_module(self.db, f, got)?;
+            }
+        }
+        Ok(())
     }
 }
 
@@ -457,8 +576,76 @@ fn create_diagnostic_snapshot(
             writeln!(snapshot).unwrap();
         }
         writeln!(snapshot, "```").unwrap();
-        write!(snapshot, "{}", diag.display(&db.upcast(), &display_config)).unwrap();
+        write!(snapshot, "{}", diag.display(db, &display_config)).unwrap();
         writeln!(snapshot, "```").unwrap();
     }
     snapshot
+}
+
+/// Run a function over an embedded test file, catching any panics that occur in the process.
+///
+/// If no panic occurs, the result of the function is returned as an `Ok()` variant.
+///
+/// If a panic occurs, a nicely formatted [`FileFailures`] is returned as an `Err()` variant.
+/// This will be formatted into a diagnostic message by `ty_test`.
+fn attempt_test<'db, T, F>(
+    db: &'db Db,
+    test_fn: F,
+    test_file: &TestFile,
+    action: &str,
+    clarification: Option<&str>,
+) -> Result<T, FileFailures>
+where
+    F: FnOnce(&'db dyn ty_python_semantic::Db, File) -> T + std::panic::UnwindSafe,
+{
+    catch_unwind(|| test_fn(db, test_file.file)).map_err(|info| {
+        let mut by_line = matcher::FailuresByLine::default();
+        let mut messages = vec![];
+        match info.location {
+            Some(location) => messages.push(format!(
+                "Attempting to {action} caused a panic at {location}"
+            )),
+            None => messages.push(format!(
+                "Attempting to {action} caused a panic at an unknown location",
+            )),
+        }
+        if let Some(clarification) = clarification {
+            messages.push(clarification.to_string());
+        }
+        messages.push(String::new());
+        match info.payload.as_str() {
+            Some(message) => messages.push(message.to_string()),
+            // Mimic the default panic hook's rendering of the panic payload if it's
+            // not a string.
+            None => messages.push("Box<dyn Any>".to_string()),
+        }
+        messages.push(String::new());
+
+        if let Some(backtrace) = info.backtrace {
+            match backtrace.status() {
+                BacktraceStatus::Disabled => {
+                    let msg =
+                        "run with `RUST_BACKTRACE=1` environment variable to display a backtrace";
+                    messages.push(msg.to_string());
+                }
+                BacktraceStatus::Captured => {
+                    messages.extend(backtrace.to_string().split('\n').map(String::from));
+                }
+                _ => {}
+            }
+        }
+
+        if let Some(backtrace) = info.salsa_backtrace {
+            salsa::attach(db, || {
+                messages.extend(format!("{backtrace:#}").split('\n').map(String::from));
+            });
+        }
+
+        by_line.push(OneIndexed::from_zero_indexed(0), messages);
+
+        FileFailures {
+            backtick_offsets: test_file.backtick_offsets.clone(),
+            by_line,
+        }
+    })
 }

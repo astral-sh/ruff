@@ -54,7 +54,6 @@ use super::suppression_comment_visitor::{
 ///
 /// This fix is always marked as unsafe because it deletes the invalid suppression comment,
 /// rather than trying to move it to a valid position, which the user more likely intended.
-///
 #[derive(ViolationMetadata)]
 pub(crate) struct InvalidFormatterSuppressionComment {
     reason: IgnoredReason,

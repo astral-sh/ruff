@@ -347,6 +347,7 @@ fn check_positional_args_for_overloaded_method(
         // If any overloads have any variadic arguments, don't do any checking
         let Parameters {
             range: _,
+            node_index: _,
             posonlyargs,
             args,
             vararg: None,

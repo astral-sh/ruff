@@ -60,6 +60,7 @@ pub(crate) fn loop_iterator_mutation(checker: &Checker, stmt_for: &StmtFor) {
         orelse: _,
         is_async: _,
         range: _,
+        node_index: _,
     } = stmt_for;
 
     let (index, target, iter) = match iter.as_ref() {
@@ -170,6 +171,7 @@ impl<'a> LoopMutationsVisitor<'a> {
         for target in targets {
             if let Expr::Subscript(ExprSubscript {
                 range: _,
+                node_index: _,
                 value,
                 slice: _,
                 ctx: _,
@@ -188,6 +190,7 @@ impl<'a> LoopMutationsVisitor<'a> {
         for target in targets {
             if let Expr::Subscript(ExprSubscript {
                 range: _,
+                node_index: _,
                 value,
                 slice,
                 ctx: _,
@@ -217,6 +220,7 @@ impl<'a> LoopMutationsVisitor<'a> {
     fn handle_call(&mut self, func: &Expr) {
         if let Expr::Attribute(ExprAttribute {
             range,
+            node_index: _,
             value,
             attr,
             ctx: _,
@@ -237,7 +241,11 @@ impl<'a> Visitor<'a> for LoopMutationsVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
             // Ex) `del items[0]`
-            Stmt::Delete(StmtDelete { range, targets }) => {
+            Stmt::Delete(StmtDelete {
+                range,
+                targets,
+                node_index: _,
+            }) => {
                 self.handle_delete(*range, targets);
                 visitor::walk_stmt(self, stmt);
             }
@@ -285,7 +293,6 @@ impl<'a> Visitor<'a> for LoopMutationsVisitor<'a> {
                 if let Some(mutations) = self.mutations.get_mut(&self.branch) {
                     mutations.clear();
                 }
-                visitor::walk_stmt(self, stmt);
             }
 
             // Avoid recursion for class and function definitions.

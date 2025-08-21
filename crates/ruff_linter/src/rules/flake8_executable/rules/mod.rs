@@ -11,7 +11,6 @@ use crate::Locator;
 use crate::checkers::ast::LintContext;
 use crate::codes::Rule;
 use crate::comments::shebang::ShebangDirective;
-use crate::settings::LinterSettings;
 
 mod shebang_leading_whitespace;
 mod shebang_missing_executable_file;
@@ -24,7 +23,6 @@ pub(crate) fn from_tokens(
     path: &Path,
     locator: &Locator,
     comment_ranges: &CommentRanges,
-    settings: &LinterSettings,
 ) {
     let mut has_any_shebang = false;
     for range in comment_ranges {
@@ -34,7 +32,7 @@ pub(crate) fn from_tokens(
 
             shebang_missing_python(range, &shebang, context);
 
-            if settings.rules.enabled(Rule::ShebangNotExecutable) {
+            if context.is_rule_enabled(Rule::ShebangNotExecutable) {
                 shebang_not_executable(path, range, context);
             }
 
@@ -45,7 +43,7 @@ pub(crate) fn from_tokens(
     }
 
     if !has_any_shebang {
-        if settings.rules.enabled(Rule::ShebangMissingExecutableFile) {
+        if context.is_rule_enabled(Rule::ShebangMissingExecutableFile) {
             shebang_missing_executable_file(path, context);
         }
     }

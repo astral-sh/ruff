@@ -1,16 +1,26 @@
+use std::fmt::Write;
 use std::{collections::BTreeMap, ops::Deref};
 
-use itertools::{Either, Itertools};
+use itertools::Itertools;
 
 use ruff_python_ast::name::Name;
+use rustc_hash::FxHashMap;
 
+use super::TypeVarVariance;
+use crate::semantic_index::place::ScopedPlaceId;
+use crate::semantic_index::{SemanticIndex, place_table};
+use crate::types::context::InferContext;
+use crate::types::diagnostic::report_undeclared_protocol_member;
 use crate::{
-    place::{place_from_bindings, place_from_declarations},
-    semantic_index::{place_table, use_def_map},
+    Db, FxOrderSet,
+    place::{Boundness, Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations},
+    semantic_index::{definition::Definition, use_def_map},
     types::{
-        ClassBase, ClassLiteral, KnownFunction, Type, TypeMapping, TypeQualifiers, TypeVarInstance,
+        BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, IsDisjointVisitor,
+        KnownFunction, NormalizedVisitor, PropertyInstanceType, Signature, Type, TypeMapping,
+        TypeQualifiers, TypeRelation, TypeTransformer, VarianceInferable,
+        signatures::{Parameter, Parameters},
     },
-    {Db, FxOrderSet},
 };
 
 impl<'db> ClassLiteral<'db> {
@@ -48,6 +58,59 @@ impl<'db> ProtocolClassLiteral<'db> {
         self.known_function_decorators(db)
             .contains(&KnownFunction::RuntimeCheckable)
     }
+
+    /// Iterate through the body of the protocol class. Check that all definitions
+    /// in the protocol class body are either explicitly declared directly in the
+    /// class body, or are declared in a superclass of the protocol class.
+    pub(super) fn validate_members(self, context: &InferContext, index: &SemanticIndex<'db>) {
+        let db = context.db();
+        let interface = self.interface(db);
+        let class_place_table = index.place_table(self.body_scope(db).file_scope_id(db));
+
+        for (symbol_id, mut bindings_iterator) in
+            use_def_map(db, self.body_scope(db)).all_end_of_scope_symbol_bindings()
+        {
+            let symbol_name = class_place_table.symbol(symbol_id).name();
+
+            if !interface.includes_member(db, symbol_name) {
+                continue;
+            }
+
+            let has_declaration = self
+                .iter_mro(db, None)
+                .filter_map(ClassBase::into_class)
+                .any(|superclass| {
+                    let superclass_scope = superclass.class_literal(db).0.body_scope(db);
+                    let Some(scoped_symbol_id) =
+                        place_table(db, superclass_scope).symbol_id(symbol_name)
+                    else {
+                        return false;
+                    };
+                    !place_from_declarations(
+                        db,
+                        index
+                            .use_def_map(superclass_scope.file_scope_id(db))
+                            .end_of_scope_declarations(ScopedPlaceId::Symbol(scoped_symbol_id)),
+                    )
+                    .into_place_and_conflicting_declarations()
+                    .0
+                    .place
+                    .is_unbound()
+                });
+
+            if has_declaration {
+                continue;
+            }
+
+            let Some(first_definition) =
+                bindings_iterator.find_map(|binding| binding.binding.definition())
+            else {
+                continue;
+            };
+
+            report_undeclared_protocol_member(context, first_definition, self, class_place_table);
+        }
+    }
 }
 
 impl<'db> Deref for ProtocolClassLiteral<'db> {
@@ -58,45 +121,64 @@ impl<'db> Deref for ProtocolClassLiteral<'db> {
     }
 }
 
+/// The interface of a protocol: the members of that protocol, and the types of those members.
+///
 /// # Ordering
 /// Ordering is based on the protocol interface member's salsa-assigned id and not on its members.
 /// The id may change between runs, or when the protocol instance members was garbage collected and recreated.
-#[salsa::interned(debug)]
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
-pub(super) struct ProtocolInterfaceMembers<'db> {
+pub(super) struct ProtocolInterface<'db> {
     #[returns(ref)]
     inner: BTreeMap<Name, ProtocolMemberData<'db>>,
 }
 
-/// The interface of a protocol: the members of that protocol, and the types of those members.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, PartialOrd, Ord)]
-pub(super) enum ProtocolInterface<'db> {
-    Members(ProtocolInterfaceMembers<'db>),
-    SelfReference,
+impl get_size2::GetSize for ProtocolInterface<'_> {}
+
+pub(super) fn walk_protocol_interface<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    interface: ProtocolInterface<'db>,
+    visitor: &V,
+) {
+    for member in interface.members(db) {
+        walk_protocol_member(db, &member, visitor);
+    }
 }
 
 impl<'db> ProtocolInterface<'db> {
-    pub(super) fn with_members<'a, M>(db: &'db dyn Db, members: M) -> Self
+    /// Synthesize a new protocol interface with the given members.
+    ///
+    /// All created members will be covariant, read-only property members
+    /// rather than method members or mutable attribute members.
+    pub(super) fn with_property_members<'a, M>(db: &'db dyn Db, members: M) -> Self
     where
         M: IntoIterator<Item = (&'a str, Type<'db>)>,
     {
         let members: BTreeMap<_, _> = members
             .into_iter()
             .map(|(name, ty)| {
+                // Synthesize a read-only property (one that has a getter but no setter)
+                // which returns the specified type from its getter.
+                let property_getter_signature = Signature::new(
+                    Parameters::new([Parameter::positional_only(Some(Name::new_static("self")))]),
+                    Some(ty.normalized(db)),
+                );
+                let property_getter = CallableType::single(db, property_getter_signature);
+                let property = PropertyInstanceType::new(db, Some(property_getter), None);
                 (
                     Name::new(name),
                     ProtocolMemberData {
-                        ty: ty.normalized(db),
                         qualifiers: TypeQualifiers::default(),
+                        kind: ProtocolMemberKind::Property(property),
                     },
                 )
             })
             .collect();
-        Self::Members(ProtocolInterfaceMembers::new(db, members))
+        Self::new(db, members)
     }
 
     fn empty(db: &'db dyn Db) -> Self {
-        Self::Members(ProtocolInterfaceMembers::new(db, BTreeMap::default()))
+        Self::new(db, BTreeMap::default())
     }
 
     pub(super) fn members<'a>(
@@ -106,75 +188,61 @@ impl<'db> ProtocolInterface<'db> {
     where
         'db: 'a,
     {
-        match self {
-            Self::Members(members) => {
-                Either::Left(members.inner(db).iter().map(|(name, data)| ProtocolMember {
-                    name,
-                    ty: data.ty,
-                    qualifiers: data.qualifiers,
-                }))
-            }
-            Self::SelfReference => Either::Right(std::iter::empty()),
-        }
+        self.inner(db).iter().map(|(name, data)| ProtocolMember {
+            name,
+            kind: data.kind,
+            qualifiers: data.qualifiers,
+        })
     }
 
-    pub(super) fn member_by_name<'a>(
-        self,
-        db: &'db dyn Db,
-        name: &'a str,
-    ) -> Option<ProtocolMember<'a, 'db>> {
-        match self {
-            Self::Members(members) => members.inner(db).get(name).map(|data| ProtocolMember {
-                name,
-                ty: data.ty,
-                qualifiers: data.qualifiers,
-            }),
-            Self::SelfReference => None,
-        }
+    fn member_by_name<'a>(self, db: &'db dyn Db, name: &'a str) -> Option<ProtocolMember<'a, 'db>> {
+        self.inner(db).get(name).map(|data| ProtocolMember {
+            name,
+            kind: data.kind,
+            qualifiers: data.qualifiers,
+        })
     }
 
-    /// Return `true` if all members of this protocol are fully static.
-    pub(super) fn is_fully_static(self, db: &'db dyn Db) -> bool {
-        self.members(db).all(|member| member.ty.is_fully_static(db))
+    pub(super) fn includes_member(self, db: &'db dyn Db, name: &str) -> bool {
+        self.inner(db).contains_key(name)
+    }
+
+    pub(super) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
+        self.member_by_name(db, name)
+            .map(|member| PlaceAndQualifiers {
+                place: Place::bound(member.ty()),
+                qualifiers: member.qualifiers(),
+            })
+            .unwrap_or_else(|| Type::object(db).instance_member(db, name))
     }
 
     /// Return `true` if if all members on `self` are also members of `other`.
     ///
     /// TODO: this method should consider the types of the members as well as their names.
     pub(super) fn is_sub_interface_of(self, db: &'db dyn Db, other: Self) -> bool {
-        match (self, other) {
-            (Self::Members(self_members), Self::Members(other_members)) => self_members
-                .inner(db)
-                .keys()
-                .all(|member_name| other_members.inner(db).contains_key(member_name)),
-            _ => {
-                unreachable!("Enclosing protocols should never be a self-reference marker")
-            }
-        }
+        self.inner(db)
+            .keys()
+            .all(|member_name| other.inner(db).contains_key(member_name))
     }
 
-    /// Return `true` if the types of any of the members match the closure passed in.
-    pub(super) fn any_over_type(
-        self,
-        db: &'db dyn Db,
-        type_fn: &dyn Fn(Type<'db>) -> bool,
-    ) -> bool {
-        self.members(db)
-            .any(|member| member.ty.any_over_type(db, type_fn))
+    pub(super) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+        Self::new(
+            db,
+            self.inner(db)
+                .iter()
+                .map(|(name, data)| (name.clone(), data.normalized_impl(db, visitor)))
+                .collect::<BTreeMap<_, _>>(),
+        )
     }
 
-    pub(super) fn normalized(self, db: &'db dyn Db) -> Self {
-        match self {
-            Self::Members(members) => Self::Members(ProtocolInterfaceMembers::new(
-                db,
-                members
-                    .inner(db)
-                    .iter()
-                    .map(|(name, data)| (name.clone(), data.normalized(db)))
-                    .collect::<BTreeMap<_, _>>(),
-            )),
-            Self::SelfReference => Self::SelfReference,
-        }
+    pub(super) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+        Self::new(
+            db,
+            self.inner(db)
+                .iter()
+                .map(|(name, data)| (name.clone(), data.materialize(db, variance)))
+                .collect::<BTreeMap<_, _>>(),
+        )
     }
 
     pub(super) fn specialized_and_normalized<'a>(
@@ -182,57 +250,87 @@ impl<'db> ProtocolInterface<'db> {
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
     ) -> Self {
-        match self {
-            Self::Members(members) => Self::Members(ProtocolInterfaceMembers::new(
-                db,
-                members
-                    .inner(db)
-                    .iter()
-                    .map(|(name, data)| {
-                        (
-                            name.clone(),
-                            data.apply_type_mapping(db, type_mapping).normalized(db),
-                        )
-                    })
-                    .collect::<BTreeMap<_, _>>(),
-            )),
-            Self::SelfReference => Self::SelfReference,
-        }
+        Self::new(
+            db,
+            self.inner(db)
+                .iter()
+                .map(|(name, data)| {
+                    (
+                        name.clone(),
+                        data.apply_type_mapping(db, type_mapping).normalized(db),
+                    )
+                })
+                .collect::<BTreeMap<_, _>>(),
+        )
     }
 
     pub(super) fn find_legacy_typevars(
         self,
         db: &'db dyn Db,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+        binding_context: Option<Definition<'db>>,
+        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
     ) {
-        match self {
-            Self::Members(members) => {
-                for data in members.inner(db).values() {
-                    data.find_legacy_typevars(db, typevars);
+        for data in self.inner(db).values() {
+            data.find_legacy_typevars(db, binding_context, typevars);
+        }
+    }
+
+    pub(super) fn display(self, db: &'db dyn Db) -> impl std::fmt::Display {
+        struct ProtocolInterfaceDisplay<'db> {
+            db: &'db dyn Db,
+            interface: ProtocolInterface<'db>,
+        }
+
+        impl std::fmt::Display for ProtocolInterfaceDisplay<'_> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_char('{')?;
+                for (i, (name, data)) in self.interface.inner(self.db).iter().enumerate() {
+                    write!(f, "\"{name}\": {data}", data = data.display(self.db))?;
+                    if i < self.interface.inner(self.db).len() - 1 {
+                        f.write_str(", ")?;
+                    }
                 }
+                f.write_char('}')
             }
-            Self::SelfReference => {}
+        }
+
+        ProtocolInterfaceDisplay {
+            db,
+            interface: self,
         }
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash, salsa::Update)]
+impl<'db> VarianceInferable<'db> for ProtocolInterface<'db> {
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+        self.members(db)
+            // TODO do we need to switch on member kind?
+            .map(|member| member.ty().variance_of(db, typevar))
+            .collect()
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash, salsa::Update, get_size2::GetSize)]
 pub(super) struct ProtocolMemberData<'db> {
-    ty: Type<'db>,
+    kind: ProtocolMemberKind<'db>,
     qualifiers: TypeQualifiers,
 }
 
 impl<'db> ProtocolMemberData<'db> {
     fn normalized(&self, db: &'db dyn Db) -> Self {
+        self.normalized_impl(db, &TypeTransformer::default())
+    }
+
+    fn normalized_impl(&self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         Self {
-            ty: self.ty.normalized(db),
+            kind: self.kind.normalized_impl(db, visitor),
             qualifiers: self.qualifiers,
         }
     }
 
     fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: &TypeMapping<'a, 'db>) -> Self {
         Self {
-            ty: self.ty.apply_type_mapping(db, type_mapping),
+            kind: self.kind.apply_type_mapping(db, type_mapping),
             qualifiers: self.qualifiers,
         }
     }
@@ -240,9 +338,130 @@ impl<'db> ProtocolMemberData<'db> {
     fn find_legacy_typevars(
         &self,
         db: &'db dyn Db,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+        binding_context: Option<Definition<'db>>,
+        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
     ) {
-        self.ty.find_legacy_typevars(db, typevars);
+        self.kind
+            .find_legacy_typevars(db, binding_context, typevars);
+    }
+
+    fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+        Self {
+            kind: self.kind.materialize(db, variance),
+            qualifiers: self.qualifiers,
+        }
+    }
+
+    fn display(&self, db: &'db dyn Db) -> impl std::fmt::Display {
+        struct ProtocolMemberDataDisplay<'db> {
+            db: &'db dyn Db,
+            data: ProtocolMemberKind<'db>,
+            qualifiers: TypeQualifiers,
+        }
+
+        impl std::fmt::Display for ProtocolMemberDataDisplay<'_> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                match self.data {
+                    ProtocolMemberKind::Method(callable) => {
+                        write!(f, "MethodMember(`{}`)", callable.display(self.db))
+                    }
+                    ProtocolMemberKind::Property(property) => {
+                        let mut d = f.debug_struct("PropertyMember");
+                        if let Some(getter) = property.getter(self.db) {
+                            d.field("getter", &format_args!("`{}`", &getter.display(self.db)));
+                        }
+                        if let Some(setter) = property.setter(self.db) {
+                            d.field("setter", &format_args!("`{}`", &setter.display(self.db)));
+                        }
+                        d.finish()
+                    }
+                    ProtocolMemberKind::Other(ty) => {
+                        f.write_str("AttributeMember(")?;
+                        write!(f, "`{}`", ty.display(self.db))?;
+                        if self.qualifiers.contains(TypeQualifiers::CLASS_VAR) {
+                            f.write_str("; ClassVar")?;
+                        }
+                        f.write_char(')')
+                    }
+                }
+            }
+        }
+
+        ProtocolMemberDataDisplay {
+            db,
+            data: self.kind,
+            qualifiers: self.qualifiers,
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, salsa::Update, Hash, get_size2::GetSize)]
+enum ProtocolMemberKind<'db> {
+    Method(CallableType<'db>),
+    Property(PropertyInstanceType<'db>),
+    Other(Type<'db>),
+}
+
+impl<'db> ProtocolMemberKind<'db> {
+    fn normalized_impl(&self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+        match self {
+            ProtocolMemberKind::Method(callable) => {
+                ProtocolMemberKind::Method(callable.normalized_impl(db, visitor))
+            }
+            ProtocolMemberKind::Property(property) => {
+                ProtocolMemberKind::Property(property.normalized_impl(db, visitor))
+            }
+            ProtocolMemberKind::Other(ty) => {
+                ProtocolMemberKind::Other(ty.normalized_impl(db, visitor))
+            }
+        }
+    }
+
+    fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: &TypeMapping<'a, 'db>) -> Self {
+        match self {
+            ProtocolMemberKind::Method(callable) => {
+                ProtocolMemberKind::Method(callable.apply_type_mapping(db, type_mapping))
+            }
+            ProtocolMemberKind::Property(property) => {
+                ProtocolMemberKind::Property(property.apply_type_mapping(db, type_mapping))
+            }
+            ProtocolMemberKind::Other(ty) => {
+                ProtocolMemberKind::Other(ty.apply_type_mapping(db, type_mapping))
+            }
+        }
+    }
+
+    fn find_legacy_typevars(
+        &self,
+        db: &'db dyn Db,
+        binding_context: Option<Definition<'db>>,
+        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+    ) {
+        match self {
+            ProtocolMemberKind::Method(callable) => {
+                callable.find_legacy_typevars(db, binding_context, typevars);
+            }
+            ProtocolMemberKind::Property(property) => {
+                property.find_legacy_typevars(db, binding_context, typevars);
+            }
+            ProtocolMemberKind::Other(ty) => {
+                ty.find_legacy_typevars(db, binding_context, typevars);
+            }
+        }
+    }
+
+    fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+        match self {
+            ProtocolMemberKind::Method(callable) => {
+                ProtocolMemberKind::Method(callable.materialize(db, variance))
+            }
+            ProtocolMemberKind::Property(property) => {
+                ProtocolMemberKind::Property(property.materialize(db, variance))
+            }
+            ProtocolMemberKind::Other(ty) => {
+                ProtocolMemberKind::Other(ty.materialize(db, variance))
+            }
+        }
     }
 }
 
@@ -250,8 +469,22 @@ impl<'db> ProtocolMemberData<'db> {
 #[derive(Debug, PartialEq, Eq)]
 pub(super) struct ProtocolMember<'a, 'db> {
     name: &'a str,
-    ty: Type<'db>,
+    kind: ProtocolMemberKind<'db>,
     qualifiers: TypeQualifiers,
+}
+
+fn walk_protocol_member<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    member: &ProtocolMember<'_, 'db>,
+    visitor: &V,
+) {
+    match member.kind {
+        ProtocolMemberKind::Method(method) => visitor.visit_callable_type(db, method),
+        ProtocolMemberKind::Property(property) => {
+            visitor.visit_property_instance_type(db, property);
+        }
+        ProtocolMemberKind::Other(ty) => visitor.visit_type(db, ty),
+    }
 }
 
 impl<'a, 'db> ProtocolMember<'a, 'db> {
@@ -259,12 +492,60 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         self.name
     }
 
-    pub(super) fn ty(&self) -> Type<'db> {
-        self.ty
-    }
-
     pub(super) fn qualifiers(&self) -> TypeQualifiers {
         self.qualifiers
+    }
+
+    fn ty(&self) -> Type<'db> {
+        match &self.kind {
+            ProtocolMemberKind::Method(callable) => Type::Callable(*callable),
+            ProtocolMemberKind::Property(property) => Type::PropertyInstance(*property),
+            ProtocolMemberKind::Other(ty) => *ty,
+        }
+    }
+
+    pub(super) fn has_disjoint_type_from(
+        &self,
+        db: &'db dyn Db,
+        other: Type<'db>,
+        visitor: &IsDisjointVisitor<'db>,
+    ) -> bool {
+        match &self.kind {
+            // TODO: implement disjointness for property/method members as well as attribute members
+            ProtocolMemberKind::Property(_) | ProtocolMemberKind::Method(_) => false,
+            ProtocolMemberKind::Other(ty) => ty.is_disjoint_from_impl(db, other, visitor),
+        }
+    }
+
+    /// Return `true` if `other` contains an attribute/method/property that satisfies
+    /// the part of the interface defined by this protocol member.
+    pub(super) fn is_satisfied_by(
+        &self,
+        db: &'db dyn Db,
+        other: Type<'db>,
+        relation: TypeRelation,
+    ) -> bool {
+        match &self.kind {
+            // TODO: consider the types of the attribute on `other` for method members
+            ProtocolMemberKind::Method(_) => matches!(
+                other.to_meta_type(db).member(db, self.name).place,
+                Place::Type(_, Boundness::Bound)
+            ),
+            // TODO: consider the types of the attribute on `other` for property members
+            ProtocolMemberKind::Property(_) => matches!(
+                other.member(db, self.name).place,
+                Place::Type(_, Boundness::Bound)
+            ),
+            ProtocolMemberKind::Other(member_type) => {
+                let Place::Type(attribute_type, Boundness::Bound) =
+                    other.member(db, self.name).place
+                else {
+                    return false;
+                };
+                member_type.has_relation_to(db, attribute_type, relation)
+                    && attribute_type.has_relation_to(db, *member_type, relation)
+            }
+        }
     }
 }
 
@@ -307,8 +588,20 @@ fn excluded_from_proto_members(member: &str) -> bool {
     ) || member.starts_with("_abc_")
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum BoundOnClass {
+    Yes,
+    No,
+}
+
+impl BoundOnClass {
+    const fn is_yes(self) -> bool {
+        matches!(self, BoundOnClass::Yes)
+    }
+}
+
 /// Inner Salsa query for [`ProtocolClassLiteral::interface`].
-#[salsa::tracked(cycle_fn=proto_interface_cycle_recover, cycle_initial=proto_interface_cycle_initial)]
+#[salsa::tracked(cycle_fn=proto_interface_cycle_recover, cycle_initial=proto_interface_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
 fn cached_protocol_interface<'db>(
     db: &'db dyn Db,
     class: ClassLiteral<'db>,
@@ -323,53 +616,72 @@ fn cached_protocol_interface<'db>(
         let parent_scope = parent_protocol.body_scope(db);
         let use_def_map = use_def_map(db, parent_scope);
         let place_table = place_table(db, parent_scope);
+        let mut direct_members = FxHashMap::default();
 
-        members.extend(
-            use_def_map
-                .all_public_declarations()
-                .flat_map(|(place_id, declarations)| {
-                    place_from_declarations(db, declarations).map(|place| (place_id, place))
-                })
-                .filter_map(|(place_id, place)| {
-                    place
-                        .place
-                        .ignore_possibly_unbound()
-                        .map(|ty| (place_id, ty, place.qualifiers))
-                })
-                // Bindings in the class body that are not declared in the class body
-                // are not valid protocol members, and we plan to emit diagnostics for them
-                // elsewhere. Invalid or not, however, it's important that we still consider
-                // them to be protocol members. The implementation of `issubclass()` and
-                // `isinstance()` for runtime-checkable protocols considers them to be protocol
-                // members at runtime, and it's important that we accurately understand
-                // type narrowing that uses `isinstance()` or `issubclass()` with
-                // runtime-checkable protocols.
-                .chain(
-                    use_def_map
-                        .all_public_bindings()
-                        .filter_map(|(place_id, bindings)| {
-                            place_from_bindings(db, bindings)
-                                .ignore_possibly_unbound()
-                                .map(|ty| (place_id, ty, TypeQualifiers::default()))
-                        }),
-                )
-                .filter_map(|(place_id, member, qualifiers)| {
-                    Some((
-                        place_table.place_expr(place_id).as_name()?,
-                        member,
-                        qualifiers,
-                    ))
-                })
-                .filter(|(name, _, _)| !excluded_from_proto_members(name))
-                .map(|(name, ty, qualifiers)| {
-                    let ty = ty.replace_self_reference(db, class);
-                    let member = ProtocolMemberData { ty, qualifiers };
-                    (name.clone(), member)
-                }),
-        );
+        // Bindings in the class body that are not declared in the class body
+        // are not valid protocol members, and we plan to emit diagnostics for them
+        // elsewhere. Invalid or not, however, it's important that we still consider
+        // them to be protocol members. The implementation of `issubclass()` and
+        // `isinstance()` for runtime-checkable protocols considers them to be protocol
+        // members at runtime, and it's important that we accurately understand
+        // type narrowing that uses `isinstance()` or `issubclass()` with
+        // runtime-checkable protocols.
+        for (symbol_id, bindings) in use_def_map.all_end_of_scope_symbol_bindings() {
+            let Some(ty) = place_from_bindings(db, bindings).ignore_possibly_unbound() else {
+                continue;
+            };
+            direct_members.insert(
+                symbol_id,
+                (ty, TypeQualifiers::default(), BoundOnClass::Yes),
+            );
+        }
+
+        for (symbol_id, declarations) in use_def_map.all_end_of_scope_symbol_declarations() {
+            let place = place_from_declarations(db, declarations).ignore_conflicting_declarations();
+            if let Some(new_type) = place.place.ignore_possibly_unbound() {
+                direct_members
+                    .entry(symbol_id)
+                    .and_modify(|(ty, quals, _)| {
+                        *ty = new_type;
+                        *quals = place.qualifiers;
+                    })
+                    .or_insert((new_type, place.qualifiers, BoundOnClass::No));
+            }
+        }
+
+        for (symbol_id, (ty, qualifiers, bound_on_class)) in direct_members {
+            let name = place_table.symbol(symbol_id).name();
+            if excluded_from_proto_members(name) {
+                continue;
+            }
+            if members.contains_key(name) {
+                continue;
+            }
+
+            let member = match ty {
+                Type::PropertyInstance(property) => ProtocolMemberKind::Property(property),
+                Type::Callable(callable)
+                    if bound_on_class.is_yes() && callable.is_function_like(db) =>
+                {
+                    ProtocolMemberKind::Method(callable)
+                }
+                Type::FunctionLiteral(function) if bound_on_class.is_yes() => {
+                    ProtocolMemberKind::Method(function.into_callable_type(db))
+                }
+                _ => ProtocolMemberKind::Other(ty),
+            };
+
+            members.insert(
+                name.clone(),
+                ProtocolMemberData {
+                    kind: member,
+                    qualifiers,
+                },
+            );
+        }
     }
 
-    ProtocolInterface::Members(ProtocolInterfaceMembers::new(db, members))
+    ProtocolInterface::new(db, members)
 }
 
 #[allow(clippy::trivially_copy_pass_by_ref)]

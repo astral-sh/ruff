@@ -46,6 +46,7 @@ impl Violation for Debugger {
     }
 }
 
+/// T100
 /// Checks for the presence of a debugger call.
 pub(crate) fn debugger_call(checker: &Checker, expr: &Expr, func: &Expr) {
     if let Some(using_type) =
@@ -64,6 +65,7 @@ pub(crate) fn debugger_call(checker: &Checker, expr: &Expr, func: &Expr) {
     }
 }
 
+/// T100
 /// Checks for the presence of a debugger import.
 pub(crate) fn debugger_import(checker: &Checker, stmt: &Stmt, module: Option<&str>, name: &str) {
     if let Some(module) = module {

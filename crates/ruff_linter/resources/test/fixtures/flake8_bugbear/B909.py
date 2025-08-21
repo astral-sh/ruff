@@ -179,3 +179,17 @@ def func():
     for elem in some_list:
         if some_list.pop() == 2:
             return
+
+# should not error - direct return with mutation (Issue #18399)
+def fail_map(mapping):
+    for key in mapping:
+        return mapping.pop(key)
+
+def success_map(mapping):
+    for key in mapping:
+        ret = mapping.pop(key)  # should not error
+        return ret
+
+def fail_list(seq):
+    for val in seq:
+        return seq.pop(4)

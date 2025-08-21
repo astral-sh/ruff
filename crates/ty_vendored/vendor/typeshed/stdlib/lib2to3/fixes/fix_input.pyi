@@ -1,3 +1,5 @@
+"""Fixer that changes input(...) into eval(input(...))."""
+
 from _typeshed import Incomplete
 from typing import ClassVar, Literal
 

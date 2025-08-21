@@ -5,6 +5,8 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
 use crate::checkers::ast::LintContext;
+use crate::preview::is_trailing_comma_type_params_enabled;
+use crate::settings::LinterSettings;
 use crate::{AlwaysFixableViolation, Violation};
 use crate::{Edit, Fix};
 
@@ -24,6 +26,8 @@ enum TokenType {
     Def,
     For,
     Lambda,
+    Class,
+    Type,
     Irrelevant,
 }
 
@@ -69,6 +73,8 @@ impl From<(TokenKind, TextRange)> for SimpleToken {
             TokenKind::Lbrace => TokenType::OpeningCurlyBracket,
             TokenKind::Rbrace => TokenType::ClosingBracket,
             TokenKind::Def => TokenType::Def,
+            TokenKind::Class => TokenType::Class,
+            TokenKind::Type => TokenType::Type,
             TokenKind::For => TokenType::For,
             TokenKind::Lambda => TokenType::Lambda,
             // Import treated like a function.
@@ -98,6 +104,8 @@ enum ContextType {
     Dict,
     /// Lambda parameter list, e.g. `lambda a, b`.
     LambdaParameters,
+    /// Type parameter list, e.g. `def foo[T, U](): ...`
+    TypeParameters,
 }
 
 /// Comma context - described a comma-delimited "situation".
@@ -290,7 +298,7 @@ pub(crate) fn trailing_commas(
         }
 
         // Update the comma context stack.
-        let context = update_context(token, prev, prev_prev, &mut stack);
+        let context = update_context(token, prev, prev_prev, &mut stack, lint_context.settings());
 
         check_token(token, prev, prev_prev, context, locator, lint_context);
 
@@ -326,6 +334,7 @@ fn check_token(
             ContextType::No => false,
             ContextType::FunctionParameters => true,
             ContextType::CallArguments => true,
+            ContextType::TypeParameters => true,
             // `(1)` is not equivalent to `(1,)`.
             ContextType::Tuple => context.num_commas != 0,
             // `x[1]` is not equivalent to `x[1,]`.
@@ -352,17 +361,20 @@ fn check_token(
     };
 
     if comma_prohibited {
-        let mut diagnostic = lint_context.report_diagnostic(ProhibitedTrailingComma, prev.range());
-        let range = diagnostic.range();
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(range)));
-        return;
+        if let Some(mut diagnostic) =
+            lint_context.report_diagnostic_if_enabled(ProhibitedTrailingComma, prev.range())
+        {
+            let range = diagnostic.expect_range();
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(range)));
+            return;
+        }
     }
 
     // Is prev a prohibited trailing comma on a bare tuple?
     // Approximation: any comma followed by a statement-ending newline.
     let bare_comma_prohibited = prev.ty == TokenType::Comma && token.ty == TokenType::Newline;
     if bare_comma_prohibited {
-        lint_context.report_diagnostic(TrailingCommaOnBareTuple, prev.range());
+        lint_context.report_diagnostic_if_enabled(TrailingCommaOnBareTuple, prev.range());
         return;
     }
 
@@ -384,17 +396,19 @@ fn check_token(
                 | TokenType::OpeningCurlyBracket
         );
     if comma_required {
-        let mut diagnostic =
-            lint_context.report_diagnostic(MissingTrailingComma, TextRange::empty(prev_prev.end()));
-        // Create a replacement that includes the final bracket (or other token),
-        // rather than just inserting a comma at the end. This prevents the UP034 fix
-        // removing any brackets in the same linter pass - doing both at the same time could
-        // lead to a syntax error.
-        let contents = locator.slice(prev_prev.range());
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            format!("{contents},"),
-            prev_prev.range(),
-        )));
+        if let Some(mut diagnostic) = lint_context
+            .report_diagnostic_if_enabled(MissingTrailingComma, TextRange::empty(prev_prev.end()))
+        {
+            // Create a replacement that includes the final bracket (or other token),
+            // rather than just inserting a comma at the end. This prevents the UP034 fix
+            // removing any brackets in the same linter pass - doing both at the same time could
+            // lead to a syntax error.
+            let contents = locator.slice(prev_prev.range());
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                format!("{contents},"),
+                prev_prev.range(),
+            )));
+        }
     }
 }
 
@@ -403,6 +417,7 @@ fn update_context(
     prev: SimpleToken,
     prev_prev: SimpleToken,
     stack: &mut Vec<Context>,
+    settings: &LinterSettings,
 ) -> Context {
     let new_context = match token.ty {
         TokenType::OpeningBracket => match (prev.ty, prev_prev.ty) {
@@ -412,6 +427,17 @@ fn update_context(
             }
             _ => Context::new(ContextType::Tuple),
         },
+        TokenType::OpeningSquareBracket if is_trailing_comma_type_params_enabled(settings) => {
+            match (prev.ty, prev_prev.ty) {
+                (TokenType::Named, TokenType::Def | TokenType::Class | TokenType::Type) => {
+                    Context::new(ContextType::TypeParameters)
+                }
+                (TokenType::ClosingBracket | TokenType::Named | TokenType::String, _) => {
+                    Context::new(ContextType::Subscript)
+                }
+                _ => Context::new(ContextType::List),
+            }
+        }
         TokenType::OpeningSquareBracket => match prev.ty {
             TokenType::ClosingBracket | TokenType::Named | TokenType::String => {
                 Context::new(ContextType::Subscript)

@@ -87,7 +87,7 @@ match x:
     case 6.0:
         reveal_type(x)  # revealed: float
     case 1j:
-        reveal_type(x)  # revealed: complex & ~float
+        reveal_type(x)  # revealed: complex
     case b"foo":
         reveal_type(x)  # revealed: Literal[b"foo"]
 
@@ -137,7 +137,7 @@ match x:
     case True | False:
         reveal_type(x)  # revealed: bool
     case 3.14 | 2.718 | 1.414:
-        reveal_type(x)  # revealed: float & ~tuple[Unknown, ...]
+        reveal_type(x)  # revealed: float
 
 reveal_type(x)  # revealed: object
 ```

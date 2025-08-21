@@ -21,8 +21,8 @@ impl InterpolatedStringContext {
         self.enclosing_flags
     }
 
-    pub(crate) const fn layout(self) -> InterpolatedStringLayout {
-        self.layout
+    pub(crate) const fn is_multiline(self) -> bool {
+        matches!(self.layout, InterpolatedStringLayout::Multiline)
     }
 }
 

@@ -13,6 +13,7 @@ license = { workspace = true }
 [dependencies]
 ty = { workspace = true }
 ty_project = { workspace = true, features = ["schemars"] }
+ty_static = { workspace = true }
 ruff = { workspace = true }
 ruff_formatter = { workspace = true }
 ruff_linter = { workspace = true, features = ["schemars"] }

@@ -223,7 +223,7 @@ impl<'a> Definitions<'a> {
             // visibility.
             let visibility = {
                 match &definition {
-                    Definition::Module(module) => module_visibility(module),
+                    Definition::Module(module) => module_visibility(*module),
                     Definition::Member(member) => match member.kind {
                         MemberKind::Class(class) => {
                             let parent = &definitions[member.parent];

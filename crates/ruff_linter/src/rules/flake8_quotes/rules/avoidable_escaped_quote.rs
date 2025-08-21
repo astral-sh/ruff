@@ -19,12 +19,12 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///
 /// ## Example
 /// ```python
-/// foo = 'bar\'s'
+/// foo = "bar\"s"
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// foo = "bar's"
+/// foo = 'bar"s'
 /// ```
 ///
 /// ## Formatter compatibility
@@ -86,7 +86,7 @@ impl<'a, 'b> AvoidableEscapedQuoteChecker<'a, 'b> {
     fn new(checker: &'a Checker<'b>, target_version: PythonVersion) -> Self {
         Self {
             checker,
-            quotes_settings: &checker.settings.flake8_quotes,
+            quotes_settings: &checker.settings().flake8_quotes,
             supports_pep701: target_version.supports_pep_701(),
         }
     }

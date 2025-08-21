@@ -1,17 +1,17 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
-snapshot_kind: text
 ---
-<filename>:7:26: F841 [*] Local variable `x` is assigned to but never used
+F841 [*] Local variable `x` is assigned to but never used
+ --> <filename>:7:26
   |
 5 |     try:
 6 |         1 / 0
 7 |     except ValueError as x:
-  |                          ^ F841
+  |                          ^
 8 |         pass
 9 |     except ImportError as x:
   |
-  = help: Remove assignment to unused variable `x`
+help: Remove assignment to unused variable `x`
 
 ℹ Safe fix
 4 4 | 
@@ -23,15 +23,16 @@ snapshot_kind: text
 9 9 |     except ImportError as x:
 10 10 |         pass
 
-<filename>:9:27: F841 [*] Local variable `x` is assigned to but never used
+F841 [*] Local variable `x` is assigned to but never used
+  --> <filename>:9:27
    |
  7 |     except ValueError as x:
  8 |         pass
  9 |     except ImportError as x:
-   |                           ^ F841
+   |                           ^
 10 |         pass
    |
-   = help: Remove assignment to unused variable `x`
+help: Remove assignment to unused variable `x`
 
 ℹ Safe fix
 6  6  |         1 / 0

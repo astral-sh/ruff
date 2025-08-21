@@ -158,6 +158,7 @@ pub(crate) fn sort_dunder_all_ann_assign(checker: &Checker, node: &ast::StmtAnnA
     }
 }
 
+/// RUF022
 /// Sort a tuple or list that defines or mutates the global variable `__all__`.
 ///
 /// This routine checks whether the tuple or list is sorted, and emits a

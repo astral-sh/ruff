@@ -5,7 +5,7 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::Locator;
-use crate::checkers::logical_lines::LogicalLinesContext;
+use crate::checkers::ast::LintContext;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 use super::LogicalLine;
@@ -48,7 +48,7 @@ pub(crate) fn redundant_backslash(
     line: &LogicalLine,
     locator: &Locator,
     indexer: &Indexer,
-    context: &mut LogicalLinesContext,
+    context: &LintContext,
 ) {
     let mut parens = 0;
     let continuation_lines = indexer.continuation_line_starts();
@@ -75,7 +75,7 @@ pub(crate) fn redundant_backslash(
                     for continuation_line in &continuation_lines[start_index..end_index] {
                         let backslash_end = locator.line_end(*continuation_line);
                         let backslash_start = backslash_end - TextSize::new(1);
-                        if let Some(mut diagnostic) = context.report_diagnostic(
+                        if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
                             RedundantBackslash,
                             TextRange::new(backslash_start, backslash_end),
                         ) {

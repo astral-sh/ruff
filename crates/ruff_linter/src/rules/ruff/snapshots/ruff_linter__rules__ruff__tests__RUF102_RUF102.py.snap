@@ -1,15 +1,16 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF102.py:2:12: RUF102 [*] Invalid rule code in `# noqa`: INVALID123
+RUF102 [*] Invalid rule code in `# noqa`: INVALID123
+ --> RUF102.py:2:12
   |
 1 | # Invalid code
 2 | import os  # noqa: INVALID123
-  |            ^^^^^^^^^^^^^^^^^^ RUF102
+  |            ^^^^^^^^^^^^^^^^^^
 3 | # External code
 4 | import re  # noqa: V123
   |
-  = help: Remove the rule code
+help: Remove the rule code
 
 ℹ Safe fix
 1 1 | # Invalid code
@@ -19,16 +20,17 @@ RUF102.py:2:12: RUF102 [*] Invalid rule code in `# noqa`: INVALID123
 4 4 | import re  # noqa: V123
 5 5 | # Valid noqa
 
-RUF102.py:4:12: RUF102 [*] Invalid rule code in `# noqa`: V123
+RUF102 [*] Invalid rule code in `# noqa`: V123
+ --> RUF102.py:4:12
   |
 2 | import os  # noqa: INVALID123
 3 | # External code
 4 | import re  # noqa: V123
-  |            ^^^^^^^^^^^^ RUF102
+  |            ^^^^^^^^^^^^
 5 | # Valid noqa
 6 | import sys  # noqa: E402
   |
-  = help: Remove the rule code
+help: Remove the rule code
 
 ℹ Safe fix
 1 1 | # Invalid code
@@ -40,16 +42,17 @@ RUF102.py:4:12: RUF102 [*] Invalid rule code in `# noqa`: V123
 6 6 | import sys  # noqa: E402
 7 7 | from functools import cache  # Preceeding comment # noqa: F401, INVALID456
 
-RUF102.py:7:65: RUF102 [*] Invalid rule code in `# noqa`: INVALID456
+RUF102 [*] Invalid rule code in `# noqa`: INVALID456
+ --> RUF102.py:7:65
   |
 5 | # Valid noqa
 6 | import sys  # noqa: E402
 7 | from functools import cache  # Preceeding comment # noqa: F401, INVALID456
-  |                                                                 ^^^^^^^^^^ RUF102
+  |                                                                 ^^^^^^^^^^
 8 | from itertools import product  # Preceeding comment # noqa: INVALID789
 9 | # Succeeding comment
   |
-  = help: Remove the rule code
+help: Remove the rule code
 
 ℹ Safe fix
 4 4 | import re  # noqa: V123
@@ -61,16 +64,17 @@ RUF102.py:7:65: RUF102 [*] Invalid rule code in `# noqa`: INVALID456
 9 9 | # Succeeding comment
 10 10 | import math # noqa: INVALID000 # Succeeding comment
 
-RUF102.py:8:53: RUF102 [*] Invalid rule code in `# noqa`: INVALID789
+RUF102 [*] Invalid rule code in `# noqa`: INVALID789
+  --> RUF102.py:8:53
    |
  6 | import sys  # noqa: E402
  7 | from functools import cache  # Preceeding comment # noqa: F401, INVALID456
  8 | from itertools import product  # Preceeding comment # noqa: INVALID789
-   |                                                     ^^^^^^^^^^^^^^^^^^ RUF102
+   |                                                     ^^^^^^^^^^^^^^^^^^
  9 | # Succeeding comment
 10 | import math # noqa: INVALID000 # Succeeding comment
    |
-   = help: Remove the rule code
+help: Remove the rule code
 
 ℹ Safe fix
 5 5 | # Valid noqa
@@ -82,16 +86,17 @@ RUF102.py:8:53: RUF102 [*] Invalid rule code in `# noqa`: INVALID789
 10 10 | import math # noqa: INVALID000 # Succeeding comment
 11 11 | # Mixed valid and invalid
 
-RUF102.py:10:13: RUF102 [*] Invalid rule code in `# noqa`: INVALID000
+RUF102 [*] Invalid rule code in `# noqa`: INVALID000
+  --> RUF102.py:10:13
    |
  8 | from itertools import product  # Preceeding comment # noqa: INVALID789
  9 | # Succeeding comment
 10 | import math # noqa: INVALID000 # Succeeding comment
-   |             ^^^^^^^^^^^^^^^^^^ RUF102
+   |             ^^^^^^^^^^^^^^^^^^
 11 | # Mixed valid and invalid
 12 | from typing import List  # noqa: F401, INVALID123
    |
-   = help: Remove the rule code
+help: Remove the rule code
 
 ℹ Safe fix
 7  7  | from functools import cache  # Preceeding comment # noqa: F401, INVALID456
@@ -103,16 +108,17 @@ RUF102.py:10:13: RUF102 [*] Invalid rule code in `# noqa`: INVALID000
 12 12 | from typing import List  # noqa: F401, INVALID123
 13 13 | # Test for multiple invalid
 
-RUF102.py:12:40: RUF102 [*] Invalid rule code in `# noqa`: INVALID123
+RUF102 [*] Invalid rule code in `# noqa`: INVALID123
+  --> RUF102.py:12:40
    |
 10 | import math # noqa: INVALID000 # Succeeding comment
 11 | # Mixed valid and invalid
 12 | from typing import List  # noqa: F401, INVALID123
-   |                                        ^^^^^^^^^^ RUF102
+   |                                        ^^^^^^^^^^
 13 | # Test for multiple invalid
 14 | from collections import defaultdict  # noqa: INVALID100, INVALID200, F401
    |
-   = help: Remove the rule code
+help: Remove the rule code
 
 ℹ Safe fix
 9  9  | # Succeeding comment
@@ -124,16 +130,17 @@ RUF102.py:12:40: RUF102 [*] Invalid rule code in `# noqa`: INVALID123
 14 14 | from collections import defaultdict  # noqa: INVALID100, INVALID200, F401
 15 15 | # Test for preserving valid codes when fixing
 
-RUF102.py:14:46: RUF102 [*] Invalid rule code in `# noqa`: INVALID100
+RUF102 [*] Invalid rule code in `# noqa`: INVALID100
+  --> RUF102.py:14:46
    |
 12 | from typing import List  # noqa: F401, INVALID123
 13 | # Test for multiple invalid
 14 | from collections import defaultdict  # noqa: INVALID100, INVALID200, F401
-   |                                              ^^^^^^^^^^ RUF102
+   |                                              ^^^^^^^^^^
 15 | # Test for preserving valid codes when fixing
 16 | from itertools import chain  # noqa: E402, INVALID300, F401
    |
-   = help: Remove the rule code
+help: Remove the rule code
 
 ℹ Safe fix
 11 11 | # Mixed valid and invalid
@@ -145,16 +152,17 @@ RUF102.py:14:46: RUF102 [*] Invalid rule code in `# noqa`: INVALID100
 16 16 | from itertools import chain  # noqa: E402, INVALID300, F401
 17 17 | # Test for mixed code types
 
-RUF102.py:14:58: RUF102 [*] Invalid rule code in `# noqa`: INVALID200
+RUF102 [*] Invalid rule code in `# noqa`: INVALID200
+  --> RUF102.py:14:58
    |
 12 | from typing import List  # noqa: F401, INVALID123
 13 | # Test for multiple invalid
 14 | from collections import defaultdict  # noqa: INVALID100, INVALID200, F401
-   |                                                          ^^^^^^^^^^ RUF102
+   |                                                          ^^^^^^^^^^
 15 | # Test for preserving valid codes when fixing
 16 | from itertools import chain  # noqa: E402, INVALID300, F401
    |
-   = help: Remove the rule code
+help: Remove the rule code
 
 ℹ Safe fix
 11 11 | # Mixed valid and invalid
@@ -166,16 +174,17 @@ RUF102.py:14:58: RUF102 [*] Invalid rule code in `# noqa`: INVALID200
 16 16 | from itertools import chain  # noqa: E402, INVALID300, F401
 17 17 | # Test for mixed code types
 
-RUF102.py:16:44: RUF102 [*] Invalid rule code in `# noqa`: INVALID300
+RUF102 [*] Invalid rule code in `# noqa`: INVALID300
+  --> RUF102.py:16:44
    |
 14 | from collections import defaultdict  # noqa: INVALID100, INVALID200, F401
 15 | # Test for preserving valid codes when fixing
 16 | from itertools import chain  # noqa: E402, INVALID300, F401
-   |                                            ^^^^^^^^^^ RUF102
+   |                                            ^^^^^^^^^^
 17 | # Test for mixed code types
 18 | import json  # noqa: E402, INVALID400, V100
    |
-   = help: Remove the rule code
+help: Remove the rule code
 
 ℹ Safe fix
 13 13 | # Test for multiple invalid
@@ -186,14 +195,15 @@ RUF102.py:16:44: RUF102 [*] Invalid rule code in `# noqa`: INVALID300
 17 17 | # Test for mixed code types
 18 18 | import json  # noqa: E402, INVALID400, V100
 
-RUF102.py:18:28: RUF102 [*] Invalid rule code in `# noqa`: INVALID400
+RUF102 [*] Invalid rule code in `# noqa`: INVALID400
+  --> RUF102.py:18:28
    |
 16 | from itertools import chain  # noqa: E402, INVALID300, F401
 17 | # Test for mixed code types
 18 | import json  # noqa: E402, INVALID400, V100
-   |                            ^^^^^^^^^^ RUF102
+   |                            ^^^^^^^^^^
    |
-   = help: Remove the rule code
+help: Remove the rule code
 
 ℹ Safe fix
 15 15 | # Test for preserving valid codes when fixing
@@ -202,14 +212,15 @@ RUF102.py:18:28: RUF102 [*] Invalid rule code in `# noqa`: INVALID400
 18    |-import json  # noqa: E402, INVALID400, V100
    18 |+import json  # noqa: E402, V100
 
-RUF102.py:18:40: RUF102 [*] Invalid rule code in `# noqa`: V100
+RUF102 [*] Invalid rule code in `# noqa`: V100
+  --> RUF102.py:18:40
    |
 16 | from itertools import chain  # noqa: E402, INVALID300, F401
 17 | # Test for mixed code types
 18 | import json  # noqa: E402, INVALID400, V100
-   |                                        ^^^^ RUF102
+   |                                        ^^^^
    |
-   = help: Remove the rule code
+help: Remove the rule code
 
 ℹ Safe fix
 15 15 | # Test for preserving valid codes when fixing

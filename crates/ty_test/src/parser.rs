@@ -143,7 +143,15 @@ impl<'m, 's> MarkdownTest<'m, 's> {
     }
 
     pub(super) fn should_snapshot_diagnostics(&self) -> bool {
-        self.section.snapshot_diagnostics
+        self.section
+            .directives
+            .contains(MdtestDirectives::SNAPSHOT_DIAGNOSTICS)
+    }
+
+    pub(super) fn should_skip_pulling_types(&self) -> bool {
+        self.section
+            .directives
+            .contains(MdtestDirectives::PULL_TYPES_SKIP)
     }
 }
 
@@ -194,7 +202,7 @@ struct Section<'s> {
     level: u8,
     parent_id: Option<SectionId>,
     config: MarkdownTestConfig,
-    snapshot_diagnostics: bool,
+    directives: MdtestDirectives,
 }
 
 #[newtype_index]
@@ -428,7 +436,7 @@ impl<'s> Parser<'s> {
             level: 0,
             parent_id: None,
             config: MarkdownTestConfig::default(),
-            snapshot_diagnostics: false,
+            directives: MdtestDirectives::default(),
         });
         Self {
             sections,
@@ -486,6 +494,7 @@ impl<'s> Parser<'s> {
 
     fn parse_impl(&mut self) -> anyhow::Result<()> {
         const SECTION_CONFIG_SNAPSHOT: &str = "snapshot-diagnostics";
+        const SECTION_CONFIG_PULLTYPES: &str = "pull-types:skip";
         const HTML_COMMENT_ALLOWLIST: &[&str] = &["blacken-docs:on", "blacken-docs:off"];
         const CODE_BLOCK_END: &[u8] = b"```";
         const HTML_COMMENT_END: &[u8] = b"-->";
@@ -498,10 +507,12 @@ impl<'s> Parser<'s> {
                     {
                         let html_comment = self.cursor.as_str()[..position].trim();
                         if html_comment == SECTION_CONFIG_SNAPSHOT {
-                            self.process_snapshot_diagnostics()?;
+                            self.process_mdtest_directive(MdtestDirective::SnapshotDiagnostics)?;
+                        } else if html_comment == SECTION_CONFIG_PULLTYPES {
+                            self.process_mdtest_directive(MdtestDirective::PullTypesSkip)?;
                         } else if !HTML_COMMENT_ALLOWLIST.contains(&html_comment) {
                             bail!(
-                                "Unknown HTML comment `{}` -- possibly a `snapshot-diagnostics` typo? \
+                                "Unknown HTML comment `{}` -- possibly a typo? \
                                 (Add to `HTML_COMMENT_ALLOWLIST` if this is a false positive)",
                                 html_comment
                             );
@@ -636,7 +647,7 @@ impl<'s> Parser<'s> {
             level: header_level.try_into()?,
             parent_id: Some(parent),
             config: self.sections[parent].config.clone(),
-            snapshot_diagnostics: self.sections[parent].snapshot_diagnostics,
+            directives: self.sections[parent].directives,
         };
 
         if !self.current_section_files.is_empty() {
@@ -784,28 +795,28 @@ impl<'s> Parser<'s> {
         Ok(())
     }
 
-    fn process_snapshot_diagnostics(&mut self) -> anyhow::Result<()> {
+    fn process_mdtest_directive(&mut self, directive: MdtestDirective) -> anyhow::Result<()> {
         if self.current_section_has_config {
             bail!(
-                "Section config to enable snapshotting diagnostics must come before \
+                "Section config to enable {directive} must come before \
                  everything else (including TOML configuration blocks).",
             );
         }
         if !self.current_section_files.is_empty() {
             bail!(
-                "Section config to enable snapshotting diagnostics must come before \
+                "Section config to enable {directive} must come before \
                  everything else (including embedded files).",
             );
         }
 
         let current_section = &mut self.sections[self.stack.top()];
-        if current_section.snapshot_diagnostics {
+        if current_section.directives.has_directive_set(directive) {
             bail!(
-                "Section config to enable snapshotting diagnostics should appear \
+                "Section config to enable {directive} should appear \
                  at most once.",
             );
         }
-        current_section.snapshot_diagnostics = true;
+        current_section.directives.add_directive(directive);
 
         Ok(())
     }
@@ -821,6 +832,56 @@ impl<'s> Parser<'s> {
 
     fn line_index(&self, char_index: TextSize) -> u32 {
         self.source.count_lines(TextRange::up_to(char_index))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum MdtestDirective {
+    /// A directive to enable snapshotting diagnostics.
+    SnapshotDiagnostics,
+    /// A directive to skip pull types.
+    PullTypesSkip,
+}
+
+impl std::fmt::Display for MdtestDirective {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            MdtestDirective::SnapshotDiagnostics => f.write_str("snapshotting diagnostics"),
+            MdtestDirective::PullTypesSkip => f.write_str("skipping the pull-types visitor"),
+        }
+    }
+}
+
+bitflags::bitflags! {
+    /// Directives that can be applied to a Markdown test section.
+    #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) struct MdtestDirectives: u8 {
+        /// We should snapshot diagnostics for this section.
+        const SNAPSHOT_DIAGNOSTICS = 1 << 0;
+        /// We should skip pulling types for this section.
+        const PULL_TYPES_SKIP = 1 << 1;
+    }
+}
+
+impl MdtestDirectives {
+    const fn has_directive_set(self, directive: MdtestDirective) -> bool {
+        match directive {
+            MdtestDirective::SnapshotDiagnostics => {
+                self.contains(MdtestDirectives::SNAPSHOT_DIAGNOSTICS)
+            }
+            MdtestDirective::PullTypesSkip => self.contains(MdtestDirectives::PULL_TYPES_SKIP),
+        }
+    }
+
+    fn add_directive(&mut self, directive: MdtestDirective) {
+        match directive {
+            MdtestDirective::SnapshotDiagnostics => {
+                self.insert(MdtestDirectives::SNAPSHOT_DIAGNOSTICS);
+            }
+            MdtestDirective::PullTypesSkip => {
+                self.insert(MdtestDirectives::PULL_TYPES_SKIP);
+            }
+        }
     }
 }
 
@@ -1906,7 +1967,7 @@ mod tests {
         let err = super::parse("file.md", &source).expect_err("Should fail to parse");
         assert_eq!(
             err.to_string(),
-            "Unknown HTML comment `snpshotttt-digggggnosstic` -- possibly a `snapshot-diagnostics` typo? \
+            "Unknown HTML comment `snpshotttt-digggggnosstic` -- possibly a typo? \
             (Add to `HTML_COMMENT_ALLOWLIST` if this is a false positive)",
         );
     }

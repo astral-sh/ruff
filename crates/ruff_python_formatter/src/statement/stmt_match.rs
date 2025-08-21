@@ -15,6 +15,7 @@ impl FormatNodeRule<StmtMatch> for FormatStmtMatch {
     fn fmt_fields(&self, item: &StmtMatch, f: &mut PyFormatter) -> FormatResult<()> {
         let StmtMatch {
             range: _,
+            node_index: _,
             subject,
             cases,
         } = item;

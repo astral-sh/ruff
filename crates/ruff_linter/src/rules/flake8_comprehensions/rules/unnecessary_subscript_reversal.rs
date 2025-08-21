@@ -52,6 +52,7 @@ pub(crate) fn unnecessary_subscript_reversal(checker: &Checker, call: &ast::Expr
         upper,
         step,
         range: _,
+        node_index: _,
     }) = slice.as_ref()
     else {
         return;
@@ -66,6 +67,7 @@ pub(crate) fn unnecessary_subscript_reversal(checker: &Checker, call: &ast::Expr
         op: UnaryOp::USub,
         operand,
         range: _,
+        node_index: _,
     }) = step.as_ref()
     else {
         return;

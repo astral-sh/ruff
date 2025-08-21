@@ -111,6 +111,7 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
             Stmt::Return(ast::StmtReturn {
                 value: Some(value),
                 range: _,
+                node_index: _,
             }) => {
                 // Mark `return lambda: x` as safe.
                 if value.is_lambda_expr() {
@@ -128,6 +129,7 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                 func,
                 arguments,
                 range: _,
+                node_index: _,
             }) => {
                 match func.as_ref() {
                     Expr::Name(ast::ExprName { id, .. }) => {
@@ -167,6 +169,7 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                 parameters,
                 body,
                 range: _,
+                node_index: _,
             }) => {
                 if !self.safe_functions.contains(&expr) {
                     // Collect all loaded variable names.

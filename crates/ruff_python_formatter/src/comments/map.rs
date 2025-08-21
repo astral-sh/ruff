@@ -249,7 +249,7 @@ impl<K: std::hash::Hash + Eq, V> MultiMap<K, V> {
     }
 
     /// Returns the *leading*, *dangling*, and *trailing* parts of `key`.
-    pub(super) fn leading_dangling_trailing(&self, key: &K) -> LeadingDanglingTrailing<V> {
+    pub(super) fn leading_dangling_trailing(&self, key: &K) -> LeadingDanglingTrailing<'_, V> {
         match self.index.get(key) {
             None => LeadingDanglingTrailing {
                 leading: &[],

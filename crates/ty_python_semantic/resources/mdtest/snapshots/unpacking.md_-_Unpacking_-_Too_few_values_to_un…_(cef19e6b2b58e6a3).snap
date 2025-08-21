@@ -24,7 +24,7 @@ error[invalid-assignment]: Not enough values to unpack
 1 | [a, *b, c, d] = (1, 2)  # error: [invalid-assignment]
   | ^^^^^^^^^^^^^   ------ Got 2
   | |
-  | Expected 3 or more
+  | Expected at least 3
   |
 info: rule `invalid-assignment` is enabled by default
 

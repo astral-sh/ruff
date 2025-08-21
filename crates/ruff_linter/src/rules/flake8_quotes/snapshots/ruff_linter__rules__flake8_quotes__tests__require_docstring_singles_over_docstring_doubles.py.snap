@@ -1,16 +1,17 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
 ---
-docstring_doubles.py:1:1: Q002 [*] Double quote docstring found but single quotes preferred
+Q002 [*] Double quote docstring found but single quotes preferred
+ --> docstring_doubles.py:1:1
   |
 1 | / """
 2 | | Double quotes multiline module docstring
 3 | | """
-  | |___^ Q002
+  | |___^
 4 |
 5 |   """
   |
-  = help: Replace double quotes docstring with single quotes
+help: Replace double quotes docstring with single quotes
 
 ℹ Safe fix
 1   |-"""
@@ -22,17 +23,18 @@ docstring_doubles.py:1:1: Q002 [*] Double quote docstring found but single quote
 5 5 | """
 6 6 | this is not a docstring
 
-docstring_doubles.py:12:5: Q002 [*] Double quote docstring found but single quotes preferred
+Q002 [*] Double quote docstring found but single quotes preferred
+  --> docstring_doubles.py:12:5
    |
 11 |   class Cls:
 12 | /     """
 13 | |     Double quotes multiline class docstring
 14 | |     """
-   | |_______^ Q002
+   | |_______^
 15 |
 16 |       """
    |
-   = help: Replace double quotes docstring with single quotes
+help: Replace double quotes docstring with single quotes
 
 ℹ Safe fix
 9  9  | l = []
@@ -47,18 +49,19 @@ docstring_doubles.py:12:5: Q002 [*] Double quote docstring found but single quot
 16 16 |     """
 17 17 |     this is not a docstring
 
-docstring_doubles.py:24:9: Q002 [*] Double quote docstring found but single quotes preferred
+Q002 [*] Double quote docstring found but single quotes preferred
+  --> docstring_doubles.py:24:9
    |
 22 |           definitely not a docstring""",
 23 |           val=l[Cls():3]):
 24 | /         """
 25 | |         Double quotes multiline function docstring
 26 | |         """
-   | |___________^ Q002
+   | |___________^
 27 |
 28 |           some_expression = 'hello world'
    |
-   = help: Replace double quotes docstring with single quotes
+help: Replace double quotes docstring with single quotes
 
 ℹ Safe fix
 21 21 |     def f(self, bar="""

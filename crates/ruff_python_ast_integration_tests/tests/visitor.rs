@@ -157,7 +157,7 @@ fn f_strings() {
 
 #[test]
 fn t_strings() {
-    let source = r"'pre' t'foo {bar:.{x}f} baz'";
+    let source = r"t'pre' t'foo {bar:.{x}f} baz'";
 
     let trace = trace_visitation(source);
 
@@ -178,10 +178,18 @@ where
     V: Visitor<'a> + ?Sized,
 {
     match module {
-        ast::Mod::Module(ast::ModModule { body, range: _ }) => {
+        ast::Mod::Module(ast::ModModule {
+            body,
+            range: _,
+            node_index: _,
+        }) => {
             visitor.visit_body(body);
         }
-        ast::Mod::Expression(ast::ModExpression { body, range: _ }) => visitor.visit_expr(body),
+        ast::Mod::Expression(ast::ModExpression {
+            body,
+            range: _,
+            node_index: _,
+        }) => visitor.visit_expr(body),
     }
 }
 

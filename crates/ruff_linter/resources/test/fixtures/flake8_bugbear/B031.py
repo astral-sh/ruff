@@ -185,38 +185,45 @@ for _section, section_items in groupby(items, key=lambda p: p[1]):
     collect_shop_items(shopper, section_items)
 
 # Shouldn't trigger the warning when there is a return statement.
-for _section, section_items in groupby(items, key=lambda p: p[1]):
-    if _section == "greens":
+def foo():
+    for _section, section_items in groupby(items, key=lambda p: p[1]):
+        if _section == "greens":
+            collect_shop_items(shopper, section_items)
+            return
+        elif _section == "frozen items":
+            return section_items
         collect_shop_items(shopper, section_items)
-        return
-    elif _section == "frozen items":
-        return section_items
-    collect_shop_items(shopper, section_items)
 
 # Should trigger the warning for duplicate access, even if is a return statement after.
-for _section, section_items in groupby(items, key=lambda p: p[1]):
-    if _section == "greens":
-        collect_shop_items(shopper, section_items)
-        collect_shop_items(shopper, section_items)
-        return
+def foo():
+    from itertools import groupby
+    for _section, section_items in groupby(items, key=lambda p: p[1]):
+        if _section == "greens":
+            collect_shop_items(shopper, section_items)
+            collect_shop_items(shopper, section_items)
+            return
 
 # Should trigger the warning for duplicate access, even if is a return in another branch.
-for _section, section_items in groupby(items, key=lambda p: p[1]):
-    if _section == "greens":
-        collect_shop_items(shopper, section_items)
-        return
-    elif _section == "frozen items":
-        collect_shop_items(shopper, section_items)
-        collect_shop_items(shopper, section_items)
+def foo():
+    from itertools import groupby
+    for _section, section_items in groupby(items, key=lambda p: p[1]):
+        if _section == "greens":
+            collect_shop_items(shopper, section_items)
+            return
+        elif _section == "frozen items":
+            collect_shop_items(shopper, section_items)
+            collect_shop_items(shopper, section_items)
 
 # Should trigger, since only one branch has a return statement.
-for _section, section_items in groupby(items, key=lambda p: p[1]):
-    if _section == "greens":
-        collect_shop_items(shopper, section_items)
-        return
-    elif _section == "frozen items":
-        collect_shop_items(shopper, section_items)
-    collect_shop_items(shopper, section_items)  # B031
+def foo():
+    from itertools import groupby
+    for _section, section_items in groupby(items, key=lambda p: p[1]):
+        if _section == "greens":
+            collect_shop_items(shopper, section_items)
+            return
+        elif _section == "frozen items":
+            collect_shop_items(shopper, section_items)
+        collect_shop_items(shopper, section_items)  # B031
 
 # Let's redefine the `groupby` function to make sure we pick up the correct one.
 # NOTE: This should always be at the end of the file.

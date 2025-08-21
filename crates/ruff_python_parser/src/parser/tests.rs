@@ -134,3 +134,26 @@ foo.bar[0].baz[2].egg??
     .unwrap();
     insta::assert_debug_snapshot!(parsed.syntax());
 }
+
+#[test]
+fn test_fstring_expr_inner_line_continuation_and_t_string() {
+    let source = r#"f'{\t"i}'"#;
+
+    let parsed = parse_expression(source);
+
+    let error = parsed.unwrap_err();
+
+    insta::assert_debug_snapshot!(error);
+}
+
+#[test]
+fn test_fstring_expr_inner_line_continuation_newline_t_string() {
+    let source = r#"f'{\
+t"i}'"#;
+
+    let parsed = parse_expression(source);
+
+    let error = parsed.unwrap_err();
+
+    insta::assert_debug_snapshot!(error);
+}

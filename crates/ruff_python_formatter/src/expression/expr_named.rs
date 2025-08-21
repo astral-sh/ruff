@@ -17,6 +17,7 @@ impl FormatNodeRule<ExprNamed> for FormatExprNamed {
             target,
             value,
             range: _,
+            node_index: _,
         } = item;
 
         // This context, a dangling comment is a comment between the `:=` and the value.

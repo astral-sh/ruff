@@ -7,28 +7,37 @@ input_file: crates/ruff_python_parser/resources/inline/ok/pos_only_py38.py
 ```
 Module(
     ModModule {
+        node_index: AtomicNodeIndex(..),
         range: 0..62,
         body: [
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: AtomicNodeIndex(..),
                     range: 43..61,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("foo"),
                         range: 47..50,
+                        node_index: AtomicNodeIndex(..),
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 50..56,
+                        node_index: AtomicNodeIndex(
+                            0,
+                        ),
                         posonlyargs: [
                             ParameterWithDefault {
                                 range: 51..52,
+                                node_index: AtomicNodeIndex(..),
                                 parameter: Parameter {
                                     range: 51..52,
+                                    node_index: AtomicNodeIndex(..),
                                     name: Identifier {
                                         id: Name("a"),
                                         range: 51..52,
+                                        node_index: AtomicNodeIndex(..),
                                     },
                                     annotation: None,
                                 },
@@ -44,9 +53,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: AtomicNodeIndex(..),
                                 range: 58..61,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 58..61,
                                     },
                                 ),

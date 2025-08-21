@@ -20,3 +20,10 @@ pub(crate) const fn is_no_chaperone_for_escaped_quote_in_triple_quoted_docstring
 ) -> bool {
     context.is_preview()
 }
+
+/// Returns `true` if the [`blank_line_before_decorated_class_in_stub`](https://github.com/astral-sh/ruff/issues/18865) preview style is enabled.
+pub(crate) const fn is_blank_line_before_decorated_class_in_stub_enabled(
+    context: &PyFormatContext,
+) -> bool {
+    context.is_preview()
+}

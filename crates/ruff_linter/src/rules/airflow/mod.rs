@@ -11,7 +11,7 @@ mod tests {
 
     use crate::registry::Rule;
     use crate::test::test_path;
-    use crate::{assert_messages, settings};
+    use crate::{assert_diagnostics, settings};
 
     #[test_case(Rule::AirflowVariableNameTaskIdMismatch, Path::new("AIR001.py"))]
     #[test_case(Rule::AirflowDagNoScheduleArgument, Path::new("AIR002.py"))]
@@ -58,7 +58,7 @@ mod tests {
             Path::new("airflow").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 }

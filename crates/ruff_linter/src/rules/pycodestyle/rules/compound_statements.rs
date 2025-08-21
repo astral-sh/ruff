@@ -168,14 +168,16 @@ pub(crate) fn compound_statements(
                                 !has_non_trivia_tokens_till(token_iter.clone(), cell_range.end())
                             }))
                     {
-                        context
-                            .report_diagnostic(UselessSemicolon, range)
-                            .set_fix(Fix::safe_edit(Edit::deletion(
+                        if let Some(mut diagnostic) =
+                            context.report_diagnostic_if_enabled(UselessSemicolon, range)
+                        {
+                            diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
                                 indexer
                                     .preceded_by_continuations(range.start(), locator.contents())
                                     .unwrap_or(range.start()),
                                 range.end(),
                             )));
+                        }
                     }
                 }
 
@@ -225,7 +227,8 @@ pub(crate) fn compound_statements(
             | TokenKind::NonLogicalNewline => {}
             _ => {
                 if let Some(range) = semi {
-                    context.report_diagnostic(MultipleStatementsOnOneLineSemicolon, range);
+                    context
+                        .report_diagnostic_if_enabled(MultipleStatementsOnOneLineSemicolon, range);
 
                     // Reset.
                     semi = None;
@@ -233,7 +236,7 @@ pub(crate) fn compound_statements(
                 }
 
                 if let Some(range) = colon {
-                    context.report_diagnostic(MultipleStatementsOnOneLineColon, range);
+                    context.report_diagnostic_if_enabled(MultipleStatementsOnOneLineColon, range);
 
                     // Reset.
                     colon = None;

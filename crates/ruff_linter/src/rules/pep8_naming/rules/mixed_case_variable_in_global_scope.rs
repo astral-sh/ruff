@@ -75,7 +75,7 @@ pub(crate) fn mixed_case_variable_in_global_scope(checker: &Checker, expr: &Expr
         return;
     }
 
-    if checker.settings.pep8_naming.ignore_names.matches(name) {
+    if checker.settings().pep8_naming.ignore_names.matches(name) {
         return;
     }
 

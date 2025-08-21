@@ -78,7 +78,7 @@ def find_ruff_bin() -> str:
 
 
 if __name__ == "__main__":
-    ruff = os.fsdecode(find_ruff_bin())
+    ruff = find_ruff_bin()
     if sys.platform == "win32":
         import subprocess
 

@@ -1,7 +1,6 @@
 use std::fmt;
 use std::sync::Arc;
 
-use countme::Count;
 use dashmap::mapref::entry::Entry;
 pub use file_root::{FileRoot, FileRootKind};
 pub use path::FilePath;
@@ -88,11 +87,12 @@ impl Files {
             .system_by_path
             .entry(absolute.clone())
             .or_insert_with(|| {
-                tracing::trace!("Adding file '{path}'");
-
                 let metadata = db.system().path_metadata(path);
+
+                tracing::trace!("Adding file '{absolute}'");
+
                 let durability = self
-                    .root(db, path)
+                    .root(db, &absolute)
                     .map_or(Durability::default(), |root| root.durability(db));
 
                 let builder = File::builder(FilePath::System(absolute))
@@ -232,7 +232,7 @@ impl Files {
         let roots = inner.roots.read().unwrap();
 
         for root in roots.all() {
-            if root.path(db).starts_with(&path) {
+            if path.starts_with(root.path(db)) {
                 root.set_revision(db).to(FileRevision::now());
             }
         }
@@ -263,12 +263,23 @@ impl Files {
 
 impl fmt::Debug for Files {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut map = f.debug_map();
+        if f.alternate() {
+            let mut map = f.debug_map();
 
-        for entry in self.inner.system_by_path.iter() {
-            map.entry(entry.key(), entry.value());
+            for entry in self.inner.system_by_path.iter() {
+                map.entry(entry.key(), entry.value());
+            }
+            map.finish()
+        } else {
+            f.debug_struct("Files")
+                .field("system_by_path", &self.inner.system_by_path.len())
+                .field(
+                    "system_virtual_by_path",
+                    &self.inner.system_virtual_by_path.len(),
+                )
+                .field("vendored_by_path", &self.inner.vendored_by_path.len())
+                .finish()
         }
-        map.finish()
     }
 }
 
@@ -279,7 +290,7 @@ impl std::panic::RefUnwindSafe for Files {}
 /// # Ordering
 /// Ordering is based on the file's salsa-assigned id and not on its values.
 /// The id may change between runs.
-#[salsa::input]
+#[salsa::input(heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct File {
     /// The path of the file (immutable).
@@ -301,12 +312,10 @@ pub struct File {
     /// the file has been deleted is to change the status to `Deleted`.
     #[default]
     status: FileStatus,
-
-    /// Counter that counts the number of created file instances and active file instances.
-    /// Only enabled in debug builds.
-    #[default]
-    count: Count<File>,
 }
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for File {}
 
 impl File {
     /// Reads the content of the file into a [`String`].
@@ -361,9 +370,22 @@ impl File {
     }
 
     /// Refreshes the file metadata by querying the file system if needed.
+    ///
+    /// This also "touches" the file root associated with the given path.
+    /// This means that any Salsa queries that depend on the corresponding
+    /// root's revision will become invalidated.
     pub fn sync_path(db: &mut dyn Db, path: &SystemPath) {
         let absolute = SystemPath::absolute(path, db.system().current_directory());
         Files::touch_root(db, &absolute);
+        Self::sync_system_path(db, &absolute, None);
+    }
+
+    /// Refreshes *only* the file metadata by querying the file system if needed.
+    ///
+    /// This specifically does not touch any file root associated with the
+    /// given file path.
+    pub fn sync_path_only(db: &mut dyn Db, path: &SystemPath) {
+        let absolute = SystemPath::absolute(path, db.system().current_directory());
         Self::sync_system_path(db, &absolute, None);
     }
 
@@ -472,7 +494,7 @@ impl fmt::Debug for File {
 ///
 /// This is a wrapper around a [`File`] that provides additional methods to interact with a virtual
 /// file.
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct VirtualFile(File);
 
 impl VirtualFile {
@@ -500,7 +522,7 @@ impl VirtualFile {
 // The types in here need to be public because they're salsa ingredients but we
 // don't want them to be publicly accessible. That's why we put them into a private module.
 mod private {
-    #[derive(Copy, Clone, Debug, Eq, PartialEq, Default)]
+    #[derive(Copy, Clone, Debug, Eq, PartialEq, Default, get_size2::GetSize)]
     pub enum FileStatus {
         /// The file exists.
         #[default]

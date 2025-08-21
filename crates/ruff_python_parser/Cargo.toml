@@ -13,13 +13,14 @@ license = { workspace = true }
 [lib]
 
 [dependencies]
-ruff_python_ast = { workspace = true }
+ruff_python_ast = { workspace = true, features = ["get-size"] }
 ruff_python_trivia = { workspace = true }
-ruff_text_size = { workspace = true }
+ruff_text_size = { workspace = true, features = ["get-size"] }
 
 bitflags = { workspace = true }
 bstr = { workspace = true }
 compact_str = { workspace = true }
+get-size2 = { workspace = true }
 memchr = { workspace = true }
 rustc-hash = { workspace = true }
 static_assertions = { workspace = true }

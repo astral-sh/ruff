@@ -64,6 +64,7 @@ impl AlwaysFixableViolation for IntOnSlicedStr {
     }
 }
 
+/// FURB166
 pub(crate) fn int_on_sliced_str(checker: &Checker, call: &ExprCall) {
     // Verify that the function is `int`.
     if !checker.semantic().match_builtin_expr(&call.func, "int") {

@@ -52,7 +52,11 @@ pub(crate) fn explicit(checker: &Checker, expr: &Expr) {
     // strings that span multiple lines even if this rule is enabled. Otherwise, there's no way
     // for the user to write multiline strings, and that setting is "more explicit" than this rule
     // being enabled.
-    if !checker.settings.flake8_implicit_str_concat.allow_multiline {
+    if !checker
+        .settings()
+        .flake8_implicit_str_concat
+        .allow_multiline
+    {
         return;
     }
 

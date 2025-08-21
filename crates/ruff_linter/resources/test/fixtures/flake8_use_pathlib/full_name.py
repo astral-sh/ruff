@@ -104,3 +104,24 @@ os.chmod(x)
 os.replace("src", "dst", src_dir_fd=1, dst_dir_fd=2)
 os.replace("src", "dst", src_dir_fd=1)
 os.replace("src", "dst", dst_dir_fd=2)
+
+os.getcwd()
+os.getcwdb()
+
+os.mkdir(path="directory")
+
+os.mkdir(
+    # comment 1
+    "directory",
+    mode=0o777
+)
+
+os.mkdir("directory", mode=0o777, dir_fd=1)
+
+os.makedirs("name", 0o777, exist_ok=False)
+
+os.makedirs("name", 0o777, False)
+
+os.makedirs(name="name", mode=0o777, exist_ok=False)
+
+os.makedirs("name", unknown_kwarg=True)

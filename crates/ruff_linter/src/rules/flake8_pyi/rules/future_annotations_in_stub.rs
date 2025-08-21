@@ -3,7 +3,7 @@ use ruff_python_ast::StmtImportFrom;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::{Fix, FixAvailability, Violation};
-use crate::{checkers::ast::Checker, fix, preview::is_fix_future_annotations_in_stub_enabled};
+use crate::{checkers::ast::Checker, fix};
 
 /// ## What it does
 /// Checks for the presence of the `from __future__ import annotations` import
@@ -16,7 +16,7 @@ use crate::{checkers::ast::Checker, fix, preview::is_fix_future_annotations_in_s
 /// statement has no effect and should be omitted.
 ///
 /// ## References
-/// - [Static Typing with Python: Type Stubs](https://typing.python.org/en/latest/source/stubs.html)
+/// - [Typing Style Guide](https://typing.python.org/en/latest/guides/writing_stubs.html#language-features)
 #[derive(ViolationMetadata)]
 pub(crate) struct FutureAnnotationsInStub;
 
@@ -55,20 +55,18 @@ pub(crate) fn from_future_import(checker: &Checker, target: &StmtImportFrom) {
 
     let mut diagnostic = checker.report_diagnostic(FutureAnnotationsInStub, *range);
 
-    if is_fix_future_annotations_in_stub_enabled(checker.settings) {
-        let stmt = checker.semantic().current_statement();
+    let stmt = checker.semantic().current_statement();
 
-        diagnostic.try_set_fix(|| {
-            let edit = fix::edits::remove_unused_imports(
-                std::iter::once("annotations"),
-                stmt,
-                None,
-                checker.locator(),
-                checker.stylist(),
-                checker.indexer(),
-            )?;
+    diagnostic.try_set_fix(|| {
+        let edit = fix::edits::remove_unused_imports(
+            std::iter::once("annotations"),
+            stmt,
+            None,
+            checker.locator(),
+            checker.stylist(),
+            checker.indexer(),
+        )?;
 
-            Ok(Fix::safe_edit(edit))
-        });
-    }
+        Ok(Fix::safe_edit(edit))
+    });
 }

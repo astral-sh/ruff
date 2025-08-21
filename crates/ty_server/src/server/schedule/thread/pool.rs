@@ -51,7 +51,7 @@ impl Pool {
 
         let threads = usize::from(threads);
 
-        let (job_sender, job_receiver) = crossbeam::channel::bounded(std::cmp::max(threads * 2, 4));
+        let (job_sender, job_receiver) = crossbeam::channel::bounded(std::cmp::min(threads * 2, 4));
         let extant_tasks = Arc::new(AtomicUsize::new(0));
 
         let mut handles = Vec::with_capacity(threads);

@@ -220,7 +220,7 @@ pub(crate) fn indent(checker: &Checker, docstring: &Docstring) {
         // yet.
         has_seen_tab = has_seen_tab || line_indent.contains('\t');
 
-        if checker.enabled(Rule::UnderIndentation) {
+        if checker.is_rule_enabled(Rule::UnderIndentation) {
             // We report under-indentation on every line. This isn't great, but enables
             // fix.
             if (is_last || !is_blank) && line_indent_size < docstring_indent_size {
@@ -264,13 +264,13 @@ pub(crate) fn indent(checker: &Checker, docstring: &Docstring) {
         current = lines.next();
     }
 
-    if checker.enabled(Rule::DocstringTabIndentation) {
+    if checker.is_rule_enabled(Rule::DocstringTabIndentation) {
         if has_seen_tab {
             checker.report_diagnostic(DocstringTabIndentation, docstring.range());
         }
     }
 
-    if checker.enabled(Rule::OverIndentation) {
+    if checker.is_rule_enabled(Rule::OverIndentation) {
         // If every line (except the last) is over-indented...
         if let Some(smallest_over_indent_size) = smallest_over_indent_size {
             for line in over_indented_lines {

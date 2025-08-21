@@ -153,6 +153,7 @@ impl<'a> Visitor<'a> for GroupNameFinder<'a> {
                 body,
                 elif_else_clauses,
                 range: _,
+                node_index: _,
             }) => {
                 // base if plus branches
                 let mut if_stack = Vec::with_capacity(1 + elif_else_clauses.len());
@@ -179,6 +180,7 @@ impl<'a> Visitor<'a> for GroupNameFinder<'a> {
                 subject,
                 cases,
                 range: _,
+                node_index: _,
             }) => {
                 self.counter_stack.push(Vec::with_capacity(cases.len()));
                 self.visit_expr(subject);
@@ -210,7 +212,11 @@ impl<'a> Visitor<'a> for GroupNameFinder<'a> {
             Stmt::Continue(_) | Stmt::Break(_) => {
                 self.reset_usage_count();
             }
-            Stmt::Return(ast::StmtReturn { value, range: _ }) => {
+            Stmt::Return(ast::StmtReturn {
+                value,
+                range: _,
+                node_index: _,
+            }) => {
                 if let Some(expr) = value {
                     self.visit_expr(expr);
                 }
@@ -250,11 +256,13 @@ impl<'a> Visitor<'a> for GroupNameFinder<'a> {
                 elt,
                 generators,
                 range: _,
+                node_index: _,
             })
             | Expr::SetComp(ast::ExprSetComp {
                 elt,
                 generators,
                 range: _,
+                node_index: _,
             }) => {
                 for comprehension in generators {
                     self.visit_comprehension(comprehension);
@@ -270,6 +278,7 @@ impl<'a> Visitor<'a> for GroupNameFinder<'a> {
                 value,
                 generators,
                 range: _,
+                node_index: _,
             }) => {
                 for comprehension in generators {
                     self.visit_comprehension(comprehension);

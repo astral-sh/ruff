@@ -738,6 +738,13 @@ def _(flag: bool, flag2: bool):
         reveal_type(y)  # revealed: bytes | str | int
 ```
 
+## Empty tuple is iterable
+
+```py
+for x in ():
+    reveal_type(x)  # revealed: Never
+```
+
 ## Never is iterable
 
 ```py
@@ -745,5 +752,44 @@ from typing_extensions import Never
 
 def f(never: Never):
     for x in never:
-        reveal_type(x)  # revealed: Never
+        reveal_type(x)  # revealed: Unknown
+```
+
+## A class literal is iterable if it inherits from `Any`
+
+A class literal can be iterated over if it has `Any` or `Unknown` in its MRO, since the
+`Any`/`Unknown` element in the MRO could materialize to a class with a custom metaclass that defines
+`__iter__` for all instances of the metaclass:
+
+```py
+from unresolved_module import SomethingUnknown  # error: [unresolved-import]
+from typing import Any, Iterable
+from ty_extensions import static_assert, is_assignable_to, TypeOf, Unknown
+
+class Foo(SomethingUnknown): ...
+
+reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
+
+# TODO: these should pass
+static_assert(is_assignable_to(TypeOf[Foo], Iterable[Unknown]))  # error: [static-assert-error]
+static_assert(is_assignable_to(type[Foo], Iterable[Unknown]))  # error: [static-assert-error]
+
+# TODO: should not error
+# error: [not-iterable]
+for x in Foo:
+    reveal_type(x)  # revealed: Unknown
+
+class Bar(Any): ...
+
+reveal_type(Bar.__mro__)  # revealed: tuple[<class 'Bar'>, Any, <class 'object'>]
+
+# TODO: these should pass
+static_assert(is_assignable_to(TypeOf[Bar], Iterable[Any]))  # error: [static-assert-error]
+static_assert(is_assignable_to(type[Bar], Iterable[Any]))  # error: [static-assert-error]
+
+# TODO: should not error
+# error: [not-iterable]
+for x in Bar:
+    # TODO: should reveal `Any`
+    reveal_type(x)  # revealed: Unknown
 ```

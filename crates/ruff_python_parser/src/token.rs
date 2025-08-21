@@ -17,7 +17,7 @@ use ruff_python_ast::str_prefix::{
 use ruff_python_ast::{AnyStringFlags, BoolOp, Int, IpyEscapeKind, Operator, StringFlags, UnaryOp};
 use ruff_text_size::{Ranged, TextRange};
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, get_size2::GetSize)]
 pub struct Token {
     /// The kind of the token.
     kind: TokenKind,
@@ -124,7 +124,7 @@ impl fmt::Debug for Token {
 }
 
 /// A kind of a token.
-#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug, PartialOrd, Ord)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug, PartialOrd, Ord, get_size2::GetSize)]
 pub enum TokenKind {
     /// Token kind for a name, commonly known as an identifier.
     Name,
@@ -753,6 +753,8 @@ bitflags! {
         const RAW_STRING = Self::RAW_STRING_LOWERCASE.bits() | Self::RAW_STRING_UPPERCASE.bits();
     }
 }
+
+impl get_size2::GetSize for TokenFlags {}
 
 impl StringFlags for TokenFlags {
     fn quote_style(self) -> Quote {

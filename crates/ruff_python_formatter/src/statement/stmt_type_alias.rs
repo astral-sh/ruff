@@ -17,6 +17,7 @@ impl FormatNodeRule<StmtTypeAlias> for FormatStmtTypeAlias {
             type_params,
             value,
             range: _,
+            node_index: _,
         } = item;
 
         write!(f, [token("type"), space(), name.as_ref().format()])?;

@@ -169,6 +169,9 @@ pub struct AnalyzeGraphCommand {
     /// Attempt to detect imports from string literals.
     #[clap(long)]
     detect_string_imports: bool,
+    /// The minimum number of dots in a string import to consider it a valid import.
+    #[clap(long)]
+    min_dots: Option<usize>,
     /// Enable preview mode. Use `--no-preview` to disable.
     #[arg(long, overrides_with("no_preview"))]
     preview: bool,
@@ -808,6 +811,7 @@ impl AnalyzeGraphCommand {
             } else {
                 None
             },
+            string_imports_min_dots: self.min_dots,
             preview: resolve_bool_arg(self.preview, self.no_preview).map(PreviewMode::from),
             target_version: self.target_version.map(ast::PythonVersion::from),
             ..ExplicitConfigOverrides::default()
@@ -1305,6 +1309,7 @@ struct ExplicitConfigOverrides {
     show_fixes: Option<bool>,
     extension: Option<Vec<ExtensionPair>>,
     detect_string_imports: Option<bool>,
+    string_imports_min_dots: Option<usize>,
 }
 
 impl ConfigurationTransformer for ExplicitConfigOverrides {
@@ -1391,6 +1396,9 @@ impl ConfigurationTransformer for ExplicitConfigOverrides {
         }
         if let Some(detect_string_imports) = &self.detect_string_imports {
             config.analyze.detect_string_imports = Some(*detect_string_imports);
+        }
+        if let Some(string_imports_min_dots) = &self.string_imports_min_dots {
+            config.analyze.string_imports_min_dots = Some(*string_imports_min_dots);
         }
 
         config

@@ -76,7 +76,6 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [enum.StrEnum](https://docs.python.org/3/library/enum.html#enum.StrEnum)
 ///
 /// [breaking change]: https://blog.pecar.me/python-enum
-
 #[derive(ViolationMetadata)]
 pub(crate) struct ReplaceStrEnum {
     name: String,

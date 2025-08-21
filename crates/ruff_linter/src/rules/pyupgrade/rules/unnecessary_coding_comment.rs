@@ -107,9 +107,11 @@ pub(crate) fn unnecessary_coding_comment(
     }
 
     let fix = Fix::safe_edit(Edit::range_deletion(range.line));
-    context
-        .report_diagnostic(UTF8EncodingDeclaration, range.comment)
-        .set_fix(fix);
+    if let Some(mut diagnostic) =
+        context.report_diagnostic_if_enabled(UTF8EncodingDeclaration, range.comment)
+    {
+        diagnostic.set_fix(fix);
+    }
 }
 
 struct CodingCommentIterator<'a> {

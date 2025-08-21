@@ -134,13 +134,13 @@ fn newline_diagnostic<'a>(
     };
 
     let diagnostic_range = TextRange::new(start, end);
-    context
-        .report_diagnostic(
-            TooManyNewlinesAtEndOfFile {
-                num_trailing_newlines,
-                in_notebook,
-            },
-            diagnostic_range,
-        )
-        .set_fix(Fix::safe_edit(Edit::range_deletion(diagnostic_range)));
+    if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
+        TooManyNewlinesAtEndOfFile {
+            num_trailing_newlines,
+            in_notebook,
+        },
+        diagnostic_range,
+    ) {
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(diagnostic_range)));
+    }
 }

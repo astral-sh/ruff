@@ -14,6 +14,16 @@
         }
       ]
     },
+    "overrides": {
+      "description": "Override configurations for specific file patterns.\n\nEach override specifies include/exclude patterns and rule configurations that apply to matching files. Multiple overrides can match the same file, with later overrides taking precedence.",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "$ref": "#/definitions/OverrideOptions"
+      }
+    },
     "rules": {
       "description": "Configures the enabled rules and their severity.\n\nSee [the rules documentation](https://ty.dev/rules) for a list of all available rules.\n\nValid severities are:\n\n* `ignore`: Disable the rule. * `warn`: Enable the rule and create a warning diagnostic. * `error`: Enable the rule and create an error diagnostic. ty will exit with a non-zero code if any error diagnostics are emitted.",
       "anyOf": [
@@ -48,25 +58,6 @@
   },
   "additionalProperties": false,
   "definitions": {
-    "DiagnosticFormat": {
-      "description": "The diagnostic output format.",
-      "oneOf": [
-        {
-          "description": "The default full mode will print \"pretty\" diagnostics.\n\nThat is, color will be used when printing to a `tty`. Moreover, diagnostic messages may include additional context and annotations on the input to help understand the message.",
-          "type": "string",
-          "enum": [
-            "full"
-          ]
-        },
-        {
-          "description": "Print diagnostics in a concise mode.\n\nThis will guarantee that each diagnostic is printed on a single line. Only the most important or primary aspects of the diagnostic are included. Contextual information is dropped.\n\nThis may use color when printing to a `tty`.",
-          "type": "string",
-          "enum": [
-            "concise"
-          ]
-        }
-      ]
-    },
     "EnvironmentOptions": {
       "type": "object",
       "properties": {
@@ -88,7 +79,7 @@
           ]
         },
         "python-platform": {
-          "description": "Specifies the target platform that will be used to analyze the source code. If specified, ty will understand conditions based on comparisons with `sys.platform`, such as are commonly found in typeshed to reflect the differing contents of the standard library across platforms.\n\nIf no platform is specified, ty will use the current platform: - `win32` for Windows - `darwin` for macOS - `android` for Android - `ios` for iOS - `linux` for everything else",
+          "description": "Specifies the target platform that will be used to analyze the source code. If specified, ty will understand conditions based on comparisons with `sys.platform`, such as are commonly found in typeshed to reflect the differing contents of the standard library across platforms. If `all` is specified, ty will assume that the source code can run on any platform.\n\nIf no platform is specified, ty will use the current platform: - `win32` for Windows - `darwin` for macOS - `android` for Android - `ios` for iOS - `linux` for everything else",
           "anyOf": [
             {
               "$ref": "#/definitions/PythonPlatform"
@@ -99,7 +90,7 @@
           ]
         },
         "python-version": {
-          "description": "Specifies the version of Python that will be used to analyze the source code. The version should be specified as a string in the format `M.m` where `M` is the major version and `m` is the minor (e.g. `\"3.0\"` or `\"3.6\"`). If a version is provided, ty will generate errors if the source code makes use of language features that are not supported in that version. It will also understand conditionals based on comparisons with `sys.version_info`, such as are commonly found in typeshed to reflect the differing contents of the standard library across Python versions.",
+          "description": "Specifies the version of Python that will be used to analyze the source code. The version should be specified as a string in the format `M.m` where `M` is the major version and `m` is the minor (e.g. `\"3.0\"` or `\"3.6\"`). If a version is provided, ty will generate errors if the source code makes use of language features that are not supported in that version.\n\nIf a version is not specified, ty will try the following techniques in order of preference to determine a value: 1. Check for the `project.requires-python` setting in a `pyproject.toml` file and use the minimum version from the specified range 2. Check for an activated or configured Python environment and attempt to infer the Python version of that environment 3. Fall back to the default value (see below)\n\nFor some language features, ty can also understand conditionals based on comparisons with `sys.version_info`. These are commonly found in typeshed, for example, to reflect the differing contents of the standard library across Python versions.",
           "anyOf": [
             {
               "$ref": "#/definitions/PythonVersion"
@@ -108,6 +99,16 @@
               "type": "null"
             }
           ]
+        },
+        "root": {
+          "description": "The root paths of the project, used for finding first-party modules.\n\nAccepts a list of directory paths searched in priority order (first has highest priority).\n\nIf left unspecified, ty will try to detect common project layouts and initialize `root` accordingly:\n\n* if a `./src` directory exists, include `.` and `./src` in the first party search path (src layout or flat) * if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path * otherwise, default to `.` (flat layout)\n\nBesides, if a `./tests` directory exists and is not a package (i.e. it does not contain an `__init__.py` file), it will also be included in the first party search path.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
         },
         "typeshed": {
           "description": "Optional path to a \"typeshed\" directory on disk for us to use for standard-library types. If this is not provided, we will fallback to our vendored typeshed stubs for the stdlib, bundled as a zip file in the binary",
@@ -147,7 +148,64 @@
         }
       ]
     },
+    "OutputFormat": {
+      "description": "The diagnostic output format.",
+      "oneOf": [
+        {
+          "description": "The default full mode will print \"pretty\" diagnostics.\n\nThat is, color will be used when printing to a `tty`. Moreover, diagnostic messages may include additional context and annotations on the input to help understand the message.",
+          "type": "string",
+          "enum": [
+            "full"
+          ]
+        },
+        {
+          "description": "Print diagnostics in a concise mode.\n\nThis will guarantee that each diagnostic is printed on a single line. Only the most important or primary aspects of the diagnostic are included. Contextual information is dropped.\n\nThis may use color when printing to a `tty`.",
+          "type": "string",
+          "enum": [
+            "concise"
+          ]
+        }
+      ]
+    },
+    "OverrideOptions": {
+      "type": "object",
+      "properties": {
+        "exclude": {
+          "description": "A list of file and directory patterns to exclude from this override.\n\nPatterns follow a syntax similar to `.gitignore`. Exclude patterns take precedence over include patterns within the same override.\n\nIf not specified, defaults to `[]` (excludes no files).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "include": {
+          "description": "A list of file and directory patterns to include for this override.\n\nThe `include` option follows a similar syntax to `.gitignore` but reversed: Including a file or directory will make it so that it (and its contents) are affected by this override.\n\nIf not specified, defaults to `[\"**\"]` (matches all files).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "rules": {
+          "description": "Rule overrides for files matching the include/exclude patterns.\n\nThese rules will be merged with the global rules, with override rules taking precedence for matching files. You can set rules to different severity levels or disable them entirely.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Rules"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
     "PythonPlatform": {
+      "description": "The target platform to assume when resolving types.\n",
       "anyOf": [
         {
           "type": "string"
@@ -213,9 +271,19 @@
     "Rules": {
       "type": "object",
       "properties": {
+        "ambiguous-protocol-member": {
+          "title": "detects protocol classes with ambiguous interfaces",
+          "description": "## What it does\nChecks for protocol classes with members that will lead to ambiguous interfaces.\n\n## Why is this bad?\nAssigning to an undeclared variable in a protocol class leads to an ambiguous\ninterface which may lead to the type checker inferring unexpected things. It's\nrecommended to ensure that all members of a protocol class are explicitly declared.\n\n## Examples\n\n```py\nfrom typing import Protocol\n\nclass BaseProto(Protocol):\n    a: int                               # fine (explicitly declared as `int`)\n    def method_member(self) -> int: ...  # fine: a method definition using `def` is considered a declaration\n    c = \"some variable\"                  # error: no explicit declaration, leading to ambiguity\n    b = method_member                    # error: no explicit declaration, leading to ambiguity\n\n    # error: this creates implicit assignments of `d` and `e` in the protocol class body.\n    # Were they really meant to be considered protocol members?\n    for d, e in enumerate(range(42)):\n        pass\n\nclass SubProto(BaseProto, Protocol):\n    a = 42  # fine (declared in superclass)\n```",
+          "default": "warn",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "byte-string-type-annotation": {
           "title": "detects byte strings in type annotation positions",
-          "description": "## What it does\nChecks for byte-strings in type annotation positions.\n\n## Why is this bad?\nStatic analysis tools like ty can't analyse type annotations that use byte-string notation.\n\n## Examples\n```python\ndef test(): -> b\"int\":\n    ...\n```\n\nUse instead:\n```python\ndef test(): -> \"int\":\n    ...\n```",
+          "description": "## What it does\nChecks for byte-strings in type annotation positions.\n\n## Why is this bad?\nStatic analysis tools like ty can't analyze type annotations that use byte-string notation.\n\n## Examples\n```python\ndef test(): -> b\"int\":\n    ...\n```\n\nUse instead:\n```python\ndef test(): -> \"int\":\n    ...\n```",
           "default": "error",
           "oneOf": [
             {
@@ -235,7 +303,7 @@
         },
         "conflicting-argument-forms": {
           "title": "detects when an argument is used as both a value and a type form in a call",
-          "description": "## What it does\nChecks whether an argument is used as both a value and a type form in a call.\n\n## Why is this bad?\nSuch calls have confusing semantics and often indicate a logic error.\n\n## Examples\n```python\nfrom typing import reveal_type\nfrom ty_extensions import is_fully_static\n\nif flag:\n    f = repr  # Expects a value\nelse:\n    f = is_fully_static  # Expects a type form\n\nf(int)  # error\n```",
+          "description": "## What it does\nChecks whether an argument is used as both a value and a type form in a call.\n\n## Why is this bad?\nSuch calls have confusing semantics and often indicate a logic error.\n\n## Examples\n```python\nfrom typing import reveal_type\nfrom ty_extensions import is_singleton\n\nif flag:\n    f = repr  # Expects a value\nelse:\n    f = is_singleton  # Expects a type form\n\nf(int)  # error\n```",
           "default": "error",
           "oneOf": [
             {
@@ -273,6 +341,16 @@
             }
           ]
         },
+        "deprecated": {
+          "title": "detects uses of deprecated items",
+          "description": "## What it does\nChecks for uses of deprecated items\n\n## Why is this bad?\nDeprecated items should no longer be used.\n\n## Examples\n```python\n@warnings.deprecated(\"use new_func instead\")\ndef old_func(): ...\n\nold_func()  # emits [deprecated] diagnostic\n```",
+          "default": "warn",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "division-by-zero": {
           "title": "detects division by zero",
           "description": "## What it does\nIt detects division by zero.\n\n## Why is this bad?\nDividing by zero raises a `ZeroDivisionError` at runtime.\n\n## Examples\n```python\n5 / 0\n```",
@@ -293,6 +371,16 @@
             }
           ]
         },
+        "duplicate-kw-only": {
+          "title": "detects dataclass definitions with more than one usage of `KW_ONLY`",
+          "description": "## What it does\nChecks for dataclass definitions with more than one field\nannotated with `KW_ONLY`.\n\n## Why is this bad?\n`dataclasses.KW_ONLY` is a special marker used to\nemulate the `*` syntax in normal signatures.\nIt can only be used once per dataclass.\n\nAttempting to annotate two different fields with\nit will lead to a runtime error.\n\n## Examples\n```python\nfrom dataclasses import dataclass, KW_ONLY\n\n@dataclass\nclass A:  # Crash at runtime\n    b: int\n    _1: KW_ONLY\n    c: str\n    _2: KW_ONLY\n    d: bytes\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "escape-character-in-forward-annotation": {
           "title": "detects forward type annotations with escape characters",
           "description": "TODO #14889",
@@ -305,7 +393,7 @@
         },
         "fstring-type-annotation": {
           "title": "detects F-strings in type annotation positions",
-          "description": "## What it does\nChecks for f-strings in type annotation positions.\n\n## Why is this bad?\nStatic analysis tools like ty can't analyse type annotations that use f-string notation.\n\n## Examples\n```python\ndef test(): -> f\"int\":\n    ...\n```\n\nUse instead:\n```python\ndef test(): -> \"int\":\n    ...\n```",
+          "description": "## What it does\nChecks for f-strings in type annotation positions.\n\n## Why is this bad?\nStatic analysis tools like ty can't analyze type annotations that use f-string notation.\n\n## Examples\n```python\ndef test(): -> f\"int\":\n    ...\n```\n\nUse instead:\n```python\ndef test(): -> \"int\":\n    ...\n```",
           "default": "error",
           "oneOf": [
             {
@@ -315,17 +403,7 @@
         },
         "implicit-concatenated-string-type-annotation": {
           "title": "detects implicit concatenated strings in type annotations",
-          "description": "## What it does\nChecks for implicit concatenated strings in type annotation positions.\n\n## Why is this bad?\nStatic analysis tools like ty can't analyse type annotations that use implicit concatenated strings.\n\n## Examples\n```python\ndef test(): -> \"Literal[\" \"5\" \"]\":\n    ...\n```\n\nUse instead:\n```python\ndef test(): -> \"Literal[5]\":\n    ...\n```",
-          "default": "error",
-          "oneOf": [
-            {
-              "$ref": "#/definitions/Level"
-            }
-          ]
-        },
-        "incompatible-slots": {
-          "title": "detects class definitions whose MRO has conflicting `__slots__`",
-          "description": "## What it does\nChecks for classes whose bases define incompatible `__slots__`.\n\n## Why is this bad?\nInheriting from bases with incompatible `__slots__`s\nwill lead to a `TypeError` at runtime.\n\nClasses with no or empty `__slots__` are always compatible:\n\n```python\nclass A: ...\nclass B:\n    __slots__ = ()\nclass C:\n    __slots__ = (\"a\", \"b\")\n\n# fine\nclass D(A, B, C): ...\n```\n\nMultiple inheritance from more than one different class\ndefining non-empty `__slots__` is not allowed:\n\n```python\nclass A:\n    __slots__ = (\"a\", \"b\")\n\nclass B:\n    __slots__ = (\"a\", \"b\")  # Even if the values are the same\n\n# TypeError: multiple bases have instance lay-out conflict\nclass C(A, B): ...\n```\n\n## Known problems\nDynamic (not tuple or string literal) `__slots__` are not checked.\nAdditionally, classes inheriting from built-in classes with implicit layouts\nlike `str` or `int` are also not checked.\n\n```pycon\n>>> hasattr(int, \"__slots__\")\nFalse\n>>> hasattr(str, \"__slots__\")\nFalse\n>>> class A(int, str): ...\nTraceback (most recent call last):\n  File \"<python-input-0>\", line 1, in <module>\n    class A(int, str): ...\nTypeError: multiple bases have instance lay-out conflict\n```",
+          "description": "## What it does\nChecks for implicit concatenated strings in type annotation positions.\n\n## Why is this bad?\nStatic analysis tools like ty can't analyze type annotations that use implicit concatenated strings.\n\n## Examples\n```python\ndef test(): -> \"Literal[\" \"5\" \"]\":\n    ...\n```\n\nUse instead:\n```python\ndef test(): -> \"Literal[5]\":\n    ...\n```",
           "default": "error",
           "oneOf": [
             {
@@ -346,6 +424,16 @@
         "index-out-of-bounds": {
           "title": "detects index out of bounds errors",
           "description": "## What it does\nChecks for attempts to use an out of bounds index to get an item from\na container.\n\n## Why is this bad?\nUsing an out of bounds index will raise an `IndexError` at runtime.\n\n## Examples\n```python\nt = (0, 1, 2)\nt[3]  # IndexError: tuple index out of range\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "instance-layout-conflict": {
+          "title": "detects class definitions that raise `TypeError` due to instance layout conflict",
+          "description": "## What it does\nChecks for classes definitions which will fail at runtime due to\n\"instance memory layout conflicts\".\n\nThis error is usually caused by attempting to combine multiple classes\nthat define non-empty `__slots__` in a class's [Method Resolution Order]\n(MRO), or by attempting to combine multiple builtin classes in a class's\nMRO.\n\n## Why is this bad?\nInheriting from bases with conflicting instance memory layouts\nwill lead to a `TypeError` at runtime.\n\nAn instance memory layout conflict occurs when CPython cannot determine\nthe memory layout instances of a class should have, because the instance\nmemory layout of one of its bases conflicts with the instance memory layout\nof one or more of its other bases.\n\nFor example, if a Python class defines non-empty `__slots__`, this will\nimpact the memory layout of instances of that class. Multiple inheritance\nfrom more than one different class defining non-empty `__slots__` is not\nallowed:\n\n```python\nclass A:\n    __slots__ = (\"a\", \"b\")\n\nclass B:\n    __slots__ = (\"a\", \"b\")  # Even if the values are the same\n\n# TypeError: multiple bases have instance lay-out conflict\nclass C(A, B): ...\n```\n\nAn instance layout conflict can also be caused by attempting to use\nmultiple inheritance with two builtin classes, due to the way that these\nclasses are implemented in a CPython C extension:\n\n```python\nclass A(int, float): ...  # TypeError: multiple bases have instance lay-out conflict\n```\n\nNote that pure-Python classes with no `__slots__`, or pure-Python classes\nwith empty `__slots__`, are always compatible:\n\n```python\nclass A: ...\nclass B:\n    __slots__ = ()\nclass C:\n    __slots__ = (\"a\", \"b\")\n\n# fine\nclass D(A, B, C): ...\n```\n\n## Known problems\nClasses that have \"dynamic\" definitions of `__slots__` (definitions do not consist\nof string literals, or tuples of string literals) are not currently considered solid\nbases by ty.\n\nAdditionally, this check is not exhaustive: many C extensions (including several in\nthe standard library) define classes that use extended memory layouts and thus cannot\ncoexist in a single MRO. Since it is currently not possible to represent this fact in\nstub files, having a full knowledge of these classes is also impossible. When it comes\nto classes that do not define `__slots__` at the Python level, therefore, ty, currently\nonly hard-codes a number of cases where it knows that a class will produce instances with\nan atypical memory layout.\n\n## Further reading\n- [CPython documentation: `__slots__`](https://docs.python.org/3/reference/datamodel.html#slots)\n- [CPython documentation: Method Resolution Order](https://docs.python.org/3/glossary.html#term-method-resolution-order)\n\n[Method Resolution Order]: https://docs.python.org/3/glossary.html#term-method-resolution-order",
           "default": "error",
           "oneOf": [
             {
@@ -376,6 +464,16 @@
         "invalid-attribute-access": {
           "title": "Invalid attribute access",
           "description": "## What it does\nChecks for assignments to class variables from instances\nand assignments to instance variables from its class.\n\n## Why is this bad?\nIncorrect assignments break the rules of the type system and\nweaken a type checker's ability to accurately reason about your code.\n\n## Examples\n```python\nclass C:\n    class_var: ClassVar[int] = 1\n    instance_var: int\n\nC.class_var = 3  # okay\nC().class_var = 3  # error: Cannot assign to class variable\n\nC().instance_var = 3  # okay\nC.instance_var = 3  # error: Cannot assign to instance variable\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "invalid-await": {
+          "title": "detects awaiting on types that don't support it",
+          "description": "## What it does\nChecks for `await` being used with types that are not [Awaitable].\n\n## Why is this bad?\nSuch expressions will lead to `TypeError` being raised at runtime.\n\n## Examples\n```python\nimport asyncio\n\nclass InvalidAwait:\n    def __await__(self) -> int:\n        return 5\n\nasync def main() -> None:\n    await InvalidAwait()  # error: [invalid-await]\n    await 42  # error: [invalid-await]\n\nasyncio.run(main())\n```\n\n[Awaitable]: https://docs.python.org/3/library/collections.abc.html#collections.abc.Awaitable",
           "default": "error",
           "oneOf": [
             {
@@ -415,7 +513,7 @@
         },
         "invalid-exception-caught": {
           "title": "detects exception handlers that catch classes that do not inherit from `BaseException`",
-          "description": "## What it does\nChecks for exception handlers that catch non-exception classes.\n\n## Why is this bad?\nCatching classes that do not inherit from `BaseException` will raise a TypeError at runtime.\n\n## Example\n```python\ntry:\n    1 / 0\nexcept 1:\n    ...\n```\n\nUse instead:\n```python\ntry:\n    1 / 0\nexcept ZeroDivisionError:\n    ...\n```\n\n## References\n- [Python documentation: except clause](https://docs.python.org/3/reference/compound_stmts.html#except-clause)\n- [Python documentation: Built-in Exceptions](https://docs.python.org/3/library/exceptions.html#built-in-exceptions)\n\n## Ruff rule\n This rule corresponds to Ruff's [`except-with-non-exception-classes` (`B030`)](https://docs.astral.sh/ruff/rules/except-with-non-exception-classes)",
+          "description": "## What it does\nChecks for exception handlers that catch non-exception classes.\n\n## Why is this bad?\nCatching classes that do not inherit from `BaseException` will raise a `TypeError` at runtime.\n\n## Example\n```python\ntry:\n    1 / 0\nexcept 1:\n    ...\n```\n\nUse instead:\n```python\ntry:\n    1 / 0\nexcept ZeroDivisionError:\n    ...\n```\n\n## References\n- [Python documentation: except clause](https://docs.python.org/3/reference/compound_stmts.html#except-clause)\n- [Python documentation: Built-in Exceptions](https://docs.python.org/3/library/exceptions.html#built-in-exceptions)\n\n## Ruff rule\n This rule corresponds to Ruff's [`except-with-non-exception-classes` (`B030`)](https://docs.astral.sh/ruff/rules/except-with-non-exception-classes)",
           "default": "error",
           "oneOf": [
             {
@@ -443,6 +541,16 @@
             }
           ]
         },
+        "invalid-key": {
+          "title": "detects invalid subscript accesses",
+          "description": "## What it does\nChecks for subscript accesses with invalid keys.\n\n## Why is this bad?\nUsing an invalid key will raise a `KeyError` at runtime.\n\n## Examples\n```python\nfrom typing import TypedDict\n\nclass Person(TypedDict):\n    name: str\n    age: int\n\nalice = Person(name=\"Alice\", age=30)\nalice[\"height\"]  # KeyError: 'height'\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-legacy-type-variable": {
           "title": "detects invalid legacy type variables",
           "description": "## What it does\nChecks for the creation of invalid legacy `TypeVar`s\n\n## Why is this bad?\nThere are several requirements that you must follow when creating a legacy `TypeVar`.\n\n## Examples\n```python\nfrom typing import TypeVar\n\nT = TypeVar(\"T\")  # okay\nQ = TypeVar(\"S\")  # error: TypeVar name must match the variable it's assigned to\nT = TypeVar(\"T\")  # error: TypeVars should not be redefined\n\n# error: TypeVar must be immediately assigned to a variable\ndef f(t: TypeVar(\"U\")): ...\n```\n\n## References\n- [Typing spec: Generics](https://typing.python.org/en/latest/spec/generics.html#introduction)",
@@ -456,6 +564,16 @@
         "invalid-metaclass": {
           "title": "detects invalid `metaclass=` arguments",
           "description": "## What it does\nChecks for arguments to `metaclass=` that are invalid.\n\n## Why is this bad?\nPython allows arbitrary expressions to be used as the argument to `metaclass=`.\nThese expressions, however, need to be callable and accept the same arguments\nas `type.__new__`.\n\n## Example\n\n```python\ndef f(): ...\n\n# TypeError: f() takes 0 positional arguments but 3 were given\nclass B(metaclass=f): ...\n```\n\n## References\n- [Python documentation: Metaclasses](https://docs.python.org/3/reference/datamodel.html#metaclasses)",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "invalid-named-tuple": {
+          "title": "detects invalid `NamedTuple` class definitions",
+          "description": "## What it does\nChecks for invalidly defined `NamedTuple` classes.\n\n## Why is this bad?\nAn invalidly defined `NamedTuple` class may lead to the type checker\ndrawing incorrect conclusions. It may also lead to `TypeError`s at runtime.\n\n## Examples\nA class definition cannot combine `NamedTuple` with other base classes\nin multiple inheritance; doing so raises a `TypeError` at runtime. The sole\nexception to this rule is `Generic[]`, which can be used alongside `NamedTuple`\nin a class's bases list.\n\n```pycon\n>>> from typing import NamedTuple\n>>> class Foo(NamedTuple, object): ...\nTypeError: can only inherit from a NamedTuple type and Generic\n```",
           "default": "error",
           "oneOf": [
             {
@@ -485,7 +603,7 @@
         },
         "invalid-protocol": {
           "title": "detects invalid protocol class definitions",
-          "description": "## What it does\nChecks for invalidly defined protocol classes.\n\n## Why is this bad?\nAn invalidly defined protocol class may lead to the type checker inferring\nunexpected things. It may also lead to `TypeError`s at runtime.\n\n## Examples\nA `Protocol` class cannot inherit from a non-`Protocol` class;\nthis raises a `TypeError` at runtime:\n\n```pycon\n>>> from typing import Protocol\n>>> class Foo(int, Protocol): ...\n...\nTraceback (most recent call last):\n  File \"<python-input-1>\", line 1, in <module>\n    class Foo(int, Protocol): ...\nTypeError: Protocols can only inherit from other protocols, got <class 'int'>\n```",
+          "description": "## What it does\nChecks for protocol classes that will raise `TypeError` at runtime.\n\n## Why is this bad?\nAn invalidly defined protocol class may lead to the type checker inferring\nunexpected things. It may also lead to `TypeError`s at runtime.\n\n## Examples\nA `Protocol` class cannot inherit from a non-`Protocol` class;\nthis raises a `TypeError` at runtime:\n\n```pycon\n>>> from typing import Protocol\n>>> class Foo(int, Protocol): ...\n...\nTraceback (most recent call last):\n  File \"<python-input-1>\", line 1, in <module>\n    class Foo(int, Protocol): ...\nTypeError: Protocols can only inherit from other protocols, got <class 'int'>\n```",
           "default": "error",
           "oneOf": [
             {
@@ -556,6 +674,26 @@
         "invalid-type-form": {
           "title": "detects invalid type forms",
           "description": "## What it does\nChecks for expressions that are used as [type expressions]\nbut cannot validly be interpreted as such.\n\n## Why is this bad?\nSuch expressions cannot be understood by ty.\nIn some cases, they might raise errors at runtime.\n\n## Examples\n```python\nfrom typing import Annotated\n\na: type[1]  # `1` is not a type\nb: Annotated[int]  # `Annotated` expects at least two arguments\n```\n[type expressions]: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "invalid-type-guard-call": {
+          "title": "detects type guard function calls that has no narrowing effect",
+          "description": "## What it does\nChecks for type guard function calls without a valid target.\n\n## Why is this bad?\nThe first non-keyword non-variadic argument to a type guard function\nis its target and must map to a symbol.\n\nStarred (`is_str(*a)`), literal (`is_str(42)`) and other non-symbol-like\nexpressions are invalid as narrowing targets.\n\n## Examples\n```python\nfrom typing import TypeIs\n\ndef f(v: object) -> TypeIs[int]: ...\n\nf()  # Error\nf(*a)  # Error\nf(10)  # Error\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "invalid-type-guard-definition": {
+          "title": "detects malformed type guard functions",
+          "description": "## What it does\nChecks for type guard functions without\na first non-self-like non-keyword-only non-variadic parameter.\n\n## Why is this bad?\nType narrowing functions must accept at least one positional argument\n(non-static methods must accept another in addition to `self`/`cls`).\n\nExtra parameters/arguments are allowed but do not affect narrowing.\n\n## Examples\n```python\nfrom typing import TypeIs\n\ndef f() -> TypeIs[int]: ...  # Error, no parameter\ndef f(*, v: object) -> TypeIs[int]: ...  # Error, no positional arguments allowed\ndef f(*args: object) -> TypeIs[int]: ... # Error, expect variadic arguments\nclass C:\n    def f(self) -> TypeIs[int]: ...  # Error, only positional argument expected is `self`\n```",
           "default": "error",
           "oneOf": [
             {
@@ -665,7 +803,7 @@
         },
         "raw-string-type-annotation": {
           "title": "detects raw strings in type annotation positions",
-          "description": "## What it does\nChecks for raw-strings in type annotation positions.\n\n## Why is this bad?\nStatic analysis tools like ty can't analyse type annotations that use raw-string notation.\n\n## Examples\n```python\ndef test(): -> r\"int\":\n    ...\n```\n\nUse instead:\n```python\ndef test(): -> \"int\":\n    ...\n```",
+          "description": "## What it does\nChecks for raw-strings in type annotation positions.\n\n## Why is this bad?\nStatic analysis tools like ty can't analyze type annotations that use raw-string notation.\n\n## Examples\n```python\ndef test(): -> r\"int\":\n    ...\n```\n\nUse instead:\n```python\ndef test(): -> \"int\":\n    ...\n```",
           "default": "error",
           "oneOf": [
             {
@@ -773,6 +911,16 @@
             }
           ]
         },
+        "unresolved-global": {
+          "title": "detects `global` statements with no definition in the global scope",
+          "description": "## What it does\nDetects variables declared as `global` in an inner scope that have no explicit\nbindings or declarations in the global scope.\n\n## Why is this bad?\nFunction bodies with `global` statements can run in any order (or not at all), which makes\nit hard for static analysis tools to infer the types of globals without\nexplicit definitions or declarations.\n\n## Example\n```python\ndef f():\n    global x  # unresolved global\n    x = 42\n\ndef g():\n    print(x)  # unresolved reference\n```\n\nUse instead:\n```python\nx: int\n\ndef f():\n    global x\n    x = 42\n\ndef g():\n    print(x)\n```\n\nOr:\n```python\nx: int | None = None\n\ndef f():\n    global x\n    x = 42\n\ndef g():\n    print(x)\n```",
+          "default": "warn",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "unresolved-import": {
           "title": "detects unresolved imports",
           "description": "## What it does\nChecks for import statements for which the module cannot be resolved.\n\n## Why is this bad?\nImporting a module that cannot be resolved will raise a `ModuleNotFoundError`\nat runtime.\n\n## Examples\n```python\nimport foo  # ModuleNotFoundError: No module named 'foo'\n```",
@@ -851,6 +999,26 @@
     "SrcOptions": {
       "type": "object",
       "properties": {
+        "exclude": {
+          "description": "A list of file and directory patterns to exclude from type checking.\n\nPatterns follow a syntax similar to `.gitignore`:\n\n- `./src/` matches only a directory - `./src` matches both files and directories - `src` matches files or directories named `src` - `*` matches any (possibly empty) sequence of characters (except `/`). - `**` matches zero or more path components. This sequence **must** form a single path component, so both `**a` and `b**` are invalid and will result in an error. A sequence of more than two consecutive `*` characters is also invalid. - `?` matches any single character except `/` - `[abc]` matches any character inside the brackets. Character sequences can also specify ranges of characters, as ordered by Unicode, so e.g. `[0-9]` specifies any character between `0` and `9` inclusive. An unclosed bracket is invalid. - `!pattern` negates a pattern (undoes the exclusion of files that would otherwise be excluded)\n\nAll paths are anchored relative to the project root (`src` only matches `<project_root>/src` and not `<project_root>/test/src`). To exclude any directory or file named `src`, use `**/src` instead.\n\nBy default, ty excludes commonly ignored directories:\n\n- `**/.bzr/` - `**/.direnv/` - `**/.eggs/` - `**/.git/` - `**/.git-rewrite/` - `**/.hg/` - `**/.mypy_cache/` - `**/.nox/` - `**/.pants.d/` - `**/.pytype/` - `**/.ruff_cache/` - `**/.svn/` - `**/.tox/` - `**/.venv/` - `**/__pypackages__/` - `**/_build/` - `**/buck-out/` - `**/dist/` - `**/node_modules/` - `**/venv/`\n\nYou can override any default exclude by using a negated pattern. For example, to re-include `dist` use `exclude = [\"!dist\"]`",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "include": {
+          "description": "A list of files and directories to check. The `include` option follows a similar syntax to `.gitignore` but reversed: Including a file or directory will make it so that it (and its contents) are type checked.\n\n- `./src/` matches only a directory - `./src` matches both files and directories - `src` matches a file or directory named `src` - `*` matches any (possibly empty) sequence of characters (except `/`). - `**` matches zero or more path components. This sequence **must** form a single path component, so both `**a` and `b**` are invalid and will result in an error. A sequence of more than two consecutive `*` characters is also invalid. - `?` matches any single character except `/` - `[abc]` matches any character inside the brackets. Character sequences can also specify ranges of characters, as ordered by Unicode, so e.g. `[0-9]` specifies any character between `0` and `9` inclusive. An unclosed bracket is invalid.\n\nAll paths are anchored relative to the project root (`src` only matches `<project_root>/src` and not `<project_root>/test/src`).\n\n`exclude` takes precedence over `include`.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
         "respect-ignore-files": {
           "description": "Whether to automatically exclude files that are ignored by `.ignore`, `.gitignore`, `.git/info/exclude`, and global `gitignore` files. Enabled by default.",
           "type": [
@@ -860,6 +1028,7 @@
         },
         "root": {
           "description": "The root of the project, used for finding first-party modules.\n\nIf left unspecified, ty will try to detect common project layouts and initialize `src.root` accordingly:\n\n* if a `./src` directory exists, include `.` and `./src` in the first party search path (src layout or flat) * if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path * otherwise, default to `.` (flat layout)\n\nBesides, if a `./tests` directory exists and is not a package (i.e. it does not contain an `__init__.py` file), it will also be included in the first party search path.",
+          "deprecated": true,
           "type": [
             "string",
             "null"
@@ -882,7 +1051,7 @@
           "description": "The format to use for printing diagnostic messages.\n\nDefaults to `full`.",
           "anyOf": [
             {
-              "$ref": "#/definitions/DiagnosticFormat"
+              "$ref": "#/definitions/OutputFormat"
             },
             {
               "type": "null"

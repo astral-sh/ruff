@@ -1,15 +1,16 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-insert_empty_lines.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+I001 [*] Import block is un-sorted or un-formatted
+ --> insert_empty_lines.py:1:1
   |
 1 | / import a
 2 | | import b
-  | |________^ I001
+  | |________^
 3 |   x = 1
 4 |   import os
   |
-  = help: Organize imports
+help: Organize imports
 
 ℹ Safe fix
 1 1 | import a
@@ -19,17 +20,18 @@ insert_empty_lines.py:1:1: I001 [*] Import block is un-sorted or un-formatted
 4 5 | import os
 5 6 | import sys
 
-insert_empty_lines.py:4:1: I001 [*] Import block is un-sorted or un-formatted
+I001 [*] Import block is un-sorted or un-formatted
+ --> insert_empty_lines.py:4:1
   |
 2 |   import b
 3 |   x = 1
 4 | / import os
 5 | | import sys
-  | |__________^ I001
+  | |__________^
 6 |   def f():
 7 |       pass
   |
-  = help: Organize imports
+help: Organize imports
 
 ℹ Safe fix
 3 3 | x = 1
@@ -41,16 +43,17 @@ insert_empty_lines.py:4:1: I001 [*] Import block is un-sorted or un-formatted
 7 9 |     pass
 8 10 | if True:
 
-insert_empty_lines.py:14:1: I001 [*] Import block is un-sorted or un-formatted
+I001 [*] Import block is un-sorted or un-formatted
+  --> insert_empty_lines.py:14:1
    |
 12 |   class X: pass
 13 |   y = 1
 14 | / import os
 15 | | import sys
-   | |__________^ I001
+   | |__________^
 16 |   """Docstring"""
    |
-   = help: Organize imports
+help: Organize imports
 
 ℹ Safe fix
 13 13 | y = 1
@@ -61,14 +64,15 @@ insert_empty_lines.py:14:1: I001 [*] Import block is un-sorted or un-formatted
 17 18 | 
 18 19 | if True:
 
-insert_empty_lines.py:52:1: I001 [*] Import block is un-sorted or un-formatted
+I001 [*] Import block is un-sorted or un-formatted
+  --> insert_empty_lines.py:52:1
    |
 52 | import os
-   | ^^^^^^^^^ I001
+   | ^^^^^^^^^
 53 |
 54 | # Comment goes here.
    |
-   = help: Organize imports
+help: Organize imports
 
 ℹ Safe fix
 51 51 | 

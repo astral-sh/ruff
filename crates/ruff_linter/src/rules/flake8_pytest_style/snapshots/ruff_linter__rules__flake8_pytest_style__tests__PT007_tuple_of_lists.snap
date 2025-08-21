@@ -1,16 +1,17 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
 ---
-PT007.py:12:9: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `list`
+PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `list`
+  --> PT007.py:12:9
    |
 10 |     ("param1", "param2"),
 11 |     (
 12 |         (1, 2),
-   |         ^^^^^^ PT007
+   |         ^^^^^^
 13 |         (3, 4),
 14 |     ),
    |
-   = help: Use `tuple` of `list` for parameter values
+help: Use `tuple` of `list` for parameter values
 
 ℹ Unsafe fix
 9  9  | @pytest.mark.parametrize(
@@ -22,16 +23,17 @@ PT007.py:12:9: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected
 14 14 |     ),
 15 15 | )
 
-PT007.py:13:9: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `list`
+PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `list`
+  --> PT007.py:13:9
    |
 11 |     (
 12 |         (1, 2),
 13 |         (3, 4),
-   |         ^^^^^^ PT007
+   |         ^^^^^^
 14 |     ),
 15 | )
    |
-   = help: Use `tuple` of `list` for parameter values
+help: Use `tuple` of `list` for parameter values
 
 ℹ Unsafe fix
 10 10 |     ("param1", "param2"),
@@ -43,14 +45,15 @@ PT007.py:13:9: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected
 15 15 | )
 16 16 | def test_tuple_of_tuples(param1, param2):
 
-PT007.py:31:35: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `list`
+PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `list`
+  --> PT007.py:31:35
    |
 31 | @pytest.mark.parametrize("param", [1, 2])
-   |                                   ^^^^^^ PT007
+   |                                   ^^^^^^
 32 | def test_list(param):
 33 |     ...
    |
-   = help: Use `tuple` of `list` for parameter values
+help: Use `tuple` of `list` for parameter values
 
 ℹ Unsafe fix
 28 28 |     ...
@@ -62,7 +65,8 @@ PT007.py:31:35: PT007 [*] Wrong values type in `pytest.mark.parametrize` expecte
 33 33 |     ...
 34 34 | 
 
-PT007.py:38:5: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `list`
+PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `list`
+  --> PT007.py:38:5
    |
 36 |   @pytest.mark.parametrize(
 37 |       ("param1", "param2"),
@@ -70,11 +74,11 @@ PT007.py:38:5: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected
 39 | |         (1, 2),
 40 | |         (3, 4),
 41 | |     ],
-   | |_____^ PT007
+   | |_____^
 42 |   )
 43 |   def test_list_of_tuples(param1, param2):
    |
-   = help: Use `tuple` of `list` for parameter values
+help: Use `tuple` of `list` for parameter values
 
 ℹ Unsafe fix
 35 35 | 
@@ -90,16 +94,17 @@ PT007.py:38:5: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected
 43 43 | def test_list_of_tuples(param1, param2):
 44 44 |     ...
 
-PT007.py:39:9: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `list`
+PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `list`
+  --> PT007.py:39:9
    |
 37 |     ("param1", "param2"),
 38 |     [
 39 |         (1, 2),
-   |         ^^^^^^ PT007
+   |         ^^^^^^
 40 |         (3, 4),
 41 |     ],
    |
-   = help: Use `tuple` of `list` for parameter values
+help: Use `tuple` of `list` for parameter values
 
 ℹ Unsafe fix
 36 36 | @pytest.mark.parametrize(
@@ -111,16 +116,17 @@ PT007.py:39:9: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected
 41 41 |     ],
 42 42 | )
 
-PT007.py:40:9: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `list`
+PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `list`
+  --> PT007.py:40:9
    |
 38 |     [
 39 |         (1, 2),
 40 |         (3, 4),
-   |         ^^^^^^ PT007
+   |         ^^^^^^
 41 |     ],
 42 | )
    |
-   = help: Use `tuple` of `list` for parameter values
+help: Use `tuple` of `list` for parameter values
 
 ℹ Unsafe fix
 37 37 |     ("param1", "param2"),
@@ -132,7 +138,8 @@ PT007.py:40:9: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected
 42 42 | )
 43 43 | def test_list_of_tuples(param1, param2):
 
-PT007.py:49:5: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `list`
+PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `list`
+  --> PT007.py:49:5
    |
 47 |   @pytest.mark.parametrize(
 48 |       ("param1", "param2"),
@@ -140,11 +147,11 @@ PT007.py:49:5: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected
 50 | |         [1, 2],
 51 | |         [3, 4],
 52 | |     ],
-   | |_____^ PT007
+   | |_____^
 53 |   )
 54 |   def test_list_of_lists(param1, param2):
    |
-   = help: Use `tuple` of `list` for parameter values
+help: Use `tuple` of `list` for parameter values
 
 ℹ Unsafe fix
 46 46 | 
@@ -160,7 +167,8 @@ PT007.py:49:5: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected
 54 54 | def test_list_of_lists(param1, param2):
 55 55 |     ...
 
-PT007.py:60:5: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `list`
+PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `list`
+  --> PT007.py:60:5
    |
 58 |   @pytest.mark.parametrize(
 59 |       "param1,param2",
@@ -168,11 +176,11 @@ PT007.py:60:5: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected
 61 | |         [1, 2],
 62 | |         [3, 4],
 63 | |     ],
-   | |_____^ PT007
+   | |_____^
 64 |   )
 65 |   def test_csv_name_list_of_lists(param1, param2):
    |
-   = help: Use `tuple` of `list` for parameter values
+help: Use `tuple` of `list` for parameter values
 
 ℹ Unsafe fix
 57 57 | 
@@ -188,7 +196,8 @@ PT007.py:60:5: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected
 65 65 | def test_csv_name_list_of_lists(param1, param2):
 66 66 |     ...
 
-PT007.py:71:5: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `list`
+PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `list`
+  --> PT007.py:71:5
    |
 69 |   @pytest.mark.parametrize(
 70 |       "param",
@@ -196,11 +205,11 @@ PT007.py:71:5: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected
 72 | |         [1, 2],
 73 | |         [3, 4],
 74 | |     ],
-   | |_____^ PT007
+   | |_____^
 75 |   )
 76 |   def test_single_list_of_lists(param):
    |
-   = help: Use `tuple` of `list` for parameter values
+help: Use `tuple` of `list` for parameter values
 
 ℹ Unsafe fix
 68 68 | 
@@ -216,14 +225,15 @@ PT007.py:71:5: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected
 76 76 | def test_single_list_of_lists(param):
 77 77 |     ...
 
-PT007.py:80:31: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `list`
+PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `list`
+  --> PT007.py:80:31
    |
 80 | @pytest.mark.parametrize("a", [1, 2])
-   |                               ^^^^^^ PT007
+   |                               ^^^^^^
 81 | @pytest.mark.parametrize(("b", "c"), ((3, 4), (5, 6)))
 82 | @pytest.mark.parametrize("d", [3,])
    |
-   = help: Use `tuple` of `list` for parameter values
+help: Use `tuple` of `list` for parameter values
 
 ℹ Unsafe fix
 77 77 |     ...
@@ -235,15 +245,16 @@ PT007.py:80:31: PT007 [*] Wrong values type in `pytest.mark.parametrize` expecte
 82 82 | @pytest.mark.parametrize("d", [3,])
 83 83 | @pytest.mark.parametrize(
 
-PT007.py:81:39: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `list`
+PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `list`
+  --> PT007.py:81:39
    |
 80 | @pytest.mark.parametrize("a", [1, 2])
 81 | @pytest.mark.parametrize(("b", "c"), ((3, 4), (5, 6)))
-   |                                       ^^^^^^ PT007
+   |                                       ^^^^^^
 82 | @pytest.mark.parametrize("d", [3,])
 83 | @pytest.mark.parametrize(
    |
-   = help: Use `tuple` of `list` for parameter values
+help: Use `tuple` of `list` for parameter values
 
 ℹ Unsafe fix
 78 78 | 
@@ -255,15 +266,16 @@ PT007.py:81:39: PT007 [*] Wrong values type in `pytest.mark.parametrize` expecte
 83 83 | @pytest.mark.parametrize(
 84 84 |     "d",
 
-PT007.py:81:47: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `list`
+PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `list`
+  --> PT007.py:81:47
    |
 80 | @pytest.mark.parametrize("a", [1, 2])
 81 | @pytest.mark.parametrize(("b", "c"), ((3, 4), (5, 6)))
-   |                                               ^^^^^^ PT007
+   |                                               ^^^^^^
 82 | @pytest.mark.parametrize("d", [3,])
 83 | @pytest.mark.parametrize(
    |
-   = help: Use `tuple` of `list` for parameter values
+help: Use `tuple` of `list` for parameter values
 
 ℹ Unsafe fix
 78 78 | 
@@ -275,16 +287,17 @@ PT007.py:81:47: PT007 [*] Wrong values type in `pytest.mark.parametrize` expecte
 83 83 | @pytest.mark.parametrize(
 84 84 |     "d",
 
-PT007.py:82:31: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `list`
+PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `list`
+  --> PT007.py:82:31
    |
 80 | @pytest.mark.parametrize("a", [1, 2])
 81 | @pytest.mark.parametrize(("b", "c"), ((3, 4), (5, 6)))
 82 | @pytest.mark.parametrize("d", [3,])
-   |                               ^^^^ PT007
+   |                               ^^^^
 83 | @pytest.mark.parametrize(
 84 |     "d",
    |
-   = help: Use `tuple` of `list` for parameter values
+help: Use `tuple` of `list` for parameter values
 
 ℹ Unsafe fix
 79 79 | 
@@ -296,16 +309,17 @@ PT007.py:82:31: PT007 [*] Wrong values type in `pytest.mark.parametrize` expecte
 84 84 |     "d",
 85 85 |     [("3", "4")],
 
-PT007.py:85:5: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `list`
+PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `list`
+  --> PT007.py:85:5
    |
 83 | @pytest.mark.parametrize(
 84 |     "d",
 85 |     [("3", "4")],
-   |     ^^^^^^^^^^^^ PT007
+   |     ^^^^^^^^^^^^
 86 | )
 87 | @pytest.mark.parametrize(
    |
-   = help: Use `tuple` of `list` for parameter values
+help: Use `tuple` of `list` for parameter values
 
 ℹ Unsafe fix
 82 82 | @pytest.mark.parametrize("d", [3,])
@@ -317,16 +331,17 @@ PT007.py:85:5: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected
 87 87 | @pytest.mark.parametrize(
 88 88 |     "e",
 
-PT007.py:89:5: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `list`
+PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `list`
+  --> PT007.py:89:5
    |
 87 | @pytest.mark.parametrize(
 88 |     "e",
 89 |     [("3", "4"),],
-   |     ^^^^^^^^^^^^^ PT007
+   |     ^^^^^^^^^^^^^
 90 | )
 91 | def test_multiple_decorators(a, b, c, d, e):
    |
-   = help: Use `tuple` of `list` for parameter values
+help: Use `tuple` of `list` for parameter values
 
 ℹ Unsafe fix
 86 86 | )

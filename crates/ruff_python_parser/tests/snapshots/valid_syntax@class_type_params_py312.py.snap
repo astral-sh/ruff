@@ -7,34 +7,42 @@ input_file: crates/ruff_python_parser/resources/inline/ok/class_type_params_py31
 ```
 Module(
     ModModule {
+        node_index: AtomicNodeIndex(..),
         range: 0..96,
         body: [
             ClassDef(
                 StmtClassDef {
+                    node_index: AtomicNodeIndex(..),
                     range: 44..95,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("Foo"),
                         range: 50..53,
+                        node_index: AtomicNodeIndex(..),
                     },
                     type_params: Some(
                         TypeParams {
                             range: 53..90,
+                            node_index: AtomicNodeIndex(..),
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
                                         range: 54..69,
+                                        node_index: AtomicNodeIndex(..),
                                         name: Identifier {
                                             id: Name("S"),
                                             range: 54..55,
+                                            node_index: AtomicNodeIndex(..),
                                         },
                                         bound: Some(
                                             Tuple(
                                                 ExprTuple {
+                                                    node_index: AtomicNodeIndex(..),
                                                     range: 57..69,
                                                     elts: [
                                                         Name(
                                                             ExprName {
+                                                                node_index: AtomicNodeIndex(..),
                                                                 range: 58..61,
                                                                 id: Name("str"),
                                                                 ctx: Load,
@@ -42,6 +50,7 @@ Module(
                                                         ),
                                                         Name(
                                                             ExprName {
+                                                                node_index: AtomicNodeIndex(..),
                                                                 range: 63..68,
                                                                 id: Name("bytes"),
                                                                 ctx: Load,
@@ -59,13 +68,16 @@ Module(
                                 TypeVar(
                                     TypeParamTypeVar {
                                         range: 71..79,
+                                        node_index: AtomicNodeIndex(..),
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 71..72,
+                                            node_index: AtomicNodeIndex(..),
                                         },
                                         bound: Some(
                                             Name(
                                                 ExprName {
+                                                    node_index: AtomicNodeIndex(..),
                                                     range: 74..79,
                                                     id: Name("float"),
                                                     ctx: Load,
@@ -78,9 +90,11 @@ Module(
                                 TypeVarTuple(
                                     TypeParamTypeVarTuple {
                                         range: 81..84,
+                                        node_index: AtomicNodeIndex(..),
                                         name: Identifier {
                                             id: Name("Ts"),
                                             range: 82..84,
+                                            node_index: AtomicNodeIndex(..),
                                         },
                                         default: None,
                                     },
@@ -88,9 +102,11 @@ Module(
                                 ParamSpec(
                                     TypeParamParamSpec {
                                         range: 86..89,
+                                        node_index: AtomicNodeIndex(..),
                                         name: Identifier {
                                             id: Name("P"),
                                             range: 88..89,
+                                            node_index: AtomicNodeIndex(..),
                                         },
                                         default: None,
                                     },
@@ -102,9 +118,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: AtomicNodeIndex(..),
                                 range: 92..95,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 92..95,
                                     },
                                 ),

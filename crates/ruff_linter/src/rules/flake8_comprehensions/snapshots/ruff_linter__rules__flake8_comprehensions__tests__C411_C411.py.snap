@@ -1,15 +1,16 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
 ---
-C411.py:2:1: C411 [*] Unnecessary `list()` call (remove the outer call to `list()`)
+C411 [*] Unnecessary `list()` call (remove the outer call to `list()`)
+ --> C411.py:2:1
   |
 1 | x = [1, 2, 3]
 2 | list([i for i in x])
-  | ^^^^^^^^^^^^^^^^^^^^ C411
+  | ^^^^^^^^^^^^^^^^^^^^
 3 |
 4 | # Skip when too many positional arguments
   |
-  = help: Remove outer `list()` call
+help: Remove outer `list()` call
 
 ℹ Unsafe fix
 1 1 | x = [1, 2, 3]

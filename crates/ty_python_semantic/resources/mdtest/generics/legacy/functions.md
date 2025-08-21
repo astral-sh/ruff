@@ -130,6 +130,51 @@ reveal_type(takes_in_protocol(ExplicitSub()))  # revealed: int
 reveal_type(takes_in_protocol(ExplicitGenericSub[str]()))  # revealed: str
 ```
 
+## Inferring tuple parameter types
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def takes_mixed_tuple_suffix(x: tuple[int, bytes, *tuple[str, ...], T, int]) -> T:
+    return x[-2]
+
+def takes_mixed_tuple_prefix(x: tuple[int, T, *tuple[str, ...], bool, int]) -> T:
+    return x[1]
+
+def _(x: tuple[int, bytes, *tuple[str, ...], bool, int]):
+    reveal_type(takes_mixed_tuple_suffix(x))  # revealed: bool
+    reveal_type(takes_mixed_tuple_prefix(x))  # revealed: bytes
+
+reveal_type(takes_mixed_tuple_suffix((1, b"foo", "bar", "baz", True, 42)))  # revealed: Literal[True]
+reveal_type(takes_mixed_tuple_prefix((1, b"foo", "bar", "baz", True, 42)))  # revealed: Literal[b"foo"]
+
+def takes_fixed_tuple(x: tuple[T, int]) -> T:
+    return x[0]
+
+def _(x: tuple[str, int]):
+    reveal_type(takes_fixed_tuple(x))  # revealed: str
+
+reveal_type(takes_fixed_tuple((True, 42)))  # revealed: Literal[True]
+
+def takes_homogeneous_tuple(x: tuple[T, ...]) -> T:
+    return x[0]
+
+def _(x: tuple[str, int], y: tuple[bool, ...], z: tuple[int, str, *tuple[range, ...], bytes]):
+    reveal_type(takes_homogeneous_tuple(x))  # revealed: str | int
+    reveal_type(takes_homogeneous_tuple(y))  # revealed: bool
+    reveal_type(takes_homogeneous_tuple(z))  # revealed: int | str | range | bytes
+
+reveal_type(takes_homogeneous_tuple((42,)))  # revealed: Literal[42]
+reveal_type(takes_homogeneous_tuple((42, 43)))  # revealed: Literal[42, 43]
+```
+
 ## Inferring a bound typevar
 
 <!-- snapshot-diagnostics -->
@@ -181,7 +226,7 @@ from typing import TypeVar
 T = TypeVar("T", bound=int)
 
 def good_param(x: T) -> None:
-    reveal_type(x)  # revealed: T
+    reveal_type(x)  # revealed: T@good_param
 ```
 
 If the function is annotated as returning the typevar, this means that the upper bound is _not_
@@ -194,7 +239,7 @@ def good_return(x: T) -> T:
     return x
 
 def bad_return(x: T) -> T:
-    # error: [invalid-return-type] "Return type does not match returned value: expected `T`, found `int`"
+    # error: [invalid-return-type] "Return type does not match returned value: expected `T@bad_return`, found `int`"
     return x + 1
 ```
 
@@ -212,7 +257,7 @@ def different_types(cond: bool, t: T, s: S) -> T:
     if cond:
         return t
     else:
-        # error: [invalid-return-type] "Return type does not match returned value: expected `T`, found `S`"
+        # error: [invalid-return-type] "Return type does not match returned value: expected `T@different_types`, found `S@different_types`"
         return s
 
 def same_types(cond: bool, t1: T, t2: T) -> T:
@@ -234,7 +279,7 @@ T = TypeVar("T", int, str)
 
 def same_constrained_types(t1: T, t2: T) -> T:
     # TODO: no error
-    # error: [unsupported-operator] "Operator `+` is unsupported between objects of type `T` and `T`"
+    # error: [unsupported-operator] "Operator `+` is unsupported between objects of type `T@same_constrained_types` and `T@same_constrained_types`"
     return t1 + t2
 ```
 
@@ -319,4 +364,136 @@ def g(x: T) -> T | None:
 
 reveal_type(f(g("a")))  # revealed: tuple[Literal["a"] | None, int]
 reveal_type(g(f("a")))  # revealed: tuple[Literal["a"], int] | None
+```
+
+## Opaque decorators don't affect typevar binding
+
+Inside the body of a generic function, we should be able to see that the typevars bound by that
+function are in fact bound by that function. This requires being able to see the enclosing
+function's _undecorated_ type and signature, especially in the case where a gradually typed
+decorator "hides" the function type from outside callers.
+
+```py
+from typing import cast, Any, Callable, TypeVar
+
+F = TypeVar("F", bound=Callable[..., Any])
+T = TypeVar("T")
+
+def opaque_decorator(f: Any) -> Any:
+    return f
+
+def transparent_decorator(f: F) -> F:
+    return f
+
+@opaque_decorator
+def decorated(t: T) -> None:
+    # error: [redundant-cast]
+    reveal_type(cast(T, t))  # revealed: T@decorated
+
+@transparent_decorator
+def decorated(t: T) -> None:
+    # error: [redundant-cast]
+    reveal_type(cast(T, t))  # revealed: T@decorated
+```
+
+## Solving TypeVars with upper bounds in unions
+
+```py
+from typing import Generic, TypeVar
+
+class A: ...
+
+T = TypeVar("T", bound=A)
+
+class B(Generic[T]):
+    x: T
+
+def f(c: T | None):
+    return None
+
+def g(b: B[T]):
+    return f(b.x)  # Fine
+```
+
+## Constrained TypeVar in a union
+
+This is a regression test for an issue that surfaced in the primer report of an early version of
+<https://github.com/astral-sh/ruff/pull/19811>, where we failed to solve the `TypeVar` here due to
+the fact that it only appears in the function's type annotations as part of a union:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T", str, bytes)
+
+def NamedTemporaryFile(suffix: T | None, prefix: T | None) -> None:
+    return None
+
+def f(x: str):
+    NamedTemporaryFile(prefix=x, suffix=".tar.gz")  # Fine
+```
+
+## Nested functions see typevars bound in outer function
+
+```py
+from typing import TypeVar, overload
+
+T = TypeVar("T")
+
+def outer(t: T) -> None:
+    def inner(t: T) -> None: ...
+
+    inner(t)
+
+@overload
+def overloaded_outer() -> None: ...
+@overload
+def overloaded_outer(t: T) -> None: ...
+def overloaded_outer(t: T | None = None) -> None:
+    def inner(t: T) -> None: ...
+
+    if t is not None:
+        inner(t)
+```
+
+## Unpacking a TypeVar
+
+We can infer precise heterogeneous types from the result of an unpacking operation applied to a type
+variable if the type variable's upper bound is a type with a precise tuple spec:
+
+```py
+from dataclasses import dataclass
+from typing import NamedTuple, Final, TypeVar, Generic
+
+T = TypeVar("T", bound=tuple[int, str])
+
+def f(x: T) -> T:
+    a, b = x
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: str
+    return x
+
+@dataclass
+class Team(Generic[T]):
+    employees: list[T]
+
+def x(team: Team[T]) -> Team[T]:
+    age, name = team.employees[0]
+    reveal_type(age)  # revealed: int
+    reveal_type(name)  # revealed: str
+    return team
+
+class Age(int): ...
+class Name(str): ...
+
+class Employee(NamedTuple):
+    age: Age
+    name: Name
+
+EMPLOYEES: Final = (Employee(name=Name("alice"), age=Age(42)),)
+team = Team(employees=list(EMPLOYEES))
+reveal_type(team.employees)  # revealed: list[Employee]
+age, name = team.employees[0]
+reveal_type(age)  # revealed: Age
+reveal_type(name)  # revealed: Name
 ```

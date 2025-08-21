@@ -10,14 +10,14 @@ use ruff_python_trivia::{PythonWhitespace, leading_indentation, textwrap::indent
 use ruff_source_file::{LineRanges, UniversalNewlines};
 use ruff_text_size::{Ranged, TextRange};
 
-use super::super::block::Block;
-use super::super::{comments, format_imports};
 use crate::Locator;
 use crate::checkers::ast::LintContext;
 use crate::line_width::LineWidthBuilder;
 use crate::package::PackageRoot;
 use crate::preview::is_full_path_match_source_strategy_enabled;
+use crate::rules::isort::block::Block;
 use crate::rules::isort::categorize::MatchSourceStrategy;
+use crate::rules::isort::{comments, format_imports};
 use crate::settings::LinterSettings;
 use crate::{Edit, Fix, FixAvailability, Violation};
 

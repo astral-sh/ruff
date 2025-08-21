@@ -1,10 +1,10 @@
 [build-system]
-requires = ["maturin>=1.0,<2.0"]
+requires = ["maturin>=1.9,<2.0"]
 build-backend = "maturin"
 
 [project]
 name = "ruff"
-version = "0.11.13"
+version = "0.12.9"
 description = "An extremely fast Python linter and code formatter, written in Rust."
 authors = [{ name = "Astral Software Inc.", email = "hey@astral.sh" }]
 readme = "README.md"
@@ -22,7 +22,7 @@ classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: MIT License",  # for compatibility with tooling such as pip-licenses
     "Operating System :: OS Independent",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3.7",
@@ -52,9 +52,6 @@ strip = true
 exclude = [
     "crates/ruff_linter/resources/test/fixtures/**/*",
     "crates/ruff_linter/src/rules/*/snapshots/**/*"
-]
-include = [
-    "rust-toolchain.toml"
 ]
 
 [tool.ruff]
@@ -95,6 +92,10 @@ ignore = [
 
 [tool.ruff.lint.isort]
 required-imports = ["from __future__ import annotations"]
+
+[tool.ruff.per-file-target-version]
+"crates/ty_python_semantic/mdtest.py" = "py310"
+"crates/ty_vendored/ty_extensions/ty_extensions.pyi" = "py312"
 
 [tool.black]
 force-exclude = '''

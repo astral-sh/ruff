@@ -1,14 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
 ---
-SIM201.py:2:4: SIM201 [*] Use `a != b` instead of `not a == b`
+SIM201 [*] Use `a != b` instead of `not a == b`
+ --> SIM201.py:2:4
   |
 1 | # SIM201
 2 | if not a == b:
-  |    ^^^^^^^^^^ SIM201
+  |    ^^^^^^^^^^
 3 |     pass
   |
-  = help: Replace with `!=` operator
+help: Replace with `!=` operator
 
 ℹ Unsafe fix
 1 1 | # SIM201
@@ -18,14 +19,15 @@ SIM201.py:2:4: SIM201 [*] Use `a != b` instead of `not a == b`
 4 4 | 
 5 5 | # SIM201
 
-SIM201.py:6:4: SIM201 [*] Use `a != b + c` instead of `not a == b + c`
+SIM201 [*] Use `a != b + c` instead of `not a == b + c`
+ --> SIM201.py:6:4
   |
 5 | # SIM201
 6 | if not a == (b + c):
-  |    ^^^^^^^^^^^^^^^^ SIM201
+  |    ^^^^^^^^^^^^^^^^
 7 |     pass
   |
-  = help: Replace with `!=` operator
+help: Replace with `!=` operator
 
 ℹ Unsafe fix
 3 3 |     pass
@@ -37,14 +39,15 @@ SIM201.py:6:4: SIM201 [*] Use `a != b + c` instead of `not a == b + c`
 8 8 | 
 9 9 | # SIM201
 
-SIM201.py:10:4: SIM201 [*] Use `a + b != c` instead of `not a + b == c`
+SIM201 [*] Use `a + b != c` instead of `not a + b == c`
+  --> SIM201.py:10:4
    |
  9 | # SIM201
 10 | if not (a + b) == c:
-   |    ^^^^^^^^^^^^^^^^ SIM201
+   |    ^^^^^^^^^^^^^^^^
 11 |     pass
    |
-   = help: Replace with `!=` operator
+help: Replace with `!=` operator
 
 ℹ Unsafe fix
 7  7  |     pass

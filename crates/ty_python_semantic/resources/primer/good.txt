@@ -1,4 +1,5 @@
 AutoSplit
+DateType
 Expression
 PyGithub
 PyWinCtl
@@ -9,7 +10,6 @@ aioredis
 aiortc
 alectryon
 alerta
-altair
 anyio
 apprise
 async-utils
@@ -40,7 +40,6 @@ flake8
 flake8-pyi
 freqtrade
 git-revise
-graphql-core
 httpx-caching
 hydra-zen
 ignite
@@ -60,16 +59,13 @@ mkdocs
 mkosi
 mongo-python-driver
 more-itertools
-mypy
 mypy-protobuf
 mypy_primer
 nionutils
-nox
 openlibrary
 operator
 optuna
 paasta
-pandas-stubs
 paroxython
 parso
 pegen
@@ -92,6 +88,7 @@ pytest-robotframework
 python-chess
 python-htmlgen
 python-sop
+pywin32
 rclip
 rich
 rotki
@@ -107,7 +104,7 @@ starlette
 static-frame
 stone
 strawberry
-streamlit
+svcs
 sympy
 tornado
 trio
@@ -120,4 +117,5 @@ werkzeug
 xarray-dataclasses
 yarl
 zipp
+zope.interface
 zulip

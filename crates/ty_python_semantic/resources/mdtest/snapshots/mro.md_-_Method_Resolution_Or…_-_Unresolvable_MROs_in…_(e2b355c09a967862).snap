@@ -24,7 +24,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/mro.md
 # Diagnostics
 
 ```
-error[inconsistent-mro]: Cannot create a consistent method resolution order (MRO) for class `Baz` with bases list `[typing.Protocol[T], <class 'Foo'>, <class 'Bar[T]'>]`
+error[inconsistent-mro]: Cannot create a consistent method resolution order (MRO) for class `Baz` with bases list `[typing.Protocol[T], <class 'Foo'>, <class 'Bar[T@Baz]'>]`
  --> src/mdtest_snippet.py:7:1
   |
 5 | class Foo(Protocol): ...

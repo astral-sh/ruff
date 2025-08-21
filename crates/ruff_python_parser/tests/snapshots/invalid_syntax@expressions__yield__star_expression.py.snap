@@ -7,20 +7,25 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/yield/star_e
 ```
 Module(
     ModModule {
+        node_index: AtomicNodeIndex(..),
         range: 0..67,
         body: [
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 37..47,
                     value: Yield(
                         ExprYield {
+                            node_index: AtomicNodeIndex(..),
                             range: 37..47,
                             value: Some(
                                 Starred(
                                     ExprStarred {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 44..46,
                                         value: Name(
                                             ExprName {
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 45..46,
                                                 id: Name("x"),
                                                 ctx: Load,
@@ -36,25 +41,31 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 49..66,
                     value: Yield(
                         ExprYield {
+                            node_index: AtomicNodeIndex(..),
                             range: 49..66,
                             value: Some(
                                 Tuple(
                                     ExprTuple {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 55..66,
                                         elts: [
                                             Starred(
                                                 ExprStarred {
+                                                    node_index: AtomicNodeIndex(..),
                                                     range: 55..63,
                                                     value: BoolOp(
                                                         ExprBoolOp {
+                                                            node_index: AtomicNodeIndex(..),
                                                             range: 56..63,
                                                             op: And,
                                                             values: [
                                                                 Name(
                                                                     ExprName {
+                                                                        node_index: AtomicNodeIndex(..),
                                                                         range: 56..57,
                                                                         id: Name("x"),
                                                                         ctx: Load,
@@ -62,6 +73,7 @@ Module(
                                                                 ),
                                                                 Name(
                                                                     ExprName {
+                                                                        node_index: AtomicNodeIndex(..),
                                                                         range: 62..63,
                                                                         id: Name("y"),
                                                                         ctx: Load,
@@ -75,6 +87,7 @@ Module(
                                             ),
                                             Name(
                                                 ExprName {
+                                                    node_index: AtomicNodeIndex(..),
                                                     range: 65..66,
                                                     id: Name("z"),
                                                     ctx: Load,

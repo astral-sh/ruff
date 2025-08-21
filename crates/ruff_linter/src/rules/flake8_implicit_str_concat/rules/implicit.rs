@@ -11,7 +11,6 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
 use crate::checkers::ast::LintContext;
-use crate::settings::LinterSettings;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -108,13 +107,15 @@ pub(crate) fn implicit(
     tokens: &Tokens,
     locator: &Locator,
     indexer: &Indexer,
-    settings: &LinterSettings,
 ) {
     for (a_token, b_token) in tokens
         .iter()
         .filter(|token| {
             token.kind() != TokenKind::Comment
-                && (settings.flake8_implicit_str_concat.allow_multiline
+                && (context
+                    .settings()
+                    .flake8_implicit_str_concat
+                    .allow_multiline
                     || token.kind() != TokenKind::NonLogicalNewline)
         })
         .tuple_windows()
@@ -146,18 +147,18 @@ pub(crate) fn implicit(
         };
 
         if locator.contains_line_break(TextRange::new(a_range.end(), b_range.start())) {
-            context.report_diagnostic(
+            context.report_diagnostic_if_enabled(
                 MultiLineImplicitStringConcatenation,
                 TextRange::new(a_range.start(), b_range.end()),
             );
         } else {
-            let mut diagnostic = context.report_diagnostic(
+            if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
                 SingleLineImplicitStringConcatenation,
                 TextRange::new(a_range.start(), b_range.end()),
-            );
-
-            if let Some(fix) = concatenate_strings(a_range, b_range, locator) {
-                diagnostic.set_fix(fix);
+            ) {
+                if let Some(fix) = concatenate_strings(a_range, b_range, locator) {
+                    diagnostic.set_fix(fix);
+                }
             }
         }
     }

@@ -10,6 +10,7 @@ use crate::generated::ExprName;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "cache", derive(ruff_macros::CacheKey))]
 #[cfg_attr(feature = "salsa", derive(salsa::Update))]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct Name(compact_str::CompactString);
 
 impl Name {
@@ -28,14 +29,29 @@ impl Name {
         Self(compact_str::CompactString::const_new(name))
     }
 
+    pub fn shrink_to_fit(&mut self) {
+        self.0.shrink_to_fit();
+    }
+
     pub fn as_str(&self) -> &str {
         self.0.as_str()
+    }
+
+    pub fn push_str(&mut self, s: &str) {
+        self.0.push_str(s);
     }
 }
 
 impl Debug for Name {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "Name({:?})", self.as_str())
+    }
+}
+
+impl std::fmt::Write for Name {
+    fn write_str(&mut self, s: &str) -> std::fmt::Result {
+        self.0.push_str(s);
+        Ok(())
     }
 }
 

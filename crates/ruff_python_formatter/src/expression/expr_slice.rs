@@ -21,6 +21,7 @@ impl FormatNodeRule<ExprSlice> for FormatExprSlice {
             upper,
             step,
             range,
+            node_index: _,
         } = item;
 
         let (first_colon, second_colon) = find_colons(
@@ -232,6 +233,7 @@ pub(crate) fn assign_comment_in_slice(
         upper,
         step: _,
         range,
+        node_index: _,
     } = expr_slice;
 
     let (first_colon, second_colon) =

@@ -7,17 +7,21 @@ input_file: crates/ruff_python_parser/resources/inline/ok/except_star_py311.py
 ```
 Module(
     ModModule {
+        node_index: AtomicNodeIndex(..),
         range: 0..77,
         body: [
             Try(
                 StmtTry {
+                    node_index: AtomicNodeIndex(..),
                     range: 44..76,
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: AtomicNodeIndex(..),
                                 range: 49..52,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 49..52,
                                     },
                                 ),
@@ -28,9 +32,11 @@ Module(
                         ExceptHandler(
                             ExceptHandlerExceptHandler {
                                 range: 53..76,
+                                node_index: AtomicNodeIndex(..),
                                 type_: Some(
                                     Name(
                                         ExprName {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 61..71,
                                             id: Name("ValueError"),
                                             ctx: Load,
@@ -41,9 +47,11 @@ Module(
                                 body: [
                                     Expr(
                                         StmtExpr {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 73..76,
                                             value: EllipsisLiteral(
                                                 ExprEllipsisLiteral {
+                                                    node_index: AtomicNodeIndex(..),
                                                     range: 73..76,
                                                 },
                                             ),

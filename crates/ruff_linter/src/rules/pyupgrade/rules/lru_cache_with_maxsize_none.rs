@@ -64,8 +64,10 @@ pub(crate) fn lru_cache_with_maxsize_none(checker: &Checker, decorator_list: &[D
                     args,
                     keywords,
                     range: _,
+                    node_index: _,
                 },
             range: _,
+            node_index: _,
         }) = &decorator.expression
         else {
             continue;
@@ -85,6 +87,7 @@ pub(crate) fn lru_cache_with_maxsize_none(checker: &Checker, decorator_list: &[D
                 arg,
                 value,
                 range: _,
+                node_index: _,
             } = &keywords[0];
             if arg.as_ref().is_some_and(|arg| arg == "maxsize") && value.is_none_literal_expr() {
                 let mut diagnostic = checker.report_diagnostic(

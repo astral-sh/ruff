@@ -1,38 +1,44 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/from_import_missing_rpar.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: AtomicNodeIndex(..),
         range: 0..53,
         body: [
             ImportFrom(
                 StmtImportFrom {
+                    node_index: AtomicNodeIndex(..),
                     range: 0..19,
                     module: Some(
                         Identifier {
                             id: Name("x"),
                             range: 5..6,
+                            node_index: AtomicNodeIndex(..),
                         },
                     ),
                     names: [
                         Alias {
                             range: 15..16,
+                            node_index: AtomicNodeIndex(..),
                             name: Identifier {
                                 id: Name("a"),
                                 range: 15..16,
+                                node_index: AtomicNodeIndex(..),
                             },
                             asname: None,
                         },
                         Alias {
                             range: 18..19,
+                            node_index: AtomicNodeIndex(..),
                             name: Identifier {
                                 id: Name("b"),
                                 range: 18..19,
+                                node_index: AtomicNodeIndex(..),
                             },
                             asname: None,
                         },
@@ -42,12 +48,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 20..25,
                     value: BinOp(
                         ExprBinOp {
+                            node_index: AtomicNodeIndex(..),
                             range: 20..25,
                             left: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 20..21,
                                     value: Int(
                                         1,
@@ -57,6 +66,7 @@ Module(
                             op: Add,
                             right: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 24..25,
                                     value: Int(
                                         1,
@@ -69,27 +79,33 @@ Module(
             ),
             ImportFrom(
                 StmtImportFrom {
+                    node_index: AtomicNodeIndex(..),
                     range: 26..46,
                     module: Some(
                         Identifier {
                             id: Name("x"),
                             range: 31..32,
+                            node_index: AtomicNodeIndex(..),
                         },
                     ),
                     names: [
                         Alias {
                             range: 41..42,
+                            node_index: AtomicNodeIndex(..),
                             name: Identifier {
                                 id: Name("a"),
                                 range: 41..42,
+                                node_index: AtomicNodeIndex(..),
                             },
                             asname: None,
                         },
                         Alias {
                             range: 44..45,
+                            node_index: AtomicNodeIndex(..),
                             name: Identifier {
                                 id: Name("b"),
                                 range: 44..45,
+                                node_index: AtomicNodeIndex(..),
                             },
                             asname: None,
                         },
@@ -99,12 +115,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 47..52,
                     value: BinOp(
                         ExprBinOp {
+                            node_index: AtomicNodeIndex(..),
                             range: 47..52,
                             left: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 47..48,
                                     value: Int(
                                         2,
@@ -114,6 +133,7 @@ Module(
                             op: Add,
                             right: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 51..52,
                                     value: Int(
                                         2,

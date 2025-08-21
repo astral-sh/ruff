@@ -27,8 +27,9 @@ with contextlib.ExitStack() as stack:
     close_files = stack.pop_all().close
 
 # OK
-with contextlib.AsyncExitStack() as exit_stack:
-    f = await exit_stack.enter_async_context(open("filename"))
+async def foo():
+    with contextlib.AsyncExitStack() as exit_stack:
+        f = await exit_stack.enter_async_context(open("filename"))
 
 # OK (false negative)
 with contextlib.ExitStack():
@@ -275,9 +276,10 @@ class ExampleClassTests(TestCase):
         cls.enterClassContext(open("filename"))
 
 # OK
-class ExampleAsyncTests(IsolatedAsyncioTestCase):
-    async def test_something(self):
-        await self.enterAsyncContext(open("filename"))
+async def foo():
+    class ExampleAsyncTests(IsolatedAsyncioTestCase):
+        async def test_something(self):
+            await self.enterAsyncContext(open("filename"))
 
 # OK
 class ExampleTests(TestCase):

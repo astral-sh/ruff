@@ -1,8 +1,7 @@
 use crate::server::Result;
 use crate::server::api::LSPResult;
 use crate::server::api::diagnostics::clear_diagnostics_for_document;
-use crate::server::client::{Notifier, Requester};
-use crate::session::Session;
+use crate::session::{Client, Session};
 use lsp_types as types;
 use lsp_types::notification as notif;
 
@@ -15,8 +14,7 @@ impl super::NotificationHandler for DidClose {
 impl super::SyncNotificationHandler for DidClose {
     fn run(
         session: &mut Session,
-        notifier: Notifier,
-        _requester: &mut Requester,
+        client: &Client,
         types::DidCloseTextDocumentParams {
             text_document: types::TextDocumentIdentifier { uri },
         }: types::DidCloseTextDocumentParams,
@@ -29,7 +27,7 @@ impl super::SyncNotificationHandler for DidClose {
             );
             return Ok(());
         };
-        clear_diagnostics_for_document(snapshot.query(), &notifier)?;
+        clear_diagnostics_for_document(snapshot.query(), client)?;
 
         session
             .close_document(&key)

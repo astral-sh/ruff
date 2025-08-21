@@ -29,7 +29,6 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#maximum-line-length
-
 #[derive(ViolationMetadata)]
 pub(crate) struct WhitespaceAfterDecorator;
 

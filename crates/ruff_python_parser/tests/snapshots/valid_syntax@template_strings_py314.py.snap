@@ -1,0 +1,138 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/template_strings_py314.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: AtomicNodeIndex(..),
+        range: 0..89,
+        body: [
+            Expr(
+                StmtExpr {
+                    node_index: AtomicNodeIndex(..),
+                    range: 44..52,
+                    value: TString(
+                        ExprTString {
+                            node_index: AtomicNodeIndex(..),
+                            range: 44..52,
+                            value: TStringValue {
+                                inner: Single(
+                                    TString {
+                                        range: 44..52,
+                                        node_index: AtomicNodeIndex(..),
+                                        elements: [
+                                            Interpolation(
+                                                InterpolatedElement {
+                                                    range: 46..51,
+                                                    node_index: AtomicNodeIndex(..),
+                                                    expression: Name(
+                                                        ExprName {
+                                                            node_index: AtomicNodeIndex(..),
+                                                            range: 47..50,
+                                                            id: Name("hey"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    debug_text: None,
+                                                    conversion: None,
+                                                    format_spec: None,
+                                                },
+                                            ),
+                                        ],
+                                        flags: TStringFlags {
+                                            quote_style: Double,
+                                            prefix: Regular,
+                                            triple_quoted: false,
+                                        },
+                                    },
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: AtomicNodeIndex(..),
+                    range: 53..63,
+                    value: TString(
+                        ExprTString {
+                            node_index: AtomicNodeIndex(..),
+                            range: 53..63,
+                            value: TStringValue {
+                                inner: Single(
+                                    TString {
+                                        range: 53..63,
+                                        node_index: AtomicNodeIndex(..),
+                                        elements: [
+                                            Interpolation(
+                                                InterpolatedElement {
+                                                    range: 55..62,
+                                                    node_index: AtomicNodeIndex(..),
+                                                    expression: Name(
+                                                        ExprName {
+                                                            node_index: AtomicNodeIndex(..),
+                                                            range: 56..61,
+                                                            id: Name("there"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    debug_text: None,
+                                                    conversion: None,
+                                                    format_spec: None,
+                                                },
+                                            ),
+                                        ],
+                                        flags: TStringFlags {
+                                            quote_style: Single,
+                                            prefix: Regular,
+                                            triple_quoted: false,
+                                        },
+                                    },
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: AtomicNodeIndex(..),
+                    range: 64..88,
+                    value: TString(
+                        ExprTString {
+                            node_index: AtomicNodeIndex(..),
+                            range: 64..88,
+                            value: TStringValue {
+                                inner: Single(
+                                    TString {
+                                        range: 64..88,
+                                        node_index: AtomicNodeIndex(..),
+                                        elements: [
+                                            Literal(
+                                                InterpolatedStringLiteralElement {
+                                                    range: 68..85,
+                                                    node_index: AtomicNodeIndex(..),
+                                                    value: "what's\nhappening?",
+                                                },
+                                            ),
+                                        ],
+                                        flags: TStringFlags {
+                                            quote_style: Double,
+                                            prefix: Regular,
+                                            triple_quoted: true,
+                                        },
+                                    },
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```

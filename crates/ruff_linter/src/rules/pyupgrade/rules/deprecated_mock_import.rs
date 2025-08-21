@@ -274,7 +274,11 @@ pub(crate) fn deprecated_mock_attribute(checker: &Checker, attribute: &ast::Expr
 /// UP026
 pub(crate) fn deprecated_mock_import(checker: &Checker, stmt: &Stmt) {
     match stmt {
-        Stmt::Import(ast::StmtImport { names, range: _ }) => {
+        Stmt::Import(ast::StmtImport {
+            names,
+            range: _,
+            node_index: _,
+        }) => {
             // Find all `mock` imports.
             if names
                 .iter()

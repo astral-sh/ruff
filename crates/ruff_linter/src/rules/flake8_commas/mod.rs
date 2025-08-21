@@ -10,7 +10,7 @@ mod tests {
 
     use crate::registry::Rule;
     use crate::test::test_path;
-    use crate::{assert_messages, settings};
+    use crate::{assert_diagnostics, settings};
 
     #[test_case(Path::new("COM81.py"))]
     #[test_case(Path::new("COM81_syntax_error.py"))]
@@ -24,7 +24,26 @@ mod tests {
                 Rule::ProhibitedTrailingComma,
             ]),
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("COM81.py"))]
+    #[test_case(Path::new("COM81_syntax_error.py"))]
+    fn preview_rules(path: &Path) -> Result<()> {
+        let snapshot = format!("preview__{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("flake8_commas").join(path).as_path(),
+            &settings::LinterSettings {
+                preview: crate::settings::types::PreviewMode::Enabled,
+                ..settings::LinterSettings::for_rules(vec![
+                    Rule::MissingTrailingComma,
+                    Rule::TrailingCommaOnBareTuple,
+                    Rule::ProhibitedTrailingComma,
+                ])
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 }

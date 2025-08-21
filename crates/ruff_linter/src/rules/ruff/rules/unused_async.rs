@@ -7,8 +7,9 @@ use ruff_python_semantic::analyze::function_type::is_stub;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+
 use crate::rules::fastapi::rules::is_fastapi_route;
-use crate::rules::ruff::rules::helpers::{
+use crate::rules::ruff::helpers::{
     class_def_visit_source_order_except_body, function_def_visit_sourceorder_except_body,
 };
 

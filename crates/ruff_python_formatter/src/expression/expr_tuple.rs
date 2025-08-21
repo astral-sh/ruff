@@ -116,6 +116,7 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
             elts,
             ctx: _,
             range: _,
+            node_index: _,
             parenthesized: is_parenthesized,
         } = item;
 

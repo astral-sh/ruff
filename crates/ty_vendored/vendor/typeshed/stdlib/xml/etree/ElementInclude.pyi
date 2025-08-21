@@ -1,7 +1,8 @@
 from _typeshed import FileDescriptorOrPath
-from typing import Final, Literal, Protocol, overload
+from typing import Final, Literal, Protocol, overload, type_check_only
 from xml.etree.ElementTree import Element
 
+@type_check_only
 class _Loader(Protocol):
     @overload
     def __call__(self, href: FileDescriptorOrPath, parse: Literal["xml"], encoding: str | None = None) -> Element: ...

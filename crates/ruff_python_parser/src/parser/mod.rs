@@ -2,12 +2,13 @@ use std::cmp::Ordering;
 
 use bitflags::bitflags;
 
-use ruff_python_ast::{Mod, ModExpression, ModModule};
+use ruff_python_ast::{AtomicNodeIndex, Mod, ModExpression, ModModule};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::error::UnsupportedSyntaxError;
 use crate::parser::expression::ExpressionContext;
 use crate::parser::progress::{ParserProgress, TokenId};
+use crate::string::InterpolatedStringKind;
 use crate::token::TokenValue;
 use crate::token_set::TokenSet;
 use crate::token_source::{TokenSource, TokenSourceCheckpoint};
@@ -132,6 +133,7 @@ impl<'src> Parser<'src> {
         ModExpression {
             body: Box::new(parsed_expr.expr),
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::dummy(),
         }
     }
 
@@ -149,6 +151,7 @@ impl<'src> Parser<'src> {
         ModModule {
             body,
             range: TextRange::new(self.start_offset, self.current_token_range().end()),
+            node_index: AtomicNodeIndex::dummy(),
         }
     }
 
@@ -797,7 +800,7 @@ impl WithItemKind {
     }
 }
 
-#[derive(Debug, PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 enum InterpolatedStringElementsKind {
     /// The regular f-string elements.
     ///
@@ -805,7 +808,7 @@ enum InterpolatedStringElementsKind {
     /// ```py
     /// f"hello {x:.2f} world"
     /// ```
-    Regular,
+    Regular(InterpolatedStringKind),
 
     /// The f-string elements are part of the format specifier.
     ///
@@ -817,15 +820,13 @@ enum InterpolatedStringElementsKind {
 }
 
 impl InterpolatedStringElementsKind {
-    const fn list_terminators(self) -> TokenSet {
+    const fn list_terminator(self) -> TokenKind {
         match self {
-            InterpolatedStringElementsKind::Regular => {
-                TokenSet::new([TokenKind::FStringEnd, TokenKind::TStringEnd])
-            }
+            InterpolatedStringElementsKind::Regular(string_kind) => string_kind.end_token(),
             // test_ok fstring_format_spec_terminator
             // f"hello {x:} world"
             // f"hello {x:.3f} world"
-            InterpolatedStringElementsKind::FormatSpec => TokenSet::new([TokenKind::Rbrace]),
+            InterpolatedStringElementsKind::FormatSpec => TokenKind::Rbrace,
         }
     }
 }
@@ -1119,7 +1120,7 @@ impl RecoveryContextKind {
                     .then_some(ListTerminatorKind::Regular),
             },
             RecoveryContextKind::InterpolatedStringElements(kind) => {
-                if p.at_ts(kind.list_terminators()) {
+                if p.at(kind.list_terminator()) {
                     Some(ListTerminatorKind::Regular)
                 } else {
                     // test_err unterminated_fstring_newline_recovery
@@ -1175,13 +1176,23 @@ impl RecoveryContextKind {
                 ) || p.at_name_or_soft_keyword()
             }
             RecoveryContextKind::WithItems(_) => p.at_expr(),
-            RecoveryContextKind::InterpolatedStringElements(_) => matches!(
-                p.current_token_kind(),
-                // Literal element
-                TokenKind::FStringMiddle | TokenKind::TStringMiddle
-                // Expression element
-                | TokenKind::Lbrace
-            ),
+            RecoveryContextKind::InterpolatedStringElements(elements_kind) => {
+                match elements_kind {
+                    InterpolatedStringElementsKind::Regular(interpolated_string_kind) => {
+                        p.current_token_kind() == interpolated_string_kind.middle_token()
+                            || p.current_token_kind() == TokenKind::Lbrace
+                    }
+                    InterpolatedStringElementsKind::FormatSpec => {
+                        matches!(
+                            p.current_token_kind(),
+                            // Literal element
+                            TokenKind::FStringMiddle | TokenKind::TStringMiddle
+                            // Expression element
+                            | TokenKind::Lbrace
+                        )
+                    }
+                }
+            }
         }
     }
 
@@ -1270,8 +1281,8 @@ impl RecoveryContextKind {
                 ),
             },
             RecoveryContextKind::InterpolatedStringElements(kind) => match kind {
-                InterpolatedStringElementsKind::Regular => ParseErrorType::OtherError(
-                    "Expected an f-string or t-string element or the end of the f-string or t-string".to_string(),
+                InterpolatedStringElementsKind::Regular(string_kind) => ParseErrorType::OtherError(
+                    format!("Expected an element of or the end of the {string_kind}"),
                 ),
                 InterpolatedStringElementsKind::FormatSpec => ParseErrorType::OtherError(
                     "Expected an f-string or t-string element or a '}'".to_string(),
@@ -1314,8 +1325,9 @@ bitflags! {
         const WITH_ITEMS_PARENTHESIZED = 1 << 25;
         const WITH_ITEMS_PARENTHESIZED_EXPRESSION = 1 << 26;
         const WITH_ITEMS_UNPARENTHESIZED = 1 << 28;
-        const FT_STRING_ELEMENTS = 1 << 29;
-        const FT_STRING_ELEMENTS_IN_FORMAT_SPEC = 1 << 30;
+        const F_STRING_ELEMENTS = 1 << 29;
+        const T_STRING_ELEMENTS = 1 << 30;
+        const FT_STRING_ELEMENTS_IN_FORMAT_SPEC = 1 << 31;
     }
 }
 
@@ -1369,7 +1381,13 @@ impl RecoveryContext {
                 WithItemKind::Unparenthesized => RecoveryContext::WITH_ITEMS_UNPARENTHESIZED,
             },
             RecoveryContextKind::InterpolatedStringElements(kind) => match kind {
-                InterpolatedStringElementsKind::Regular => RecoveryContext::FT_STRING_ELEMENTS,
+                InterpolatedStringElementsKind::Regular(InterpolatedStringKind::FString) => {
+                    RecoveryContext::F_STRING_ELEMENTS
+                }
+                InterpolatedStringElementsKind::Regular(InterpolatedStringKind::TString) => {
+                    RecoveryContext::T_STRING_ELEMENTS
+                }
+
                 InterpolatedStringElementsKind::FormatSpec => {
                     RecoveryContext::FT_STRING_ELEMENTS_IN_FORMAT_SPEC
                 }
@@ -1440,8 +1458,11 @@ impl RecoveryContext {
             RecoveryContext::WITH_ITEMS_UNPARENTHESIZED => {
                 RecoveryContextKind::WithItems(WithItemKind::Unparenthesized)
             }
-            RecoveryContext::FT_STRING_ELEMENTS => RecoveryContextKind::InterpolatedStringElements(
-                InterpolatedStringElementsKind::Regular,
+            RecoveryContext::F_STRING_ELEMENTS => RecoveryContextKind::InterpolatedStringElements(
+                InterpolatedStringElementsKind::Regular(InterpolatedStringKind::FString),
+            ),
+            RecoveryContext::T_STRING_ELEMENTS => RecoveryContextKind::InterpolatedStringElements(
+                InterpolatedStringElementsKind::Regular(InterpolatedStringKind::TString),
             ),
             RecoveryContext::FT_STRING_ELEMENTS_IN_FORMAT_SPEC => {
                 RecoveryContextKind::InterpolatedStringElements(

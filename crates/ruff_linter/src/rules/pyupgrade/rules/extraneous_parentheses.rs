@@ -126,15 +126,16 @@ pub(crate) fn extraneous_parentheses(context: &LintContext, tokens: &Tokens, loc
             continue;
         };
 
-        let mut diagnostic = context.report_diagnostic(
+        if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
             ExtraneousParentheses,
             TextRange::new(start_range.start(), end_range.end()),
-        );
-        let contents = locator.slice(TextRange::new(start_range.start(), end_range.end()));
-        diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
-            contents[1..contents.len() - 1].to_string(),
-            start_range.start(),
-            end_range.end(),
-        )));
+        ) {
+            let contents = locator.slice(TextRange::new(start_range.start(), end_range.end()));
+            diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
+                contents[1..contents.len() - 1].to_string(),
+                start_range.start(),
+                end_range.end(),
+            )));
+        }
     }
 }

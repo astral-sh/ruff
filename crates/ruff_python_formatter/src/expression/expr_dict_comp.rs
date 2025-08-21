@@ -14,6 +14,7 @@ impl FormatNodeRule<ExprDictComp> for FormatExprDictComp {
     fn fmt_fields(&self, item: &ExprDictComp, f: &mut PyFormatter) -> FormatResult<()> {
         let ExprDictComp {
             range: _,
+            node_index: _,
             key,
             value,
             generators,

@@ -57,7 +57,7 @@ export interface Diagnostic {
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
 pub struct ExpandedMessage {
-    pub code: Option<String>,
+    pub code: String,
     pub message: String,
     pub start_location: Location,
     pub end_location: Location,
@@ -77,9 +77,30 @@ struct ExpandedEdit {
     content: Option<String>,
 }
 
+/// Perform global constructor initialization.
+#[cfg(target_family = "wasm")]
+#[expect(unsafe_code)]
+pub fn before_main() {
+    unsafe extern "C" {
+        fn __wasm_call_ctors();
+    }
+
+    // Salsa uses the `inventory` crate, which registers global constructors that may need to be
+    // called explicitly on WASM. See <https://github.com/dtolnay/inventory/blob/master/src/lib.rs#L105>
+    // for details.
+    unsafe {
+        __wasm_call_ctors();
+    }
+}
+
+#[cfg(not(target_family = "wasm"))]
+pub fn before_main() {}
+
 #[wasm_bindgen(start)]
 pub fn run() {
     use log::Level;
+
+    before_main();
 
     // When the `console_error_panic_hook` feature is enabled, we can call the
     // `set_panic_hook` function at least once during initialization, and then
@@ -188,7 +209,7 @@ impl Workspace {
         );
 
         // Generate checks.
-        let messages = check_path(
+        let diagnostics = check_path(
             Path::new("<filename>"),
             None,
             &locator,
@@ -205,15 +226,15 @@ impl Workspace {
 
         let source_code = locator.to_source_code();
 
-        let messages: Vec<ExpandedMessage> = messages
+        let messages: Vec<ExpandedMessage> = diagnostics
             .into_iter()
             .map(|msg| ExpandedMessage {
-                code: msg.noqa_code().map(|code| code.to_string()),
+                code: msg.secondary_code_or_id().to_string(),
                 message: msg.body().to_string(),
-                start_location: source_code.line_column(msg.start()).into(),
-                end_location: source_code.line_column(msg.end()).into(),
+                start_location: source_code.line_column(msg.expect_range().start()).into(),
+                end_location: source_code.line_column(msg.expect_range().end()).into(),
                 fix: msg.fix().map(|fix| ExpandedFix {
-                    message: msg.suggestion().map(ToString::to_string),
+                    message: msg.first_help_text().map(ToString::to_string),
                     edits: fix
                         .edits()
                         .iter()
@@ -287,7 +308,7 @@ impl<'a> ParsedModule<'a> {
         })
     }
 
-    fn format(&self, settings: &Settings) -> FormatResult<Formatted<PyFormatContext>> {
+    fn format(&self, settings: &Settings) -> FormatResult<Formatted<PyFormatContext<'_>>> {
         // TODO(konstin): Add an options for py/pyi to the UI (2/2)
         let options = settings
             .formatter

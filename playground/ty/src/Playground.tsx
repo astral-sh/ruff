@@ -128,6 +128,14 @@ export default function Playground() {
     dispatchFiles({ type: "selectFile", id: file });
   }, []);
 
+  const handleVendoredFileSelected = useCallback((handle: FileHandle) => {
+    dispatchFiles({ type: "selectVendoredFile", handle });
+  }, []);
+
+  const handleVendoredFileCleared = useCallback(() => {
+    dispatchFiles({ type: "clearVendoredFile" });
+  }, []);
+
   const handleReset = useCallback(() => {
     if (workspace == null) {
       return;
@@ -174,6 +182,8 @@ export default function Playground() {
           onRemoveFile={handleFileRemoved}
           onSelectFile={handleFileSelected}
           onChangeFile={handleFileChanged}
+          onSelectVendoredFile={handleVendoredFileSelected}
+          onClearVendoredFile={handleVendoredFileCleared}
         />
       </Suspense>
       {error ? (
@@ -289,6 +299,11 @@ interface FilesState {
   playgroundRevision: number;
 
   nextId: FileId;
+
+  /**
+   * The currently viewed vendored/builtin file, if any.
+   */
+  currentVendoredFile: FileHandle | null;
 }
 
 export type FileAction =
@@ -311,7 +326,12 @@ export type FileAction =
     }
   | { type: "selectFile"; id: FileId }
   | { type: "selectFileByName"; name: string }
-  | { type: "reset" };
+  | { type: "reset" }
+  | {
+      type: "selectVendoredFile";
+      handle: FileHandle;
+    }
+  | { type: "clearVendoredFile" };
 
 const INIT_FILES_STATE: ReadonlyFiles = {
   index: [],
@@ -321,6 +341,7 @@ const INIT_FILES_STATE: ReadonlyFiles = {
   revision: 0,
   selected: null,
   playgroundRevision: 0,
+  currentVendoredFile: null,
 };
 
 function filesReducer(
@@ -339,6 +360,7 @@ function filesReducer(
         contents: { ...state.contents, [id]: content },
         nextId: state.nextId + 1,
         revision: state.revision + 1,
+        currentVendoredFile: null, // Clear vendored file when adding new file
       };
     }
 
@@ -375,6 +397,7 @@ function filesReducer(
         contents,
         handles,
         revision: state.revision + 1,
+        currentVendoredFile: null, // Clear vendored file when removing file
       };
     }
     case "rename": {
@@ -397,6 +420,7 @@ function filesReducer(
       return {
         ...state,
         selected: id,
+        currentVendoredFile: null, // Clear vendored file when selecting regular file
       };
     }
 
@@ -409,6 +433,7 @@ function filesReducer(
       return {
         ...state,
         selected,
+        currentVendoredFile: null, // Clear vendored file when selecting regular file
       };
     }
 
@@ -417,6 +442,22 @@ function filesReducer(
         ...INIT_FILES_STATE,
         playgroundRevision: state.playgroundRevision + 1,
         revision: state.revision + 1,
+      };
+    }
+
+    case "selectVendoredFile": {
+      const { handle } = action;
+
+      return {
+        ...state,
+        currentVendoredFile: handle,
+      };
+    }
+
+    case "clearVendoredFile": {
+      return {
+        ...state,
+        currentVendoredFile: null,
       };
     }
   }

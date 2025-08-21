@@ -74,8 +74,7 @@ x = f"a{2+2:=^{foo(x+y**2):something else}one more}b"
 f'{(abc:=10)}'
 
 f"This is a really long string, but just make sure that you reflow fstrings {
-    2+2:d
-}"
+    2+2:d}"
 f"This is a really long string, but just make sure that you reflow fstrings correctly {2+2:d}"
 
 f"{2+2=}"

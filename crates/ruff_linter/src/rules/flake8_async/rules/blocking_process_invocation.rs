@@ -21,12 +21,18 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Example
 /// ```python
+/// import os
+///
+///
 /// async def foo():
 ///     os.popen(cmd)
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// import asyncio
+///
+///
 /// async def foo():
 ///     asyncio.create_subprocess_shell(cmd)
 /// ```
@@ -54,12 +60,18 @@ impl Violation for CreateSubprocessInAsyncFunction {
 ///
 /// ## Example
 /// ```python
+/// import subprocess
+///
+///
 /// async def foo():
 ///     subprocess.run(cmd)
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// import asyncio
+///
+///
 /// async def foo():
 ///     asyncio.create_subprocess_shell(cmd)
 /// ```
@@ -87,12 +99,19 @@ impl Violation for RunProcessInAsyncFunction {
 ///
 /// ## Example
 /// ```python
+/// import os
+///
+///
 /// async def foo():
 ///     os.waitpid(0)
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// import asyncio
+/// import os
+///
+///
 /// def wait_for_process():
 ///     os.waitpid(0)
 ///

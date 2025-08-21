@@ -127,6 +127,80 @@ def f(x: int | str):
     return x
 ```
 
+### In `if TYPE_CHECKING` block
+
+Inside an `if TYPE_CHECKING` block, we allow "stub" style function definitions with empty bodies,
+since these functions will never actually be called.
+
+```py
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    def f() -> int: ...
+
+else:
+    def f() -> str:
+        return "hello"
+
+reveal_type(f)  # revealed: def f() -> int
+
+if not TYPE_CHECKING:
+    ...
+elif True:
+    def g() -> str: ...
+
+else:
+    def h() -> str: ...
+
+if not TYPE_CHECKING:
+    def i() -> int:
+        return 1
+
+else:
+    def i() -> str: ...
+
+reveal_type(i)  # revealed: def i() -> str
+
+if False:
+    ...
+elif TYPE_CHECKING:
+    def j() -> str: ...
+
+else:
+    def j_() -> str: ...  # error: [invalid-return-type]
+
+if False:
+    ...
+elif not TYPE_CHECKING:
+    def k_() -> str: ...  # error: [invalid-return-type]
+
+else:
+    def k() -> str: ...
+
+class Foo:
+    if TYPE_CHECKING:
+        def f(self) -> int: ...
+
+if TYPE_CHECKING:
+    class Bar:
+        def f(self) -> int: ...
+
+def get_bool() -> bool:
+    return True
+
+if TYPE_CHECKING:
+    if get_bool():
+        def l() -> str: ...
+
+if get_bool():
+    if TYPE_CHECKING:
+        def m() -> str: ...
+
+if TYPE_CHECKING:
+    if not TYPE_CHECKING:
+        def n() -> str: ...
+```
+
 ## Conditional return type
 
 ```py
@@ -359,6 +433,8 @@ def f(cond: bool) -> str:
 
 <!-- snapshot-diagnostics -->
 
+### Synchronous
+
 A function with a `yield` or `yield from` expression anywhere in its body is a
 [generator function](https://docs.python.org/3/glossary.html#term-generator). A generator function
 implicitly returns an instance of `types.GeneratorType` even if it does not contain any `return`
@@ -386,6 +462,8 @@ def i2() -> typing.Generator:
 def j() -> str:  # error: [invalid-return-type]
     yield 42
 ```
+
+### Asynchronous
 
 If it is an `async` function with a `yield` statement in its body, it is an
 [asynchronous generator function](https://docs.python.org/3/glossary.html#term-asynchronous-generator).
@@ -426,4 +504,17 @@ class Abstract(Protocol):
 
 class Concrete(Abstract):
     def method(self) -> str: ...  # error: [invalid-return-type]
+```
+
+## Diagnostics for `invalid-return-type` on dynamic type
+
+```toml
+environment.python-version = "3.12"
+```
+
+```py
+from typing import Never, Any
+
+def f(func: Any) -> Never:  # error: [invalid-return-type]
+    func()
 ```

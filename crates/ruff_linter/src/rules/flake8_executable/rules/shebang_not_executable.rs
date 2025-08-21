@@ -58,7 +58,7 @@ pub(crate) fn shebang_not_executable(filepath: &Path, range: TextRange, context:
     }
 
     if let Ok(false) = is_executable(filepath) {
-        context.report_diagnostic(ShebangNotExecutable, range);
+        context.report_diagnostic_if_enabled(ShebangNotExecutable, range);
     }
 }
 

@@ -80,13 +80,14 @@ impl Violation for IfStmtMinMax {
     }
 }
 
-/// R1730, R1731
+/// PLR1730, PLR1731
 pub(crate) fn if_stmt_min_max(checker: &Checker, stmt_if: &ast::StmtIf) {
     let ast::StmtIf {
         test,
         body,
         elif_else_clauses,
         range: _,
+        node_index: _,
     } = stmt_if;
 
     if !elif_else_clauses.is_empty() {

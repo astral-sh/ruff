@@ -53,7 +53,7 @@ impl Violation for NonlocalAndGlobal {
     }
 }
 
-/// E115
+/// PLE0115
 pub(crate) fn nonlocal_and_global(checker: &Checker, nonlocal: &ast::StmtNonlocal) {
     // Determine whether any of the newly declared `nonlocal` variables are already declared as
     // `global`.

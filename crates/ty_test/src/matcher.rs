@@ -338,6 +338,7 @@ impl Matcher {
 #[cfg(test)]
 mod tests {
     use super::FailuresByLine;
+    use ruff_db::Db;
     use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
     use ruff_db::files::{File, system_path_to_file};
     use ruff_db::system::DbWithWritableSystem as _;
@@ -385,15 +386,13 @@ mod tests {
         let mut db = crate::db::Db::setup();
 
         let settings = ProgramSettings {
-            python_version: Some(PythonVersionWithSource::default()),
+            python_version: PythonVersionWithSource::default(),
             python_platform: PythonPlatform::default(),
-            search_paths: SearchPathSettings::new(Vec::new()),
+            search_paths: SearchPathSettings::new(Vec::new())
+                .to_search_paths(db.system(), db.vendored())
+                .expect("Valid search paths settings"),
         };
-        match Program::try_get(&db) {
-            Some(program) => program.update_from_settings(&mut db, settings),
-            None => Program::from_settings(&db, settings).map(|_| ()),
-        }
-        .expect("Failed to update Program settings in TestDb");
+        Program::init_or_update(&mut db, settings);
 
         db.write_file("/src/test.py", source).unwrap();
         let file = system_path_to_file(&db, "/src/test.py").unwrap();

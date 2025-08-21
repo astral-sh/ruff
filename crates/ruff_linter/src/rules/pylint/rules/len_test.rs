@@ -1,11 +1,13 @@
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, ExprCall};
+use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::type_inference::{PythonType, ResolvedPythonType};
 use ruff_python_semantic::analyze::typing::find_binding_value;
-use ruff_python_semantic::{BindingId, SemanticModel};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::fix::edits;
 use crate::fix::snippet::SourceCodeSnippet;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
@@ -39,6 +41,19 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///
 /// if not vegetables:
 ///     print(vegetables)
+/// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe when the `len` call includes a comment,
+/// as the comment would be removed.
+///
+/// For example, the fix would be marked as unsafe in the following case:
+/// ```python
+/// fruits = []
+/// if len(
+///     fruits  # comment
+/// ):
+///     ...
 /// ```
 ///
 /// ## References
@@ -98,10 +113,17 @@ pub(crate) fn len_test(checker: &Checker, call: &ExprCall) {
             },
             call.range(),
         )
-        .set_fix(Fix::safe_edit(Edit::range_replacement(
-            replacement,
-            call.range(),
-        )));
+        .set_fix(Fix::applicable_edit(
+            Edit::range_replacement(
+                edits::pad(replacement, call.range(), checker.locator()),
+                call.range(),
+            ),
+            if checker.comment_ranges().intersects(call.range()) {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            },
+        ));
 }
 
 fn is_indirect_sequence(expr: &Expr, semantic: &SemanticModel) -> bool {
@@ -110,12 +132,11 @@ fn is_indirect_sequence(expr: &Expr, semantic: &SemanticModel) -> bool {
     };
 
     let scope = semantic.current_scope();
-    let bindings: Vec<BindingId> = scope.get_all(name).collect();
-    let [binding_id] = bindings.as_slice() else {
+    let Some(binding_id) = scope.get(name) else {
         return false;
     };
 
-    let binding = semantic.binding(*binding_id);
+    let binding = semantic.binding(binding_id);
 
     // Attempt to find the binding's value
     let Some(binding_value) = find_binding_value(binding, semantic) else {

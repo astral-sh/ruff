@@ -210,6 +210,7 @@ macro_rules! display_settings {
 }
 
 #[derive(Debug, Clone, CacheKey)]
+#[expect(clippy::struct_excessive_bools)]
 pub struct LinterSettings {
     pub exclude: FilePatternSet,
     pub extension: ExtensionMapping,
@@ -251,6 +252,7 @@ pub struct LinterSettings {
     pub task_tags: Vec<String>,
     pub typing_modules: Vec<String>,
     pub typing_extensions: bool,
+    pub future_annotations: bool,
 
     // Plugins
     pub flake8_annotations: flake8_annotations::settings::Settings,
@@ -453,6 +455,7 @@ impl LinterSettings {
             explicit_preview_rules: false,
             extension: ExtensionMapping::default(),
             typing_extensions: true,
+            future_annotations: false,
         }
     }
 
@@ -471,6 +474,11 @@ impl LinterSettings {
         self.per_file_target_version
             .is_match(path)
             .map_or(self.unresolved_target_version, TargetVersion::from)
+    }
+
+    pub fn future_annotations(&self) -> bool {
+        // TODO(brent) we can just access the field directly once this is stabilized.
+        self.future_annotations && crate::preview::is_add_future_annotations_imports_enabled(self)
     }
 }
 

@@ -1,16 +1,16 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
-snapshot_kind: text
 ---
-E26.py:2:5: E261 [*] Insert at least two spaces before an inline comment
+E261 [*] Insert at least two spaces before an inline comment
+ --> E26.py:2:5
   |
 1 | #: E261:1:5
 2 | pass # an inline comment
-  |     ^ E261
+  |     ^
 3 | #: E262:1:12
 4 | x = x + 1  #Increment x
   |
-  = help: Insert spaces
+help: Insert spaces
 
 ℹ Safe fix
 1 1 | #: E261:1:5

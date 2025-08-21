@@ -105,7 +105,7 @@ pub(crate) enum Log {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Deserialize, Serialize, Default)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum SystemKind {
-    /// Use an in-memory system with a case sensitive file system..
+    /// Use an in-memory system with a case-sensitive file system.
     ///
     /// This is recommended for all tests because it's fast.
     #[default]

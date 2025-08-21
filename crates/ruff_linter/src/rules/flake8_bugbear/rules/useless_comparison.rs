@@ -6,7 +6,7 @@ use ruff_text_size::Ranged;
 use crate::Violation;
 use crate::checkers::ast::Checker;
 
-use super::super::helpers::at_last_top_level_expression_in_cell;
+use crate::rules::flake8_bugbear::helpers::at_last_top_level_expression_in_cell;
 
 /// ## What it does
 /// Checks for useless comparisons.

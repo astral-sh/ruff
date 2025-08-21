@@ -1,16 +1,17 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
 ---
-PT028.py:3:16: PT028 Test function parameter `a` has default argument
+PT028 Test function parameter `a` has default argument
+ --> PT028.py:3:16
   |
 1 | # Errors
 2 |
 3 | def test_foo(a=1): ...
-  |                ^ PT028
+  |                ^
 4 | def test_foo(a = 1): ...
 5 | def test_foo(a = (1)): ...
   |
-  = help: Remove default argument
+help: Remove default argument
 
 ℹ Display-only fix
 1 1 | # Errors
@@ -21,15 +22,16 @@ PT028.py:3:16: PT028 Test function parameter `a` has default argument
 5 5 | def test_foo(a = (1)): ...
 6 6 | def test_foo(a: int=1): ...
 
-PT028.py:4:18: PT028 Test function parameter `a` has default argument
+PT028 Test function parameter `a` has default argument
+ --> PT028.py:4:18
   |
 3 | def test_foo(a=1): ...
 4 | def test_foo(a = 1): ...
-  |                  ^ PT028
+  |                  ^
 5 | def test_foo(a = (1)): ...
 6 | def test_foo(a: int=1): ...
   |
-  = help: Remove default argument
+help: Remove default argument
 
 ℹ Display-only fix
 1 1 | # Errors
@@ -41,16 +43,17 @@ PT028.py:4:18: PT028 Test function parameter `a` has default argument
 6 6 | def test_foo(a: int=1): ...
 7 7 | def test_foo(a: int = 1): ...
 
-PT028.py:5:19: PT028 Test function parameter `a` has default argument
+PT028 Test function parameter `a` has default argument
+ --> PT028.py:5:19
   |
 3 | def test_foo(a=1): ...
 4 | def test_foo(a = 1): ...
 5 | def test_foo(a = (1)): ...
-  |                   ^ PT028
+  |                   ^
 6 | def test_foo(a: int=1): ...
 7 | def test_foo(a: int = 1): ...
   |
-  = help: Remove default argument
+help: Remove default argument
 
 ℹ Display-only fix
 2 2 | 
@@ -62,16 +65,17 @@ PT028.py:5:19: PT028 Test function parameter `a` has default argument
 7 7 | def test_foo(a: int = 1): ...
 8 8 | def test_foo(a: (int) = 1): ...
 
-PT028.py:6:21: PT028 Test function parameter `a` has default argument
+PT028 Test function parameter `a` has default argument
+ --> PT028.py:6:21
   |
 4 | def test_foo(a = 1): ...
 5 | def test_foo(a = (1)): ...
 6 | def test_foo(a: int=1): ...
-  |                     ^ PT028
+  |                     ^
 7 | def test_foo(a: int = 1): ...
 8 | def test_foo(a: (int) = 1): ...
   |
-  = help: Remove default argument
+help: Remove default argument
 
 ℹ Display-only fix
 3 3 | def test_foo(a=1): ...
@@ -83,16 +87,17 @@ PT028.py:6:21: PT028 Test function parameter `a` has default argument
 8 8 | def test_foo(a: (int) = 1): ...
 9 9 | def test_foo(a: int = (1)): ...
 
-PT028.py:7:23: PT028 Test function parameter `a` has default argument
+PT028 Test function parameter `a` has default argument
+ --> PT028.py:7:23
   |
 5 | def test_foo(a = (1)): ...
 6 | def test_foo(a: int=1): ...
 7 | def test_foo(a: int = 1): ...
-  |                       ^ PT028
+  |                       ^
 8 | def test_foo(a: (int) = 1): ...
 9 | def test_foo(a: int = (1)): ...
   |
-  = help: Remove default argument
+help: Remove default argument
 
 ℹ Display-only fix
 4 4 | def test_foo(a = 1): ...
@@ -104,16 +109,17 @@ PT028.py:7:23: PT028 Test function parameter `a` has default argument
 9 9 | def test_foo(a: int = (1)): ...
 10 10 | def test_foo(a: (int) = (1)): ...
 
-PT028.py:8:25: PT028 Test function parameter `a` has default argument
+PT028 Test function parameter `a` has default argument
+  --> PT028.py:8:25
    |
  6 | def test_foo(a: int=1): ...
  7 | def test_foo(a: int = 1): ...
  8 | def test_foo(a: (int) = 1): ...
-   |                         ^ PT028
+   |                         ^
  9 | def test_foo(a: int = (1)): ...
 10 | def test_foo(a: (int) = (1)): ...
    |
-   = help: Remove default argument
+help: Remove default argument
 
 ℹ Display-only fix
 5 5 | def test_foo(a = (1)): ...
@@ -125,16 +131,17 @@ PT028.py:8:25: PT028 Test function parameter `a` has default argument
 10 10 | def test_foo(a: (int) = (1)): ...
 11 11 | def test_foo(a=1, /, b=2, *, c=3): ...
 
-PT028.py:9:24: PT028 Test function parameter `a` has default argument
+PT028 Test function parameter `a` has default argument
+  --> PT028.py:9:24
    |
  7 | def test_foo(a: int = 1): ...
  8 | def test_foo(a: (int) = 1): ...
  9 | def test_foo(a: int = (1)): ...
-   |                        ^ PT028
+   |                        ^
 10 | def test_foo(a: (int) = (1)): ...
 11 | def test_foo(a=1, /, b=2, *, c=3): ...
    |
-   = help: Remove default argument
+help: Remove default argument
 
 ℹ Display-only fix
 6  6  | def test_foo(a: int=1): ...
@@ -146,15 +153,16 @@ PT028.py:9:24: PT028 Test function parameter `a` has default argument
 11 11 | def test_foo(a=1, /, b=2, *, c=3): ...
 12 12 | 
 
-PT028.py:10:26: PT028 Test function parameter `a` has default argument
+PT028 Test function parameter `a` has default argument
+  --> PT028.py:10:26
    |
  8 | def test_foo(a: (int) = 1): ...
  9 | def test_foo(a: int = (1)): ...
 10 | def test_foo(a: (int) = (1)): ...
-   |                          ^ PT028
+   |                          ^
 11 | def test_foo(a=1, /, b=2, *, c=3): ...
    |
-   = help: Remove default argument
+help: Remove default argument
 
 ℹ Display-only fix
 7  7  | def test_foo(a: int = 1): ...
@@ -166,14 +174,15 @@ PT028.py:10:26: PT028 Test function parameter `a` has default argument
 12 12 | 
 13 13 | 
 
-PT028.py:11:16: PT028 Test function parameter `a` has default argument
+PT028 Test function parameter `a` has default argument
+  --> PT028.py:11:16
    |
  9 | def test_foo(a: int = (1)): ...
 10 | def test_foo(a: (int) = (1)): ...
 11 | def test_foo(a=1, /, b=2, *, c=3): ...
-   |                ^ PT028
+   |                ^
    |
-   = help: Remove default argument
+help: Remove default argument
 
 ℹ Display-only fix
 8  8  | def test_foo(a: (int) = 1): ...
@@ -185,14 +194,15 @@ PT028.py:11:16: PT028 Test function parameter `a` has default argument
 13 13 | 
 14 14 | # No errors
 
-PT028.py:11:24: PT028 Test function parameter `b` has default argument
+PT028 Test function parameter `b` has default argument
+  --> PT028.py:11:24
    |
  9 | def test_foo(a: int = (1)): ...
 10 | def test_foo(a: (int) = (1)): ...
 11 | def test_foo(a=1, /, b=2, *, c=3): ...
-   |                        ^ PT028
+   |                        ^
    |
-   = help: Remove default argument
+help: Remove default argument
 
 ℹ Display-only fix
 8  8  | def test_foo(a: (int) = 1): ...
@@ -204,14 +214,15 @@ PT028.py:11:24: PT028 Test function parameter `b` has default argument
 13 13 | 
 14 14 | # No errors
 
-PT028.py:11:32: PT028 Test function parameter `c` has default argument
+PT028 Test function parameter `c` has default argument
+  --> PT028.py:11:32
    |
  9 | def test_foo(a: int = (1)): ...
 10 | def test_foo(a: (int) = (1)): ...
 11 | def test_foo(a=1, /, b=2, *, c=3): ...
-   |                                ^ PT028
+   |                                ^
    |
-   = help: Remove default argument
+help: Remove default argument
 
 ℹ Display-only fix
 8  8  | def test_foo(a: (int) = 1): ...

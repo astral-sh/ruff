@@ -20,12 +20,18 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Example
 /// ```python
+/// import urllib
+///
+///
 /// async def fetch():
 ///     urllib.request.urlopen("https://example.com/foo/bar").read()
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// import aiohttp
+///
+///
 /// async def fetch():
 ///     async with aiohttp.ClientSession() as session:
 ///         async with session.get("https://example.com/foo/bar") as resp:

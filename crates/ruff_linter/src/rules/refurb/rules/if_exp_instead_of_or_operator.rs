@@ -61,6 +61,7 @@ pub(crate) fn if_exp_instead_of_or_operator(checker: &Checker, if_expr: &ast::Ex
         body,
         orelse,
         range,
+        node_index: _,
     } = if_expr;
 
     if ComparableExpr::from(test) != ComparableExpr::from(body) {

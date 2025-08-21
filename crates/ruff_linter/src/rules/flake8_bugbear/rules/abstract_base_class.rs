@@ -131,7 +131,11 @@ fn is_abc_class(bases: &[Expr], keywords: &[Keyword], semantic: &SemanticModel) 
 fn is_empty_body(body: &[Stmt]) -> bool {
     body.iter().all(|stmt| match stmt {
         Stmt::Pass(_) => true,
-        Stmt::Expr(ast::StmtExpr { value, range: _ }) => {
+        Stmt::Expr(ast::StmtExpr {
+            value,
+            range: _,
+            node_index: _,
+        }) => {
             matches!(
                 value.as_ref(),
                 Expr::StringLiteral(_) | Expr::EllipsisLiteral(_)
@@ -188,7 +192,7 @@ pub(crate) fn abstract_base_class(
         let has_abstract_decorator = is_abstract(decorator_list, checker.semantic());
         has_abstract_method |= has_abstract_decorator;
 
-        if !checker.enabled(Rule::EmptyMethodWithoutAbstractDecorator) {
+        if !checker.is_rule_enabled(Rule::EmptyMethodWithoutAbstractDecorator) {
             continue;
         }
 
@@ -204,7 +208,7 @@ pub(crate) fn abstract_base_class(
             );
         }
     }
-    if checker.enabled(Rule::AbstractBaseClassWithoutAbstractMethod) {
+    if checker.is_rule_enabled(Rule::AbstractBaseClassWithoutAbstractMethod) {
         if !has_abstract_method {
             checker.report_diagnostic(
                 AbstractBaseClassWithoutAbstractMethod {

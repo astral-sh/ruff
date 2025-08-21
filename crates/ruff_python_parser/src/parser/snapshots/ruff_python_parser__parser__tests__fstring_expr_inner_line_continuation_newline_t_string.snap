@@ -1,0 +1,12 @@
+---
+source: crates/ruff_python_parser/src/parser/tests.rs
+expression: error
+---
+ParseError {
+    error: Lexical(
+        TStringError(
+            SingleRbrace,
+        ),
+    ),
+    location: 8..9,
+}

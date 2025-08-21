@@ -1,18 +1,24 @@
+"""Internal classes used by compression modules"""
+
 from _typeshed import Incomplete, WriteableBuffer
 from collections.abc import Callable
 from io import DEFAULT_BUFFER_SIZE, BufferedIOBase, RawIOBase
-from typing import Any, Protocol
+from typing import Any, Protocol, type_check_only
 
 BUFFER_SIZE = DEFAULT_BUFFER_SIZE
 
+@type_check_only
 class _Reader(Protocol):
     def read(self, n: int, /) -> bytes: ...
     def seekable(self) -> bool: ...
     def seek(self, n: int, /) -> Any: ...
 
-class BaseStream(BufferedIOBase): ...
+class BaseStream(BufferedIOBase):
+    """Mode-checking helper functions."""
 
 class DecompressReader(RawIOBase):
+    """Adapts the decompressor API to a RawIOBase reader API"""
+
     def __init__(
         self,
         fp: _Reader,

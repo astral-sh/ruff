@@ -7,16 +7,20 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/await/no_exp
 ```
 Module(
     ModModule {
+        node_index: AtomicNodeIndex(..),
         range: 0..85,
         body: [
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 59..64,
                     value: Await(
                         ExprAwait {
+                            node_index: AtomicNodeIndex(..),
                             range: 59..64,
                             value: Name(
                                 ExprName {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 64..64,
                                     id: Name(""),
                                     ctx: Invalid,
@@ -28,16 +32,21 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: AtomicNodeIndex(..),
                     range: 66..85,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("foo"),
                         range: 70..73,
+                        node_index: AtomicNodeIndex(..),
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 73..75,
+                        node_index: AtomicNodeIndex(
+                            0,
+                        ),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -48,6 +57,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: AtomicNodeIndex(..),
                                 range: 81..85,
                             },
                         ),

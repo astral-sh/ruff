@@ -1604,7 +1604,7 @@ impl<'a> SemanticModel<'a> {
         let mut parent_expressions = self.current_expressions().skip(1);
 
         match parent_expressions.next() {
-            // The parent expression is of the inner union is a single `typing.Union`.
+            // The parent expression of the inner union is a single `typing.Union`.
             // Ex) `Union[Union[a, b]]`
             Some(Expr::Subscript(parent)) => self.match_typing_expr(&parent.value, "Union"),
             // The parent expression is of the inner union is a tuple with two or more
@@ -1622,6 +1622,18 @@ impl<'a> SemanticModel<'a> {
             // Not a nested union otherwise.
             _ => false,
         }
+    }
+
+    /// Return `true` if the model is directly inside an Optional (e.g., the inner `Union` in
+    /// `Optional[Union[int, str]]`).
+    pub fn inside_optional(&self) -> bool {
+        let mut parent_expressions = self.current_expressions().skip(1);
+        matches!(
+            parent_expressions.next(),
+            // The parent expression is a single `typing.Optional`.
+            // Ex) `Optional[EXPR]`
+            Some(Expr::Subscript(parent)) if self.match_typing_expr(&parent.value, "Optional")
+        )
     }
 
     /// Return `true` if the model is in a nested literal expression (e.g., the inner `Literal` in
@@ -1944,6 +1956,11 @@ impl<'a> SemanticModel<'a> {
         self.flags.intersects(SemanticModelFlags::T_STRING)
     }
 
+    /// Return `true` if the model is in an f-string or t-string.
+    pub const fn in_interpolated_string(&self) -> bool {
+        self.in_f_string() || self.in_t_string()
+    }
+
     /// Return `true` if the model is in an f-string replacement field.
     pub const fn in_interpolated_string_replacement_field(&self) -> bool {
         self.flags
@@ -2075,6 +2092,20 @@ impl<'a> SemanticModel<'a> {
             }
 
             None
+        })
+    }
+
+    /// Finds and returns the [`Scope`] corresponding to a given [`ast::StmtFunctionDef`].
+    ///
+    /// This method searches all scopes created by a function definition, comparing the
+    /// [`TextRange`] of the provided `function_def` with the the range of the function
+    /// associated with the scope.
+    pub fn function_scope(&self, function_def: &ast::StmtFunctionDef) -> Option<&Scope<'_>> {
+        self.scopes.iter().find(|scope| {
+            let Some(function) = scope.kind.as_function() else {
+                return false;
+            };
+            function.range() == function_def.range()
         })
     }
 }

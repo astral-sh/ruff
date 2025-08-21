@@ -1,3 +1,4 @@
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
@@ -24,6 +25,21 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// Use instead:
 /// ```python
 /// callable(obj)
+/// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe if there's comments in the `hasattr` call
+/// expression, as comments may be removed.
+///
+/// For example, the fix would be marked as unsafe in the following case:
+/// ```python
+/// hasattr(
+///     # comment 1
+///     obj,  # comment 2
+///     # comment 3
+///     "__call__",  # comment 4
+///     # comment 5
+/// )
 /// ```
 ///
 /// ## References
@@ -84,7 +100,15 @@ pub(crate) fn unreliable_callable_check(
                 format!("{binding}({})", checker.locator().slice(obj)),
                 expr.range(),
             );
-            Ok(Fix::safe_edits(binding_edit, import_edit))
+            Ok(Fix::applicable_edits(
+                binding_edit,
+                import_edit,
+                if checker.comment_ranges().intersects(expr.range()) {
+                    Applicability::Unsafe
+                } else {
+                    Applicability::Safe
+                },
+            ))
         });
     }
 }

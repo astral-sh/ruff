@@ -17,6 +17,7 @@ fn command() -> Command {
     command.arg("analyze");
     command.arg("graph");
     command.arg("--preview");
+    command.env_clear();
     command
 }
 
@@ -56,33 +57,40 @@ fn dependencies() -> Result<()> {
         .write_str(indoc::indoc! {r#"
         def f(): pass
     "#})?;
+    root.child("ruff")
+        .child("e.pyi")
+        .write_str(indoc::indoc! {r#"
+        def f() -> None: ...
+    "#})?;
 
     insta::with_settings!({
         filters => INSTA_FILTERS.to_vec(),
     }, {
-        assert_cmd_snapshot!(command().current_dir(&root), @r###"
-            success: true
-            exit_code: 0
-            ----- stdout -----
-            {
-              "ruff/__init__.py": [],
-              "ruff/a.py": [
-                "ruff/b.py"
-              ],
-              "ruff/b.py": [
-                "ruff/c.py"
-              ],
-              "ruff/c.py": [
-                "ruff/d.py"
-              ],
-              "ruff/d.py": [
-                "ruff/e.py"
-              ],
-              "ruff/e.py": []
-            }
+        assert_cmd_snapshot!(command().current_dir(&root), @r#"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        {
+          "ruff/__init__.py": [],
+          "ruff/a.py": [
+            "ruff/b.py"
+          ],
+          "ruff/b.py": [
+            "ruff/c.py"
+          ],
+          "ruff/c.py": [
+            "ruff/d.py"
+          ],
+          "ruff/d.py": [
+            "ruff/e.py",
+            "ruff/e.pyi"
+          ],
+          "ruff/e.py": [],
+          "ruff/e.pyi": []
+        }
 
-            ----- stderr -----
-            "###);
+        ----- stderr -----
+        "#);
     });
 
     Ok(())
@@ -196,23 +204,43 @@ fn string_detection() -> Result<()> {
     insta::with_settings!({
         filters => INSTA_FILTERS.to_vec(),
     }, {
-        assert_cmd_snapshot!(command().arg("--detect-string-imports").current_dir(&root), @r###"
-            success: true
-            exit_code: 0
-            ----- stdout -----
-            {
-              "ruff/__init__.py": [],
-              "ruff/a.py": [
-                "ruff/b.py"
-              ],
-              "ruff/b.py": [
-                "ruff/c.py"
-              ],
-              "ruff/c.py": []
-            }
+        assert_cmd_snapshot!(command().arg("--detect-string-imports").current_dir(&root), @r#"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        {
+          "ruff/__init__.py": [],
+          "ruff/a.py": [
+            "ruff/b.py"
+          ],
+          "ruff/b.py": [],
+          "ruff/c.py": []
+        }
 
-            ----- stderr -----
-            "###);
+        ----- stderr -----
+        "#);
+    });
+
+    insta::with_settings!({
+        filters => INSTA_FILTERS.to_vec(),
+    }, {
+        assert_cmd_snapshot!(command().arg("--detect-string-imports").arg("--min-dots").arg("1").current_dir(&root), @r#"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        {
+          "ruff/__init__.py": [],
+          "ruff/a.py": [
+            "ruff/b.py"
+          ],
+          "ruff/b.py": [
+            "ruff/c.py"
+          ],
+          "ruff/c.py": []
+        }
+
+        ----- stderr -----
+        "#);
     });
 
     Ok(())
@@ -565,8 +593,8 @@ fn venv() -> Result<()> {
 
         ----- stderr -----
         ruff failed
-          Cause: Invalid search path settings
-          Cause: Failed to discover the site-packages directory: Invalid `--python` argument `none`: does not point to a Python executable or a directory on disk
+          Cause: Invalid `--python` argument `none`: does not point to a Python executable or a directory on disk
+          Cause: No such file or directory (os error 2)
         ");
     });
 

@@ -219,6 +219,7 @@ pub(crate) fn bad_string_format_type(
     let mut format_strings = vec![];
     for StringLiteral {
         value: _,
+        node_index: _,
         range,
         flags,
     } in &format_string.value
@@ -236,7 +237,11 @@ pub(crate) fn bad_string_format_type(
     // Parse the parameters.
     let is_valid = match &*bin_op.right {
         Expr::Tuple(ast::ExprTuple { elts, .. }) => is_valid_tuple(&format_strings, elts),
-        Expr::Dict(ast::ExprDict { items, range: _ }) => is_valid_dict(&format_strings, items),
+        Expr::Dict(ast::ExprDict {
+            items,
+            range: _,
+            node_index: _,
+        }) => is_valid_dict(&format_strings, items),
         _ => is_valid_constant(&format_strings, &bin_op.right),
     };
     if !is_valid {

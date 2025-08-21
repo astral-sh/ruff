@@ -489,8 +489,8 @@ pub(crate) enum ErrorAssertionParseError<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ruff_db::files::system_path_to_file;
     use ruff_db::system::DbWithWritableSystem as _;
+    use ruff_db::{Db as _, files::system_path_to_file};
     use ruff_python_trivia::textwrap::dedent;
     use ruff_source_file::OneIndexed;
     use ty_python_semantic::{
@@ -501,22 +501,20 @@ mod tests {
         let mut db = Db::setup();
 
         let settings = ProgramSettings {
-            python_version: Some(PythonVersionWithSource::default()),
+            python_version: PythonVersionWithSource::default(),
             python_platform: PythonPlatform::default(),
-            search_paths: SearchPathSettings::new(Vec::new()),
+            search_paths: SearchPathSettings::new(Vec::new())
+                .to_search_paths(db.system(), db.vendored())
+                .unwrap(),
         };
-        match Program::try_get(&db) {
-            Some(program) => program.update_from_settings(&mut db, settings),
-            None => Program::from_settings(&db, settings).map(|_| ()),
-        }
-        .expect("Failed to update Program settings in TestDb");
+        Program::init_or_update(&mut db, settings);
 
         db.write_file("/src/test.py", source).unwrap();
         let file = system_path_to_file(&db, "/src/test.py").unwrap();
         InlineFileAssertions::from_file(&db, file)
     }
 
-    fn as_vec(assertions: &InlineFileAssertions) -> Vec<LineAssertions> {
+    fn as_vec(assertions: &InlineFileAssertions) -> Vec<LineAssertions<'_>> {
         assertions.into_iter().collect()
     }
 

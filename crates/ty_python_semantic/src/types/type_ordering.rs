@@ -3,7 +3,7 @@ use std::cmp::Ordering;
 use crate::db::Db;
 
 use super::{
-    DynamicType, SuperOwnerKind, TodoType, Type, class_base::ClassBase,
+    DynamicType, SuperOwnerKind, TodoType, Type, TypeIsType, class_base::ClassBase,
     subclass_of::SubclassOfInner,
 };
 
@@ -64,6 +64,10 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::BytesLiteral(_), _) => Ordering::Less,
         (_, Type::BytesLiteral(_)) => Ordering::Greater,
 
+        (Type::EnumLiteral(left), Type::EnumLiteral(right)) => left.cmp(right),
+        (Type::EnumLiteral(_), _) => Ordering::Less,
+        (_, Type::EnumLiteral(_)) => Ordering::Greater,
+
         (Type::FunctionLiteral(left), Type::FunctionLiteral(right)) => left.cmp(right),
         (Type::FunctionLiteral(_), _) => Ordering::Less,
         (_, Type::FunctionLiteral(_)) => Ordering::Greater,
@@ -96,10 +100,6 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::Callable(_), _) => Ordering::Less,
         (_, Type::Callable(_)) => Ordering::Greater,
 
-        (Type::Tuple(left), Type::Tuple(right)) => left.cmp(right),
-        (Type::Tuple(_), _) => Ordering::Less,
-        (_, Type::Tuple(_)) => Ordering::Greater,
-
         (Type::ModuleLiteral(left), Type::ModuleLiteral(right)) => left.cmp(right),
         (Type::ModuleLiteral(_), _) => Ordering::Less,
         (_, Type::ModuleLiteral(_)) => Ordering::Greater,
@@ -126,7 +126,13 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::SubclassOf(_), _) => Ordering::Less,
         (_, Type::SubclassOf(_)) => Ordering::Greater,
 
-        (Type::NominalInstance(left), Type::NominalInstance(right)) => left.class.cmp(&right.class),
+        (Type::TypeIs(left), Type::TypeIs(right)) => typeis_ordering(db, *left, *right),
+        (Type::TypeIs(_), _) => Ordering::Less,
+        (_, Type::TypeIs(_)) => Ordering::Greater,
+
+        (Type::NominalInstance(left), Type::NominalInstance(right)) => {
+            left.class(db).cmp(&right.class(db))
+        }
         (Type::NominalInstance(_), _) => Ordering::Less,
         (_, Type::NominalInstance(_)) => Ordering::Greater,
 
@@ -135,6 +141,10 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         }
         (Type::ProtocolInstance(_), _) => Ordering::Less,
         (_, Type::ProtocolInstance(_)) => Ordering::Greater,
+
+        (Type::NonInferableTypeVar(left), Type::NonInferableTypeVar(right)) => left.cmp(right),
+        (Type::NonInferableTypeVar(_), _) => Ordering::Less,
+        (_, Type::NonInferableTypeVar(_)) => Ordering::Greater,
 
         (Type::TypeVar(left), Type::TypeVar(right)) => left.cmp(right),
         (Type::TypeVar(_), _) => Ordering::Less,
@@ -158,6 +168,9 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 (ClassBase::Generic, _) => Ordering::Less,
                 (_, ClassBase::Generic) => Ordering::Greater,
 
+                (ClassBase::TypedDict, _) => Ordering::Less,
+                (_, ClassBase::TypedDict) => Ordering::Greater,
+
                 (ClassBase::Dynamic(left), ClassBase::Dynamic(right)) => {
                     dynamic_elements_ordering(left, right)
                 }
@@ -167,7 +180,7 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 (SuperOwnerKind::Class(_), _) => Ordering::Less,
                 (_, SuperOwnerKind::Class(_)) => Ordering::Greater,
                 (SuperOwnerKind::Instance(left), SuperOwnerKind::Instance(right)) => {
-                    left.class.cmp(&right.class)
+                    left.class(db).cmp(&right.class(db))
                 }
                 (SuperOwnerKind::Instance(_), _) => Ordering::Less,
                 (_, SuperOwnerKind::Instance(_)) => Ordering::Greater,
@@ -194,6 +207,10 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::Dynamic(left), Type::Dynamic(right)) => dynamic_elements_ordering(*left, *right),
         (Type::Dynamic(_), _) => Ordering::Less,
         (_, Type::Dynamic(_)) => Ordering::Greater,
+
+        (Type::TypeAlias(left), Type::TypeAlias(right)) => left.cmp(right),
+        (Type::TypeAlias(_), _) => Ordering::Less,
+        (_, Type::TypeAlias(_)) => Ordering::Greater,
 
         (Type::Union(_), _) | (_, Type::Union(_)) => {
             unreachable!("our type representation does not permit nested unions");
@@ -226,6 +243,12 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
 
             unreachable!("Two equal, normalized intersections should share the same Salsa ID")
         }
+
+        (Type::TypedDict(left), Type::TypedDict(right)) => {
+            left.defining_class.cmp(&right.defining_class)
+        }
+        (Type::TypedDict(_), _) => Ordering::Less,
+        (_, Type::TypedDict(_)) => Ordering::Greater,
     }
 }
 
@@ -246,5 +269,33 @@ fn dynamic_elements_ordering(left: DynamicType, right: DynamicType) -> Ordering 
 
         (DynamicType::TodoPEP695ParamSpec, _) => Ordering::Less,
         (_, DynamicType::TodoPEP695ParamSpec) => Ordering::Greater,
+
+        (DynamicType::TodoUnpack, _) => Ordering::Less,
+        (_, DynamicType::TodoUnpack) => Ordering::Greater,
+
+        (DynamicType::TodoTypeAlias, _) => Ordering::Less,
+        (_, DynamicType::TodoTypeAlias) => Ordering::Greater,
+    }
+}
+
+/// Determine a canonical order for two instances of [`TypeIsType`].
+///
+/// The following criteria are considered, in order:
+/// * Boundness: Unbound precedes bound
+/// * Symbol name: String comparison
+/// * Guarded type: [`union_or_intersection_elements_ordering`]
+fn typeis_ordering(db: &dyn Db, left: TypeIsType, right: TypeIsType) -> Ordering {
+    let (left_ty, right_ty) = (left.return_type(db), right.return_type(db));
+
+    match (left.place_info(db), right.place_info(db)) {
+        (None, Some(_)) => Ordering::Less,
+        (Some(_), None) => Ordering::Greater,
+
+        (None, None) => union_or_intersection_elements_ordering(db, &left_ty, &right_ty),
+
+        (Some(_), Some(_)) => match left.place_name(db).cmp(&right.place_name(db)) {
+            Ordering::Equal => union_or_intersection_elements_ordering(db, &left_ty, &right_ty),
+            ordering => ordering,
+        },
     }
 }

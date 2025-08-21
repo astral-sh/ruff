@@ -106,7 +106,7 @@ reveal_type(d)  # revealed: Literal[5]
 ### Starred expression (1)
 
 ```py
-# error: [invalid-assignment] "Not enough values to unpack: Expected 3 or more"
+# error: [invalid-assignment] "Not enough values to unpack: Expected at least 3"
 [a, *b, c, d] = (1, 2)
 reveal_type(a)  # revealed: Unknown
 reveal_type(b)  # revealed: list[Unknown]
@@ -119,7 +119,7 @@ reveal_type(d)  # revealed: Unknown
 ```py
 [a, *b, c] = (1, 2)
 reveal_type(a)  # revealed: Literal[1]
-reveal_type(b)  # revealed: list[Unknown]
+reveal_type(b)  # revealed: list[Never]
 reveal_type(c)  # revealed: Literal[2]
 ```
 
@@ -154,7 +154,7 @@ reveal_type(c)  # revealed: list[Literal[3, 4]]
 ### Starred expression (6)
 
 ```py
-# error: [invalid-assignment] "Not enough values to unpack: Expected 5 or more"
+# error: [invalid-assignment] "Not enough values to unpack: Expected at least 5"
 (a, b, c, *d, e, f) = (1,)
 reveal_type(a)  # revealed: Unknown
 reveal_type(b)  # revealed: Unknown
@@ -258,6 +258,265 @@ def _(value: list[int]):
     reveal_type(c)  # revealed: int
 ```
 
+## Homogeneous tuples
+
+### Simple unpacking
+
+```py
+def _(value: tuple[int, ...]):
+    a, b = value
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: int
+```
+
+### Nested unpacking
+
+```py
+def _(value: tuple[tuple[int, ...], ...]):
+    a, (b, c) = value
+    reveal_type(a)  # revealed: tuple[int, ...]
+    reveal_type(b)  # revealed: int
+    reveal_type(c)  # revealed: int
+```
+
+### Invalid nested unpacking
+
+```py
+def _(value: tuple[int, ...]):
+    # error: [not-iterable] "Object of type `int` is not iterable"
+    a, (b, c) = value
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: Unknown
+    reveal_type(c)  # revealed: Unknown
+```
+
+### Starred expression
+
+```py
+def _(value: tuple[int, ...]):
+    a, *b, c = value
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: list[int]
+    reveal_type(c)  # revealed: int
+```
+
+## Mixed tuples
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+### Simple unpacking (1)
+
+```py
+def _(value: tuple[int, *tuple[str, ...]]):
+    a, b = value
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: str
+```
+
+### Simple unpacking (2)
+
+```py
+def _(value: tuple[int, int, *tuple[str, ...]]):
+    a, b = value
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: int
+```
+
+### Simple unpacking (3)
+
+```py
+def _(value: tuple[int, *tuple[str, ...], int]):
+    a, b, c = value
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: str
+    reveal_type(c)  # revealed: int
+```
+
+### Invalid unpacked
+
+```py
+def _(value: tuple[int, int, int, *tuple[str, ...]]):
+    # error: [invalid-assignment] "Too many values to unpack: Expected 2"
+    a, b = value
+    reveal_type(a)  # revealed: Unknown
+    reveal_type(b)  # revealed: Unknown
+```
+
+### Nested unpacking
+
+```py
+def _(value: tuple[str, *tuple[tuple[int, ...], ...]]):
+    a, (b, c) = value
+    reveal_type(a)  # revealed: str
+    reveal_type(b)  # revealed: int
+    reveal_type(c)  # revealed: int
+```
+
+### Invalid nested unpacking
+
+```py
+def _(value: tuple[str, *tuple[int, ...]]):
+    # error: [not-iterable] "Object of type `int` is not iterable"
+    a, (b, c) = value
+    reveal_type(a)  # revealed: str
+    reveal_type(b)  # revealed: Unknown
+    reveal_type(c)  # revealed: Unknown
+```
+
+### Starred expression (1)
+
+```py
+def _(value: tuple[int, *tuple[str, ...]]):
+    a, *b, c = value
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: list[str]
+    reveal_type(c)  # revealed: str
+```
+
+### Starred expression (2)
+
+```py
+def _(value: tuple[int, *tuple[str, ...], int]):
+    a, *b, c = value
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: list[str]
+    reveal_type(c)  # revealed: int
+```
+
+### Starred expression (3)
+
+```py
+def _(value: tuple[int, *tuple[str, ...], int]):
+    a, *b, c, d = value
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: list[str]
+    reveal_type(c)  # revealed: str
+    reveal_type(d)  # revealed: int
+```
+
+### Starred expression (4)
+
+```py
+def _(value: tuple[int, int, *tuple[str, ...], int]):
+    a, *b, c = value
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: list[int | str]
+    reveal_type(c)  # revealed: int
+```
+
+## Tuple subclasses
+
+A tuple subclass inherits its heterogeneous unpacking behaviour from its tuple superclass.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+class I0: ...
+class I1: ...
+class I2: ...
+class HeterogeneousTupleSubclass(tuple[I0, I1, I2]): ...
+
+def f(x: HeterogeneousTupleSubclass):
+    a, b, c = x
+    reveal_type(a)  # revealed: I0
+    reveal_type(b)  # revealed: I1
+    reveal_type(c)  # revealed: I2
+
+    d, e = x  # error: [invalid-assignment] "Too many values to unpack: Expected 2"
+
+    reveal_type(d)  # revealed: Unknown
+    reveal_type(e)  # revealed: Unknown
+
+    f, g, h, i = x  # error: [invalid-assignment] "Not enough values to unpack: Expected 4"
+
+    reveal_type(f)  # revealed: Unknown
+    reveal_type(g)  # revealed: Unknown
+    reveal_type(h)  # revealed: Unknown
+    reveal_type(i)  # revealed: Unknown
+
+    [j, *k] = x
+    reveal_type(j)  # revealed: I0
+    reveal_type(k)  # revealed: list[I1 | I2]
+
+    [l, m, *n] = x
+    reveal_type(l)  # revealed: I0
+    reveal_type(m)  # revealed: I1
+    reveal_type(n)  # revealed: list[I2]
+
+    [o, p, q, *r] = x
+    reveal_type(o)  # revealed: I0
+    reveal_type(p)  # revealed: I1
+    reveal_type(q)  # revealed: I2
+    reveal_type(r)  # revealed: list[Never]
+
+    # error: [invalid-assignment] "Not enough values to unpack: Expected at least 4"
+    [s, t, u, v, *w] = x
+    reveal_type(s)  # revealed: Unknown
+    reveal_type(t)  # revealed: Unknown
+    reveal_type(u)  # revealed: Unknown
+    reveal_type(v)  # revealed: Unknown
+    reveal_type(w)  # revealed: list[Unknown]
+
+class MixedTupleSubclass(tuple[I0, *tuple[I1, ...], I2]): ...
+
+def f(x: MixedTupleSubclass):
+    (a,) = x  # error: [invalid-assignment] "Too many values to unpack: Expected 1"
+    reveal_type(a)  # revealed: Unknown
+
+    c, d = x
+    reveal_type(c)  # revealed: I0
+    reveal_type(d)  # revealed: I2
+
+    e, f, g = x
+    reveal_type(e)  # revealed: I0
+    reveal_type(f)  # revealed: I1
+    reveal_type(g)  # revealed: I2
+
+    h, i, j, k = x
+    reveal_type(h)  # revealed: I0
+    reveal_type(i)  # revealed: I1
+    reveal_type(j)  # revealed: I1
+    reveal_type(k)  # revealed: I2
+
+    [l, *m] = x
+    reveal_type(l)  # revealed: I0
+    reveal_type(m)  # revealed: list[I1 | I2]
+
+    [n, o, *p] = x
+    reveal_type(n)  # revealed: I0
+
+    # TODO: `I1 | I2` might be better here? (https://github.com/astral-sh/ty/issues/947)
+    reveal_type(o)  # revealed: I1
+
+    reveal_type(p)  # revealed: list[I1 | I2]
+
+    [o, p, q, *r] = x
+    reveal_type(o)  # revealed: I0
+
+    # TODO: `I1 | I2` might be better for both of these? (https://github.com/astral-sh/ty/issues/947)
+    reveal_type(p)  # revealed: I1
+    reveal_type(q)  # revealed: I1
+
+    reveal_type(r)  # revealed: list[I1 | I2]
+
+    s, *t, u = x
+    reveal_type(s)  # revealed: I0
+    reveal_type(t)  # revealed: list[I1]
+    reveal_type(u)  # revealed: I2
+
+    aa, bb, *cc, dd = x
+    reveal_type(aa)  # revealed: I0
+    reveal_type(bb)  # revealed: I1
+    reveal_type(cc)  # revealed: list[I1]
+    reveal_type(dd)  # revealed: I2
+```
+
 ## String
 
 ### Simple unpacking
@@ -290,7 +549,7 @@ reveal_type(b)  # revealed: Unknown
 ### Starred expression (1)
 
 ```py
-# error: [invalid-assignment] "Not enough values to unpack: Expected 3 or more"
+# error: [invalid-assignment] "Not enough values to unpack: Expected at least 3"
 (a, *b, c, d) = "ab"
 reveal_type(a)  # revealed: Unknown
 reveal_type(b)  # revealed: list[Unknown]
@@ -299,7 +558,7 @@ reveal_type(d)  # revealed: Unknown
 ```
 
 ```py
-# error: [invalid-assignment] "Not enough values to unpack: Expected 3 or more"
+# error: [invalid-assignment] "Not enough values to unpack: Expected at least 3"
 (a, b, *c, d) = "a"
 reveal_type(a)  # revealed: Unknown
 reveal_type(b)  # revealed: Unknown
@@ -312,7 +571,7 @@ reveal_type(d)  # revealed: Unknown
 ```py
 (a, *b, c) = "ab"
 reveal_type(a)  # revealed: LiteralString
-reveal_type(b)  # revealed: list[Unknown]
+reveal_type(b)  # revealed: list[Never]
 reveal_type(c)  # revealed: LiteralString
 ```
 
@@ -734,9 +993,6 @@ with ContextManager() as (a, *b):
 ### Unbound context manager expression
 
 ```py
-# TODO: should only be one diagnostic
-# error: [unresolved-reference] "Name `nonexistant` used when not defined"
-# error: [unresolved-reference] "Name `nonexistant` used when not defined"
 # error: [unresolved-reference] "Name `nonexistant` used when not defined"
 with nonexistant as (x, y):
     reveal_type(x)  # revealed: Unknown

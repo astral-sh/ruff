@@ -4,7 +4,6 @@ use ruff_text_size::TextRange;
 
 use crate::Violation;
 use crate::checkers::ast::LintContext;
-use crate::settings::LinterSettings;
 
 use super::LogicalLine;
 
@@ -61,12 +60,14 @@ impl Violation for IndentationWithInvalidMultiple {
 /// ```python
 /// if True:
 ///    # a = 1
+///     ...
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// if True:
 ///     # a = 1
+///     ...
 /// ```
 ///
 /// ## Formatter compatibility
@@ -267,7 +268,6 @@ pub(crate) fn indentation(
     indent_size: usize,
     range: TextRange,
     context: &LintContext,
-    settings: &LinterSettings,
 ) {
     if indent_level % indent_size != 0 {
         if logical_line.is_comment_only() {
@@ -276,7 +276,6 @@ pub(crate) fn indentation(
                     indent_width: indent_size,
                 },
                 range,
-                settings,
             );
         } else {
             context.report_diagnostic_if_enabled(
@@ -284,7 +283,6 @@ pub(crate) fn indentation(
                     indent_width: indent_size,
                 },
                 range,
-                settings,
             );
         }
     }
@@ -294,17 +292,17 @@ pub(crate) fn indentation(
 
     if indent_expect && indent_level <= prev_indent_level.unwrap_or(0) {
         if logical_line.is_comment_only() {
-            context.report_diagnostic_if_enabled(NoIndentedBlockComment, range, settings);
+            context.report_diagnostic_if_enabled(NoIndentedBlockComment, range);
         } else {
-            context.report_diagnostic_if_enabled(NoIndentedBlock, range, settings);
+            context.report_diagnostic_if_enabled(NoIndentedBlock, range);
         }
     } else if !indent_expect
         && prev_indent_level.is_some_and(|prev_indent_level| indent_level > prev_indent_level)
     {
         if logical_line.is_comment_only() {
-            context.report_diagnostic_if_enabled(UnexpectedIndentationComment, range, settings);
+            context.report_diagnostic_if_enabled(UnexpectedIndentationComment, range);
         } else {
-            context.report_diagnostic_if_enabled(UnexpectedIndentation, range, settings);
+            context.report_diagnostic_if_enabled(UnexpectedIndentation, range);
         }
     }
     if indent_expect {
@@ -316,7 +314,6 @@ pub(crate) fn indentation(
                     is_comment: logical_line.is_comment_only(),
                 },
                 range,
-                settings,
             );
         }
     }

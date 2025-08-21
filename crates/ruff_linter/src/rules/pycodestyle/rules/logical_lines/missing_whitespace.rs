@@ -3,7 +3,7 @@ use ruff_python_parser::TokenKind;
 use ruff_text_size::Ranged;
 
 use crate::Edit;
-use crate::checkers::logical_lines::LogicalLinesContext;
+use crate::checkers::ast::LintContext;
 use crate::{AlwaysFixableViolation, Fix};
 
 use super::{DefinitionState, LogicalLine};
@@ -40,8 +40,8 @@ impl AlwaysFixableViolation for MissingWhitespace {
 }
 
 /// E231
-pub(crate) fn missing_whitespace(line: &LogicalLine, context: &mut LogicalLinesContext) {
-    let mut fstrings = 0u32;
+pub(crate) fn missing_whitespace(line: &LogicalLine, context: &LintContext) {
+    let mut interpolated_strings = 0u32;
     let mut definition_state = DefinitionState::from_tokens(line.tokens());
     let mut brackets = Vec::new();
     let mut iter = line.tokens().iter().peekable();
@@ -50,21 +50,23 @@ pub(crate) fn missing_whitespace(line: &LogicalLine, context: &mut LogicalLinesC
         let kind = token.kind();
         definition_state.visit_token_kind(kind);
         match kind {
-            TokenKind::FStringStart => fstrings += 1,
-            TokenKind::FStringEnd => fstrings = fstrings.saturating_sub(1),
-            TokenKind::Lsqb if fstrings == 0 => {
+            TokenKind::FStringStart | TokenKind::TStringStart => interpolated_strings += 1,
+            TokenKind::FStringEnd | TokenKind::TStringEnd => {
+                interpolated_strings = interpolated_strings.saturating_sub(1);
+            }
+            TokenKind::Lsqb if interpolated_strings == 0 => {
                 brackets.push(kind);
             }
-            TokenKind::Rsqb if fstrings == 0 => {
+            TokenKind::Rsqb if interpolated_strings == 0 => {
                 brackets.pop();
             }
-            TokenKind::Lbrace if fstrings == 0 => {
+            TokenKind::Lbrace if interpolated_strings == 0 => {
                 brackets.push(kind);
             }
-            TokenKind::Rbrace if fstrings == 0 => {
+            TokenKind::Rbrace if interpolated_strings == 0 => {
                 brackets.pop();
             }
-            TokenKind::Colon if fstrings > 0 => {
+            TokenKind::Colon if interpolated_strings > 0 => {
                 // Colon in f-string, no space required. This will yield false
                 // negatives for cases like the following as it's hard to
                 // differentiate between the usage of a colon in a f-string.
@@ -103,9 +105,10 @@ pub(crate) fn missing_whitespace(line: &LogicalLine, context: &mut LogicalLinesC
                         }
                     }
 
-                    if let Some(mut diagnostic) =
-                        context.report_diagnostic(MissingWhitespace { token: kind }, token.range())
-                    {
+                    if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
+                        MissingWhitespace { token: kind },
+                        token.range(),
+                    ) {
                         diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
                             " ".to_string(),
                             token.end(),

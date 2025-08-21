@@ -163,8 +163,8 @@ impl FileRangeExt for FileRange {
     fn to_location(&self, db: &dyn Db, encoding: PositionEncoding) -> Option<Location> {
         let file = self.file();
         let uri = file_to_url(db, file)?;
-        let source = source_text(db.upcast(), file);
-        let line_index = line_index(db.upcast(), file);
+        let source = source_text(db, file);
+        let line_index = line_index(db, file);
 
         let range = self.range().to_lsp_range(&source, &line_index, encoding);
         Some(Location { uri, range })

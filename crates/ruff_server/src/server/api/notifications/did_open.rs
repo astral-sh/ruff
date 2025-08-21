@@ -2,8 +2,7 @@ use crate::TextDocument;
 use crate::server::Result;
 use crate::server::api::LSPResult;
 use crate::server::api::diagnostics::publish_diagnostics_for_document;
-use crate::server::client::{Notifier, Requester};
-use crate::session::Session;
+use crate::session::{Client, Session};
 use lsp_types as types;
 use lsp_types::notification as notif;
 
@@ -16,8 +15,7 @@ impl super::NotificationHandler for DidOpen {
 impl super::SyncNotificationHandler for DidOpen {
     fn run(
         session: &mut Session,
-        notifier: Notifier,
-        _requester: &mut Requester,
+        client: &Client,
         types::DidOpenTextDocumentParams {
             text_document:
                 types::TextDocumentItem {
@@ -40,7 +38,7 @@ impl super::SyncNotificationHandler for DidOpen {
                     anyhow::anyhow!("Unable to take snapshot for document with URL {uri}")
                 })
                 .with_failure_code(lsp_server::ErrorCode::InternalError)?;
-            publish_diagnostics_for_document(&snapshot, &notifier)?;
+            publish_diagnostics_for_document(&snapshot, client)?;
         }
 
         Ok(())

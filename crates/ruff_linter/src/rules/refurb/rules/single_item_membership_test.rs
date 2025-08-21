@@ -89,7 +89,7 @@ pub(crate) fn single_item_membership_test(
             generate_comparison(
                 left,
                 &[membership_test.replacement_op()],
-                &[item.clone()],
+                std::slice::from_ref(item),
                 expr.into(),
                 checker.comment_ranges(),
                 checker.source(),
@@ -129,6 +129,7 @@ fn single_item<'a>(expr: &'a Expr, semantic: &'a SemanticModel) -> Option<&'a Ex
             func,
             arguments,
             range: _,
+            node_index: _,
         }) => {
             if arguments.len() != 1 || !is_set_method(func, semantic) {
                 return None;

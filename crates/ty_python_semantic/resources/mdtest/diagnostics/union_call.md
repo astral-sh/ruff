@@ -59,6 +59,7 @@ just ensuring that we get test coverage for each of the possible diagnostic mess
 
 ```py
 from inspect import getattr_static
+from typing import overload
 
 def f1() -> int:
     return 0
@@ -72,11 +73,19 @@ def f3(a: int, b: int) -> int:
 def f4[T: str](x: T) -> int:
     return 0
 
-class OverloadExample:
-    def f(self, x: str) -> int:
-        return 0
+@overload
+def f5() -> None: ...
+@overload
+def f5(x: str) -> str: ...
+def f5(x: str | None = None) -> str | None:
+    return x
 
-f5 = getattr_static(OverloadExample, "f").__get__
+@overload
+def f6() -> None: ...
+@overload
+def f6(x: str, y: str) -> str: ...
+def f6(x: str | None = None, y: str | None = None) -> str | None:
+    return x + y if x and y else None
 
 def _(n: int):
     class PossiblyNotCallable:
@@ -96,14 +105,17 @@ def _(n: int):
         f = 5
     elif n == 5:
         f = f5
+    elif n == 6:
+        f = f6
     else:
         f = PossiblyNotCallable()
     # error: [too-many-positional-arguments]
     # error: [invalid-argument-type] "Argument to function `f2` is incorrect: Expected `str`, found `Literal[3]`"
     # error: [missing-argument]
     # error: [invalid-argument-type] "Argument to function `f4` is incorrect: Argument type `Literal[3]` does not satisfy upper bound of type variable `T`"
+    # error: [invalid-argument-type] "Argument to function `f5` is incorrect: Expected `str`, found `Literal[3]`"
+    # error: [no-matching-overload] "No overload of function `f6` matches arguments"
     # error: [call-non-callable] "Object of type `Literal[5]` is not callable"
-    # error: [no-matching-overload]
     # error: [call-non-callable] "Object of type `PossiblyNotCallable` is not callable (possibly unbound `__call__` method)"
     x = f(3)
 ```

@@ -81,4 +81,5 @@ match(foo):
 # https://github.com/astral-sh/ruff/issues/12094
 pass;
 
-yield, x
+def foo():
+    yield, x

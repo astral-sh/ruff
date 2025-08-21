@@ -1,6 +1,14 @@
+"""Common pathname manipulations, WindowsNT/95 version.
+
+Instead of importing this module directly, import os and refer to this
+module as os.path.
+"""
+
 import sys
 from _typeshed import BytesPath, StrOrBytesPath, StrPath
 from genericpath import (
+    ALLOW_MISSING as ALLOW_MISSING,
+    _AllowMissingType,
     commonprefix as commonprefix,
     exists as exists,
     getatime as getatime,
@@ -89,6 +97,7 @@ __all__ = [
     "sameopenfile",
     "samestat",
     "commonpath",
+    "ALLOW_MISSING",
 ]
 if sys.version_info >= (3, 12):
     __all__ += ["isjunction", "splitroot"]
@@ -108,19 +117,14 @@ def join(path: StrPath, /, *paths: StrPath) -> str: ...
 def join(path: BytesPath, /, *paths: BytesPath) -> bytes: ...
 
 if sys.platform == "win32":
-    if sys.version_info >= (3, 10):
-        @overload
-        def realpath(path: PathLike[AnyStr], *, strict: bool = False) -> AnyStr: ...
-        @overload
-        def realpath(path: AnyStr, *, strict: bool = False) -> AnyStr: ...
-    else:
-        @overload
-        def realpath(path: PathLike[AnyStr]) -> AnyStr: ...
-        @overload
-        def realpath(path: AnyStr) -> AnyStr: ...
+    @overload
+    def realpath(path: PathLike[AnyStr], *, strict: bool | _AllowMissingType = False) -> AnyStr: ...
+    @overload
+    def realpath(path: AnyStr, *, strict: bool | _AllowMissingType = False) -> AnyStr: ...
 
 else:
     realpath = abspath
 
 if sys.version_info >= (3, 13):
-    def isreserved(path: StrOrBytesPath) -> bool: ...
+    def isreserved(path: StrOrBytesPath) -> bool:
+        """Return true if the pathname is reserved by the system."""

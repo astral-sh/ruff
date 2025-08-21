@@ -1,8 +1,7 @@
 use crate::server::Result;
 use crate::server::api::LSPResult;
 use crate::server::api::diagnostics::publish_diagnostics_for_document;
-use crate::server::client::{Notifier, Requester};
-use crate::session::Session;
+use crate::session::{Client, Session};
 use lsp_server::ErrorCode;
 use lsp_types as types;
 use lsp_types::notification as notif;
@@ -16,8 +15,7 @@ impl super::NotificationHandler for DidChangeNotebook {
 impl super::SyncNotificationHandler for DidChangeNotebook {
     fn run(
         session: &mut Session,
-        notifier: Notifier,
-        _requester: &mut Requester,
+        client: &Client,
         types::DidChangeNotebookDocumentParams {
             notebook_document: types::VersionedNotebookDocumentIdentifier { uri, version },
             change: types::NotebookDocumentChangeEvent { cells, metadata },
@@ -32,7 +30,7 @@ impl super::SyncNotificationHandler for DidChangeNotebook {
         let snapshot = session
             .take_snapshot(key.into_url())
             .expect("snapshot should be available");
-        publish_diagnostics_for_document(&snapshot, &notifier)?;
+        publish_diagnostics_for_document(&snapshot, client)?;
 
         Ok(())
     }

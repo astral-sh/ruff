@@ -63,6 +63,7 @@ pub(crate) fn reimplemented_container_builtin(checker: &Checker, expr: &ExprLamb
         parameters,
         body,
         range: _,
+        node_index: _,
     } = expr;
 
     if parameters.is_some() {

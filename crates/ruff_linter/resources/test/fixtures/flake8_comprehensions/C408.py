@@ -27,3 +27,13 @@ dict(
 
 tuple(  # comment
 )
+
+t"{dict(x='y')}"
+t'{dict(x="y")}'
+t"{dict()}"
+t"a {dict()} b"
+
+t"{dict(x='y') | dict(y='z')}"
+t"{ dict(x='y') | dict(y='z') }"
+t"a {dict(x='y') | dict(y='z')} b"
+t"a { dict(x='y') | dict(y='z') } b"

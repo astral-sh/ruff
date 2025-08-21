@@ -1,9 +1,10 @@
-use crate::{Db, IOErrorDiagnostic, IOErrorKind, Project};
+use crate::glob::IncludeExcludeFilter;
+use crate::{Db, GlobFilterCheckMode, IOErrorDiagnostic, IOErrorKind, IncludeResult, Project};
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::walk_directory::{ErrorKind, WalkDirectoryBuilder, WalkState};
-use ruff_db::system::{FileType, SystemPath, SystemPathBuf};
+use ruff_db::system::{SystemPath, SystemPathBuf};
 use ruff_python_ast::PySourceType;
-use rustc_hash::{FxBuildHasher, FxHashSet};
+use rustc_hash::FxHashSet;
 use std::path::PathBuf;
 use thiserror::Error;
 
@@ -13,22 +14,47 @@ use thiserror::Error;
 ///
 /// This struct mainly exists because `dyn Db` isn't `Send` or `Sync`, making it impossible
 /// to access fields from within the walker.
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub(crate) struct ProjectFilesFilter<'a> {
     /// The same as [`Project::included_paths_or_root`].
     included_paths: &'a [SystemPathBuf],
 
-    /// The filter skips checking if the path is in `included_paths` if set to `true`.
-    ///
-    /// Skipping this check is useful when the walker only walks over `included_paths`.
-    skip_included_paths: bool,
+    /// The resolved `src.include` and `src.exclude` filter.
+    src_filter: &'a IncludeExcludeFilter,
 }
 
 impl<'a> ProjectFilesFilter<'a> {
     pub(crate) fn from_project(db: &'a dyn Db, project: Project) -> Self {
         Self {
             included_paths: project.included_paths_or_root(db),
-            skip_included_paths: false,
+            src_filter: &project.settings(db).src().files,
+        }
+    }
+
+    fn match_included_paths(
+        &self,
+        path: &SystemPath,
+        mode: GlobFilterCheckMode,
+    ) -> Option<CheckPathMatch> {
+        match mode {
+            GlobFilterCheckMode::TopDown => Some(CheckPathMatch::Partial),
+            GlobFilterCheckMode::Adhoc => {
+                self.included_paths
+                    .iter()
+                    .filter_map(|included_path| {
+                        if let Ok(relative_path) = path.strip_prefix(included_path) {
+                            // Exact matches are always included
+                            if relative_path.as_str().is_empty() {
+                                Some(CheckPathMatch::Full)
+                            } else {
+                                Some(CheckPathMatch::Partial)
+                            }
+                        } else {
+                            None
+                        }
+                    })
+                    .max()
+            }
         }
     }
 
@@ -45,45 +71,40 @@ impl<'a> ProjectFilesFilter<'a> {
     /// This method may return `true` for files that don't end up being included when walking the
     /// project tree because it doesn't consider `.gitignore` and other ignore files when deciding
     /// if a file's included.
-    pub(crate) fn is_included(&self, path: &SystemPath) -> bool {
-        #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-        enum CheckPathMatch {
-            /// The path is a partial match of the checked path (it's a sub path)
-            Partial,
-
-            /// The path matches a check path exactly.
-            Full,
-        }
-
-        let m = if self.skip_included_paths {
-            Some(CheckPathMatch::Partial)
-        } else {
-            self.included_paths
-                .iter()
-                .filter_map(|included_path| {
-                    if let Ok(relative_path) = path.strip_prefix(included_path) {
-                        // Exact matches are always included
-                        if relative_path.as_str().is_empty() {
-                            Some(CheckPathMatch::Full)
-                        } else {
-                            Some(CheckPathMatch::Partial)
-                        }
-                    } else {
-                        None
-                    }
-                })
-                .max()
-        };
-
-        match m {
-            None => false,
-            Some(CheckPathMatch::Partial) => {
-                // TODO: For partial matches, only include the file if it is included by the project's include/exclude settings.
-                true
-            }
-            Some(CheckPathMatch::Full) => true,
+    pub(crate) fn is_file_included(
+        &self,
+        path: &SystemPath,
+        mode: GlobFilterCheckMode,
+    ) -> IncludeResult {
+        match self.match_included_paths(path, mode) {
+            None => IncludeResult::NotIncluded,
+            Some(CheckPathMatch::Partial) => self.src_filter.is_file_included(path, mode),
+            Some(CheckPathMatch::Full) => IncludeResult::Included,
         }
     }
+
+    pub(crate) fn is_directory_included(
+        &self,
+        path: &SystemPath,
+        mode: GlobFilterCheckMode,
+    ) -> IncludeResult {
+        match self.match_included_paths(path, mode) {
+            None => IncludeResult::NotIncluded,
+            Some(CheckPathMatch::Partial) => {
+                self.src_filter.is_directory_maybe_included(path, mode)
+            }
+            Some(CheckPathMatch::Full) => IncludeResult::Included,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+enum CheckPathMatch {
+    /// The path is a partial match of the checked path (it's a sub path)
+    Partial,
+
+    /// The path matches a check path exactly.
+    Full,
 }
 
 pub(crate) struct ProjectFilesWalker<'a> {
@@ -96,9 +117,7 @@ impl<'a> ProjectFilesWalker<'a> {
     pub(crate) fn new(db: &'a dyn Db) -> Self {
         let project = db.project();
 
-        let mut filter = ProjectFilesFilter::from_project(db, project);
-        // It's unnecessary to filter on included paths because it only iterates over those to start with.
-        filter.skip_included_paths = true;
+        let filter = ProjectFilesFilter::from_project(db, project);
 
         Self::from_paths(db, project.included_paths_or_root(db), filter)
             .expect("included_paths_or_root to never return an empty iterator")
@@ -132,7 +151,7 @@ impl<'a> ProjectFilesWalker<'a> {
         let mut walker = db
             .system()
             .walk_directory(paths.next()?.as_ref())
-            .standard_filters(db.project().settings(db).respect_ignore_files())
+            .standard_filters(db.project().settings(db).src().respect_ignore_files)
             .ignore_hidden(false);
 
         for path in paths {
@@ -144,33 +163,83 @@ impl<'a> ProjectFilesWalker<'a> {
 
     /// Walks the project paths and collects the paths of all files that
     /// are included in the project.
-    pub(crate) fn walk_paths(self) -> (Vec<SystemPathBuf>, Vec<IOErrorDiagnostic>) {
-        let paths = std::sync::Mutex::new(Vec::new());
+    pub(crate) fn collect_vec(self, db: &dyn Db) -> (Vec<File>, Vec<IOErrorDiagnostic>) {
+        let files = std::sync::Mutex::new(Vec::new());
         let diagnostics = std::sync::Mutex::new(Vec::new());
 
         self.walker.run(|| {
-            Box::new(|entry| {
+            let db = db.dyn_clone();
+            let filter = &self.filter;
+            let files = &files;
+            let diagnostics = &diagnostics;
+
+            Box::new(move |entry| {
                 match entry {
                     Ok(entry) => {
-                        if !self.filter.is_included(entry.path()) {
-                            tracing::debug!("Ignoring not-included path: {}", entry.path());
-                            return WalkState::Skip;
-                        }
+                        // Skip excluded directories unless they were explicitly passed to the walker
+                        // (which is the case passed to `ty check <paths>`).
+                        if entry.file_type().is_directory() {
+                            if entry.depth() > 0 {
+                                let directory_included = filter
+                                    .is_directory_included(entry.path(), GlobFilterCheckMode::TopDown);
+                                return match directory_included {
+                                    IncludeResult::Included => WalkState::Continue,
+                                    IncludeResult::Excluded => {
+                                        tracing::debug!(
+                                            "Skipping directory '{path}' because it is excluded by a default or `src.exclude` pattern",
+                                            path=entry.path()
+                                        );
+                                        WalkState::Skip
+                                    },
+                                    IncludeResult::NotIncluded => {
+                                        tracing::debug!(
+                                            "Skipping directory `{path}` because it doesn't match any `src.include` pattern or path specified on the CLI",
+                                            path=entry.path()
+                                        );
+                                        WalkState::Skip
+                                    },
+                                };
+                            }
+                        } else {
+                            // Ignore any non python files to avoid creating too many entries in `Files`.
+                            if entry
+                                .path()
+                                .extension()
+                                .and_then(PySourceType::try_from_extension)
+                                .is_none()
+                            {
+                                return WalkState::Continue;
+                            }
 
-                        // Skip over any non python files to avoid creating too many entries in `Files`.
-                        match entry.file_type() {
-                            FileType::File => {
-                                if entry
-                                    .path()
-                                    .extension()
-                                    .and_then(PySourceType::try_from_extension)
-                                    .is_some()
+                            // For all files, except the ones that were explicitly passed to the walker (CLI),
+                            // check if they're included in the project.
+                            if entry.depth() > 0 {
+                                match filter
+                                    .is_file_included(entry.path(), GlobFilterCheckMode::TopDown)
                                 {
-                                    let mut paths = paths.lock().unwrap();
-                                    paths.push(entry.into_path());
+                                    IncludeResult::Included => {},
+                                    IncludeResult::Excluded => {
+                                        tracing::debug!(
+                                            "Ignoring file `{path}` because it is excluded by a default or `src.exclude` pattern.",
+                                            path=entry.path()
+                                        );
+                                        return WalkState::Continue;
+                                    },
+                                    IncludeResult::NotIncluded => {
+                                        tracing::debug!(
+                                            "Ignoring file `{path}` because it doesn't match any `src.include` pattern or path specified on the CLI.",
+                                            path=entry.path()
+                                        );
+                                        return WalkState::Continue;
+                                    },
                                 }
                             }
-                            FileType::Directory | FileType::Symlink => {}
+
+                            // If this returns `Err`, then the file was deleted between now and when the walk callback was called.
+                            // We can ignore this.
+                            if let Ok(file) = system_path_to_file(&*db, entry.path()) {
+                                files.lock().unwrap().push(file);
+                            }
                         }
                     }
                     Err(error) => match error.kind() {
@@ -211,43 +280,18 @@ impl<'a> ProjectFilesWalker<'a> {
         });
 
         (
-            paths.into_inner().unwrap(),
+            files.into_inner().unwrap(),
             diagnostics.into_inner().unwrap(),
         )
     }
 
-    pub(crate) fn collect_vec(self, db: &dyn Db) -> (Vec<File>, Vec<IOErrorDiagnostic>) {
-        let (paths, diagnostics) = self.walk_paths();
-
-        (
-            paths
-                .into_iter()
-                .filter_map(move |path| {
-                    // If this returns `None`, then the file was deleted between the `walk_directory` call and now.
-                    // We can ignore this.
-                    system_path_to_file(db.upcast(), &path).ok()
-                })
-                .collect(),
-            diagnostics,
-        )
-    }
-
     pub(crate) fn collect_set(self, db: &dyn Db) -> (FxHashSet<File>, Vec<IOErrorDiagnostic>) {
-        let (paths, diagnostics) = self.walk_paths();
-
-        let mut files = FxHashSet::with_capacity_and_hasher(paths.len(), FxBuildHasher);
-
-        for path in paths {
-            if let Ok(file) = system_path_to_file(db.upcast(), &path) {
-                files.insert(file);
-            }
-        }
-
-        (files, diagnostics)
+        let (files, diagnostics) = self.collect_vec(db);
+        (files.into_iter().collect(), diagnostics)
     }
 }
 
-#[derive(Error, Debug, Clone)]
+#[derive(Error, Debug, Clone, get_size2::GetSize)]
 pub(crate) enum WalkError {
     #[error("`{path}`: {error}")]
     IOPathError { path: SystemPathBuf, error: String },

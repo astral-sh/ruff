@@ -4,6 +4,7 @@ use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_python_semantic::analyze::typing::is_dict;
 use ruff_text_size::Ranged;
 
+use crate::fix::edits;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 use crate::{checkers::ast::Checker, fix::snippet::SourceCodeSnippet};
 
@@ -92,7 +93,7 @@ pub(crate) fn zip_dict_keys_and_values(checker: &Checker, expr: &ast::ExprCall) 
 
     let Some(binding) = checker
         .semantic()
-        .only_binding(var1)
+        .resolve_name(var1)
         .map(|id| checker.semantic().binding(id))
     else {
         return;
@@ -101,7 +102,11 @@ pub(crate) fn zip_dict_keys_and_values(checker: &Checker, expr: &ast::ExprCall) 
         return;
     }
 
-    let expected = format!("{}.items()", checker.locator().slice(var1));
+    let expected = edits::pad(
+        format!("{}.items()", checker.locator().slice(var1)),
+        expr.range(),
+        checker.locator(),
+    );
     let actual = checker.locator().slice(expr);
 
     let mut diagnostic = checker.report_diagnostic(

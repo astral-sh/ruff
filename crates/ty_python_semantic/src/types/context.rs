@@ -1,7 +1,7 @@
 use std::fmt;
 
 use drop_bomb::DebugDropBomb;
-use ruff_db::diagnostic::{DiagnosticTag, SubDiagnostic};
+use ruff_db::diagnostic::{DiagnosticTag, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_db::{
     diagnostic::{Annotation, Diagnostic, DiagnosticId, IntoDiagnosticMessage, Severity, Span},
@@ -12,7 +12,7 @@ use ruff_text_size::{Ranged, TextRange};
 use super::{Type, TypeCheckDiagnostics, binding_type};
 
 use crate::lint::LintSource;
-use crate::semantic_index::place::ScopeId;
+use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::semantic_index;
 use crate::types::function::FunctionDecorators;
 use crate::{
@@ -32,7 +32,7 @@ use crate::{
 /// ## Consuming
 /// It's important that the context is explicitly consumed before dropping by calling
 /// [`InferContext::finish`] and the returned diagnostics must be stored
-/// on the current [`TypeInference`](super::infer::TypeInference) result.
+/// on the current [`TypeInferenceBuilder`](super::infer::TypeInferenceBuilder) result.
 pub(crate) struct InferContext<'db, 'ast> {
     db: &'db dyn Db,
     scope: ScopeId<'db>,
@@ -66,6 +66,10 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
     /// The module for which the types are inferred.
     pub(crate) fn module(&self) -> &'ast ParsedModuleRef {
         self.module
+    }
+
+    pub(crate) fn scope(&self) -> ScopeId<'db> {
+        self.scope
     }
 
     /// Create a span with the range of the given expression
@@ -183,7 +187,7 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
 
     /// Are we currently inferring types in a stub file?
     pub(crate) fn in_stub(&self) -> bool {
-        self.file.is_stub(self.db().upcast())
+        self.file.is_stub(self.db())
     }
 
     #[must_use]
@@ -284,7 +288,6 @@ impl LintDiagnosticGuard<'_, '_> {
     ///
     /// Callers can add additional primary or secondary annotations via the
     /// `DerefMut` trait implementation to a `Diagnostic`.
-    #[expect(dead_code)]
     pub(super) fn add_primary_tag(&mut self, tag: DiagnosticTag) {
         let ann = self.primary_annotation_mut().unwrap();
         ann.push_tag(tag);
@@ -327,7 +330,7 @@ impl Drop for LintDiagnosticGuard<'_, '_> {
         let mut diag = self.diag.take().unwrap();
 
         diag.sub(SubDiagnostic::new(
-            Severity::Info,
+            SubDiagnosticSeverity::Info,
             match self.source {
                 LintSource::Default => format!("rule `{}` is enabled by default", diag.id()),
                 LintSource::Cli => format!("rule `{}` was selected on the command line", diag.id()),
@@ -395,13 +398,13 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
         //   returns a rule selector for a given file that respects the package's settings,
         //   any global pragma comments in the file, and any per-file-ignores.
 
-        if !ctx.db.is_file_open(ctx.file) {
+        if !ctx.db.should_check_file(ctx.file) {
             return None;
         }
         let lint_id = LintId::of(lint);
         // Skip over diagnostics if the rule
         // is disabled.
-        let (severity, source) = ctx.db.rule_selection().get(lint_id)?;
+        let (severity, source) = ctx.db.rule_selection(ctx.file).get(lint_id)?;
         // If we're not in type checking mode,
         // we can bail now.
         if ctx.is_in_no_type_check() {
@@ -569,7 +572,7 @@ impl<'db, 'ctx> DiagnosticGuardBuilder<'db, 'ctx> {
         id: DiagnosticId,
         severity: Severity,
     ) -> Option<DiagnosticGuardBuilder<'db, 'ctx>> {
-        if !ctx.db.is_file_open(ctx.file) {
+        if !ctx.db.should_check_file(ctx.file) {
             return None;
         }
         Some(DiagnosticGuardBuilder { ctx, id, severity })

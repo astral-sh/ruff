@@ -278,3 +278,82 @@ def _(x: type[UsesMeta1], y: type[UsesMeta2]):
     else:
         reveal_type(y)  # revealed: type[UsesMeta2]
 ```
+
+## Narrowing if an object with an intersection/union/TypeVar type is used as the second argument
+
+If an intersection with only positive members is used as the second argument, and all positive
+members of the intersection are valid arguments for the second argument to `isinstance()`, we
+intersect with each positive member of the intersection:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, ClassVar
+from ty_extensions import Intersection
+
+class Foo: ...
+
+class Bar:
+    attribute: ClassVar[int]
+
+class Baz:
+    attribute: ClassVar[str]
+
+def f(x: type[Foo], y: Intersection[type[Bar], type[Baz]], z: type[Any]):
+    if issubclass(x, y):
+        reveal_type(x)  # revealed: type[Foo] & type[Bar] & type[Baz]
+
+    if issubclass(x, z):
+        reveal_type(x)  # revealed: type[Foo] & Any
+```
+
+The same if a union type is used:
+
+```py
+def g(x: type[Foo], y: type[Bar | Baz]):
+    if issubclass(x, y):
+        reveal_type(x)  # revealed: (type[Foo] & type[Bar]) | (type[Foo] & type[Baz])
+```
+
+And even if a `TypeVar` is used, providing it has valid upper bounds/constraints:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T", bound=type[Bar])
+
+def h_old_syntax(x: type[Foo], y: T) -> T:
+    if issubclass(x, y):
+        reveal_type(x)  # revealed: type[Foo] & type[Bar]
+        reveal_type(x.attribute)  # revealed: int
+
+    return y
+
+def h[U: type[Bar | Baz]](x: type[Foo], y: U) -> U:
+    if issubclass(x, y):
+        reveal_type(x)  # revealed: (type[Foo] & type[Bar]) | (type[Foo] & type[Baz])
+        reveal_type(x.attribute)  # revealed: int | str
+
+    return y
+```
+
+Or even a tuple of tuple of typevars that have intersection bounds...
+
+```py
+from ty_extensions import Intersection
+
+class Spam: ...
+class Eggs: ...
+class Ham: ...
+class Mushrooms: ...
+
+def i[T: Intersection[type[Bar], type[Baz | Spam]], U: (type[Eggs], type[Ham])](x: type[Foo], y: T, z: U) -> tuple[T, U]:
+    if issubclass(x, (y, (z, Mushrooms))):
+        # revealed: (type[Foo] & type[Bar] & type[Baz]) | (type[Foo] & type[Bar] & type[Spam]) | (type[Foo] & type[Eggs]) | (type[Foo] & type[Ham]) | (type[Foo] & type[Mushrooms])
+        reveal_type(x)
+
+    return (y, z)
+```

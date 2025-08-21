@@ -1,5 +1,5 @@
-use crate::server::{Result, client::Notifier};
-use crate::session::DocumentSnapshot;
+use crate::server::Result;
+use crate::session::{Client, DocumentSnapshot};
 use anyhow::Context;
 use lsp_types::{self as types, request as req};
 use regex::Regex;
@@ -15,12 +15,12 @@ impl super::RequestHandler for Hover {
 }
 
 impl super::BackgroundDocumentRequestHandler for Hover {
-    fn document_url(params: &types::HoverParams) -> std::borrow::Cow<lsp_types::Url> {
+    fn document_url(params: &types::HoverParams) -> std::borrow::Cow<'_, lsp_types::Url> {
         std::borrow::Cow::Borrowed(&params.text_document_position_params.text_document.uri)
     }
     fn run_with_snapshot(
         snapshot: DocumentSnapshot,
-        _notifier: Notifier,
+        _client: &Client,
         params: types::HoverParams,
     ) -> Result<Option<types::Hover>> {
         Ok(hover(&snapshot, &params.text_document_position_params))

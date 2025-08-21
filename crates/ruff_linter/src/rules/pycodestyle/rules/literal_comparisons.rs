@@ -222,7 +222,7 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
 
     if !helpers::is_constant_non_singleton(next) {
         if let Some(op) = EqCmpOp::try_from(*op) {
-            if checker.enabled(Rule::NoneComparison) && comparator.is_none_literal_expr() {
+            if checker.is_rule_enabled(Rule::NoneComparison) && comparator.is_none_literal_expr() {
                 match op {
                     EqCmpOp::Eq => {
                         let diagnostic =
@@ -239,7 +239,7 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
                 }
             }
 
-            if checker.enabled(Rule::TrueFalseComparison) {
+            if checker.is_rule_enabled(Rule::TrueFalseComparison) {
                 if let Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) = comparator {
                     match op {
                         EqCmpOp::Eq => {
@@ -290,7 +290,7 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
         }
 
         if let Some(op) = EqCmpOp::try_from(*op) {
-            if checker.enabled(Rule::NoneComparison) && next.is_none_literal_expr() {
+            if checker.is_rule_enabled(Rule::NoneComparison) && next.is_none_literal_expr() {
                 match op {
                     EqCmpOp::Eq => {
                         let diagnostic =
@@ -307,7 +307,7 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
                 }
             }
 
-            if checker.enabled(Rule::TrueFalseComparison) {
+            if checker.is_rule_enabled(Rule::TrueFalseComparison) {
                 if let Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) = next {
                     match op {
                         EqCmpOp::Eq => {

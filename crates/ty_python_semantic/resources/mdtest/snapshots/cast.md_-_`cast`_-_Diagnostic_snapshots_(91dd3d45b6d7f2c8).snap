@@ -1,0 +1,34 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: cast.md - `cast` - Diagnostic snapshots
+mdtest path: crates/ty_python_semantic/resources/mdtest/directives/cast.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | import secrets
+2 | from typing import cast
+3 | 
+4 | # error: [redundant-cast] "Value is already of type `int`"
+5 | cast(int, secrets.randbelow(10))
+```
+
+# Diagnostics
+
+```
+warning[redundant-cast]: Value is already of type `int`
+ --> src/mdtest_snippet.py:5:1
+  |
+4 | # error: [redundant-cast] "Value is already of type `int`"
+5 | cast(int, secrets.randbelow(10))
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+info: rule `redundant-cast` is enabled by default
+
+```

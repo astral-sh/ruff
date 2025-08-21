@@ -6,7 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::rules::ruff::rules::helpers::{
+use crate::rules::ruff::helpers::{
     dataclass_kind, has_default_copy_semantics, is_class_var_annotation, is_final_annotation,
     is_special_attribute,
 };

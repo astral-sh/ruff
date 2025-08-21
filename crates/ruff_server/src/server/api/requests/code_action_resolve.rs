@@ -8,9 +8,10 @@ use ruff_linter::codes::Rule;
 use crate::PositionEncoding;
 use crate::edit::WorkspaceEditTracker;
 use crate::fix::Fixes;
+use crate::server::Result;
 use crate::server::SupportedCodeAction;
 use crate::server::api::LSPResult;
-use crate::server::{Result, client::Notifier};
+use crate::session::Client;
 use crate::session::{DocumentQuery, DocumentSnapshot, ResolvedClientCapabilities};
 
 pub(crate) struct CodeActionResolve;
@@ -20,14 +21,14 @@ impl super::RequestHandler for CodeActionResolve {
 }
 
 impl super::BackgroundDocumentRequestHandler for CodeActionResolve {
-    fn document_url(params: &types::CodeAction) -> Cow<types::Url> {
+    fn document_url(params: &types::CodeAction) -> Cow<'_, types::Url> {
         let uri: lsp_types::Url = serde_json::from_value(params.data.clone().unwrap_or_default())
             .expect("code actions should have a URI in their data fields");
         Cow::Owned(uri)
     }
     fn run_with_snapshot(
         snapshot: DocumentSnapshot,
-        _notifier: Notifier,
+        _client: &Client,
         mut action: types::CodeAction,
     ) -> Result<types::CodeAction> {
         let query = snapshot.query();

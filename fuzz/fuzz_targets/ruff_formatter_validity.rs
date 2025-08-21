@@ -37,13 +37,13 @@ fn do_fuzz(case: &[u8]) -> Corpus {
         ParseSource::None,
     );
 
-    if linter_result.has_syntax_errors() {
+    if linter_result.has_invalid_syntax() {
         return Corpus::Keep; // keep, but don't continue
     }
 
     let mut warnings = HashMap::new();
 
-    for msg in &linter_result.messages {
+    for msg in &linter_result.diagnostics {
         let count: &mut usize = warnings.entry(msg.name()).or_default();
         *count += 1;
     }
@@ -63,11 +63,11 @@ fn do_fuzz(case: &[u8]) -> Corpus {
         );
 
         assert!(
-            !linter_result.has_syntax_errors(),
+            linter_result.has_invalid_syntax(),
             "formatter introduced a parse error"
         );
 
-        for msg in &linter_result.messages {
+        for msg in &linter_result.diagnostics {
             if let Some(count) = warnings.get_mut(msg.name()) {
                 if let Some(decremented) = count.checked_sub(1) {
                     *count = decremented;

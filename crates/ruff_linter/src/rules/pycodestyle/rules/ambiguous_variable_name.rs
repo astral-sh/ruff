@@ -32,7 +32,6 @@ use crate::rules::pycodestyle::helpers::is_ambiguous_name;
 /// o = 123
 /// i = 42
 /// ```
-///
 #[derive(ViolationMetadata)]
 pub(crate) struct AmbiguousVariableName(pub String);
 

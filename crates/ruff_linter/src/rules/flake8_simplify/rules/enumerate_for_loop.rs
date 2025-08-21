@@ -20,6 +20,7 @@ use crate::checkers::ast::Checker;
 /// ## Example
 /// ```python
 /// fruits = ["apple", "banana", "cherry"]
+/// i = 0
 /// for fruit in fruits:
 ///     print(f"{i + 1}. {fruit}")
 ///     i += 1

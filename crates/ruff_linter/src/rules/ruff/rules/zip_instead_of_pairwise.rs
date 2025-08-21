@@ -94,6 +94,7 @@ fn match_slice_info(expr: &Expr) -> Option<SliceInfo> {
         let Expr::NumberLiteral(ast::ExprNumberLiteral {
             value: ast::Number::Int(int),
             range: _,
+            node_index: _,
         }) = lower.as_ref()
         else {
             return None;

@@ -25,7 +25,7 @@ use super::{DisplayTypeVars, TypeVarReferenceVisitor, check_type_vars, in_nested
 /// in Python 3.13.
 ///
 /// Not all type checkers fully support PEP 695 yet, so even valid fixes suggested by this rule may
-/// cause type checking to fail.
+/// cause type checking to [fail].
 ///
 /// ## Fix safety
 ///
@@ -76,6 +76,7 @@ use super::{DisplayTypeVars, TypeVarReferenceVisitor, check_type_vars, in_nested
 /// [PYI018]: https://docs.astral.sh/ruff/rules/unused-private-type-var/
 /// [UP046]: https://docs.astral.sh/ruff/rules/non-pep695-generic-class/
 /// [UP049]: https://docs.astral.sh/ruff/rules/private-type-parameter/
+/// [fail]: https://github.com/python/mypy/issues/18507
 #[derive(ViolationMetadata)]
 pub(crate) struct NonPEP695GenericFunction {
     name: String,

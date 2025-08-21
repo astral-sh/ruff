@@ -120,8 +120,7 @@ def _(flag: bool):
 
 ### Dunder methods as class-level annotations with no value
 
-Class-level annotations with no value assigned are considered instance-only, and aren't available as
-dunder methods:
+Class-level annotations with no value assigned are considered to be accessible on the class:
 
 ```py
 from typing import Callable
@@ -129,10 +128,8 @@ from typing import Callable
 class C:
     __call__: Callable[..., None]
 
-# error: [call-non-callable]
 C()()
 
-# error: [invalid-assignment]
 _: Callable[..., None] = C()
 ```
 
@@ -258,7 +255,8 @@ class NotSubscriptable2:
         self.__getitem__ = external_getitem
 
 def _(union: NotSubscriptable1 | NotSubscriptable2):
-    # error: [non-subscriptable]
+    # error: [non-subscriptable] "Cannot subscript object of type `NotSubscriptable2` with no `__getitem__` method"
+    # error: [non-subscriptable] "Cannot subscript object of type `NotSubscriptable1` with no `__getitem__` method"
     union[0]
 ```
 

@@ -20,6 +20,9 @@ pub fn get_cwd() -> &'static Path {
 
 /// Create a set with codes matching the pattern/code pairs.
 pub(crate) fn ignores_from_path(path: &Path, ignore_list: &CompiledPerFileIgnoreList) -> RuleSet {
+    if ignore_list.is_empty() {
+        return RuleSet::empty();
+    }
     ignore_list
         .iter_matches(path, "Adding per-file ignores")
         .flatten()

@@ -66,6 +66,7 @@ impl FormatNodeRule<StmtTry> for FormatStmtTry {
             finalbody,
             is_star,
             range: _,
+            node_index: _,
         } = item;
 
         let comments_info = f.context().comments().clone();

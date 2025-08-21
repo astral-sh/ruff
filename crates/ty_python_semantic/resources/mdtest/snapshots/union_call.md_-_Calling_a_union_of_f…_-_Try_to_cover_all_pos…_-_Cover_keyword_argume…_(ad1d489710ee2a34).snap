@@ -40,7 +40,7 @@ error[parameter-already-assigned]: Multiple values provided for parameter `name`
    |                  ^^^^^^^^^^
    |
 info: Union variant `def f1(name: str) -> int` is incompatible with this call site
-info: Attempted to call union type `(def f1(name: str) -> int) | (def any(*args, **kwargs) -> int)`
+info: Attempted to call union type `(def f1(name: str) -> int) | (def any(...) -> int)`
 info: rule `parameter-already-assigned` is enabled by default
 
 ```
@@ -55,7 +55,7 @@ error[unknown-argument]: Argument `unknown` does not match any known parameter o
    |                              ^^^^^^^^^^^^^^
    |
 info: Union variant `def f1(name: str) -> int` is incompatible with this call site
-info: Attempted to call union type `(def f1(name: str) -> int) | (def any(*args, **kwargs) -> int)`
+info: Attempted to call union type `(def f1(name: str) -> int) | (def any(...) -> int)`
 info: rule `unknown-argument` is enabled by default
 
 ```

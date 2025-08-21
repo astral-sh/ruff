@@ -103,3 +103,65 @@ def _(a: bool):
         reveal_type(x / y)  # revealed: int | float
         reveal_type(x % y)  # revealed: int
 ```
+
+## Bitwise operations with a variable
+
+```py
+import random
+
+def _(a: bool):
+    def lhs_is_int(x: int):
+        reveal_type(x | a)  # revealed: int
+        reveal_type(x & a)  # revealed: int
+        reveal_type(x ^ a)  # revealed: int
+
+    def rhs_is_int(x: int):
+        reveal_type(a | x)  # revealed: int
+        reveal_type(a & x)  # revealed: int
+        reveal_type(a ^ x)  # revealed: int
+
+    def lhs_is_int_literal():
+        reveal_type(0 | a)  # revealed: int
+        reveal_type(0 & a)  # revealed: int
+        reveal_type(0 ^ a)  # revealed: int
+
+        reveal_type(1 | a)  # revealed: int
+        reveal_type(1 & a)  # revealed: int
+        reveal_type(1 ^ a)  # revealed: int
+
+    def lhs_is_true():
+        reveal_type(True | a)  # revealed: bool
+        reveal_type(True & a)  # revealed: bool
+        reveal_type(True ^ a)  # revealed: bool
+
+    def rhs_is_true():
+        reveal_type(a | True)  # revealed: bool
+        reveal_type(a & True)  # revealed: bool
+        reveal_type(a ^ True)  # revealed: bool
+
+    def lhs_is_false():
+        reveal_type(False | a)  # revealed: bool
+        reveal_type(False & a)  # revealed: bool
+        reveal_type(False ^ a)  # revealed: bool
+
+    def rhs_is_false():
+        reveal_type(a | False)  # revealed: bool
+        reveal_type(a & False)  # revealed: bool
+        reveal_type(a ^ False)  # revealed: bool
+
+    def both_are_bool(x: bool, y: bool):
+        reveal_type(x | y)  # revealed: bool
+        reveal_type(x & y)  # revealed: bool
+        reveal_type(x ^ y)  # revealed: bool
+
+    def lhs_is_int_literal_rhs_is_bool_literal():
+        reveal_type(0 & True)  # revealed: Literal[0]
+        reveal_type(0 | True)  # revealed: Literal[1]
+        reveal_type(3 & True)  # revealed: Literal[1]
+        reveal_type(3 | True)  # revealed: Literal[3]
+
+        reveal_type(0 & False)  # revealed: Literal[0]
+        reveal_type(0 | False)  # revealed: Literal[0]
+        reveal_type(3 & False)  # revealed: Literal[0]
+        reveal_type(3 | False)  # revealed: Literal[3]
+```

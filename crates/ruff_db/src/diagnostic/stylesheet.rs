@@ -41,6 +41,8 @@ pub struct DiagnosticStylesheet {
     pub(crate) line_no: Style,
     pub(crate) emphasis: Style,
     pub(crate) none: Style,
+    pub(crate) separator: Style,
+    pub(crate) secondary_code: Style,
 }
 
 impl Default for DiagnosticStylesheet {
@@ -62,6 +64,8 @@ impl DiagnosticStylesheet {
             line_no: bright_blue.effects(Effects::BOLD),
             emphasis: Style::new().effects(Effects::BOLD),
             none: Style::new(),
+            separator: AnsiColor::Cyan.on_default(),
+            secondary_code: AnsiColor::Red.on_default().effects(Effects::BOLD),
         }
     }
 
@@ -75,6 +79,8 @@ impl DiagnosticStylesheet {
             line_no: Style::new(),
             emphasis: Style::new(),
             none: Style::new(),
+            separator: Style::new(),
+            secondary_code: Style::new(),
         }
     }
 }

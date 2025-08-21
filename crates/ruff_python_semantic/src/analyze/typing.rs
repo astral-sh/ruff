@@ -287,6 +287,7 @@ pub fn is_immutable_annotation(
             op: Operator::BitOr,
             right,
             range: _,
+            node_index: _,
         }) => {
             is_immutable_annotation(left, semantic, extend_immutable_calls)
                 && is_immutable_annotation(right, semantic, extend_immutable_calls)
@@ -428,11 +429,51 @@ pub fn traverse_union<'a, F>(func: &mut F, semantic: &SemanticModel, expr: &'a E
 where
     F: FnMut(&'a Expr, &'a Expr),
 {
+    traverse_union_options(func, semantic, expr, UnionTraversalOptions::default());
+}
+
+/// Traverse a "union" type annotation, applying `func` to each union member.
+///
+/// Supports traversal of `Union`, `|`, and `Optional` union expressions.
+///
+/// The function is called with each expression in the union (excluding declarations of nested
+/// unions) and the parent expression.
+pub fn traverse_union_and_optional<'a, F>(func: &mut F, semantic: &SemanticModel, expr: &'a Expr)
+where
+    F: FnMut(&'a Expr, &'a Expr),
+{
+    traverse_union_options(
+        func,
+        semantic,
+        expr,
+        UnionTraversalOptions {
+            traverse_optional: true,
+        },
+    );
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+/// Options for traversing union types.
+///
+/// See also [`traverse_union_options`].
+struct UnionTraversalOptions {
+    traverse_optional: bool,
+}
+
+fn traverse_union_options<'a, F>(
+    func: &mut F,
+    semantic: &SemanticModel,
+    expr: &'a Expr,
+    options: UnionTraversalOptions,
+) where
+    F: FnMut(&'a Expr, &'a Expr),
+{
     fn inner<'a, F>(
         func: &mut F,
         semantic: &SemanticModel,
         expr: &'a Expr,
         parent: Option<&'a Expr>,
+        options: UnionTraversalOptions,
     ) where
         F: FnMut(&'a Expr, &'a Expr),
     {
@@ -442,6 +483,7 @@ where
             left,
             right,
             range: _,
+            node_index: _,
         }) = expr
         {
             // The union data structure usually looks like this:
@@ -454,25 +496,31 @@ where
             // in the order they appear in the source code.
 
             // Traverse the left then right arms
-            inner(func, semantic, left, Some(expr));
-            inner(func, semantic, right, Some(expr));
+            inner(func, semantic, left, Some(expr), options);
+            inner(func, semantic, right, Some(expr), options);
             return;
         }
 
-        // Ex) `Union[x, y]`
         if let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr {
+            // Ex) `Union[x, y]`
             if semantic.match_typing_expr(value, "Union") {
                 if let Expr::Tuple(tuple) = &**slice {
                     // Traverse each element of the tuple within the union recursively to handle cases
                     // such as `Union[..., Union[...]]`
                     tuple
                         .iter()
-                        .for_each(|elem| inner(func, semantic, elem, Some(expr)));
+                        .for_each(|elem| inner(func, semantic, elem, Some(expr), options));
                     return;
                 }
 
                 // Ex) `Union[Union[a, b]]` and `Union[a | b | c]`
-                inner(func, semantic, slice, Some(expr));
+                inner(func, semantic, slice, Some(expr), options);
+                return;
+            }
+            // Ex) `Optional[x]`
+            if options.traverse_optional && semantic.match_typing_expr(value, "Optional") {
+                inner(func, semantic, value, Some(expr), options);
+                inner(func, semantic, slice, Some(expr), options);
                 return;
             }
         }
@@ -483,7 +531,7 @@ where
         }
     }
 
-    inner(func, semantic, expr, None);
+    inner(func, semantic, expr, None, options);
 }
 
 /// Traverse a "literal" type annotation, applying `func` to each literal member.

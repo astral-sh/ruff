@@ -1,33 +1,41 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/expressions/lambda_default_parameters.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: AtomicNodeIndex(..),
         range: 0..20,
         body: [
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 0..20,
                     value: Lambda(
                         ExprLambda {
+                            node_index: AtomicNodeIndex(..),
                             range: 0..20,
                             parameters: Some(
                                 Parameters {
                                     range: 7..17,
+                                    node_index: AtomicNodeIndex(
+                                        0,
+                                    ),
                                     posonlyargs: [],
                                     args: [
                                         ParameterWithDefault {
                                             range: 7..8,
+                                            node_index: AtomicNodeIndex(..),
                                             parameter: Parameter {
                                                 range: 7..8,
+                                                node_index: AtomicNodeIndex(..),
                                                 name: Identifier {
                                                     id: Name("a"),
                                                     range: 7..8,
+                                                    node_index: AtomicNodeIndex(..),
                                                 },
                                                 annotation: None,
                                             },
@@ -35,17 +43,21 @@ Module(
                                         },
                                         ParameterWithDefault {
                                             range: 10..14,
+                                            node_index: AtomicNodeIndex(..),
                                             parameter: Parameter {
                                                 range: 10..11,
+                                                node_index: AtomicNodeIndex(..),
                                                 name: Identifier {
                                                     id: Name("b"),
                                                     range: 10..11,
+                                                    node_index: AtomicNodeIndex(..),
                                                 },
                                                 annotation: None,
                                             },
                                             default: Some(
                                                 NumberLiteral(
                                                     ExprNumberLiteral {
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 12..14,
                                                         value: Int(
                                                             20,
@@ -56,11 +68,14 @@ Module(
                                         },
                                         ParameterWithDefault {
                                             range: 16..17,
+                                            node_index: AtomicNodeIndex(..),
                                             parameter: Parameter {
                                                 range: 16..17,
+                                                node_index: AtomicNodeIndex(..),
                                                 name: Identifier {
                                                     id: Name("c"),
                                                     range: 16..17,
+                                                    node_index: AtomicNodeIndex(..),
                                                 },
                                                 annotation: None,
                                             },
@@ -74,6 +89,7 @@ Module(
                             ),
                             body: NumberLiteral(
                                 ExprNumberLiteral {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 19..20,
                                     value: Int(
                                         1,

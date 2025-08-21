@@ -96,7 +96,7 @@ enum EncodingArg<'a> {
 
 /// Return the encoding argument to an `encode` call, if it can be determined to be a
 /// UTF-8-equivalent encoding.
-fn match_encoding_arg(arguments: &Arguments) -> Option<EncodingArg> {
+fn match_encoding_arg(arguments: &Arguments) -> Option<EncodingArg<'_>> {
     match (&*arguments.args, &*arguments.keywords) {
         // Ex `"".encode()`
         ([], []) => return Some(EncodingArg::Empty),
@@ -187,6 +187,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: &ast::ExprCall) {
                             &call.arguments,
                             Parentheses::Preserve,
                             checker.locator().contents(),
+                            checker.comment_ranges(),
                         )
                         .map(Fix::safe_edit)
                     });
@@ -204,6 +205,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: &ast::ExprCall) {
                             &call.arguments,
                             Parentheses::Preserve,
                             checker.locator().contents(),
+                            checker.comment_ranges(),
                         )
                         .map(Fix::safe_edit)
                     });
@@ -228,6 +230,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: &ast::ExprCall) {
                             &call.arguments,
                             Parentheses::Preserve,
                             checker.locator().contents(),
+                            checker.comment_ranges(),
                         )
                         .map(Fix::safe_edit)
                     });
@@ -245,6 +248,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: &ast::ExprCall) {
                             &call.arguments,
                             Parentheses::Preserve,
                             checker.locator().contents(),
+                            checker.comment_ranges(),
                         )
                         .map(Fix::safe_edit)
                     });

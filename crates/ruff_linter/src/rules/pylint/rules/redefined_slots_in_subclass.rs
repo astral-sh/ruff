@@ -115,7 +115,7 @@ fn check_super_slots(checker: &Checker, class_def: &ast::StmtClassDef, slot: &Sl
     }
 }
 
-fn slots_members(body: &[Stmt]) -> FxHashSet<Slot> {
+fn slots_members(body: &[Stmt]) -> FxHashSet<Slot<'_>> {
     let mut members = FxHashSet::default();
     for stmt in body {
         match stmt {
@@ -161,13 +161,17 @@ fn slots_members(body: &[Stmt]) -> FxHashSet<Slot> {
     members
 }
 
-fn slots_attributes(expr: &Expr) -> impl Iterator<Item = Slot> {
+fn slots_attributes(expr: &Expr) -> impl Iterator<Item = Slot<'_>> {
     // Ex) `__slots__ = ("name",)`
     let elts_iter = match expr {
         Expr::Tuple(ast::ExprTuple { elts, .. })
         | Expr::List(ast::ExprList { elts, .. })
         | Expr::Set(ast::ExprSet { elts, .. }) => Some(elts.iter().filter_map(|elt| match elt {
-            Expr::StringLiteral(ast::ExprStringLiteral { value, range }) => Some(Slot {
+            Expr::StringLiteral(ast::ExprStringLiteral {
+                value,
+                range,
+                node_index: _,
+            }) => Some(Slot {
                 name: value.to_str(),
                 range: *range,
             }),
@@ -183,12 +187,14 @@ fn slots_attributes(expr: &Expr) -> impl Iterator<Item = Slot> {
                 .unwrap()
                 .iter_keys()
                 .filter_map(|key| match key {
-                    Some(Expr::StringLiteral(ast::ExprStringLiteral { value, range })) => {
-                        Some(Slot {
-                            name: value.to_str(),
-                            range: *range,
-                        })
-                    }
+                    Some(Expr::StringLiteral(ast::ExprStringLiteral {
+                        value,
+                        range,
+                        node_index: _,
+                    })) => Some(Slot {
+                        name: value.to_str(),
+                        range: *range,
+                    }),
                     _ => None,
                 }),
         ),

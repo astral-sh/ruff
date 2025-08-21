@@ -57,6 +57,7 @@ KNOWN_FORMATTING_VIOLATIONS = [
     "incorrect-blank-line-after-class",
     "incorrect-blank-line-before-class",
     "indentation-with-invalid-multiple",
+    "indentation-with-invalid-multiple-comment",
     "line-too-long",
     "missing-trailing-comma",
     "missing-whitespace",
@@ -111,7 +112,6 @@ KNOWN_FORMATTING_VIOLATIONS = [
 # For some docs, Ruff is unable to parse the example code.
 KNOWN_PARSE_ERRORS = [
     "blank-line-with-whitespace",
-    "indentation-with-invalid-multiple-comment",
     "indented-form-feed",
     "missing-newline-at-end-of-file",
     "mixed-spaces-and-tabs",

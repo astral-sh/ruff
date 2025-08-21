@@ -1,31 +1,35 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/ok/class_def_arguments.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: AtomicNodeIndex(..),
         range: 0..32,
         body: [
             ClassDef(
                 StmtClassDef {
+                    node_index: AtomicNodeIndex(..),
                     range: 0..14,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("Foo"),
                         range: 6..9,
+                        node_index: AtomicNodeIndex(..),
                     },
                     type_params: None,
                     arguments: None,
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: AtomicNodeIndex(..),
                                 range: 11..14,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 11..14,
                                     },
                                 ),
@@ -36,16 +40,19 @@ Module(
             ),
             ClassDef(
                 StmtClassDef {
+                    node_index: AtomicNodeIndex(..),
                     range: 15..31,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("Foo"),
                         range: 21..24,
+                        node_index: AtomicNodeIndex(..),
                     },
                     type_params: None,
                     arguments: Some(
                         Arguments {
                             range: 24..26,
+                            node_index: AtomicNodeIndex(..),
                             args: [],
                             keywords: [],
                         },
@@ -53,9 +60,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: AtomicNodeIndex(..),
                                 range: 28..31,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 28..31,
                                     },
                                 ),

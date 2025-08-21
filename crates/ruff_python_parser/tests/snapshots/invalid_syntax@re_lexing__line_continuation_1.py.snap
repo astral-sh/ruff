@@ -7,16 +7,20 @@ input_file: crates/ruff_python_parser/resources/invalid/re_lexing/line_continuat
 ```
 Module(
     ModModule {
+        node_index: AtomicNodeIndex(..),
         range: 0..36,
         body: [
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 0..13,
                     value: Call(
                         ExprCall {
+                            node_index: AtomicNodeIndex(..),
                             range: 0..13,
                             func: Name(
                                 ExprName {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 0..4,
                                     id: Name("call"),
                                     ctx: Load,
@@ -24,9 +28,11 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 4..13,
+                                node_index: AtomicNodeIndex(..),
                                 args: [
                                     Name(
                                         ExprName {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 5..6,
                                             id: Name("a"),
                                             ctx: Load,
@@ -34,6 +40,7 @@ Module(
                                     ),
                                     Name(
                                         ExprName {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 8..9,
                                             id: Name("b"),
                                             ctx: Load,
@@ -48,16 +55,21 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: AtomicNodeIndex(..),
                     range: 16..35,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("bar"),
                         range: 20..23,
+                        node_index: AtomicNodeIndex(..),
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 23..25,
+                        node_index: AtomicNodeIndex(
+                            0,
+                        ),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -68,6 +80,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
+                                node_index: AtomicNodeIndex(..),
                                 range: 31..35,
                             },
                         ),

@@ -185,6 +185,7 @@ fn make_suggestion(set: &ast::ExprName, element: &Expr, generator: Generator) ->
         attr: ast::Identifier::new("discard".to_string(), TextRange::default()),
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     };
     // Make the actual call `set.discard(element)`
     let call = ast::ExprCall {
@@ -193,13 +194,16 @@ fn make_suggestion(set: &ast::ExprName, element: &Expr, generator: Generator) ->
             args: Box::from([element.clone()]),
             keywords: Box::from([]),
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
         },
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     };
     // And finally, turn it into a statement.
     let stmt = ast::StmtExpr {
         value: Box::new(call.into()),
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     };
     generator.stmt(&stmt.into())
 }

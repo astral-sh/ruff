@@ -6,9 +6,11 @@ use std::collections::BTreeSet;
 
 use crate::walk::ProjectFilesWalker;
 use ruff_db::Db as _;
-use ruff_db::files::{File, Files};
+use ruff_db::file_revision::FileRevision;
+use ruff_db::files::{File, FileRootKind, Files};
 use ruff_db::system::SystemPath;
 use rustc_hash::FxHashSet;
+use salsa::Setter;
 use ty_python_semantic::Program;
 
 /// Represents the result of applying changes to the project database.
@@ -40,8 +42,6 @@ impl ProjectDatabase {
         let project_root = project.root(self).to_path_buf();
         let config_file_override =
             project_options_overrides.and_then(|options| options.config_file_override.clone());
-        let options =
-            project_options_overrides.map(|project_options| project_options.options.clone());
         let program = Program::get(self);
         let custom_stdlib_versions_path = program
             .custom_stdlib_search_path(self)
@@ -57,12 +57,6 @@ impl ProjectDatabase {
         // Deduplicate the `sync` calls. Many file watchers emit multiple events for the same path.
         let mut synced_files = FxHashSet::default();
         let mut sync_recursively = BTreeSet::default();
-
-        let mut sync_path = |db: &mut ProjectDatabase, path: &SystemPath| {
-            if synced_files.insert(path.to_path_buf()) {
-                File::sync_path(db, path);
-            }
-        };
 
         for change in changes {
             tracing::trace!("Handle change: {:?}", change);
@@ -93,12 +87,49 @@ impl ProjectDatabase {
 
             match change {
                 ChangeEvent::Changed { path, kind: _ } | ChangeEvent::Opened(path) => {
-                    sync_path(self, &path);
+                    if synced_files.insert(path.to_path_buf()) {
+                        let absolute =
+                            SystemPath::absolute(&path, self.system().current_directory());
+                        File::sync_path_only(self, &absolute);
+                        if let Some(root) = self.files().root(self, &absolute) {
+                            match root.kind_at_time_of_creation(self) {
+                                // When a file inside the root of
+                                // the project is changed, we don't
+                                // want to mark the entire root as
+                                // having changed too. In theory it
+                                // might make sense to, but at time
+                                // of writing, the file root revision
+                                // on a project is used to invalidate
+                                // the submodule files found within a
+                                // directory. If we bumped the revision
+                                // on every change within a project,
+                                // then this caching technique would be
+                                // effectively useless.
+                                //
+                                // It's plausible we should explore
+                                // a more robust cache invalidation
+                                // strategy that models more directly
+                                // what we care about. For example, by
+                                // keeping track of directories and
+                                // their direct children explicitly,
+                                // and then keying the submodule cache
+                                // off of that instead. ---AG
+                                FileRootKind::Project => {}
+                                FileRootKind::LibrarySearchPath => {
+                                    root.set_revision(self).to(FileRevision::now());
+                                }
+                            }
+                        }
+                    }
                 }
 
                 ChangeEvent::Created { kind, path } => {
                     match kind {
-                        CreatedKind::File => sync_path(self, &path),
+                        CreatedKind::File => {
+                            if synced_files.insert(path.to_path_buf()) {
+                                File::sync_path(self, &path);
+                            }
+                        }
                         CreatedKind::Directory | CreatedKind::Any => {
                             sync_recursively.insert(path.clone());
                         }
@@ -113,14 +144,15 @@ impl ProjectDatabase {
                     // should be included in the project. We can skip this check for
                     // paths that aren't part of the project or shouldn't be included
                     // when checking the project.
-                    if project.is_path_included(self, &path) {
-                        if self.system().is_file(&path) {
+
+                    if self.system().is_file(&path) {
+                        if project.is_file_included(self, &path) {
                             // Add the parent directory because `walkdir` always visits explicitly passed files
                             // even if they match an exclude filter.
                             added_paths.insert(path.parent().unwrap().to_path_buf());
-                        } else {
-                            added_paths.insert(path);
                         }
+                    } else if project.is_directory_included(self, &path) {
+                        added_paths.insert(path);
                     }
                 }
 
@@ -138,7 +170,9 @@ impl ProjectDatabase {
                     };
 
                     if is_file {
-                        sync_path(self, &path);
+                        if synced_files.insert(path.to_path_buf()) {
+                            File::sync_path(self, &path);
+                        }
 
                         if let Some(file) = self.files().try_system(self, &path) {
                             project.remove_file(self, file);
@@ -153,7 +187,9 @@ impl ProjectDatabase {
                             result.custom_stdlib_changed = true;
                         }
 
-                        if project.is_path_included(self, &path) || path == project_root {
+                        let directory_included = project.is_directory_included(self, &path);
+
+                        if directory_included || path == project_root {
                             // TODO: Shouldn't it be enough to simply traverse the project files and remove all
                             // that start with the given path?
                             tracing::debug!(
@@ -165,6 +201,10 @@ impl ProjectDatabase {
                             // indexed files and remove the once that start with the same path, unless
                             // the deleted path is the project configuration.
                             result.project_changed = true;
+                        } else if !directory_included {
+                            tracing::debug!(
+                                "Skipping reload because directory '{path}' isn't included in the project"
+                            );
                         }
                     }
                 }
@@ -210,31 +250,48 @@ impl ProjectDatabase {
             };
             match new_project_metadata {
                 Ok(mut metadata) => {
-                    if let Some(cli_options) = options {
-                        metadata.apply_options(cli_options);
-                    }
-
                     if let Err(error) = metadata.apply_configuration_files(self.system()) {
                         tracing::error!(
                             "Failed to apply configuration files, continuing without applying them: {error}"
                         );
                     }
 
-                    let program_settings = metadata.to_program_settings(self.system());
+                    if let Some(overrides) = project_options_overrides {
+                        metadata.apply_overrides(overrides);
+                    }
 
-                    let program = Program::get(self);
-                    if let Err(error) = program.update_from_settings(self, program_settings) {
-                        tracing::error!(
-                            "Failed to update the program settings, keeping the old program settings: {error}"
-                        );
+                    match metadata.to_program_settings(self.system(), self.vendored()) {
+                        Ok(program_settings) => {
+                            let program = Program::get(self);
+                            program.update_from_settings(self, program_settings);
+                        }
+                        Err(error) => {
+                            tracing::error!(
+                                "Failed to convert metadata to program settings, continuing without applying them: {error}"
+                            );
+                        }
                     }
 
                     if metadata.root() == project.root(self) {
                         tracing::debug!("Reloading project after structural change");
                         project.reload(self, metadata);
                     } else {
-                        tracing::debug!("Replace project after structural change");
-                        project = Project::from_metadata(self, metadata);
+                        match Project::from_metadata(self, metadata) {
+                            Ok(new_project) => {
+                                tracing::debug!("Replace project after structural change");
+                                project = new_project;
+                            }
+                            Err(error) => {
+                                tracing::error!(
+                                    "Keeping old project configuration because loading the new settings failed with: {error}"
+                                );
+
+                                project
+                                    .set_settings_diagnostics(self)
+                                    .to(vec![error.into_diagnostic()]);
+                            }
+                        }
+
                         self.project = Some(project);
                     }
                 }
@@ -247,13 +304,16 @@ impl ProjectDatabase {
 
             return result;
         } else if result.custom_stdlib_changed {
-            let search_paths = project
+            match project
                 .metadata(self)
-                .to_program_settings(self.system())
-                .search_paths;
-
-            if let Err(error) = program.update_search_paths(self, &search_paths) {
-                tracing::error!("Failed to set the new search paths: {error}");
+                .to_program_settings(self.system(), self.vendored())
+            {
+                Ok(program_settings) => {
+                    program.update_from_settings(self, program_settings);
+                }
+                Err(error) => {
+                    tracing::error!("Failed to resolve program settings: {error}");
+                }
             }
         }
 

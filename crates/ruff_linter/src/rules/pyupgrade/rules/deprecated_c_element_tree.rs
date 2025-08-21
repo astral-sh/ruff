@@ -14,12 +14,12 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///
 /// ## Example
 /// ```python
-/// from xml.etree import cElementTree
+/// from xml.etree import cElementTree as ET
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// from xml.etree import ElementTree
+/// from xml.etree import ElementTree as ET
 /// ```
 ///
 /// ## References
@@ -53,7 +53,11 @@ where
 /// UP023
 pub(crate) fn deprecated_c_element_tree(checker: &Checker, stmt: &Stmt) {
     match stmt {
-        Stmt::Import(ast::StmtImport { names, range: _ }) => {
+        Stmt::Import(ast::StmtImport {
+            names,
+            range: _,
+            node_index: _,
+        }) => {
             // Ex) `import xml.etree.cElementTree as ET`
             for name in names {
                 if &name.name == "xml.etree.cElementTree" && name.asname.is_some() {
@@ -66,6 +70,7 @@ pub(crate) fn deprecated_c_element_tree(checker: &Checker, stmt: &Stmt) {
             names,
             level,
             range: _,
+            node_index: _,
         }) => {
             if *level > 0 {
                 // Ex) `import .xml.etree.cElementTree as ET`

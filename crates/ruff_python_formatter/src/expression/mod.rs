@@ -685,6 +685,7 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
             #[expect(clippy::cast_possible_truncation)]
             Expr::BoolOp(ast::ExprBoolOp {
                 range: _,
+                node_index: _,
                 op: _,
                 values,
             }) => self.update_max_precedence_with_count(
@@ -696,6 +697,7 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
                 left: _,
                 right: _,
                 range: _,
+                node_index: _,
             }) => self.update_max_precedence(OperatorPrecedence::from(*op)),
 
             Expr::If(_) => {
@@ -708,6 +710,7 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
             #[expect(clippy::cast_possible_truncation)]
             Expr::Compare(ast::ExprCompare {
                 range: _,
+                node_index: _,
                 left: _,
                 ops,
                 comparators: _,
@@ -719,6 +722,7 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
             }
             Expr::Call(ast::ExprCall {
                 range: _,
+                node_index: _,
                 func,
                 arguments: _,
             }) => {
@@ -740,6 +744,7 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
             // `[a, b].test.test[300].dot`
             Expr::Attribute(ast::ExprAttribute {
                 range: _,
+                node_index: _,
                 value,
                 attr: _,
                 ctx: _,
@@ -760,6 +765,7 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
             // Visit the sub-expressions because the sub expressions may be the end of the entire expression.
             Expr::UnaryOp(ast::ExprUnaryOp {
                 range: _,
+                node_index: _,
                 op,
                 operand: _,
             }) => {

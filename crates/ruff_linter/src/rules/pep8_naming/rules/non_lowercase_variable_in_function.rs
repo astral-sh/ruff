@@ -77,7 +77,7 @@ pub(crate) fn non_lowercase_variable_in_function(checker: &Checker, expr: &Expr,
     }
 
     // Ignore explicitly-allowed names.
-    if checker.settings.pep8_naming.ignore_names.matches(name) {
+    if checker.settings().pep8_naming.ignore_names.matches(name) {
         return;
     }
 

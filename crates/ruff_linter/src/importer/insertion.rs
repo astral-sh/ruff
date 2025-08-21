@@ -5,6 +5,7 @@ use ruff_python_ast::Stmt;
 use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_codegen::Stylist;
 use ruff_python_parser::{TokenKind, Tokens};
+use ruff_python_trivia::is_python_whitespace;
 use ruff_python_trivia::{PythonWhitespace, textwrap::indent};
 use ruff_source_file::{LineRanges, UniversalNewlineIterator};
 use ruff_text_size::{Ranged, TextSize};
@@ -55,11 +56,17 @@ impl<'a> Insertion<'a> {
         stylist: &Stylist,
     ) -> Insertion<'static> {
         // Skip over any docstrings.
-        let mut location = if let Some(location) = match_docstring_end(body) {
+        let mut location = if let Some(mut location) = match_docstring_end(body) {
             // If the first token after the docstring is a semicolon, insert after the semicolon as
             // an inline statement.
             if let Some(offset) = match_semicolon(locator.after(location)) {
                 return Insertion::inline(" ", location.add(offset).add(TextSize::of(';')), ";");
+            }
+
+            // While the first token after the docstring is a continuation character (i.e. "\"), advance
+            // additional rows to prevent inserting in the same logical line.
+            while match_continuation(locator.after(location)).is_some() {
+                location = locator.full_line_end(location);
             }
 
             // Otherwise, advance to the next row.
@@ -274,18 +281,11 @@ impl<'a> Insertion<'a> {
     }
 }
 
-/// Find the end of the last docstring.
+/// Find the end of the docstring (first string statement).
 fn match_docstring_end(body: &[Stmt]) -> Option<TextSize> {
-    let mut iter = body.iter();
-    let mut stmt = iter.next()?;
+    let stmt = body.first()?;
     if !is_docstring_stmt(stmt) {
         return None;
-    }
-    for next in iter {
-        if !is_docstring_stmt(next) {
-            break;
-        }
-        stmt = next;
     }
     Some(stmt.end())
 }
@@ -294,7 +294,7 @@ fn match_docstring_end(body: &[Stmt]) -> Option<TextSize> {
 fn match_semicolon(s: &str) -> Option<TextSize> {
     for (offset, c) in s.char_indices() {
         match c {
-            ' ' | '\t' => continue,
+            _ if is_python_whitespace(c) => continue,
             ';' => return Some(TextSize::try_from(offset).unwrap()),
             _ => break,
         }
@@ -306,7 +306,7 @@ fn match_semicolon(s: &str) -> Option<TextSize> {
 fn match_continuation(s: &str) -> Option<TextSize> {
     for (offset, c) in s.char_indices() {
         match c {
-            ' ' | '\t' => continue,
+            _ if is_python_whitespace(c) => continue,
             '\\' => return Some(TextSize::try_from(offset).unwrap()),
             _ => break,
         }
@@ -329,7 +329,7 @@ mod tests {
 
     #[test]
     fn start_of_file() -> Result<()> {
-        fn insert(contents: &str) -> Result<Insertion> {
+        fn insert(contents: &str) -> Result<Insertion<'_>> {
             let parsed = parse_module(contents)?;
             let locator = Locator::new(contents);
             let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
@@ -366,7 +366,28 @@ mod tests {
         .trim_start();
         assert_eq!(
             insert(contents)?,
-            Insertion::own_line("", TextSize::from(40), "\n")
+            Insertion::own_line("", TextSize::from(20), "\n")
+        );
+
+        let contents = r#"
+"""Hello, world!"""\
+
+"#
+        .trim_start();
+        assert_eq!(
+            insert(contents)?,
+            Insertion::own_line("", TextSize::from(22), "\n")
+        );
+
+        let contents = r#"
+"""Hello, world!"""\
+\
+
+"#
+        .trim_start();
+        assert_eq!(
+            insert(contents)?,
+            Insertion::own_line("", TextSize::from(24), "\n")
         );
 
         let contents = r"
@@ -440,7 +461,7 @@ x = 1
 
     #[test]
     fn start_of_block() {
-        fn insert(contents: &str, offset: TextSize) -> Insertion {
+        fn insert(contents: &str, offset: TextSize) -> Insertion<'_> {
             let parsed = parse_module(contents).unwrap();
             let locator = Locator::new(contents);
             let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());

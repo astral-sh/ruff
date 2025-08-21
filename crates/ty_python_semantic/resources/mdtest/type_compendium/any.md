@@ -2,24 +2,13 @@
 
 ## Introduction
 
-The type `Any` is the dynamic type in Python's gradual type system. It represents an unknown
-fully-static type, which means that it represents an *unknown* set of runtime values.
-
-```py
-from ty_extensions import static_assert, is_fully_static
-from typing import Any
-```
-
-`Any` is a dynamic type:
-
-```py
-static_assert(not is_fully_static(Any))
-```
+The type `Any` is the dynamic type in Python's gradual type system. It represents an unknown static
+type, which means that it represents an *unknown* set of runtime values.
 
 ## Every type is assignable to `Any`, and `Any` is assignable to every type
 
 ```py
-from ty_extensions import static_assert, is_fully_static, is_assignable_to
+from ty_extensions import static_assert, is_assignable_to
 from typing_extensions import Never, Any
 
 class C: ...

@@ -13,7 +13,7 @@ mod tests {
     use crate::rules::pydocstyle;
     use crate::rules::pydocstyle::settings::Convention;
     use crate::test::test_path;
-    use crate::{assert_messages, settings};
+    use crate::{assert_diagnostics, settings};
 
     use super::settings::Settings;
 
@@ -24,7 +24,7 @@ mod tests {
             Path::new("pydoclint").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -46,7 +46,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -68,7 +68,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -94,7 +94,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 }

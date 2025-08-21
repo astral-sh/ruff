@@ -157,7 +157,7 @@ pub(crate) fn used_dummy_variable(checker: &Checker, binding: &Binding, binding_
     {
         return;
     }
-    if !checker.settings.dummy_variable_rgx.is_match(name) {
+    if !checker.settings().dummy_variable_rgx.is_match(name) {
         return;
     }
 
@@ -211,7 +211,7 @@ fn get_possible_new_name(
     };
 
     // Check if the fix name is again dummy identifier
-    if checker.settings.dummy_variable_rgx.is_match(&fix_name) {
+    if checker.settings().dummy_variable_rgx.is_match(&fix_name) {
         return None;
     }
 

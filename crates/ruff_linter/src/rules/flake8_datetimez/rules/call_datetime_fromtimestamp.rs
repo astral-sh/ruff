@@ -6,7 +6,7 @@ use ruff_python_semantic::Modules;
 use crate::Violation;
 use crate::checkers::ast::Checker;
 
-use super::helpers::{self, DatetimeModuleAntipattern};
+use crate::rules::flake8_datetimez::helpers::{self, DatetimeModuleAntipattern};
 
 /// ## What it does
 /// Checks for usage of `datetime.datetime.fromtimestamp()` that do not specify
@@ -69,6 +69,7 @@ impl Violation for CallDatetimeFromtimestamp {
     }
 }
 
+/// DTZ006
 pub(crate) fn call_datetime_fromtimestamp(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::DATETIME) {
         return;

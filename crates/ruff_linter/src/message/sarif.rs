@@ -5,12 +5,12 @@ use anyhow::Result;
 use serde::{Serialize, Serializer};
 use serde_json::json;
 
+use ruff_db::diagnostic::{Diagnostic, SecondaryCode};
 use ruff_source_file::OneIndexed;
 
 use crate::VERSION;
-use crate::codes::NoqaCode;
 use crate::fs::normalize_path;
-use crate::message::{Emitter, EmitterContext, Message};
+use crate::message::{Emitter, EmitterContext};
 use crate::registry::{Linter, RuleNamespace};
 
 pub struct SarifEmitter;
@@ -19,17 +19,20 @@ impl Emitter for SarifEmitter {
     fn emit(
         &mut self,
         writer: &mut dyn Write,
-        messages: &[Message],
+        diagnostics: &[Diagnostic],
         _context: &EmitterContext,
     ) -> Result<()> {
-        let results = messages
+        let results = diagnostics
             .iter()
             .map(SarifResult::from_message)
             .collect::<Result<Vec<_>>>()?;
 
-        let unique_rules: HashSet<_> = results.iter().filter_map(|result| result.code).collect();
+        let unique_rules: HashSet<_> = results
+            .iter()
+            .filter_map(|result| result.code.as_secondary_code())
+            .collect();
         let mut rules: Vec<SarifRule> = unique_rules.into_iter().map(SarifRule::from).collect();
-        rules.sort_by(|a, b| a.code.cmp(&b.code));
+        rules.sort_by(|a, b| a.code.cmp(b.code));
 
         let output = json!({
             "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
@@ -54,26 +57,25 @@ impl Emitter for SarifEmitter {
 #[derive(Debug, Clone)]
 struct SarifRule<'a> {
     name: &'a str,
-    code: String,
+    code: &'a SecondaryCode,
     linter: &'a str,
     summary: &'a str,
     explanation: Option<&'a str>,
     url: Option<String>,
 }
 
-impl From<NoqaCode> for SarifRule<'_> {
-    fn from(code: NoqaCode) -> Self {
-        let code_str = code.to_string();
+impl<'a> From<&'a SecondaryCode> for SarifRule<'a> {
+    fn from(code: &'a SecondaryCode) -> Self {
         // This is a manual re-implementation of Rule::from_code, but we also want the Linter. This
         // avoids calling Linter::parse_code twice.
-        let (linter, suffix) = Linter::parse_code(&code_str).unwrap();
+        let (linter, suffix) = Linter::parse_code(code).unwrap();
         let rule = linter
             .all_rules()
             .find(|rule| rule.noqa_code().suffix() == suffix)
             .expect("Expected a valid noqa code corresponding to a rule");
         Self {
             name: rule.into(),
-            code: code_str,
+            code,
             linter: linter.name(),
             summary: rule.message_formats()[0],
             explanation: rule.explanation(),
@@ -111,8 +113,39 @@ impl Serialize for SarifRule<'_> {
 }
 
 #[derive(Debug)]
-struct SarifResult {
-    code: Option<NoqaCode>,
+enum RuleCode<'a> {
+    SecondaryCode(&'a SecondaryCode),
+    LintId(&'a str),
+}
+
+impl RuleCode<'_> {
+    fn as_secondary_code(&self) -> Option<&SecondaryCode> {
+        match self {
+            RuleCode::SecondaryCode(code) => Some(code),
+            RuleCode::LintId(_) => None,
+        }
+    }
+
+    fn as_str(&self) -> &str {
+        match self {
+            RuleCode::SecondaryCode(code) => code.as_str(),
+            RuleCode::LintId(id) => id,
+        }
+    }
+}
+
+impl<'a> From<&'a Diagnostic> for RuleCode<'a> {
+    fn from(code: &'a Diagnostic) -> Self {
+        match code.secondary_code() {
+            Some(diagnostic) => Self::SecondaryCode(diagnostic),
+            None => Self::LintId(code.id().as_str()),
+        }
+    }
+}
+
+#[derive(Debug)]
+struct SarifResult<'a> {
+    code: RuleCode<'a>,
     level: String,
     message: String,
     uri: String,
@@ -122,14 +155,14 @@ struct SarifResult {
     end_column: OneIndexed,
 }
 
-impl SarifResult {
+impl<'a> SarifResult<'a> {
     #[cfg(not(target_arch = "wasm32"))]
-    fn from_message(message: &Message) -> Result<Self> {
-        let start_location = message.compute_start_location();
-        let end_location = message.compute_end_location();
-        let path = normalize_path(&*message.filename());
+    fn from_message(message: &'a Diagnostic) -> Result<Self> {
+        let start_location = message.expect_ruff_start_location();
+        let end_location = message.expect_ruff_end_location();
+        let path = normalize_path(&*message.expect_ruff_filename());
         Ok(Self {
-            code: message.noqa_code(),
+            code: RuleCode::from(message),
             level: "error".to_string(),
             message: message.body().to_string(),
             uri: url::Url::from_file_path(&path)
@@ -144,12 +177,12 @@ impl SarifResult {
 
     #[cfg(target_arch = "wasm32")]
     #[expect(clippy::unnecessary_wraps)]
-    fn from_message(message: &Message) -> Result<Self> {
-        let start_location = message.compute_start_location();
-        let end_location = message.compute_end_location();
-        let path = normalize_path(&*message.filename());
+    fn from_message(message: &'a Diagnostic) -> Result<Self> {
+        let start_location = message.expect_ruff_start_location();
+        let end_location = message.expect_ruff_end_location();
+        let path = normalize_path(&*message.expect_ruff_filename());
         Ok(Self {
-            code: message.noqa_code(),
+            code: RuleCode::from(message),
             level: "error".to_string(),
             message: message.body().to_string(),
             uri: path.display().to_string(),
@@ -161,7 +194,7 @@ impl SarifResult {
     }
 }
 
-impl Serialize for SarifResult {
+impl Serialize for SarifResult<'_> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -184,7 +217,7 @@ impl Serialize for SarifResult {
                     }
                 }
             }],
-            "ruleId": self.code.map(|code| code.to_string()),
+            "ruleId": self.code.as_str(),
         })
         .serialize(serializer)
     }
@@ -194,12 +227,12 @@ impl Serialize for SarifResult {
 mod tests {
     use crate::message::SarifEmitter;
     use crate::message::tests::{
-        capture_emitter_output, create_messages, create_syntax_error_messages,
+        capture_emitter_output, create_diagnostics, create_syntax_error_diagnostics,
     };
 
     fn get_output() -> String {
         let mut emitter = SarifEmitter {};
-        capture_emitter_output(&mut emitter, &create_messages())
+        capture_emitter_output(&mut emitter, &create_diagnostics())
     }
 
     #[test]
@@ -211,7 +244,7 @@ mod tests {
     #[test]
     fn valid_syntax_error_json() {
         let mut emitter = SarifEmitter {};
-        let content = capture_emitter_output(&mut emitter, &create_syntax_error_messages());
+        let content = capture_emitter_output(&mut emitter, &create_syntax_error_diagnostics());
         serde_json::from_str::<serde_json::Value>(&content).unwrap();
     }
 

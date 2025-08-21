@@ -1,7 +1,8 @@
 ---
 source: crates/ruff_linter/src/linter.rs
 ---
-<filename>:2:5: SyntaxError: Starred expression cannot be used here
+invalid-syntax: Starred expression cannot be used here
+ --> <filename>:2:5
   |
 2 | for *x in range(10):
   |     ^^

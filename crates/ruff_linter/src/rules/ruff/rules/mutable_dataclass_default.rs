@@ -6,7 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::rules::ruff::rules::helpers::{dataclass_kind, is_class_var_annotation};
+use crate::rules::ruff::helpers::{dataclass_kind, is_class_var_annotation};
 
 /// ## What it does
 /// Checks for mutable default values in dataclass attributes.

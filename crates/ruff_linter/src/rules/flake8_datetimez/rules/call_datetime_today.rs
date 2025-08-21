@@ -7,7 +7,7 @@ use ruff_python_semantic::Modules;
 use crate::Violation;
 use crate::checkers::ast::Checker;
 
-use super::helpers;
+use crate::rules::flake8_datetimez::helpers;
 
 /// ## What it does
 /// Checks for usage of `datetime.datetime.today()`.
@@ -56,6 +56,7 @@ impl Violation for CallDatetimeToday {
     }
 }
 
+/// DTZ002
 pub(crate) fn call_datetime_today(checker: &Checker, func: &Expr, location: TextRange) {
     if !checker.semantic().seen_module(Modules::DATETIME) {
         return;

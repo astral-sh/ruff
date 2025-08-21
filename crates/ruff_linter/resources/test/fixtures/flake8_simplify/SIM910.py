@@ -49,3 +49,9 @@ def foo(some_other: object):
 # OK
 def foo(some_other):
     a = some_other.get('a', None)
+
+
+# https://github.com/astral-sh/ruff/issues/18777
+def foo():
+    dict = {"Tom": 23, "Maria": 23, "Dog": 11}
+    age = dict.get("Cat", None)

@@ -36,6 +36,10 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// logger = logging.getLogger(__name__)
 /// ```
 ///
+/// ## Fix safety
+/// This fix is always unsafe, as changing from `Logger` to `getLogger`
+/// changes program behavior by will adding the logger to the logging tree.
+///
 /// [Logger Objects]: https://docs.python.org/3/library/logging.html#logger-objects
 #[derive(ViolationMetadata)]
 pub(crate) struct DirectLoggerInstantiation;

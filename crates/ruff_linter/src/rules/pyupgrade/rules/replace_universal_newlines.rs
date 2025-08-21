@@ -76,6 +76,7 @@ pub(crate) fn replace_universal_newlines(checker: &Checker, call: &ast::ExprCall
                     &call.arguments,
                     Parentheses::Preserve,
                     checker.locator().contents(),
+                    checker.comment_ranges(),
                 )
                 .map(Fix::safe_edit)
             });

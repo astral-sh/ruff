@@ -28,7 +28,7 @@ use crate::rules::flynt::helpers;
 /// f"{foo} {bar}"
 /// ```
 ///
-/// # Fix safety
+/// ## Fix safety
 /// The fix is always marked unsafe because the evaluation of the f-string
 /// expressions will default to calling the `__format__` method of each
 /// object, whereas `str.join` expects each object to be an instance of
@@ -91,6 +91,7 @@ fn build_fstring(joiner: &str, joinees: &[Expr], flags: FStringFlags) -> Option<
                 .into_boxed_str(),
             flags: flags?,
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
         };
         return Some(node.into());
     }
@@ -113,6 +114,7 @@ fn build_fstring(joiner: &str, joinees: &[Expr], flags: FStringFlags) -> Option<
     let node = ast::FString {
         elements: f_string_elements.into(),
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
         flags,
     };
     Some(node.into())

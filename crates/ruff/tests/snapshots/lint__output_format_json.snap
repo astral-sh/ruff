@@ -1,0 +1,88 @@
+---
+source: crates/ruff/tests/lint.rs
+info:
+  program: ruff
+  args:
+    - check
+    - "--no-cache"
+    - "--output-format"
+    - json
+    - "--select"
+    - "F401,F821"
+    - "--target-version"
+    - py39
+    - input.py
+---
+success: false
+exit_code: 1
+----- stdout -----
+[
+  {
+    "cell": null,
+    "code": "F401",
+    "end_location": {
+      "column": 10,
+      "row": 1
+    },
+    "filename": "[TMP]/input.py",
+    "fix": {
+      "applicability": "safe",
+      "edits": [
+        {
+          "content": "",
+          "end_location": {
+            "column": 1,
+            "row": 2
+          },
+          "location": {
+            "column": 1,
+            "row": 1
+          }
+        }
+      ],
+      "message": "Remove unused import: `os`"
+    },
+    "location": {
+      "column": 8,
+      "row": 1
+    },
+    "message": "`os` imported but unused",
+    "noqa_row": 1,
+    "url": "https://docs.astral.sh/ruff/rules/unused-import"
+  },
+  {
+    "cell": null,
+    "code": "F821",
+    "end_location": {
+      "column": 6,
+      "row": 2
+    },
+    "filename": "[TMP]/input.py",
+    "fix": null,
+    "location": {
+      "column": 5,
+      "row": 2
+    },
+    "message": "Undefined name `y`",
+    "noqa_row": 2,
+    "url": "https://docs.astral.sh/ruff/rules/undefined-name"
+  },
+  {
+    "cell": null,
+    "code": "invalid-syntax",
+    "end_location": {
+      "column": 6,
+      "row": 3
+    },
+    "filename": "[TMP]/input.py",
+    "fix": null,
+    "location": {
+      "column": 1,
+      "row": 3
+    },
+    "message": "Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)",
+    "noqa_row": null,
+    "url": null
+  }
+]
+----- stderr -----

@@ -7,19 +7,24 @@ input_file: crates/ruff_python_parser/resources/inline/err/rebound_comprehension
 ```
 Module(
     ModModule {
+        node_index: AtomicNodeIndex(..),
         range: 0..342,
         body: [
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 0..28,
                     value: ListComp(
                         ExprListComp {
+                            node_index: AtomicNodeIndex(..),
                             range: 0..28,
                             elt: Named(
                                 ExprNamed {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 2..8,
                                     target: Name(
                                         ExprName {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 2..3,
                                             id: Name("a"),
                                             ctx: Store,
@@ -27,6 +32,7 @@ Module(
                                     ),
                                     value: NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 7..8,
                                             value: Int(
                                                 0,
@@ -38,8 +44,10 @@ Module(
                             generators: [
                                 Comprehension {
                                     range: 10..27,
+                                    node_index: AtomicNodeIndex(..),
                                     target: Name(
                                         ExprName {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 14..15,
                                             id: Name("a"),
                                             ctx: Store,
@@ -47,9 +55,11 @@ Module(
                                     ),
                                     iter: Call(
                                         ExprCall {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 19..27,
                                             func: Name(
                                                 ExprName {
+                                                    node_index: AtomicNodeIndex(..),
                                                     range: 19..24,
                                                     id: Name("range"),
                                                     ctx: Load,
@@ -57,9 +67,11 @@ Module(
                                             ),
                                             arguments: Arguments {
                                                 range: 24..27,
+                                                node_index: AtomicNodeIndex(..),
                                                 args: [
                                                     NumberLiteral(
                                                         ExprNumberLiteral {
+                                                            node_index: AtomicNodeIndex(..),
                                                             range: 25..26,
                                                             value: Int(
                                                                 0,
@@ -81,15 +93,19 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 29..57,
                     value: SetComp(
                         ExprSetComp {
+                            node_index: AtomicNodeIndex(..),
                             range: 29..57,
                             elt: Named(
                                 ExprNamed {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 31..37,
                                     target: Name(
                                         ExprName {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 31..32,
                                             id: Name("a"),
                                             ctx: Store,
@@ -97,6 +113,7 @@ Module(
                                     ),
                                     value: NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 36..37,
                                             value: Int(
                                                 0,
@@ -108,8 +125,10 @@ Module(
                             generators: [
                                 Comprehension {
                                     range: 39..56,
+                                    node_index: AtomicNodeIndex(..),
                                     target: Name(
                                         ExprName {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 43..44,
                                             id: Name("a"),
                                             ctx: Store,
@@ -117,9 +136,11 @@ Module(
                                     ),
                                     iter: Call(
                                         ExprCall {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 48..56,
                                             func: Name(
                                                 ExprName {
+                                                    node_index: AtomicNodeIndex(..),
                                                     range: 48..53,
                                                     id: Name("range"),
                                                     ctx: Load,
@@ -127,9 +148,11 @@ Module(
                                             ),
                                             arguments: Arguments {
                                                 range: 53..56,
+                                                node_index: AtomicNodeIndex(..),
                                                 args: [
                                                     NumberLiteral(
                                                         ExprNumberLiteral {
+                                                            node_index: AtomicNodeIndex(..),
                                                             range: 54..55,
                                                             value: Int(
                                                                 0,
@@ -151,15 +174,19 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 58..91,
                     value: DictComp(
                         ExprDictComp {
+                            node_index: AtomicNodeIndex(..),
                             range: 58..91,
                             key: Named(
                                 ExprNamed {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 60..66,
                                     target: Name(
                                         ExprName {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 60..61,
                                             id: Name("a"),
                                             ctx: Store,
@@ -167,6 +194,7 @@ Module(
                                     ),
                                     value: NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 65..66,
                                             value: Int(
                                                 0,
@@ -177,6 +205,7 @@ Module(
                             ),
                             value: Name(
                                 ExprName {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 69..72,
                                     id: Name("val"),
                                     ctx: Load,
@@ -185,8 +214,10 @@ Module(
                             generators: [
                                 Comprehension {
                                     range: 73..90,
+                                    node_index: AtomicNodeIndex(..),
                                     target: Name(
                                         ExprName {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 77..78,
                                             id: Name("a"),
                                             ctx: Store,
@@ -194,9 +225,11 @@ Module(
                                     ),
                                     iter: Call(
                                         ExprCall {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 82..90,
                                             func: Name(
                                                 ExprName {
+                                                    node_index: AtomicNodeIndex(..),
                                                     range: 82..87,
                                                     id: Name("range"),
                                                     ctx: Load,
@@ -204,9 +237,11 @@ Module(
                                             ),
                                             arguments: Arguments {
                                                 range: 87..90,
+                                                node_index: AtomicNodeIndex(..),
                                                 args: [
                                                     NumberLiteral(
                                                         ExprNumberLiteral {
+                                                            node_index: AtomicNodeIndex(..),
                                                             range: 88..89,
                                                             value: Int(
                                                                 0,
@@ -228,12 +263,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 92..125,
                     value: DictComp(
                         ExprDictComp {
+                            node_index: AtomicNodeIndex(..),
                             range: 92..125,
                             key: Name(
                                 ExprName {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 93..96,
                                     id: Name("key"),
                                     ctx: Load,
@@ -241,9 +279,11 @@ Module(
                             ),
                             value: Named(
                                 ExprNamed {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 99..105,
                                     target: Name(
                                         ExprName {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 99..100,
                                             id: Name("a"),
                                             ctx: Store,
@@ -251,6 +291,7 @@ Module(
                                     ),
                                     value: NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 104..105,
                                             value: Int(
                                                 0,
@@ -262,8 +303,10 @@ Module(
                             generators: [
                                 Comprehension {
                                     range: 107..124,
+                                    node_index: AtomicNodeIndex(..),
                                     target: Name(
                                         ExprName {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 111..112,
                                             id: Name("a"),
                                             ctx: Store,
@@ -271,9 +314,11 @@ Module(
                                     ),
                                     iter: Call(
                                         ExprCall {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 116..124,
                                             func: Name(
                                                 ExprName {
+                                                    node_index: AtomicNodeIndex(..),
                                                     range: 116..121,
                                                     id: Name("range"),
                                                     ctx: Load,
@@ -281,9 +326,11 @@ Module(
                                             ),
                                             arguments: Arguments {
                                                 range: 121..124,
+                                                node_index: AtomicNodeIndex(..),
                                                 args: [
                                                     NumberLiteral(
                                                         ExprNumberLiteral {
+                                                            node_index: AtomicNodeIndex(..),
                                                             range: 122..123,
                                                             value: Int(
                                                                 0,
@@ -305,15 +352,19 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 126..154,
                     value: Generator(
                         ExprGenerator {
+                            node_index: AtomicNodeIndex(..),
                             range: 126..154,
                             elt: Named(
                                 ExprNamed {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 128..134,
                                     target: Name(
                                         ExprName {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 128..129,
                                             id: Name("a"),
                                             ctx: Store,
@@ -321,6 +372,7 @@ Module(
                                     ),
                                     value: NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 133..134,
                                             value: Int(
                                                 0,
@@ -332,8 +384,10 @@ Module(
                             generators: [
                                 Comprehension {
                                     range: 136..153,
+                                    node_index: AtomicNodeIndex(..),
                                     target: Name(
                                         ExprName {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 140..141,
                                             id: Name("a"),
                                             ctx: Store,
@@ -341,9 +395,11 @@ Module(
                                     ),
                                     iter: Call(
                                         ExprCall {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 145..153,
                                             func: Name(
                                                 ExprName {
+                                                    node_index: AtomicNodeIndex(..),
                                                     range: 145..150,
                                                     id: Name("range"),
                                                     ctx: Load,
@@ -351,9 +407,11 @@ Module(
                                             ),
                                             arguments: Arguments {
                                                 range: 150..153,
+                                                node_index: AtomicNodeIndex(..),
                                                 args: [
                                                     NumberLiteral(
                                                         ExprNumberLiteral {
+                                                            node_index: AtomicNodeIndex(..),
                                                             range: 151..152,
                                                             value: Int(
                                                                 0,
@@ -376,19 +434,24 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 155..185,
                     value: ListComp(
                         ExprListComp {
+                            node_index: AtomicNodeIndex(..),
                             range: 155..185,
                             elt: List(
                                 ExprList {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 156..166,
                                     elts: [
                                         Named(
                                             ExprNamed {
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 158..164,
                                                 target: Name(
                                                     ExprName {
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 158..159,
                                                         id: Name("a"),
                                                         ctx: Store,
@@ -396,6 +459,7 @@ Module(
                                                 ),
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 163..164,
                                                         value: Int(
                                                             0,
@@ -411,8 +475,10 @@ Module(
                             generators: [
                                 Comprehension {
                                     range: 167..184,
+                                    node_index: AtomicNodeIndex(..),
                                     target: Name(
                                         ExprName {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 171..172,
                                             id: Name("a"),
                                             ctx: Store,
@@ -420,9 +486,11 @@ Module(
                                     ),
                                     iter: Call(
                                         ExprCall {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 176..184,
                                             func: Name(
                                                 ExprName {
+                                                    node_index: AtomicNodeIndex(..),
                                                     range: 176..181,
                                                     id: Name("range"),
                                                     ctx: Load,
@@ -430,9 +498,11 @@ Module(
                                             ),
                                             arguments: Arguments {
                                                 range: 181..184,
+                                                node_index: AtomicNodeIndex(..),
                                                 args: [
                                                     NumberLiteral(
                                                         ExprNumberLiteral {
+                                                            node_index: AtomicNodeIndex(..),
                                                             range: 182..183,
                                                             value: Int(
                                                                 0,
@@ -454,15 +524,19 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 186..233,
                     value: ListComp(
                         ExprListComp {
+                            node_index: AtomicNodeIndex(..),
                             range: 186..233,
                             elt: Named(
                                 ExprNamed {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 188..194,
                                     target: Name(
                                         ExprName {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 188..189,
                                             id: Name("a"),
                                             ctx: Store,
@@ -470,6 +544,7 @@ Module(
                                     ),
                                     value: NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 193..194,
                                             value: Int(
                                                 0,
@@ -481,8 +556,10 @@ Module(
                             generators: [
                                 Comprehension {
                                     range: 196..214,
+                                    node_index: AtomicNodeIndex(..),
                                     target: Name(
                                         ExprName {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 200..201,
                                             id: Name("b"),
                                             ctx: Store,
@@ -490,9 +567,11 @@ Module(
                                     ),
                                     iter: Call(
                                         ExprCall {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 205..214,
                                             func: Name(
                                                 ExprName {
+                                                    node_index: AtomicNodeIndex(..),
                                                     range: 205..210,
                                                     id: Name("range"),
                                                     ctx: Load,
@@ -500,9 +579,11 @@ Module(
                                             ),
                                             arguments: Arguments {
                                                 range: 211..214,
+                                                node_index: AtomicNodeIndex(..),
                                                 args: [
                                                     NumberLiteral(
                                                         ExprNumberLiteral {
+                                                            node_index: AtomicNodeIndex(..),
                                                             range: 212..213,
                                                             value: Int(
                                                                 0,
@@ -519,8 +600,10 @@ Module(
                                 },
                                 Comprehension {
                                     range: 215..232,
+                                    node_index: AtomicNodeIndex(..),
                                     target: Name(
                                         ExprName {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 219..220,
                                             id: Name("a"),
                                             ctx: Store,
@@ -528,9 +611,11 @@ Module(
                                     ),
                                     iter: Call(
                                         ExprCall {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 224..232,
                                             func: Name(
                                                 ExprName {
+                                                    node_index: AtomicNodeIndex(..),
                                                     range: 224..229,
                                                     id: Name("range"),
                                                     ctx: Load,
@@ -538,9 +623,11 @@ Module(
                                             ),
                                             arguments: Arguments {
                                                 range: 229..232,
+                                                node_index: AtomicNodeIndex(..),
                                                 args: [
                                                     NumberLiteral(
                                                         ExprNumberLiteral {
+                                                            node_index: AtomicNodeIndex(..),
                                                             range: 230..231,
                                                             value: Int(
                                                                 0,
@@ -562,15 +649,19 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 234..281,
                     value: ListComp(
                         ExprListComp {
+                            node_index: AtomicNodeIndex(..),
                             range: 234..281,
                             elt: Named(
                                 ExprNamed {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 236..242,
                                     target: Name(
                                         ExprName {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 236..237,
                                             id: Name("a"),
                                             ctx: Store,
@@ -578,6 +669,7 @@ Module(
                                     ),
                                     value: NumberLiteral(
                                         ExprNumberLiteral {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 241..242,
                                             value: Int(
                                                 0,
@@ -589,8 +681,10 @@ Module(
                             generators: [
                                 Comprehension {
                                     range: 244..262,
+                                    node_index: AtomicNodeIndex(..),
                                     target: Name(
                                         ExprName {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 248..249,
                                             id: Name("a"),
                                             ctx: Store,
@@ -598,9 +692,11 @@ Module(
                                     ),
                                     iter: Call(
                                         ExprCall {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 253..262,
                                             func: Name(
                                                 ExprName {
+                                                    node_index: AtomicNodeIndex(..),
                                                     range: 253..258,
                                                     id: Name("range"),
                                                     ctx: Load,
@@ -608,9 +704,11 @@ Module(
                                             ),
                                             arguments: Arguments {
                                                 range: 259..262,
+                                                node_index: AtomicNodeIndex(..),
                                                 args: [
                                                     NumberLiteral(
                                                         ExprNumberLiteral {
+                                                            node_index: AtomicNodeIndex(..),
                                                             range: 260..261,
                                                             value: Int(
                                                                 0,
@@ -627,8 +725,10 @@ Module(
                                 },
                                 Comprehension {
                                     range: 263..280,
+                                    node_index: AtomicNodeIndex(..),
                                     target: Name(
                                         ExprName {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 267..268,
                                             id: Name("b"),
                                             ctx: Store,
@@ -636,9 +736,11 @@ Module(
                                     ),
                                     iter: Call(
                                         ExprCall {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 272..280,
                                             func: Name(
                                                 ExprName {
+                                                    node_index: AtomicNodeIndex(..),
                                                     range: 272..277,
                                                     id: Name("range"),
                                                     ctx: Load,
@@ -646,9 +748,11 @@ Module(
                                             ),
                                             arguments: Arguments {
                                                 range: 277..280,
+                                                node_index: AtomicNodeIndex(..),
                                                 args: [
                                                     NumberLiteral(
                                                         ExprNumberLiteral {
+                                                            node_index: AtomicNodeIndex(..),
                                                             range: 278..279,
                                                             value: Int(
                                                                 0,
@@ -670,19 +774,24 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 282..341,
                     value: ListComp(
                         ExprListComp {
+                            node_index: AtomicNodeIndex(..),
                             range: 282..341,
                             elt: Tuple(
                                 ExprTuple {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 283..303,
                                     elts: [
                                         Named(
                                             ExprNamed {
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 285..291,
                                                 target: Name(
                                                     ExprName {
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 285..286,
                                                         id: Name("a"),
                                                         ctx: Store,
@@ -690,6 +799,7 @@ Module(
                                                 ),
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 290..291,
                                                         value: Int(
                                                             0,
@@ -700,9 +810,11 @@ Module(
                                         ),
                                         Named(
                                             ExprNamed {
+                                                node_index: AtomicNodeIndex(..),
                                                 range: 295..301,
                                                 target: Name(
                                                     ExprName {
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 295..296,
                                                         id: Name("b"),
                                                         ctx: Store,
@@ -710,6 +822,7 @@ Module(
                                                 ),
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
+                                                        node_index: AtomicNodeIndex(..),
                                                         range: 300..301,
                                                         value: Int(
                                                             1,
@@ -726,8 +839,10 @@ Module(
                             generators: [
                                 Comprehension {
                                     range: 304..322,
+                                    node_index: AtomicNodeIndex(..),
                                     target: Name(
                                         ExprName {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 308..309,
                                             id: Name("a"),
                                             ctx: Store,
@@ -735,9 +850,11 @@ Module(
                                     ),
                                     iter: Call(
                                         ExprCall {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 313..322,
                                             func: Name(
                                                 ExprName {
+                                                    node_index: AtomicNodeIndex(..),
                                                     range: 313..318,
                                                     id: Name("range"),
                                                     ctx: Load,
@@ -745,9 +862,11 @@ Module(
                                             ),
                                             arguments: Arguments {
                                                 range: 319..322,
+                                                node_index: AtomicNodeIndex(..),
                                                 args: [
                                                     NumberLiteral(
                                                         ExprNumberLiteral {
+                                                            node_index: AtomicNodeIndex(..),
                                                             range: 320..321,
                                                             value: Int(
                                                                 0,
@@ -764,8 +883,10 @@ Module(
                                 },
                                 Comprehension {
                                     range: 323..340,
+                                    node_index: AtomicNodeIndex(..),
                                     target: Name(
                                         ExprName {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 327..328,
                                             id: Name("b"),
                                             ctx: Store,
@@ -773,9 +894,11 @@ Module(
                                     ),
                                     iter: Call(
                                         ExprCall {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 332..340,
                                             func: Name(
                                                 ExprName {
+                                                    node_index: AtomicNodeIndex(..),
                                                     range: 332..337,
                                                     id: Name("range"),
                                                     ctx: Load,
@@ -783,9 +906,11 @@ Module(
                                             ),
                                             arguments: Arguments {
                                                 range: 337..340,
+                                                node_index: AtomicNodeIndex(..),
                                                 args: [
                                                     NumberLiteral(
                                                         ExprNumberLiteral {
+                                                            node_index: AtomicNodeIndex(..),
                                                             range: 338..339,
                                                             value: Int(
                                                                 0,

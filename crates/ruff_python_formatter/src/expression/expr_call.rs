@@ -27,6 +27,7 @@ impl FormatNodeRule<ExprCall> for FormatExprCall {
     fn fmt_fields(&self, item: &ExprCall, f: &mut PyFormatter) -> FormatResult<()> {
         let ExprCall {
             range: _,
+            node_index: _,
             func,
             arguments,
         } = item;

@@ -21,6 +21,9 @@ use crate::rules::flake8_async::helpers::MethodName;
 ///
 /// ## Example
 /// ```python
+/// import asyncio
+///
+///
 /// async def func():
 ///     async with asyncio.timeout(2):
 ///         do_something()
@@ -28,6 +31,9 @@ use crate::rules::flake8_async::helpers::MethodName;
 ///
 /// Use instead:
 /// ```python
+/// import asyncio
+///
+///
 /// async def func():
 ///     async with asyncio.timeout(2):
 ///         do_something()

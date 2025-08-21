@@ -13,7 +13,11 @@ pub struct FormatExprAwait;
 
 impl FormatNodeRule<ExprAwait> for FormatExprAwait {
     fn fmt_fields(&self, item: &ExprAwait, f: &mut PyFormatter) -> FormatResult<()> {
-        let ExprAwait { range: _, value } = item;
+        let ExprAwait {
+            range: _,
+            node_index: _,
+            value,
+        } = item;
 
         write!(
             f,

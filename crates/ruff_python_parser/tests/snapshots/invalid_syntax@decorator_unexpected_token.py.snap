@@ -1,24 +1,27 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/decorator_unexpected_token.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: AtomicNodeIndex(..),
         range: 0..34,
         body: [
             With(
                 StmtWith {
+                    node_index: AtomicNodeIndex(..),
                     range: 5..22,
                     is_async: true,
                     items: [
                         WithItem {
                             range: 16..17,
+                            node_index: AtomicNodeIndex(..),
                             context_expr: Name(
                                 ExprName {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 16..17,
                                     id: Name("x"),
                                     ctx: Load,
@@ -30,9 +33,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: AtomicNodeIndex(..),
                                 range: 19..22,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 19..22,
                                     },
                                 ),
@@ -43,10 +48,12 @@ Module(
             ),
             Assign(
                 StmtAssign {
+                    node_index: AtomicNodeIndex(..),
                     range: 28..33,
                     targets: [
                         Name(
                             ExprName {
+                                node_index: AtomicNodeIndex(..),
                                 range: 28..29,
                                 id: Name("x"),
                                 ctx: Store,
@@ -55,6 +62,7 @@ Module(
                     ],
                     value: NumberLiteral(
                         ExprNumberLiteral {
+                            node_index: AtomicNodeIndex(..),
                             range: 32..33,
                             value: Int(
                                 1,

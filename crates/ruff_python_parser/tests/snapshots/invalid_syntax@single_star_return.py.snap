@@ -7,20 +7,26 @@ input_file: crates/ruff_python_parser/resources/inline/err/single_star_return.py
 ```
 Module(
     ModModule {
+        node_index: AtomicNodeIndex(..),
         range: 0..19,
         body: [
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: AtomicNodeIndex(..),
                     range: 0..18,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("f"),
                         range: 4..5,
+                        node_index: AtomicNodeIndex(..),
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 5..7,
+                        node_index: AtomicNodeIndex(
+                            0,
+                        ),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -31,13 +37,16 @@ Module(
                     body: [
                         Return(
                             StmtReturn {
+                                node_index: AtomicNodeIndex(..),
                                 range: 9..18,
                                 value: Some(
                                     Starred(
                                         ExprStarred {
+                                            node_index: AtomicNodeIndex(..),
                                             range: 16..18,
                                             value: Name(
                                                 ExprName {
+                                                    node_index: AtomicNodeIndex(..),
                                                     range: 17..18,
                                                     id: Name("x"),
                                                     ctx: Load,

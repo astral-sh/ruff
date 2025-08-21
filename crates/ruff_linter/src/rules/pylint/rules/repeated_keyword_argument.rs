@@ -35,6 +35,7 @@ impl Violation for RepeatedKeywordArgument {
     }
 }
 
+/// PLE1132
 pub(crate) fn repeated_keyword_argument(checker: &Checker, call: &ExprCall) {
     let ExprCall { arguments, .. } = call;
 

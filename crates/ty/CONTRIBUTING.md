@@ -133,7 +133,7 @@ for instructions on running these checks locally.
 
 ## Coding guidelines
 
-We use the [Salsa](https:://github.com/salsa-rs/salsa) library for incremental computation. Many
+We use the [Salsa](https://github.com/salsa-rs/salsa) library for incremental computation. Many
 methods take a Salsa database (usually `db: &'db dyn Db`) as an argument. This should always be the
 first argument (or second after `self`).
 

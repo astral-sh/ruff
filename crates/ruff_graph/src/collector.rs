@@ -1,3 +1,4 @@
+use crate::StringImports;
 use ruff_python_ast::visitor::source_order::{
     SourceOrderVisitor, walk_expr, walk_module, walk_stmt,
 };
@@ -10,13 +11,13 @@ pub(crate) struct Collector<'a> {
     /// The path to the current module.
     module_path: Option<&'a [String]>,
     /// Whether to detect imports from string literals.
-    string_imports: bool,
+    string_imports: StringImports,
     /// The collected imports from the Python AST.
     imports: Vec<CollectedImport>,
 }
 
 impl<'a> Collector<'a> {
-    pub(crate) fn new(module_path: Option<&'a [String]>, string_imports: bool) -> Self {
+    pub(crate) fn new(module_path: Option<&'a [String]>, string_imports: StringImports) -> Self {
         Self {
             module_path,
             string_imports,
@@ -39,6 +40,7 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
                 module,
                 level,
                 range: _,
+                node_index: _,
             }) => {
                 let module = module.as_deref();
                 let level = *level;
@@ -78,7 +80,11 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
                     }
                 }
             }
-            Stmt::Import(ast::StmtImport { names, range: _ }) => {
+            Stmt::Import(ast::StmtImport {
+                names,
+                range: _,
+                node_index: _,
+            }) => {
                 for alias in names {
                     if let Some(module_name) = ModuleName::new(alias.name.as_str()) {
                         self.imports.push(CollectedImport::Import(module_name));
@@ -113,7 +119,7 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
             | Stmt::Continue(_)
             | Stmt::IpyEscapeCommand(_) => {
                 // Only traverse simple statements when string imports is enabled.
-                if self.string_imports {
+                if self.string_imports.enabled {
                     walk_stmt(self, stmt);
                 }
             }
@@ -121,15 +127,26 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
     }
 
     fn visit_expr(&mut self, expr: &'ast Expr) {
-        if self.string_imports {
-            if let Expr::StringLiteral(ast::ExprStringLiteral { value, range: _ }) = expr {
-                // Determine whether the string literal "looks like" an import statement: contains
-                // a dot, and consists solely of valid Python identifiers.
+        if self.string_imports.enabled {
+            if let Expr::StringLiteral(ast::ExprStringLiteral {
+                value,
+                range: _,
+                node_index: _,
+            }) = expr
+            {
                 let value = value.to_str();
-                if let Some(module_name) = ModuleName::new(value) {
-                    self.imports.push(CollectedImport::Import(module_name));
+                // Determine whether the string literal "looks like" an import statement: contains
+                // the requisite number of dots, and consists solely of valid Python identifiers.
+                if self.string_imports.min_dots == 0
+                    || memchr::memchr_iter(b'.', value.as_bytes()).count()
+                        >= self.string_imports.min_dots
+                {
+                    if let Some(module_name) = ModuleName::new(value) {
+                        self.imports.push(CollectedImport::Import(module_name));
+                    }
                 }
             }
+
             walk_expr(self, expr);
         }
     }

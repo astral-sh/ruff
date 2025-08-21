@@ -453,6 +453,7 @@ impl<'a> Importer<'a> {
                 names,
                 level,
                 range: _,
+                node_index: _,
             }) = stmt
             {
                 if *level == 0
@@ -525,6 +526,17 @@ impl<'a> Importer<'a> {
         } else {
             None
         }
+    }
+
+    /// Add a `from __future__ import annotations` import.
+    pub(crate) fn add_future_import(&self) -> Edit {
+        let import = &NameImport::ImportFrom(MemberNameImport::member(
+            "__future__".to_string(),
+            "annotations".to_string(),
+        ));
+        // Note that `TextSize::default` should ensure that the import is added at the very
+        // beginning of the file via `Insertion::start_of_file`.
+        self.add_import(import, TextSize::default())
     }
 }
 

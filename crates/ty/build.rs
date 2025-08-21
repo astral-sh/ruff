@@ -7,13 +7,25 @@ use std::{
 fn main() {
     // The workspace root directory is not available without walking up the tree
     // https://github.com/rust-lang/cargo/issues/3946
-    let workspace_root = Path::new(&std::env::var("CARGO_MANIFEST_DIR").unwrap())
-        .join("..")
+    let ruff_workspace_root = Path::new(&std::env::var("CARGO_MANIFEST_DIR").unwrap())
         .join("..")
         .join("..");
+    let ty_workspace_root = ruff_workspace_root.join("..");
 
-    version_info(&workspace_root);
-    commit_info(&workspace_root);
+    version_info(&ty_workspace_root);
+
+    // If not in a git repository, do not attempt to retrieve commit information
+    let git_dir = ty_workspace_root.join(".git");
+    if git_dir.exists() {
+        commit_info(&git_dir, &ty_workspace_root, false);
+    } else {
+        // Try if we're inside the ruff repository and, if so, use that commit hash.
+        let git_dir = ruff_workspace_root.join(".git");
+
+        if git_dir.exists() {
+            commit_info(&git_dir, &ruff_workspace_root, true);
+        }
+    }
 
     let target = std::env::var("TARGET").unwrap();
     println!("cargo::rustc-env=RUST_HOST_TARGET={target}");
@@ -45,14 +57,8 @@ fn version_info(workspace_root: &Path) {
 }
 
 /// Retrieve commit information from the Git repository.
-fn commit_info(workspace_root: &Path) {
-    // If not in a git repository, do not attempt to retrieve commit information
-    let git_dir = workspace_root.join(".git");
-    if !git_dir.exists() {
-        return;
-    }
-
-    if let Some(git_head_path) = git_head(&git_dir) {
+fn commit_info(git_dir: &Path, workspace_root: &Path, is_ruff: bool) {
+    if let Some(git_head_path) = git_head(git_dir) {
         println!("cargo:rerun-if-changed={}", git_head_path.display());
 
         let git_head_contents = fs::read_to_string(git_head_path);
@@ -96,7 +102,10 @@ fn commit_info(workspace_root: &Path) {
         let mut describe_parts = describe.split('-');
         let last_tag = describe_parts.next().unwrap();
 
-        println!("cargo::rustc-env=TY_LAST_TAG={last_tag}");
+        println!(
+            "cargo::rustc-env=TY_LAST_TAG={ruff}{last_tag}",
+            ruff = if is_ruff { "ruff/" } else { "" }
+        );
 
         // If this is the tagged commit, this component will be missing
         println!(

@@ -238,6 +238,9 @@ impl Violation for DocstringExtraneousYields {
 ///
 /// ## Example
 /// ```python
+/// class FasterThanLightError(ArithmeticError): ...
+///
+///
 /// def calculate_speed(distance: float, time: float) -> float:
 ///     """Calculate speed as distance divided by time.
 ///
@@ -256,6 +259,9 @@ impl Violation for DocstringExtraneousYields {
 ///
 /// Use instead:
 /// ```python
+/// class FasterThanLightError(ArithmeticError): ...
+///
+///
 /// def calculate_speed(distance: float, time: float) -> float:
 ///     """Calculate speed as distance divided by time.
 ///
@@ -446,7 +452,7 @@ impl<'a> DocstringSections<'a> {
 ///
 /// Attempts to parse using the specified [`SectionStyle`], falling back to the other style if no
 /// entries are found.
-fn parse_entries(content: &str, style: Option<SectionStyle>) -> Vec<QualifiedName> {
+fn parse_entries(content: &str, style: Option<SectionStyle>) -> Vec<QualifiedName<'_>> {
     match style {
         Some(SectionStyle::Google) => parse_entries_google(content),
         Some(SectionStyle::Numpy) => parse_entries_numpy(content),
@@ -468,7 +474,7 @@ fn parse_entries(content: &str, style: Option<SectionStyle>) -> Vec<QualifiedNam
 ///     FasterThanLightError: If speed is greater than the speed of light.
 ///     DivisionByZero: If attempting to divide by zero.
 /// ```
-fn parse_entries_google(content: &str) -> Vec<QualifiedName> {
+fn parse_entries_google(content: &str) -> Vec<QualifiedName<'_>> {
     let mut entries: Vec<QualifiedName> = Vec::new();
     for potential in content.lines() {
         let Some(colon_idx) = potential.find(':') else {
@@ -490,7 +496,7 @@ fn parse_entries_google(content: &str) -> Vec<QualifiedName> {
 /// DivisionByZero
 ///     If attempting to divide by zero.
 /// ```
-fn parse_entries_numpy(content: &str) -> Vec<QualifiedName> {
+fn parse_entries_numpy(content: &str) -> Vec<QualifiedName<'_>> {
     let mut entries: Vec<QualifiedName> = Vec::new();
     let mut lines = content.lines();
     let Some(dashes) = lines.next() else {
@@ -673,6 +679,7 @@ impl<'a> Visitor<'a> for BodyVisitor<'a> {
             }
             Stmt::Return(ast::StmtReturn {
                 range,
+                node_index: _,
                 value: Some(value),
             }) => {
                 self.returns.push(ReturnEntry {
@@ -684,7 +691,11 @@ impl<'a> Visitor<'a> for BodyVisitor<'a> {
                     },
                 });
             }
-            Stmt::Return(ast::StmtReturn { range, value: None }) => {
+            Stmt::Return(ast::StmtReturn {
+                range,
+                node_index: _,
+                value: None,
+            }) => {
                 self.returns.push(ReturnEntry {
                     range: *range,
                     kind: ReturnEntryKind::ImplicitNone,
@@ -701,6 +712,7 @@ impl<'a> Visitor<'a> for BodyVisitor<'a> {
         match expr {
             Expr::Yield(ast::ExprYield {
                 range,
+                node_index: _,
                 value: Some(value),
             }) => {
                 self.yields.push(YieldEntry {
@@ -708,7 +720,11 @@ impl<'a> Visitor<'a> for BodyVisitor<'a> {
                     is_none_yield: value.is_none_literal_expr(),
                 });
             }
-            Expr::Yield(ast::ExprYield { range, value: None }) => {
+            Expr::Yield(ast::ExprYield {
+                range,
+                node_index: _,
+                value: None,
+            }) => {
                 self.yields.push(YieldEntry {
                     range: *range,
                     is_none_yield: true,
@@ -877,7 +893,7 @@ pub(crate) fn check_docstring(
         return;
     };
 
-    if checker.settings.pydoclint.ignore_one_line_docstrings && is_one_line(docstring) {
+    if checker.settings().pydoclint.ignore_one_line_docstrings && is_one_line(docstring) {
         return;
     }
 
@@ -905,11 +921,11 @@ pub(crate) fn check_docstring(
     };
 
     // DOC201
-    if checker.enabled(Rule::DocstringMissingReturns) {
+    if checker.is_rule_enabled(Rule::DocstringMissingReturns) {
         if should_document_returns(function_def)
             && !returns_documented(docstring, &docstring_sections, convention)
         {
-            let extra_property_decorators = checker.settings.pydocstyle.property_decorators();
+            let extra_property_decorators = checker.settings().pydocstyle.property_decorators();
             if !definition.is_property(extra_property_decorators, semantic) {
                 if !body_entries.returns.is_empty() {
                     match function_def.returns.as_deref() {
@@ -943,7 +959,7 @@ pub(crate) fn check_docstring(
     }
 
     // DOC402
-    if checker.enabled(Rule::DocstringMissingYields) {
+    if checker.is_rule_enabled(Rule::DocstringMissingYields) {
         if !yields_documented(docstring, &docstring_sections, convention) {
             if !body_entries.yields.is_empty() {
                 match function_def.returns.as_deref() {
@@ -964,7 +980,7 @@ pub(crate) fn check_docstring(
     }
 
     // DOC501
-    if checker.enabled(Rule::DocstringMissingException) {
+    if checker.is_rule_enabled(Rule::DocstringMissingException) {
         for body_raise in &body_entries.raised_exceptions {
             let Some(name) = body_raise.qualified_name.segments().last() else {
                 continue;
@@ -996,7 +1012,7 @@ pub(crate) fn check_docstring(
     // document that it raises an exception without including the exception in the implementation.
     if !visibility::is_abstract(&function_def.decorator_list, semantic) {
         // DOC202
-        if checker.enabled(Rule::DocstringExtraneousReturns) {
+        if checker.is_rule_enabled(Rule::DocstringExtraneousReturns) {
             if docstring_sections.returns.is_some() {
                 if body_entries.returns.is_empty()
                     || body_entries.returns.iter().all(ReturnEntry::is_implicit)
@@ -1007,7 +1023,7 @@ pub(crate) fn check_docstring(
         }
 
         // DOC403
-        if checker.enabled(Rule::DocstringExtraneousYields) {
+        if checker.is_rule_enabled(Rule::DocstringExtraneousYields) {
             if docstring_sections.yields.is_some() {
                 if body_entries.yields.is_empty() {
                     checker.report_diagnostic(DocstringExtraneousYields, docstring.range());
@@ -1016,7 +1032,7 @@ pub(crate) fn check_docstring(
         }
 
         // DOC502
-        if checker.enabled(Rule::DocstringExtraneousException) {
+        if checker.is_rule_enabled(Rule::DocstringExtraneousException) {
             if let Some(docstring_raises) = docstring_sections.raises {
                 let mut extraneous_exceptions = Vec::new();
                 for docstring_raise in &docstring_raises.raised_exceptions {

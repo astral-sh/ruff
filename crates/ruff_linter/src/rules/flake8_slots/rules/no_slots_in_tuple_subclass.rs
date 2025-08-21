@@ -6,7 +6,7 @@ use ruff_python_ast::identifier::Identifier;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::rules::flake8_slots::rules::helpers::has_slots;
+use crate::rules::flake8_slots::helpers::has_slots;
 
 /// ## What it does
 /// Checks for subclasses of `tuple` that lack a `__slots__` definition.

@@ -7,7 +7,7 @@ use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashMap;
 
 use crate::checkers::ast::Checker;
-use crate::rules::ruff::rules::helpers::function_def_visit_sourceorder_except_body;
+use crate::rules::ruff::helpers::function_def_visit_sourceorder_except_body;
 use crate::{FixAvailability, Violation};
 
 /// ## What it does

@@ -13,7 +13,7 @@ declare_lint! {
     /// Checks for f-strings in type annotation positions.
     ///
     /// ## Why is this bad?
-    /// Static analysis tools like ty can't analyse type annotations that use f-string notation.
+    /// Static analysis tools like ty can't analyze type annotations that use f-string notation.
     ///
     /// ## Examples
     /// ```python
@@ -38,7 +38,7 @@ declare_lint! {
         /// Checks for byte-strings in type annotation positions.
         ///
         /// ## Why is this bad?
-        /// Static analysis tools like ty can't analyse type annotations that use byte-string notation.
+        /// Static analysis tools like ty can't analyze type annotations that use byte-string notation.
         ///
         /// ## Examples
         /// ```python
@@ -63,7 +63,7 @@ declare_lint! {
         /// Checks for raw-strings in type annotation positions.
         ///
         /// ## Why is this bad?
-        /// Static analysis tools like ty can't analyse type annotations that use raw-string notation.
+        /// Static analysis tools like ty can't analyze type annotations that use raw-string notation.
         ///
         /// ## Examples
         /// ```python
@@ -88,7 +88,7 @@ declare_lint! {
         /// Checks for implicit concatenated strings in type annotation positions.
         ///
         /// ## Why is this bad?
-        /// Static analysis tools like ty can't analyse type annotations that use implicit concatenated strings.
+        /// Static analysis tools like ty can't analyze type annotations that use implicit concatenated strings.
         ///
         /// ## Examples
         /// ```python
@@ -137,7 +137,7 @@ pub(crate) fn parse_string_annotation(
     let _span = tracing::trace_span!("parse_string_annotation", string=?string_expr.range(), ?file)
         .entered();
 
-    let source = source_text(db.upcast(), file);
+    let source = source_text(db, file);
 
     if let Some(string_literal) = string_expr.as_single_part_string() {
         let prefix = string_literal.flags.prefix();

@@ -1,17 +1,17 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_todos/mod.rs
-snapshot_kind: text
 ---
-TD006.py:5:3: TD006 [*] Invalid TODO capitalization: `ToDo` should be `TODO`
+TD006 [*] Invalid TODO capitalization: `ToDo` should be `TODO`
+ --> TD006.py:5:3
   |
 3 | # Todoism is a word which starts with todo, but is not a todo
 4 | # TDO006 - error
 5 | # ToDo (evanrittenhouse): invalid capitalization
-  |   ^^^^ TD006
+  |   ^^^^
 6 | # todo (evanrittenhouse): another invalid capitalization
 7 | # foo # todo: invalid capitalization
   |
-  = help: Replace `ToDo` with `TODO`
+help: Replace `ToDo` with `TODO`
 
 ℹ Safe fix
 2 2 | # TODO (evanrittenhouse): this is a valid TODO
@@ -22,15 +22,16 @@ TD006.py:5:3: TD006 [*] Invalid TODO capitalization: `ToDo` should be `TODO`
 6 6 | # todo (evanrittenhouse): another invalid capitalization
 7 7 | # foo # todo: invalid capitalization
 
-TD006.py:6:3: TD006 [*] Invalid TODO capitalization: `todo` should be `TODO`
+TD006 [*] Invalid TODO capitalization: `todo` should be `TODO`
+ --> TD006.py:6:3
   |
 4 | # TDO006 - error
 5 | # ToDo (evanrittenhouse): invalid capitalization
 6 | # todo (evanrittenhouse): another invalid capitalization
-  |   ^^^^ TD006
+  |   ^^^^
 7 | # foo # todo: invalid capitalization
   |
-  = help: Replace `todo` with `TODO`
+help: Replace `todo` with `TODO`
 
 ℹ Safe fix
 3 3 | # Todoism is a word which starts with todo, but is not a todo
@@ -40,14 +41,15 @@ TD006.py:6:3: TD006 [*] Invalid TODO capitalization: `todo` should be `TODO`
   6 |+# TODO (evanrittenhouse): another invalid capitalization
 7 7 | # foo # todo: invalid capitalization
 
-TD006.py:7:9: TD006 [*] Invalid TODO capitalization: `todo` should be `TODO`
+TD006 [*] Invalid TODO capitalization: `todo` should be `TODO`
+ --> TD006.py:7:9
   |
 5 | # ToDo (evanrittenhouse): invalid capitalization
 6 | # todo (evanrittenhouse): another invalid capitalization
 7 | # foo # todo: invalid capitalization
-  |         ^^^^ TD006
+  |         ^^^^
   |
-  = help: Replace `todo` with `TODO`
+help: Replace `todo` with `TODO`
 
 ℹ Safe fix
 4 4 | # TDO006 - error

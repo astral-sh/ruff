@@ -181,21 +181,20 @@ pub(crate) fn call(checker: &Checker, func: &Expr) {
 
     let range = func.range();
     match attr.as_str() {
-        "isnull" if checker.settings.rules.enabled(Rule::PandasUseOfDotIsNull) => {
+        // PD003
+        "isnull" if checker.is_rule_enabled(Rule::PandasUseOfDotIsNull) => {
             checker.report_diagnostic(PandasUseOfDotIsNull, range);
         }
-        "notnull" if checker.settings.rules.enabled(Rule::PandasUseOfDotNotNull) => {
+        // PD004
+        "notnull" if checker.is_rule_enabled(Rule::PandasUseOfDotNotNull) => {
             checker.report_diagnostic(PandasUseOfDotNotNull, range);
         }
-        "pivot" | "unstack"
-            if checker
-                .settings
-                .rules
-                .enabled(Rule::PandasUseOfDotPivotOrUnstack) =>
-        {
+        // PD010
+        "pivot" | "unstack" if checker.is_rule_enabled(Rule::PandasUseOfDotPivotOrUnstack) => {
             checker.report_diagnostic(PandasUseOfDotPivotOrUnstack, range);
         }
-        "stack" if checker.settings.rules.enabled(Rule::PandasUseOfDotStack) => {
+        // PD013
+        "stack" if checker.is_rule_enabled(Rule::PandasUseOfDotStack) => {
             checker.report_diagnostic(PandasUseOfDotStack, range);
         }
         _ => {}

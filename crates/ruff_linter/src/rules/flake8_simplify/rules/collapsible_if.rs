@@ -125,8 +125,8 @@ pub(crate) fn nested_if_statements(
                             content,
                             (&nested_if).into(),
                             checker.locator(),
-                            checker.settings.pycodestyle.max_line_length,
-                            checker.settings.tab_size,
+                            checker.settings().pycodestyle.max_line_length,
+                            checker.settings().tab_size,
                         )
                     }) {
                         Ok(Some(Fix::unsafe_edit(edit)))
@@ -178,7 +178,7 @@ impl<'a> From<&NestedIf<'a>> for AnyNodeRef<'a> {
 }
 
 /// Returns the body, the range of the `if` or `elif` and whether the range is for an `if` or `elif`
-fn nested_if_body(stmt_if: &ast::StmtIf) -> Option<NestedIf> {
+fn nested_if_body(stmt_if: &ast::StmtIf) -> Option<NestedIf<'_>> {
     let ast::StmtIf {
         test,
         body,

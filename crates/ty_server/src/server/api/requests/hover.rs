@@ -1,8 +1,10 @@
 use std::borrow::Cow;
 
-use crate::DocumentSnapshot;
 use crate::document::{PositionExt, ToRangeExt};
-use crate::server::api::traits::{BackgroundDocumentRequestHandler, RequestHandler};
+use crate::server::api::traits::{
+    BackgroundDocumentRequestHandler, RequestHandler, RetriableRequestHandler,
+};
+use crate::session::DocumentSnapshot;
 use crate::session::client::Client;
 use lsp_types::request::HoverRequest;
 use lsp_types::{HoverContents, HoverParams, MarkupContent, Url};
@@ -18,18 +20,24 @@ impl RequestHandler for HoverRequestHandler {
 }
 
 impl BackgroundDocumentRequestHandler for HoverRequestHandler {
-    fn document_url(params: &HoverParams) -> Cow<Url> {
+    fn document_url(params: &HoverParams) -> Cow<'_, Url> {
         Cow::Borrowed(&params.text_document_position_params.text_document.uri)
     }
 
     fn run_with_snapshot(
         db: &ProjectDatabase,
-        snapshot: DocumentSnapshot,
+        snapshot: &DocumentSnapshot,
         _client: &Client,
         params: HoverParams,
     ) -> crate::server::Result<Option<lsp_types::Hover>> {
+        if snapshot
+            .workspace_settings()
+            .is_language_services_disabled()
+        {
+            return Ok(None);
+        }
+
         let Some(file) = snapshot.file(db) else {
-            tracing::debug!("Failed to resolve file for {:?}", params);
             return Ok(None);
         };
 
@@ -47,7 +55,7 @@ impl BackgroundDocumentRequestHandler for HoverRequestHandler {
 
         let (markup_kind, lsp_markup_kind) = if snapshot
             .resolved_client_capabilities()
-            .hover_prefer_markdown
+            .prefers_markdown_in_hover()
         {
             (MarkupKind::Markdown, lsp_types::MarkupKind::Markdown)
         } else {
@@ -69,3 +77,5 @@ impl BackgroundDocumentRequestHandler for HoverRequestHandler {
         }))
     }
 }
+
+impl RetriableRequestHandler for HoverRequestHandler {}

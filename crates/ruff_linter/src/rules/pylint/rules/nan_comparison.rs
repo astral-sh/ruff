@@ -1,10 +1,12 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::linter::float::as_nan_float_string_literal;
 
 /// ## What it does
 /// Checks for comparisons against NaN values.
@@ -30,7 +32,6 @@ use crate::checkers::ast::Checker;
 /// if math.isnan(x):
 ///     pass
 /// ```
-///
 #[derive(ViolationMetadata)]
 pub(crate) struct NanComparison {
     nan: Nan,
@@ -113,14 +114,10 @@ fn is_nan_float(expr: &Expr, semantic: &SemanticModel) -> bool {
         return false;
     }
 
-    let [Expr::StringLiteral(ast::ExprStringLiteral { value, .. })] = &**args else {
+    let [expr] = &**args else {
         return false;
     };
-
-    if !matches!(
-        value.to_str(),
-        "nan" | "NaN" | "NAN" | "Nan" | "nAn" | "naN" | "nAN" | "NAn"
-    ) {
+    if as_nan_float_string_literal(expr).is_none() {
         return false;
     }
 

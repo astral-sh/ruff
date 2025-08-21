@@ -1,7 +1,7 @@
 import sys
 from collections.abc import Callable
 from typing import Any, ClassVar, Final, final
-from typing_extensions import TypeAlias
+from typing_extensions import TypeAlias, deprecated
 
 # _tkinter is meant to be only used internally by tkinter, but some tkinter
 # functions e.g. return _tkinter.Tcl_Obj objects. Tcl_Obj represents a Tcl
@@ -19,9 +19,12 @@ from typing_extensions import TypeAlias
 @final
 class Tcl_Obj:
     @property
-    def string(self) -> str: ...
+    def string(self) -> str:
+        """the string representation of this object, either as str or bytes"""
+
     @property
-    def typename(self) -> str: ...
+    def typename(self) -> str:
+        """name of the Tcl type"""
     __hash__: ClassVar[None]  # type: ignore[assignment]
     def __eq__(self, value, /): ...
     def __ge__(self, value, /): ...
@@ -84,6 +87,7 @@ class TkappType:
     def record(self, script, /): ...
     def setvar(self, *ags, **kwargs): ...
     if sys.version_info < (3, 11):
+        @deprecated("Deprecated since Python 3.9; removed in Python 3.11. Use `splitlist()` instead.")
         def split(self, arg, /): ...
 
     def splitlist(self, arg, /): ...
@@ -91,8 +95,11 @@ class TkappType:
     def wantobjects(self, *args, **kwargs): ...
     def willdispatch(self): ...
     if sys.version_info >= (3, 12):
-        def gettrace(self, /) -> _TkinterTraceFunc | None: ...
-        def settrace(self, func: _TkinterTraceFunc | None, /) -> None: ...
+        def gettrace(self, /) -> _TkinterTraceFunc | None:
+            """Get the tracing function."""
+
+        def settrace(self, func: _TkinterTraceFunc | None, /) -> None:
+            """Set the tracing function."""
 
 # These should be kept in sync with tkinter.tix constants, except ALL_EVENTS which doesn't match TCL_ALL_EVENTS
 ALL_EVENTS: Final = -3
@@ -124,7 +131,16 @@ if sys.version_info >= (3, 13):
         sync: bool = False,
         use: str | None = None,
         /,
-    ): ...
+    ):
+        """
+
+        wantTk
+          if false, then Tk_Init() doesn't get called
+        sync
+          if true, then pass -sync to wish
+        use
+          if not None, then pass -use to wish
+        """
 
 else:
     def create(
@@ -137,7 +153,22 @@ else:
         sync: bool = False,
         use: str | None = None,
         /,
-    ): ...
+    ):
+        """
 
-def getbusywaitinterval(): ...
-def setbusywaitinterval(new_val, /): ...
+        wantTk
+          if false, then Tk_Init() doesn't get called
+        sync
+          if true, then pass -sync to wish
+        use
+          if not None, then pass -use to wish
+        """
+
+def getbusywaitinterval():
+    """Return the current busy-wait interval between successive calls to Tcl_DoOneEvent in a threaded Python interpreter."""
+
+def setbusywaitinterval(new_val, /):
+    """Set the busy-wait interval in milliseconds between successive calls to Tcl_DoOneEvent in a threaded Python interpreter.
+
+    It should be set to a divisor of the maximum time between frames in an animation.
+    """
