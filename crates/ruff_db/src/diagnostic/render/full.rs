@@ -194,19 +194,6 @@ impl std::fmt::Display for Diff<'_> {
                         let old_index = change.old_index().map(OneIndexed::from_zero_indexed);
                         let new_index = change.new_index().map(OneIndexed::from_zero_indexed);
 
-                        let (old_index, new_index) =
-                            if let Some(notebook_index) = &self.notebook_index {
-                                let old_index = old_index.map(|old_index| {
-                                    notebook_index.cell_row(old_index).unwrap_or_default()
-                                });
-                                let new_index = new_index.map(|new_index| {
-                                    notebook_index.cell_row(new_index).unwrap_or_default()
-                                });
-                                (old_index, new_index)
-                            } else {
-                                (old_index, new_index)
-                            };
-
                         write!(
                             f,
                             "{} {} |{sign}",
