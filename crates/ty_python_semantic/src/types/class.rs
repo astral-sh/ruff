@@ -2441,10 +2441,13 @@ impl<'db> ClassLiteral<'db> {
                     } else if self
                         .dataclass_params(db)
                         .is_some_and(|params| params.contains(DataclassParams::KW_ONLY))
+                        || self.try_metaclass(db).is_ok_and(|(_, transformer_params)| {
+                            transformer_params.is_some_and(|params| {
+                                params.contains(DataclassTransformerParams::KW_ONLY_DEFAULT)
+                            })
+                        })
                     {
                         // `@dataclass(kw_only=True)` or `@dataclass_transform(kw_only_default=True)`
-                        // (`DataclassTransformerParams` -> `DataclassParams` conversion is done
-                        // before so it's ok to only check `DataclassParams`)
                         field.kw_only = Some(true);
                     }
                 }

@@ -110,6 +110,35 @@ CustomerModel(id=1, name="Test")
 CustomerModel()
 ```
 
+### Metaclass with `kw_only_default=True`
+
+```py
+from typing import dataclass_transform
+
+@dataclass_transform(kw_only_default=True)
+class ModelMeta(type):
+    pass
+
+class WithMeta(metaclass=ModelMeta):
+    x: int
+
+# error: [missing-argument]
+# error: [too-many-positional-arguments]
+WithMeta(3)
+
+@dataclass_transform(kw_only_default=True)
+def mydc():
+    return lambda func: func
+
+@mydc
+class WithDeco:
+    x: int
+
+# error: [missing-argument]
+# error: [too-many-positional-arguments]
+WithDeco(3)
+```
+
 ### Decorating a base class
 
 ```py
