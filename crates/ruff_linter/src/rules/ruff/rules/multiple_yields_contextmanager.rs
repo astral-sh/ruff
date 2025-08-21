@@ -65,7 +65,7 @@ pub(crate) fn multiple_yields_in_contextmanager(checker: &Checker, function_def:
     if let Some(context_manager_name) = get_contextmanager_decorator(function_def, checker) {
         let mut violations = Vec::new();
         {
-            let mut yield_tracker = YieldTracker::new(&mut violations, context_manager_name);
+            let mut yield_tracker = YieldTracker::new(&mut violations);
             source_order::walk_body(&mut yield_tracker, &function_def.body);
         }
 
@@ -111,7 +111,7 @@ struct YieldTracker<'a> {
 }
 
 impl<'a> YieldTracker<'a> {
-    fn new(violations: &'a mut Vec<TextRange>, _decorator_name: &'static str) -> Self {
+    fn new(violations: &'a mut Vec<TextRange>) -> Self {
         Self {
             violations,
             scopes: vec![YieldScope::new()],
@@ -136,15 +136,11 @@ impl<'a> YieldTracker<'a> {
     }
 
     fn check_terminating_branch(&mut self, yields: &[&'a Expr]) {
-        if yields.len() > 1 {
-            self.emit_multiple_violations(yields);
-        }
+        self.report_excess(yields);
     }
 
     fn merge_continuing_branch(&mut self, yields: &[&'a Expr]) {
-        if yields.len() > 1 {
-            self.emit_multiple_violations(yields);
-        }
+        self.report_excess(yields);
         let scope = self
             .scopes
             .last_mut()
@@ -163,6 +159,12 @@ impl<'a> YieldTracker<'a> {
         // Only report the second to last violations
         for &yield_expr in yields.iter().skip(1) {
             self.emit_violation(yield_expr);
+        }
+    }
+
+    fn report_excess(&mut self, yields: &[&'a Expr]) {
+        if yields.len() > 1 {
+            self.emit_multiple_violations(yields);
         }
     }
 
@@ -192,9 +194,7 @@ impl<'a> YieldTracker<'a> {
         for _ in 0..branch_count {
             let (branch_yields, branch_returns) = self.pop_scope();
 
-            if branch_yields.len() > 1 {
-                self.emit_multiple_violations(&branch_yields);
-            }
+            self.report_excess(&branch_yields);
 
             if branch_returns {
                 if branch_yields.len() > max_yields_in_returning_branches.len() {
@@ -276,9 +276,7 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldTracker<'a> {
                 for _ in 0..try_stmt.handlers.len() {
                     let (except_yields, except_returns) = self.pop_scope();
 
-                    if except_yields.len() > 1 {
-                        self.emit_multiple_violations(&except_yields);
-                    }
+                    self.report_excess(&except_yields);
 
                     if except_returns {
                         if except_yields.len() > max_yields_in_returning_except_branch.len() {
@@ -293,15 +291,9 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldTracker<'a> {
 
                 let (try_yields, try_returns) = self.pop_scope();
 
-                if try_yields.len() > 1 {
-                    self.emit_multiple_violations(&try_yields);
-                }
-                if else_yields.len() > 1 {
-                    self.emit_multiple_violations(&else_yields);
-                }
-                if finally_yields.len() > 1 {
-                    self.emit_multiple_violations(&finally_yields);
-                }
+                self.report_excess(&try_yields);
+                self.report_excess(&else_yields);
+                self.report_excess(&finally_yields);
 
                 if finally_returns {
                     // Get maximum accumulated yields in all except branches
