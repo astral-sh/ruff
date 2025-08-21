@@ -565,7 +565,7 @@ a = A(1, 2)
 a = A(x=1, y=2)
 ```
 
-All fields participate in positional field ordering checks:
+No fields of a `kw_only=True` dataclass participate in field ordering checks.
 
 ```py
 from dataclasses import dataclass, field
