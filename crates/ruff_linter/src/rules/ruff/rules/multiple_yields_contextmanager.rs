@@ -125,7 +125,7 @@ impl<'a> YieldTracker<'a> {
     fn add_yield(&mut self, expr: &'a Expr) {
         if let Some(scope) = self.scopes.last_mut() {
             scope.add_yield(expr);
-            if scope.does_yield_more_than_once() {
+            if scope.yields_excessively() {
                 self.emit_violation(expr);
             }
         }
@@ -147,9 +147,9 @@ impl<'a> YieldTracker<'a> {
         for &yield_expr in yields {
             scope.add_yield(yield_expr);
         }
-        let does_yield_more_than_once = scope.does_yield_more_than_once();
+        let yields_excessive = scope.yields_excessively();
         let yield_exprs_clone = scope.yield_expressions.clone();
-        if does_yield_more_than_once {
+        if yields_excessive {
             self.emit_multiple_violations(&yield_exprs_clone);
         }
     }
@@ -167,7 +167,7 @@ impl<'a> YieldTracker<'a> {
         }
     }
 
-    fn get_max_yields(&self, branches: &[Vec<&'a Expr>]) -> Vec<&'a Expr> {
+    fn max_yields(&self, branches: &[Vec<&'a Expr>]) -> Vec<&'a Expr> {
         branches
             .iter()
             .max_by_key(|branch| branch.len())
@@ -215,8 +215,8 @@ impl<'a> YieldTracker<'a> {
             }
         }
 
-        let max_returning = self.get_max_yields(&returning_branches);
-        let max_continuing = self.get_max_yields(&continuing_branches);
+        let max_returning = self.max_yields(&returning_branches);
+        let max_continuing = self.max_yields(&continuing_branches);
 
         self.report_excess(&max_returning);
         self.propagate_yields(&max_continuing);
@@ -240,7 +240,7 @@ impl<'a> YieldScope<'a> {
         self.yield_expressions.clear();
     }
 
-    fn does_yield_more_than_once(&self) -> bool {
+    fn yields_excessively(&self) -> bool {
         self.yield_expressions.len() > 1
     }
 
@@ -281,23 +281,17 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldTracker<'a> {
 
                 let (else_yields, else_returns) = self.pop_scope();
 
-                // We need to distinguish whether an except branch returns
-                let mut max_yields_in_returning_except_branch = Vec::new();
-                let mut max_yields_in_nonreturning_except_branch = Vec::new();
+                let mut returning_except_branches = Vec::new();
+                let mut continuing_except_branches = Vec::new();
 
                 for _ in 0..try_stmt.handlers.len() {
                     let (except_yields, except_returns) = self.pop_scope();
-
                     self.report_excess(&except_yields);
 
                     if except_returns {
-                        if except_yields.len() > max_yields_in_returning_except_branch.len() {
-                            max_yields_in_returning_except_branch = except_yields;
-                        }
+                        returning_except_branches.push(except_yields);
                     } else {
-                        if except_yields.len() > max_yields_in_nonreturning_except_branch.len() {
-                            max_yields_in_nonreturning_except_branch = except_yields;
-                        }
+                        continuing_except_branches.push(except_yields);
                     }
                 }
 
@@ -308,14 +302,14 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldTracker<'a> {
                 self.report_excess(&finally_yields);
 
                 if finally_returns {
-                    // Get maximum accumulated yields in all except branches
-                    let max_except_yields = if max_yields_in_returning_except_branch.len()
-                        > max_yields_in_nonreturning_except_branch.len()
-                    {
-                        max_yields_in_returning_except_branch
-                    } else {
-                        max_yields_in_nonreturning_except_branch
-                    };
+                    let max_returning_except = self.max_yields(&returning_except_branches);
+                    let max_continuing_except = self.max_yields(&continuing_except_branches);
+                    let max_except_yields =
+                        if max_returning_except.len() > max_continuing_except.len() {
+                            max_returning_except
+                        } else {
+                            max_continuing_except
+                        };
 
                     // We need to consider all possible paths through try/except/else/finally
                     let mut common_path = try_yields.clone();
@@ -344,27 +338,30 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldTracker<'a> {
                     // Since the code preceding yields is most likely to fail, we assume either
                     // valid try-else-finally or erroneous except-finally execution.
 
+                    let max_returning_except = self.max_yields(&returning_except_branches);
+                    let max_continuing_except = self.max_yields(&continuing_except_branches);
+
                     // Check except branches that return and don't propagate yields
-                    let mut exception_return = max_yields_in_returning_except_branch;
+                    let mut exception_return = max_returning_except;
                     exception_return.extend(finally_yields.clone());
                     self.report_excess(&exception_return);
 
-                    let mut exception_no_return = max_yields_in_nonreturning_except_branch;
+                    let mut exception_no_return = max_continuing_except;
                     exception_no_return.extend(finally_yields.clone());
 
-                    let mut try_else_finally = try_yields.clone();
-                    try_else_finally.extend(else_yields);
-                    try_else_finally.extend(finally_yields.clone());
+                    let mut normal_path = try_yields.clone();
+                    normal_path.extend(else_yields);
+                    normal_path.extend(finally_yields.clone());
 
                     // If try returns, we consider try-finally
                     // If try doesn't return, we consider try-(max of else OR non-return except)-finally
                     // Propagate yields from non-returning path
                     // Returning except branches are handled above
                     if try_returns {
-                        let mut valid_try_return = try_yields.clone();
+                        let mut try_path = try_yields.clone();
                         // Finally is executed even if else returns
-                        valid_try_return.extend(finally_yields.clone());
-                        self.report_excess(&valid_try_return);
+                        try_path.extend(finally_yields.clone());
+                        self.report_excess(&try_path);
 
                         // Propagate the non-returning exception
                         self.propagate_yields(&exception_no_return);
@@ -372,16 +369,15 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldTracker<'a> {
                         if else_returns {
                             // Finally is executed even if else returns
                             // Check returning path and propagate the non-returning exception
-                            self.report_excess(&try_else_finally);
+                            self.report_excess(&normal_path);
                             self.propagate_yields(&exception_no_return);
                         } else {
                             // No returns, we propagate yields along the path with maximum yields
-                            let max_yield_path =
-                                if try_else_finally.len() > exception_no_return.len() {
-                                    try_else_finally
-                                } else {
-                                    exception_no_return
-                                };
+                            let max_yield_path = if normal_path.len() > exception_no_return.len() {
+                                normal_path
+                            } else {
+                                exception_no_return
+                            };
                             self.propagate_yields(&max_yield_path);
                         }
                     }
