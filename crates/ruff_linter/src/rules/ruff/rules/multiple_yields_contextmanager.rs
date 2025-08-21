@@ -138,6 +138,19 @@ impl<'a> YieldTracker<'a> {
         }
     }
 
+    fn emit_multiple_violations(&mut self, yields: &[&'a Expr]) {
+        // Only report the second to last violations
+        for &yield_expr in yields.iter().skip(1) {
+            self.emit_violation(yield_expr);
+        }
+    }
+
+    fn report_excess(&mut self, yields: &[&'a Expr]) {
+        if yields.len() > 1 {
+            self.emit_multiple_violations(yields);
+        }
+    }
+
     fn propagate_yields(&mut self, yields: &[&'a Expr]) {
         self.report_excess(yields);
         let scope = self
@@ -154,17 +167,21 @@ impl<'a> YieldTracker<'a> {
         }
     }
 
-    fn emit_multiple_violations(&mut self, yields: &[&'a Expr]) {
-        // Only report the second to last violations
-        for &yield_expr in yields.iter().skip(1) {
-            self.emit_violation(yield_expr);
-        }
+    fn push_scope(&mut self, scope: YieldScope<'a>) {
+        self.scopes.push(scope);
     }
 
-    fn report_excess(&mut self, yields: &[&'a Expr]) {
-        if yields.len() > 1 {
-            self.emit_multiple_violations(yields);
-        }
+    fn pop_scope(&mut self) -> Option<(Vec<&'a Expr>, bool)> {
+        self.scopes
+            .pop()
+            .map(|scope| (scope.yield_expressions, scope.does_return))
+    }
+
+    fn clear_scope_yields(&mut self) {
+        self.scopes
+            .last_mut()
+            .expect("Missing current scope for clearing yields")
+            .clear();
     }
 
     fn max_yields(&self, branches: &[Vec<&'a Expr>]) -> Vec<&'a Expr> {
@@ -179,23 +196,6 @@ impl<'a> YieldTracker<'a> {
         let mut path = base.to_vec();
         path.extend_from_slice(finally_yields);
         path
-    }
-
-    fn clear_scope_yields(&mut self) {
-        self.scopes
-            .last_mut()
-            .expect("Missing current scope for clearing yields")
-            .clear();
-    }
-
-    fn pop_scope(&mut self) -> Option<(Vec<&'a Expr>, bool)> {
-        self.scopes
-            .pop()
-            .map(|scope| (scope.yield_expressions, scope.does_return))
-    }
-
-    fn push_scope(&mut self, scope: YieldScope<'a>) {
-        self.scopes.push(scope);
     }
 
     fn handle_loop(&mut self, body: &'a [ast::Stmt], orelse: &'a [ast::Stmt]) {
@@ -259,6 +259,7 @@ impl<'a> YieldTracker<'a> {
         }
     }
 
+    // Finally returns - execution stops, report worst-case path
     fn handle_terminating_paths(
         &mut self,
         try_yields: &[&'a Expr],
@@ -278,41 +279,7 @@ impl<'a> YieldTracker<'a> {
         self.clear_scope_yields();
     }
 
-    fn get_max_except_path(
-        &self,
-        returning_except_branches: &[Vec<&'a Expr>],
-        continuing_except_branches: &[Vec<&'a Expr>],
-    ) -> Vec<&'a Expr> {
-        let max_returning_except = self.max_yields(returning_except_branches);
-        let max_continuing_except = self.max_yields(continuing_except_branches);
-
-        if max_returning_except.len() > max_continuing_except.len() {
-            max_returning_except
-        } else {
-            max_continuing_except
-        }
-    }
-
-    fn build_pre_finally_path(
-        &self,
-        try_yields: &[&'a Expr],
-        try_returns: bool,
-        else_yields: &[&'a Expr],
-        max_except_yields: &[&'a Expr],
-    ) -> Vec<&'a Expr> {
-        let mut common_path = try_yields.to_vec();
-
-        if !try_returns {
-            common_path.extend(if else_yields.len() > max_except_yields.len() {
-                else_yields
-            } else {
-                max_except_yields
-            });
-        }
-
-        common_path
-    }
-
+    // Finally doesn't return - execution continues, handle all paths
     fn handle_continuing_paths(
         &mut self,
         try_yields: &[&'a Expr],
@@ -343,6 +310,69 @@ impl<'a> YieldTracker<'a> {
         );
     }
 
+    fn handle_exclusive_branches(&mut self, branch_count: usize) {
+        let mut returning_branches = Vec::new();
+        let mut continuing_branches = Vec::new();
+
+        for _ in 0..branch_count {
+            let (branch_yields, branch_returns) = self
+                .pop_scope()
+                .expect("Missing branch scope in if/match statement");
+            self.report_excess(&branch_yields);
+
+            if branch_returns {
+                returning_branches.push(branch_yields);
+            } else {
+                continuing_branches.push(branch_yields);
+            }
+        }
+
+        let max_returning = self.max_yields(&returning_branches);
+        let max_continuing = self.max_yields(&continuing_branches);
+
+        self.report_excess(&max_returning);
+        self.propagate_yields(&max_continuing);
+    }
+
+    // Path building methods
+    // Find except handler with most yields
+    fn get_max_except_path(
+        &self,
+        returning_except_branches: &[Vec<&'a Expr>],
+        continuing_except_branches: &[Vec<&'a Expr>],
+    ) -> Vec<&'a Expr> {
+        let max_returning_except = self.max_yields(returning_except_branches);
+        let max_continuing_except = self.max_yields(continuing_except_branches);
+
+        if max_returning_except.len() > max_continuing_except.len() {
+            max_returning_except
+        } else {
+            max_continuing_except
+        }
+    }
+
+    // Build path before finally: try + (else or except)
+    fn build_pre_finally_path(
+        &self,
+        try_yields: &[&'a Expr],
+        try_returns: bool,
+        else_yields: &[&'a Expr],
+        max_except_yields: &[&'a Expr],
+    ) -> Vec<&'a Expr> {
+        let mut common_path = try_yields.to_vec();
+
+        if !try_returns {
+            common_path.extend(if else_yields.len() > max_except_yields.len() {
+                else_yields
+            } else {
+                max_except_yields
+            });
+        }
+
+        common_path
+    }
+
+    // Build exception paths with finally appended
     fn build_except_paths(
         &self,
         returning_except_branches: &[Vec<&'a Expr>],
@@ -358,6 +388,7 @@ impl<'a> YieldTracker<'a> {
         (exception_return, exception_no_return)
     }
 
+    // Build normal execution path: try + else + finally
     fn build_try_else_path(
         &self,
         try_yields: &[&'a Expr],
@@ -369,6 +400,7 @@ impl<'a> YieldTracker<'a> {
         self.append_finally(&try_else, finally_yields)
     }
 
+    // Decide which paths propagate based on return statements
     fn propagate_continuing_paths(
         &mut self,
         try_yields: &[&'a Expr],
@@ -393,30 +425,6 @@ impl<'a> YieldTracker<'a> {
             };
             self.propagate_yields(&max_yield_path);
         }
-    }
-
-    fn handle_exclusive_branches(&mut self, branch_count: usize) {
-        let mut returning_branches = Vec::new();
-        let mut continuing_branches = Vec::new();
-
-        for _ in 0..branch_count {
-            let (branch_yields, branch_returns) = self
-                .pop_scope()
-                .expect("Missing branch scope in if/match statement");
-            self.report_excess(&branch_yields);
-
-            if branch_returns {
-                returning_branches.push(branch_yields);
-            } else {
-                continuing_branches.push(branch_yields);
-            }
-        }
-
-        let max_returning = self.max_yields(&returning_branches);
-        let max_continuing = self.max_yields(&continuing_branches);
-
-        self.report_excess(&max_returning);
-        self.propagate_yields(&max_continuing);
     }
 }
 
