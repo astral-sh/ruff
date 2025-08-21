@@ -195,34 +195,25 @@ impl std::fmt::Display for Diff<'_> {
                             ),
                         };
 
-                        let index = index.map(OneIndexed::from_zero_indexed);
+                        let line = Line {
+                            index: index.map(OneIndexed::from_zero_indexed),
+                            width: digit_with,
+                        };
 
                         write!(
                             f,
-                            "{}{} ",
-                            fmt_styled(
-                                format_args!(
-                                    "{} ",
-                                    Line {
-                                        index,
-                                        width: digit_with
-                                    },
-                                ),
-                                self.stylesheet.line_no,
-                            ),
-                            fmt_styled(sign, line_no_style),
+                            "{line} {sign} ",
+                            line = fmt_styled(line, self.stylesheet.line_no),
+                            sign = fmt_styled(sign, line_no_style),
                         )?;
 
                         for (emphasized, value) in change.iter_strings_lossy() {
                             let value = show_nonprinting(&value);
+                            let styled = fmt_styled(value, style);
                             if emphasized {
-                                write!(
-                                    f,
-                                    "{}",
-                                    fmt_styled(fmt_styled(value, style), self.stylesheet.emphasis)
-                                )?;
+                                write!(f, "{}", fmt_styled(styled, self.stylesheet.underline))?;
                             } else {
-                                write!(f, "{}", fmt_styled(value, style))?;
+                                write!(f, "{styled}")?;
                             }
                         }
                     }
