@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::num::NonZeroUsize;
 
 use anstyle::Style;
+use ruff_notebook::NotebookIndex;
 use similar::{ChangeTag, InlineChange, TextDiff};
 
 use ruff_annotate_snippets::Renderer as AnnotateRenderer;
@@ -81,6 +82,7 @@ impl<'a> FullRenderer<'a> {
 struct Diff<'a> {
     fix: &'a Fix,
     diagnostic_source: DiagnosticSource,
+    notebook_index: Option<NotebookIndex>,
     stylesheet: &'a DiagnosticStylesheet,
 }
 
@@ -90,12 +92,11 @@ impl<'a> Diff<'a> {
         stylesheet: &'a DiagnosticStylesheet,
         resolver: &'a dyn FileResolver,
     ) -> Option<Diff<'a>> {
+        let file = &diagnostic.primary_span_ref()?.file;
         Some(Diff {
             fix: diagnostic.fix()?,
-            diagnostic_source: diagnostic
-                .primary_span_ref()?
-                .file
-                .diagnostic_source(resolver),
+            diagnostic_source: file.diagnostic_source(resolver),
+            notebook_index: resolver.notebook_index(file),
             stylesheet,
         })
     }
@@ -162,6 +163,20 @@ impl std::fmt::Display for Diff<'_> {
 
                     let old_index = change.old_index().map(OneIndexed::from_zero_indexed);
                     let new_index = change.new_index().map(OneIndexed::from_zero_indexed);
+
+                    let (old_index, new_index) = if let Some(notebook_index) = &self.notebook_index
+                    {
+                        (
+                            old_index.map(|old_index| {
+                                notebook_index.cell_row(old_index).unwrap_or_default()
+                            }),
+                            new_index.map(|new_index| {
+                                notebook_index.cell_row(new_index).unwrap_or_default()
+                            }),
+                        )
+                    } else {
+                        (old_index, new_index)
+                    };
 
                     display_lines.push(DisplayLine::Diff {
                         old: Line {
@@ -720,9 +735,9 @@ print()
         ℹ Safe fix
         1 1 | # cell 1
         2   |-import os
-        3 2 | # cell 2
-        4 3 | import math
-        5 4 | 
+        1 2 | # cell 2
+        2 1 | import math
+        3 2 | 
 
         error[unused-import][*]: `math` imported but unused
          --> notebook.ipynb:cell 2:2:8
@@ -738,11 +753,11 @@ print()
         ℹ Safe fix
         1 1 | # cell 1
         2 2 | import os
-        3 3 | # cell 2
-        4   |-import math
-        5 4 | 
-        6 5 | print('hello world')
-        7 6 | # cell 3
+        1 1 | # cell 2
+        2   |-import math
+        3 2 | 
+        4 3 | print('hello world')
+        1 4 | # cell 3
 
         error[unused-variable]: Local variable `x` is assigned to but never used
          --> notebook.ipynb:cell 3:4:5
@@ -755,11 +770,11 @@ print()
         help: Remove assignment to unused variable `x`
 
         ℹ Unsafe fix
-        7  7  | # cell 3
-        8  8  | def foo():
-        9  9  |     print()
-        10    |-    x = 1
-        11 10 |
+        1  1  | # cell 3
+        2  2  | def foo():
+        3  3  |     print()
+        4     |-    x = 1
+        5  4  |
         ");
     }
 
