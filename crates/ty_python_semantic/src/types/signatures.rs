@@ -234,7 +234,7 @@ impl<'db> VarianceInferable<'db> for &CallableSignature<'db> {
 }
 
 /// The signature of one of the overloads of a callable.
-#[derive(Clone, Debug, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Debug, salsa::Update, get_size2::GetSize, PartialEq, Eq, Hash)]
 pub struct Signature<'db> {
     /// The generic context for this overload, if it is generic.
     pub(crate) generic_context: Option<GenericContext<'db>>,
@@ -967,28 +967,6 @@ impl<'db> Signature<'db> {
     /// Create a new signature with the given definition.
     pub(crate) fn with_definition(self, definition: Option<Definition<'db>>) -> Self {
         Self { definition, ..self }
-    }
-}
-
-// Manual implementations of PartialEq, Eq, and Hash that exclude the definition field
-// since the definition is not relevant for type equality/equivalence
-impl PartialEq for Signature<'_> {
-    fn eq(&self, other: &Self) -> bool {
-        self.generic_context == other.generic_context
-            && self.inherited_generic_context == other.inherited_generic_context
-            && self.parameters == other.parameters
-            && self.return_ty == other.return_ty
-    }
-}
-
-impl Eq for Signature<'_> {}
-
-impl std::hash::Hash for Signature<'_> {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.generic_context.hash(state);
-        self.inherited_generic_context.hash(state);
-        self.parameters.hash(state);
-        self.return_ty.hash(state);
     }
 }
 
