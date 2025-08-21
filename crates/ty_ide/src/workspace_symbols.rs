@@ -16,7 +16,7 @@ pub fn workspace_symbols(db: &dyn Db, query: &str) -> Vec<WorkspaceSymbolInfo> {
     let options = SymbolsOptions {
         hierarchical: false, // Workspace symbols are always flat
         global_only: false,
-        query_string: Some(query.to_string()),
+        query_string: Some(query.into()),
     };
 
     // Get all files in the project
