@@ -3,13 +3,14 @@ use std::fmt::Write;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::{self as ast, Expr, Parameter};
+use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::{self as ast, Expr, ParameterWithDefault};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_index::Indexer;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::function_type::is_stub;
 use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
-use ruff_python_trivia::{indentation_at_offset, textwrap};
+use ruff_python_trivia::{CommentRanges, indentation_at_offset, textwrap};
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 
@@ -111,8 +112,7 @@ pub(crate) fn mutable_argument_default(checker: &Checker, function_def: &ast::St
             .iter()
             .map(|target| QualifiedName::from_dotted_name(target))
             .collect();
-
-        if is_mutable_expr(default, checker.semantic())
+        if is_guaranteed_mutable_expr(default, checker.semantic())
             && !parameter.annotation().is_some_and(|expr| {
                 is_immutable_annotation(expr, checker.semantic(), extend_immutable_calls.as_slice())
             })
@@ -122,17 +122,31 @@ pub(crate) fn mutable_argument_default(checker: &Checker, function_def: &ast::St
             // If the function body is on the same line as the function def, do not fix
             if let Some(fix) = move_initialization(
                 function_def,
-                &parameter.parameter,
+                parameter,
                 default,
                 checker.semantic(),
                 checker.locator(),
                 checker.stylist(),
                 checker.indexer(),
                 checker.generator(),
+                checker.comment_ranges(),
+                checker.source(),
             ) {
                 diagnostic.set_fix(fix);
             }
         }
+    }
+}
+
+/// Returns `true` if the expression is guaranteed to create a mutable object.
+fn is_guaranteed_mutable_expr(expr: &Expr, semantic: &SemanticModel) -> bool {
+    match expr {
+        Expr::Generator(_) => true,
+        Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+            elts.iter().any(|e| is_guaranteed_mutable_expr(e, semantic))
+        }
+        Expr::Named(ast::ExprNamed { value, .. }) => is_mutable_expr(value, semantic),
+        _ => is_mutable_expr(expr, semantic),
     }
 }
 
@@ -141,13 +155,15 @@ pub(crate) fn mutable_argument_default(checker: &Checker, function_def: &ast::St
 #[expect(clippy::too_many_arguments)]
 fn move_initialization(
     function_def: &ast::StmtFunctionDef,
-    parameter: &Parameter,
+    parameter: &ParameterWithDefault,
     default: &Expr,
     semantic: &SemanticModel,
     locator: &Locator,
     stylist: &Stylist,
     indexer: &Indexer,
     generator: Generator,
+    comment_ranges: &CommentRanges,
+    source: &str,
 ) -> Option<Fix> {
     let mut body = function_def.body.iter().peekable();
 
@@ -157,8 +173,13 @@ fn move_initialization(
         return None;
     }
 
+    let range = match parenthesized_range(default.into(), parameter.into(), comment_ranges, source)
+    {
+        Some(range) => range,
+        None => default.range(),
+    };
     // Set the default argument value to `None`.
-    let default_edit = Edit::range_replacement("None".to_string(), default.range());
+    let default_edit = Edit::range_replacement("None".to_string(), range);
 
     // If the function is a stub, this is the only necessary edit.
     if is_stub(function_def, semantic) {
@@ -167,14 +188,14 @@ fn move_initialization(
 
     // Add an `if`, to set the argument to its original value if still `None`.
     let mut content = String::new();
-    let _ = write!(&mut content, "if {} is None:", parameter.name());
+    let _ = write!(&mut content, "if {} is None:", parameter.parameter.name());
     content.push_str(stylist.line_ending().as_str());
     content.push_str(stylist.indentation());
     let _ = write!(
         &mut content,
         "{} = {}",
-        parameter.name(),
-        generator.expr(default)
+        parameter.parameter.name(),
+        generator.expr_parenthesized(default)
     );
     content.push_str(stylist.line_ending().as_str());
 
