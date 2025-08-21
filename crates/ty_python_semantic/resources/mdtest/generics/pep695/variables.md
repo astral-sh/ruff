@@ -327,6 +327,17 @@ def union[T: Base, U: (Base, Unrelated)](t: T, u: U) -> None:
     static_assert(is_subtype_of(U, U | None))
 ```
 
+A bound or constrained typevar in a union with a dynamic type is assignable to the typevar:
+
+```py
+def union_with_dynamic[T: Base, U: (Base, Unrelated)](t: T, u: U) -> None:
+    static_assert(is_assignable_to(T | Any, T))
+    static_assert(is_assignable_to(U | Any, U))
+
+    static_assert(not is_subtype_of(T | Any, T))
+    static_assert(not is_subtype_of(U | Any, U))
+```
+
 And an intersection of a typevar with another type is always a subtype of the TypeVar:
 
 ```py
