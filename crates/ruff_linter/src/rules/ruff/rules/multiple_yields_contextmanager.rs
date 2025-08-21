@@ -143,7 +143,7 @@ impl<'a> YieldTracker<'a> {
         let scope = self
             .scopes
             .last_mut()
-            .expect("Scope stack should never be empty during AST traversal");
+            .expect("Missing current scope for yield propagation");
         for &yield_expr in yields {
             scope.add_yield(yield_expr);
         }
@@ -178,16 +178,14 @@ impl<'a> YieldTracker<'a> {
     fn clear_yields_in_current_scope(&mut self) {
         self.scopes
             .last_mut()
-            .expect("Scope stack should never be empty during AST traversal")
+            .expect("Missing current scope for clearing yields")
             .clear();
     }
 
-    fn pop_scope(&mut self) -> (Vec<&'a Expr>, bool) {
-        let scope = self
-            .scopes
+    fn pop_scope(&mut self) -> Option<(Vec<&'a Expr>, bool)> {
+        self.scopes
             .pop()
-            .expect("Scope stack should never be empty during AST traversal");
-        (scope.yield_expressions, scope.does_return)
+            .map(|scope| (scope.yield_expressions, scope.does_return))
     }
 
     fn push_scope(&mut self, scope: YieldScope<'a>) {
@@ -205,7 +203,9 @@ impl<'a> YieldTracker<'a> {
         let mut continuing_branches = Vec::new();
 
         for _ in 0..branch_count {
-            let (branch_yields, branch_returns) = self.pop_scope();
+            let (branch_yields, branch_returns) = self
+                .pop_scope()
+                .expect("Missing branch scope in if/match statement");
             self.report_excess(&branch_yields);
 
             if branch_returns {
@@ -277,15 +277,21 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldTracker<'a> {
             AnyNodeRef::StmtTry(try_stmt) => {
                 // Finally is always executed, even if prior branches return
                 // Other branches are skipped
-                let (finally_yields, finally_returns) = self.pop_scope();
+                let (finally_yields, finally_returns) = self
+                    .pop_scope()
+                    .expect("Missing finally block scope in try-statement");
 
-                let (else_yields, else_returns) = self.pop_scope();
+                let (else_yields, else_returns) = self
+                    .pop_scope()
+                    .expect("Missing else block scope in try-statement");
 
                 let mut returning_except_branches = Vec::new();
                 let mut continuing_except_branches = Vec::new();
 
                 for _ in 0..try_stmt.handlers.len() {
-                    let (except_yields, except_returns) = self.pop_scope();
+                    let (except_yields, except_returns) = self
+                        .pop_scope()
+                        .expect("Missing except handler scope in try-statement");
                     self.report_excess(&except_yields);
 
                     if except_returns {
@@ -295,7 +301,9 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldTracker<'a> {
                     }
                 }
 
-                let (try_yields, try_returns) = self.pop_scope();
+                let (try_yields, try_returns) = self
+                    .pop_scope()
+                    .expect("Missing try block scope in try-statement");
 
                 self.report_excess(&try_yields);
                 self.report_excess(&else_yields);
@@ -392,8 +400,10 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldTracker<'a> {
                 self.handle_exclusive_branches(branch_count);
             }
             AnyNodeRef::StmtFor(_) | AnyNodeRef::StmtWhile(_) => {
-                let (else_yields, else_returns) = self.pop_scope();
-                let (body_yields, _body_returns) = self.pop_scope();
+                let (else_yields, else_returns) =
+                    self.pop_scope().expect("Missing loop else scope");
+                let (body_yields, _body_returns) =
+                    self.pop_scope().expect("Missing loop body scope");
 
                 if !body_yields.is_empty() {
                     if body_yields.len() == 1 {
