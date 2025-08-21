@@ -4681,10 +4681,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Handle various singletons.
         if let Some(name_expr) = target.as_name_expr() {
-            if let Some(special_form) =
-                SpecialFormType::try_from_file_and_name(self.db(), self.file(), &name_expr.id)
+            let declared_type = declared.inner_type();
+            if declared_type.is_subclass_of()
+                || declared_type
+                    .into_nominal_instance()
+                    .is_some_and(|instance| {
+                        instance
+                            .class(self.db())
+                            .is_known(self.db(), KnownClass::SpecialForm)
+                    })
             {
-                declared.inner = Type::SpecialForm(special_form);
+                if let Some(special_form) =
+                    SpecialFormType::try_from_file_and_name(self.db(), self.file(), &name_expr.id)
+                {
+                    declared.inner = Type::SpecialForm(special_form);
+                }
             }
         }
 
