@@ -523,8 +523,8 @@ def f(x: MixedTupleSubclass):
 
 ```py
 a, b = "ab"
-reveal_type(a)  # revealed: LiteralString
-reveal_type(b)  # revealed: LiteralString
+reveal_type(a)  # revealed: Literal["a"]
+reveal_type(b)  # revealed: Literal["b"]
 ```
 
 ### Uneven unpacking (1)
@@ -570,37 +570,37 @@ reveal_type(d)  # revealed: Unknown
 
 ```py
 (a, *b, c) = "ab"
-reveal_type(a)  # revealed: LiteralString
+reveal_type(a)  # revealed: Literal["a"]
 reveal_type(b)  # revealed: list[Never]
-reveal_type(c)  # revealed: LiteralString
+reveal_type(c)  # revealed: Literal["b"]
 ```
 
 ### Starred expression (3)
 
 ```py
 (a, *b, c) = "abc"
-reveal_type(a)  # revealed: LiteralString
-reveal_type(b)  # revealed: list[LiteralString]
-reveal_type(c)  # revealed: LiteralString
+reveal_type(a)  # revealed: Literal["a"]
+reveal_type(b)  # revealed: list[Literal["b"]]
+reveal_type(c)  # revealed: Literal["c"]
 ```
 
 ### Starred expression (4)
 
 ```py
 (a, *b, c, d) = "abcdef"
-reveal_type(a)  # revealed: LiteralString
-reveal_type(b)  # revealed: list[LiteralString]
-reveal_type(c)  # revealed: LiteralString
-reveal_type(d)  # revealed: LiteralString
+reveal_type(a)  # revealed: Literal["a"]
+reveal_type(b)  # revealed: list[Literal["b", "c", "d"]]
+reveal_type(c)  # revealed: Literal["e"]
+reveal_type(d)  # revealed: Literal["f"]
 ```
 
 ### Starred expression (5)
 
 ```py
 (a, b, *c) = "abcd"
-reveal_type(a)  # revealed: LiteralString
-reveal_type(b)  # revealed: LiteralString
-reveal_type(c)  # revealed: list[LiteralString]
+reveal_type(a)  # revealed: Literal["a"]
+reveal_type(b)  # revealed: Literal["b"]
+reveal_type(c)  # revealed: list[Literal["c", "d"]]
 ```
 
 ### Starred expression (6)
@@ -650,8 +650,8 @@ reveal_type(b)  # revealed: Unknown
 ```py
 (a, b) = "\ud800\udfff"
 
-reveal_type(a)  # revealed: LiteralString
-reveal_type(b)  # revealed: LiteralString
+reveal_type(a)  # revealed: Literal["�"]
+reveal_type(b)  # revealed: Literal["�"]
 ```
 
 ## Union
@@ -714,7 +714,7 @@ def _(arg: tuple[int, tuple[str, bytes]] | tuple[tuple[int, bytes], Literal["ab"
     a, (b, c) = arg
     reveal_type(a)  # revealed: int | tuple[int, bytes]
     reveal_type(b)  # revealed: str
-    reveal_type(c)  # revealed: bytes | LiteralString
+    reveal_type(c)  # revealed: bytes | Literal["b"]
 ```
 
 ### Starred expression
@@ -785,8 +785,8 @@ from typing import Literal
 
 def _(arg: tuple[int, int] | Literal["ab"]):
     a, b = arg
-    reveal_type(a)  # revealed: int | LiteralString
-    reveal_type(b)  # revealed: int | LiteralString
+    reveal_type(a)  # revealed: int | Literal["a"]
+    reveal_type(b)  # revealed: int | Literal["b"]
 ```
 
 ### Custom iterator (1)

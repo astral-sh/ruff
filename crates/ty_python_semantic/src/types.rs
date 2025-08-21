@@ -45,7 +45,7 @@ use crate::types::constraints::{
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{INVALID_AWAIT, INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
 pub use crate::types::display::DisplaySettings;
-use crate::types::enums::{enum_metadata, is_single_member_enum};
+use crate::types::enums::{enum_member_literals, enum_metadata, is_single_member_enum};
 use crate::types::function::{
     DataclassTransformerParams, FunctionDecorators, FunctionSpans, FunctionType, KnownFunction,
 };
@@ -4917,6 +4917,8 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         mode: EvaluationMode,
     ) -> Result<Cow<'db, TupleSpec<'db>>, IterationError<'db>> {
+        const MAX_TUPLE_LENGTH: usize = 128;
+
         if mode.is_async() {
             let try_call_dunder_anext_on_iterator = |iterator: Type<'db>| -> Result<
                 Result<Type<'db>, AwaitError<'db>>,
@@ -4984,14 +4986,24 @@ impl<'db> Type<'db> {
                 ))));
             }
             Type::StringLiteral(string_literal_ty) => {
-                // We could go further and deconstruct to an array of `StringLiteral`
-                // with each individual character, instead of just an array of
-                // `LiteralString`, but there would be a cost and it's not clear that
-                // it's worth it.
-                return Ok(Cow::Owned(TupleSpec::heterogeneous(std::iter::repeat_n(
-                    Type::LiteralString,
-                    string_literal_ty.python_len(db),
-                ))));
+                let string_literal = string_literal_ty.value(db);
+                if string_literal.len() < MAX_TUPLE_LENGTH {
+                    return Ok(Cow::Owned(TupleSpec::heterogeneous(
+                        string_literal
+                            .chars()
+                            .map(|c| Type::string_literal(db, &c.to_string())),
+                    )));
+                }
+            }
+            Type::BytesLiteral(bytes) => {
+                let bytes_literal = bytes.value(db);
+                if bytes_literal.len() < MAX_TUPLE_LENGTH {
+                    return Ok(Cow::Owned(TupleSpec::heterogeneous(
+                        bytes_literal
+                            .iter()
+                            .map(|b| Type::IntLiteral(i64::from(*b))),
+                    )));
+                }
             }
             Type::Never => {
                 // The dunder logic below would have us return `tuple[Never, ...]`, which eagerly
@@ -5016,6 +5028,15 @@ impl<'db> Type<'db> {
                 "should not be able to iterate over type variable {} in inferable position",
                 self.display(db)
             ),
+            Type::ClassLiteral(class) => {
+                if let Some(enum_members) = enum_member_literals(db, class, None) {
+                    if enum_metadata(db, class)
+                        .is_some_and(|metadata| metadata.members.len() < MAX_TUPLE_LENGTH)
+                    {
+                        return Ok(Cow::Owned(TupleSpec::heterogeneous(enum_members)));
+                    }
+                }
+            }
             Type::Dynamic(_)
             | Type::FunctionLiteral(_)
             | Type::GenericAlias(_)
@@ -5026,7 +5047,6 @@ impl<'db> Type<'db> {
             | Type::DataclassTransformer(_)
             | Type::Callable(_)
             | Type::ModuleLiteral(_)
-            | Type::ClassLiteral(_)
             | Type::SubclassOf(_)
             | Type::ProtocolInstance(_)
             | Type::SpecialForm(_)
@@ -5040,7 +5060,6 @@ impl<'db> Type<'db> {
             | Type::BooleanLiteral(_)
             | Type::EnumLiteral(_)
             | Type::LiteralString
-            | Type::BytesLiteral(_)
             | Type::BoundSuper(_)
             | Type::TypeIs(_)
             | Type::TypedDict(_) => {}
