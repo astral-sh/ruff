@@ -729,8 +729,8 @@ print()
         --cell 2------------------------------------------------------------------------
         1 1 | # cell 2
         2   |-import math
-        1 2 | 
-        2 1 | print('hello world')
+        3 2 | 
+        4 3 | print('hello world')
 
         error[unused-variable]: Local variable `x` is assigned to but never used
          --> notebook.ipynb:cell 3:4:5
@@ -746,9 +746,9 @@ print()
         --cell 3------------------------------------------------------------------------
         1 1 | # cell 3
         2 2 | def foo():
-        1 1 |     print()
-        2   |-    x = 1
-        3 2 |
+        3 3 |     print()
+        4   |-    x = 1
+        5 4 |
         ");
     }
 
