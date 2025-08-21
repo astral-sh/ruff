@@ -260,3 +260,8 @@ pub(crate) const fn is_maxsplit_without_separator_fix_enabled(settings: &LinterS
 pub(crate) const fn is_bidi_forbid_arabic_letter_mark_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
+
+// https://github.com/astral-sh/ruff/pull/20020
+pub(crate) const fn is_separate_unused_import_diag_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
