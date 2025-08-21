@@ -300,7 +300,7 @@ impl<'db> NominalInstanceType<'db> {
             (NominalInstanceInner::NonTuple(class1), NominalInstanceInner::NonTuple(class2)) => {
                 class1.is_equivalent_to_impl(db, class2, visitor)
             }
-            _ => C::never(db),
+            _ => C::unsatisfiable(db),
         }
     }
 
@@ -310,11 +310,11 @@ impl<'db> NominalInstanceType<'db> {
         other: Self,
         visitor: &IsDisjointVisitor<'db, C>,
     ) -> C {
-        let mut result = C::never(db);
+        let mut result = C::unsatisfiable(db);
         if let Some(self_spec) = self.tuple_spec(db) {
             if let Some(other_spec) = other.tuple_spec(db) {
                 let compatible = self_spec.is_disjoint_from_impl(db, &other_spec, visitor);
-                if result.union(db, compatible).is_always(db) {
+                if result.union(db, compatible).is_always_satisfied(db) {
                     return result;
                 }
             }
@@ -547,11 +547,11 @@ impl<'db> ProtocolInstanceType<'db> {
         _visitor: &IsEquivalentVisitor<'db, C>,
     ) -> C {
         if self == other {
-            return C::always(db);
+            return C::always_satisfiable(db);
         }
         let self_normalized = self.normalized(db);
         if self_normalized == Type::ProtocolInstance(other) {
-            return C::always(db);
+            return C::always_satisfiable(db);
         }
         C::from_bool(db, self_normalized == other.normalized(db))
     }
@@ -567,7 +567,7 @@ impl<'db> ProtocolInstanceType<'db> {
         _other: Self,
         _visitor: &IsDisjointVisitor<'db, C>,
     ) -> C {
-        C::never(db)
+        C::unsatisfiable(db)
     }
 
     pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {

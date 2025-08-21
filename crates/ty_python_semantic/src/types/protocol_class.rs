@@ -520,7 +520,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
     ) -> C {
         match &self.kind {
             // TODO: implement disjointness for property/method members as well as attribute members
-            ProtocolMemberKind::Property(_) | ProtocolMemberKind::Method(_) => C::never(db),
+            ProtocolMemberKind::Property(_) | ProtocolMemberKind::Method(_) => C::unsatisfiable(db),
             ProtocolMemberKind::Other(ty) => ty.is_disjoint_from_impl(db, other, visitor),
         }
     }
@@ -555,7 +555,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                 let Place::Type(attribute_type, Boundness::Bound) =
                     other.member(db, self.name).place
                 else {
-                    return C::never(db);
+                    return C::unsatisfiable(db);
                 };
                 member_type
                     .has_relation_to_impl(db, attribute_type, relation, visitor)

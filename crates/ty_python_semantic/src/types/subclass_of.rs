@@ -197,7 +197,9 @@ impl<'db> SubclassOfType<'db> {
         _visitor: &IsDisjointVisitor<'db, C>,
     ) -> C {
         match (self.subclass_of, other.subclass_of) {
-            (SubclassOfInner::Dynamic(_), _) | (_, SubclassOfInner::Dynamic(_)) => C::never(db),
+            (SubclassOfInner::Dynamic(_), _) | (_, SubclassOfInner::Dynamic(_)) => {
+                C::unsatisfiable(db)
+            }
             (SubclassOfInner::Class(self_class), SubclassOfInner::Class(other_class)) => {
                 C::from_bool(db, !self_class.could_coexist_in_mro_with(db, other_class))
             }

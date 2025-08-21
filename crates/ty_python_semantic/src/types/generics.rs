@@ -570,7 +570,7 @@ impl<'db> Specialization<'db> {
     ) -> C {
         let generic_context = self.generic_context(db);
         if generic_context != other.generic_context(db) {
-            return C::never(db);
+            return C::unsatisfiable(db);
         }
 
         if let (Some(self_tuple), Some(other_tuple)) = (self.tuple_inner(db), other.tuple_inner(db))
@@ -578,7 +578,7 @@ impl<'db> Specialization<'db> {
             return self_tuple.has_relation_to_impl(db, other_tuple, relation, visitor);
         }
 
-        let mut result = C::always(db);
+        let mut result = C::always_satisfiable(db);
         for ((bound_typevar, self_type), other_type) in (generic_context.variables(db).into_iter())
             .zip(self.types(db))
             .zip(other.types(db))
@@ -586,7 +586,7 @@ impl<'db> Specialization<'db> {
             if self_type.is_dynamic() || other_type.is_dynamic() {
                 match relation {
                     TypeRelation::Assignability => continue,
-                    TypeRelation::Subtyping => return C::never(db),
+                    TypeRelation::Subtyping => return C::unsatisfiable(db),
                 }
             }
 
@@ -611,9 +611,9 @@ impl<'db> Specialization<'db> {
                 TypeVarVariance::Contravariant => {
                     other_type.has_relation_to_impl(db, *self_type, relation, visitor)
                 }
-                TypeVarVariance::Bivariant => C::always(db),
+                TypeVarVariance::Bivariant => C::always_satisfiable(db),
             };
-            if result.intersect(db, compatible).is_never(db) {
+            if result.intersect(db, compatible).is_never_satisfied(db) {
                 return result;
             }
         }
@@ -629,10 +629,10 @@ impl<'db> Specialization<'db> {
     ) -> C {
         let generic_context = self.generic_context(db);
         if generic_context != other.generic_context(db) {
-            return C::never(db);
+            return C::unsatisfiable(db);
         }
 
-        let mut result = C::always(db);
+        let mut result = C::always_satisfiable(db);
         for ((bound_typevar, self_type), other_type) in (generic_context.variables(db).into_iter())
             .zip(self.types(db))
             .zip(other.types(db))
@@ -649,19 +649,19 @@ impl<'db> Specialization<'db> {
                 | TypeVarVariance::Contravariant => {
                     self_type.is_equivalent_to_impl(db, *other_type, visitor)
                 }
-                TypeVarVariance::Bivariant => C::always(db),
+                TypeVarVariance::Bivariant => C::always_satisfiable(db),
             };
-            if result.intersect(db, compatible).is_never(db) {
+            if result.intersect(db, compatible).is_never_satisfied(db) {
                 return result;
             }
         }
 
         match (self.tuple_inner(db), other.tuple_inner(db)) {
-            (Some(_), None) | (None, Some(_)) => return C::never(db),
+            (Some(_), None) | (None, Some(_)) => return C::unsatisfiable(db),
             (None, None) => {}
             (Some(self_tuple), Some(other_tuple)) => {
                 let compatible = self_tuple.is_equivalent_to_impl(db, other_tuple, visitor);
-                if result.intersect(db, compatible).is_never(db) {
+                if result.intersect(db, compatible).is_never_satisfied(db) {
                     return result;
                 }
             }

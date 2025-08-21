@@ -549,7 +549,7 @@ impl<'db> ClassType<'db> {
             db,
             other,
             TypeRelation::Subtyping,
-            &HasRelationToVisitor::new(C::always(db)),
+            &HasRelationToVisitor::new(C::always_satisfiable(db)),
         )
     }
 
@@ -568,7 +568,7 @@ impl<'db> ClassType<'db> {
                 },
 
                 // Protocol and Generic are not represented by a ClassType.
-                ClassBase::Protocol | ClassBase::Generic => C::never(db),
+                ClassBase::Protocol | ClassBase::Generic => C::unsatisfiable(db),
 
                 ClassBase::Class(base) => match (base, other) {
                     (ClassType::NonGeneric(base), ClassType::NonGeneric(other)) => {
@@ -585,12 +585,12 @@ impl<'db> ClassType<'db> {
                         })
                     }
                     (ClassType::Generic(_), ClassType::NonGeneric(_))
-                    | (ClassType::NonGeneric(_), ClassType::Generic(_)) => C::never(db),
+                    | (ClassType::NonGeneric(_), ClassType::Generic(_)) => C::unsatisfiable(db),
                 },
 
                 ClassBase::TypedDict => {
                     // TODO: Implement subclassing and assignability for TypedDicts.
-                    C::always(db)
+                    C::always_satisfiable(db)
                 }
             }
         })
@@ -603,13 +603,13 @@ impl<'db> ClassType<'db> {
         visitor: &IsEquivalentVisitor<'db, C>,
     ) -> C {
         if self == other {
-            return C::always(db);
+            return C::always_satisfiable(db);
         }
 
         match (self, other) {
             // A non-generic class is never equivalent to a generic class.
             // Two non-generic classes are only equivalent if they are equal (handled above).
-            (ClassType::NonGeneric(_), _) | (_, ClassType::NonGeneric(_)) => C::never(db),
+            (ClassType::NonGeneric(_), _) | (_, ClassType::NonGeneric(_)) => C::unsatisfiable(db),
 
             (ClassType::Generic(this), ClassType::Generic(other)) => {
                 C::from_bool(db, this.origin(db) == other.origin(db)).and(db, || {

@@ -905,10 +905,10 @@ impl<'db> FunctionType<'db> {
         visitor: &IsEquivalentVisitor<'db, C>,
     ) -> C {
         if self.normalized(db) == other.normalized(db) {
-            return C::always(db);
+            return C::always_satisfiable(db);
         }
         if self.literal(db) != other.literal(db) {
-            return C::never(db);
+            return C::unsatisfiable(db);
         }
         let self_signature = self.signature(db);
         let other_signature = other.signature(db);
