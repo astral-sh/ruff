@@ -184,7 +184,7 @@ impl<'a> YieldTracker<'a> {
             .clear();
     }
 
-    fn max_yields(&self, branches: &[Vec<&'a Expr>]) -> Vec<&'a Expr> {
+    fn max_yields(branches: &[Vec<&'a Expr>]) -> Vec<&'a Expr> {
         branches
             .iter()
             .max_by_key(|branch| branch.len())
@@ -192,7 +192,7 @@ impl<'a> YieldTracker<'a> {
             .unwrap_or_default()
     }
 
-    fn append_finally(&self, base: &[&'a Expr], finally_yields: &[&'a Expr]) -> Vec<&'a Expr> {
+    fn append_finally(base: &[&'a Expr], finally_yields: &[&'a Expr]) -> Vec<&'a Expr> {
         let mut path = base.to_vec();
         path.extend_from_slice(finally_yields);
         path
@@ -270,10 +270,10 @@ impl<'a> YieldTracker<'a> {
         continuing_except_branches: &[Vec<&'a Expr>],
     ) {
         let except_yields =
-            self.get_max_except_path(returning_except_branches, continuing_except_branches);
+            Self::get_max_except_path(returning_except_branches, continuing_except_branches);
         let base_path =
-            self.build_pre_finally_path(try_yields, try_returns, else_yields, &except_yields);
-        let max_path = self.append_finally(&base_path, finally_yields);
+            Self::build_pre_finally_path(try_yields, try_returns, else_yields, &except_yields);
+        let max_path = Self::append_finally(&base_path, finally_yields);
 
         self.report_excess(&max_path);
         self.clear_scope_yields();
@@ -290,7 +290,7 @@ impl<'a> YieldTracker<'a> {
         returning_except_branches: &[Vec<&'a Expr>],
         continuing_except_branches: &[Vec<&'a Expr>],
     ) {
-        let (exception_return, exception_no_return) = self.build_except_paths(
+        let (exception_return, exception_no_return) = Self::build_except_paths(
             returning_except_branches,
             continuing_except_branches,
             finally_yields,
@@ -298,7 +298,7 @@ impl<'a> YieldTracker<'a> {
 
         self.report_excess(&exception_return);
 
-        let normal_path = self.build_try_else_path(try_yields, else_yields, finally_yields);
+        let normal_path = Self::build_try_else_path(try_yields, else_yields, finally_yields);
 
         self.propagate_continuing_paths(
             try_yields,
@@ -327,8 +327,8 @@ impl<'a> YieldTracker<'a> {
             }
         }
 
-        let max_returning = self.max_yields(&returning_branches);
-        let max_continuing = self.max_yields(&continuing_branches);
+        let max_returning = Self::max_yields(&returning_branches);
+        let max_continuing = Self::max_yields(&continuing_branches);
 
         self.report_excess(&max_returning);
         self.propagate_yields(&max_continuing);
@@ -337,12 +337,11 @@ impl<'a> YieldTracker<'a> {
     // Path building methods
     // Find except handler with most yields
     fn get_max_except_path(
-        &self,
         returning_except_branches: &[Vec<&'a Expr>],
         continuing_except_branches: &[Vec<&'a Expr>],
     ) -> Vec<&'a Expr> {
-        let max_returning_except = self.max_yields(returning_except_branches);
-        let max_continuing_except = self.max_yields(continuing_except_branches);
+        let max_returning_except = Self::max_yields(returning_except_branches);
+        let max_continuing_except = Self::max_yields(continuing_except_branches);
 
         if max_returning_except.len() > max_continuing_except.len() {
             max_returning_except
@@ -353,7 +352,6 @@ impl<'a> YieldTracker<'a> {
 
     // Build path before finally: try + (else or except)
     fn build_pre_finally_path(
-        &self,
         try_yields: &[&'a Expr],
         try_returns: bool,
         else_yields: &[&'a Expr],
@@ -374,30 +372,28 @@ impl<'a> YieldTracker<'a> {
 
     // Build exception paths with finally appended
     fn build_except_paths(
-        &self,
         returning_except_branches: &[Vec<&'a Expr>],
         continuing_except_branches: &[Vec<&'a Expr>],
         finally_yields: &[&'a Expr],
     ) -> (Vec<&'a Expr>, Vec<&'a Expr>) {
-        let max_returning_except = self.max_yields(returning_except_branches);
-        let max_continuing_except = self.max_yields(continuing_except_branches);
+        let max_returning_except = Self::max_yields(returning_except_branches);
+        let max_continuing_except = Self::max_yields(continuing_except_branches);
 
-        let exception_return = self.append_finally(&max_returning_except, finally_yields);
-        let exception_no_return = self.append_finally(&max_continuing_except, finally_yields);
+        let exception_return = Self::append_finally(&max_returning_except, finally_yields);
+        let exception_no_return = Self::append_finally(&max_continuing_except, finally_yields);
 
         (exception_return, exception_no_return)
     }
 
     // Build normal execution path: try + else + finally
     fn build_try_else_path(
-        &self,
         try_yields: &[&'a Expr],
         else_yields: &[&'a Expr],
         finally_yields: &[&'a Expr],
     ) -> Vec<&'a Expr> {
         let mut try_else = try_yields.to_vec();
         try_else.extend(else_yields);
-        self.append_finally(&try_else, finally_yields)
+        Self::append_finally(&try_else, finally_yields)
     }
 
     // Decide which paths propagate based on return statements
@@ -411,7 +407,7 @@ impl<'a> YieldTracker<'a> {
         exception_no_return: &[&'a Expr],
     ) {
         if try_returns {
-            let try_path = self.append_finally(try_yields, finally_yields);
+            let try_path = Self::append_finally(try_yields, finally_yields);
             self.report_excess(&try_path);
             self.propagate_yields(exception_no_return);
         } else if else_returns {
