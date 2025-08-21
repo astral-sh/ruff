@@ -786,7 +786,7 @@ class DataProcessor:
         5 |     def __init__(self):
         6 |         self.multiplier = func
           |                           ^^^^
-        7 |     
+        7 |
         8 |     def process(self, value):
           |
 
@@ -834,7 +834,7 @@ def process_model():
         2 | class MyModel:
         3 |     attr = 42
           |     ^^^^
-        4 |         
+        4 |
         5 |     def get_attribute(self):
           |
 
