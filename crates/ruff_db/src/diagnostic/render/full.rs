@@ -149,8 +149,9 @@ impl std::fmt::Display for Diff<'_> {
 
         for (idx, group) in diff.grouped_ops(3).iter().enumerate() {
             if idx > 0 {
-                display_lines.push(DisplayLine::Hline);
+                display_lines.push(DisplayLine::Hline { cell: None });
             }
+            let mut last_cell = None;
             for op in group {
                 for change in diff.iter_inline_changes(op) {
                     let sign = match change.tag() {
@@ -166,14 +167,20 @@ impl std::fmt::Display for Diff<'_> {
 
                     let (old_index, new_index) = if let Some(notebook_index) = &self.notebook_index
                     {
-                        (
-                            old_index.map(|old_index| {
-                                notebook_index.cell_row(old_index).unwrap_or_default()
-                            }),
-                            new_index.map(|new_index| {
-                                notebook_index.cell_row(new_index).unwrap_or_default()
-                            }),
-                        )
+                        let cell = old_index
+                            .or(new_index)
+                            .and_then(|index| notebook_index.cell(index));
+                        if cell != last_cell {
+                            display_lines.push(DisplayLine::Hline { cell });
+                        }
+                        last_cell = cell;
+                        let old_index = old_index.map(|old_index| {
+                            notebook_index.cell_row(old_index).unwrap_or_default()
+                        });
+                        let new_index = new_index.map(|new_index| {
+                            notebook_index.cell_row(new_index).unwrap_or_default()
+                        });
+                        (old_index, new_index)
                     } else {
                         (old_index, new_index)
                     };
@@ -251,7 +258,9 @@ enum DisplayLine<'a> {
     /// A header line like `ℹ Safe fix`.
     Header { message: &'static str, style: Style },
     /// A horizontal line, used for separating groups.
-    Hline,
+    ///
+    /// If `cell` is `Some`, include the cell number in the line.
+    Hline { cell: Option<OneIndexed> },
     Diff {
         old: Line,
         new: Line,
@@ -268,7 +277,10 @@ impl std::fmt::Display for DisplayLine<'_> {
             DisplayLine::Header { message, style } => {
                 writeln!(f, "ℹ {}", fmt_styled(message, *style))?
             }
-            DisplayLine::Hline => writeln!(f, "{:-^1$}", "-", 80)?,
+            DisplayLine::Hline { cell } => match cell {
+                Some(cell) => writeln!(f, "-- cell {cell:-<72}")?,
+                None => writeln!(f, "{:-^1$}", "-", 80)?,
+            },
             DisplayLine::Diff {
                 old,
                 new,
@@ -733,8 +745,10 @@ print()
         help: Remove unused import: `os`
 
         ℹ Safe fix
+        -- cell 1-----------------------------------------------------------------------
         1 1 | # cell 1
         2   |-import os
+        -- cell 2-----------------------------------------------------------------------
         1 2 | # cell 2
         2 1 | import math
         3 2 | 
@@ -751,12 +765,15 @@ print()
         help: Remove unused import: `math`
 
         ℹ Safe fix
+        -- cell 1-----------------------------------------------------------------------
         1 1 | # cell 1
         2 2 | import os
+        -- cell 2-----------------------------------------------------------------------
         1 1 | # cell 2
         2   |-import math
         3 2 | 
         4 3 | print('hello world')
+        -- cell 3-----------------------------------------------------------------------
         1 4 | # cell 3
 
         error[unused-variable]: Local variable `x` is assigned to but never used
@@ -770,6 +787,7 @@ print()
         help: Remove assignment to unused variable `x`
 
         ℹ Unsafe fix
+        -- cell 3-----------------------------------------------------------------------
         1  1  | # cell 3
         2  2  | def foo():
         3  3  |     print()
