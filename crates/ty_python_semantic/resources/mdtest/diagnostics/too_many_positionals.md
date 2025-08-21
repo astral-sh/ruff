@@ -1,4 +1,4 @@
-# "Missing argument" diagnostics
+# too-many-positional-arguments diagnostics
 
 <!-- snapshot-diagnostics -->
 

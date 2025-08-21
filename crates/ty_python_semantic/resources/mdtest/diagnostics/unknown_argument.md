@@ -1,4 +1,4 @@
-# "No known parameter" diagnostics
+# Unknown argument diagnostics
 
 <!-- snapshot-diagnostics -->
 

@@ -1,4 +1,4 @@
-# "Missing argument" diagnostics
+# Missing argument diagnostics
 
 <!-- snapshot-diagnostics -->
 

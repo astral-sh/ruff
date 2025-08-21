@@ -3,8 +3,8 @@ source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
 ---
-mdtest name: no_known_parameter.md - "No known parameter" diagnostics
-mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/no_known_parameter.md
+mdtest name: unknown_argument.md - Unknown argument diagnostics
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/unknown_argument.md
 ---
 
 # Python source files
