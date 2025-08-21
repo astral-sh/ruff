@@ -106,22 +106,4 @@ help: Remove docstring
    15 |+    
 19 16 | 
 20 17 |     def __init__(self) -> None: ...
-21 18 | 
-
-PYI021 [*] Docstrings should not be included in stubs
-  --> PYI021.pyi:28:5
-   |
-27 | def check_isolation_level(mode: int) -> None:
-28 |     """Shouldn't try to fix either."""  # ERROR PYI021
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-29 |     ...  # ERROR PIE790
-   |
-help: Remove docstring
-
-ℹ Unsafe fix
-25 25 | 
-26 26 | 
-27 27 | def check_isolation_level(mode: int) -> None:
-28    |-    """Shouldn't try to fix either."""  # ERROR PYI021
-   28 |+      # ERROR PYI021
-29 29 |     ...  # ERROR PIE790
+21 18 |
