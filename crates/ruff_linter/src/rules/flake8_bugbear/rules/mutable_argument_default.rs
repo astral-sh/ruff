@@ -145,7 +145,7 @@ fn is_guaranteed_mutable_expr(expr: &Expr, semantic: &SemanticModel) -> bool {
         Expr::Tuple(ast::ExprTuple { elts, .. }) => {
             elts.iter().any(|e| is_guaranteed_mutable_expr(e, semantic))
         }
-        Expr::Named(ast::ExprNamed { value, .. }) => is_mutable_expr(value, semantic),
+        Expr::Named(ast::ExprNamed { value, .. }) => is_guaranteed_mutable_expr(value, semantic),
         _ => is_mutable_expr(expr, semantic),
     }
 }
