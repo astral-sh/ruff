@@ -2759,6 +2759,12 @@ impl<'db> BindingError<'db> {
         union_diag: Option<&UnionDiagnostic<'_, '_>>,
         matching_overload: Option<&MatchingOverloadLiteral<'_>>,
     ) {
+        let callable_kind = match callable_ty {
+            Type::FunctionLiteral(_) => "Function",
+            Type::BoundMethod(_) => "Method",
+            _ => "Callable",
+        };
+
         match self {
             Self::InvalidArgumentType {
                 parameter,
@@ -2831,8 +2837,10 @@ impl<'db> BindingError<'db> {
                 } else if let Some((name_span, parameter_span)) =
                     callable_ty.parameter_span(context.db(), Some(parameter.index))
                 {
-                    let mut sub =
-                        SubDiagnostic::new(SubDiagnosticSeverity::Info, "Function defined here");
+                    let mut sub = SubDiagnostic::new(
+                        SubDiagnosticSeverity::Info,
+                        format_args!("{callable_kind} defined here"),
+                    );
                     sub.annotate(Annotation::primary(name_span));
                     sub.annotate(
                         Annotation::secondary(parameter_span).message("Parameter declared here"),
@@ -2863,6 +2871,13 @@ impl<'db> BindingError<'db> {
                     ));
                     if let Some(union_diag) = union_diag {
                         union_diag.add_union_context(context.db(), &mut diag);
+                    } else if let Some(spans) = callable_ty.function_spans(context.db()) {
+                        let mut sub = SubDiagnostic::new(
+                            SubDiagnosticSeverity::Info,
+                            format_args!("{callable_kind} signature here"),
+                        );
+                        sub.annotate(Annotation::primary(spans.signature));
+                        diag.sub(sub);
                     }
                 }
             }
@@ -2880,6 +2895,19 @@ impl<'db> BindingError<'db> {
                     ));
                     if let Some(union_diag) = union_diag {
                         union_diag.add_union_context(context.db(), &mut diag);
+                    } else {
+                        let span = callable_ty.parameter_span(
+                            context.db(),
+                            (parameters.0.len() == 1).then(|| parameters.0[0].index),
+                        );
+                        if let Some((_, parameter_span)) = span {
+                            let mut sub = SubDiagnostic::new(
+                                SubDiagnosticSeverity::Info,
+                                format_args!("Parameter{s} declared here"),
+                            );
+                            sub.annotate(Annotation::primary(parameter_span));
+                            diag.sub(sub);
+                        }
                     }
                 }
             }
@@ -2900,6 +2928,13 @@ impl<'db> BindingError<'db> {
                     ));
                     if let Some(union_diag) = union_diag {
                         union_diag.add_union_context(context.db(), &mut diag);
+                    } else if let Some(spans) = callable_ty.function_spans(context.db()) {
+                        let mut sub = SubDiagnostic::new(
+                            SubDiagnosticSeverity::Info,
+                            format_args!("{callable_kind} signature here"),
+                        );
+                        sub.annotate(Annotation::primary(spans.signature));
+                        diag.sub(sub);
                     }
                 }
             }
