@@ -1373,11 +1373,14 @@ impl<'db> Type<'db> {
 
             // Pretend that instances of `dataclasses.Field` are assignable to their default type.
             // This allows field definitions like `name: str = field(default="")` in dataclasses
-            // to pass the assignability check of the inferred type to the declared type.
+            // to pass the assignability check of the inferred type to the declared type
+            // Note: a field without a default is assignable to the annotated type.
             (Type::KnownInstance(KnownInstanceType::Field(field)), right)
                 if relation.is_assignability() =>
             {
-                field.default_type(db).has_relation_to(db, right, relation)
+                field
+                    .default_type(db)
+                    .is_none_or(|ty| ty.has_relation_to(db, right, relation))
             }
 
             (Type::TypedDict(_), _) | (_, Type::TypedDict(_)) => {
@@ -6586,7 +6589,9 @@ fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
             // Nothing to visit
         }
         KnownInstanceType::Field(field) => {
-            visitor.visit_type(db, field.default_type(db));
+            if let Some(ty) = field.default_type(db) {
+                visitor.visit_type(db, ty);
+            }
         }
     }
 }
@@ -6666,7 +6671,11 @@ impl<'db> KnownInstanceType<'db> {
                     KnownInstanceType::Deprecated(_) => f.write_str("warnings.deprecated"),
                     KnownInstanceType::Field(field) => {
                         f.write_str("dataclasses.Field[")?;
-                        field.default_type(self.db).display(self.db).fmt(f)?;
+                        if let Some(ty) = field.default_type(self.db) {
+                            ty.display(self.db).fmt(f)?;
+                        } else {
+                            f.write_str("None")?;
+                        }
                         f.write_str("]")
                     }
                 }
@@ -7006,7 +7015,8 @@ impl get_size2::GetSize for DeprecatedInstance<'_> {}
 pub struct FieldInstance<'db> {
     /// The type of the default value for this field. This is derived from the `default` or
     /// `default_factory` arguments to `dataclasses.field()`.
-    pub default_type: Type<'db>,
+    /// `None` means no default value was provided.
+    pub default_type: Option<Type<'db>>,
 
     /// Whether this field is part of the `__init__` signature, or not.
     pub init: bool,
@@ -7022,7 +7032,8 @@ impl<'db> FieldInstance<'db> {
     pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         FieldInstance::new(
             db,
-            self.default_type(db).normalized_impl(db, visitor),
+            self.default_type(db)
+                .map(|ty| ty.normalized_impl(db, visitor)),
             self.init(db),
             self.kw_only(db),
         )

@@ -1420,8 +1420,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         continue;
                     }
 
-                    // In bind.rs, we set `Type::unknown()` if no `default` (or `default_factory`) has been set
-                    if field.default_ty.is_some_and(|t| !t.is_unknown()) {
+                    if field.default_ty.is_some() {
                         has_seen_default_field = true;
                     } else if has_seen_default_field {
                         required_after_default_field_names.push(name);

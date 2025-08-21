@@ -2406,7 +2406,7 @@ impl<'db> ClassLiteral<'db> {
                 let mut init = true;
                 let mut kw_only = None;
                 if let Some(Type::KnownInstance(KnownInstanceType::Field(field))) = default_ty {
-                    default_ty = Some(field.default_type(db));
+                    default_ty = field.default_type(db);
                     init = field.init(db);
                     kw_only = field.kw_only(db);
                 }

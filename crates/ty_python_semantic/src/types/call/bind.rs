@@ -929,11 +929,15 @@ impl<'db> Bindings<'db> {
                                 overload.parameter_types()
                             {
                                 let default_ty = match (default, default_factory) {
-                                    (Some(default_ty), _) => *default_ty,
-                                    (_, Some(default_factory_ty)) => default_factory_ty
-                                        .try_call(db, &CallArguments::none())
-                                        .map_or(Type::unknown(), |binding| binding.return_type(db)),
-                                    _ => Type::unknown(),
+                                    (Some(default_ty), _) => Some(*default_ty),
+                                    (_, Some(default_factory_ty)) => Some(
+                                        default_factory_ty
+                                            .try_call(db, &CallArguments::none())
+                                            .map_or(Type::unknown(), |binding| {
+                                                binding.return_type(db)
+                                            }),
+                                    ),
+                                    _ => None,
                                 };
 
                                 let init = init

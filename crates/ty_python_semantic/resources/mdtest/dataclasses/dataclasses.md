@@ -124,8 +124,9 @@ class D:
 @dataclass
 class E:
     x: int = field(default=3)
+    y: int = field(default_factory=lambda: 4)
     # error: [dataclass-field-order]
-    y: str
+    z: str
 
 import sys
 
