@@ -175,7 +175,13 @@ impl<'a> YieldTracker<'a> {
             .unwrap_or_default()
     }
 
-    fn clear_yields_in_current_scope(&mut self) {
+    fn append_finally(&self, base: &[&'a Expr], finally_yields: &[&'a Expr]) -> Vec<&'a Expr> {
+        let mut path = base.to_vec();
+        path.extend_from_slice(finally_yields);
+        path
+    }
+
+    fn clear_scope_yields(&mut self) {
         self.scopes
             .last_mut()
             .expect("Missing current scope for clearing yields")
@@ -321,7 +327,7 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldTracker<'a> {
 
                     // We need to consider all possible paths through try/except/else/finally
                     let mut common_path = try_yields.clone();
-                    let mut max_path = if try_returns {
+                    let base_path = if try_returns {
                         common_path
                     } else {
                         // try + (else OR except) + finally
@@ -334,12 +340,12 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldTracker<'a> {
                         common_path
                     };
                     // Finally always executes, even when previous branches return
-                    max_path.extend(finally_yields.clone());
+                    let max_path = self.append_finally(&base_path, &finally_yields);
 
                     // This branch terminates because finally returns
                     self.report_excess(&max_path);
                     // Clear current scope because finally returns
-                    self.clear_yields_in_current_scope();
+                    self.clear_scope_yields();
                 } else {
                     // Finally doesn't return: we need to handle the different control flow paths and
                     // propagate yield count to outer scope.
@@ -350,25 +356,24 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldTracker<'a> {
                     let max_continuing_except = self.max_yields(&continuing_except_branches);
 
                     // Check except branches that return and don't propagate yields
-                    let mut exception_return = max_returning_except;
-                    exception_return.extend(finally_yields.clone());
+                    let exception_return =
+                        self.append_finally(&max_returning_except, &finally_yields);
                     self.report_excess(&exception_return);
 
-                    let mut exception_no_return = max_continuing_except;
-                    exception_no_return.extend(finally_yields.clone());
+                    let exception_no_return =
+                        self.append_finally(&max_continuing_except, &finally_yields);
 
-                    let mut normal_path = try_yields.clone();
-                    normal_path.extend(else_yields);
-                    normal_path.extend(finally_yields.clone());
+                    let mut try_else = try_yields.clone();
+                    try_else.extend(else_yields);
+                    let normal_path = self.append_finally(&try_else, &finally_yields);
 
                     // If try returns, we consider try-finally
                     // If try doesn't return, we consider try-(max of else OR non-return except)-finally
                     // Propagate yields from non-returning path
                     // Returning except branches are handled above
                     if try_returns {
-                        let mut try_path = try_yields.clone();
                         // Finally is executed even if else returns
-                        try_path.extend(finally_yields.clone());
+                        let try_path = self.append_finally(&try_yields, &finally_yields);
                         self.report_excess(&try_path);
 
                         // Propagate the non-returning exception
@@ -415,7 +420,7 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldTracker<'a> {
                 self.propagate_yields(&else_yields);
                 if else_returns {
                     // If else returns, don't propagate yield count
-                    self.clear_yields_in_current_scope();
+                    self.clear_scope_yields();
                 }
             }
             _ => {}
