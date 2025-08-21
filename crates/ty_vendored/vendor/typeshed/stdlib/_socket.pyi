@@ -879,7 +879,14 @@ operations. A timeout of None indicates that timeouts on socket
 operations are disabled.
 """
     if sys.platform == "win32":
-        def ioctl(self, control: int, option: int | tuple[int, int, int] | bool, /) -> None: ...
+        def ioctl(self, control: int, option: int | tuple[int, int, int] | bool, /) -> None:
+            """ioctl(cmd, option) -> long
+
+Control the socket with WSAIoctl syscall. Currently supported 'cmd' values are
+SIO_RCVALL:  'option' must be one of the socket.RCVALL_* constants.
+SIO_KEEPALIVE_VALS:  'option' is a tuple of (onoff, timeout, interval).
+SIO_LOOPBACK_FAST_PATH: 'option' is a boolean value, and is disabled by default
+"""
 
     def listen(self, backlog: int = ..., /) -> None:
         """listen([backlog])
@@ -1069,7 +1076,14 @@ None, optlen.
     @overload
     def setsockopt(self, level: int, optname: int, value: None, optlen: int, /) -> None: ...
     if sys.platform == "win32":
-        def share(self, process_id: int, /) -> bytes: ...
+        def share(self, process_id: int, /) -> bytes:
+            """share(process_id) -> bytes
+
+Share the socket with another process.  The target process id
+must be provided and the resulting bytes object passed to the target
+process.  There the shared socket can be instantiated by calling
+socket.fromshare().
+"""
 
     def shutdown(self, how: int, /) -> None:
         """shutdown(flag)
