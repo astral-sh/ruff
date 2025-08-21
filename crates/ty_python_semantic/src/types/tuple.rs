@@ -442,7 +442,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
                     };
                     let element_constraints =
                         self_ty.has_relation_to_impl(db, *other_ty, relation, visitor);
-                    if result.intersect(db, element_constraints) {
+                    if result.intersect(db, element_constraints).is_never(db) {
                         return result;
                     }
                 }
@@ -452,7 +452,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
                     };
                     let element_constraints =
                         self_ty.has_relation_to_impl(db, *other_ty, relation, visitor);
-                    if result.intersect(db, element_constraints) {
+                    if result.intersect(db, element_constraints).is_never(db) {
                         return result;
                     }
                 }
@@ -774,7 +774,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                     };
                     let element_constraints =
                         self_ty.has_relation_to_impl(db, other_ty, relation, visitor);
-                    if result.intersect(db, element_constraints) {
+                    if result.intersect(db, element_constraints).is_never(db) {
                         return result;
                     }
                 }
@@ -785,7 +785,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                     };
                     let element_constraints =
                         self_ty.has_relation_to_impl(db, other_ty, relation, visitor);
-                    if result.intersect(db, element_constraints) {
+                    if result.intersect(db, element_constraints).is_never(db) {
                         return result;
                     }
                 }
@@ -827,7 +827,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                             return C::never(db);
                         }
                     };
-                    if result.intersect(db, pair_constraints) {
+                    if result.intersect(db, pair_constraints).is_never(db) {
                         return result;
                     }
                 }
@@ -853,7 +853,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                             return C::never(db);
                         }
                     };
-                    if result.intersect(db, pair_constraints) {
+                    if result.intersect(db, pair_constraints).is_never(db) {
                         return result;
                     }
                 }

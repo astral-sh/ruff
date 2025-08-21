@@ -17,16 +17,10 @@ pub(crate) trait Constraints<'db>: Clone + Sized {
     fn is_always(&self, db: &'db dyn Db) -> bool;
 
     /// Updates this constraint set to hold the union of itself and another constraint set. Returns
-    /// whether the result [`is_always`][Self::is_always]. (We use this to implement
-    /// short-circuiting; once a constraint set is always true, unioning anything else into it is
-    /// by definition a no-op.)
-    fn union(&mut self, db: &'db dyn Db, other: Self) -> bool;
+    fn union(&mut self, db: &'db dyn Db, other: Self) -> &Self;
 
     /// Updates this constraint set to hold the intersection of itself and another constraint set.
-    /// Returns whether the result [`is_never`][Self::is_always]. (We use this to implement
-    /// short-circuiting; once a constraint set is always false, intersecting anything else into it
-    /// is by definition a no-op.)
-    fn intersect(&mut self, db: &'db dyn Db, other: Self) -> bool;
+    fn intersect(&mut self, db: &'db dyn Db, other: Self) -> &Self;
 
     /// Returns the negation of this constraint set.
     fn negate(self, db: &'db dyn Db) -> Self;
@@ -74,14 +68,14 @@ impl<'db> Constraints<'db> for bool {
         *self
     }
 
-    fn union(&mut self, db: &'db dyn Db, other: Self) -> bool {
+    fn union(&mut self, _db: &'db dyn Db, other: Self) -> &Self {
         *self = *self || other;
-        self.is_always(db)
+        self
     }
 
-    fn intersect(&mut self, db: &'db dyn Db, other: Self) -> bool {
+    fn intersect(&mut self, _db: &'db dyn Db, other: Self) -> &Self {
         *self = *self && other;
-        self.is_never(db)
+        self
     }
 
     fn negate(self, _db: &'db dyn Db) -> Self {
@@ -118,14 +112,14 @@ impl<T> OptionConstraintsExtension<T> for Option<T> {
 
 /// An extension trait for building constraint sets from an [`Iterator`].
 pub(crate) trait IteratorConstraintsExtension<T> {
-    /// Returns the constraints under when any element of the iterator holds.
+    /// Returns the constraints under which any element of the iterator holds.
     ///
     /// This method short-circuits; if we encounter any element that
     /// [`is_always`][Constraints::is_always] true, then the overall result must be as well, and we
     /// stop consuming elements from the iterator.
     fn when_any<'db, C: Constraints<'db>>(self, db: &'db dyn Db, f: impl FnMut(T) -> C) -> C;
 
-    /// Returns the constraints under when every element of the iterator holds.
+    /// Returns the constraints under which every element of the iterator holds.
     ///
     /// This method short-circuits; if we encounter any element that
     /// [`is_never`][Constraints::is_never] true, then the overall result must be as well, and we
@@ -140,7 +134,7 @@ where
     fn when_any<'db, C: Constraints<'db>>(self, db: &'db dyn Db, mut f: impl FnMut(T) -> C) -> C {
         let mut result = C::never(db);
         for child in self {
-            if result.union(db, f(child)) {
+            if result.union(db, f(child)).is_always(db) {
                 return result;
             }
         }
@@ -150,7 +144,7 @@ where
     fn when_all<'db, C: Constraints<'db>>(self, db: &'db dyn Db, mut f: impl FnMut(T) -> C) -> C {
         let mut result = C::always(db);
         for child in self {
-            if result.intersect(db, f(child)) {
+            if result.intersect(db, f(child)).is_never(db) {
                 return result;
             }
         }

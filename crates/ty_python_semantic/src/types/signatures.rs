@@ -508,12 +508,13 @@ impl<'db> Signature<'db> {
         visitor: &IsEquivalentVisitor<'db, C>,
     ) -> C {
         let mut result = C::always(db);
-        let mut types_inconsistent =
-            |self_type: Option<Type<'db>>, other_type: Option<Type<'db>>| {
-                let self_type = self_type.unwrap_or(Type::unknown());
-                let other_type = other_type.unwrap_or(Type::unknown());
-                result.intersect(db, self_type.is_equivalent_to_impl(db, other_type, visitor))
-            };
+        let mut check_types = |self_type: Option<Type<'db>>, other_type: Option<Type<'db>>| {
+            let self_type = self_type.unwrap_or(Type::unknown());
+            let other_type = other_type.unwrap_or(Type::unknown());
+            !result
+                .intersect(db, self_type.is_equivalent_to_impl(db, other_type, visitor))
+                .is_never(db)
+        };
 
         if self.parameters.is_gradual() != other.parameters.is_gradual() {
             return C::never(db);
@@ -523,7 +524,7 @@ impl<'db> Signature<'db> {
             return C::never(db);
         }
 
-        if types_inconsistent(self.return_ty, other.return_ty) {
+        if !check_types(self.return_ty, other.return_ty) {
             return result;
         }
 
@@ -571,7 +572,7 @@ impl<'db> Signature<'db> {
                 _ => return C::never(db),
             }
 
-            if types_inconsistent(
+            if !check_types(
                 self_parameter.annotated_type(),
                 other_parameter.annotated_type(),
             ) {
@@ -652,14 +653,16 @@ impl<'db> Signature<'db> {
         }
 
         let mut result = C::always(db);
-        let mut types_inconsistent = |type1: Option<Type<'db>>, type2: Option<Type<'db>>| {
+        let mut check_types = |type1: Option<Type<'db>>, type2: Option<Type<'db>>| {
             let type1 = type1.unwrap_or(Type::unknown());
             let type2 = type2.unwrap_or(Type::unknown());
-            result.intersect(db, type1.has_relation_to_impl(db, type2, relation, visitor))
+            !result
+                .intersect(db, type1.has_relation_to_impl(db, type2, relation, visitor))
+                .is_never(db)
         };
 
         // Return types are covariant.
-        if types_inconsistent(self.return_ty, other.return_ty) {
+        if !check_types(self.return_ty, other.return_ty) {
             return result;
         }
 
@@ -753,7 +756,7 @@ impl<'db> Signature<'db> {
                             if self_default.is_none() && other_default.is_some() {
                                 return C::never(db);
                             }
-                            if types_inconsistent(
+                            if !check_types(
                                 other_parameter.annotated_type(),
                                 self_parameter.annotated_type(),
                             ) {
@@ -778,7 +781,7 @@ impl<'db> Signature<'db> {
                             if self_default.is_none() && other_default.is_some() {
                                 return C::never(db);
                             }
-                            if types_inconsistent(
+                            if !check_types(
                                 other_parameter.annotated_type(),
                                 self_parameter.annotated_type(),
                             ) {
@@ -791,7 +794,7 @@ impl<'db> Signature<'db> {
                             ParameterKind::PositionalOnly { .. }
                             | ParameterKind::PositionalOrKeyword { .. },
                         ) => {
-                            if types_inconsistent(
+                            if !check_types(
                                 other_parameter.annotated_type(),
                                 self_parameter.annotated_type(),
                             ) {
@@ -831,7 +834,7 @@ impl<'db> Signature<'db> {
                                         break;
                                     }
                                 }
-                                if types_inconsistent(
+                                if !check_types(
                                     other_parameter.annotated_type(),
                                     self_parameter.annotated_type(),
                                 ) {
@@ -842,7 +845,7 @@ impl<'db> Signature<'db> {
                         }
 
                         (ParameterKind::Variadic { .. }, ParameterKind::Variadic { .. }) => {
-                            if types_inconsistent(
+                            if !check_types(
                                 other_parameter.annotated_type(),
                                 self_parameter.annotated_type(),
                             ) {
@@ -924,7 +927,7 @@ impl<'db> Signature<'db> {
                                 if self_default.is_none() && other_default.is_some() {
                                     return C::never(db);
                                 }
-                                if types_inconsistent(
+                                if !check_types(
                                     other_parameter.annotated_type(),
                                     self_parameter.annotated_type(),
                                 ) {
@@ -936,7 +939,7 @@ impl<'db> Signature<'db> {
                             ),
                         }
                     } else if let Some(self_keyword_variadic_type) = self_keyword_variadic {
-                        if types_inconsistent(
+                        if !check_types(
                             other_parameter.annotated_type(),
                             self_keyword_variadic_type,
                         ) {
@@ -952,10 +955,7 @@ impl<'db> Signature<'db> {
                         // parameter, `self` must also have a keyword variadic parameter.
                         return C::never(db);
                     };
-                    if types_inconsistent(
-                        other_parameter.annotated_type(),
-                        self_keyword_variadic_type,
-                    ) {
+                    if !check_types(other_parameter.annotated_type(), self_keyword_variadic_type) {
                         return result;
                     }
                 }
