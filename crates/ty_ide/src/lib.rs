@@ -287,6 +287,7 @@ mod tests {
     use ruff_db::diagnostic::{Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig};
     use ruff_db::files::{File, system_path_to_file};
     use ruff_db::system::{DbWithWritableSystem, SystemPath, SystemPathBuf};
+    use ruff_python_trivia::textwrap::dedent;
     use ruff_text_size::TextSize;
     use ty_project::ProjectMetadata;
     use ty_python_semantic::{
@@ -417,12 +418,12 @@ mod tests {
         pub(super) fn source(
             &mut self,
             path: impl Into<SystemPathBuf>,
-            contents: impl Into<String>,
+            contents: impl AsRef<str>,
         ) -> &mut CursorTestBuilder {
             const MARKER: &str = "<CURSOR>";
 
             let path = path.into();
-            let contents = contents.into();
+            let contents = dedent(contents.as_ref()).into_owned();
             let Some(cursor_offset) = contents.find(MARKER) else {
                 self.sources.push(Source {
                     path,
