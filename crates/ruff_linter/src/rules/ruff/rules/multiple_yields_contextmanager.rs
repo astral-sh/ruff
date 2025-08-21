@@ -39,11 +39,11 @@ use crate::{FixAvailability, Violation};
 /// - [Python documentation: contextlib.asynccontextmanager](https://docs.python.org/3/library/contextlib.html#contextlib.asynccontextmanager)
 #[derive(ViolationMetadata)]
 pub(crate) struct MultipleYieldsInContextManager {
-    decorator_name: String,
+    decorator_name: &'static str,
 }
 
 impl MultipleYieldsInContextManager {
-    fn new(decorator_name: String) -> Self {
+    fn new(decorator_name: &'static str) -> Self {
         Self { decorator_name }
     }
 }
@@ -67,7 +67,7 @@ pub(crate) fn multiple_yields_in_contextmanager(checker: &Checker, function_def:
         source_order::walk_body(&mut path_tracker, &function_def.body);
         for expr in path_tracker.into_violations() {
             checker.report_diagnostic(
-                MultipleYieldsInContextManager::new(context_manager_name.clone()),
+                MultipleYieldsInContextManager::new(context_manager_name),
                 expr.range(),
             );
         }
@@ -77,17 +77,15 @@ pub(crate) fn multiple_yields_in_contextmanager(checker: &Checker, function_def:
 fn get_contextmanager_decorator(
     function_def: &StmtFunctionDef,
     checker: &Checker,
-) -> Option<String> {
+) -> Option<&'static str> {
     function_def.decorator_list.iter().find_map(|decorator| {
         let callable = map_callable(&decorator.expression);
         checker
             .semantic()
             .resolve_qualified_name(callable)
             .and_then(|qualified| match qualified.segments() {
-                ["contextlib", "contextmanager"] => Some("contextlib.contextmanager".to_string()),
-                ["contextlib", "asynccontextmanager"] => {
-                    Some("contextlib.asynccontextmanager".to_string())
-                }
+                ["contextlib", "contextmanager"] => Some("contextlib.contextmanager"),
+                ["contextlib", "asynccontextmanager"] => Some("contextlib.asynccontextmanager"),
                 _ => None,
             })
     })
