@@ -1823,7 +1823,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Type::BooleanLiteral(_) | Type::IntLiteral(_) => {}
             Type::NominalInstance(instance)
                 if matches!(
-                    instance.class(self.db()).known(self.db()),
+                    instance.class_ignoring_newtype(self.db()).known(self.db()),
                     Some(KnownClass::Float | KnownClass::Int | KnownClass::Bool)
                 ) => {}
             _ => return false,
@@ -4004,7 +4004,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Super instances do not allow attribute assignment
             Type::NominalInstance(instance)
-                if instance.class(db).is_known(db, KnownClass::Super) =>
+                if instance
+                    .class_ignoring_newtype(db)
+                    .is_known(db, KnownClass::Super) =>
             {
                 if emit_diagnostics {
                     if let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target) {
@@ -6274,6 +6276,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         | KnownClass::TypeVar
                         | KnownClass::TypeAliasType
                         | KnownClass::Deprecated
+                        | KnownClass::NewType
                 )
             ) || (
                 // Constructor calls to `tuple` and subclasses of `tuple` are handled in `Type::Bindings`,
@@ -9157,7 +9160,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Type::Dynamic(DynamicType::TodoUnpack) => Err(GenericContextError::NotYetSupported),
                 Type::NominalInstance(nominal)
                     if matches!(
-                        nominal.class(self.db()).known(self.db()),
+                        nominal.class_ignoring_newtype(self.db()).known(self.db()),
                         Some(KnownClass::TypeVarTuple | KnownClass::ParamSpec)
                     ) =>
                 {
@@ -9201,8 +9204,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Some(ty @ (Type::IntLiteral(_) | Type::BooleanLiteral(_))) => SliceArg::Arg(ty),
             Some(ty @ Type::NominalInstance(instance))
                 if instance
-                    .class(self.db())
-                    .is_known(self.db(), KnownClass::NoneType) =>
+                    .class_if_not_newtype(self.db())
+                    .is_some_and(|class| class.is_known(self.db(), KnownClass::NoneType)) =>
             {
                 SliceArg::Arg(ty)
             }
@@ -10426,6 +10429,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     self.infer_type_expression(&subscript.slice);
                     todo_type!("Generic PEP-695 type alias")
                 }
+                KnownInstanceType::NewType(newtype) => {
+                    self.infer_type_expression(&subscript.slice);
+                    if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
+                        builder.into_diagnostic(format_args!(
+                            "`{}` is a `NewType` and cannot be specialized",
+                            newtype.name(self.db())
+                        ));
+                    }
+                    Type::unknown()
+                }
             },
             Type::Dynamic(DynamicType::Todo(_)) => {
                 self.infer_type_expression(slice);
@@ -11141,7 +11154,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     Type::NominalInstance(nominal)
                         if nominal
-                            .class(self.db())
+                            // TODO: What could NewType mean here?
+                            .class_ignoring_newtype(self.db())
                             .is_known(self.db(), KnownClass::ParamSpec) =>
                     {
                         return Some(Parameters::todo());

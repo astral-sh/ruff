@@ -631,7 +631,14 @@ impl<'db> IntersectionBuilder<'db> {
                 self
             }
             Type::NominalInstance(instance)
-                if enum_metadata(self.db, instance.class(self.db).class_literal(self.db).0)
+                if !instance.is_newtype()
+                    && enum_metadata(
+                        self.db,
+                        instance
+                            .class_ignoring_newtype(self.db)
+                            .class_literal(self.db)
+                            .0,
+                    )
                     .is_some() =>
             {
                 let mut contains_enum_literal_as_negative_element = false;
@@ -657,9 +664,13 @@ impl<'db> IntersectionBuilder<'db> {
                     self.add_positive_impl(
                         Type::Union(UnionType::new(
                             db,
-                            enum_member_literals(db, instance.class(db).class_literal(db).0, None)
-                                .expect("Calling `enum_member_literals` on an enum class")
-                                .collect::<Box<[_]>>(),
+                            enum_member_literals(
+                                db,
+                                instance.class_ignoring_newtype(db).class_literal(db).0,
+                                None,
+                            )
+                            .expect("Calling `enum_member_literals` on an enum class")
+                            .collect::<Box<[_]>>(),
                         )),
                         seen_aliases,
                     )
@@ -854,7 +865,8 @@ impl<'db> InnerIntersectionBuilder<'db> {
             _ => {
                 let known_instance = new_positive
                     .into_nominal_instance()
-                    .and_then(|instance| instance.class(db).known(db));
+                    .and_then(|instance| instance.class_if_not_newtype(db))
+                    .and_then(|class| class.known(db));
 
                 if known_instance == Some(KnownClass::Object) {
                     // `object & T` -> `T`; it is always redundant to add `object` to an intersection
@@ -874,7 +886,9 @@ impl<'db> InnerIntersectionBuilder<'db> {
                             new_positive = Type::BooleanLiteral(false);
                         }
                         Type::NominalInstance(instance)
-                            if instance.class(db).is_known(db, KnownClass::Bool) =>
+                            if instance
+                                .class_if_not_newtype(db)
+                                .is_some_and(|class| class.is_known(db, KnownClass::Bool)) =>
                         {
                             match new_positive {
                                 // `bool & AlwaysTruthy` -> `Literal[True]`
@@ -968,7 +982,8 @@ impl<'db> InnerIntersectionBuilder<'db> {
             self.positive
                 .iter()
                 .filter_map(|ty| ty.into_nominal_instance())
-                .filter_map(|instance| instance.class(db).known(db))
+                .filter_map(|instance| instance.class_if_not_newtype(db))
+                .filter_map(|class| class.known(db))
                 .any(KnownClass::is_bool)
         };
 

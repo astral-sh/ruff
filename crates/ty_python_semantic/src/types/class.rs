@@ -20,7 +20,9 @@ use crate::semantic_index::{
 };
 use crate::types::constraints::{Constraints, IteratorConstraintsExtension};
 use crate::types::context::InferContext;
-use crate::types::diagnostic::{INVALID_LEGACY_TYPE_VARIABLE, INVALID_TYPE_ALIAS_TYPE};
+use crate::types::diagnostic::{
+    INVALID_LEGACY_TYPE_VARIABLE, INVALID_NEWTYPE, INVALID_TYPE_ALIAS_TYPE,
+};
 use crate::types::enums::enum_metadata;
 use crate::types::function::{DataclassTransformerParams, KnownFunction};
 use crate::types::generics::{GenericContext, Specialization, walk_specialization};
@@ -31,10 +33,10 @@ use crate::types::typed_dict::typed_dict_params_from_class_def;
 use crate::types::{
     ApplyTypeMappingVisitor, Binding, BoundSuperError, BoundSuperType, CallableType,
     DataclassParams, DeprecatedInstance, HasRelationToVisitor, IsEquivalentVisitor,
-    KnownInstanceType, ManualPEP695TypeAliasType, MaterializationKind, NormalizedVisitor,
-    PropertyInstanceType, StringLiteralType, TypeAliasType, TypeMapping, TypeRelation,
-    TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, TypedDictParams, VarianceInferable,
-    declaration_type, infer_definition_types, todo_type,
+    KnownInstanceType, ManualPEP695TypeAliasType, MaterializationKind, NewTypeBase,
+    NewTypeInstance, NormalizedVisitor, PropertyInstanceType, StringLiteralType, TypeAliasType,
+    TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind,
+    TypedDictParams, VarianceInferable, declaration_type, infer_definition_types, todo_type,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet, Program,
@@ -1317,7 +1319,8 @@ impl<'db> Field<'db> {
     pub(crate) fn is_kw_only_sentinel(&self, db: &'db dyn Db) -> bool {
         self.declared_ty
             .into_nominal_instance()
-            .is_some_and(|instance| instance.class(db).is_known(db, KnownClass::KwOnly))
+            .and_then(|instance| instance.class_if_not_newtype(db))
+            .is_some_and(|class| class.is_known(db, KnownClass::KwOnly))
     }
 }
 
@@ -4245,14 +4248,6 @@ impl KnownClass {
             .is_ok_and(|class| class.is_subclass_of(db, None, other))
     }
 
-    pub(super) fn when_subclass_of<'db, C: Constraints<'db>>(
-        self,
-        db: &'db dyn Db,
-        other: ClassType<'db>,
-    ) -> C {
-        C::from_bool(db, self.is_subclass_of(db, other))
-    }
-
     /// Return the module in which we should look up the definition for this class
     fn canonical_module(self, db: &dyn Db) -> KnownModule {
         match self {
@@ -4966,6 +4961,69 @@ impl KnownClass {
                         containing_assignment,
                         value,
                     )),
+                )));
+            }
+
+            KnownClass::NewType => {
+                let assigned_to = index
+                    .try_expression(ast::ExprRef::from(call_expression))
+                    .and_then(|expr| expr.assigned_to(db));
+
+                let Some(target) = assigned_to.as_ref().and_then(|assigned_to| {
+                    match assigned_to.node(module).targets.as_slice() {
+                        [ast::Expr::Name(target)] => Some(target),
+                        _ => None,
+                    }
+                }) else {
+                    if let Some(builder) = context.report_lint(&INVALID_NEWTYPE, call_expression) {
+                        builder.into_diagnostic(
+                            "A `typing.NewType` must be immediately assigned to a variable",
+                        );
+                    }
+                    return;
+                };
+                let definition = index.expect_single_definition(target);
+
+                let [Some(name), Some(supertype), ..] = overload.parameter_types() else {
+                    return;
+                };
+
+                let Some(name) = name.into_string_literal() else {
+                    if let Some(builder) = context.report_lint(&INVALID_NEWTYPE, call_expression) {
+                        builder.into_diagnostic(
+                            "The name of a `typing.NewType` must be a string literal",
+                        );
+                    }
+                    return;
+                };
+
+                let newtype_base = match supertype {
+                    Type::ClassLiteral(class_literal) => {
+                        NewTypeBase::ClassType(class_literal.default_specialization(db))
+                    }
+                    Type::GenericAlias(alias) => NewTypeBase::ClassType(ClassType::Generic(*alias)),
+                    Type::KnownInstance(KnownInstanceType::NewType(newtype)) => {
+                        NewTypeBase::NewType(*newtype)
+                    }
+                    _ => {
+                        if let Some(builder) =
+                            context.report_lint(&INVALID_NEWTYPE, call_expression)
+                        {
+                            builder.into_diagnostic(
+                                "The second argument to `typing.NewType` must be a class or another `NewType`",
+                            );
+                        }
+                        return;
+                    }
+                };
+
+                overload.set_return_type(Type::KnownInstance(KnownInstanceType::NewType(
+                    NewTypeInstance::new(
+                        db,
+                        ast::name::Name::new(name.value(db)),
+                        definition,
+                        newtype_base,
+                    ),
                 )));
             }
 

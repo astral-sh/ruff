@@ -187,21 +187,22 @@ impl Display for DisplayRepresentation<'_> {
             Type::Dynamic(dynamic) => dynamic.fmt(f),
             Type::Never => f.write_str("Never"),
             Type::NominalInstance(instance) => {
-                let class = instance.class(self.db);
+                let (class, newtype) = instance.class_and_newtype(self.db);
 
-                match (class, class.known(self.db)) {
-                    (_, Some(KnownClass::NoneType)) => f.write_str("None"),
-                    (_, Some(KnownClass::NoDefaultType)) => f.write_str("NoDefault"),
-                    (ClassType::Generic(alias), Some(KnownClass::Tuple)) => alias
+                match (newtype, class, class.known(self.db)) {
+                    (Some(newtype), _, _) => f.write_str(newtype.name(self.db)),
+                    (None, _, Some(KnownClass::NoneType)) => f.write_str("None"),
+                    (None, _, Some(KnownClass::NoDefaultType)) => f.write_str("NoDefault"),
+                    (None, ClassType::Generic(alias), Some(KnownClass::Tuple)) => alias
                         .specialization(self.db)
                         .tuple(self.db)
                         .expect("Specialization::tuple() should always return `Some()` for `KnownClass::Tuple`")
                         .display_with(self.db, self.settings)
                         .fmt(f),
-                    (ClassType::NonGeneric(class), _) => {
+                    (None, ClassType::NonGeneric(class), _) => {
                         self.write_maybe_qualified_class(f, class)
                     },
-                    (ClassType::Generic(alias), _) => alias.display_with(self.db, self.settings).fmt(f),
+                    (None, ClassType::Generic(alias), _) => alias.display_with(self.db, self.settings).fmt(f),
                 }
             }
             Type::ProtocolInstance(protocol) => match protocol.inner {

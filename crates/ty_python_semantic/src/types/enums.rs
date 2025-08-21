@@ -130,26 +130,28 @@ pub(crate) fn enum_metadata<'db>(
                             // Some types are specifically disallowed for enum members.
                             return None;
                         }
-                        Type::NominalInstance(instance) => match instance.class(db).known(db) {
-                            // enum.nonmember
-                            Some(KnownClass::Nonmember) => return None,
+                        Type::NominalInstance(instance) => {
+                            match instance.class_ignoring_newtype(db).known(db) {
+                                // enum.nonmember
+                                Some(KnownClass::Nonmember) => return None,
 
-                            // enum.member
-                            Some(KnownClass::Member) => Some(
-                                ty.member(db, "value")
-                                    .place
-                                    .ignore_possibly_unbound()
-                                    .unwrap_or(Type::unknown()),
-                            ),
+                                // enum.member
+                                Some(KnownClass::Member) => Some(
+                                    ty.member(db, "value")
+                                        .place
+                                        .ignore_possibly_unbound()
+                                        .unwrap_or(Type::unknown()),
+                                ),
 
-                            // enum.auto
-                            Some(KnownClass::Auto) => {
-                                auto_counter += 1;
-                                Some(Type::IntLiteral(auto_counter))
+                                // enum.auto
+                                Some(KnownClass::Auto) => {
+                                    auto_counter += 1;
+                                    Some(Type::IntLiteral(auto_counter))
+                                }
+
+                                _ => None,
                             }
-
-                            _ => None,
-                        },
+                        }
 
                         _ => None,
                     };
@@ -208,7 +210,10 @@ pub(crate) fn enum_metadata<'db>(
                 PlaceAndQualifiers {
                     place: Place::Type(Type::NominalInstance(instance), _),
                     ..
-                } if instance.class(db).is_known(db, KnownClass::Member) => {
+                } if instance
+                    .class_ignoring_newtype(db) // TODO: what could it mean to wrap `enum.member` in a NewType?
+                    .is_known(db, KnownClass::Member) =>
+                {
                     // If the attribute is specifically declared with `enum.member`, it is considered a member
                 }
                 _ => {
