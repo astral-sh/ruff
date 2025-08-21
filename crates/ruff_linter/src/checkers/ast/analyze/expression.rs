@@ -142,7 +142,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             }
 
             if checker.is_rule_enabled(Rule::UnnecessaryDefaultTypeArgs) {
-                if checker.target_version() >= PythonVersion::PY313 {
+                if checker.target_version() >= PythonVersion::PY313
+                    || checker.semantic().in_stub_file()
+                {
                     pyupgrade::rules::unnecessary_default_type_args(checker, expr);
                 }
             }
