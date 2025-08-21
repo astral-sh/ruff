@@ -492,7 +492,29 @@ impl<'db> AtomicConstraint<'db> {
     /// Panics if the two constraints have different typevars.
     fn intersect(self, db: &'db dyn Db, other: Self) -> IntersectionResult<AtomicConstraint<'db>> {
         debug_assert!(self.typevar == other.typevar);
+
+        // We'll show our work for each match arm with a case analysis. We calculate "min" using
+        // intersection, and "max" using union.
+        //
+        // We use `s : t` for the positive constraint `s ≤: T ≤: t`, and draw it like this:
+        //
+        //         s┠───┨t
+        //
+        // We use `¬(s : t)` for the corresponding negative constraint, and draw it like this:
+        //
+        //     0┠───┤s t├───┨1
+
         match (self.sign, other.sign) {
+            // When both constraints are positive, the result is always
+            //   max(s₁,s₂) : min(t₁,t₂)
+            //
+            //   self:    s₁┠─────┨t₁    s₁┠────┨t₁       s₁┠─┨t₁
+            //   other:     s₂┠─┨t₂         s₂┠────┨t₂         s₂┠─┨t₂
+            //
+            //   result:    s₂┠─┨t₂         s₂┠─┨t₁            ∅
+            //
+            // Note that in the last case, max(s₁,s₂) ≥: min(t₁,t₂), which will get simplified to ∅
+            // by the `positive` and `from_one` helpers.
             (ConstraintSign::Positive, ConstraintSign::Positive) => {
                 IntersectionResult::from_one(Self::positive(
                     db,
@@ -502,6 +524,20 @@ impl<'db> AtomicConstraint<'db> {
                 ))
             }
 
+            // When both constraints are negative, the result is always
+            //   ¬(min(s₁,s₂) : max(t₁,t₂)) ⊔ (min(t₁,t₂) : max(s₁,s₂))
+            //
+            //   self:    0┠─┤s₁     t₁├─┨1     0┠───┤s₁ t₁├─┨1     0┠─┤s₁ t₁├─────────┨1
+            //   other:   0┠───┤s₂ t₂├───┨1     0┠─┤s₂ t₂├───┨1     0┠─────────┤s₂ t₂├─┨1
+            //
+            //   result:  0┠─┤s₁     t₁├─┨1     0┠─┤s₂   t₁├─┨1     0┠─┤s₁         t₂├─┨1
+            //                    ∅                    ∅                   t₁├─┤s₂
+            //
+            // Note that in the first two cases, min(t₁,t₂) ≥: max(s₁,s₂), which will get
+            // simplified to ∅ by the `positive` and `from_two` helpers.
+            //
+            // TODO: Oof, the positive constraint in the final example should have open lower and
+            // upper bounds, not closed... (i.e, t₁ < T < s₂, not t₁ ≤ T ≤ s₂)
             (ConstraintSign::Negative, ConstraintSign::Negative) => IntersectionResult::from_two(
                 Self::negative(
                     db,
@@ -517,6 +553,20 @@ impl<'db> AtomicConstraint<'db> {
                 ),
             ),
 
+            // When one constraint is positive and the other negative, the result is always
+            //   (s₊ : min(s₋, t₊)) ⊔ (max(s₊,t₋) : t₊)
+            //
+            //   self:      s₊┠─────────┨t₊          s₊┠─┨t₊          s₊┠───┨t₊
+            //   other:   0┠────┤s₋ t₋├────┨1    0┠──┤s₋ t₋├──┨1    0┠────┤s₋ t₋├──┨1
+            //
+            //   result:    s₊┠─┤s₋                     ∅             s₊┠─┤s₋
+            //                      t₋├─┨t₊             ∅                      ∅
+            //
+            //   self:          s₊┠───┨t₊        s₊┠─┨t₊                        s₊┠─┨t₊
+            //   other:   0┠──┤s₋ t₋├────┨1    0┠───────┤s₋ t₋├─┨1    0┠─┤s₋ t₋├───────┨1
+            //
+            //   result:      ∅                  s₊┠─┨t₊                   ∅
+            //                    t₋├─┨t₊                  ∅                    s₊┠─┨t₊
             (ConstraintSign::Positive, ConstraintSign::Negative) => IntersectionResult::from_two(
                 Self::positive(
                     db,
@@ -531,7 +581,6 @@ impl<'db> AtomicConstraint<'db> {
                     self.upper,
                 ),
             ),
-
             (ConstraintSign::Negative, ConstraintSign::Positive) => IntersectionResult::from_two(
                 Self::positive(
                     db,
