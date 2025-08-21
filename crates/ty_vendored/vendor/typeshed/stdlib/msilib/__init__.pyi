@@ -1,26 +1,26 @@
 import sys
 from collections.abc import Container, Iterable, Sequence
 from types import ModuleType
-from typing import Any, Literal
+from typing import Any, Final
 
 if sys.platform == "win32":
     from _msi import *
     from _msi import _Database
 
-    AMD64: bool
-    Win64: bool
+    AMD64: Final[bool]
+    Win64: Final[bool]
 
-    datasizemask: Literal[0x00FF]
-    type_valid: Literal[0x0100]
-    type_localizable: Literal[0x0200]
-    typemask: Literal[0x0C00]
-    type_long: Literal[0x0000]
-    type_short: Literal[0x0400]
-    type_string: Literal[0x0C00]
-    type_binary: Literal[0x0800]
-    type_nullable: Literal[0x1000]
-    type_key: Literal[0x2000]
-    knownbits: Literal[0x3FFF]
+    datasizemask: Final = 0x00FF
+    type_valid: Final = 0x0100
+    type_localizable: Final = 0x0200
+    typemask: Final = 0x0C00
+    type_long: Final = 0x0000
+    type_short: Final = 0x0400
+    type_string: Final = 0x0C00
+    type_binary: Final = 0x0800
+    type_nullable: Final = 0x1000
+    type_key: Final = 0x2000
+    knownbits: Final = 0x3FFF
 
     class Table:
         name: str
@@ -37,9 +37,7 @@ if sys.platform == "win32":
         action: str,
         seqno: int | type[_Unspecified] = ...,
         cond: str | type[_Unspecified] = ...,
-    ) -> None:
-        """Change the sequence number of an action in a sequence list"""
-
+    ) -> None: ...
     def add_data(db: _Database, table: str, values: Iterable[tuple[Any, ...]]) -> None: ...
     def add_stream(db: _Database, name: str, path: str) -> None: ...
     def init_database(
@@ -82,17 +80,7 @@ if sys.platform == "win32":
             _logical: str,
             default: str,
             componentflags: int | None = None,
-        ) -> None:
-            """Create a new directory in the Directory table. There is a current component
-            at each point in time for the directory, which is either explicitly created
-            through start_component, or implicitly when files are added for the first
-            time. Files are added into the current component, and into the cab file.
-            To create a directory, a base directory object needs to be specified (can be
-            None), the path to the physical directory, and a logical directory name.
-            Default specifies the DefaultDir slot in the directory table. componentflags
-            specifies the default flags that new components get.
-            """
-
+        ) -> None: ...
         def start_component(
             self,
             component: str | None = None,
@@ -100,30 +88,11 @@ if sys.platform == "win32":
             flags: int | None = None,
             keyfile: str | None = None,
             uuid: str | None = None,
-        ) -> None:
-            """Add an entry to the Component table, and make this component the current for this
-            directory. If no component name is given, the directory name is used. If no feature
-            is given, the current feature is used. If no flags are given, the directory's default
-            flags are used. If no keyfile is given, the KeyPath is left null in the Component
-            table.
-            """
-
+        ) -> None: ...
         def make_short(self, file: str) -> str: ...
-        def add_file(self, file: str, src: str | None = None, version: str | None = None, language: str | None = None) -> str:
-            """Add a file to the current component of the directory, starting a new one
-            if there is no current component. By default, the file name in the source
-            and the file table will be identical. If the src file is specified, it is
-            interpreted relative to the current directory. Optionally, a version and a
-            language can be specified for the entry in the File table.
-            """
-
-        def glob(self, pattern: str, exclude: Container[str] | None = None) -> list[str]:
-            """Add a list of files to the current component as specified in the
-            glob pattern. Individual files can be excluded in the exclude list.
-            """
-
-        def remove_pyc(self) -> None:
-            """Remove .pyc files on uninstall"""
+        def add_file(self, file: str, src: str | None = None, version: str | None = None, language: str | None = None) -> str: ...
+        def glob(self, pattern: str, exclude: Container[str] | None = None) -> list[str]: ...
+        def remove_pyc(self) -> None: ...
 
     class Binary:
         name: str

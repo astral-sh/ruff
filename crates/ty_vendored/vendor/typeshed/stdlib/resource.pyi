@@ -3,40 +3,33 @@ from _typeshed import structseq
 from typing import Final, final
 
 if sys.platform != "win32":
-    RLIMIT_AS: int
-    RLIMIT_CORE: int
-    RLIMIT_CPU: int
-    RLIMIT_DATA: int
-    RLIMIT_FSIZE: int
-    RLIMIT_MEMLOCK: int
-    RLIMIT_NOFILE: int
-    RLIMIT_NPROC: int
-    RLIMIT_RSS: int
-    RLIMIT_STACK: int
-    RLIM_INFINITY: int
-    RUSAGE_CHILDREN: int
-    RUSAGE_SELF: int
+    # Depends on resource.h
+    RLIMIT_AS: Final[int]
+    RLIMIT_CORE: Final[int]
+    RLIMIT_CPU: Final[int]
+    RLIMIT_DATA: Final[int]
+    RLIMIT_FSIZE: Final[int]
+    RLIMIT_MEMLOCK: Final[int]
+    RLIMIT_NOFILE: Final[int]
+    RLIMIT_NPROC: Final[int]
+    RLIMIT_RSS: Final[int]
+    RLIMIT_STACK: Final[int]
+    RLIM_INFINITY: Final[int]
+    RUSAGE_CHILDREN: Final[int]
+    RUSAGE_SELF: Final[int]
     if sys.platform == "linux":
-        RLIMIT_MSGQUEUE: int
-        RLIMIT_NICE: int
-        RLIMIT_OFILE: int
-        RLIMIT_RTPRIO: int
-        RLIMIT_RTTIME: int
-        RLIMIT_SIGPENDING: int
-        RUSAGE_THREAD: int
+        RLIMIT_MSGQUEUE: Final[int]
+        RLIMIT_NICE: Final[int]
+        RLIMIT_OFILE: Final[int]
+        RLIMIT_RTPRIO: Final[int]
+        RLIMIT_RTTIME: Final[int]
+        RLIMIT_SIGPENDING: Final[int]
+        RUSAGE_THREAD: Final[int]
 
     @final
     class struct_rusage(
         structseq[float], tuple[float, float, int, int, int, int, int, int, int, int, int, int, int, int, int, int]
     ):
-        """struct_rusage: Result from getrusage.
-
-        This object may be accessed either as a tuple of
-            (utime,stime,maxrss,ixrss,idrss,isrss,minflt,majflt,
-            nswap,inblock,oublock,msgsnd,msgrcv,nsignals,nvcsw,nivcsw)
-        or via the attributes ru_utime, ru_stime, ru_maxrss, and so on.
-        """
-
         if sys.version_info >= (3, 10):
             __match_args__: Final = (
                 "ru_utime",
@@ -58,68 +51,37 @@ if sys.platform != "win32":
             )
 
         @property
-        def ru_utime(self) -> float:
-            """user time used"""
-
+        def ru_utime(self) -> float: ...
         @property
-        def ru_stime(self) -> float:
-            """system time used"""
-
+        def ru_stime(self) -> float: ...
         @property
-        def ru_maxrss(self) -> int:
-            """max. resident set size"""
-
+        def ru_maxrss(self) -> int: ...
         @property
-        def ru_ixrss(self) -> int:
-            """shared memory size"""
-
+        def ru_ixrss(self) -> int: ...
         @property
-        def ru_idrss(self) -> int:
-            """unshared data size"""
-
+        def ru_idrss(self) -> int: ...
         @property
-        def ru_isrss(self) -> int:
-            """unshared stack size"""
-
+        def ru_isrss(self) -> int: ...
         @property
-        def ru_minflt(self) -> int:
-            """page faults not requiring I/O"""
-
+        def ru_minflt(self) -> int: ...
         @property
-        def ru_majflt(self) -> int:
-            """page faults requiring I/O"""
-
+        def ru_majflt(self) -> int: ...
         @property
-        def ru_nswap(self) -> int:
-            """number of swap outs"""
-
+        def ru_nswap(self) -> int: ...
         @property
-        def ru_inblock(self) -> int:
-            """block input operations"""
-
+        def ru_inblock(self) -> int: ...
         @property
-        def ru_oublock(self) -> int:
-            """block output operations"""
-
+        def ru_oublock(self) -> int: ...
         @property
-        def ru_msgsnd(self) -> int:
-            """IPC messages sent"""
-
+        def ru_msgsnd(self) -> int: ...
         @property
-        def ru_msgrcv(self) -> int:
-            """IPC messages received"""
-
+        def ru_msgrcv(self) -> int: ...
         @property
-        def ru_nsignals(self) -> int:
-            """signals received"""
-
+        def ru_nsignals(self) -> int: ...
         @property
-        def ru_nvcsw(self) -> int:
-            """voluntary context switches"""
-
+        def ru_nvcsw(self) -> int: ...
         @property
-        def ru_nivcsw(self) -> int:
-            """involuntary context switches"""
+        def ru_nivcsw(self) -> int: ...
 
     def getpagesize() -> int: ...
     def getrlimit(resource: int, /) -> tuple[int, int]: ...
@@ -129,6 +91,5 @@ if sys.platform != "win32":
         if sys.version_info >= (3, 12):
             def prlimit(pid: int, resource: int, limits: tuple[int, int] | None = None, /) -> tuple[int, int]: ...
         else:
-            def prlimit(pid: int, resource: int, limits: tuple[int, int] = ..., /) -> tuple[int, int]:
-                """prlimit(pid, resource, [limits])"""
+            def prlimit(pid: int, resource: int, limits: tuple[int, int] = ..., /) -> tuple[int, int]: ...
     error = OSError

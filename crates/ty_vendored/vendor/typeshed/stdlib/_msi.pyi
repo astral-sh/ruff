@@ -1,7 +1,5 @@
-"""Documentation"""
-
 import sys
-from typing import type_check_only
+from typing import Final, type_check_only
 
 if sys.platform == "win32":
     class MSIError(Exception): ...
@@ -53,70 +51,47 @@ if sys.platform == "win32":
         __new__: None  # type: ignore[assignment]
         __init__: None  # type: ignore[assignment]
 
-    def UuidCreate() -> str:
-        """Return the string representation of a new unique identifier."""
+    def UuidCreate() -> str: ...
+    def FCICreate(cabname: str, files: list[str], /) -> None: ...
+    def OpenDatabase(path: str, persist: int, /) -> _Database: ...
+    def CreateRecord(count: int, /) -> _Record: ...
 
-    def FCICreate(cabname: str, files: list[str], /) -> None:
-        """Create a new CAB file.
+    MSICOLINFO_NAMES: Final[int]
+    MSICOLINFO_TYPES: Final[int]
+    MSIDBOPEN_CREATE: Final[int]
+    MSIDBOPEN_CREATEDIRECT: Final[int]
+    MSIDBOPEN_DIRECT: Final[int]
+    MSIDBOPEN_PATCHFILE: Final[int]
+    MSIDBOPEN_READONLY: Final[int]
+    MSIDBOPEN_TRANSACT: Final[int]
+    MSIMODIFY_ASSIGN: Final[int]
+    MSIMODIFY_DELETE: Final[int]
+    MSIMODIFY_INSERT: Final[int]
+    MSIMODIFY_INSERT_TEMPORARY: Final[int]
+    MSIMODIFY_MERGE: Final[int]
+    MSIMODIFY_REFRESH: Final[int]
+    MSIMODIFY_REPLACE: Final[int]
+    MSIMODIFY_SEEK: Final[int]
+    MSIMODIFY_UPDATE: Final[int]
+    MSIMODIFY_VALIDATE: Final[int]
+    MSIMODIFY_VALIDATE_DELETE: Final[int]
+    MSIMODIFY_VALIDATE_FIELD: Final[int]
+    MSIMODIFY_VALIDATE_NEW: Final[int]
 
-        cabname
-          the name of the CAB file
-        files
-          a list of tuples, each containing the name of the file on disk,
-          and the name of the file inside the CAB file
-        """
-
-    def OpenDatabase(path: str, persist: int, /) -> _Database:
-        """Return a new database object.
-
-        path
-          the file name of the MSI file
-        persist
-          the persistence mode
-        """
-
-    def CreateRecord(count: int, /) -> _Record:
-        """Return a new record object.
-
-        count
-          the number of fields of the record
-        """
-    MSICOLINFO_NAMES: int
-    MSICOLINFO_TYPES: int
-    MSIDBOPEN_CREATE: int
-    MSIDBOPEN_CREATEDIRECT: int
-    MSIDBOPEN_DIRECT: int
-    MSIDBOPEN_PATCHFILE: int
-    MSIDBOPEN_READONLY: int
-    MSIDBOPEN_TRANSACT: int
-    MSIMODIFY_ASSIGN: int
-    MSIMODIFY_DELETE: int
-    MSIMODIFY_INSERT: int
-    MSIMODIFY_INSERT_TEMPORARY: int
-    MSIMODIFY_MERGE: int
-    MSIMODIFY_REFRESH: int
-    MSIMODIFY_REPLACE: int
-    MSIMODIFY_SEEK: int
-    MSIMODIFY_UPDATE: int
-    MSIMODIFY_VALIDATE: int
-    MSIMODIFY_VALIDATE_DELETE: int
-    MSIMODIFY_VALIDATE_FIELD: int
-    MSIMODIFY_VALIDATE_NEW: int
-
-    PID_APPNAME: int
-    PID_AUTHOR: int
-    PID_CHARCOUNT: int
-    PID_CODEPAGE: int
-    PID_COMMENTS: int
-    PID_CREATE_DTM: int
-    PID_KEYWORDS: int
-    PID_LASTAUTHOR: int
-    PID_LASTPRINTED: int
-    PID_LASTSAVE_DTM: int
-    PID_PAGECOUNT: int
-    PID_REVNUMBER: int
-    PID_SECURITY: int
-    PID_SUBJECT: int
-    PID_TEMPLATE: int
-    PID_TITLE: int
-    PID_WORDCOUNT: int
+    PID_APPNAME: Final[int]
+    PID_AUTHOR: Final[int]
+    PID_CHARCOUNT: Final[int]
+    PID_CODEPAGE: Final[int]
+    PID_COMMENTS: Final[int]
+    PID_CREATE_DTM: Final[int]
+    PID_KEYWORDS: Final[int]
+    PID_LASTAUTHOR: Final[int]
+    PID_LASTPRINTED: Final[int]
+    PID_LASTSAVE_DTM: Final[int]
+    PID_PAGECOUNT: Final[int]
+    PID_REVNUMBER: Final[int]
+    PID_SECURITY: Final[int]
+    PID_SUBJECT: Final[int]
+    PID_TEMPLATE: Final[int]
+    PID_TITLE: Final[int]
+    PID_WORDCOUNT: Final[int]

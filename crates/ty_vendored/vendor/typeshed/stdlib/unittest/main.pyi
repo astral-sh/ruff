@@ -1,5 +1,3 @@
-"""Unittest main program"""
-
 import sys
 import unittest.case
 import unittest.loader
@@ -19,10 +17,6 @@ class _TestRunner(Protocol):
 
 # not really documented
 class TestProgram:
-    """A command-line program that runs a set of tests; this is primarily
-    for making test modules conveniently executable.
-    """
-
     result: unittest.result.TestResult
     module: None | str | ModuleType
     verbosity: int
@@ -70,8 +64,11 @@ class TestProgram:
         ) -> None: ...
 
     if sys.version_info < (3, 13):
-        @deprecated("Deprecated in Python 3.11; removal scheduled for Python 3.13")
-        def usageExit(self, msg: Any = None) -> None: ...
+        if sys.version_info >= (3, 11):
+            @deprecated("Deprecated since Python 3.11; removed in Python 3.13.")
+            def usageExit(self, msg: Any = None) -> None: ...
+        else:
+            def usageExit(self, msg: Any = None) -> None: ...
 
     def parseArgs(self, argv: list[str]) -> None: ...
     def createTests(self, from_discovery: bool = False, Loader: unittest.loader.TestLoader | None = None) -> None: ...

@@ -1,5 +1,3 @@
-"""Cross-interpreter Queues High Level Module."""
-
 import queue
 import sys
 from typing import Final, SupportsIndex
@@ -25,39 +23,15 @@ if sys.version_info >= (3, 13):  # needed to satisfy pyright checks for Python <
         "list_all",
     ]
 
-    class QueueEmpty(QueueError, queue.Empty):
-        """Raised from get_nowait() when the queue is empty.
-
-        It is also raised from get() if it times out.
-        """
-
-    class QueueFull(QueueError, queue.Full):
-        """Raised from put_nowait() when the queue is full.
-
-        It is also raised from put() if it times out.
-        """
-
-    class ItemInterpreterDestroyed(QueueError, _crossinterp.ItemInterpreterDestroyed):
-        """Raised from get() and get_nowait()."""
-
+    class QueueEmpty(QueueError, queue.Empty): ...
+    class QueueFull(QueueError, queue.Full): ...
+    class ItemInterpreterDestroyed(QueueError, _crossinterp.ItemInterpreterDestroyed): ...
     UNBOUND: Final[UnboundItem]
 
-    def create(maxsize: int = 0, *, unbounditems: _AnyUnbound = ...) -> Queue:
-        """Return a new cross-interpreter queue.
-
-        The queue may be used to pass data safely between interpreters.
-
-        "unbounditems" sets the default for Queue.put(); see that method for
-        supported values.  The default value is UNBOUND, which replaces
-        the unbound item.
-        """
-
-    def list_all() -> list[Queue]:
-        """Return a list of all open queues."""
+    def create(maxsize: int = 0, *, unbounditems: _AnyUnbound = ...) -> Queue: ...
+    def list_all() -> list[Queue]: ...
 
     class Queue:
-        """A cross-interpreter queue."""
-
         def __new__(cls, id: int, /) -> Self: ...
         def __del__(self) -> None: ...
         def __hash__(self) -> int: ...
@@ -78,57 +52,7 @@ if sys.version_info >= (3, 13):  # needed to satisfy pyright checks for Python <
             *,
             unbounditems: _AnyUnbound | None = None,
             _delay: float = ...,
-        ) -> None:
-            """Add the object to the queue.
-
-            This blocks while the queue is full.
-
-            For most objects, the object received through Queue.get() will
-            be a new one, equivalent to the original and not sharing any
-            actual underlying data.  The notable exceptions include
-            cross-interpreter types (like Queue) and memoryview, where the
-            underlying data is actually shared.  Furthermore, some types
-            can be sent through a queue more efficiently than others.  This
-            group includes various immutable types like int, str, bytes, and
-            tuple (if the items are likewise efficiently shareable).  See interpreters.is_shareable().
-
-            "unbounditems" controls the behavior of Queue.get() for the given
-            object if the current interpreter (calling put()) is later
-            destroyed.
-
-            If "unbounditems" is None (the default) then it uses the
-            queue's default, set with create_queue(),
-            which is usually UNBOUND.
-
-            If "unbounditems" is UNBOUND_ERROR then get() will raise an
-            ItemInterpreterDestroyed exception if the original interpreter
-            has been destroyed.  This does not otherwise affect the queue;
-            the next call to put() will work like normal, returning the next
-            item in the queue.
-
-            If "unbounditems" is UNBOUND_REMOVE then the item will be removed
-            from the queue as soon as the original interpreter is destroyed.
-            Be aware that this will introduce an imbalance between put()
-            and get() calls.
-
-            If "unbounditems" is UNBOUND then it is returned by get() in place
-            of the unbound item.
-            """
-
+        ) -> None: ...
         def put_nowait(self, obj: object, *, unbounditems: _AnyUnbound | None = None) -> None: ...
-        def get(self, timeout: SupportsIndex | None = None, *, _delay: float = ...) -> object:
-            """Return the next object from the queue.
-
-            This blocks while the queue is empty.
-
-            If the next item's original interpreter has been destroyed
-            then the "next object" is determined by the value of the
-            "unbounditems" argument to put().
-            """
-
-        def get_nowait(self) -> object:
-            """Return the next object from the channel.
-
-            If the queue is empty then raise QueueEmpty.  Otherwise this
-            is the same as get().
-            """
+        def get(self, timeout: SupportsIndex | None = None, *, _delay: float = ...) -> object: ...
+        def get_nowait(self) -> object: ...

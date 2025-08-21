@@ -1,9 +1,3 @@
-"""
-Enough Mach-O to make your head spin.
+from typing import Final
 
-See the relevant header files in /usr/include/mach-o
-
-And also Apple's documentation.
-"""
-
-__version__: str
+__version__: Final[str]
