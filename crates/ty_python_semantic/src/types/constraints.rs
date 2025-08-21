@@ -1,18 +1,18 @@
 //! Constraints under which type properties hold
 //!
 //! For "concrete" types (which contain no type variables), type properties like assignability have
-//! simple answers: one type is either assignable to another type, or it isn't. (The rules for
+//! simple answers: one type is either assignable to another type, or it isn't. (The _rules_ for
 //! comparing two particular concrete types can be rather complex, but the _answer_ is a simple
 //! "yes" or "no".)
 //!
 //! These properties are more complex when type variables are involved, because there are (usually)
 //! many different concrete types that a typevar can be specialized to, and the type property might
-//! hold for some specializations, but not for others. That means for types that include typevars
-//! "is this type assignable to another" no longer makes sense as a question. The better question
-//! is "under what constraints is this type assignable to another".
+//! hold for some specializations, but not for others. That means that for types that include
+//! typevars, "Is this type assignable to another?" no longer makes sense as a question. The better
+//! question is: "Under what constraints is this type assignable to another?".
 //!
 //! This module provides the machinery for representing the "under what constraints" part of that
-//! question. An individual constraint restricts the specialization a single typevar to be within a
+//! question. An individual constraint restricts the specialization of a single typevar to be within a
 //! particular lower and upper bound. You can then build up more complex constraint sets using
 //! union, intersection, and negation operations (just like types themselves).
 //!
