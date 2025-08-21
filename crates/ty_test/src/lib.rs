@@ -78,7 +78,7 @@ pub fn run(
             println!("\n{}\n", test.name().bold().underline());
         }
 
-        if let Err(failures) = run_test(&mut db, relative_fixture_path, snapshot_path, &test) {
+        if let Err(failures) = failures {
             let md_index = LineIndex::from_source_text(&source);
 
             for test_failures in failures {
@@ -105,7 +105,7 @@ pub fn run(
                 }
             }
         }
-        if let Err(inconsistencies) = run_module_resolution_consistency_test(&db) {
+        if let Err(inconsistencies) = inconsistencies {
             any_failures = true;
             for inconsistency in inconsistencies {
                 match output_format {
