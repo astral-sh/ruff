@@ -191,7 +191,7 @@ impl std::fmt::Display for Diff<'_> {
                                 "|",
                                 self.stylesheet.none,
                                 self.stylesheet.line_no,
-                                change.old_index(),
+                                change.new_index(),
                             ),
                         };
 
