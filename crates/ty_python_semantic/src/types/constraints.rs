@@ -115,12 +115,13 @@ impl<'db> Constraints<'db> for bool {
 
 /// An extension trait for building constraint sets from [`Option`] values.
 pub(crate) trait OptionConstraintsExtension<T> {
-    /// Returns [`always`][Constraints::always] if the option is `None`; otherwise applies a
-    /// function to determine under what constraints the value inside of it holds.
+    /// Returns [`always_satisfiable`][Constraints::always_satisfiable] if the option is `None`;
+    /// otherwise applies a function to determine under what constraints the value inside of it
+    /// holds.
     fn when_none_or<'db, C: Constraints<'db>>(self, db: &'db dyn Db, f: impl FnOnce(T) -> C) -> C;
 
-    /// Returns [`never`][Constraints::never] if the option is `None`; otherwise applies a
-    /// function to determine under what constraints the value inside of it holds.
+    /// Returns [`unsatisfiable`][Constraints::unsatisfiable] if the option is `None`; otherwise
+    /// applies a function to determine under what constraints the value inside of it holds.
     fn when_some_and<'db, C: Constraints<'db>>(self, db: &'db dyn Db, f: impl FnOnce(T) -> C) -> C;
 }
 
