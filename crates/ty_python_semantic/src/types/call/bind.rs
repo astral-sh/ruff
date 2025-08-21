@@ -16,6 +16,7 @@ use crate::Program;
 use crate::db::Db;
 use crate::dunder_all::dunder_all_names;
 use crate::place::{Boundness, Place};
+use crate::types::call::arguments::is_expandable_type;
 use crate::types::diagnostic::{
     CALL_NON_CALLABLE, CONFLICTING_ARGUMENT_FORMS, INVALID_ARGUMENT_TYPE, MISSING_ARGUMENT,
     NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED, TOO_MANY_POSITIONAL_ARGUMENTS,
@@ -1336,6 +1337,48 @@ impl<'db> CallableBinding<'db> {
         // Restore the bindings state to the one prior to the type checking step in preparation
         // for evaluating the expanded argument lists.
         snapshotter.restore(self, pre_evaluation_snapshot);
+
+        // At this point, there's at least one argument that can be expanded.
+        //
+        // This heuristic tries to detect if there's any need to perform argument type expansion or
+        // not by checking whether there are any non-expandable argument type that cannot be
+        // assigned to any of the remaining overloads.
+        //
+        // This heuristic needs to be applied after restoring the bindings state to the one before
+        // type checking as argument type expansion would evaluate it from that point on.
+        for (argument_index, (argument, argument_type)) in argument_types.iter().enumerate() {
+            // TODO: Remove `Keywords` once `**kwargs` support is added
+            if matches!(argument, Argument::Synthetic | Argument::Keywords) {
+                continue;
+            }
+            let Some(argument_type) = argument_type else {
+                continue;
+            };
+            if is_expandable_type(db, argument_type) {
+                continue;
+            }
+            let mut is_argument_assignable_to_any_overload = false;
+            'overload: for (_, overload) in self.matching_overloads() {
+                for parameter_index in &overload.argument_matches[argument_index].parameters {
+                    let parameter_type = overload.signature.parameters()[*parameter_index]
+                        .annotated_type()
+                        .unwrap_or(Type::unknown());
+                    if argument_type.is_assignable_to(db, parameter_type) {
+                        is_argument_assignable_to_any_overload = true;
+                        break 'overload;
+                    }
+                }
+            }
+            if !is_argument_assignable_to_any_overload {
+                tracing::debug!(
+                    "Argument at {argument_index} (`{}`) is not assignable to any of the \
+                    remaining overloads, skipping argument type expansion",
+                    argument_type.display(db)
+                );
+                snapshotter.restore(self, post_evaluation_snapshot);
+                return;
+            }
+        }
 
         for expanded_argument_lists in expansions {
             // This is the merged state of the bindings after evaluating all of the expanded
