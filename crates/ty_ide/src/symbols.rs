@@ -125,47 +125,64 @@ impl SymbolKind {
     }
 }
 
-pub(crate) fn symbols_for_file(
-    db: &dyn Db,
+pub(crate) fn symbols_for_file<'db>(
+    db: &'db dyn Db,
     file: File,
     options: &SymbolsOptions,
-) -> Vec<SymbolInfo> {
+) -> impl Iterator<Item = &'db SymbolInfo> {
     assert!(
         !options.hierarchical || options.query_string.is_none(),
         "Cannot use hierarchical mode with a query string"
     );
 
+    let ingredient = SymbolsOptionsWithoutQuery {
+        hierarchical: options.hierarchical,
+        global_only: options.global_only,
+    };
+    symbols_for_file_inner(db, file, ingredient)
+        .iter()
+        .filter(|symbol| {
+            let Some(ref query) = options.query_string else {
+                return true;
+            };
+            query.is_match(symbol)
+        })
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+struct SymbolsOptionsWithoutQuery {
+    hierarchical: bool,
+    global_only: bool,
+}
+
+#[salsa::tracked(returns(deref))]
+fn symbols_for_file_inner<'db>(
+    db: &'db dyn Db,
+    file: File,
+    options: SymbolsOptionsWithoutQuery,
+) -> Vec<SymbolInfo> {
     let parsed = parsed_module(db, file);
     let module = parsed.load(db);
 
-    let mut visitor = SymbolVisitor::new(options);
+    let mut visitor = SymbolVisitor {
+        symbols: vec![],
+        symbol_stack: vec![],
+        in_function: false,
+        options,
+    };
     visitor.visit_body(&module.syntax().body);
-    let mut symbols = visitor.symbols;
-    if let Some(ref query) = options.query_string {
-        symbols.retain(|symbol| query.is_match(symbol));
-    }
-    symbols
+    visitor.symbols
 }
 
-struct SymbolVisitor<'a> {
+struct SymbolVisitor {
     symbols: Vec<SymbolInfo>,
     symbol_stack: Vec<SymbolInfo>,
     /// Track if we're currently inside a function (to exclude local variables)
     in_function: bool,
-    /// Options controlling symbol collection
-    options: &'a SymbolsOptions,
+    options: SymbolsOptionsWithoutQuery,
 }
 
-impl<'a> SymbolVisitor<'a> {
-    fn new(options: &'a SymbolsOptions) -> Self {
-        Self {
-            symbols: Vec::new(),
-            symbol_stack: Vec::new(),
-            in_function: false,
-            options,
-        }
-    }
-
+impl SymbolVisitor {
     fn visit_body(&mut self, body: &[Stmt]) {
         for stmt in body {
             self.visit_stmt(stmt);
@@ -205,7 +222,7 @@ impl<'a> SymbolVisitor<'a> {
     }
 }
 
-impl SourceOrderVisitor<'_> for SymbolVisitor<'_> {
+impl SourceOrderVisitor<'_> for SymbolVisitor {
     fn visit_stmt(&mut self, stmt: &Stmt) {
         match stmt {
             Stmt::FunctionDef(func_def) => {
