@@ -1,8 +1,6 @@
 use std::borrow::Cow;
 use std::num::NonZeroUsize;
 
-use anstyle::Style;
-use ruff_notebook::NotebookIndex;
 use similar::{ChangeTag, TextDiff};
 
 use ruff_annotate_snippets::Renderer as AnnotateRenderer;
@@ -261,30 +259,6 @@ impl std::fmt::Display for Diff<'_> {
         }
 
         Ok(())
-    }
-}
-
-struct LineStyle {
-    style: Style,
-}
-
-impl LineStyle {
-    fn apply_to(&self, input: &str) -> impl std::fmt::Display {
-        fmt_styled(input, self.style)
-    }
-
-    fn from(value: ChangeTag, stylesheet: &DiagnosticStylesheet) -> LineStyle {
-        match value {
-            ChangeTag::Equal => LineStyle {
-                style: stylesheet.none,
-            },
-            ChangeTag::Delete => LineStyle {
-                style: stylesheet.deletion,
-            },
-            ChangeTag::Insert => LineStyle {
-                style: stylesheet.insertion,
-            },
-        }
     }
 }
 
