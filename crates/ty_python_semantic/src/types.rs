@@ -1358,7 +1358,17 @@ impl<'db> Type<'db> {
             return true;
         }
 
+        // The ordering of the arms of this match statement is important. It is divided into
+        // several sections; when adding logic, please make sure you add it to the correct section!
         match (self, target) {
+            //-------------------------------------------------------------------------------------
+            // 1. FAST PATHS
+            //
+            // These match arms are for fast paths that we can check without having to recurse into
+            // the structure of the type, and which occur often enough to make it worth optimizing
+            // for. Note that this means you should not call `has_relation_to_impl` recursively in
+            // any of the arms in this section!
+
             // Everything is a subtype of `object`.
             (_, Type::NominalInstance(instance)) if instance.is_object(db) => true,
 
@@ -1370,30 +1380,6 @@ impl<'db> Type<'db> {
             // handled above. It's always assignable, though.
             (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => relation.is_assignability(),
 
-            (Type::TypeAlias(self_alias), _) => visitor.visit((self, target), || {
-                self_alias
-                    .value_type(db)
-                    .has_relation_to_impl(db, target, relation, visitor)
-            }),
-
-            (_, Type::TypeAlias(target_alias)) => visitor.visit((self, target), || {
-                self.has_relation_to_impl(db, target_alias.value_type(db), relation, visitor)
-            }),
-
-            // Pretend that instances of `dataclasses.Field` are assignable to their default type.
-            // This allows field definitions like `name: str = field(default="")` in dataclasses
-            // to pass the assignability check of the inferred type to the declared type.
-            (Type::KnownInstance(KnownInstanceType::Field(field)), right)
-                if relation.is_assignability() =>
-            {
-                field.default_type(db).has_relation_to(db, right, relation)
-            }
-
-            (Type::TypedDict(_), _) | (_, Type::TypedDict(_)) => {
-                // TODO: Implement assignability and subtyping for TypedDict
-                relation.is_assignability()
-            }
-
             // In general, a TypeVar `T` is not a subtype of a type `S` unless one of the two conditions is satisfied:
             // 1. `T` is a bound TypeVar and `T`'s upper bound is a subtype of `S`.
             //    TypeVars without an explicit upper bound are treated as having an implicit upper bound of `object`.
@@ -1402,6 +1388,10 @@ impl<'db> Type<'db> {
             // However, there is one exception to this general rule: for any given typevar `T`,
             // `T` will always be a subtype of any union containing `T`.
             // A similar rule applies in reverse to intersection types.
+            //
+            // TODO: Once assignability generates constraint sets instead of a simple bool, we
+            // won't need these special cases, since the connectives section below will handle this
+            // correctly.
             (Type::NonInferableTypeVar(_), Type::Union(union))
                 if union.elements(db).contains(&self) =>
             {
@@ -1428,56 +1418,70 @@ impl<'db> Type<'db> {
                 Type::NonInferableTypeVar(rhs_bound_typevar),
             ) if lhs_bound_typevar == rhs_bound_typevar => true,
 
-            // A fully static typevar is a subtype of its upper bound, and to something similar to
-            // the union of its constraints. An unbound, unconstrained, fully static typevar has an
-            // implicit upper bound of `object` (which is handled above).
+            //-------------------------------------------------------------------------------------
+            // 2. CONNECTIVES
+            //
+            // These match arms handle our connectives. Surprisingly, there are three of them!
+            // Union and intersection are the obvious ones, but a constrained non-inferable typevar
+            // is the "one-of" of its constraints.
+
+            // TODO: At the moment, the order of the arms in this section is important. Once
+            // assignability generates constraint sets instead of a simple bool, it shouldn't
+            // matter as much anymore.
+            //
+            // As one example, in
+            //
+            // ```py
+            // def union[T: (Base, Unrelated)](t: T) -> None:
+            //     static_assert(is_assignable_to(T, T | None))
+            // ```
+            //
+            // we need to check that `T <: T | None` for both `T = Base` and `T = Unrelated`. In
+            // this particular example, the lhs is a bare typevar, so you might think that we can
+            // apply the two specializations to the rhs and check each. But the `T` on the lhs
+            // might be arbitrarily deep in the type, and might appear multiple times; we need
+            // constraint sets to be able to express these kinds of consistency requirements.
+
+            // A constrained typevar specializes to exactly one of its constraints, but not to any
+            // subtype of those constraints, nor to any union of multiple constraints. Since there
+            // is a finite number of types the typevar can specialize to, we can just check them
+            // each in turn.
             (Type::NonInferableTypeVar(bound_typevar), _)
-                if bound_typevar.typevar(db).bound_or_constraints(db).is_some() =>
+                if bound_typevar.typevar(db).constraints(db).is_some() =>
             {
-                match bound_typevar.typevar(db).bound_or_constraints(db) {
-                    None => unreachable!(),
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        bound.has_relation_to_impl(db, target, relation, visitor)
-                    }
-                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        constraints.elements(db).iter().all(|constraint| {
-                            constraint.has_relation_to_impl(db, target, relation, visitor)
-                        })
-                    }
-                }
+                let Some(constraints) = bound_typevar.typevar(db).constraints(db) else {
+                    unreachable!();
+                };
+                constraints.iter().all(|constraint| {
+                    constraint.has_relation_to_impl(db, target, relation, visitor)
+                })
             }
 
-            // If the typevar is constrained, there must be multiple constraints, and the typevar
-            // might be specialized to any one of them. However, the constraints do not have to be
-            // disjoint, which means an lhs type might be a subtype of all of the constraints.
-            (_, Type::NonInferableTypeVar(bound_typevar))
-                if bound_typevar
-                    .typevar(db)
-                    .constraints(db)
-                    .is_some_and(|constraints| {
-                        constraints.iter().all(|constraint| {
-                            self.has_relation_to_impl(db, *constraint, relation, visitor)
-                        })
-                    }) =>
-            {
-                true
-            }
-
-            // `Never` is the bottom type, the empty set.
-            // Other than one unlikely edge case (TypeVars bound to `Never`),
-            // no other type is a subtype of or assignable to `Never`.
-            (_, Type::Never) => false,
-
+            // Union
             (Type::Union(union), _) => union
                 .elements(db)
                 .iter()
                 .all(|&elem_ty| elem_ty.has_relation_to_impl(db, target, relation, visitor)),
-
             (_, Type::Union(union)) => union
                 .elements(db)
                 .iter()
                 .any(|&elem_ty| self.has_relation_to_impl(db, elem_ty, relation, visitor)),
 
+            // A constrained typevar specializes to exactly one of its constraints, but not to any
+            // subtype of those constraints, nor to any union of multiple constraints. However, the
+            // constraints do not have to be disjoint, which means an lhs type might be a subtype
+            // of all of the constraints.
+            (_, Type::NonInferableTypeVar(bound_typevar))
+                if bound_typevar.typevar(db).constraints(db).is_some() =>
+            {
+                let Some(constraints) = bound_typevar.typevar(db).constraints(db) else {
+                    unreachable!();
+                };
+                (constraints.iter())
+                    .all(|constraint| self.has_relation_to_impl(db, *constraint, relation, visitor))
+            }
+
+            // Intersection
             // If both sides are intersections we need to handle the right side first
             // (A & B & C) is a subtype of (A & B) because the left is a subtype of both A and B,
             // but none of A, B, or C is a subtype of (A & B).
@@ -1491,21 +1495,71 @@ impl<'db> Type<'db> {
                         .iter()
                         .all(|&neg_ty| self.is_disjoint_from(db, neg_ty))
             }
-
             (Type::Intersection(intersection), _) => intersection
                 .positive(db)
                 .iter()
                 .any(|&elem_ty| elem_ty.has_relation_to_impl(db, target, relation, visitor)),
 
-            // Other than the special cases checked above, no other types are a subtype of a
-            // typevar, since there's no guarantee what type the typevar will be specialized to.
-            // (If the typevar is bounded, it might be specialized to a smaller type than the
-            // bound. This is true even if the bound is a final class, since the typevar can still
-            // be specialized to `Never`.)
-            (_, Type::NonInferableTypeVar(_)) => false,
+            //-------------------------------------------------------------------------------------
+            // 3. EVERYTHING ELSE
+
+            // For a non-inferable typevar, assignability must hold for all possible
+            // specializations.
+            //
+            // For bounded typevars, and unbounded/unconstrained typevars (which
+            // have an implicit bound of `object`), we can handle this by performing the check on
+            // the top materialization of the lhs, and/or the bottom materialization of the rhs.
+            //
+            // Constrained typevars are actually a special kind of connective, which we handled
+            // above.
+            (Type::NonInferableTypeVar(bound_typevar), _) => {
+                // A typevar on the lhs can specialize to any subtype of its bound. If the
+                // bound satisfies the relation, then any specialization does too.
+                let upper_bound = bound_typevar
+                    .typevar(db)
+                    .upper_bound(db)
+                    .unwrap_or_else(|| Type::object(db));
+                upper_bound.has_relation_to_impl(db, target, relation, visitor)
+            }
+            (_, Type::NonInferableTypeVar(_)) => {
+                // If the rhs typevar has an upper bound, then we cannot assume any types are a
+                // subtype of it, since it might be specialized to a smaller type than the
+                // bound. This is true even if the bound is a final class, since the typevar
+                // can still be specialized to `Never`.
+                self.has_relation_to_impl(db, Type::Never, relation, visitor)
+            }
+
+            // `Never` is the bottom type, the empty set.
+            // Other than one unlikely edge case (TypeVars bound to `Never`, handled above),
+            // no other type is a subtype of or assignable to `Never`.
+            (_, Type::Never) => false,
 
             // TODO: Infer specializations here
             (Type::TypeVar(_), _) | (_, Type::TypeVar(_)) => false,
+
+            (Type::TypeAlias(self_alias), _) => visitor.visit((self, target), || {
+                self_alias
+                    .value_type(db)
+                    .has_relation_to_impl(db, target, relation, visitor)
+            }),
+
+            (_, Type::TypeAlias(target_alias)) => visitor.visit((self, target), || {
+                self.has_relation_to_impl(db, target_alias.value_type(db), relation, visitor)
+            }),
+
+            // Pretend that instances of `dataclasses.Field` are assignable to their default type.
+            // This allows field definitions like `name: str = field(default="")` in dataclasses
+            // to pass the assignability check of the inferred type to the declared type.
+            (Type::KnownInstance(KnownInstanceType::Field(field)), right)
+                if relation.is_assignability() =>
+            {
+                field.default_type(db).has_relation_to(db, right, relation)
+            }
+
+            (Type::TypedDict(_), _) | (_, Type::TypedDict(_)) => {
+                // TODO: Implement assignability and subtyping for TypedDict
+                relation.is_assignability()
+            }
 
             // Note that the definition of `Type::AlwaysFalsy` depends on the return value of `__bool__`.
             // If `__bool__` always returns True or False, it can be treated as a subtype of `AlwaysTruthy` or `AlwaysFalsy`, respectively.
@@ -1765,7 +1819,7 @@ impl<'db> Type<'db> {
 
             // Other than the special cases enumerated above, `Instance` types and typevars are
             // never subtypes of any other variants
-            (Type::NominalInstance(_) | Type::NonInferableTypeVar(_), _) => false,
+            (Type::NominalInstance(_), _) => false,
         }
     }
 
