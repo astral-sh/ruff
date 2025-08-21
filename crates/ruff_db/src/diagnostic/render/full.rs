@@ -145,13 +145,8 @@ impl std::fmt::Display for Diff<'_> {
         // tests, which is the only place these are currently used.
         writeln!(f, "ℹ {}", fmt_styled(message, self.stylesheet.separator))?;
 
+        let mut last_cell = None;
         for (cell, range) in cells {
-            println!("<<< cell {cell:?} >>>");
-            println!("```\n{}\n```", source_code.slice(range));
-            if let Some(cell) = cell {
-                writeln!(f, "-- cell {cell:-<72}")?;
-            }
-
             let input = source_code.slice(range);
 
             let mut output = String::with_capacity(input.len());
@@ -178,7 +173,12 @@ impl std::fmt::Display for Diff<'_> {
             let digit_with = OneIndexed::from_zero_indexed(largest_new.max(largest_old)).digits();
 
             for (idx, group) in diff.grouped_ops(3).iter().enumerate() {
-                if idx > 0 {
+                if let Some(cell) = cell {
+                    if last_cell.is_none_or(|last| last != cell) {
+                        writeln!(f, "--cell {cell:-<73}")?;
+                    }
+                    last_cell = Some(cell);
+                } else if idx > 0 {
                     writeln!(f, "{:-^1$}", "-", 80)?;
                 }
                 for op in group {
@@ -723,11 +723,9 @@ print()
         help: Remove unused import: `os`
 
         ℹ Safe fix
-        -- cell 1-----------------------------------------------------------------------
+        --cell 1------------------------------------------------------------------------
         1 1 | # cell 1
         2   |-import os
-        -- cell 2-----------------------------------------------------------------------
-        -- cell 3-----------------------------------------------------------------------
 
         error[unused-import][*]: `math` imported but unused
          --> notebook.ipynb:cell 2:2:8
@@ -741,13 +739,11 @@ print()
         help: Remove unused import: `math`
 
         ℹ Safe fix
-        -- cell 1-----------------------------------------------------------------------
-        -- cell 2-----------------------------------------------------------------------
+        --cell 2------------------------------------------------------------------------
         1 1 | # cell 2
         2   |-import math
         1 2 | 
         2 1 | print('hello world')
-        -- cell 3-----------------------------------------------------------------------
 
         error[unused-variable]: Local variable `x` is assigned to but never used
          --> notebook.ipynb:cell 3:4:5
