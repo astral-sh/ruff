@@ -153,7 +153,7 @@ impl std::fmt::Display for Diff<'_> {
             let mut last_end = range.start();
 
             for edit in self.fix.edits() {
-                if edit.start() > last_end && edit.start() < range.end() {
+                if edit.start() >= last_end && edit.start() < range.end() {
                     output.push_str(source_code.slice(TextRange::new(last_end, edit.start())));
                     output.push_str(edit.content().unwrap_or_default());
                     last_end = edit.end();
