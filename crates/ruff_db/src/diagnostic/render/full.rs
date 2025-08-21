@@ -1,9 +1,9 @@
 use std::borrow::Cow;
+use std::collections::BTreeMap;
 use std::num::NonZeroUsize;
 
 use anstyle::Style;
 use ruff_notebook::NotebookIndex;
-use rustc_hash::FxHashMap;
 use similar::{ChangeTag, TextDiff};
 
 use ruff_annotate_snippets::Renderer as AnnotateRenderer;
@@ -111,7 +111,7 @@ impl std::fmt::Display for Diff<'_> {
         // Partition the source code into ranges for each cell. If `self.notebook_index` is `None`,
         // indicating a regular script file, all the lines will be in one "cell" under the `None`
         // key.
-        let mut cells: FxHashMap<Option<OneIndexed>, TextRange> = FxHashMap::default();
+        let mut cells: BTreeMap<Option<OneIndexed>, TextRange> = BTreeMap::default();
         for line in source_code.line_starts() {
             let index = source_code.line_index(*line);
             let cell = if let Some(notebook_index) = &self.notebook_index {
