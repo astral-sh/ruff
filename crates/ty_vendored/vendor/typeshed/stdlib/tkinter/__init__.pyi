@@ -1657,7 +1657,19 @@ corresponding attributes.
     def wm_attributes(self, option: Literal["-topmost"], /) -> bool: ...
     if sys.platform == "darwin":
         @overload
-        def wm_attributes(self, option: Literal["-modified"], /) -> bool: ...
+        def wm_attributes(self, option: Literal["-modified"], /) -> bool:
+            """Return or sets platform specific attributes.
+
+When called with a single argument return_python_dict=True,
+return a dict of the platform specific attributes and their values.
+When called without arguments or with a single argument
+return_python_dict=False, return a tuple containing intermixed
+attribute names with the minus prefix and their values.
+
+When called with a single string value, return the value for the
+specific option.  When called with keyword arguments, set the
+corresponding attributes.
+"""
         @overload
         def wm_attributes(self, option: Literal["-notify"], /) -> bool: ...
         @overload
@@ -1724,7 +1736,19 @@ corresponding attributes.
         def wm_attributes(self, option: Literal["topmost"], /) -> bool: ...
         if sys.platform == "darwin":
             @overload
-            def wm_attributes(self, option: Literal["modified"], /) -> bool: ...
+            def wm_attributes(self, option: Literal["modified"], /) -> bool:
+                """Return or sets platform specific attributes.
+
+When called with a single argument return_python_dict=True,
+return a dict of the platform specific attributes and their values.
+When called without arguments or with a single argument
+return_python_dict=False, return a tuple containing intermixed
+attribute names with the minus prefix and their values.
+
+When called with a single string value, return the value for the
+specific option.  When called with keyword arguments, set the
+corresponding attributes.
+"""
             @overload
             def wm_attributes(self, option: Literal["notify"], /) -> bool: ...
             @overload
@@ -1781,7 +1805,19 @@ corresponding attributes.
     def wm_attributes(self, option: Literal["-topmost"], value: bool, /) -> Literal[""]: ...
     if sys.platform == "darwin":
         @overload
-        def wm_attributes(self, option: Literal["-modified"], value: bool, /) -> Literal[""]: ...
+        def wm_attributes(self, option: Literal["-modified"], value: bool, /) -> Literal[""]:
+            """Return or sets platform specific attributes.
+
+When called with a single argument return_python_dict=True,
+return a dict of the platform specific attributes and their values.
+When called without arguments or with a single argument
+return_python_dict=False, return a tuple containing intermixed
+attribute names with the minus prefix and their values.
+
+When called with a single string value, return the value for the
+specific option.  When called with keyword arguments, set the
+corresponding attributes.
+"""
         @overload
         def wm_attributes(self, option: Literal["-notify"], value: bool, /) -> Literal[""]: ...
         @overload
@@ -1841,7 +1877,19 @@ corresponding attributes.
                 titlepath: str = ...,
                 topmost: bool = ...,
                 transparent: bool = ...,
-            ) -> None: ...
+            ) -> None:
+                """Return or sets platform specific attributes.
+
+When called with a single argument return_python_dict=True,
+return a dict of the platform specific attributes and their values.
+When called without arguments or with a single argument
+return_python_dict=False, return a tuple containing intermixed
+attribute names with the minus prefix and their values.
+
+When called with a single string value, return the value for the
+specific option.  When called with keyword arguments, set the
+corresponding attributes.
+"""
         elif sys.platform == "win32":
             @overload
             def wm_attributes(
