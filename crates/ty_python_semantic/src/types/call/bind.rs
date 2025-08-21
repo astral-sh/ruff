@@ -16,7 +16,7 @@ use crate::Program;
 use crate::db::Db;
 use crate::dunder_all::dunder_all_names;
 use crate::place::{Boundness, Place};
-use crate::types::call::arguments::is_type_expandable;
+use crate::types::call::arguments::is_expandable_type;
 use crate::types::diagnostic::{
     CALL_NON_CALLABLE, CONFLICTING_ARGUMENT_FORMS, INVALID_ARGUMENT_TYPE, MISSING_ARGUMENT,
     NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED, TOO_MANY_POSITIONAL_ARGUMENTS,
@@ -1344,7 +1344,7 @@ impl<'db> CallableBinding<'db> {
             let Some(argument_type) = argument_type else {
                 continue;
             };
-            if is_type_expandable(db, argument_type) {
+            if is_expandable_type(db, argument_type) {
                 continue;
             }
             let mut is_argument_assignable_to_any_overload = false;

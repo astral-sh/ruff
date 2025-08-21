@@ -211,7 +211,7 @@ impl<'a, 'db> FromIterator<(Argument<'a>, Option<Type<'db>>)> for CallArguments<
 /// Returns `true` if the type can be expanded into its subtypes.
 ///
 /// In other words, it returns `true` if [`expand_type`] returns [`Some`] for the given type.
-pub(crate) fn is_type_expandable<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+pub(crate) fn is_expandable_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     match ty {
         Type::NominalInstance(instance) => {
             let class = instance.class(db);
@@ -219,7 +219,7 @@ pub(crate) fn is_type_expandable<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
                 || instance.tuple_spec(db).is_some_and(|spec| match &*spec {
                     Tuple::Fixed(fixed_length_tuple) => fixed_length_tuple
                         .all_elements()
-                        .any(|element| is_type_expandable(db, *element)),
+                        .any(|element| is_expandable_type(db, *element)),
                     Tuple::Variable(_) => false,
                 })
                 || enum_metadata(db, class.class_literal(db).0).is_some()
@@ -233,6 +233,7 @@ pub(crate) fn is_type_expandable<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
 ///
 /// Returns [`None`] if the type cannot be expanded.
 fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
+    // NOTE: Update `is_expandable_type` if this logic changes accordingly.
     match ty {
         Type::NominalInstance(instance) => {
             let class = instance.class(db);
