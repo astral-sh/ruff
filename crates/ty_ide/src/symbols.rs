@@ -1,6 +1,8 @@
 //! Implements logic used by the document symbol provider, workspace symbol
 //! provider, and auto-import feature of the completion provider.
 
+use regex::Regex;
+
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor};
@@ -16,7 +18,59 @@ pub struct SymbolsOptions {
     /// Include only symbols in the global scope
     pub global_only: bool,
     /// Query string for filtering symbol names
-    pub query_string: Option<String>,
+    pub query_string: Option<QueryPattern>,
+}
+
+#[derive(Clone, Debug)]
+pub struct QueryPattern {
+    re: Option<Regex>,
+    original: String,
+}
+
+impl QueryPattern {
+    pub fn new(literal_query_string: &str) -> QueryPattern {
+        let mut pattern = "(?i)".to_string();
+        for ch in literal_query_string.chars() {
+            pattern.push_str(&regex::escape(ch.encode_utf8(&mut [0; 4])));
+            pattern.push_str(".*");
+        }
+        // In theory regex compilation could fail if the pattern string
+        // was long enough to exceed the default regex compilation size
+        // limit. But this length would be approaching ~10MB or so.
+        QueryPattern {
+            re: Regex::new(&pattern).ok(),
+            original: literal_query_string.to_string(),
+        }
+    }
+
+    fn is_match(&self, symbol: &SymbolInfo) -> bool {
+        self.is_match_symbol_name(&symbol.name)
+    }
+
+    fn is_match_symbol_name(&self, symbol_name: &str) -> bool {
+        if let Some(ref re) = self.re {
+            re.is_match(symbol_name)
+        } else {
+            // This is a degenerate case. The only way
+            // we should get here is if the query string
+            // was thousands (or more) characters long.
+            symbol_name.contains(&self.original)
+        }
+    }
+}
+
+impl From<&str> for QueryPattern {
+    fn from(literal_query_string: &str) -> QueryPattern {
+        QueryPattern::new(literal_query_string)
+    }
+}
+
+impl Eq for QueryPattern {}
+
+impl PartialEq for QueryPattern {
+    fn eq(&self, rhs: &QueryPattern) -> bool {
+        self.original == rhs.original
+    }
 }
 
 /// Symbol information for IDE features like document outline.
@@ -88,7 +142,7 @@ pub(crate) fn symbols_for_file(
     visitor.visit_body(&module.syntax().body);
     let mut symbols = visitor.symbols;
     if let Some(ref query) = options.query_string {
-        symbols.retain(|symbol| is_pattern_in_symbol(query, &symbol.name));
+        symbols.retain(|symbol| query.is_match(symbol));
     }
     symbols
 }
@@ -284,31 +338,10 @@ impl SourceOrderVisitor<'_> for SymbolVisitor<'_> {
     }
 }
 
-/// Returns true if symbol name contains all characters in the query
-/// string in order. The comparison is case insensitive.
-fn is_pattern_in_symbol(query_string: &str, symbol_name: &str) -> bool {
-    let typed_lower = query_string.to_lowercase();
-    let symbol_lower = symbol_name.to_lowercase();
-    let typed_chars: Vec<char> = typed_lower.chars().collect();
-    let symbol_chars: Vec<char> = symbol_lower.chars().collect();
-
-    let mut typed_pos = 0;
-    let mut symbol_pos = 0;
-
-    while typed_pos < typed_chars.len() && symbol_pos < symbol_chars.len() {
-        if typed_chars[typed_pos] == symbol_chars[symbol_pos] {
-            typed_pos += 1;
-        }
-        symbol_pos += 1;
-    }
-
-    typed_pos == typed_chars.len()
-}
-
 #[cfg(test)]
 mod tests {
     fn matches(query: &str, symbol: &str) -> bool {
-        super::is_pattern_in_symbol(query, symbol)
+        super::QueryPattern::new(query).is_match_symbol_name(symbol)
     }
 
     #[test]
