@@ -204,6 +204,197 @@ impl<'a> YieldTracker<'a> {
         self.visit_body(orelse);
     }
 
+    fn handle_try_statement(&mut self, try_stmt: &ast::StmtTry) {
+        let (finally_yields, finally_returns) = self
+            .pop_scope()
+            .expect("Missing finally block scope in try-statement");
+
+        let (else_yields, else_returns) = self
+            .pop_scope()
+            .expect("Missing else block scope in try-statement");
+
+        let mut returning_except_branches = Vec::new();
+        let mut continuing_except_branches = Vec::new();
+
+        for _ in 0..try_stmt.handlers.len() {
+            let (except_yields, except_returns) = self
+                .pop_scope()
+                .expect("Missing except handler scope in try-statement");
+            self.report_excess(&except_yields);
+
+            if except_returns {
+                returning_except_branches.push(except_yields);
+            } else {
+                continuing_except_branches.push(except_yields);
+            }
+        }
+
+        let (try_yields, try_returns) = self
+            .pop_scope()
+            .expect("Missing try block scope in try-statement");
+
+        self.report_excess(&try_yields);
+        self.report_excess(&else_yields);
+        self.report_excess(&finally_yields);
+
+        if finally_returns {
+            self.handle_terminating_paths(
+                &try_yields,
+                try_returns,
+                &else_yields,
+                &finally_yields,
+                &returning_except_branches,
+                &continuing_except_branches,
+            );
+        } else {
+            self.handle_continuing_paths(
+                &try_yields,
+                try_returns,
+                &else_yields,
+                else_returns,
+                &finally_yields,
+                &returning_except_branches,
+                &continuing_except_branches,
+            );
+        }
+    }
+
+    fn handle_terminating_paths(
+        &mut self,
+        try_yields: &[&'a Expr],
+        try_returns: bool,
+        else_yields: &[&'a Expr],
+        finally_yields: &[&'a Expr],
+        returning_except_branches: &[Vec<&'a Expr>],
+        continuing_except_branches: &[Vec<&'a Expr>],
+    ) {
+        let except_yields =
+            self.get_max_except_path(returning_except_branches, continuing_except_branches);
+        let base_path =
+            self.build_pre_finally_path(try_yields, try_returns, else_yields, &except_yields);
+        let max_path = self.append_finally(&base_path, finally_yields);
+
+        self.report_excess(&max_path);
+        self.clear_scope_yields();
+    }
+
+    fn get_max_except_path(
+        &self,
+        returning_except_branches: &[Vec<&'a Expr>],
+        continuing_except_branches: &[Vec<&'a Expr>],
+    ) -> Vec<&'a Expr> {
+        let max_returning_except = self.max_yields(returning_except_branches);
+        let max_continuing_except = self.max_yields(continuing_except_branches);
+
+        if max_returning_except.len() > max_continuing_except.len() {
+            max_returning_except
+        } else {
+            max_continuing_except
+        }
+    }
+
+    fn build_pre_finally_path(
+        &self,
+        try_yields: &[&'a Expr],
+        try_returns: bool,
+        else_yields: &[&'a Expr],
+        max_except_yields: &[&'a Expr],
+    ) -> Vec<&'a Expr> {
+        let mut common_path = try_yields.to_vec();
+
+        if !try_returns {
+            common_path.extend(if else_yields.len() > max_except_yields.len() {
+                else_yields
+            } else {
+                max_except_yields
+            });
+        }
+
+        common_path
+    }
+
+    fn handle_continuing_paths(
+        &mut self,
+        try_yields: &[&'a Expr],
+        try_returns: bool,
+        else_yields: &[&'a Expr],
+        else_returns: bool,
+        finally_yields: &[&'a Expr],
+        returning_except_branches: &[Vec<&'a Expr>],
+        continuing_except_branches: &[Vec<&'a Expr>],
+    ) {
+        let (exception_return, exception_no_return) = self.build_except_paths(
+            returning_except_branches,
+            continuing_except_branches,
+            finally_yields,
+        );
+
+        self.report_excess(&exception_return);
+
+        let normal_path = self.build_try_else_path(try_yields, else_yields, finally_yields);
+
+        self.propagate_continuing_paths(
+            try_yields,
+            try_returns,
+            else_returns,
+            finally_yields,
+            &normal_path,
+            &exception_no_return,
+        );
+    }
+
+    fn build_except_paths(
+        &self,
+        returning_except_branches: &[Vec<&'a Expr>],
+        continuing_except_branches: &[Vec<&'a Expr>],
+        finally_yields: &[&'a Expr],
+    ) -> (Vec<&'a Expr>, Vec<&'a Expr>) {
+        let max_returning_except = self.max_yields(returning_except_branches);
+        let max_continuing_except = self.max_yields(continuing_except_branches);
+
+        let exception_return = self.append_finally(&max_returning_except, finally_yields);
+        let exception_no_return = self.append_finally(&max_continuing_except, finally_yields);
+
+        (exception_return, exception_no_return)
+    }
+
+    fn build_try_else_path(
+        &self,
+        try_yields: &[&'a Expr],
+        else_yields: &[&'a Expr],
+        finally_yields: &[&'a Expr],
+    ) -> Vec<&'a Expr> {
+        let mut try_else = try_yields.to_vec();
+        try_else.extend(else_yields);
+        self.append_finally(&try_else, finally_yields)
+    }
+
+    fn propagate_continuing_paths(
+        &mut self,
+        try_yields: &[&'a Expr],
+        try_returns: bool,
+        else_returns: bool,
+        finally_yields: &[&'a Expr],
+        normal_path: &[&'a Expr],
+        exception_no_return: &[&'a Expr],
+    ) {
+        if try_returns {
+            let try_path = self.append_finally(try_yields, finally_yields);
+            self.report_excess(&try_path);
+            self.propagate_yields(exception_no_return);
+        } else if else_returns {
+            self.report_excess(normal_path);
+            self.propagate_yields(exception_no_return);
+        } else {
+            let max_yield_path = if normal_path.len() > exception_no_return.len() {
+                normal_path.to_vec()
+            } else {
+                exception_no_return.to_vec()
+            };
+            self.propagate_yields(&max_yield_path);
+        }
+    }
+
     fn handle_exclusive_branches(&mut self, branch_count: usize) {
         let mut returning_branches = Vec::new();
         let mut continuing_branches = Vec::new();
@@ -281,120 +472,7 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldTracker<'a> {
     fn leave_node(&mut self, node: AnyNodeRef<'a>) {
         match node {
             AnyNodeRef::StmtTry(try_stmt) => {
-                // Finally is always executed, even if prior branches return
-                // Other branches are skipped
-                let (finally_yields, finally_returns) = self
-                    .pop_scope()
-                    .expect("Missing finally block scope in try-statement");
-
-                let (else_yields, else_returns) = self
-                    .pop_scope()
-                    .expect("Missing else block scope in try-statement");
-
-                let mut returning_except_branches = Vec::new();
-                let mut continuing_except_branches = Vec::new();
-
-                for _ in 0..try_stmt.handlers.len() {
-                    let (except_yields, except_returns) = self
-                        .pop_scope()
-                        .expect("Missing except handler scope in try-statement");
-                    self.report_excess(&except_yields);
-
-                    if except_returns {
-                        returning_except_branches.push(except_yields);
-                    } else {
-                        continuing_except_branches.push(except_yields);
-                    }
-                }
-
-                let (try_yields, try_returns) = self
-                    .pop_scope()
-                    .expect("Missing try block scope in try-statement");
-
-                self.report_excess(&try_yields);
-                self.report_excess(&else_yields);
-                self.report_excess(&finally_yields);
-
-                if finally_returns {
-                    let max_returning_except = self.max_yields(&returning_except_branches);
-                    let max_continuing_except = self.max_yields(&continuing_except_branches);
-                    let max_except_yields =
-                        if max_returning_except.len() > max_continuing_except.len() {
-                            max_returning_except
-                        } else {
-                            max_continuing_except
-                        };
-
-                    // We need to consider all possible paths through try/except/else/finally
-                    let mut common_path = try_yields.clone();
-                    let base_path = if try_returns {
-                        common_path
-                    } else {
-                        // try + (else OR except) + finally
-                        // Else is only executed if no exception
-                        common_path.extend(if else_yields.len() > max_except_yields.len() {
-                            else_yields
-                        } else {
-                            max_except_yields
-                        });
-                        common_path
-                    };
-                    // Finally always executes, even when previous branches return
-                    let max_path = self.append_finally(&base_path, &finally_yields);
-
-                    // This branch terminates because finally returns
-                    self.report_excess(&max_path);
-                    // Clear current scope because finally returns
-                    self.clear_scope_yields();
-                } else {
-                    // Finally doesn't return: we need to handle the different control flow paths and
-                    // propagate yield count to outer scope.
-                    // Since the code preceding yields is most likely to fail, we assume either
-                    // valid try-else-finally or erroneous except-finally execution.
-
-                    let max_returning_except = self.max_yields(&returning_except_branches);
-                    let max_continuing_except = self.max_yields(&continuing_except_branches);
-
-                    // Check except branches that return and don't propagate yields
-                    let exception_return =
-                        self.append_finally(&max_returning_except, &finally_yields);
-                    self.report_excess(&exception_return);
-
-                    let exception_no_return =
-                        self.append_finally(&max_continuing_except, &finally_yields);
-
-                    let mut try_else = try_yields.clone();
-                    try_else.extend(else_yields);
-                    let normal_path = self.append_finally(&try_else, &finally_yields);
-
-                    // If try returns, we consider try-finally
-                    // If try doesn't return, we consider try-(max of else OR non-return except)-finally
-                    // Propagate yields from non-returning path
-                    // Returning except branches are handled above
-                    if try_returns {
-                        // Finally is executed even if else returns
-                        let try_path = self.append_finally(&try_yields, &finally_yields);
-                        self.report_excess(&try_path);
-
-                        // Propagate the non-returning exception
-                        self.propagate_yields(&exception_no_return);
-                    } else {
-                        if else_returns {
-                            // Finally is executed even if else returns
-                            // Check returning path and propagate the non-returning exception
-                            self.report_excess(&normal_path);
-                            self.propagate_yields(&exception_no_return);
-                        } else {
-                            // No returns, we propagate yields along the path with maximum yields
-                            let max_yield_path = if normal_path.len() > exception_no_return.len() {
-                                normal_path
-                            } else {
-                                exception_no_return
-                            };
-                            self.propagate_yields(&max_yield_path);
-                        }
-                    }
-                }
+                self.handle_try_statement(try_stmt);
             }
             AnyNodeRef::StmtIf(if_stmt) => {
                 let branch_count = 1 + if_stmt.elif_else_clauses.len();
