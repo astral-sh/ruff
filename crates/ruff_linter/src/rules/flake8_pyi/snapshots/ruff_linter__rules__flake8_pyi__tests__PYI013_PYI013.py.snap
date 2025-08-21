@@ -1,14 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-PYI013.py:3:5: PYI013 [*] Non-empty class body must not contain `...`
+PYI013 [*] Non-empty class body must not contain `...`
+ --> PYI013.py:3:5
   |
 1 | class OneAttributeClass:
 2 |     value: int
 3 |     ...
-  |     ^^^ PYI013
+  |     ^^^
   |
-  = help: Remove unnecessary `...`
+help: Remove unnecessary `...`
 
 ℹ Safe fix
 1 1 | class OneAttributeClass:
@@ -18,14 +19,15 @@ PYI013.py:3:5: PYI013 [*] Non-empty class body must not contain `...`
 5 4 | 
 6 5 | class OneAttributeClass2:
 
-PYI013.py:7:5: PYI013 [*] Non-empty class body must not contain `...`
+PYI013 [*] Non-empty class body must not contain `...`
+ --> PYI013.py:7:5
   |
 6 | class OneAttributeClass2:
 7 |     ...
-  |     ^^^ PYI013
+  |     ^^^
 8 |     value: int
   |
-  = help: Remove unnecessary `...`
+help: Remove unnecessary `...`
 
 ℹ Safe fix
 4 4 | 
@@ -36,14 +38,15 @@ PYI013.py:7:5: PYI013 [*] Non-empty class body must not contain `...`
 9 8 | 
 10 9 | 
 
-PYI013.py:12:5: PYI013 [*] Non-empty class body must not contain `...`
+PYI013 [*] Non-empty class body must not contain `...`
+  --> PYI013.py:12:5
    |
 11 | class TwoEllipsesClass:
 12 |     ...
-   |     ^^^ PYI013
+   |     ^^^
 13 |     ...
    |
-   = help: Remove unnecessary `...`
+help: Remove unnecessary `...`
 
 ℹ Safe fix
 10 10 | 
@@ -54,14 +57,15 @@ PYI013.py:12:5: PYI013 [*] Non-empty class body must not contain `...`
 15 14 | 
 16 15 | class DocstringClass:
 
-PYI013.py:13:5: PYI013 [*] Non-empty class body must not contain `...`
+PYI013 [*] Non-empty class body must not contain `...`
+  --> PYI013.py:13:5
    |
 11 | class TwoEllipsesClass:
 12 |     ...
 13 |     ...
-   |     ^^^ PYI013
+   |     ^^^
    |
-   = help: Remove unnecessary `...`
+help: Remove unnecessary `...`
 
 ℹ Safe fix
 10 10 | 
@@ -72,14 +76,15 @@ PYI013.py:13:5: PYI013 [*] Non-empty class body must not contain `...`
 15 14 | 
 16 15 | class DocstringClass:
 
-PYI013.py:21:5: PYI013 [*] Non-empty class body must not contain `...`
+PYI013 [*] Non-empty class body must not contain `...`
+  --> PYI013.py:21:5
    |
 19 |     """
 20 |
 21 |     ...
-   |     ^^^ PYI013
+   |     ^^^
    |
-   = help: Remove unnecessary `...`
+help: Remove unnecessary `...`
 
 ℹ Safe fix
 18 18 |     My body only contains an ellipsis.
@@ -90,14 +95,15 @@ PYI013.py:21:5: PYI013 [*] Non-empty class body must not contain `...`
 23 22 | 
 24 23 | class NonEmptyChild(Exception):
 
-PYI013.py:26:5: PYI013 [*] Non-empty class body must not contain `...`
+PYI013 [*] Non-empty class body must not contain `...`
+  --> PYI013.py:26:5
    |
 24 | class NonEmptyChild(Exception):
 25 |     value: int
 26 |     ...
-   |     ^^^ PYI013
+   |     ^^^
    |
-   = help: Remove unnecessary `...`
+help: Remove unnecessary `...`
 
 ℹ Safe fix
 23 23 | 
@@ -108,14 +114,15 @@ PYI013.py:26:5: PYI013 [*] Non-empty class body must not contain `...`
 28 27 | 
 29 28 | class NonEmptyChild2(Exception):
 
-PYI013.py:30:5: PYI013 [*] Non-empty class body must not contain `...`
+PYI013 [*] Non-empty class body must not contain `...`
+  --> PYI013.py:30:5
    |
 29 | class NonEmptyChild2(Exception):
 30 |     ...
-   |     ^^^ PYI013
+   |     ^^^
 31 |     value: int
    |
-   = help: Remove unnecessary `...`
+help: Remove unnecessary `...`
 
 ℹ Safe fix
 27 27 | 
@@ -126,16 +133,17 @@ PYI013.py:30:5: PYI013 [*] Non-empty class body must not contain `...`
 32 31 | 
 33 32 | 
 
-PYI013.py:36:5: PYI013 [*] Non-empty class body must not contain `...`
+PYI013 [*] Non-empty class body must not contain `...`
+  --> PYI013.py:36:5
    |
 34 | class NonEmptyWithInit:
 35 |     value: int
 36 |     ...
-   |     ^^^ PYI013
+   |     ^^^
 37 |
 38 |     def __init__():
    |
-   = help: Remove unnecessary `...`
+help: Remove unnecessary `...`
 
 ℹ Safe fix
 33 33 | 
@@ -146,14 +154,15 @@ PYI013.py:36:5: PYI013 [*] Non-empty class body must not contain `...`
 38 37 |     def __init__():
 39 38 |         pass
 
-PYI013.py:44:5: PYI013 [*] Non-empty class body must not contain `...`
+PYI013 [*] Non-empty class body must not contain `...`
+  --> PYI013.py:44:5
    |
 42 | class NonEmptyChildWithInlineComment:
 43 |     value: int
 44 |     ... # preserve me
-   |     ^^^ PYI013
+   |     ^^^
    |
-   = help: Remove unnecessary `...`
+help: Remove unnecessary `...`
 
 ℹ Safe fix
 41 41 | 

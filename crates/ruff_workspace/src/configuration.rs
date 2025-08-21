@@ -250,7 +250,8 @@ impl Configuration {
             .unwrap_or_default();
         let flake8_import_conventions = lint
             .flake8_import_conventions
-            .map(Flake8ImportConventionsOptions::into_settings)
+            .map(Flake8ImportConventionsOptions::try_into_settings)
+            .transpose()?
             .unwrap_or_default();
 
         conflicting_import_settings(&isort, &flake8_import_conventions)?;

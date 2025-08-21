@@ -103,9 +103,7 @@ impl BackgroundRequestHandler for WorkspaceDiagnosticRequestHandler {
         client: &Client,
         params: WorkspaceDiagnosticParams,
     ) -> Result<WorkspaceDiagnosticReportResult> {
-        let index = snapshot.index();
-
-        if !index.global_settings().diagnostic_mode().is_workspace() {
+        if !snapshot.global_settings().diagnostic_mode().is_workspace() {
             tracing::debug!("Workspace diagnostics is disabled; returning empty report");
             return Ok(WorkspaceDiagnosticReportResult::Report(
                 WorkspaceDiagnosticReport { items: vec![] },

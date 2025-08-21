@@ -2,7 +2,9 @@ use std::borrow::Cow;
 use std::time::Instant;
 
 use lsp_types::request::Completion;
-use lsp_types::{CompletionItem, CompletionItemKind, CompletionParams, CompletionResponse, Url};
+use lsp_types::{
+    CompletionItem, CompletionItemKind, CompletionParams, CompletionResponse, Documentation, Url,
+};
 use ruff_db::source::{line_index, source_text};
 use ty_ide::completion;
 use ty_project::ProjectDatabase;
@@ -22,7 +24,7 @@ impl RequestHandler for CompletionRequestHandler {
 }
 
 impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
-    fn document_url(params: &CompletionParams) -> Cow<Url> {
+    fn document_url(params: &CompletionParams) -> Cow<'_, Url> {
         Cow::Borrowed(&params.text_document_position.text_document.uri)
     }
 
@@ -34,7 +36,10 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
     ) -> crate::server::Result<Option<CompletionResponse>> {
         let start = Instant::now();
 
-        if snapshot.client_settings().is_language_services_disabled() {
+        if snapshot
+            .workspace_settings()
+            .is_language_services_disabled()
+        {
             return Ok(None);
         }
 
@@ -61,9 +66,12 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
             .map(|(i, comp)| {
                 let kind = comp.kind(db).map(ty_kind_to_lsp_kind);
                 CompletionItem {
-                    label: comp.name.into(),
+                    label: comp.inner.name.into(),
                     kind,
                     sort_text: Some(format!("{i:-max_index_len$}")),
+                    documentation: comp
+                        .documentation
+                        .map(|docstring| Documentation::String(docstring.render_plaintext())),
                     ..Default::default()
                 }
             })

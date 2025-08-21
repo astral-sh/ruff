@@ -1,14 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
 ---
-PT006.py:24:26: PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected a string of comma-separated values
+PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected a string of comma-separated values
+  --> PT006.py:24:26
    |
 24 | @pytest.mark.parametrize(("param1", "param2"), [(1, 2), (3, 4)])
-   |                          ^^^^^^^^^^^^^^^^^^^^ PT006
+   |                          ^^^^^^^^^^^^^^^^^^^^
 25 | def test_tuple(param1, param2):
 26 |     ...
    |
-   = help: Use a string of comma-separated values for the first argument
+help: Use a string of comma-separated values for the first argument
 
 ℹ Unsafe fix
 21 21 |     ...
@@ -20,14 +21,15 @@ PT006.py:24:26: PT006 [*] Wrong type passed to first argument of `pytest.mark.pa
 26 26 |     ...
 27 27 | 
 
-PT006.py:29:26: PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
+PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
+  --> PT006.py:29:26
    |
 29 | @pytest.mark.parametrize(("param1",), [1, 2, 3])
-   |                          ^^^^^^^^^^^ PT006
+   |                          ^^^^^^^^^^^
 30 | def test_tuple_one_elem(param1, param2):
 31 |     ...
    |
-   = help: Use a string for the first argument
+help: Use a string for the first argument
 
 ℹ Safe fix
 26 26 |     ...
@@ -39,14 +41,15 @@ PT006.py:29:26: PT006 [*] Wrong type passed to first argument of `pytest.mark.pa
 31 31 |     ...
 32 32 | 
 
-PT006.py:34:26: PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected a string of comma-separated values
+PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected a string of comma-separated values
+  --> PT006.py:34:26
    |
 34 | @pytest.mark.parametrize(["param1", "param2"], [(1, 2), (3, 4)])
-   |                          ^^^^^^^^^^^^^^^^^^^^ PT006
+   |                          ^^^^^^^^^^^^^^^^^^^^
 35 | def test_list(param1, param2):
 36 |     ...
    |
-   = help: Use a string of comma-separated values for the first argument
+help: Use a string of comma-separated values for the first argument
 
 ℹ Unsafe fix
 31 31 |     ...
@@ -58,14 +61,15 @@ PT006.py:34:26: PT006 [*] Wrong type passed to first argument of `pytest.mark.pa
 36 36 |     ...
 37 37 | 
 
-PT006.py:39:26: PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
+PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
+  --> PT006.py:39:26
    |
 39 | @pytest.mark.parametrize(["param1"], [1, 2, 3])
-   |                          ^^^^^^^^^^ PT006
+   |                          ^^^^^^^^^^
 40 | def test_list_one_elem(param1, param2):
 41 |     ...
    |
-   = help: Use a string for the first argument
+help: Use a string for the first argument
 
 ℹ Safe fix
 36 36 |     ...
@@ -77,32 +81,35 @@ PT006.py:39:26: PT006 [*] Wrong type passed to first argument of `pytest.mark.pa
 41 41 |     ...
 42 42 | 
 
-PT006.py:44:26: PT006 Wrong type passed to first argument of `pytest.mark.parametrize`; expected a string of comma-separated values
+PT006 Wrong type passed to first argument of `pytest.mark.parametrize`; expected a string of comma-separated values
+  --> PT006.py:44:26
    |
 44 | @pytest.mark.parametrize([some_expr, another_expr], [1, 2, 3])
-   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^ PT006
+   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^
 45 | def test_list_expressions(param1, param2):
 46 |     ...
    |
-   = help: Use a string of comma-separated values for the first argument
+help: Use a string of comma-separated values for the first argument
 
-PT006.py:49:26: PT006 Wrong type passed to first argument of `pytest.mark.parametrize`; expected a string of comma-separated values
+PT006 Wrong type passed to first argument of `pytest.mark.parametrize`; expected a string of comma-separated values
+  --> PT006.py:49:26
    |
 49 | @pytest.mark.parametrize([some_expr, "param2"], [1, 2, 3])
-   |                          ^^^^^^^^^^^^^^^^^^^^^ PT006
+   |                          ^^^^^^^^^^^^^^^^^^^^^
 50 | def test_list_mixed_expr_literal(param1, param2):
 51 |     ...
    |
-   = help: Use a string of comma-separated values for the first argument
+help: Use a string of comma-separated values for the first argument
 
-PT006.py:86:26: PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
+PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
+  --> PT006.py:86:26
    |
 86 | @pytest.mark.parametrize(("param",), [(1,), (2,)])
-   |                          ^^^^^^^^^^ PT006
+   |                          ^^^^^^^^^^
 87 | def test_single_element_tuple(param):
 88 |     ...
    |
-   = help: Use a string for the first argument
+help: Use a string for the first argument
 
 ℹ Safe fix
 83 83 |     ...
@@ -114,14 +121,15 @@ PT006.py:86:26: PT006 [*] Wrong type passed to first argument of `pytest.mark.pa
 88 88 |     ...
 89 89 | 
 
-PT006.py:91:26: PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
+PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
+  --> PT006.py:91:26
    |
 91 | @pytest.mark.parametrize(("param",), [[1], [2]])
-   |                          ^^^^^^^^^^ PT006
+   |                          ^^^^^^^^^^
 92 | def test_single_element_list(param):
 93 |     ...
    |
-   = help: Use a string for the first argument
+help: Use a string for the first argument
 
 ℹ Safe fix
 88 88 |     ...
@@ -133,14 +141,15 @@ PT006.py:91:26: PT006 [*] Wrong type passed to first argument of `pytest.mark.pa
 93 93 |     ...
 94 94 | 
 
-PT006.py:96:26: PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
+PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
+  --> PT006.py:96:26
    |
 96 | @pytest.mark.parametrize(("param",), [[1], [2]])
-   |                          ^^^^^^^^^^ PT006
+   |                          ^^^^^^^^^^
 97 | def test_single_element_list(param):
 98 |     ...
    |
-   = help: Use a string for the first argument
+help: Use a string for the first argument
 
 ℹ Safe fix
 93 93 |     ...
@@ -152,7 +161,8 @@ PT006.py:96:26: PT006 [*] Wrong type passed to first argument of `pytest.mark.pa
 98 98 |     ...
 99 99 | 
 
-PT006.py:103:5: PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
+PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
+   --> PT006.py:103:5
     |
 101 |   # Unsafe fix
 102 |   @pytest.mark.parametrize(
@@ -160,11 +170,11 @@ PT006.py:103:5: PT006 [*] Wrong type passed to first argument of `pytest.mark.pa
 104 | |         # comment
 105 | |         "param",
 106 | |     ),
-    | |_____^ PT006
+    | |_____^
 107 |       [[1], [2]],
 108 |   )
     |
-    = help: Use a string for the first argument
+help: Use a string for the first argument
 
 ℹ Unsafe fix
 100 100 | 
@@ -181,16 +191,17 @@ PT006.py:103:5: PT006 [*] Wrong type passed to first argument of `pytest.mark.pa
 109 106 | def test_comment_in_argnames(param):
 110 107 |     ...
 
-PT006.py:114:5: PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
+PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
+   --> PT006.py:114:5
     |
 112 | # Unsafe fix
 113 | @pytest.mark.parametrize(
 114 |     ("param",),
-    |     ^^^^^^^^^^ PT006
+    |     ^^^^^^^^^^
 115 |     [
 116 |         (
     |
-    = help: Use a string for the first argument
+help: Use a string for the first argument
 
 ℹ Unsafe fix
 111 111 | 
@@ -210,16 +221,17 @@ PT006.py:114:5: PT006 [*] Wrong type passed to first argument of `pytest.mark.pa
 122 119 | )
 123 120 | def test_comment_in_argvalues(param):
 
-PT006.py:129:5: PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
+PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
+   --> PT006.py:129:5
     |
 127 | # Safe fix
 128 | @pytest.mark.parametrize(
 129 |     ("param",),
-    |     ^^^^^^^^^^ PT006
+    |     ^^^^^^^^^^
 130 |     [
 131 |         (1,),
     |
-    = help: Use a string for the first argument
+help: Use a string for the first argument
 
 ℹ Safe fix
 126 126 | 
@@ -237,16 +249,17 @@ PT006.py:129:5: PT006 [*] Wrong type passed to first argument of `pytest.mark.pa
 135 135 | )
 136 136 | def test_comment_between_argvalues_items(param):
 
-PT006.py:142:5: PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
+PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
+   --> PT006.py:142:5
     |
 140 | # A fix should be suggested for `argnames`, but not for `argvalues`.
 141 | @pytest.mark.parametrize(
 142 |     ("param",),
-    |     ^^^^^^^^^^ PT006
+    |     ^^^^^^^^^^
 143 |     [
 144 |         (1,),
     |
-    = help: Use a string for the first argument
+help: Use a string for the first argument
 
 ℹ Safe fix
 139 139 | 

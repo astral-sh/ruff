@@ -1,14 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF046_LF.py:2:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046 [*] Value being cast to `int` is already an integer
+ --> RUF046_LF.py:2:1
   |
 1 |   # \n as newline
 2 | / int(-
 3 | |     1)
-  | |______^ RUF046
+  | |______^
   |
-  = help: Remove unnecessary `int` call
+help: Remove unnecessary `int` call
 
 ℹ Safe fix
 1 1 | # \n as newline

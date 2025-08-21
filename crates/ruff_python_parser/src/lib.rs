@@ -485,7 +485,7 @@ impl Tokens {
     }
 
     /// Returns an iterator over all the tokens that provides context.
-    pub fn iter_with_context(&self) -> TokenIterWithContext {
+    pub fn iter_with_context(&self) -> TokenIterWithContext<'_> {
         TokenIterWithContext::new(&self.raw)
     }
 

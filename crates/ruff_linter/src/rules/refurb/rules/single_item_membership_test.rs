@@ -89,7 +89,7 @@ pub(crate) fn single_item_membership_test(
             generate_comparison(
                 left,
                 &[membership_test.replacement_op()],
-                &[item.clone()],
+                std::slice::from_ref(item),
                 expr.into(),
                 checker.comment_ranges(),
                 checker.source(),

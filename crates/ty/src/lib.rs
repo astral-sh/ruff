@@ -62,6 +62,10 @@ pub(crate) fn version() -> Result<()> {
 }
 
 fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
+    // Enabled ANSI colors on Windows 10.
+    #[cfg(windows)]
+    assert!(colored::control::set_virtual_terminal(true).is_ok());
+
     set_colored_override(args.color);
 
     let verbosity = args.verbosity.level();
@@ -156,7 +160,9 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     match std::env::var(EnvVars::TY_MEMORY_REPORT).as_deref() {
         Ok("short") => write!(stdout, "{}", db.salsa_memory_dump().display_short())?,
         Ok("mypy_primer") => write!(stdout, "{}", db.salsa_memory_dump().display_mypy_primer())?,
-        Ok("full") => write!(stdout, "{}", db.salsa_memory_dump().display_full())?,
+        Ok("full") => {
+            write!(stdout, "{}", db.salsa_memory_dump().display_full())?;
+        }
         Ok(other) => {
             tracing::warn!(
                 "Unknown value for `TY_MEMORY_REPORT`: `{other}`. Valid values are `short`, `mypy_primer`, and `full`."

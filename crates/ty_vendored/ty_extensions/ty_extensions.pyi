@@ -1,5 +1,15 @@
+import sys
+from collections.abc import Iterable
 from enum import Enum
-from typing import Any, LiteralString, _SpecialForm
+from typing import (
+    Any,
+    ClassVar,
+    LiteralString,
+    Protocol,
+    _SpecialForm,
+)
+
+from typing_extensions import Self  # noqa: UP035
 
 # Special operations
 def static_assert(condition: object, msg: LiteralString | None = None) -> None: ...
@@ -69,3 +79,16 @@ def has_member(obj: Any, name: str) -> bool: ...
 # diagnostic describing the protocol's interface. Passing a non-protocol type
 # will cause ty to emit an error diagnostic.
 def reveal_protocol_interface(protocol: type) -> None: ...
+
+# A protocol describing an interface that should be satisfied by all named tuples
+# created using `typing.NamedTuple` or `collections.namedtuple`.
+class NamedTupleLike(Protocol):
+    # from typing.NamedTuple stub
+    _field_defaults: ClassVar[dict[str, Any]]
+    _fields: ClassVar[tuple[str, ...]]
+    @classmethod
+    def _make(self: Self, iterable: Iterable[Any]) -> Self: ...
+    def _asdict(self, /) -> dict[str, Any]: ...
+    def _replace(self: Self, /, **kwargs) -> Self: ...
+    if sys.version_info >= (3, 13):
+        def __replace__(self: Self, **kwargs) -> Self: ...

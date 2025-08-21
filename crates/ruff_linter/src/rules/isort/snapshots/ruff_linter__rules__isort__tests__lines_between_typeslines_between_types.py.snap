@@ -1,7 +1,8 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-lines_between_types.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+I001 [*] Import block is un-sorted or un-formatted
+  --> lines_between_types.py:1:1
    |
  1 | / from __future__ import annotations
  2 | |
@@ -19,9 +20,9 @@ lines_between_types.py:1:1: I001 [*] Import block is un-sorted or un-formatted
 14 | |
 15 | | from . import config
 16 | | from .data import Data
-   | |______________________^ I001
+   | |______________________^
    |
-   = help: Organize imports
+help: Organize imports
 
 ℹ Safe fix
 9  9  | import requests

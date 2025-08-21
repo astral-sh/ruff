@@ -15,10 +15,12 @@ license.workspace = true
 ruff_cache = { workspace = true }
 ruff_db = { workspace = true, features = ["cache", "serde"] }
 ruff_macros = { workspace = true }
+ruff_memory_usage = { workspace = true }
 ruff_options_metadata = { workspace = true }
 ruff_python_ast = { workspace = true, features = ["serde"] }
 ruff_python_formatter = { workspace = true, optional = true }
 ruff_text_size = { workspace = true }
+ty_combine = { workspace = true }
 ty_python_semantic = { workspace = true, features = ["serde"] }
 ty_vendored = { workspace = true }
 

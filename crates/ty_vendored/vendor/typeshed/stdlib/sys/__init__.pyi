@@ -289,6 +289,18 @@ class _flags(_UninstantiableStructseq, tuple[int, ...]):
         @property
         def safe_path(self) -> bool:
             """-P"""
+    if sys.version_info >= (3, 13):
+        @property
+        def gil(self) -> Literal[0, 1]:
+            """-X gil"""
+    if sys.version_info >= (3, 14):
+        @property
+        def thread_inherit_context(self) -> Literal[0, 1]:
+            """-X thread_inherit_context"""
+
+        @property
+        def context_aware_warnings(self) -> Literal[0, 1]:
+            """-X context_aware_warnings"""
     # Whether or not this exists on lower versions of Python
     # may depend on which patch release you're using
     # (it was backported to all Python versions on 3.8+ as a security fix)
@@ -688,6 +700,7 @@ def settrace(function: TraceFunction | None, /) -> None:
 if sys.platform == "win32":
     # A tuple of length 5, even though it has more than 5 attributes.
     @final
+    @type_check_only
     class _WinVersion(_UninstantiableStructseq, tuple[int, int, int, int, str]):
         @property
         def major(self) -> int: ...

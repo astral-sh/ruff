@@ -15,10 +15,13 @@ use std::{collections::HashMap, slice::Iter};
 use itertools::EitherOrBoth;
 use smallvec::{SmallVec, smallvec_inline};
 
-use super::{DynamicType, Type, TypeTransformer, TypeVarVariance, definition_expression_type};
+use super::{DynamicType, Type, TypeVarVariance, definition_expression_type};
 use crate::semantic_index::definition::Definition;
 use crate::types::generics::{GenericContext, walk_generic_context};
-use crate::types::{KnownClass, TypeMapping, TypeRelation, TypeVarInstance, todo_type};
+use crate::types::{
+    BindingContext, BoundTypeVarInstance, KnownClass, NormalizedVisitor, TypeMapping, TypeRelation,
+    VarianceInferable, todo_type,
+};
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
 
@@ -64,7 +67,7 @@ impl<'db> CallableSignature<'db> {
     pub(crate) fn normalized_impl(
         &self,
         db: &'db dyn Db,
-        visitor: &mut TypeTransformer<'db>,
+        visitor: &NormalizedVisitor<'db>,
     ) -> Self {
         Self::from_overloads(
             self.overloads
@@ -88,16 +91,24 @@ impl<'db> CallableSignature<'db> {
     pub(crate) fn find_legacy_typevars(
         &self,
         db: &'db dyn Db,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+        binding_context: Option<Definition<'db>>,
+        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
     ) {
         for signature in &self.overloads {
-            signature.find_legacy_typevars(db, typevars);
+            signature.find_legacy_typevars(db, binding_context, typevars);
         }
     }
 
-    pub(crate) fn bind_self(&self) -> Self {
+    /// Binds the first (presumably `self`) parameter of this signature. If a `self_type` is
+    /// provided, we will replace any occurrences of `typing.Self` in the parameter and return
+    /// annotations with that type.
+    pub(crate) fn bind_self(&self, db: &'db dyn Db, self_type: Option<Type<'db>>) -> Self {
         Self {
-            overloads: self.overloads.iter().map(Signature::bind_self).collect(),
+            overloads: self
+                .overloads
+                .iter()
+                .map(|signature| signature.bind_self(db, self_type))
+                .collect(),
         }
     }
 
@@ -212,6 +223,16 @@ impl<'a, 'db> IntoIterator for &'a CallableSignature<'db> {
     }
 }
 
+impl<'db> VarianceInferable<'db> for &CallableSignature<'db> {
+    // TODO: possibly need to replace self
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+        self.overloads
+            .iter()
+            .map(|signature| signature.variance_of(db, typevar))
+            .collect()
+    }
+}
+
 /// The signature of one of the overloads of a callable.
 #[derive(Clone, Debug, salsa::Update, get_size2::GetSize)]
 pub struct Signature<'db> {
@@ -244,7 +265,7 @@ pub struct Signature<'db> {
 pub(super) fn walk_signature<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     signature: &Signature<'db>,
-    visitor: &mut V,
+    visitor: &V,
 ) {
     if let Some(generic_context) = &signature.generic_context {
         walk_generic_context(db, *generic_context, visitor);
@@ -325,8 +346,11 @@ impl<'db> Signature<'db> {
         let parameters =
             Parameters::from_parameters(db, definition, function_node.parameters.as_ref());
         let return_ty = function_node.returns.as_ref().map(|returns| {
-            let plain_return_ty = definition_expression_type(db, definition, returns.as_ref());
-
+            let plain_return_ty = definition_expression_type(db, definition, returns.as_ref())
+                .apply_type_mapping(
+                    db,
+                    &TypeMapping::MarkTypeVarsInferable(BindingContext::Definition(definition)),
+                );
             if function_node.is_async && !is_generator {
                 KnownClass::CoroutineType
                     .to_specialized_instance(db, [Type::any(), Type::any(), plain_return_ty])
@@ -386,7 +410,7 @@ impl<'db> Signature<'db> {
     pub(crate) fn normalized_impl(
         &self,
         db: &'db dyn Db,
-        visitor: &mut TypeTransformer<'db>,
+        visitor: &NormalizedVisitor<'db>,
     ) -> Self {
         Self {
             generic_context: self
@@ -428,18 +452,19 @@ impl<'db> Signature<'db> {
     pub(crate) fn find_legacy_typevars(
         &self,
         db: &'db dyn Db,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+        binding_context: Option<Definition<'db>>,
+        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
     ) {
         for param in &self.parameters {
             if let Some(ty) = param.annotated_type() {
-                ty.find_legacy_typevars(db, typevars);
+                ty.find_legacy_typevars(db, binding_context, typevars);
             }
             if let Some(ty) = param.default_type() {
-                ty.find_legacy_typevars(db, typevars);
+                ty.find_legacy_typevars(db, binding_context, typevars);
             }
         }
         if let Some(ty) = self.return_ty {
-            ty.find_legacy_typevars(db, typevars);
+            ty.find_legacy_typevars(db, binding_context, typevars);
         }
     }
 
@@ -453,13 +478,20 @@ impl<'db> Signature<'db> {
         self.definition
     }
 
-    pub(crate) fn bind_self(&self) -> Self {
+    pub(crate) fn bind_self(&self, db: &'db dyn Db, self_type: Option<Type<'db>>) -> Self {
+        let mut parameters = Parameters::new(self.parameters().iter().skip(1).cloned());
+        let mut return_ty = self.return_ty;
+        if let Some(self_type) = self_type {
+            parameters = parameters.apply_type_mapping(db, &TypeMapping::BindSelf(self_type));
+            return_ty =
+                return_ty.map(|ty| ty.apply_type_mapping(db, &TypeMapping::BindSelf(self_type)));
+        }
         Self {
             generic_context: self.generic_context,
             inherited_generic_context: self.inherited_generic_context,
             definition: self.definition,
-            parameters: Parameters::new(self.parameters().iter().skip(1).cloned()),
-            return_ty: self.return_ty,
+            parameters,
+            return_ty,
         }
     }
 
@@ -960,6 +992,28 @@ impl std::hash::Hash for Signature<'_> {
     }
 }
 
+impl<'db> VarianceInferable<'db> for &Signature<'db> {
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+        tracing::debug!(
+            "Checking variance of `{tvar}` in `{self:?}`",
+            tvar = typevar.typevar(db).name(db)
+        );
+        itertools::chain(
+            self.parameters
+                .iter()
+                .filter_map(|parameter| match parameter.form {
+                    ParameterForm::Type => None,
+                    ParameterForm::Value => parameter.annotated_type().map(|ty| {
+                        ty.with_polarity(TypeVarVariance::Contravariant)
+                            .variance_of(db, typevar)
+                    }),
+                }),
+            self.return_ty.map(|ty| ty.variance_of(db, typevar)),
+        )
+        .collect()
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub(crate) struct Parameters<'db> {
     // TODO: use SmallVec here once invariance bug is fixed
@@ -1183,7 +1237,7 @@ impl<'db> Parameters<'db> {
         self.value.len()
     }
 
-    pub(crate) fn iter(&self) -> std::slice::Iter<Parameter<'db>> {
+    pub(crate) fn iter(&self) -> std::slice::Iter<'_, Parameter<'db>> {
         self.value.iter()
     }
 
@@ -1369,7 +1423,7 @@ impl<'db> Parameter<'db> {
     pub(crate) fn normalized_impl(
         &self,
         db: &'db dyn Db,
-        visitor: &mut TypeTransformer<'db>,
+        visitor: &NormalizedVisitor<'db>,
     ) -> Self {
         let Parameter {
             annotated_type,
@@ -1428,9 +1482,12 @@ impl<'db> Parameter<'db> {
         kind: ParameterKind<'db>,
     ) -> Self {
         Self {
-            annotated_type: parameter
-                .annotation()
-                .map(|annotation| definition_expression_type(db, definition, annotation)),
+            annotated_type: parameter.annotation().map(|annotation| {
+                definition_expression_type(db, definition, annotation).apply_type_mapping(
+                    db,
+                    &TypeMapping::MarkTypeVarsInferable(BindingContext::Definition(definition)),
+                )
+            }),
             kind,
             form: ParameterForm::Value,
         }
@@ -1793,11 +1850,7 @@ mod tests {
         };
         assert_eq!(a_name, "a");
         assert_eq!(b_name, "b");
-        // TODO resolution should not be deferred; we should see A, not A | B
-        assert_eq!(
-            a_annotated_ty.unwrap().display(&db).to_string(),
-            "Unknown | A | B"
-        );
+        assert_eq!(a_annotated_ty.unwrap().display(&db).to_string(), "A");
         assert_eq!(b_annotated_ty.unwrap().display(&db).to_string(), "T@f");
     }
 

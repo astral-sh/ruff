@@ -1,15 +1,16 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF059_2.py:8:20: RUF059 [*] Unpacked variable `x2` is never used
+RUF059 [*] Unpacked variable `x2` is never used
+ --> RUF059_2.py:8:20
   |
 6 |         pass
 7 |
 8 |     with foo() as (x2, y2):
-  |                    ^^ RUF059
+  |                    ^^
 9 |         pass
   |
-  = help: Prefix it with an underscore or any other dummy variable pattern
+help: Prefix it with an underscore or any other dummy variable pattern
 
 ℹ Unsafe fix
 5 5 |     with foo() as x1:
@@ -21,15 +22,16 @@ RUF059_2.py:8:20: RUF059 [*] Unpacked variable `x2` is never used
 10 10 | 
 11 11 |     with (foo() as x3, foo() as y3, foo() as z3):
 
-RUF059_2.py:8:24: RUF059 [*] Unpacked variable `y2` is never used
+RUF059 [*] Unpacked variable `y2` is never used
+ --> RUF059_2.py:8:24
   |
 6 |         pass
 7 |
 8 |     with foo() as (x2, y2):
-  |                        ^^ RUF059
+  |                        ^^
 9 |         pass
   |
-  = help: Prefix it with an underscore or any other dummy variable pattern
+help: Prefix it with an underscore or any other dummy variable pattern
 
 ℹ Unsafe fix
 5 5 |     with foo() as x1:
@@ -41,15 +43,16 @@ RUF059_2.py:8:24: RUF059 [*] Unpacked variable `y2` is never used
 10 10 | 
 11 11 |     with (foo() as x3, foo() as y3, foo() as z3):
 
-RUF059_2.py:17:6: RUF059 [*] Unpacked variable `x2` is never used
+RUF059 [*] Unpacked variable `x2` is never used
+  --> RUF059_2.py:17:6
    |
 15 | def f():
 16 |     (x1, y1) = (1, 2)
 17 |     (x2, y2) = coords2 = (1, 2)
-   |      ^^ RUF059
+   |      ^^
 18 |     coords3 = (x3, y3) = (1, 2)
    |
-   = help: Prefix it with an underscore or any other dummy variable pattern
+help: Prefix it with an underscore or any other dummy variable pattern
 
 ℹ Unsafe fix
 14 14 | 
@@ -61,15 +64,16 @@ RUF059_2.py:17:6: RUF059 [*] Unpacked variable `x2` is never used
 19 19 | 
 20 20 | 
 
-RUF059_2.py:17:10: RUF059 [*] Unpacked variable `y2` is never used
+RUF059 [*] Unpacked variable `y2` is never used
+  --> RUF059_2.py:17:10
    |
 15 | def f():
 16 |     (x1, y1) = (1, 2)
 17 |     (x2, y2) = coords2 = (1, 2)
-   |          ^^ RUF059
+   |          ^^
 18 |     coords3 = (x3, y3) = (1, 2)
    |
-   = help: Prefix it with an underscore or any other dummy variable pattern
+help: Prefix it with an underscore or any other dummy variable pattern
 
 ℹ Unsafe fix
 14 14 | 
@@ -81,14 +85,15 @@ RUF059_2.py:17:10: RUF059 [*] Unpacked variable `y2` is never used
 19 19 | 
 20 20 | 
 
-RUF059_2.py:18:16: RUF059 [*] Unpacked variable `x3` is never used
+RUF059 [*] Unpacked variable `x3` is never used
+  --> RUF059_2.py:18:16
    |
 16 |     (x1, y1) = (1, 2)
 17 |     (x2, y2) = coords2 = (1, 2)
 18 |     coords3 = (x3, y3) = (1, 2)
-   |                ^^ RUF059
+   |                ^^
    |
-   = help: Prefix it with an underscore or any other dummy variable pattern
+help: Prefix it with an underscore or any other dummy variable pattern
 
 ℹ Unsafe fix
 15 15 | def f():
@@ -100,14 +105,15 @@ RUF059_2.py:18:16: RUF059 [*] Unpacked variable `x3` is never used
 20 20 | 
 21 21 | def f():
 
-RUF059_2.py:18:20: RUF059 [*] Unpacked variable `y3` is never used
+RUF059 [*] Unpacked variable `y3` is never used
+  --> RUF059_2.py:18:20
    |
 16 |     (x1, y1) = (1, 2)
 17 |     (x2, y2) = coords2 = (1, 2)
 18 |     coords3 = (x3, y3) = (1, 2)
-   |                    ^^ RUF059
+   |                    ^^
    |
-   = help: Prefix it with an underscore or any other dummy variable pattern
+help: Prefix it with an underscore or any other dummy variable pattern
 
 ℹ Unsafe fix
 15 15 | def f():
@@ -119,14 +125,15 @@ RUF059_2.py:18:20: RUF059 [*] Unpacked variable `y3` is never used
 20 20 | 
 21 21 | def f():
 
-RUF059_2.py:22:24: RUF059 [*] Unpacked variable `x` is never used
+RUF059 [*] Unpacked variable `x` is never used
+  --> RUF059_2.py:22:24
    |
 21 | def f():
 22 |     with Nested(m) as (x, y):
-   |                        ^ RUF059
+   |                        ^
 23 |         pass
    |
-   = help: Prefix it with an underscore or any other dummy variable pattern
+help: Prefix it with an underscore or any other dummy variable pattern
 
 ℹ Unsafe fix
 19 19 | 
@@ -138,14 +145,15 @@ RUF059_2.py:22:24: RUF059 [*] Unpacked variable `x` is never used
 24 24 | 
 25 25 | 
 
-RUF059_2.py:22:27: RUF059 [*] Unpacked variable `y` is never used
+RUF059 [*] Unpacked variable `y` is never used
+  --> RUF059_2.py:22:27
    |
 21 | def f():
 22 |     with Nested(m) as (x, y):
-   |                           ^ RUF059
+   |                           ^
 23 |         pass
    |
-   = help: Prefix it with an underscore or any other dummy variable pattern
+help: Prefix it with an underscore or any other dummy variable pattern
 
 ℹ Unsafe fix
 19 19 | 
@@ -157,13 +165,14 @@ RUF059_2.py:22:27: RUF059 [*] Unpacked variable `y` is never used
 24 24 | 
 25 25 | 
 
-RUF059_2.py:27:17: RUF059 [*] Unpacked variable `a` is never used
+RUF059 [*] Unpacked variable `a` is never used
+  --> RUF059_2.py:27:17
    |
 26 | def f():
 27 |     toplevel = (a, b) = lexer.get_token()
-   |                 ^ RUF059
+   |                 ^
    |
-   = help: Prefix it with an underscore or any other dummy variable pattern
+help: Prefix it with an underscore or any other dummy variable pattern
 
 ℹ Unsafe fix
 24 24 | 
@@ -175,13 +184,14 @@ RUF059_2.py:27:17: RUF059 [*] Unpacked variable `a` is never used
 29 29 | 
 30 30 | def f():
 
-RUF059_2.py:27:20: RUF059 [*] Unpacked variable `b` is never used
+RUF059 [*] Unpacked variable `b` is never used
+  --> RUF059_2.py:27:20
    |
 26 | def f():
 27 |     toplevel = (a, b) = lexer.get_token()
-   |                    ^ RUF059
+   |                    ^
    |
-   = help: Prefix it with an underscore or any other dummy variable pattern
+help: Prefix it with an underscore or any other dummy variable pattern
 
 ℹ Unsafe fix
 24 24 | 
@@ -193,13 +203,14 @@ RUF059_2.py:27:20: RUF059 [*] Unpacked variable `b` is never used
 29 29 | 
 30 30 | def f():
 
-RUF059_2.py:31:6: RUF059 [*] Unpacked variable `a` is never used
+RUF059 [*] Unpacked variable `a` is never used
+  --> RUF059_2.py:31:6
    |
 30 | def f():
 31 |     (a, b) = toplevel = lexer.get_token()
-   |      ^ RUF059
+   |      ^
    |
-   = help: Prefix it with an underscore or any other dummy variable pattern
+help: Prefix it with an underscore or any other dummy variable pattern
 
 ℹ Unsafe fix
 28 28 | 
@@ -208,13 +219,14 @@ RUF059_2.py:31:6: RUF059 [*] Unpacked variable `a` is never used
 31    |-    (a, b) = toplevel = lexer.get_token()
    31 |+    (_a, b) = toplevel = lexer.get_token()
 
-RUF059_2.py:31:9: RUF059 [*] Unpacked variable `b` is never used
+RUF059 [*] Unpacked variable `b` is never used
+  --> RUF059_2.py:31:9
    |
 30 | def f():
 31 |     (a, b) = toplevel = lexer.get_token()
-   |         ^ RUF059
+   |         ^
    |
-   = help: Prefix it with an underscore or any other dummy variable pattern
+help: Prefix it with an underscore or any other dummy variable pattern
 
 ℹ Unsafe fix
 28 28 | 

@@ -1,16 +1,17 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E26.py:4:12: E262 [*] Inline comment should start with `# `
+E262 [*] Inline comment should start with `# `
+ --> E26.py:4:12
   |
 2 | pass # an inline comment
 3 | #: E262:1:12
 4 | x = x + 1  #Increment x
-  |            ^^^^^^^^^^^^ E262
+  |            ^^^^^^^^^^^^
 5 | #: E262:1:12
 6 | x = x + 1  #  Increment x
   |
-  = help: Format space
+help: Format space
 
 ℹ Safe fix
 1 1 | #: E261:1:5
@@ -22,16 +23,17 @@ E26.py:4:12: E262 [*] Inline comment should start with `# `
 6 6 | x = x + 1  #  Increment x
 7 7 | #: E262:1:12
 
-E26.py:6:12: E262 [*] Inline comment should start with `# `
+E262 [*] Inline comment should start with `# `
+ --> E26.py:6:12
   |
 4 | x = x + 1  #Increment x
 5 | #: E262:1:12
 6 | x = x + 1  #  Increment x
-  |            ^^^^^^^^^^^^^^ E262
+  |            ^^^^^^^^^^^^^^
 7 | #: E262:1:12
 8 | x = y + 1  #:  Increment x
   |
-  = help: Format space
+help: Format space
 
 ℹ Safe fix
 3 3 | #: E262:1:12
@@ -43,16 +45,17 @@ E26.py:6:12: E262 [*] Inline comment should start with `# `
 8 8 | x = y + 1  #:  Increment x
 9 9 | #: E265:1:1
 
-E26.py:8:12: E262 [*] Inline comment should start with `# `
+E262 [*] Inline comment should start with `# `
+  --> E26.py:8:12
    |
  6 | x = x + 1  #  Increment x
  7 | #: E262:1:12
  8 | x = y + 1  #:  Increment x
-   |            ^^^^^^^^^^^^^^^ E262
+   |            ^^^^^^^^^^^^^^^
  9 | #: E265:1:1
 10 | #Block comment
    |
-   = help: Format space
+help: Format space
 
 ℹ Safe fix
 5 5 | #: E262:1:12
@@ -64,16 +67,17 @@ E26.py:8:12: E262 [*] Inline comment should start with `# `
 10 10 | #Block comment
 11 11 | a = 1
 
-E26.py:63:9: E262 [*] Inline comment should start with `# `
+E262 [*] Inline comment should start with `# `
+  --> E26.py:63:9
    |
 61 | # -*- coding: utf8 -*-
 62 | #  (One space one NBSP) Ok for block comment
 63 | a = 42  #  (One space one NBSP)
-   |         ^^^^^^^^^^^^^^^^^^^^^^^ E262
+   |         ^^^^^^^^^^^^^^^^^^^^^^^
 64 | #: E262:2:9
 65 | #  (Two spaces) Ok for block comment
    |
-   = help: Format space
+help: Format space
 
 ℹ Safe fix
 60 60 | #: E262:3:9
@@ -85,16 +89,17 @@ E26.py:63:9: E262 [*] Inline comment should start with `# `
 65 65 | #  (Two spaces) Ok for block comment
 66 66 | a = 42  #  (Two spaces)
 
-E26.py:66:9: E262 [*] Inline comment should start with `# `
+E262 [*] Inline comment should start with `# `
+  --> E26.py:66:9
    |
 64 | #: E262:2:9
 65 | #  (Two spaces) Ok for block comment
 66 | a = 42  #  (Two spaces)
-   |         ^^^^^^^^^^^^^^^ E262
+   |         ^^^^^^^^^^^^^^^
 67 |
 68 | #: E265:5:1
    |
-   = help: Format space
+help: Format space
 
 ℹ Safe fix
 63 63 | a = 42  #  (One space one NBSP)
@@ -106,16 +111,17 @@ E26.py:66:9: E262 [*] Inline comment should start with `# `
 68 68 | #: E265:5:1
 69 69 | ### Means test is not done yet
 
-E26.py:84:8: E262 [*] Inline comment should start with `# `
+E262 [*] Inline comment should start with `# `
+  --> E26.py:84:8
    |
 82 | ##  Foo
 83 |
 84 | a = 1  ## Foo
-   |        ^^^^^^ E262
+   |        ^^^^^^
 85 |
 86 | a = 1  #:Foo
    |
-   = help: Format space
+help: Format space
 
 ℹ Safe fix
 81 81 | #: E266:1:3
@@ -126,14 +132,15 @@ E26.py:84:8: E262 [*] Inline comment should start with `# `
 85 85 | 
 86 86 | a = 1  #:Foo
 
-E26.py:86:8: E262 [*] Inline comment should start with `# `
+E262 [*] Inline comment should start with `# `
+  --> E26.py:86:8
    |
 84 | a = 1  ## Foo
 85 |
 86 | a = 1  #:Foo
-   |        ^^^^^ E262
+   |        ^^^^^
    |
-   = help: Format space
+help: Format space
 
 ℹ Safe fix
 83 83 | 

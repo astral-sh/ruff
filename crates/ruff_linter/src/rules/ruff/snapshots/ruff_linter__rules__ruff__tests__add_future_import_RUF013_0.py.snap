@@ -1,13 +1,14 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF013_0.py:20:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
+RUF013 [*] PEP 484 prohibits implicit `Optional`
+  --> RUF013_0.py:20:12
    |
 20 | def f(arg: int = None):  # RUF013
-   |            ^^^ RUF013
+   |            ^^^
 21 |     pass
    |
-   = help: Convert to `T | None`
+help: Convert to `T | None`
 
 ℹ Unsafe fix
    1  |+from __future__ import annotations
@@ -24,13 +25,14 @@ RUF013_0.py:20:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
 22 23 | 
 23 24 | 
 
-RUF013_0.py:24:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
+RUF013 [*] PEP 484 prohibits implicit `Optional`
+  --> RUF013_0.py:24:12
    |
 24 | def f(arg: str = None):  # RUF013
-   |            ^^^ RUF013
+   |            ^^^
 25 |     pass
    |
-   = help: Convert to `T | None`
+help: Convert to `T | None`
 
 ℹ Unsafe fix
    1  |+from __future__ import annotations
@@ -47,13 +49,14 @@ RUF013_0.py:24:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
 26 27 | 
 27 28 | 
 
-RUF013_0.py:28:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
+RUF013 [*] PEP 484 prohibits implicit `Optional`
+  --> RUF013_0.py:28:12
    |
 28 | def f(arg: Tuple[str] = None):  # RUF013
-   |            ^^^^^^^^^^ RUF013
+   |            ^^^^^^^^^^
 29 |     pass
    |
-   = help: Convert to `T | None`
+help: Convert to `T | None`
 
 ℹ Unsafe fix
    1  |+from __future__ import annotations
@@ -70,13 +73,14 @@ RUF013_0.py:28:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
 30 31 | 
 31 32 | 
 
-RUF013_0.py:58:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
+RUF013 [*] PEP 484 prohibits implicit `Optional`
+  --> RUF013_0.py:58:12
    |
 58 | def f(arg: Union = None):  # RUF013
-   |            ^^^^^ RUF013
+   |            ^^^^^
 59 |     pass
    |
-   = help: Convert to `T | None`
+help: Convert to `T | None`
 
 ℹ Unsafe fix
    1  |+from __future__ import annotations
@@ -93,13 +97,14 @@ RUF013_0.py:58:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
 60 61 | 
 61 62 | 
 
-RUF013_0.py:62:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
+RUF013 [*] PEP 484 prohibits implicit `Optional`
+  --> RUF013_0.py:62:12
    |
 62 | def f(arg: Union[int] = None):  # RUF013
-   |            ^^^^^^^^^^ RUF013
+   |            ^^^^^^^^^^
 63 |     pass
    |
-   = help: Convert to `T | None`
+help: Convert to `T | None`
 
 ℹ Unsafe fix
    1  |+from __future__ import annotations
@@ -116,13 +121,14 @@ RUF013_0.py:62:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
 64 65 | 
 65 66 | 
 
-RUF013_0.py:66:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
+RUF013 [*] PEP 484 prohibits implicit `Optional`
+  --> RUF013_0.py:66:12
    |
 66 | def f(arg: Union[int, str] = None):  # RUF013
-   |            ^^^^^^^^^^^^^^^ RUF013
+   |            ^^^^^^^^^^^^^^^
 67 |     pass
    |
-   = help: Convert to `T | None`
+help: Convert to `T | None`
 
 ℹ Unsafe fix
    1  |+from __future__ import annotations
@@ -139,13 +145,14 @@ RUF013_0.py:66:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
 68 69 | 
 69 70 | 
 
-RUF013_0.py:85:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
+RUF013 [*] PEP 484 prohibits implicit `Optional`
+  --> RUF013_0.py:85:12
    |
 85 | def f(arg: int | float = None):  # RUF013
-   |            ^^^^^^^^^^^ RUF013
+   |            ^^^^^^^^^^^
 86 |     pass
    |
-   = help: Convert to `T | None`
+help: Convert to `T | None`
 
 ℹ Unsafe fix
    1  |+from __future__ import annotations
@@ -162,13 +169,14 @@ RUF013_0.py:85:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
 87 88 | 
 88 89 | 
 
-RUF013_0.py:89:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
+RUF013 [*] PEP 484 prohibits implicit `Optional`
+  --> RUF013_0.py:89:12
    |
 89 | def f(arg: int | float | str | bytes = None):  # RUF013
-   |            ^^^^^^^^^^^^^^^^^^^^^^^^^ RUF013
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^
 90 |     pass
    |
-   = help: Convert to `T | None`
+help: Convert to `T | None`
 
 ℹ Unsafe fix
    1  |+from __future__ import annotations
@@ -185,13 +193,14 @@ RUF013_0.py:89:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
 91 92 | 
 92 93 | 
 
-RUF013_0.py:108:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
+RUF013 [*] PEP 484 prohibits implicit `Optional`
+   --> RUF013_0.py:108:12
     |
 108 | def f(arg: Literal[1] = None):  # RUF013
-    |            ^^^^^^^^^^ RUF013
+    |            ^^^^^^^^^^
 109 |     pass
     |
-    = help: Convert to `T | None`
+help: Convert to `T | None`
 
 ℹ Unsafe fix
     1   |+from __future__ import annotations
@@ -208,13 +217,14 @@ RUF013_0.py:108:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
 110 111 | 
 111 112 | 
 
-RUF013_0.py:112:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
+RUF013 [*] PEP 484 prohibits implicit `Optional`
+   --> RUF013_0.py:112:12
     |
 112 | def f(arg: Literal[1, "foo"] = None):  # RUF013
-    |            ^^^^^^^^^^^^^^^^^ RUF013
+    |            ^^^^^^^^^^^^^^^^^
 113 |     pass
     |
-    = help: Convert to `T | None`
+help: Convert to `T | None`
 
 ℹ Unsafe fix
     1   |+from __future__ import annotations
@@ -231,13 +241,14 @@ RUF013_0.py:112:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
 114 115 | 
 115 116 | 
 
-RUF013_0.py:131:22: RUF013 [*] PEP 484 prohibits implicit `Optional`
+RUF013 [*] PEP 484 prohibits implicit `Optional`
+   --> RUF013_0.py:131:22
     |
 131 | def f(arg: Annotated[int, ...] = None):  # RUF013
-    |                      ^^^ RUF013
+    |                      ^^^
 132 |     pass
     |
-    = help: Convert to `T | None`
+help: Convert to `T | None`
 
 ℹ Unsafe fix
     1   |+from __future__ import annotations
@@ -254,13 +265,14 @@ RUF013_0.py:131:22: RUF013 [*] PEP 484 prohibits implicit `Optional`
 133 134 | 
 134 135 | 
 
-RUF013_0.py:135:32: RUF013 [*] PEP 484 prohibits implicit `Optional`
+RUF013 [*] PEP 484 prohibits implicit `Optional`
+   --> RUF013_0.py:135:32
     |
 135 | def f(arg: Annotated[Annotated[int | str, ...], ...] = None):  # RUF013
-    |                                ^^^^^^^^^ RUF013
+    |                                ^^^^^^^^^
 136 |     pass
     |
-    = help: Convert to `T | None`
+help: Convert to `T | None`
 
 ℹ Unsafe fix
     1   |+from __future__ import annotations
@@ -277,15 +289,16 @@ RUF013_0.py:135:32: RUF013 [*] PEP 484 prohibits implicit `Optional`
 137 138 | 
 138 139 | 
 
-RUF013_0.py:151:11: RUF013 [*] PEP 484 prohibits implicit `Optional`
+RUF013 [*] PEP 484 prohibits implicit `Optional`
+   --> RUF013_0.py:151:11
     |
 150 | def f(
 151 |     arg1: int = None,  # RUF013
-    |           ^^^ RUF013
+    |           ^^^
 152 |     arg2: Union[int, float] = None,  # RUF013
 153 |     arg3: Literal[1, 2, 3] = None,  # RUF013
     |
-    = help: Convert to `T | None`
+help: Convert to `T | None`
 
 ℹ Unsafe fix
     1   |+from __future__ import annotations
@@ -302,16 +315,17 @@ RUF013_0.py:151:11: RUF013 [*] PEP 484 prohibits implicit `Optional`
 153 154 |     arg3: Literal[1, 2, 3] = None,  # RUF013
 154 155 | ):
 
-RUF013_0.py:152:11: RUF013 [*] PEP 484 prohibits implicit `Optional`
+RUF013 [*] PEP 484 prohibits implicit `Optional`
+   --> RUF013_0.py:152:11
     |
 150 | def f(
 151 |     arg1: int = None,  # RUF013
 152 |     arg2: Union[int, float] = None,  # RUF013
-    |           ^^^^^^^^^^^^^^^^^ RUF013
+    |           ^^^^^^^^^^^^^^^^^
 153 |     arg3: Literal[1, 2, 3] = None,  # RUF013
 154 | ):
     |
-    = help: Convert to `T | None`
+help: Convert to `T | None`
 
 ℹ Unsafe fix
     1   |+from __future__ import annotations
@@ -328,16 +342,17 @@ RUF013_0.py:152:11: RUF013 [*] PEP 484 prohibits implicit `Optional`
 154 155 | ):
 155 156 |     pass
 
-RUF013_0.py:153:11: RUF013 [*] PEP 484 prohibits implicit `Optional`
+RUF013 [*] PEP 484 prohibits implicit `Optional`
+   --> RUF013_0.py:153:11
     |
 151 |     arg1: int = None,  # RUF013
 152 |     arg2: Union[int, float] = None,  # RUF013
 153 |     arg3: Literal[1, 2, 3] = None,  # RUF013
-    |           ^^^^^^^^^^^^^^^^ RUF013
+    |           ^^^^^^^^^^^^^^^^
 154 | ):
 155 |     pass
     |
-    = help: Convert to `T | None`
+help: Convert to `T | None`
 
 ℹ Unsafe fix
     1   |+from __future__ import annotations
@@ -354,13 +369,14 @@ RUF013_0.py:153:11: RUF013 [*] PEP 484 prohibits implicit `Optional`
 155 156 |     pass
 156 157 | 
 
-RUF013_0.py:181:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
+RUF013 [*] PEP 484 prohibits implicit `Optional`
+   --> RUF013_0.py:181:12
     |
 181 | def f(arg: Union[Annotated[int, ...], Union[str, bytes]] = None):  # RUF013
-    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF013
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 182 |     pass
     |
-    = help: Convert to `T | None`
+help: Convert to `T | None`
 
 ℹ Unsafe fix
     1   |+from __future__ import annotations
@@ -377,13 +393,14 @@ RUF013_0.py:181:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
 183 184 | 
 184 185 | 
 
-RUF013_0.py:188:13: RUF013 [*] PEP 484 prohibits implicit `Optional`
+RUF013 [*] PEP 484 prohibits implicit `Optional`
+   --> RUF013_0.py:188:13
     |
 188 | def f(arg: "int" = None):  # RUF013
-    |             ^^^ RUF013
+    |             ^^^
 189 |     pass
     |
-    = help: Convert to `Optional[T]`
+help: Convert to `Optional[T]`
 
 ℹ Unsafe fix
 185 185 | # Quoted
@@ -395,13 +412,14 @@ RUF013_0.py:188:13: RUF013 [*] PEP 484 prohibits implicit `Optional`
 190 190 | 
 191 191 | 
 
-RUF013_0.py:192:13: RUF013 [*] PEP 484 prohibits implicit `Optional`
+RUF013 [*] PEP 484 prohibits implicit `Optional`
+   --> RUF013_0.py:192:13
     |
 192 | def f(arg: "str" = None):  # RUF013
-    |             ^^^ RUF013
+    |             ^^^
 193 |     pass
     |
-    = help: Convert to `Optional[T]`
+help: Convert to `Optional[T]`
 
 ℹ Unsafe fix
 189 189 |     pass
@@ -413,21 +431,23 @@ RUF013_0.py:192:13: RUF013 [*] PEP 484 prohibits implicit `Optional`
 194 194 | 
 195 195 | 
 
-RUF013_0.py:196:12: RUF013 PEP 484 prohibits implicit `Optional`
+RUF013 PEP 484 prohibits implicit `Optional`
+   --> RUF013_0.py:196:12
     |
 196 | def f(arg: "st" "r" = None):  # RUF013
-    |            ^^^^^^^^ RUF013
+    |            ^^^^^^^^
 197 |     pass
     |
-    = help: Convert to `Optional[T]`
+help: Convert to `Optional[T]`
 
-RUF013_0.py:204:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
+RUF013 [*] PEP 484 prohibits implicit `Optional`
+   --> RUF013_0.py:204:12
     |
 204 | def f(arg: Union["int", "str"] = None):  # RUF013
-    |            ^^^^^^^^^^^^^^^^^^^ RUF013
+    |            ^^^^^^^^^^^^^^^^^^^
 205 |     pass
     |
-    = help: Convert to `T | None`
+help: Convert to `T | None`
 
 ℹ Unsafe fix
     1   |+from __future__ import annotations

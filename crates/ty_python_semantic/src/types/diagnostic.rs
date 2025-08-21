@@ -6,20 +6,26 @@ use super::{
     add_inferred_python_version_hint_to_diagnostic,
 };
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
+use crate::semantic_index::SemanticIndex;
+use crate::semantic_index::definition::Definition;
+use crate::semantic_index::place::{PlaceTable, ScopedPlaceId};
 use crate::suppression::FileSuppressionId;
-use crate::types::LintDiagnosticGuard;
-use crate::types::class::{SolidBase, SolidBaseKind};
+use crate::types::class::{Field, SolidBase, SolidBaseKind};
 use crate::types::function::KnownFunction;
 use crate::types::string_annotation::{
     BYTE_STRING_TYPE_ANNOTATION, ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION, FSTRING_TYPE_ANNOTATION,
     IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION, INVALID_SYNTAX_IN_FORWARD_ANNOTATION,
     RAW_STRING_TYPE_ANNOTATION,
 };
+use crate::types::{
+    DynamicType, LintDiagnosticGuard, Protocol, ProtocolInstanceType, SubclassOfInner, binding_type,
+};
 use crate::types::{SpecialFormType, Type, protocol_class::ProtocolClassLiteral};
 use crate::util::diagnostics::format_enumeration;
-use crate::{Db, FxIndexMap, Module, ModuleName, Program, declare_lint};
+use crate::{Db, FxIndexMap, FxOrderMap, Module, ModuleName, Program, declare_lint};
 use itertools::Itertools;
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
+use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
@@ -27,6 +33,7 @@ use std::fmt::Formatter;
 
 /// Registers all known type check lints.
 pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
+    registry.register_lint(&AMBIGUOUS_PROTOCOL_MEMBER);
     registry.register_lint(&CALL_NON_CALLABLE);
     registry.register_lint(&POSSIBLY_UNBOUND_IMPLICIT_CALL);
     registry.register_lint(&CONFLICTING_ARGUMENT_FORMS);
@@ -40,9 +47,11 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INSTANCE_LAYOUT_CONFLICT);
     registry.register_lint(&INCONSISTENT_MRO);
     registry.register_lint(&INDEX_OUT_OF_BOUNDS);
+    registry.register_lint(&INVALID_KEY);
     registry.register_lint(&INVALID_ARGUMENT_TYPE);
     registry.register_lint(&INVALID_RETURN_TYPE);
     registry.register_lint(&INVALID_ASSIGNMENT);
+    registry.register_lint(&INVALID_AWAIT);
     registry.register_lint(&INVALID_BASE);
     registry.register_lint(&INVALID_CONTEXT_MANAGER);
     registry.register_lint(&INVALID_DECLARATION);
@@ -54,6 +63,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_OVERLOAD);
     registry.register_lint(&INVALID_PARAMETER_DEFAULT);
     registry.register_lint(&INVALID_PROTOCOL);
+    registry.register_lint(&INVALID_NAMED_TUPLE);
     registry.register_lint(&INVALID_RAISE);
     registry.register_lint(&INVALID_SUPER_ARGUMENT);
     registry.register_lint(&INVALID_TYPE_CHECKING_CONSTANT);
@@ -419,7 +429,7 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks for invalidly defined protocol classes.
+    /// Checks for protocol classes that will raise `TypeError` at runtime.
     ///
     /// ## Why is this bad?
     /// An invalidly defined protocol class may lead to the type checker inferring
@@ -440,6 +450,67 @@ declare_lint! {
     /// ```
     pub(crate) static INVALID_PROTOCOL = {
         summary: "detects invalid protocol class definitions",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for protocol classes with members that will lead to ambiguous interfaces.
+    ///
+    /// ## Why is this bad?
+    /// Assigning to an undeclared variable in a protocol class leads to an ambiguous
+    /// interface which may lead to the type checker inferring unexpected things. It's
+    /// recommended to ensure that all members of a protocol class are explicitly declared.
+    ///
+    /// ## Examples
+    ///
+    /// ```py
+    /// from typing import Protocol
+    ///
+    /// class BaseProto(Protocol):
+    ///     a: int                               # fine (explicitly declared as `int`)
+    ///     def method_member(self) -> int: ...  # fine: a method definition using `def` is considered a declaration
+    ///     c = "some variable"                  # error: no explicit declaration, leading to ambiguity
+    ///     b = method_member                    # error: no explicit declaration, leading to ambiguity
+    ///
+    ///     # error: this creates implicit assignments of `d` and `e` in the protocol class body.
+    ///     # Were they really meant to be considered protocol members?
+    ///     for d, e in enumerate(range(42)):
+    ///         pass
+    ///
+    /// class SubProto(BaseProto, Protocol):
+    ///     a = 42  # fine (declared in superclass)
+    /// ```
+    pub(crate) static AMBIGUOUS_PROTOCOL_MEMBER = {
+        summary: "detects protocol classes with ambiguous interfaces",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for invalidly defined `NamedTuple` classes.
+    ///
+    /// ## Why is this bad?
+    /// An invalidly defined `NamedTuple` class may lead to the type checker
+    /// drawing incorrect conclusions. It may also lead to `TypeError`s at runtime.
+    ///
+    /// ## Examples
+    /// A class definition cannot combine `NamedTuple` with other base classes
+    /// in multiple inheritance; doing so raises a `TypeError` at runtime. The sole
+    /// exception to this rule is `Generic[]`, which can be used alongside `NamedTuple`
+    /// in a class's bases list.
+    ///
+    /// ```pycon
+    /// >>> from typing import NamedTuple
+    /// >>> class Foo(NamedTuple, object): ...
+    /// TypeError: can only inherit from a NamedTuple type and Generic
+    /// ```
+    pub(crate) static INVALID_NAMED_TUPLE = {
+        summary: "detects invalid `NamedTuple` class definitions",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
@@ -484,6 +555,31 @@ declare_lint! {
     /// ```
     pub(crate) static INDEX_OUT_OF_BOUNDS = {
         summary: "detects index out of bounds errors",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for subscript accesses with invalid keys.
+    ///
+    /// ## Why is this bad?
+    /// Using an invalid key will raise a `KeyError` at runtime.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from typing import TypedDict
+    ///
+    /// class Person(TypedDict):
+    ///     name: str
+    ///     age: int
+    ///
+    /// alice = Person(name="Alice", age=30)
+    /// alice["height"]  # KeyError: 'height'
+    /// ```
+    pub(crate) static INVALID_KEY = {
+        summary: "detects invalid subscript accesses",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
@@ -546,6 +642,36 @@ declare_lint! {
     /// [assignable to]: https://typing.python.org/en/latest/spec/glossary.html#term-assignable
     pub(crate) static INVALID_ASSIGNMENT = {
         summary: "detects invalid assignments",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for `await` being used with types that are not [Awaitable].
+    ///
+    /// ## Why is this bad?
+    /// Such expressions will lead to `TypeError` being raised at runtime.
+    ///
+    /// ## Examples
+    /// ```python
+    /// import asyncio
+    ///
+    /// class InvalidAwait:
+    ///     def __await__(self) -> int:
+    ///         return 5
+    ///
+    /// async def main() -> None:
+    ///     await InvalidAwait()  # error: [invalid-await]
+    ///     await 42  # error: [invalid-await]
+    ///
+    /// asyncio.run(main())
+    /// ```
+    ///
+    /// [Awaitable]: https://docs.python.org/3/library/collections.abc.html#collections.abc.Awaitable
+    pub(crate) static INVALID_AWAIT = {
+        summary: "detects awaiting on types that don't support it",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
@@ -651,7 +777,7 @@ declare_lint! {
     /// Checks for exception handlers that catch non-exception classes.
     ///
     /// ## Why is this bad?
-    /// Catching classes that do not inherit from `BaseException` will raise a TypeError at runtime.
+    /// Catching classes that do not inherit from `BaseException` will raise a `TypeError` at runtime.
     ///
     /// ## Example
     /// ```python
@@ -2370,6 +2496,95 @@ pub(crate) fn report_attempted_protocol_instantiation(
     diagnostic.sub(class_def_diagnostic);
 }
 
+pub(crate) fn report_undeclared_protocol_member(
+    context: &InferContext,
+    definition: Definition,
+    protocol_class: ProtocolClassLiteral,
+    class_symbol_table: &PlaceTable,
+) {
+    /// We want to avoid suggesting an annotation for e.g. `x = None`,
+    /// because the user almost certainly doesn't want to write `x: None = None`.
+    /// We also want to avoid suggesting invalid syntax such as `x: <class 'int'> = int`.
+    fn should_give_hint<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+        let class = match ty {
+            Type::ProtocolInstance(ProtocolInstanceType {
+                inner: Protocol::FromClass(_),
+                ..
+            }) => return true,
+            Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
+                SubclassOfInner::Class(class) => class,
+                SubclassOfInner::Dynamic(DynamicType::Any) => return true,
+                SubclassOfInner::Dynamic(_) => return false,
+            },
+            Type::NominalInstance(instance) => instance.class(db),
+            _ => return false,
+        };
+
+        !matches!(
+            class.known(db),
+            Some(KnownClass::NoneType | KnownClass::EllipsisType)
+        )
+    }
+
+    let db = context.db();
+
+    let Some(builder) = context.report_lint(
+        &AMBIGUOUS_PROTOCOL_MEMBER,
+        definition.full_range(db, context.module()),
+    ) else {
+        return;
+    };
+
+    let ScopedPlaceId::Symbol(symbol_id) = definition.place(db) else {
+        return;
+    };
+
+    let symbol_name = class_symbol_table.symbol(symbol_id).name();
+    let class_name = protocol_class.name(db);
+
+    let mut diagnostic = builder
+        .into_diagnostic("Cannot assign to undeclared variable in the body of a protocol class");
+
+    if definition.kind(db).is_unannotated_assignment() {
+        let binding_type = binding_type(db, definition);
+
+        let suggestion = binding_type
+            .literal_fallback_instance(db)
+            .unwrap_or(binding_type);
+
+        if should_give_hint(db, suggestion) {
+            diagnostic.set_primary_message(format_args!(
+                "Consider adding an annotation, e.g. `{symbol_name}: {} = ...`",
+                suggestion.display(db)
+            ));
+        } else {
+            diagnostic.set_primary_message(format_args!(
+                "Consider adding an annotation for `{symbol_name}`"
+            ));
+        }
+    } else {
+        diagnostic.set_primary_message(format_args!(
+            "`{symbol_name}` is not declared as a protocol member"
+        ));
+    }
+
+    let mut class_def_diagnostic = SubDiagnostic::new(
+        SubDiagnosticSeverity::Info,
+        "Assigning to an undeclared variable in a protocol class \
+    leads to an ambiguous interface",
+    );
+    class_def_diagnostic.annotate(
+        Annotation::primary(protocol_class.header_span(db))
+            .message(format_args!("`{class_name}` declared as a protocol here",)),
+    );
+    diagnostic.sub(class_def_diagnostic);
+
+    diagnostic.info(format_args!(
+        "No declarations found for `{symbol_name}` \
+        in the body of `{class_name}` or any of its superclasses"
+    ));
+}
+
 pub(crate) fn report_duplicate_bases(
     context: &InferContext,
     class: ClassLiteral,
@@ -2544,6 +2759,107 @@ fn report_invalid_base<'ctx, 'db>(
     Some(diagnostic)
 }
 
+pub(crate) fn report_invalid_key_on_typed_dict<'db>(
+    context: &InferContext<'db, '_>,
+    value_node: AnyNodeRef,
+    slice_node: AnyNodeRef,
+    value_ty: Type<'db>,
+    slice_ty: Type<'db>,
+    items: &FxOrderMap<Name, Field<'db>>,
+) {
+    let db = context.db();
+    if let Some(builder) = context.report_lint(&INVALID_KEY, slice_node) {
+        match slice_ty {
+            Type::StringLiteral(key) => {
+                let key = key.value(db);
+                let typed_dict_name = value_ty.display(db);
+
+                let mut diagnostic = builder.into_diagnostic(format_args!(
+                    "Invalid key access on TypedDict `{typed_dict_name}`",
+                ));
+
+                diagnostic.annotate(
+                    context
+                        .secondary(value_node)
+                        .message(format_args!("TypedDict `{typed_dict_name}`")),
+                );
+
+                let existing_keys = items.iter().map(|(name, _)| name.as_str());
+
+                diagnostic.set_primary_message(format!(
+                    "Unknown key \"{key}\"{hint}",
+                    hint = if let Some(suggestion) = did_you_mean(existing_keys, key) {
+                        format!(" - did you mean \"{suggestion}\"?")
+                    } else {
+                        String::new()
+                    }
+                ));
+
+                diagnostic
+            }
+            _ => builder.into_diagnostic(format_args!(
+                "TypedDict `{}` cannot be indexed with a key of type `{}`",
+                value_ty.display(db),
+                slice_ty.display(db),
+            )),
+        };
+    }
+}
+
+pub(super) fn report_namedtuple_field_without_default_after_field_with_default<'db>(
+    context: &InferContext<'db, '_>,
+    class: ClassLiteral<'db>,
+    index: &'db SemanticIndex<'db>,
+    field_name: &str,
+    field_with_default: &str,
+) {
+    let db = context.db();
+    let module = context.module();
+
+    let diagnostic_range = class
+        .first_declaration_of_name(db, field_name, index)
+        .and_then(|definition| definition.declaration.definition())
+        .map(|definition| definition.kind(db).full_range(module))
+        .unwrap_or_else(|| class.header_range(db));
+
+    let Some(builder) = context.report_lint(&INVALID_NAMED_TUPLE, diagnostic_range) else {
+        return;
+    };
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "NamedTuple field without default value cannot follow field(s) with default value(s)",
+    ));
+
+    diagnostic.set_primary_message(format_args!(
+        "Field `{field_name}` defined here without a default value"
+    ));
+
+    let Some(field_with_default_range) = class
+        .first_binding_of_name(db, field_with_default, index)
+        .and_then(|definition| definition.binding.definition())
+        .map(|definition| definition.kind(db).full_range(module))
+    else {
+        return;
+    };
+
+    // If the end-of-scope definition in the class scope of the field-with-a-default-value
+    // occurs after the range of the field-without-a-default-value,
+    // avoid adding a subdiagnostic that points to the definition of the
+    // field-with-a-default-value. It's confusing to talk about a field "before" the
+    // field without the default value but then point to a definition that actually
+    // occurs after the field without-a-default-value.
+    if field_with_default_range.end() < diagnostic_range.start() {
+        diagnostic.annotate(
+            Annotation::secondary(context.span(field_with_default_range)).message(format_args!(
+                "Earlier field `{field_with_default}` defined here with a default value",
+            )),
+        );
+    } else {
+        diagnostic.info(format_args!(
+            "Earlier field `{field_with_default}` was defined with a default value"
+        ));
+    }
+}
+
 /// This function receives an unresolved `from foo import bar` import,
 /// where `foo` can be resolved to a module but that module does not
 /// have a `bar` member or submodule.
@@ -2590,4 +2906,30 @@ pub(super) fn hint_if_stdlib_submodule_exists_on_other_versions(
     ));
 
     add_inferred_python_version_hint_to_diagnostic(db, &mut diagnostic, "resolving modules");
+}
+
+/// Suggest a name from `existing_names` that is similar to `wrong_name`.
+fn did_you_mean<S: AsRef<str>, T: AsRef<str>>(
+    existing_names: impl Iterator<Item = S>,
+    wrong_name: T,
+) -> Option<String> {
+    if wrong_name.as_ref().len() < 3 {
+        return None;
+    }
+
+    existing_names
+        .filter(|ref id| id.as_ref().len() >= 2)
+        .map(|ref id| {
+            (
+                id.as_ref().to_string(),
+                strsim::damerau_levenshtein(
+                    &id.as_ref().to_lowercase(),
+                    &wrong_name.as_ref().to_lowercase(),
+                ),
+            )
+        })
+        .min_by_key(|(_, dist)| *dist)
+        // Heuristic to filter out bad matches
+        .filter(|(_, dist)| *dist <= 3)
+        .map(|(id, _)| id)
 }

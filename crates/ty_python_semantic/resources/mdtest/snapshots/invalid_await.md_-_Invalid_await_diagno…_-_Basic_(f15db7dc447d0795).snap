@@ -1,0 +1,41 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: invalid_await.md - Invalid await diagnostics - Basic
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_await.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | async def main() -> None:
+2 |     await 1  # error: [invalid-await]
+```
+
+# Diagnostics
+
+```
+error[invalid-await]: `Literal[1]` is not awaitable
+   --> src/mdtest_snippet.py:2:11
+    |
+  1 | async def main() -> None:
+  2 |     await 1  # error: [invalid-await]
+    |           ^
+    |
+   ::: stdlib/builtins.pyi:337:7
+    |
+335 | _LiteralInteger = _PositiveInteger | _NegativeInteger | Literal[0]  # noqa: Y026  # TODO: Use TypeAlias once mypy bugs are fixed
+336 |
+337 | class int:
+    |       --- type defined here
+338 |     """int([x]) -> integer
+339 |     int(x, base=10) -> integer
+    |
+info: `__await__` is missing
+info: rule `invalid-await` is enabled by default
+
+```

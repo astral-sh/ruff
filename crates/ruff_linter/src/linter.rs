@@ -44,44 +44,15 @@ pub struct LinterResult {
     /// Flag indicating that the parsed source code does not contain any
     /// [`ParseError`]s
     has_valid_syntax: bool,
-    /// Flag indicating that the parsed source code does not contain any [`ParseError`]s,
-    /// [`UnsupportedSyntaxError`]s, or [`SemanticSyntaxError`]s.
-    has_no_syntax_errors: bool,
 }
 
 impl LinterResult {
-    /// Returns `true` if the parsed source code contains any [`ParseError`]s *or*
-    /// [`UnsupportedSyntaxError`]s.
-    ///
-    /// See [`LinterResult::has_invalid_syntax`] for a version specific to [`ParseError`]s.
-    pub fn has_syntax_errors(&self) -> bool {
-        !self.has_no_syntax_errors()
-    }
-
-    /// Returns `true` if the parsed source code does not contain any [`ParseError`]s *or*
-    /// [`UnsupportedSyntaxError`]s.
-    ///
-    /// See [`LinterResult::has_valid_syntax`] for a version specific to [`ParseError`]s.
-    pub fn has_no_syntax_errors(&self) -> bool {
-        self.has_valid_syntax() && self.has_no_syntax_errors
-    }
-
-    /// Returns `true` if the parsed source code is valid i.e., it has no [`ParseError`]s.
-    ///
-    /// Note that this does not include version-related [`UnsupportedSyntaxError`]s.
-    ///
-    /// See [`LinterResult::has_no_syntax_errors`] for a version that takes these into account.
-    pub fn has_valid_syntax(&self) -> bool {
-        self.has_valid_syntax
-    }
-
     /// Returns `true` if the parsed source code is invalid i.e., it has [`ParseError`]s.
     ///
-    /// Note that this does not include version-related [`UnsupportedSyntaxError`]s.
-    ///
-    /// See [`LinterResult::has_no_syntax_errors`] for a version that takes these into account.
+    /// Note that this does not include version-related [`UnsupportedSyntaxError`]s or
+    /// [`SemanticSyntaxError`]s.
     pub fn has_invalid_syntax(&self) -> bool {
-        !self.has_valid_syntax()
+        !self.has_valid_syntax
     }
 }
 
@@ -513,7 +484,6 @@ pub fn lint_only(
 
     LinterResult {
         has_valid_syntax: parsed.has_valid_syntax(),
-        has_no_syntax_errors: !diagnostics.iter().any(Diagnostic::is_invalid_syntax),
         diagnostics,
     }
 }
@@ -670,7 +640,6 @@ pub fn lint_fix<'a>(
             result: LinterResult {
                 diagnostics,
                 has_valid_syntax,
-                has_no_syntax_errors,
             },
             transformed,
             fixed,

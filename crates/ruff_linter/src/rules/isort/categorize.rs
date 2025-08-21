@@ -388,7 +388,7 @@ impl KnownModules {
 
     /// Return the [`ImportSection`] for a given module, if it's been categorized as a known module
     /// by the user.
-    fn categorize(&self, module_name: &str) -> Option<(&ImportSection, Reason)> {
+    fn categorize(&self, module_name: &str) -> Option<(&ImportSection, Reason<'_>)> {
         if self.has_submodules {
             // Check all module prefixes from the longest to the shortest (e.g., given
             // `foo.bar.baz`, check `foo.bar.baz`, then `foo.bar`, then `foo`, taking the first,
@@ -412,7 +412,7 @@ impl KnownModules {
         }
     }
 
-    fn categorize_submodule(&self, submodule: &str) -> Option<(&ImportSection, Reason)> {
+    fn categorize_submodule(&self, submodule: &str) -> Option<(&ImportSection, Reason<'_>)> {
         let section = self.known.iter().find_map(|(pattern, section)| {
             if pattern.matches(submodule) {
                 Some(section)

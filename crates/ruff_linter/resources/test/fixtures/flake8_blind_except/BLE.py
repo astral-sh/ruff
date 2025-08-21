@@ -154,6 +154,11 @@ try:
 except Exception as e:
     raise ValueError from e
 
+try:
+    ...
+except Exception as e:
+    raise e from ValueError("hello")
+
 
 try:
     pass
@@ -245,3 +250,9 @@ try:
     pass
 except (Exception, ValueError) as e:
     raise e
+
+# `from None` cause
+try:
+    pass
+except BaseException as e:
+    raise e from None

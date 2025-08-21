@@ -131,7 +131,10 @@ class _SimpleCData(_CData, Generic[_T], metaclass=_PyCSimpleType):
     def __init__(self, value: _T = ...) -> None: ...  # pyright: ignore[reportInvalidTypeVarUse]
     def __ctypes_from_outparam__(self, /) -> _T: ...  # type: ignore[override]
 
+@type_check_only
 class _CanCastTo(_CData): ...
+
+@type_check_only
 class _PointerLike(_CanCastTo): ...
 
 # This type is not exposed. It calls itself _ctypes.PyCPointerType.

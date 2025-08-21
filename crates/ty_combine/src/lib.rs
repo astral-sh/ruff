@@ -161,9 +161,10 @@ impl_noop_combine!(String);
 
 #[cfg(test)]
 mod tests {
-    use crate::combine::Combine;
     use ordermap::OrderMap;
     use std::collections::HashMap;
+
+    use super::Combine;
 
     #[test]
     fn combine_option() {

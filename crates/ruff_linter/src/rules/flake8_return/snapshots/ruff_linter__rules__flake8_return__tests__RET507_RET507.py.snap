@@ -1,17 +1,17 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_return/mod.rs
-snapshot_kind: text
 ---
-RET507.py:8:9: RET507 [*] Unnecessary `elif` after `continue` statement
+RET507 [*] Unnecessary `elif` after `continue` statement
+  --> RET507.py:8:9
    |
  6 |         if i < y:  # [no-else-continue]
  7 |             continue
  8 |         elif i < w:
-   |         ^^^^ RET507
+   |         ^^^^
  9 |             continue
 10 |         else:
    |
-   = help: Remove unnecessary `elif`
+help: Remove unnecessary `elif`
 
 ℹ Safe fix
 5 5 |     for i in x:
@@ -23,16 +23,17 @@ RET507.py:8:9: RET507 [*] Unnecessary `elif` after `continue` statement
 10 10 |         else:
 11 11 |             a = z
 
-RET507.py:22:9: RET507 [*] Unnecessary `elif` after `continue` statement
+RET507 [*] Unnecessary `elif` after `continue` statement
+  --> RET507.py:22:9
    |
 20 |                 b = 2
 21 |             continue
 22 |         elif z:
-   |         ^^^^ RET507
+   |         ^^^^
 23 |             c = 2
 24 |         else:
    |
-   = help: Remove unnecessary `elif`
+help: Remove unnecessary `elif`
 
 ℹ Safe fix
 19 19 |             else:
@@ -44,15 +45,16 @@ RET507.py:22:9: RET507 [*] Unnecessary `elif` after `continue` statement
 24 24 |         else:
 25 25 |             c = 3
 
-RET507.py:36:9: RET507 [*] Unnecessary `else` after `continue` statement
+RET507 [*] Unnecessary `else` after `continue` statement
+  --> RET507.py:36:9
    |
 34 |         if i < y:  # [no-else-continue]
 35 |             continue
 36 |         else:
-   |         ^^^^ RET507
+   |         ^^^^
 37 |             a = z
    |
-   = help: Remove unnecessary `else`
+help: Remove unnecessary `else`
 
 ℹ Safe fix
 33 33 |     for i in x:
@@ -65,16 +67,17 @@ RET507.py:36:9: RET507 [*] Unnecessary `else` after `continue` statement
 39 38 | 
 40 39 | def foo3(x, y, z):
 
-RET507.py:47:13: RET507 [*] Unnecessary `else` after `continue` statement
+RET507 [*] Unnecessary `else` after `continue` statement
+  --> RET507.py:47:13
    |
 45 |                 b = 2
 46 |                 continue
 47 |             else:
-   |             ^^^^ RET507
+   |             ^^^^
 48 |                 c = 3
 49 |                 continue
    |
-   = help: Remove unnecessary `else`
+help: Remove unnecessary `else`
 
 ℹ Safe fix
 44 44 |             if z:  # [no-else-continue]
@@ -89,16 +92,17 @@ RET507.py:47:13: RET507 [*] Unnecessary `else` after `continue` statement
 51 50 |             d = 4
 52 51 |             continue
 
-RET507.py:63:9: RET507 [*] Unnecessary `else` after `continue` statement
+RET507 [*] Unnecessary `else` after `continue` statement
+  --> RET507.py:63:9
    |
 61 |                 b = 2
 62 |             continue
 63 |         else:
-   |         ^^^^ RET507
+   |         ^^^^
 64 |             c = 3
 65 |         continue
    |
-   = help: Remove unnecessary `else`
+help: Remove unnecessary `else`
 
 ℹ Safe fix
 60 60 |             else:
@@ -111,16 +115,17 @@ RET507.py:63:9: RET507 [*] Unnecessary `else` after `continue` statement
 66 65 | 
 67 66 | 
 
-RET507.py:74:13: RET507 [*] Unnecessary `else` after `continue` statement
+RET507 [*] Unnecessary `else` after `continue` statement
+  --> RET507.py:74:13
    |
 72 |                 a = 4
 73 |                 continue
 74 |             else:
-   |             ^^^^ RET507
+   |             ^^^^
 75 |                 b = 2
 76 |         else:
    |
-   = help: Remove unnecessary `else`
+help: Remove unnecessary `else`
 
 ℹ Safe fix
 71 71 |             if y:  # [no-else-continue]
@@ -133,16 +138,17 @@ RET507.py:74:13: RET507 [*] Unnecessary `else` after `continue` statement
 77 76 |             c = 3
 78 77 |         continue
 
-RET507.py:85:9: RET507 [*] Unnecessary `else` after `continue` statement
+RET507 [*] Unnecessary `else` after `continue` statement
+  --> RET507.py:85:9
    |
 83 |         if x:  # [no-else-continue]
 84 |             continue
 85 |         else:
-   |         ^^^^ RET507
+   |         ^^^^
 86 |             try:
 87 |                 return
    |
-   = help: Remove unnecessary `else`
+help: Remove unnecessary `else`
 
 ℹ Safe fix
 82 82 |     for i in range(10):

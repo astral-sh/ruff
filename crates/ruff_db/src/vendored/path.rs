@@ -37,7 +37,7 @@ impl VendoredPath {
         self.0.as_std_path()
     }
 
-    pub fn components(&self) -> Utf8Components {
+    pub fn components(&self) -> Utf8Components<'_> {
         self.0.components()
     }
 

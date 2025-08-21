@@ -27,7 +27,10 @@ impl Emitter for SarifEmitter {
             .map(SarifResult::from_message)
             .collect::<Result<Vec<_>>>()?;
 
-        let unique_rules: HashSet<_> = results.iter().filter_map(|result| result.code).collect();
+        let unique_rules: HashSet<_> = results
+            .iter()
+            .filter_map(|result| result.code.as_secondary_code())
+            .collect();
         let mut rules: Vec<SarifRule> = unique_rules.into_iter().map(SarifRule::from).collect();
         rules.sort_by(|a, b| a.code.cmp(b.code));
 
@@ -110,8 +113,39 @@ impl Serialize for SarifRule<'_> {
 }
 
 #[derive(Debug)]
+enum RuleCode<'a> {
+    SecondaryCode(&'a SecondaryCode),
+    LintId(&'a str),
+}
+
+impl RuleCode<'_> {
+    fn as_secondary_code(&self) -> Option<&SecondaryCode> {
+        match self {
+            RuleCode::SecondaryCode(code) => Some(code),
+            RuleCode::LintId(_) => None,
+        }
+    }
+
+    fn as_str(&self) -> &str {
+        match self {
+            RuleCode::SecondaryCode(code) => code.as_str(),
+            RuleCode::LintId(id) => id,
+        }
+    }
+}
+
+impl<'a> From<&'a Diagnostic> for RuleCode<'a> {
+    fn from(code: &'a Diagnostic) -> Self {
+        match code.secondary_code() {
+            Some(diagnostic) => Self::SecondaryCode(diagnostic),
+            None => Self::LintId(code.id().as_str()),
+        }
+    }
+}
+
+#[derive(Debug)]
 struct SarifResult<'a> {
-    code: Option<&'a SecondaryCode>,
+    code: RuleCode<'a>,
     level: String,
     message: String,
     uri: String,
@@ -128,7 +162,7 @@ impl<'a> SarifResult<'a> {
         let end_location = message.expect_ruff_end_location();
         let path = normalize_path(&*message.expect_ruff_filename());
         Ok(Self {
-            code: message.secondary_code(),
+            code: RuleCode::from(message),
             level: "error".to_string(),
             message: message.body().to_string(),
             uri: url::Url::from_file_path(&path)
@@ -148,7 +182,7 @@ impl<'a> SarifResult<'a> {
         let end_location = message.expect_ruff_end_location();
         let path = normalize_path(&*message.expect_ruff_filename());
         Ok(Self {
-            code: message.secondary_code(),
+            code: RuleCode::from(message),
             level: "error".to_string(),
             message: message.body().to_string(),
             uri: path.display().to_string(),
@@ -183,7 +217,7 @@ impl Serialize for SarifResult<'_> {
                     }
                 }
             }],
-            "ruleId": self.code,
+            "ruleId": self.code.as_str(),
         })
         .serialize(serializer)
     }

@@ -1,14 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
 ---
-PT001.py:14:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
+PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
+  --> PT001.py:14:1
    |
 14 | @pytest.fixture()
-   | ^^^^^^^^^^^^^^^^^ PT001
+   | ^^^^^^^^^^^^^^^^^
 15 | def parentheses_no_params():
 16 |     return 42
    |
-   = help: Remove parentheses
+help: Remove parentheses
 
 ℹ Safe fix
 11 11 |     return 42
@@ -20,16 +21,17 @@ PT001.py:14:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
 16 16 |     return 42
 17 17 | 
 
-PT001.py:24:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
+PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
+  --> PT001.py:24:1
    |
 24 | / @pytest.fixture(
 25 | |
 26 | | )
-   | |_^ PT001
+   | |_^
 27 |   def parentheses_no_params_multiline():
 28 |       return 42
    |
-   = help: Remove parentheses
+help: Remove parentheses
 
 ℹ Safe fix
 21 21 |     return 42
@@ -43,14 +45,15 @@ PT001.py:24:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
 28 26 |     return 42
 29 27 | 
 
-PT001.py:39:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
+PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
+  --> PT001.py:39:1
    |
 39 | @fixture()
-   | ^^^^^^^^^^ PT001
+   | ^^^^^^^^^^
 40 | def imported_from_parentheses_no_params():
 41 |     return 42
    |
-   = help: Remove parentheses
+help: Remove parentheses
 
 ℹ Safe fix
 36 36 |     return 42
@@ -62,16 +65,17 @@ PT001.py:39:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
 41 41 |     return 42
 42 42 | 
 
-PT001.py:49:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
+PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
+  --> PT001.py:49:1
    |
 49 | / @fixture(
 50 | |
 51 | | )
-   | |_^ PT001
+   | |_^
 52 |   def imported_from_parentheses_no_params_multiline():
 53 |       return 42
    |
-   = help: Remove parentheses
+help: Remove parentheses
 
 ℹ Safe fix
 46 46 |     return 42
@@ -85,14 +89,15 @@ PT001.py:49:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
 53 51 |     return 42
 54 52 | 
 
-PT001.py:64:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
+PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
+  --> PT001.py:64:1
    |
 64 | @aliased()
-   | ^^^^^^^^^^ PT001
+   | ^^^^^^^^^^
 65 | def aliased_parentheses_no_params():
 66 |     return 42
    |
-   = help: Remove parentheses
+help: Remove parentheses
 
 ℹ Safe fix
 61 61 |     return 42
@@ -104,16 +109,17 @@ PT001.py:64:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
 66 66 |     return 42
 67 67 | 
 
-PT001.py:74:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
+PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
+  --> PT001.py:74:1
    |
 74 | / @aliased(
 75 | |
 76 | | )
-   | |_^ PT001
+   | |_^
 77 |   def aliased_parentheses_no_params_multiline():
 78 |       return 42
    |
-   = help: Remove parentheses
+help: Remove parentheses
 
 ℹ Safe fix
 71 71 |     return 42
@@ -127,17 +133,18 @@ PT001.py:74:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
 78 76 |     return 42
 79 77 | 
 
-PT001.py:81:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
+PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
+  --> PT001.py:81:1
    |
 80 |   # https://github.com/astral-sh/ruff/issues/18770
 81 | / @pytest.fixture(
 82 | |     # TODO: use module scope
 83 | |     # scope="module"
 84 | | )
-   | |_^ PT001
+   | |_^
 85 |   def my_fixture(): ...
    |
-   = help: Remove parentheses
+help: Remove parentheses
 
 ℹ Unsafe fix
 78 78 |     return 42
@@ -152,14 +159,15 @@ PT001.py:81:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
 86 83 | 
 87 84 | 
 
-PT001.py:88:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
+PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
+  --> PT001.py:88:1
    |
 88 | @(pytest.fixture())
-   | ^^^^^^^^^^^^^^^^^^^ PT001
+   | ^^^^^^^^^^^^^^^^^^^
 89 | def outer_paren_fixture_no_params():
 90 |     return 42
    |
-   = help: Remove parentheses
+help: Remove parentheses
 
 ℹ Safe fix
 85 85 | def my_fixture(): ...
@@ -171,14 +179,15 @@ PT001.py:88:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
 90 90 |     return 42
 91 91 | 
 
-PT001.py:93:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
+PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
+  --> PT001.py:93:1
    |
 93 | @(fixture())
-   | ^^^^^^^^^^^^ PT001
+   | ^^^^^^^^^^^^
 94 | def outer_paren_imported_fixture_no_params():
 95 |     return 42
    |
-   = help: Remove parentheses
+help: Remove parentheses
 
 ℹ Safe fix
 90 90 |     return 42

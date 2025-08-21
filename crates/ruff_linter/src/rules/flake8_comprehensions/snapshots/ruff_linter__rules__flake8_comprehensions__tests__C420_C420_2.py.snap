@@ -1,12 +1,13 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
 ---
-C420_2.py:1:7: C420 [*] Unnecessary dict comprehension for iterable; use `dict.fromkeys` instead
+C420 [*] Unnecessary dict comprehension for iterable; use `dict.fromkeys` instead
+ --> C420_2.py:1:7
   |
 1 | foo or{x: None for x in bar}
-  |       ^^^^^^^^^^^^^^^^^^^^^^ C420
+  |       ^^^^^^^^^^^^^^^^^^^^^^
   |
-  = help: Replace with `dict.fromkeys(iterable, value)`)
+help: Replace with `dict.fromkeys(iterable, value)`)
 
 ℹ Safe fix
 1   |-foo or{x: None for x in bar}

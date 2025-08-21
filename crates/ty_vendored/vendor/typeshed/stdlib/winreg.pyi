@@ -550,7 +550,7 @@ if sys.platform == "win32":
 
         def __enter__(self) -> Self: ...
         def __exit__(
-            self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: TracebackType | None
+            self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: TracebackType | None, /
         ) -> bool | None: ...
         def Close(self) -> None:
             """Closes the underlying Windows handle.

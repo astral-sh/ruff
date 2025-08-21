@@ -1,15 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
-snapshot_kind: text
 ---
-sphinx.py:13:5: D412 [*] No blank lines allowed between a section header and its content ("Example")
+D412 [*] No blank lines allowed between a section header and its content ("Example")
+  --> sphinx.py:13:5
    |
 11 | def func():
 12 |     """
 13 |     Example:
-   |     ^^^^^^^ D412
+   |     ^^^^^^^
    |
-   = help: Remove blank line(s)
+help: Remove blank line(s)
 
 ℹ Safe fix
 12 12 |     """
@@ -20,14 +20,15 @@ sphinx.py:13:5: D412 [*] No blank lines allowed between a section header and its
 17 16 | 
 18 17 |         import foo
 
-sphinx.py:24:5: D412 [*] No blank lines allowed between a section header and its content ("Example")
+D412 [*] No blank lines allowed between a section header and its content ("Example")
+  --> sphinx.py:24:5
    |
 22 | def func():
 23 |     """
 24 |     Example:
-   |     ^^^^^^^ D412
+   |     ^^^^^^^
    |
-   = help: Remove blank line(s)
+help: Remove blank line(s)
 
 ℹ Safe fix
 23 23 |     """
@@ -39,15 +40,16 @@ sphinx.py:24:5: D412 [*] No blank lines allowed between a section header and its
 29 27 | 
 30 28 |         import foo
 
-sphinx.py:47:5: D412 [*] No blank lines allowed between a section header and its content ("Example")
+D412 [*] No blank lines allowed between a section header and its content ("Example")
+  --> sphinx.py:47:5
    |
 45 | def func():
 46 |     """
 47 |     Example
-   |     ^^^^^^^ D412
+   |     ^^^^^^^
 48 |     -------
    |
-   = help: Remove blank line(s)
+help: Remove blank line(s)
 
 ℹ Safe fix
 47 47 |     Example
@@ -58,15 +60,16 @@ sphinx.py:47:5: D412 [*] No blank lines allowed between a section header and its
 52 51 | 
 53 52 |         import foo
 
-sphinx.py:59:5: D412 [*] No blank lines allowed between a section header and its content ("Example")
+D412 [*] No blank lines allowed between a section header and its content ("Example")
+  --> sphinx.py:59:5
    |
 57 | def func():
 58 |     """
 59 |     Example
-   |     ^^^^^^^ D412
+   |     ^^^^^^^
 60 |     -------
    |
-   = help: Remove blank line(s)
+help: Remove blank line(s)
 
 ℹ Safe fix
 59 59 |     Example

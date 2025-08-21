@@ -1,15 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
-snapshot_kind: text
 ---
-UP011.py:5:21: UP011 [*] Unnecessary parentheses to `functools.lru_cache`
+UP011 [*] Unnecessary parentheses to `functools.lru_cache`
+ --> UP011.py:5:21
   |
 5 | @functools.lru_cache()
-  |                     ^^ UP011
+  |                     ^^
 6 | def fixme():
 7 |     pass
   |
-  = help: Remove unnecessary parentheses
+help: Remove unnecessary parentheses
 
 ℹ Safe fix
 2 2 | from functools import lru_cache
@@ -21,14 +21,15 @@ UP011.py:5:21: UP011 [*] Unnecessary parentheses to `functools.lru_cache`
 7 7 |     pass
 8 8 | 
 
-UP011.py:10:11: UP011 [*] Unnecessary parentheses to `functools.lru_cache`
+UP011 [*] Unnecessary parentheses to `functools.lru_cache`
+  --> UP011.py:10:11
    |
 10 | @lru_cache()
-   |           ^^ UP011
+   |           ^^
 11 | def fixme():
 12 |     pass
    |
-   = help: Remove unnecessary parentheses
+help: Remove unnecessary parentheses
 
 ℹ Safe fix
 7  7  |     pass
@@ -40,15 +41,16 @@ UP011.py:10:11: UP011 [*] Unnecessary parentheses to `functools.lru_cache`
 12 12 |     pass
 13 13 | 
 
-UP011.py:16:21: UP011 [*] Unnecessary parentheses to `functools.lru_cache`
+UP011 [*] Unnecessary parentheses to `functools.lru_cache`
+  --> UP011.py:16:21
    |
 15 | @other_decorator
 16 | @functools.lru_cache()
-   |                     ^^ UP011
+   |                     ^^
 17 | def fixme():
 18 |     pass
    |
-   = help: Remove unnecessary parentheses
+help: Remove unnecessary parentheses
 
 ℹ Safe fix
 13 13 | 
@@ -60,14 +62,15 @@ UP011.py:16:21: UP011 [*] Unnecessary parentheses to `functools.lru_cache`
 18 18 |     pass
 19 19 | 
 
-UP011.py:21:21: UP011 [*] Unnecessary parentheses to `functools.lru_cache`
+UP011 [*] Unnecessary parentheses to `functools.lru_cache`
+  --> UP011.py:21:21
    |
 21 | @functools.lru_cache()
-   |                     ^^ UP011
+   |                     ^^
 22 | @other_decorator
 23 | def fixme():
    |
-   = help: Remove unnecessary parentheses
+help: Remove unnecessary parentheses
 
 ℹ Safe fix
 18 18 |     pass

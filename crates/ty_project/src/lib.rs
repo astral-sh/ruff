@@ -28,8 +28,6 @@ use ty_python_semantic::lint::{LintRegistry, LintRegistryBuilder, RuleSelection}
 use ty_python_semantic::types::check_types;
 use ty_python_semantic::{add_inferred_python_version_hint_to_diagnostic, register_lints};
 
-pub mod combine;
-
 mod db;
 mod files;
 mod glob;
@@ -57,7 +55,7 @@ pub fn default_lints_registry() -> LintRegistry {
 /// 2. Running `ruff check` with different target versions results in different programs (settings) but
 ///    it remains the same project. That's why program is a narrowed view of the project only
 ///    holding on to the most fundamental settings required for checking.
-#[salsa::input]
+#[salsa::input(heap_size=ruff_memory_usage::heap_size)]
 #[derive(Debug)]
 pub struct Project {
     /// The files that are open in the project, [`None`] if there are no open files.
@@ -203,7 +201,7 @@ impl Project {
     /// This is a salsa query to prevent re-computing queries if other, unrelated
     /// settings change. For example, we don't want that changing the terminal settings
     /// invalidates any type checking queries.
-    #[salsa::tracked(returns(deref), heap_size=get_size2::heap_size)]
+    #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
     pub fn rules(self, db: &dyn Db) -> Arc<RuleSelection> {
         self.settings(db).to_rules()
     }
@@ -526,7 +524,7 @@ impl Project {
     }
 }
 
-#[salsa::tracked(returns(ref), heap_size=get_size2::heap_size)]
+#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn check_file_impl(db: &dyn Db, file: File) -> Result<Box<[Diagnostic]>, Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = Vec::new();
 
@@ -638,7 +636,7 @@ impl Iterator for ProjectFilesIter<'_> {
 
 impl FusedIterator for ProjectFilesIter<'_> {}
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, get_size2::GetSize)]
 pub struct IOErrorDiagnostic {
     file: Option<File>,
     error: IOErrorKind,
@@ -654,7 +652,7 @@ impl IOErrorDiagnostic {
     }
 }
 
-#[derive(Error, Debug, Clone)]
+#[derive(Error, Debug, Clone, get_size2::GetSize)]
 enum IOErrorKind {
     #[error(transparent)]
     Walk(#[from] walk::WalkError),

@@ -16,25 +16,28 @@ info:
 success: false
 exit_code: 1
 ----- stdout -----
-input.py:1:8: F401 [*] `os` imported but unused
+F401 [*] `os` imported but unused
+ --> input.py:1:8
   |
 1 | import os  # F401
-  |        ^^ F401
+  |        ^^
 2 | x = y      # F821
 3 | match 42:  # invalid-syntax
   |
-  = help: Remove unused import: `os`
+help: Remove unused import: `os`
 
-input.py:2:5: F821 Undefined name `y`
+F821 Undefined name `y`
+ --> input.py:2:5
   |
 1 | import os  # F401
 2 | x = y      # F821
-  |     ^ F821
+  |     ^
 3 | match 42:  # invalid-syntax
 4 |     case _: ...
   |
 
-input.py:3:1: SyntaxError: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
+invalid-syntax: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
+ --> input.py:3:1
   |
 1 | import os  # F401
 2 | x = y      # F821

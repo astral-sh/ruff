@@ -1,13 +1,14 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-F632.py:1:4: F632 [*] Use `==` to compare constant literals
+F632 [*] Use `==` to compare constant literals
+ --> F632.py:1:4
   |
 1 | if x is "abc":
-  |    ^^^^^^^^^^ F632
+  |    ^^^^^^^^^^
 2 |     pass
   |
-  = help: Replace `is` with `==`
+help: Replace `is` with `==`
 
 ℹ Safe fix
 1   |-if x is "abc":
@@ -16,15 +17,16 @@ F632.py:1:4: F632 [*] Use `==` to compare constant literals
 3 3 | 
 4 4 | if 123 is not y:
 
-F632.py:4:4: F632 [*] Use `!=` to compare constant literals
+F632 [*] Use `!=` to compare constant literals
+ --> F632.py:4:4
   |
 2 |     pass
 3 |
 4 | if 123 is not y:
-  |    ^^^^^^^^^^^^ F632
+  |    ^^^^^^^^^^^^
 5 |     pass
   |
-  = help: Replace `is not` with `!=`
+help: Replace `is not` with `!=`
 
 ℹ Safe fix
 1 1 | if x is "abc":
@@ -36,17 +38,18 @@ F632.py:4:4: F632 [*] Use `!=` to compare constant literals
 6 6 | 
 7 7 | if 123 is \
 
-F632.py:7:4: F632 [*] Use `!=` to compare constant literals
+F632 [*] Use `!=` to compare constant literals
+ --> F632.py:7:4
   |
 5 |       pass
 6 |
 7 |   if 123 is \
   |  ____^
 8 | |         not y:
-  | |_____________^ F632
+  | |_____________^
 9 |       pass
   |
-  = help: Replace `is not` with `!=`
+help: Replace `is not` with `!=`
 
 ℹ Safe fix
 4 4 | if 123 is not y:
@@ -59,15 +62,16 @@ F632.py:7:4: F632 [*] Use `!=` to compare constant literals
 10 9 | 
 11 10 | if "123" is x < 3:
 
-F632.py:11:4: F632 [*] Use `==` to compare constant literals
+F632 [*] Use `==` to compare constant literals
+  --> F632.py:11:4
    |
  9 |     pass
 10 |
 11 | if "123" is x < 3:
-   |    ^^^^^^^^^^^^^^ F632
+   |    ^^^^^^^^^^^^^^
 12 |     pass
    |
-   = help: Replace `is` with `==`
+help: Replace `is` with `==`
 
 ℹ Safe fix
 8  8  |         not y:
@@ -79,15 +83,16 @@ F632.py:11:4: F632 [*] Use `==` to compare constant literals
 13 13 | 
 14 14 | if "123" != x is 3:
 
-F632.py:14:4: F632 [*] Use `==` to compare constant literals
+F632 [*] Use `==` to compare constant literals
+  --> F632.py:14:4
    |
 12 |     pass
 13 |
 14 | if "123" != x is 3:
-   |    ^^^^^^^^^^^^^^^ F632
+   |    ^^^^^^^^^^^^^^^
 15 |     pass
    |
-   = help: Replace `is` with `==`
+help: Replace `is` with `==`
 
 ℹ Safe fix
 11 11 | if "123" is x < 3:
@@ -99,15 +104,16 @@ F632.py:14:4: F632 [*] Use `==` to compare constant literals
 16 16 | 
 17 17 | if ("123" != x) is 3:
 
-F632.py:17:4: F632 [*] Use `==` to compare constant literals
+F632 [*] Use `==` to compare constant literals
+  --> F632.py:17:4
    |
 15 |     pass
 16 |
 17 | if ("123" != x) is 3:
-   |    ^^^^^^^^^^^^^^^^^ F632
+   |    ^^^^^^^^^^^^^^^^^
 18 |     pass
    |
-   = help: Replace `is` with `==`
+help: Replace `is` with `==`
 
 ℹ Safe fix
 14 14 | if "123" != x is 3:
@@ -119,15 +125,16 @@ F632.py:17:4: F632 [*] Use `==` to compare constant literals
 19 19 | 
 20 20 | if "123" != (x is 3):
 
-F632.py:20:14: F632 [*] Use `==` to compare constant literals
+F632 [*] Use `==` to compare constant literals
+  --> F632.py:20:14
    |
 18 |     pass
 19 |
 20 | if "123" != (x is 3):
-   |              ^^^^^^ F632
+   |              ^^^^^^
 21 |     pass
    |
-   = help: Replace `is` with `==`
+help: Replace `is` with `==`
 
 ℹ Safe fix
 17 17 | if ("123" != x) is 3:
@@ -139,18 +146,19 @@ F632.py:20:14: F632 [*] Use `==` to compare constant literals
 22 22 | 
 23 23 | {2 is
 
-F632.py:23:2: F632 [*] Use `!=` to compare constant literals
+F632 [*] Use `!=` to compare constant literals
+  --> F632.py:23:2
    |
 21 |       pass
 22 |
 23 |   {2 is
    |  __^
 24 | | not ''}
-   | |______^ F632
+   | |______^
 25 |
 26 |   {2 is
    |
-   = help: Replace `is not` with `!=`
+help: Replace `is not` with `!=`
 
 ℹ Safe fix
 20 20 | if "123" != (x is 3):
@@ -163,18 +171,19 @@ F632.py:23:2: F632 [*] Use `!=` to compare constant literals
 26 25 | {2 is
 27 26 |  not ''}
 
-F632.py:26:2: F632 [*] Use `!=` to compare constant literals
+F632 [*] Use `!=` to compare constant literals
+  --> F632.py:26:2
    |
 24 |   not ''}
 25 |
 26 |   {2 is
    |  __^
 27 | |  not ''}
-   | |_______^ F632
+   | |_______^
 28 |
 29 |   # Regression test for
    |
-   = help: Replace `is not` with `!=`
+help: Replace `is not` with `!=`
 
 ℹ Safe fix
 23 23 | {2 is
@@ -187,14 +196,15 @@ F632.py:26:2: F632 [*] Use `!=` to compare constant literals
 29 28 | # Regression test for
 30 29 | if values[1is not None ] is not '-':
 
-F632.py:30:4: F632 [*] Use `!=` to compare constant literals
+F632 [*] Use `!=` to compare constant literals
+  --> F632.py:30:4
    |
 29 | # Regression test for
 30 | if values[1is not None ] is not '-':
-   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F632
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 31 |     pass
    |
-   = help: Replace `is not` with `!=`
+help: Replace `is not` with `!=`
 
 ℹ Safe fix
 27 27 |  not ''}
@@ -206,14 +216,15 @@ F632.py:30:4: F632 [*] Use `!=` to compare constant literals
 32 32 | 
 33 33 | # Regression test for https://github.com/astral-sh/ruff/issues/11736
 
-F632.py:30:11: F632 [*] Use `!=` to compare constant literals
+F632 [*] Use `!=` to compare constant literals
+  --> F632.py:30:11
    |
 29 | # Regression test for
 30 | if values[1is not None ] is not '-':
-   |           ^^^^^^^^^^^^ F632
+   |           ^^^^^^^^^^^^
 31 |     pass
    |
-   = help: Replace `is not` with `!=`
+help: Replace `is not` with `!=`
 
 ℹ Safe fix
 27 27 |  not ''}
@@ -225,13 +236,14 @@ F632.py:30:11: F632 [*] Use `!=` to compare constant literals
 32 32 | 
 33 33 | # Regression test for https://github.com/astral-sh/ruff/issues/11736
 
-F632.py:34:12: F632 [*] Use `!=` to compare constant literals
+F632 [*] Use `!=` to compare constant literals
+  --> F632.py:34:12
    |
 33 | # Regression test for https://github.com/astral-sh/ruff/issues/11736
 34 | variable: "123 is not y"
-   |            ^^^^^^^^^^^^ F632
+   |            ^^^^^^^^^^^^
    |
-   = help: Replace `is not` with `!=`
+help: Replace `is not` with `!=`
 
 ℹ Safe fix
 31 31 |     pass

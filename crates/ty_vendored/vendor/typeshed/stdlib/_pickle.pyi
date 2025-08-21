@@ -6,6 +6,7 @@ from pickle import PickleBuffer as PickleBuffer
 from typing import Any, Protocol, type_check_only
 from typing_extensions import TypeAlias
 
+@type_check_only
 class _ReadableFileobj(Protocol):
     def read(self, n: int, /) -> bytes: ...
     def readline(self) -> bytes: ...

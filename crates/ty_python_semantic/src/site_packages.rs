@@ -23,9 +23,11 @@ use ruff_python_ast::PythonVersion;
 use ruff_python_trivia::Cursor;
 use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
 use ruff_text_size::{TextLen, TextRange};
+use strum::IntoEnumIterator;
 use ty_static::EnvVars;
 
 type SitePackagesDiscoveryResult<T> = Result<T, SitePackagesDiscoveryError>;
+type StdlibDiscoveryResult<T> = Result<T, StdlibDiscoveryError>;
 
 /// An ordered, deduplicated set of `site-packages` search paths.
 ///
@@ -48,8 +50,8 @@ type SitePackagesDiscoveryResult<T> = Result<T, SitePackagesDiscoveryError>;
 pub struct SitePackagesPaths(IndexSet<SystemPathBuf>);
 
 impl SitePackagesPaths {
-    fn single(path: SystemPathBuf) -> Self {
-        Self(IndexSet::from([path]))
+    fn is_empty(&self) -> bool {
+        self.0.is_empty()
     }
 
     fn insert(&mut self, path: SystemPathBuf) {
@@ -87,7 +89,7 @@ impl SitePackagesPaths {
 
         let parent_component = site_packages_ancestor_components.next()?;
 
-        if site_packages_ancestor_components.next()? != "lib" {
+        if site_packages_ancestor_components.next()? != UnixLibDir::Lib {
             return None;
         }
 
@@ -109,9 +111,9 @@ impl SitePackagesPaths {
     }
 }
 
-impl FromIterator<SystemPathBuf> for SitePackagesPaths {
-    fn from_iter<T: IntoIterator<Item = SystemPathBuf>>(iter: T) -> Self {
-        Self(IndexSet::from_iter(iter))
+impl<const N: usize> From<[SystemPathBuf; N]> for SitePackagesPaths {
+    fn from(paths: [SystemPathBuf; N]) -> Self {
+        Self(IndexSet::from(paths))
     }
 }
 
@@ -137,6 +139,12 @@ pub enum PythonEnvironment {
 }
 
 impl PythonEnvironment {
+    /// Discover the python environment using the following priorities:
+    ///
+    /// 1. activated virtual environment
+    /// 2. conda (child)
+    /// 3. working dir virtual environment
+    /// 4. conda (base)
     pub fn discover(
         project_root: &SystemPath,
         system: &dyn System,
@@ -159,13 +167,9 @@ impl PythonEnvironment {
             .map(Some);
         }
 
-        if let Ok(conda_env) = system.env_var(EnvVars::CONDA_PREFIX) {
-            return resolve_environment(
-                system,
-                SystemPath::new(&conda_env),
-                SysPrefixPathOrigin::CondaPrefixVar,
-            )
-            .map(Some);
+        if let Some(conda_env) = conda_environment_from_env(system, CondaEnvironmentKind::Child) {
+            return resolve_environment(system, &conda_env, SysPrefixPathOrigin::CondaPrefixVar)
+                .map(Some);
         }
 
         tracing::debug!("Discovering virtual environment in `{project_root}`");
@@ -186,6 +190,11 @@ impl PythonEnvironment {
                     );
                 }
             }
+        }
+
+        if let Some(conda_env) = conda_environment_from_env(system, CondaEnvironmentKind::Base) {
+            return resolve_environment(system, &conda_env, SysPrefixPathOrigin::CondaPrefixVar)
+                .map(Some);
         }
 
         Ok(None)
@@ -230,6 +239,59 @@ impl PythonEnvironment {
             Self::System(env) => env.site_packages_directories(system),
         }
     }
+
+    pub fn real_stdlib_path(&self, system: &dyn System) -> StdlibDiscoveryResult<SystemPathBuf> {
+        match self {
+            Self::Virtual(env) => env.real_stdlib_directory(system),
+            Self::System(env) => env.real_stdlib_directory(system),
+        }
+    }
+}
+
+/// Enumeration of the subdirectories of `sys.prefix` that could contain a
+/// `site-packages` directory if the host system is Unix-like.
+///
+/// For example, if `sys.prefix` is `.venv` and the Python version is 3.10,
+/// the `site-packages` directory could be located at `.venv/lib/python3.10/site-packages`,
+/// or at `.venv/lib64/python3.10/site-packages`, or there could indeed be `site-packages`
+/// directories at both of these locations.
+#[derive(Debug, Clone, Copy, Eq, PartialEq, strum_macros::EnumIter)]
+enum UnixLibDir {
+    Lib,
+    Lib64,
+}
+
+impl UnixLibDir {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Lib => "lib",
+            Self::Lib64 => "lib64",
+        }
+    }
+}
+
+impl std::fmt::Display for UnixLibDir {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl AsRef<SystemPath> for UnixLibDir {
+    fn as_ref(&self) -> &SystemPath {
+        SystemPath::new(self.as_str())
+    }
+}
+
+impl PartialEq<&str> for UnixLibDir {
+    fn eq(&self, other: &&str) -> bool {
+        self.as_str() == *other
+    }
+}
+
+impl PartialEq<UnixLibDir> for &str {
+    fn eq(&self, other: &UnixLibDir) -> bool {
+        other == self
+    }
 }
 
 /// The Python runtime that produced the venv.
@@ -250,12 +312,26 @@ pub(crate) enum PythonImplementation {
 impl PythonImplementation {
     /// Return the relative path from `sys.prefix` to the `site-packages` directory
     /// if this is a known implementation. Return `None` if this is an unknown implementation.
-    fn relative_site_packages_path(self, version: Option<PythonVersion>) -> Option<String> {
+    fn relative_site_packages_path(
+        self,
+        lib_dir: UnixLibDir,
+        version: Option<PythonVersion>,
+    ) -> Option<String> {
         match self {
             Self::CPython | Self::GraalPy => {
-                version.map(|version| format!("lib/python{version}/site-packages"))
+                version.map(|version| format!("{lib_dir}/python{version}/site-packages"))
             }
-            Self::PyPy => version.map(|version| format!("lib/pypy{version}/site-packages")),
+            Self::PyPy => version.map(|version| format!("{lib_dir}/pypy{version}/site-packages")),
+            Self::Unknown => None,
+        }
+    }
+
+    /// Return the relative path from `sys.prefix` to the directory containing the python stdlib's
+    /// .pys if this is a known implementation. Return `None` if this is an unknown implementation.
+    fn relative_stdlib_path(self, version: Option<PythonVersion>) -> Option<String> {
+        match self {
+            Self::CPython | Self::GraalPy => version.map(|version| format!("lib/python{version}")),
+            Self::PyPy => version.map(|version| format!("lib/pypy{version}")),
             Self::Unknown => None,
         }
     }
@@ -395,7 +471,7 @@ impl VirtualEnvironment {
 
     /// Return a list of `site-packages` directories that are available from this virtual environment
     ///
-    /// See the documentation for [`site_packages_directory_from_sys_prefix`] for more details.
+    /// See the documentation for [`site_packages_directories_from_sys_prefix`] for more details.
     pub(crate) fn site_packages_directories(
         &self,
         system: &dyn System,
@@ -411,9 +487,8 @@ impl VirtualEnvironment {
 
         let version = version.as_ref().map(|v| v.version);
 
-        let mut site_packages_directories = SitePackagesPaths::single(
-            site_packages_directory_from_sys_prefix(root_path, version, *implementation, system)?,
-        );
+        let mut site_packages_directories =
+            site_packages_directories_from_sys_prefix(root_path, version, *implementation, system)?;
 
         if let Some(parent_env_site_packages) = parent_environment.as_deref() {
             match parent_env_site_packages.site_packages_paths(system) {
@@ -438,14 +513,14 @@ impl VirtualEnvironment {
             // or if we fail to resolve the `site-packages` from the `sys.prefix` path,
             // we should probably print a warning but *not* abort type checking
             if let Some(sys_prefix_path) = system_sys_prefix {
-                match site_packages_directory_from_sys_prefix(
+                match site_packages_directories_from_sys_prefix(
                     &sys_prefix_path,
                     version,
                     *implementation,
                     system,
                 ) {
-                    Ok(site_packages_directory) => {
-                        site_packages_directories.insert(site_packages_directory);
+                    Ok(system_directories) => {
+                        site_packages_directories.extend(system_directories);
                     }
                     Err(error) => tracing::warn!(
                         "{error}. System site-packages will not be used for module resolution."
@@ -466,6 +541,115 @@ System site-packages will not be used for module resolution.",
         );
         Ok(site_packages_directories)
     }
+
+    /// Return the real stdlib path (containing actual .py files, and not some variation of typeshed).
+    ///
+    /// See the documentation for [`real_stdlib_directory_from_sys_prefix`] for more details.
+    pub(crate) fn real_stdlib_directory(
+        &self,
+        system: &dyn System,
+    ) -> StdlibDiscoveryResult<SystemPathBuf> {
+        let VirtualEnvironment {
+            base_executable_home_path,
+            implementation,
+            version,
+            // Unlike site-packages, what we're looking for is never inside the virtual environment
+            // so this is only used for diagnostics.
+            root_path,
+            // We don't need to respect this setting
+            include_system_site_packages: _,
+            // We don't need to inherit any info from the parent environment
+            parent_environment: _,
+        } = self;
+
+        // Unconditionally follow the same logic that `site_packages_directories` uses when
+        // `include_system_site_packages` is true, as those site-packages should be a subdir
+        // of the dir we're looking for.
+        let version = version.as_ref().map(|v| v.version);
+        if let Some(system_sys_prefix) =
+            SysPrefixPath::from_executable_home_path_real(system, base_executable_home_path)
+        {
+            let real_stdlib_directory = real_stdlib_directory_from_sys_prefix(
+                &system_sys_prefix,
+                version,
+                *implementation,
+                system,
+            );
+            match &real_stdlib_directory {
+                Ok(path) => tracing::debug!(
+                    "Resolved real stdlib path for this virtual environment is: {path}"
+                ),
+                Err(_) => tracing::debug!(
+                    "Failed to resolve real stdlib path for this virtual environment"
+                ),
+            }
+            real_stdlib_directory
+        } else {
+            let cfg_path = root_path.join("pyvenv.cfg");
+            tracing::debug!(
+                "Failed to resolve `sys.prefix` of the system Python installation \
+from the `home` value in the `pyvenv.cfg` file at `{cfg_path}`. \
+System stdlib will not be used for module definitions.",
+            );
+            Err(StdlibDiscoveryError::NoSysPrefixFound(cfg_path))
+        }
+    }
+}
+
+/// Different kinds of conda environment
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+pub(crate) enum CondaEnvironmentKind {
+    /// The base Conda environment; treated like a system Python environment.
+    Base,
+    /// Any other Conda environment; treated like a virtual environment.
+    Child,
+}
+
+impl CondaEnvironmentKind {
+    /// Compute the kind of `CONDA_PREFIX` we have.
+    ///
+    /// When the base environment is used, `CONDA_DEFAULT_ENV` will be set to a name, i.e., `base` or
+    /// `root` which does not match the prefix, e.g. `/usr/local` instead of
+    /// `/usr/local/conda/envs/<name>`.
+    fn from_prefix_path(system: &dyn System, path: &SystemPath) -> Self {
+        // If we cannot read `CONDA_DEFAULT_ENV`, there's no way to know if the base environment
+        let Ok(default_env) = system.env_var(EnvVars::CONDA_DEFAULT_ENV) else {
+            return CondaEnvironmentKind::Child;
+        };
+
+        // These are the expected names for the base environment
+        if default_env != "base" && default_env != "root" {
+            return CondaEnvironmentKind::Child;
+        }
+
+        let Some(name) = path.file_name() else {
+            return CondaEnvironmentKind::Child;
+        };
+
+        if name == default_env {
+            CondaEnvironmentKind::Base
+        } else {
+            CondaEnvironmentKind::Child
+        }
+    }
+}
+
+/// Read `CONDA_PREFIX` and confirm that it has the expected kind
+pub(crate) fn conda_environment_from_env(
+    system: &dyn System,
+    kind: CondaEnvironmentKind,
+) -> Option<SystemPathBuf> {
+    let dir = system
+        .env_var(EnvVars::CONDA_PREFIX)
+        .ok()
+        .filter(|value| !value.is_empty())?;
+    let path = SystemPathBuf::from(dir);
+
+    if kind != CondaEnvironmentKind::from_prefix_path(system, &path) {
+        return None;
+    }
+
+    Some(path)
 }
 
 /// A parser for `pyvenv.cfg` files: metadata files for virtual environments.
@@ -594,7 +778,7 @@ impl SystemEnvironment {
     /// Create a new system environment from the given path.
     ///
     /// At this time, there is no eager validation and this is infallible. Instead, validation
-    /// will occur in [`site_packages_directory_from_sys_prefix`] — which will fail if there is not
+    /// will occur in [`site_packages_directories_from_sys_prefix`] — which will fail if there is not
     /// a Python environment at the given path.
     pub(crate) fn new(path: SysPrefixPath) -> Self {
         Self { root_path: path }
@@ -602,25 +786,46 @@ impl SystemEnvironment {
 
     /// Return a list of `site-packages` directories that are available from this environment.
     ///
-    /// See the documentation for [`site_packages_directory_from_sys_prefix`] for more details.
+    /// See the documentation for [`site_packages_directories_from_sys_prefix`] for more details.
     pub(crate) fn site_packages_directories(
         &self,
         system: &dyn System,
     ) -> SitePackagesDiscoveryResult<SitePackagesPaths> {
         let SystemEnvironment { root_path } = self;
 
-        let site_packages_directories =
-            SitePackagesPaths::single(site_packages_directory_from_sys_prefix(
-                root_path,
-                None,
-                PythonImplementation::Unknown,
-                system,
-            )?);
+        let site_packages_directories = site_packages_directories_from_sys_prefix(
+            root_path,
+            None,
+            PythonImplementation::Unknown,
+            system,
+        )?;
 
         tracing::debug!(
             "Resolved site-packages directories for this environment are: {site_packages_directories:?}"
         );
         Ok(site_packages_directories)
+    }
+
+    /// Return a list of `site-packages` directories that are available from this environment.
+    ///
+    /// See the documentation for [`site_packages_directories_from_sys_prefix`] for more details.
+    pub(crate) fn real_stdlib_directory(
+        &self,
+        system: &dyn System,
+    ) -> StdlibDiscoveryResult<SystemPathBuf> {
+        let SystemEnvironment { root_path } = self;
+
+        let stdlib_directory = real_stdlib_directory_from_sys_prefix(
+            root_path,
+            None,
+            PythonImplementation::Unknown,
+            system,
+        )?;
+
+        tracing::debug!(
+            "Resolved real stdlib directory for this environment is: {stdlib_directory:?}"
+        );
+        Ok(stdlib_directory)
     }
 }
 
@@ -647,11 +852,27 @@ pub enum SitePackagesDiscoveryError {
     /// would be relative to the `sys.prefix` path, and we tried to fallback to iterating
     /// through the `<sys.prefix>/lib` directory looking for a `site-packages` directory,
     /// but we came across some I/O error while trying to do so.
-    CouldNotReadLibDirectory(SysPrefixPath, io::Error),
+    CouldNotReadLibDirectory(SysPrefixPath),
 
     /// We looked everywhere we could think of for the `site-packages` directory,
     /// but none could be found despite our best endeavours.
     NoSitePackagesDirFound(SysPrefixPath),
+}
+
+/// Enumeration of ways in which stdlib discovery can fail.
+#[derive(Debug)]
+pub enum StdlibDiscoveryError {
+    /// We looked everywhere we could think of for the standard library's directory,
+    /// but none could be found despite our best endeavours.
+    NoStdlibFound(SysPrefixPath),
+    /// Stdlib discovery failed because we're on a Unix system,
+    /// we weren't able to figure out from the `pyvenv.cfg` file exactly where the stdlib
+    /// would be relative to the `sys.prefix` path, and we tried to fallback to iterating
+    /// through the `<sys.prefix>/lib` directory looking for a stdlib directory,
+    /// but we came across some I/O error while trying to do so.
+    CouldNotReadLibDirectory(SysPrefixPath, io::Error),
+    /// We failed to resolve the value of `sys.prefix`.
+    NoSysPrefixFound(SystemPathBuf),
 }
 
 impl std::error::Error for SitePackagesDiscoveryError {
@@ -662,9 +883,9 @@ impl std::error::Error for SitePackagesDiscoveryError {
                 io_err.as_ref().map(|e| e as &dyn std::error::Error)
             }
             Self::NoPyvenvCfgFile(_, io_err) => Some(io_err),
-            Self::PyvenvCfgParseError(_, _) => None,
-            Self::CouldNotReadLibDirectory(_, io_err) => Some(io_err),
-            Self::NoSitePackagesDirFound(_) => None,
+            Self::PyvenvCfgParseError(_, _)
+            | Self::CouldNotReadLibDirectory(_)
+            | Self::NoSitePackagesDirFound(_) => None,
         }
     }
 }
@@ -702,11 +923,11 @@ impl std::fmt::Display for SitePackagesDiscoveryError {
                     "Failed to parse the `pyvenv.cfg` file at `{path}` because {kind}"
                 )
             }
-            Self::CouldNotReadLibDirectory(SysPrefixPath { inner, origin }, _) => display_error(
+            Self::CouldNotReadLibDirectory(SysPrefixPath { inner, origin }) => display_error(
                 f,
                 origin,
                 inner,
-                "Failed to iterate over the contents of the `lib` directory of the Python installation",
+                "Failed to iterate over the contents of the `lib`/`lib64` directories of the Python installation",
                 None,
             ),
             Self::NoSitePackagesDirFound(SysPrefixPath { inner, origin }) => display_error(
@@ -717,6 +938,43 @@ impl std::fmt::Display for SitePackagesDiscoveryError {
                 Some(
                     "Could not find a `site-packages` directory for this Python installation/executable",
                 ),
+            ),
+        }
+    }
+}
+
+impl std::error::Error for StdlibDiscoveryError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::CouldNotReadLibDirectory(_, io_err) => Some(io_err),
+            Self::NoStdlibFound(_) => None,
+            Self::NoSysPrefixFound(_) => None,
+        }
+    }
+}
+
+impl std::fmt::Display for StdlibDiscoveryError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NoSysPrefixFound(path) => {
+                write!(
+                    f,
+                    "Failed to resolve a `sys.prefix` from the `pyvenv.cfg` file at `{path}`"
+                )
+            }
+            Self::CouldNotReadLibDirectory(SysPrefixPath { inner, origin }, _) => display_error(
+                f,
+                origin,
+                inner,
+                "Failed to iterate over the contents of the `lib` directory of the Python installation",
+                None,
+            ),
+            Self::NoStdlibFound(SysPrefixPath { inner, origin }) => display_error(
+                f,
+                origin,
+                inner,
+                &format!("Invalid {origin}"),
+                Some("Could not find a stdlib directory for this Python installation/executable"),
             ),
         }
     }
@@ -817,19 +1075,19 @@ when trying to resolve the `home` value to a directory on disk: {io_err}"
     }
 }
 
-/// Attempt to retrieve the `site-packages` directory
+/// Attempt to retrieve the `site-packages` directories
 /// associated with a given Python installation.
 ///
-/// The location of the `site-packages` directory can vary according to the
+/// The location of the `site-packages` directories can vary according to the
 /// Python version that this installation represents. The Python version may
 /// or may not be known at this point, which is why the `python_version`
 /// parameter is an `Option`.
-fn site_packages_directory_from_sys_prefix(
+fn site_packages_directories_from_sys_prefix(
     sys_prefix_path: &SysPrefixPath,
     python_version: Option<PythonVersion>,
     implementation: PythonImplementation,
     system: &dyn System,
-) -> SitePackagesDiscoveryResult<SystemPathBuf> {
+) -> SitePackagesDiscoveryResult<SitePackagesPaths> {
     tracing::debug!(
         "Searching for site-packages directory in sys.prefix {}",
         sys_prefix_path.inner
@@ -839,10 +1097,10 @@ fn site_packages_directory_from_sys_prefix(
         let site_packages = sys_prefix_path.join(r"Lib\site-packages");
         return system
             .is_directory(&site_packages)
-            .then_some(site_packages)
-            .ok_or(SitePackagesDiscoveryError::NoSitePackagesDirFound(
-                sys_prefix_path.to_owned(),
-            ));
+            .then(|| SitePackagesPaths::from([site_packages]))
+            .ok_or_else(|| {
+                SitePackagesDiscoveryError::NoSitePackagesDirFound(sys_prefix_path.to_owned())
+            });
     }
 
     // In the Python standard library's `site.py` module (used for finding `site-packages`
@@ -854,41 +1112,50 @@ fn site_packages_directory_from_sys_prefix(
     //     libdirs.append("lib")
     // ```
     //
-    // Pyright therefore searches for both a `lib/python3.X/site-packages` directory
-    // and a `lib64/python3.X/site-packages` directory on non-MacOS Unix systems,
-    // since `sys.platlibdir` can sometimes be equal to `"lib64"`.
-    //
-    // However, we only care about the `site-packages` directory insofar as it allows
+    // We generally only care about the `site-packages` directory insofar as it allows
     // us to discover Python source code that can be used for inferring type
-    // information regarding third-party dependencies. That means that we don't need
-    // to care about any possible `lib64/site-packages` directories, since
-    // [the `sys`-module documentation] states that `sys.platlibdir` is *only* ever
-    // used for C extensions, never for pure-Python modules.
+    // information regarding third-party dependencies. In theory, therefore, that means
+    // that we don't need to care about any possible `lib64/site-packages` directories,
+    // since [the `sys`-module documentation] states that `sys.platlibdir` is *only* ever
+    // used for C extensions, never for pure-Python modules. However, in practice,
+    // some installers appear to do [some strange things on Fedora] that mean that `.py`
+    // files *can* end up in `lib64/site-packages` in some edge cases. And we'll probably
+    // need to start looking in `lib64/site-packages` directories in the future anyway, in
+    // order to distinguish between "unresolved import" and "resolved to an opaque C
+    // extension" in diagnostic messages.
     //
     // [the non-Windows branch]: https://github.com/python/cpython/blob/a8be8fc6c4682089be45a87bd5ee1f686040116c/Lib/site.py#L401-L410
     // [the `sys`-module documentation]: https://docs.python.org/3/library/sys.html#sys.platlibdir
+    // [some strange things on Fedora]: https://github.com/astral-sh/ty/issues/1043
+
+    let mut directories = SitePackagesPaths::default();
 
     // If we were able to figure out what Python version this installation is,
-    // we should be able to avoid iterating through all items in the `lib/` directory:
-    if let Some(expected_relative_path) = implementation.relative_site_packages_path(python_version)
-    {
-        let expected_absolute_path = sys_prefix_path.join(expected_relative_path);
-        if system.is_directory(&expected_absolute_path) {
-            return Ok(expected_absolute_path);
-        }
-
-        // CPython free-threaded (3.13+) variant: pythonXYt
-        if matches!(implementation, PythonImplementation::CPython)
-            && python_version.is_some_and(PythonVersion::free_threaded_build_available)
+    // we should be able to avoid iterating through all items in the `lib/` and `lib64/` directories:
+    for lib_dir in UnixLibDir::iter() {
+        if let Some(expected_relative_path) =
+            implementation.relative_site_packages_path(lib_dir, python_version)
         {
-            let alternative_path = sys_prefix_path.join(format!(
-                "lib/python{}t/site-packages",
-                python_version.unwrap()
-            ));
-            if system.is_directory(&alternative_path) {
-                return Ok(alternative_path);
+            let expected_absolute_path = sys_prefix_path.join(expected_relative_path);
+            if system.is_directory(&expected_absolute_path) {
+                directories.insert(expected_absolute_path);
+            } else if matches!(implementation, PythonImplementation::CPython)
+                && python_version.is_some_and(PythonVersion::free_threaded_build_available)
+            {
+                // CPython free-threaded (3.13+) variant: pythonX.Yt
+                let alternative_path = sys_prefix_path.join(format!(
+                    "{lib_dir}/python{}t/site-packages",
+                    python_version.unwrap()
+                ));
+                if system.is_directory(&alternative_path) {
+                    directories.insert(alternative_path);
+                }
             }
         }
+    }
+
+    if !directories.is_empty() {
+        return Ok(directories);
     }
 
     // Either we couldn't figure out the version before calling this function
@@ -899,10 +1166,115 @@ fn site_packages_directory_from_sys_prefix(
     // Note: the `python3.x` part of the `site-packages` path can't be computed from
     // the `--python-version` the user has passed, as they might be running Python 3.12 locally
     // even if they've requested that we type check their code "as if" they're running 3.8.
+    let mut found_at_least_one_lib_dir = false;
+
+    for lib_dir in UnixLibDir::iter() {
+        let Ok(directory_iterator) = system.read_directory(&sys_prefix_path.join(lib_dir)) else {
+            tracing::debug!("Could not find a `<sys.prefix>/{lib_dir}` directory; continuing");
+            continue;
+        };
+
+        found_at_least_one_lib_dir = true;
+
+        for entry_result in directory_iterator {
+            let Ok(entry) = entry_result else {
+                continue;
+            };
+
+            if !entry.file_type().is_directory() {
+                continue;
+            }
+
+            let mut path = entry.into_path();
+
+            let name = path.file_name().unwrap_or_else(|| panic!(
+                "File name should be non-null because path is guaranteed to be a child of `{lib_dir}`",
+            ));
+
+            if !(name.starts_with("python3.") || name.starts_with("pypy3.")) {
+                continue;
+            }
+
+            path.push("site-packages");
+            if system.is_directory(&path) {
+                directories.insert(path);
+            }
+        }
+    }
+
+    if directories.is_empty() {
+        if found_at_least_one_lib_dir {
+            Err(SitePackagesDiscoveryError::NoSitePackagesDirFound(
+                sys_prefix_path.to_owned(),
+            ))
+        } else {
+            Err(SitePackagesDiscoveryError::CouldNotReadLibDirectory(
+                sys_prefix_path.to_owned(),
+            ))
+        }
+    } else {
+        Ok(directories)
+    }
+}
+
+/// Attempt to retrieve the real stdlib directory
+/// associated with a given Python installation.
+///
+/// The location of the stdlib directory can vary according to the
+/// Python version that this installation represents. The Python version may
+/// or may not be known at this point, which is why the `python_version`
+/// parameter is an `Option`.
+fn real_stdlib_directory_from_sys_prefix(
+    sys_prefix_path: &SysPrefixPath,
+    python_version: Option<PythonVersion>,
+    implementation: PythonImplementation,
+    system: &dyn System,
+) -> StdlibDiscoveryResult<SystemPathBuf> {
+    tracing::debug!(
+        "Searching for real stdlib directory in sys.prefix {}",
+        sys_prefix_path.inner
+    );
+
+    if cfg!(target_os = "windows") {
+        let stdlib = sys_prefix_path.join("Lib");
+        return system.is_directory(&stdlib).then_some(stdlib).ok_or(
+            StdlibDiscoveryError::NoStdlibFound(sys_prefix_path.to_owned()),
+        );
+    }
+
+    // If we were able to figure out what Python version this installation is,
+    // we should be able to avoid iterating through all items in the `lib/` directory:
+    if let Some(expected_relative_path) = implementation.relative_stdlib_path(python_version) {
+        let expected_absolute_path = sys_prefix_path.join(expected_relative_path);
+        if system.is_directory(&expected_absolute_path) {
+            return Ok(expected_absolute_path);
+        }
+
+        // CPython free-threaded (3.13+) variant: pythonXYt
+        if matches!(implementation, PythonImplementation::CPython)
+            && python_version.is_some_and(PythonVersion::free_threaded_build_available)
+        {
+            let alternative_path =
+                sys_prefix_path.join(format!("lib/python{}t", python_version.unwrap()));
+            if system.is_directory(&alternative_path) {
+                return Ok(alternative_path);
+            }
+        }
+    }
+
+    // Either we couldn't figure out the version before calling this function
+    // (e.g., from a `pyvenv.cfg` file if this was a venv),
+    // or we couldn't find a stdlib folder at the expected location given
+    // the parsed version
+    //
+    // Note: the `python3.x` part of the stdlib path can't be computed from
+    // the `--python-version` the user has passed, as they might be running Python 3.12 locally
+    // even if they've requested that we type check their code "as if" they're running 3.8.
     for entry_result in system
-        .read_directory(&sys_prefix_path.join("lib"))
+        // must be `lib`, not `lib64`, for the stdlib
+        .read_directory(&sys_prefix_path.join(UnixLibDir::Lib))
         .map_err(|io_err| {
-            SitePackagesDiscoveryError::CouldNotReadLibDirectory(sys_prefix_path.to_owned(), io_err)
+            StdlibDiscoveryError::CouldNotReadLibDirectory(sys_prefix_path.to_owned(), io_err)
         })?
     {
         let Ok(entry) = entry_result else {
@@ -913,22 +1285,19 @@ fn site_packages_directory_from_sys_prefix(
             continue;
         }
 
-        let mut path = entry.into_path();
+        let path = entry.into_path();
 
-        let name = path
-            .file_name()
-            .expect("File name to be non-null because path is guaranteed to be a child of `lib`");
+        let name = path.file_name().expect(
+            "File name should be non-null because path is guaranteed to be a child of `lib`",
+        );
 
         if !(name.starts_with("python3.") || name.starts_with("pypy3.")) {
             continue;
         }
 
-        path.push("site-packages");
-        if system.is_directory(&path) {
-            return Ok(path);
-        }
+        return Ok(path);
     }
-    Err(SitePackagesDiscoveryError::NoSitePackagesDirFound(
+    Err(StdlibDiscoveryError::NoStdlibFound(
         sys_prefix_path.to_owned(),
     ))
 }
@@ -1044,6 +1413,77 @@ impl SysPrefixPath {
         } else {
             path.parent().map(|path| Self {
                 inner: path.to_path_buf(),
+                origin: SysPrefixPathOrigin::DerivedFromPyvenvCfg,
+            })
+        }
+    }
+    /// Like `from_executable_home_path` but attempts to resolve through symlink facades
+    /// to find a sys prefix that will actually contain the stdlib.
+    fn from_executable_home_path_real(system: &dyn System, path: &PythonHomePath) -> Option<Self> {
+        let mut home_path = path.0.clone();
+
+        // Try to find the python executable in the given directory and canonicalize it
+        // to resolve any symlink. This is (at least) necessary for homebrew pythons
+        // and the macOS system python.
+        //
+        // In python installations like homebrew, the home path points to a directory like
+        // `/opt/homebrew/opt/python@3.13/bin` and indeed if you look for `../lib/python3.13/`
+        // you *will* find `site-packages` but you *won't* find the stdlib! (For the macOS
+        // system install you won't even find `site-packages` here.)
+        //
+        // However if you look at `/opt/homebrew/opt/python@3.13/bin/python3.13` (the actual
+        // python executable in that dir) you will find that it's a symlink to something like
+        // `../Frameworks/Python.framework/Versions/3.13/bin/python3.13`
+        //
+        // From this Framework binary path if you go to `../../lib/python3.13/` you will then
+        // find the python stdlib as expected (and a different instance of site-packages).
+        //
+        // FIXME: it would be nice to include a "we know the python name" fastpath like in
+        // `real_stdlib_directory_from_sys_prefix`.
+        if let Ok(dir) = system.read_directory(&home_path) {
+            for entry_result in dir {
+                let Ok(entry) = entry_result else {
+                    continue;
+                };
+
+                if entry.file_type().is_directory() {
+                    continue;
+                }
+
+                let path = entry.into_path();
+
+                let name = path.file_name().expect(
+                    "File name should be non-null because path is guaranteed to be a child of `lib`",
+                );
+
+                if !(name.starts_with("python3.") || name.starts_with("pypy3.")) {
+                    continue;
+                }
+
+                let Ok(canonical_path) = system.canonicalize_path(&path) else {
+                    continue;
+                };
+
+                let Some(parent) = canonical_path.parent() else {
+                    continue;
+                };
+
+                home_path = parent.to_path_buf();
+                break;
+            }
+        }
+
+        // No need to check whether `path.parent()` is a directory:
+        // the parent of a canonicalised path that is known to exist
+        // is guaranteed to be a directory.
+        if cfg!(target_os = "windows") {
+            Some(Self {
+                inner: home_path.to_path_buf(),
+                origin: SysPrefixPathOrigin::DerivedFromPyvenvCfg,
+            })
+        } else {
+            home_path.parent().map(|home_path| Self {
+                inner: home_path.to_path_buf(),
                 origin: SysPrefixPathOrigin::DerivedFromPyvenvCfg,
             })
         }
@@ -1417,6 +1857,10 @@ mod tests {
                     &expected_venv_site_packages
                 );
             }
+
+            let stdlib_directory = venv.real_stdlib_directory(&self.system).unwrap();
+            let expected_stdlib_directory = self.expected_system_stdlib();
+            assert_eq!(stdlib_directory, expected_stdlib_directory);
         }
 
         #[track_caller]
@@ -1444,6 +1888,10 @@ mod tests {
                 site_packages_directories,
                 std::slice::from_ref(&expected_site_packages)
             );
+
+            let stdlib_directory = env.real_stdlib_directory(&self.system).unwrap();
+            let expected_stdlib_directory = self.expected_system_stdlib();
+            assert_eq!(stdlib_directory, expected_stdlib_directory);
         }
 
         fn expected_system_site_packages(&self) -> SystemPathBuf {
@@ -1457,6 +1905,21 @@ mod tests {
             } else {
                 SystemPathBuf::from(&*format!(
                     "/Python3.{minor_version}/lib/python3.{minor_version}/site-packages"
+                ))
+            }
+        }
+
+        fn expected_system_stdlib(&self) -> SystemPathBuf {
+            let minor_version = self.minor_version;
+            if cfg!(target_os = "windows") {
+                SystemPathBuf::from(&*format!(r"\Python3.{minor_version}\Lib"))
+            } else if self.free_threaded {
+                SystemPathBuf::from(&*format!(
+                    "/Python3.{minor_version}/lib/python3.{minor_version}t"
+                ))
+            } else {
+                SystemPathBuf::from(&*format!(
+                    "/Python3.{minor_version}/lib/python3.{minor_version}"
                 ))
             }
         }

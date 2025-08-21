@@ -1,14 +1,15 @@
 ---
 source: crates/ruff_linter/src/linter.rs
 ---
-<filename>:7:13: PYI019 [*] Use `Self` instead of custom TypeVar `T`
+PYI019 [*] Use `Self` instead of custom TypeVar `T`
+ --> <filename>:7:13
   |
 6 | class C:
 7 |     def __new__(cls: type[T]) -> T:
-  |                ^^^^^^^^^^^^^^^^^^^ PYI019
+  |                ^^^^^^^^^^^^^^^^^^^
 8 |               return cls
   |
-  = help: Replace TypeVar `T` with `Self`
+help: Replace TypeVar `T` with `Self`
 
 ℹ Safe fix
 1 1 | 

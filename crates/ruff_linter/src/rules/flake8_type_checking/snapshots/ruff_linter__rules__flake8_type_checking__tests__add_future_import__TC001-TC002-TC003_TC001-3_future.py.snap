@@ -1,14 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 ---
-TC001-3_future.py:1:25: TC003 [*] Move standard library import `collections.Counter` into a type-checking block
+TC003 [*] Move standard library import `collections.Counter` into a type-checking block
+ --> TC001-3_future.py:1:25
   |
 1 | from collections import Counter
-  |                         ^^^^^^^ TC003
+  |                         ^^^^^^^
 2 |
 3 | from elsewhere import third_party
   |
-  = help: Move into type-checking block
+help: Move into type-checking block
 
 ℹ Unsafe fix
 1     |-from collections import Counter
@@ -25,16 +26,17 @@ TC001-3_future.py:1:25: TC003 [*] Move standard library import `collections.Coun
 7  11 | 
 8  12 | def f(x: first_party.foo): ...
 
-TC001-3_future.py:3:23: TC002 [*] Move third-party import `elsewhere.third_party` into a type-checking block
+TC002 [*] Move third-party import `elsewhere.third_party` into a type-checking block
+ --> TC001-3_future.py:3:23
   |
 1 | from collections import Counter
 2 |
 3 | from elsewhere import third_party
-  |                       ^^^^^^^^^^^ TC002
+  |                       ^^^^^^^^^^^
 4 |
 5 | from . import first_party
   |
-  = help: Move into type-checking block
+help: Move into type-checking block
 
 ℹ Unsafe fix
    1  |+from __future__ import annotations
@@ -51,14 +53,15 @@ TC001-3_future.py:3:23: TC002 [*] Move third-party import `elsewhere.third_party
 7  11 | 
 8  12 | def f(x: first_party.foo): ...
 
-TC001-3_future.py:5:15: TC001 [*] Move application import `.first_party` into a type-checking block
+TC001 [*] Move application import `.first_party` into a type-checking block
+ --> TC001-3_future.py:5:15
   |
 3 | from elsewhere import third_party
 4 |
 5 | from . import first_party
-  |               ^^^^^^^^^^^ TC001
+  |               ^^^^^^^^^^^
   |
-  = help: Move into type-checking block
+help: Move into type-checking block
 
 ℹ Unsafe fix
    1  |+from __future__ import annotations

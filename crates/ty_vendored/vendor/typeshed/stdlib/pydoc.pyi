@@ -44,7 +44,7 @@ from builtins import list as _list  # "list" conflicts with method name
 from collections.abc import Callable, Container, Mapping, MutableMapping
 from reprlib import Repr
 from types import MethodType, ModuleType, TracebackType
-from typing import IO, Any, AnyStr, Final, NoReturn, Protocol, TypeVar
+from typing import IO, Any, AnyStr, Final, NoReturn, Protocol, TypeVar, type_check_only
 from typing_extensions import TypeGuard, deprecated
 
 __all__ = ["help"]
@@ -56,6 +56,7 @@ __date__: Final[str]
 __version__: Final[str]
 __credits__: Final[str]
 
+@type_check_only
 class _Pager(Protocol):
     def __call__(self, text: str, title: str = "") -> None: ...
 

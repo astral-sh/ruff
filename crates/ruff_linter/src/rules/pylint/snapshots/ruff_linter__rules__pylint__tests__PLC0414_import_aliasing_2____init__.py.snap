@@ -1,14 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-__init__.py:1:8: PLC0414 [*] Import alias does not rename original package
+PLC0414 [*] Import alias does not rename original package
+ --> __init__.py:1:8
   |
 1 | import collections as collections
-  |        ^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0414
+  |        ^^^^^^^^^^^^^^^^^^^^^^^^^^
 2 | from collections import OrderedDict as OrderedDict
 3 | from . import foo as foo
   |
-  = help: Remove import alias
+help: Remove import alias
 
 ℹ Unsafe fix
 1   |-import collections as collections

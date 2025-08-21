@@ -151,7 +151,7 @@ impl<'db> Mro<'db> {
                             )
                     ) =>
             {
-                ClassBase::try_from_type(db, *single_base).map_or_else(
+                ClassBase::try_from_type(db, *single_base, class.class_literal(db).0).map_or_else(
                     || Err(MroErrorKind::InvalidBases(Box::from([(0, *single_base)]))),
                     |single_base| {
                         if single_base.has_cyclic_mro(db) {
@@ -186,7 +186,7 @@ impl<'db> Mro<'db> {
                             &original_bases[i + 1..],
                         );
                     } else {
-                        match ClassBase::try_from_type(db, *base) {
+                        match ClassBase::try_from_type(db, *base, class.class_literal(db).0) {
                             Some(valid_base) => resolved_bases.push(valid_base),
                             None => invalid_bases.push((i, *base)),
                         }
@@ -253,7 +253,9 @@ impl<'db> Mro<'db> {
                     // `inconsistent-mro` diagnostic (which would be accurate -- but not nearly as
                     // precise!).
                     for (index, base) in original_bases.iter().enumerate() {
-                        let Some(base) = ClassBase::try_from_type(db, *base) else {
+                        let Some(base) =
+                            ClassBase::try_from_type(db, *base, class.class_literal(db).0)
+                        else {
                             continue;
                         };
                         base_to_indices.entry(base).or_default().push(index);
@@ -269,7 +271,10 @@ impl<'db> Mro<'db> {
                             continue;
                         }
                         match base {
-                            ClassBase::Class(_) | ClassBase::Generic | ClassBase::Protocol => {
+                            ClassBase::Class(_)
+                            | ClassBase::Generic
+                            | ClassBase::Protocol
+                            | ClassBase::TypedDict => {
                                 errors.push(DuplicateBaseError {
                                     duplicate_base: base,
                                     first_index: *first_index,

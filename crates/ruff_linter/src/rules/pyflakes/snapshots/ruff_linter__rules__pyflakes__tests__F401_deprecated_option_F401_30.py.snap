@@ -1,14 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-F401_30.py:6:19: F401 [*] `.main.MaμToMan` imported but unused
+F401 [*] `.main.MaμToMan` imported but unused
+ --> F401_30.py:6:19
   |
 4 | """
 5 |
 6 | from .main import MaµToMan
-  |                   ^^^^^^^^ F401
+  |                   ^^^^^^^^
   |
-  = help: Remove unused import: `.main.MaμToMan`
+help: Remove unused import: `.main.MaμToMan`
 
 ℹ Safe fix
 3 3 | even if they have characters in them that undergo NFKC normalization

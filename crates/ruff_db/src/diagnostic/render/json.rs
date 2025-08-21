@@ -6,7 +6,7 @@ use ruff_notebook::NotebookIndex;
 use ruff_source_file::{LineColumn, OneIndexed};
 use ruff_text_size::Ranged;
 
-use crate::diagnostic::{Diagnostic, DiagnosticSource, DisplayDiagnosticConfig, SecondaryCode};
+use crate::diagnostic::{Diagnostic, DiagnosticSource, DisplayDiagnosticConfig};
 
 use super::FileResolver;
 
@@ -99,7 +99,7 @@ pub(super) fn diagnostic_to_json<'a>(
     // In preview, the locations and filename can be optional.
     if config.preview {
         JsonDiagnostic {
-            code: diagnostic.secondary_code(),
+            code: diagnostic.secondary_code_or_id(),
             url: diagnostic.to_ruff_url(),
             message: diagnostic.body(),
             fix,
@@ -111,7 +111,7 @@ pub(super) fn diagnostic_to_json<'a>(
         }
     } else {
         JsonDiagnostic {
-            code: diagnostic.secondary_code(),
+            code: diagnostic.secondary_code_or_id(),
             url: diagnostic.to_ruff_url(),
             message: diagnostic.body(),
             fix,
@@ -221,7 +221,7 @@ impl Serialize for ExpandedEdits<'_> {
 #[derive(Serialize)]
 pub(crate) struct JsonDiagnostic<'a> {
     cell: Option<OneIndexed>,
-    code: Option<&'a SecondaryCode>,
+    code: &'a str,
     end_location: Option<JsonLocation>,
     filename: Option<&'a str>,
     fix: Option<JsonFix<'a>>,
@@ -302,7 +302,7 @@ mod tests {
         [
           {
             "cell": null,
-            "code": null,
+            "code": "test-diagnostic",
             "end_location": {
               "column": 1,
               "row": 1
@@ -336,7 +336,7 @@ mod tests {
         [
           {
             "cell": null,
-            "code": null,
+            "code": "test-diagnostic",
             "end_location": null,
             "filename": null,
             "fix": null,

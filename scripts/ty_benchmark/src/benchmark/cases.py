@@ -58,7 +58,7 @@ class Ty(Tool):
     name: str
 
     def __init__(self, *, path: Path | None = None):
-        self.name = str(path) or "ty"
+        self.name = str(path) if path else "ty"
         self.path = (
             path or (Path(__file__) / "../../../../../target/release/ty")
         ).resolve()

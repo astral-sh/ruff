@@ -21,7 +21,7 @@ from _imp import (
 from _typeshed import StrPath
 from os import PathLike
 from types import TracebackType
-from typing import IO, Any, Protocol
+from typing import IO, Any, Protocol, type_check_only
 
 SEARCH_ERROR: int
 PY_SOURCE: int
@@ -95,6 +95,7 @@ class NullImporter:
 
 # Technically, a text file has to support a slightly different set of operations than a binary file,
 # but we ignore that here.
+@type_check_only
 class _FileLike(Protocol):
     closed: bool
     mode: str

@@ -1900,7 +1900,7 @@ impl<'a> From<&'a Expr> for HashableExpr<'a> {
     fn from(expr: &'a Expr) -> Self {
         /// Returns a version of the given expression that can be hashed and compared according to
         /// Python  semantics.
-        fn as_hashable(expr: &Expr) -> ComparableExpr {
+        fn as_hashable(expr: &Expr) -> ComparableExpr<'_> {
             match expr {
                 Expr::Named(named) => ComparableExpr::NamedExpr(ExprNamed {
                     target: Box::new(ComparableExpr::from(&named.target)),

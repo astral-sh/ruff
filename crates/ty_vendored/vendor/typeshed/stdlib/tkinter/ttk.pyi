@@ -17,7 +17,7 @@ import tkinter
 from _typeshed import Incomplete, MaybeNone
 from collections.abc import Callable
 from tkinter.font import _FontDescription
-from typing import Any, Literal, TypedDict, overload
+from typing import Any, Literal, TypedDict, overload, type_check_only
 from typing_extensions import TypeAlias
 
 __all__ = [
@@ -1679,6 +1679,7 @@ class Spinbox(Entry):
     def set(self, value: Any) -> None:
         """Sets the value of the Spinbox to value."""
 
+@type_check_only
 class _TreeviewItemDict(TypedDict):
     text: str
     image: list[str] | Literal[""]  # no idea why it's wrapped in list
@@ -1686,6 +1687,7 @@ class _TreeviewItemDict(TypedDict):
     open: bool  # actually 0 or 1
     tags: list[str] | Literal[""]
 
+@type_check_only
 class _TreeviewTagDict(TypedDict):
     # There is also 'text' and 'anchor', but they don't seem to do anything, using them is likely a bug
     foreground: str
@@ -1693,6 +1695,7 @@ class _TreeviewTagDict(TypedDict):
     font: _FontDescription
     image: str  # not wrapped in list :D
 
+@type_check_only
 class _TreeviewHeaderDict(TypedDict):
     text: str
     image: list[str] | Literal[""]
@@ -1700,6 +1703,7 @@ class _TreeviewHeaderDict(TypedDict):
     command: str
     state: str  # Doesn't seem to appear anywhere else than in these dicts
 
+@type_check_only
 class _TreeviewColumnDict(TypedDict):
     width: int
     minwidth: int

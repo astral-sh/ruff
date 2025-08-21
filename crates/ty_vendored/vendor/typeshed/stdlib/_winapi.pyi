@@ -172,6 +172,9 @@ if sys.platform == "win32":
         ERROR_ACCESS_DENIED: Final = 5
         ERROR_PRIVILEGE_NOT_HELD: Final = 1314
 
+    if sys.version_info >= (3, 14):
+        COPY_FILE_DIRECTORY: Final = 0x00000080
+
     def CloseHandle(handle: int, /) -> None:
         """Close handle."""
 

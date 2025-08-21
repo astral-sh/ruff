@@ -1,40 +1,45 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_django/mod.rs
 ---
-DJ008.py:6:7: DJ008 Model does not define `__str__` method
+DJ008 Model does not define `__str__` method
+ --> DJ008.py:6:7
   |
 5 | # Models without __str__
 6 | class TestModel1(models.Model):
-  |       ^^^^^^^^^^ DJ008
+  |       ^^^^^^^^^^
 7 |     new_field = models.CharField(max_length=10)
   |
 
-DJ008.py:21:7: DJ008 Model does not define `__str__` method
+DJ008 Model does not define `__str__` method
+  --> DJ008.py:21:7
    |
 21 | class TestModel2(Model):
-   |       ^^^^^^^^^^ DJ008
+   |       ^^^^^^^^^^
 22 |     new_field = models.CharField(max_length=10)
    |
 
-DJ008.py:36:7: DJ008 Model does not define `__str__` method
+DJ008 Model does not define `__str__` method
+  --> DJ008.py:36:7
    |
 36 | class TestModel3(Model):
-   |       ^^^^^^^^^^ DJ008
+   |       ^^^^^^^^^^
 37 |     new_field = models.CharField(max_length=10)
    |
 
-DJ008.py:182:7: DJ008 Model does not define `__str__` method
+DJ008 Model does not define `__str__` method
+   --> DJ008.py:182:7
     |
 181 | # Subclass without __str__
 182 | class SubclassTestModel3(TestModel1):
-    |       ^^^^^^^^^^^^^^^^^^ DJ008
+    |       ^^^^^^^^^^^^^^^^^^
 183 |     pass
     |
 
-DJ008.py:215:7: DJ008 Model does not define `__str__` method
+DJ008 Model does not define `__str__` method
+   --> DJ008.py:215:7
     |
 215 | class TypeAnnotatedNonAbstractModel(models.Model):
-    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DJ008
+    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 216 |     """Model with type-annotated abstract = False - should trigger DJ008"""
 217 |     new_field = models.CharField(max_length=10)
     |

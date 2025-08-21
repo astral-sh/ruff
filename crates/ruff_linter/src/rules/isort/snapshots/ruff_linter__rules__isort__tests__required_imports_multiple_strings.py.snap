@@ -1,7 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-multiple_strings.py:1:1: I002 [*] Missing required import: `from __future__ import annotations`
+I002 [*] Missing required import: `from __future__ import annotations`
+--> multiple_strings.py:1:1
+help: Insert required import: `from __future__ import annotations`
+
 ℹ Safe fix
 1 1 | """This is a docstring."""
   2 |+from __future__ import annotations
@@ -9,7 +12,10 @@ multiple_strings.py:1:1: I002 [*] Missing required import: `from __future__ impo
 3 4 | "This is also not a docstring."
 4 5 | 
 
-multiple_strings.py:1:1: I002 [*] Missing required import: `from __future__ import generator_stop`
+I002 [*] Missing required import: `from __future__ import generator_stop`
+--> multiple_strings.py:1:1
+help: Insert required import: `from __future__ import generator_stop`
+
 ℹ Safe fix
 1 1 | """This is a docstring."""
   2 |+from __future__ import generator_stop

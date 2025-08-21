@@ -1,17 +1,18 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-UP018_LF.py:3:1: UP018 [*] Unnecessary `int` call (rewrite as a literal)
+UP018 [*] Unnecessary `int` call (rewrite as a literal)
+ --> UP018_LF.py:3:1
   |
 1 |   # Keep parentheses around preserved \n 
 2 |
 3 | / int(-
 4 | |     1)
-  | |______^ UP018
+  | |______^
 5 |
 6 |   int(+
   |
-  = help: Replace with integer literal
+help: Replace with integer literal
 
 ℹ Safe fix
 1 1 | # Keep parentheses around preserved \n 
@@ -22,15 +23,16 @@ UP018_LF.py:3:1: UP018 [*] Unnecessary `int` call (rewrite as a literal)
 5 5 | 
 6 6 | int(+
 
-UP018_LF.py:6:1: UP018 [*] Unnecessary `int` call (rewrite as a literal)
+UP018 [*] Unnecessary `int` call (rewrite as a literal)
+ --> UP018_LF.py:6:1
   |
 4 |       1)
 5 |
 6 | / int(+
 7 | |     1)
-  | |______^ UP018
+  | |______^
   |
-  = help: Replace with integer literal
+help: Replace with integer literal
 
 ℹ Safe fix
 3 3 | int(-

@@ -23,7 +23,7 @@ def foo() -> str:
 ";
 
     let mut server = TestServerBuilder::new()?
-        .with_workspace(workspace_root, ClientOptions::default())?
+        .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content)?
         .enable_pull_diagnostics(true)
         .build()?
@@ -49,7 +49,7 @@ def foo() -> str:
 ";
 
     let mut server = TestServerBuilder::new()?
-        .with_workspace(workspace_root, ClientOptions::default())?
+        .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content)?
         .enable_pull_diagnostics(true)
         .build()?
@@ -105,7 +105,7 @@ def foo() -> str:
 ";
 
     let mut server = TestServerBuilder::new()?
-        .with_workspace(workspace_root, ClientOptions::default())?
+        .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content_v1)?
         .enable_pull_diagnostics(true)
         .build()?
@@ -217,14 +217,11 @@ def foo() -> str:
     return 42  # Same error: expected str, got int
 ";
 
-    let global_options = ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace);
-
     let mut server = TestServerBuilder::new()?
-        .with_workspace(
-            workspace_root,
+        .with_workspace(workspace_root, None)?
+        .with_initialization_options(
             ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
-        )?
-        .with_initialization_options(global_options)
+        )
         .with_file(file_a, file_a_content)?
         .with_file(file_b, file_b_content_v1)?
         .with_file(file_c, file_c_content_v1)?
@@ -335,12 +332,12 @@ def foo() -> str:
     return 42
 ";
 
-    let global_options = ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace);
-
     let mut server = TestServerBuilder::new()?
-        .with_workspace(workspace_root, global_options.clone())?
+        .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content)?
-        .with_initialization_options(global_options)
+        .with_initialization_options(
+            ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
+        )
         .enable_pull_diagnostics(true)
         .build()?
         .wait_until_workspaces_are_initialized()?;
@@ -431,14 +428,11 @@ def foo() -> str:
     return 42  # Type error: expected str, got int
 ";
 
-    let global_options = ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace);
-
     let mut builder = TestServerBuilder::new()?
-        .with_workspace(
-            workspace_root,
+        .with_workspace(workspace_root, None)?
+        .with_initialization_options(
             ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
-        )?
-        .with_initialization_options(global_options);
+        );
 
     for i in 0..NUM_FILES {
         let file_path_string = format!("src/file_{i:03}.py");
@@ -467,7 +461,7 @@ def foo() -> str:
 
     // First, read the response of the workspace diagnostic request.
     // Note: This response comes after the progress notifications but it simplifies the test to read it first.
-    let final_response = server.await_response::<WorkspaceDiagnosticReportResult>(&request_id)?;
+    let final_response = server.await_response::<WorkspaceDiagnosticRequest>(&request_id)?;
 
     // Process the final report.
     // This should always be a partial report. However, the type definition in the LSP specification
@@ -523,11 +517,11 @@ fn workspace_diagnostic_streaming_with_caching() -> Result<()> {
     let error_content = "def foo() -> str:\n    return 42  # Error";
     let changed_content = "def foo() -> str:\n    return true  # Error";
 
-    let global_options = ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace);
-
     let mut builder = TestServerBuilder::new()?
-        .with_workspace(workspace_root, global_options.clone())?
-        .with_initialization_options(global_options);
+        .with_workspace(workspace_root, None)?
+        .with_initialization_options(
+            ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
+        );
 
     for i in 0..NUM_FILES {
         let file_path_string = format!("src/error_{i}.py");
@@ -596,7 +590,7 @@ fn workspace_diagnostic_streaming_with_caching() -> Result<()> {
             },
         });
 
-    let final_response2 = server.await_response::<WorkspaceDiagnosticReportResult>(&request2_id)?;
+    let final_response2 = server.await_response::<WorkspaceDiagnosticRequest>(&request2_id)?;
 
     let mut all_items = Vec::new();
 
@@ -739,8 +733,7 @@ def hello() -> str:
     );
 
     // The workspace diagnostic request should now complete with the new diagnostic
-    let workspace_response =
-        server.await_response::<WorkspaceDiagnosticReportResult>(&request_id)?;
+    let workspace_response = server.await_response::<WorkspaceDiagnosticRequest>(&request_id)?;
 
     // Verify we got a report with one file containing the new diagnostic
     assert_debug_snapshot!(
@@ -782,7 +775,7 @@ def hello() -> str:
     server.cancel(&request_id);
 
     // The workspace diagnostic request should now respond with a cancellation response (Err).
-    let result = server.await_response::<WorkspaceDiagnosticReportResult>(&request_id);
+    let result = server.await_response::<WorkspaceDiagnosticRequest>(&request_id);
     assert_debug_snapshot!(
         "workspace_diagnostic_long_polling_cancellation_result",
         result
@@ -840,7 +833,7 @@ def hello() -> str:
     );
 
     // First request should complete with diagnostics
-    let first_response = server.await_response::<WorkspaceDiagnosticReportResult>(&request_id_1)?;
+    let first_response = server.await_response::<WorkspaceDiagnosticRequest>(&request_id_1)?;
 
     // Extract result IDs from the first response for the second request
     let previous_result_ids = extract_result_ids_from_response(&first_response);
@@ -873,8 +866,7 @@ def hello() -> str:
     );
 
     // Second request should complete with the fix (no diagnostics)
-    let second_response =
-        server.await_response::<WorkspaceDiagnosticReportResult>(&request_id_2)?;
+    let second_response = server.await_response::<WorkspaceDiagnosticRequest>(&request_id_2)?;
 
     // Snapshot both responses to verify the full cycle
     assert_debug_snapshot!(
@@ -895,12 +887,12 @@ fn create_workspace_server_with_file(
     file_path: &SystemPath,
     file_content: &str,
 ) -> Result<TestServer> {
-    let global_options = ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace);
-
     TestServerBuilder::new()?
-        .with_workspace(workspace_root, global_options.clone())?
+        .with_workspace(workspace_root, None)?
         .with_file(file_path, file_content)?
-        .with_initialization_options(global_options)
+        .with_initialization_options(
+            ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
+        )
         .enable_pull_diagnostics(true)
         .build()?
         .wait_until_workspaces_are_initialized()
@@ -930,10 +922,10 @@ fn shutdown_and_await_workspace_diagnostic(
     let shutdown_id = server.send_request::<lsp_types::request::Shutdown>(());
 
     // The workspace diagnostic request should now respond with an empty report
-    let workspace_response = server.await_response::<WorkspaceDiagnosticReportResult>(request_id);
+    let workspace_response = server.await_response::<WorkspaceDiagnosticRequest>(request_id);
 
     // Complete shutdown sequence
-    server.await_response::<()>(&shutdown_id)?;
+    server.await_response::<lsp_types::request::Shutdown>(&shutdown_id)?;
     server.send_notification::<lsp_types::notification::Exit>(());
 
     workspace_response
@@ -944,7 +936,7 @@ fn assert_workspace_diagnostics_suspends_for_long_polling(
     server: &mut TestServer,
     request_id: &lsp_server::RequestId,
 ) {
-    match server.await_response::<WorkspaceDiagnosticReportResult>(request_id) {
+    match server.await_response::<WorkspaceDiagnosticRequest>(request_id) {
         Ok(_) => {
             panic!("Expected workspace diagnostic request to suspend for long-polling.");
         }

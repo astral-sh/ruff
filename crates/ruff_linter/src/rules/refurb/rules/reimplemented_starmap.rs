@@ -343,7 +343,9 @@ enum ComprehensionTarget<'a> {
 }
 
 /// Extract the target from the comprehension (e.g., `(x, y, z)` in `(x, y, z, ...) in iter`).
-fn match_comprehension_target(comprehension: &ast::Comprehension) -> Option<ComprehensionTarget> {
+fn match_comprehension_target(
+    comprehension: &ast::Comprehension,
+) -> Option<ComprehensionTarget<'_>> {
     if comprehension.is_async || !comprehension.ifs.is_empty() {
         return None;
     }

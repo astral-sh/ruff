@@ -9,7 +9,7 @@ use anyhow::Result;
 use itertools::Itertools;
 use rustc_hash::FxHashMap;
 
-use ruff_db::diagnostic::Diagnostic;
+use ruff_db::diagnostic::{Diagnostic, Span};
 use ruff_notebook::Notebook;
 #[cfg(not(fuzzing))]
 use ruff_notebook::NotebookError;
@@ -281,10 +281,16 @@ Either ensure you always emit a fix or change `Violation::FIX_AVAILABILITY` to e
             // noqa offset and the source file
             let range = diagnostic.expect_range();
             diagnostic.set_noqa_offset(directives.noqa_line_for.resolve(range.start()));
-            if let Some(annotation) = diagnostic.primary_annotation_mut() {
-                annotation.set_span(
-                    ruff_db::diagnostic::Span::from(source_code.clone()).with_range(range),
-                );
+            // This part actually is necessary to avoid long relative paths in snapshots.
+            for annotation in diagnostic.annotations_mut() {
+                let range = annotation.get_span().range().unwrap();
+                annotation.set_span(Span::from(source_code.clone()).with_range(range));
+            }
+            for sub in diagnostic.sub_diagnostics_mut() {
+                for annotation in sub.annotations_mut() {
+                    let range = annotation.get_span().range().unwrap();
+                    annotation.set_span(Span::from(source_code.clone()).with_range(range));
+                }
             }
 
             diagnostic

@@ -1,14 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-empty_comment_line_continuation.py:1:1: PLR2044 [*] Line with empty comment
+PLR2044 [*] Line with empty comment
+ --> empty_comment_line_continuation.py:1:1
   |
 1 | #
-  | ^ PLR2044
+  | ^
 2 | x = 0 \
 3 | #
   |
-  = help: Delete the empty comment
+help: Delete the empty comment
 
 ℹ Safe fix
 1   |-#
@@ -16,16 +17,17 @@ empty_comment_line_continuation.py:1:1: PLR2044 [*] Line with empty comment
 3 2 | #
 4 3 | +1
 
-empty_comment_line_continuation.py:3:1: PLR2044 [*] Line with empty comment
+PLR2044 [*] Line with empty comment
+ --> empty_comment_line_continuation.py:3:1
   |
 1 | #
 2 | x = 0 \
 3 | #
-  | ^ PLR2044
+  | ^
 4 | +1
 5 | print(x)
   |
-  = help: Delete the empty comment
+help: Delete the empty comment
 
 ℹ Safe fix
 1 1 | #

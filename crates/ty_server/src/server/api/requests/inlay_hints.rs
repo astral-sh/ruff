@@ -19,7 +19,7 @@ impl RequestHandler for InlayHintRequestHandler {
 }
 
 impl BackgroundDocumentRequestHandler for InlayHintRequestHandler {
-    fn document_url(params: &InlayHintParams) -> Cow<Url> {
+    fn document_url(params: &InlayHintParams) -> Cow<'_, Url> {
         Cow::Borrowed(&params.text_document.uri)
     }
 
@@ -29,7 +29,10 @@ impl BackgroundDocumentRequestHandler for InlayHintRequestHandler {
         _client: &Client,
         params: InlayHintParams,
     ) -> crate::server::Result<Option<Vec<lsp_types::InlayHint>>> {
-        if snapshot.client_settings().is_language_services_disabled() {
+        let workspace_settings = snapshot.workspace_settings();
+        if workspace_settings.is_language_services_disabled()
+            || !workspace_settings.inlay_hints().any_enabled()
+        {
             return Ok(None);
         }
 
@@ -44,7 +47,7 @@ impl BackgroundDocumentRequestHandler for InlayHintRequestHandler {
             .range
             .to_text_range(&source, &index, snapshot.encoding());
 
-        let inlay_hints = inlay_hints(db, file, range);
+        let inlay_hints = inlay_hints(db, file, range, workspace_settings.inlay_hints());
 
         let inlay_hints = inlay_hints
             .into_iter()

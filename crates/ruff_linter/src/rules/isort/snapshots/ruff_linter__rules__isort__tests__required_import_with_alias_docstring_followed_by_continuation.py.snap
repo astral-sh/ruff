@@ -1,7 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-docstring_followed_by_continuation.py:1:1: I002 [*] Missing required import: `from __future__ import annotations as _annotations`
+I002 [*] Missing required import: `from __future__ import annotations as _annotations`
+--> docstring_followed_by_continuation.py:1:1
+help: Insert required import: `from __future__ import annotations as _annotations`
+
 ℹ Safe fix
 1 1 | """Hello, world!"""\
 2 2 | 

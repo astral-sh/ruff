@@ -75,7 +75,7 @@ class _:
 
     if cond():
         a = A()
-    reveal_type(a.x)  # revealed: int | None
+    reveal_type(a.x)  # revealed: int | None | Unknown
     reveal_type(a.y)  # revealed: Unknown | None
     reveal_type(a.z)  # revealed: Unknown | None
 
@@ -213,23 +213,20 @@ reveal_type(l[0])  # revealed: Literal[0]
 reveal_type(d[0])  # revealed: Literal[0]
 reveal_type(b[0])  # revealed: Literal[0]
 reveal_type(dd[0])  # revealed: Literal[0]
-# TODO: should be Literal[0]
-reveal_type(cm[0])  # revealed: Unknown
+reveal_type(cm[0])  # revealed: Literal[0]
 
 class C:
     reveal_type(l[0])  # revealed: Literal[0]
     reveal_type(d[0])  # revealed: Literal[0]
     reveal_type(b[0])  # revealed: Literal[0]
     reveal_type(dd[0])  # revealed: Literal[0]
-    # TODO: should be Literal[0]
-    reveal_type(cm[0])  # revealed: Unknown
+    reveal_type(cm[0])  # revealed: Literal[0]
 
 [reveal_type(l[0]) for _ in range(1)]  # revealed: Literal[0]
 [reveal_type(d[0]) for _ in range(1)]  # revealed: Literal[0]
 [reveal_type(b[0]) for _ in range(1)]  # revealed: Literal[0]
 [reveal_type(dd[0]) for _ in range(1)]  # revealed: Literal[0]
-# TODO: should be Literal[0]
-[reveal_type(cm[0]) for _ in range(1)]  # revealed: Unknown
+[reveal_type(cm[0]) for _ in range(1)]  # revealed: Literal[0]
 
 def _():
     reveal_type(l[0])  # revealed: int | None
@@ -244,8 +241,7 @@ class D(TypedDict):
 
 td = D(x=1, label="a")
 td["x"] = 0
-# TODO: should be Literal[0]
-reveal_type(td["x"])  # revealed: @Todo(Support for `TypedDict`)
+reveal_type(td["x"])  # revealed: Literal[0]
 
 # error: [unresolved-reference]
 does["not"]["exist"] = 0

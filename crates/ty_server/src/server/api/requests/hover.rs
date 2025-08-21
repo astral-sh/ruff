@@ -20,7 +20,7 @@ impl RequestHandler for HoverRequestHandler {
 }
 
 impl BackgroundDocumentRequestHandler for HoverRequestHandler {
-    fn document_url(params: &HoverParams) -> Cow<Url> {
+    fn document_url(params: &HoverParams) -> Cow<'_, Url> {
         Cow::Borrowed(&params.text_document_position_params.text_document.uri)
     }
 
@@ -30,7 +30,10 @@ impl BackgroundDocumentRequestHandler for HoverRequestHandler {
         _client: &Client,
         params: HoverParams,
     ) -> crate::server::Result<Option<lsp_types::Hover>> {
-        if snapshot.client_settings().is_language_services_disabled() {
+        if snapshot
+            .workspace_settings()
+            .is_language_services_disabled()
+        {
             return Ok(None);
         }
 

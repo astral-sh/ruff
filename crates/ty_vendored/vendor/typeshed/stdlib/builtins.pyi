@@ -643,6 +643,9 @@ class int:
     def __index__(self) -> int:
         """Return self converted to an integer, if self is suitable for use as an index into a list."""
 
+    def __format__(self, format_spec: str, /) -> str:
+        """Convert to a string according to format_spec."""
+
 class float:
     """Convert a string or number to a floating-point number, if possible."""
 
@@ -795,6 +798,9 @@ class float:
     def __hash__(self) -> int: ...
     def __bool__(self) -> bool:
         """True if self else False"""
+
+    def __format__(self, format_spec: str, /) -> str:
+        """Formats the float according to format_spec."""
     if sys.version_info >= (3, 14):
         @classmethod
         def from_number(cls, number: float | SupportsIndex | SupportsFloat, /) -> Self:
@@ -873,6 +879,9 @@ class complex:
     def __hash__(self) -> int: ...
     def __bool__(self) -> bool:
         """True if self else False"""
+
+    def __format__(self, format_spec: str, /) -> str:
+        """Convert to a string according to format_spec."""
     if sys.version_info >= (3, 11):
         def __complex__(self) -> complex:
             """Convert this value to exact type complex."""
@@ -1418,6 +1427,8 @@ class str(Sequence[str]):
     @overload
     def __rmul__(self, value: SupportsIndex, /) -> str: ...  # type: ignore[misc]
     def __getnewargs__(self) -> tuple[str]: ...
+    def __format__(self, format_spec: str, /) -> str:
+        """Return a formatted version of the string as described by format_spec."""
 
 class bytes(Sequence[int]):
     """bytes(iterable_of_ints) -> bytes
@@ -3324,6 +3335,9 @@ class property:
     def __delete__(self, instance: Any, /) -> None:
         """Delete an attribute of instance."""
 
+# This class does not exist at runtime, but stubtest complains if it's marked as
+# @type_check_only because it has an alias that does exist at runtime. See mypy#19568.
+# @type_check_only
 @final
 class _NotImplementedType(Any):
     __call__: None
@@ -3683,6 +3697,7 @@ def input(prompt: object = "", /) -> str:
     On *nix systems, readline is used if available.
     """
 
+@type_check_only
 class _GetItemIterable(Protocol[_T_co]):
     def __getitem__(self, i: int, /) -> _T_co: ...
 
@@ -4121,6 +4136,7 @@ def open(
 def ord(c: str | bytes | bytearray, /) -> int:
     """Return the Unicode code point for a one-character string."""
 
+@type_check_only
 class _SupportsWriteAndFlush(SupportsWrite[_T_contra], SupportsFlush, Protocol[_T_contra]): ...
 
 @overload
@@ -4151,12 +4167,15 @@ def print(
 _E_contra = TypeVar("_E_contra", contravariant=True)
 _M_contra = TypeVar("_M_contra", contravariant=True)
 
+@type_check_only
 class _SupportsPow2(Protocol[_E_contra, _T_co]):
     def __pow__(self, other: _E_contra, /) -> _T_co: ...
 
+@type_check_only
 class _SupportsPow3NoneOnly(Protocol[_E_contra, _T_co]):
     def __pow__(self, other: _E_contra, modulo: None = None, /) -> _T_co: ...
 
+@type_check_only
 class _SupportsPow3(Protocol[_E_contra, _M_contra, _T_co]):
     def __pow__(self, other: _E_contra, modulo: _M_contra, /) -> _T_co: ...
 
@@ -4238,9 +4257,11 @@ def repr(obj: object, /) -> str:
 # and https://github.com/python/typeshed/pull/9151
 # on why we don't use `SupportsRound` from `typing.pyi`
 
+@type_check_only
 class _SupportsRound1(Protocol[_T_co]):
     def __round__(self) -> _T_co: ...
 
+@type_check_only
 class _SupportsRound2(Protocol[_T_co]):
     def __round__(self, ndigits: int, /) -> _T_co: ...
 
@@ -4279,6 +4300,7 @@ def sorted(iterable: Iterable[_T], /, *, key: Callable[[_T], SupportsRichCompari
 _AddableT1 = TypeVar("_AddableT1", bound=SupportsAdd[Any, Any])
 _AddableT2 = TypeVar("_AddableT2", bound=SupportsAdd[Any, Any])
 
+@type_check_only
 class _SupportsSumWithNoDefaultGiven(SupportsAdd[Any, Any], SupportsRAdd[int, Any], Protocol): ...
 
 _SupportsSumNoDefaultT = TypeVar("_SupportsSumNoDefaultT", bound=_SupportsSumWithNoDefaultGiven)

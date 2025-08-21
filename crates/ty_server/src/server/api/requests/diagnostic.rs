@@ -23,7 +23,7 @@ impl RequestHandler for DocumentDiagnosticRequestHandler {
 }
 
 impl BackgroundDocumentRequestHandler for DocumentDiagnosticRequestHandler {
-    fn document_url(params: &DocumentDiagnosticParams) -> Cow<Url> {
+    fn document_url(params: &DocumentDiagnosticParams) -> Cow<'_, Url> {
         Cow::Borrowed(&params.text_document.uri)
     }
 

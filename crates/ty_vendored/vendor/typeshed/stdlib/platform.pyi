@@ -9,7 +9,7 @@ format is usable as part of a filename.
 
 import sys
 from typing import NamedTuple, type_check_only
-from typing_extensions import Self
+from typing_extensions import Self, deprecated
 
 def libc_ver(executable: str | None = None, lib: str = "", version: str = "", chunksize: int = 16384) -> tuple[str, str]:
     """Tries to determine the libc version that the file executable
@@ -40,19 +40,42 @@ def mac_ver(
     which default to ''. All tuple entries are strings.
     """
 
-def java_ver(
-    release: str = "", vendor: str = "", vminfo: tuple[str, str, str] = ("", "", ""), osinfo: tuple[str, str, str] = ("", "", "")
-) -> tuple[str, str, tuple[str, str, str], tuple[str, str, str]]:
-    """Version interface for Jython.
+if sys.version_info >= (3, 13):
+    @deprecated("Deprecated since Python 3.13; will be removed in Python 3.15.")
+    def java_ver(
+        release: str = "",
+        vendor: str = "",
+        vminfo: tuple[str, str, str] = ("", "", ""),
+        osinfo: tuple[str, str, str] = ("", "", ""),
+    ) -> tuple[str, str, tuple[str, str, str], tuple[str, str, str]]:
+        """Version interface for Jython.
 
-    Returns a tuple (release, vendor, vminfo, osinfo) with vminfo being
-    a tuple (vm_name, vm_release, vm_vendor) and osinfo being a
-    tuple (os_name, os_version, os_arch).
+        Returns a tuple (release, vendor, vminfo, osinfo) with vminfo being
+        a tuple (vm_name, vm_release, vm_vendor) and osinfo being a
+        tuple (os_name, os_version, os_arch).
 
-    Values which cannot be determined are set to the defaults
-    given as parameters (which all default to '').
+        Values which cannot be determined are set to the defaults
+        given as parameters (which all default to '').
 
-    """
+        """
+
+else:
+    def java_ver(
+        release: str = "",
+        vendor: str = "",
+        vminfo: tuple[str, str, str] = ("", "", ""),
+        osinfo: tuple[str, str, str] = ("", "", ""),
+    ) -> tuple[str, str, tuple[str, str, str], tuple[str, str, str]]:
+        """Version interface for Jython.
+
+        Returns a tuple (release, vendor, vminfo, osinfo) with vminfo being
+        a tuple (vm_name, vm_release, vm_vendor) and osinfo being a
+        tuple (os_name, os_version, os_arch).
+
+        Values which cannot be determined are set to the defaults
+        given as parameters (which all default to '').
+
+        """
 
 def system_alias(system: str, release: str, version: str) -> tuple[str, str, str]:
     """Returns (system, release, version) aliased to common

@@ -18,7 +18,7 @@ import sys
 from _collections_abc import dict_items, dict_keys, dict_values
 from _typeshed import SupportsItems, SupportsKeysAndGetItem, SupportsRichComparison, SupportsRichComparisonT
 from types import GenericAlias
-from typing import Any, ClassVar, Generic, NoReturn, SupportsIndex, TypeVar, final, overload
+from typing import Any, ClassVar, Generic, NoReturn, SupportsIndex, TypeVar, final, overload, type_check_only
 from typing_extensions import Self
 
 if sys.version_info >= (3, 10):
@@ -631,14 +631,17 @@ class _OrderedDictValuesView(ValuesView[_VT_co]):
 # but they are not exposed anywhere)
 # pyright doesn't have a specific error code for subclassing error!
 @final
+@type_check_only
 class _odict_keys(dict_keys[_KT_co, _VT_co]):  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues]
     def __reversed__(self) -> Iterator[_KT_co]: ...
 
 @final
+@type_check_only
 class _odict_items(dict_items[_KT_co, _VT_co]):  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues]
     def __reversed__(self) -> Iterator[tuple[_KT_co, _VT_co]]: ...
 
 @final
+@type_check_only
 class _odict_values(dict_values[_KT_co, _VT_co]):  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues]
     def __reversed__(self) -> Iterator[_VT_co]: ...
 

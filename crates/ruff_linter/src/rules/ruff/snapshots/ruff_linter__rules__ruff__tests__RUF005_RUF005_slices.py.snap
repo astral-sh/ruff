@@ -1,15 +1,16 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF005_slices.py:2:7: RUF005 [*] Consider `[1, 2, 3, *foo]` instead of concatenation
+RUF005 [*] Consider `[1, 2, 3, *foo]` instead of concatenation
+ --> RUF005_slices.py:2:7
   |
 1 | foo = [4, 5, 6]
 2 | bar = [1, 2, 3] + foo
-  |       ^^^^^^^^^^^^^^^ RUF005
+  |       ^^^^^^^^^^^^^^^
 3 | slicing1 = foo[:1] + [7, 8, 9]
 4 | slicing2 = [7, 8, 9] + bar[1:]
   |
-  = help: Replace with `[1, 2, 3, *foo]`
+help: Replace with `[1, 2, 3, *foo]`
 
 ℹ Unsafe fix
 1 1 | foo = [4, 5, 6]
@@ -19,16 +20,17 @@ RUF005_slices.py:2:7: RUF005 [*] Consider `[1, 2, 3, *foo]` instead of concatena
 4 4 | slicing2 = [7, 8, 9] + bar[1:]
 5 5 | slicing3 = foo[:1] + [7, 8, 9] + bar[1:]
 
-RUF005_slices.py:3:12: RUF005 [*] Consider `[*foo[:1], 7, 8, 9]` instead of concatenation
+RUF005 [*] Consider `[*foo[:1], 7, 8, 9]` instead of concatenation
+ --> RUF005_slices.py:3:12
   |
 1 | foo = [4, 5, 6]
 2 | bar = [1, 2, 3] + foo
 3 | slicing1 = foo[:1] + [7, 8, 9]
-  |            ^^^^^^^^^^^^^^^^^^^ RUF005
+  |            ^^^^^^^^^^^^^^^^^^^
 4 | slicing2 = [7, 8, 9] + bar[1:]
 5 | slicing3 = foo[:1] + [7, 8, 9] + bar[1:]
   |
-  = help: Replace with `[*foo[:1], 7, 8, 9]`
+help: Replace with `[*foo[:1], 7, 8, 9]`
 
 ℹ Unsafe fix
 1 1 | foo = [4, 5, 6]
@@ -39,16 +41,17 @@ RUF005_slices.py:3:12: RUF005 [*] Consider `[*foo[:1], 7, 8, 9]` instead of conc
 5 5 | slicing3 = foo[:1] + [7, 8, 9] + bar[1:]
 6 6 | indexing = foo[0] + [7, 8, 9] + bar[1]  # Not changed; looks a little suspect for concatenation.
 
-RUF005_slices.py:4:12: RUF005 [*] Consider `[7, 8, 9, *bar[1:]]` instead of concatenation
+RUF005 [*] Consider `[7, 8, 9, *bar[1:]]` instead of concatenation
+ --> RUF005_slices.py:4:12
   |
 2 | bar = [1, 2, 3] + foo
 3 | slicing1 = foo[:1] + [7, 8, 9]
 4 | slicing2 = [7, 8, 9] + bar[1:]
-  |            ^^^^^^^^^^^^^^^^^^^ RUF005
+  |            ^^^^^^^^^^^^^^^^^^^
 5 | slicing3 = foo[:1] + [7, 8, 9] + bar[1:]
 6 | indexing = foo[0] + [7, 8, 9] + bar[1]  # Not changed; looks a little suspect for concatenation.
   |
-  = help: Replace with `[7, 8, 9, *bar[1:]]`
+help: Replace with `[7, 8, 9, *bar[1:]]`
 
 ℹ Unsafe fix
 1 1 | foo = [4, 5, 6]
@@ -59,15 +62,16 @@ RUF005_slices.py:4:12: RUF005 [*] Consider `[7, 8, 9, *bar[1:]]` instead of conc
 5 5 | slicing3 = foo[:1] + [7, 8, 9] + bar[1:]
 6 6 | indexing = foo[0] + [7, 8, 9] + bar[1]  # Not changed; looks a little suspect for concatenation.
 
-RUF005_slices.py:5:12: RUF005 [*] Consider `[*foo[:1], 7, 8, 9, *bar[1:]]` instead of concatenation
+RUF005 [*] Consider `[*foo[:1], 7, 8, 9, *bar[1:]]` instead of concatenation
+ --> RUF005_slices.py:5:12
   |
 3 | slicing1 = foo[:1] + [7, 8, 9]
 4 | slicing2 = [7, 8, 9] + bar[1:]
 5 | slicing3 = foo[:1] + [7, 8, 9] + bar[1:]
-  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF005
+  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 6 | indexing = foo[0] + [7, 8, 9] + bar[1]  # Not changed; looks a little suspect for concatenation.
   |
-  = help: Replace with `[*foo[:1], 7, 8, 9, *bar[1:]]`
+help: Replace with `[*foo[:1], 7, 8, 9, *bar[1:]]`
 
 ℹ Unsafe fix
 2 2 | bar = [1, 2, 3] + foo

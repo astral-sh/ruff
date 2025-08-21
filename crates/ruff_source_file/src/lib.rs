@@ -190,7 +190,7 @@ impl SourceFile {
         &self.source_text()[range]
     }
 
-    pub fn to_source_code(&self) -> SourceCode {
+    pub fn to_source_code(&self) -> SourceCode<'_, '_> {
         SourceCode {
             text: self.source_text(),
             index: self.index(),

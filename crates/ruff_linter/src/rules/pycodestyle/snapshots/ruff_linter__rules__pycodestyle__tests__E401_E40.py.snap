@@ -1,15 +1,16 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E40.py:2:1: E401 [*] Multiple imports on one line
+E401 [*] Multiple imports on one line
+ --> E40.py:2:1
   |
 1 | #: E401
 2 | import os, sys
-  | ^^^^^^^^^^^^^^ E401
+  | ^^^^^^^^^^^^^^
 3 |
 4 | #: Okay
   |
-  = help: Split imports
+help: Split imports
 
 ℹ Safe fix
 1 1 | #: E401
@@ -20,14 +21,15 @@ E40.py:2:1: E401 [*] Multiple imports on one line
 4 5 | #: Okay
 5 6 | import os
 
-E40.py:65:1: E401 [*] Multiple imports on one line
+E401 [*] Multiple imports on one line
+  --> E40.py:65:1
    |
 64 | #: E401
 65 | import re as regex, string  # also with a comment!
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ E401
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^
 66 | import re as regex, string; x = 1
    |
-   = help: Split imports
+help: Split imports
 
 ℹ Safe fix
 62 62 | import bar
@@ -40,16 +42,17 @@ E40.py:65:1: E401 [*] Multiple imports on one line
 67 68 | 
 68 69 | x = 1; import re as regex, string
 
-E40.py:66:1: E401 [*] Multiple imports on one line
+E401 [*] Multiple imports on one line
+  --> E40.py:66:1
    |
 64 | #: E401
 65 | import re as regex, string  # also with a comment!
 66 | import re as regex, string; x = 1
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ E401
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^
 67 |
 68 | x = 1; import re as regex, string
    |
-   = help: Split imports
+help: Split imports
 
 ℹ Safe fix
 63 63 | 
@@ -61,14 +64,15 @@ E40.py:66:1: E401 [*] Multiple imports on one line
 68 68 | x = 1; import re as regex, string
 69 69 | 
 
-E40.py:68:8: E401 [*] Multiple imports on one line
+E401 [*] Multiple imports on one line
+  --> E40.py:68:8
    |
 66 | import re as regex, string; x = 1
 67 |
 68 | x = 1; import re as regex, string
-   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^ E401
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: Split imports
+help: Split imports
 
 ℹ Safe fix
 65 65 | import re as regex, string  # also with a comment!
@@ -80,15 +84,16 @@ E40.py:68:8: E401 [*] Multiple imports on one line
 70 70 | 
 71 71 | def blah():
 
-E40.py:72:5: E401 [*] Multiple imports on one line
+E401 [*] Multiple imports on one line
+  --> E40.py:72:5
    |
 71 | def blah():
 72 |     import datetime as dt, copy
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^ E401
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 73 |
 74 |     def nested_and_tested():
    |
-   = help: Split imports
+help: Split imports
 
 ℹ Safe fix
 69 69 | 
@@ -101,15 +106,16 @@ E40.py:72:5: E401 [*] Multiple imports on one line
 74 75 |     def nested_and_tested():
 75 76 |         import builtins, textwrap as tw
 
-E40.py:75:9: E401 [*] Multiple imports on one line
+E401 [*] Multiple imports on one line
+  --> E40.py:75:9
    |
 74 |     def nested_and_tested():
 75 |         import builtins, textwrap as tw
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E401
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 76 |
 77 |         x = 1; import re as regex, string
    |
-   = help: Split imports
+help: Split imports
 
 ℹ Safe fix
 72 72 |     import datetime as dt, copy
@@ -122,15 +128,16 @@ E40.py:75:9: E401 [*] Multiple imports on one line
 77 78 |         x = 1; import re as regex, string
 78 79 |         import re as regex, string; x = 1
 
-E40.py:77:16: E401 [*] Multiple imports on one line
+E401 [*] Multiple imports on one line
+  --> E40.py:77:16
    |
 75 |         import builtins, textwrap as tw
 76 |
 77 |         x = 1; import re as regex, string
-   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^ E401
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^
 78 |         import re as regex, string; x = 1
    |
-   = help: Split imports
+help: Split imports
 
 ℹ Safe fix
 74 74 |     def nested_and_tested():
@@ -142,15 +149,16 @@ E40.py:77:16: E401 [*] Multiple imports on one line
 79 79 | 
 80 80 |     if True: import re as regex, string
 
-E40.py:78:9: E401 [*] Multiple imports on one line
+E401 [*] Multiple imports on one line
+  --> E40.py:78:9
    |
 77 |         x = 1; import re as regex, string
 78 |         import re as regex, string; x = 1
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^ E401
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^
 79 |
 80 |     if True: import re as regex, string
    |
-   = help: Split imports
+help: Split imports
 
 ℹ Safe fix
 75 75 |         import builtins, textwrap as tw
@@ -161,14 +169,15 @@ E40.py:78:9: E401 [*] Multiple imports on one line
 79 79 | 
 80 80 |     if True: import re as regex, string
 
-E40.py:80:14: E401 [*] Multiple imports on one line
+E401 [*] Multiple imports on one line
+  --> E40.py:80:14
    |
 78 |         import re as regex, string; x = 1
 79 |
 80 |     if True: import re as regex, string
-   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^ E401
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: Split imports
+help: Split imports
 
 ℹ Safe fix
 77 77 |         x = 1; import re as regex, string

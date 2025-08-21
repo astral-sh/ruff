@@ -19,7 +19,7 @@ exit_code: 1
 [
   {
     "check_name": "F401",
-    "description": "`os` imported but unused",
+    "description": "F401: `os` imported but unused",
     "fingerprint": "4dbad37161e65c72",
     "location": {
       "path": "input.py",
@@ -38,7 +38,7 @@ exit_code: 1
   },
   {
     "check_name": "F821",
-    "description": "Undefined name `y`",
+    "description": "F821: Undefined name `y`",
     "fingerprint": "7af59862a085230",
     "location": {
       "path": "input.py",
@@ -56,8 +56,8 @@ exit_code: 1
     "severity": "major"
   },
   {
-    "check_name": "syntax-error",
-    "description": "Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)",
+    "check_name": "invalid-syntax",
+    "description": "invalid-syntax: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)",
     "fingerprint": "e558cec859bb66e8",
     "location": {
       "path": "input.py",

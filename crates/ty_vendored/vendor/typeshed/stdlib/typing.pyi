@@ -310,15 +310,15 @@ class TypeVar:
             contravariant: bool = False,
         ) -> None: ...
     if sys.version_info >= (3, 10):
-        def __or__(self, right: Any) -> _SpecialForm:  # AnnotationForm
+        def __or__(self, right: Any, /) -> _SpecialForm:  # AnnotationForm
             """Return self|value."""
 
-        def __ror__(self, left: Any) -> _SpecialForm:  # AnnotationForm
+        def __ror__(self, left: Any, /) -> _SpecialForm:  # AnnotationForm
             """Return value|self."""
     if sys.version_info >= (3, 11):
-        def __typing_subst__(self, arg: Any) -> Any: ...
+        def __typing_subst__(self, arg: Any, /) -> Any: ...
     if sys.version_info >= (3, 13):
-        def __typing_prepare_subst__(self, alias: Any, args: Any) -> tuple[Any, ...]: ...
+        def __typing_prepare_subst__(self, alias: Any, args: Any, /) -> tuple[Any, ...]: ...
         def has_default(self) -> bool: ...
     if sys.version_info >= (3, 14):
         @property
@@ -422,8 +422,8 @@ if sys.version_info >= (3, 11):
         def __iter__(self) -> Any:
             """Implement iter(self)."""
 
-        def __typing_subst__(self, arg: Never) -> Never: ...
-        def __typing_prepare_subst__(self, alias: Any, args: Any) -> tuple[Any, ...]: ...
+        def __typing_subst__(self, arg: Never, /) -> Never: ...
+        def __typing_prepare_subst__(self, alias: Any, args: Any, /) -> tuple[Any, ...]: ...
         if sys.version_info >= (3, 14):
             @property
             def evaluate_default(self) -> EvaluateFunc | None: ...
@@ -452,7 +452,7 @@ if sys.version_info >= (3, 10):
         else:
             def __init__(self, origin: ParamSpec) -> None: ...
 
-        def __eq__(self, other: object) -> bool: ...
+        def __eq__(self, other: object, /) -> bool: ...
         __hash__: ClassVar[None]  # type: ignore[assignment]
 
     @final
@@ -478,7 +478,7 @@ if sys.version_info >= (3, 10):
         else:
             def __init__(self, origin: ParamSpec) -> None: ...
 
-        def __eq__(self, other: object) -> bool: ...
+        def __eq__(self, other: object, /) -> bool: ...
         __hash__: ClassVar[None]  # type: ignore[assignment]
 
     @final
@@ -598,13 +598,13 @@ if sys.version_info >= (3, 10):
         def kwargs(self) -> ParamSpecKwargs:
             """Represents keyword arguments."""
         if sys.version_info >= (3, 11):
-            def __typing_subst__(self, arg: Any) -> Any: ...
-            def __typing_prepare_subst__(self, alias: Any, args: Any) -> tuple[Any, ...]: ...
+            def __typing_subst__(self, arg: Any, /) -> Any: ...
+            def __typing_prepare_subst__(self, alias: Any, args: Any, /) -> tuple[Any, ...]: ...
 
-        def __or__(self, right: Any) -> _SpecialForm:
+        def __or__(self, right: Any, /) -> _SpecialForm:
             """Return self|value."""
 
-        def __ror__(self, left: Any) -> _SpecialForm:
+        def __ror__(self, left: Any, /) -> _SpecialForm:
             """Return value|self."""
         if sys.version_info >= (3, 13):
             def has_default(self) -> bool: ...
@@ -738,6 +738,7 @@ def type_check_only(func_or_cls: _FT) -> _FT: ...
 
 # Type aliases and type constructors
 
+@type_check_only
 class _Alias:
     # Class for defining generic aliases for library types.
     def __getitem__(self, typeargs: Any) -> Any: ...
@@ -1993,13 +1994,13 @@ if sys.version_info >= (3, 12):
         # It's writable on types, but not on instances of TypeAliasType.
         @property
         def __module__(self) -> str | None: ...  # type: ignore[override]
-        def __getitem__(self, parameters: Any) -> GenericAlias:  # AnnotationForm
+        def __getitem__(self, parameters: Any, /) -> GenericAlias:  # AnnotationForm
             """Return self[key]."""
 
-        def __or__(self, right: Any) -> _SpecialForm:
+        def __or__(self, right: Any, /) -> _SpecialForm:
             """Return self|value."""
 
-        def __ror__(self, left: Any) -> _SpecialForm:
+        def __ror__(self, left: Any, /) -> _SpecialForm:
             """Return value|self."""
         if sys.version_info >= (3, 14):
             @property
@@ -2037,6 +2038,7 @@ if sys.version_info >= (3, 13):
         """
 
     @final
+    @type_check_only
     class _NoDefaultType: ...
 
     NoDefault: _NoDefaultType
