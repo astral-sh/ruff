@@ -20,14 +20,9 @@
 
 ### Documentation
 
-- Fix description of global config file discovery strategy (#19143) ([#19188](https://github.com/astral-sh/ruff/pull/19188))
+- Fix description of global config file discovery strategy ([#19188](https://github.com/astral-sh/ruff/pull/19188))
 - Update outdated links to <https://typing.python.org/en/latest/source/stubs.html> ([#19992](https://github.com/astral-sh/ruff/pull/19992))
 - \[`flake8-annotations`\] Remove unused import in example (`ANN401`) ([#20000](https://github.com/astral-sh/ruff/pull/20000))
-
-### Other changes
-
-- Add `full` output format changes to the changelog ([#19968](https://github.com/astral-sh/ruff/pull/19968))
-- Bump Rust MSRV to 1.87 ([#19924](https://github.com/astral-sh/ruff/pull/19924))
 
 ## 0.12.9
 
