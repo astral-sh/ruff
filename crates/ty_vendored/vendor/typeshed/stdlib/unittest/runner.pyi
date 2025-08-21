@@ -1,5 +1,5 @@
-"""Running tests
-"""
+"""Running tests"""
+
 import sys
 import unittest.case
 import unittest.result
@@ -24,8 +24,8 @@ class _TextTestStream(_SupportsWriteAndFlush, Protocol):
 # But that's not feasible to do Generically
 # We can expand the attributes if requested
 class _WritelnDecorator:
-    """Used to decorate file-like objects with a handy 'writeln' method
-"""
+    """Used to decorate file-like objects with a handy 'writeln' method"""
+
     def __init__(self, stream: _SupportsWriteAndFlush) -> None: ...
     def writeln(self, arg: str | None = None) -> None: ...
     def __getattr__(self, attr: str) -> Any: ...  # Any attribute from the stream type passed to __init__
@@ -41,8 +41,9 @@ _StreamT = TypeVar("_StreamT", bound=_TextTestStream, default=_WritelnDecorator)
 class TextTestResult(unittest.result.TestResult, Generic[_StreamT]):
     """A test result class that can print formatted text results to a stream.
 
-Used by TextTestRunner.
-"""
+    Used by TextTestRunner.
+    """
+
     descriptions: bool  # undocumented
     dots: bool  # undocumented
     separator1: str
@@ -53,8 +54,8 @@ Used by TextTestRunner.
         durations: int | None
         def __init__(self, stream: _StreamT, descriptions: bool, verbosity: int, *, durations: int | None = None) -> None:
             """Construct a TextTestResult. Subclasses should accept **kwargs
-to ensure compatibility as the interface changes.
-"""
+            to ensure compatibility as the interface changes.
+            """
     else:
         def __init__(self, stream: _StreamT, descriptions: bool, verbosity: int) -> None: ...
 
@@ -64,9 +65,10 @@ to ensure compatibility as the interface changes.
 class TextTestRunner:
     """A test runner class that displays results in textual form.
 
-It prints out the names of tests as they are run, errors as they
-occur, and a summary of the results at the end of the test run.
-"""
+    It prints out the names of tests as they are run, errors as they
+    occur, and a summary of the results at the end of the test run.
+    """
+
     resultclass: _ResultClassType
     stream: _WritelnDecorator
     descriptions: bool
@@ -93,9 +95,9 @@ occur, and a summary of the results at the end of the test run.
         ) -> None:
             """Construct a TextTestRunner.
 
-Subclasses should accept **kwargs to ensure compatibility as the
-interface changes.
-"""
+            Subclasses should accept **kwargs to ensure compatibility as the
+            interface changes.
+            """
     else:
         def __init__(
             self,
@@ -111,11 +113,10 @@ interface changes.
         ) -> None:
             """Construct a TextTestRunner.
 
-        Subclasses should accept **kwargs to ensure compatibility as the
-        interface changes.
-        """
+            Subclasses should accept **kwargs to ensure compatibility as the
+            interface changes.
+            """
 
     def _makeResult(self) -> TextTestResult: ...
     def run(self, test: unittest.suite.TestSuite | unittest.case.TestCase) -> TextTestResult:
-        """Run the given test case or test suite.
-"""
+        """Run the given test case or test suite."""

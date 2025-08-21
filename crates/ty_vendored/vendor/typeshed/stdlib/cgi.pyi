@@ -8,6 +8,7 @@ of a POST request. POST requests larger than this size will result in a
 ValueError being raised during parsing. The default value of this variable is 0,
 meaning the request size is unlimited.
 """
+
 from _typeshed import SupportsContainsAndGetItem, SupportsGetItem, SupportsItemAccess, Unused
 from builtins import list as _list, type as _type
 from collections.abc import Iterable, Iterator, Mapping
@@ -40,26 +41,27 @@ def parse(
 ) -> dict[str, list[str]]:
     """Parse a query in the environment or from a file (default stdin)
 
-        Arguments, all optional:
+    Arguments, all optional:
 
-        fp              : file pointer; default: sys.stdin.buffer
+    fp              : file pointer; default: sys.stdin.buffer
 
-        environ         : environment dictionary; default: os.environ
+    environ         : environment dictionary; default: os.environ
 
-        keep_blank_values: flag indicating whether blank values in
-            percent-encoded forms should be treated as blank strings.
-            A true value indicates that blanks should be retained as
-            blank strings.  The default false value indicates that
-            blank values are to be ignored and treated as if they were
-            not included.
+    keep_blank_values: flag indicating whether blank values in
+        percent-encoded forms should be treated as blank strings.
+        A true value indicates that blanks should be retained as
+        blank strings.  The default false value indicates that
+        blank values are to be ignored and treated as if they were
+        not included.
 
-        strict_parsing: flag indicating what to do with parsing errors.
-            If false (the default), errors are silently ignored.
-            If true, errors raise a ValueError exception.
+    strict_parsing: flag indicating what to do with parsing errors.
+        If false (the default), errors are silently ignored.
+        If true, errors raise a ValueError exception.
 
-        separator: str. The symbol to use for separating the query arguments.
-            Defaults to &.
+    separator: str. The symbol to use for separating the query arguments.
+        Defaults to &.
     """
+
 def parse_multipart(
     fp: IO[Any], pdict: SupportsGetItem[str, bytes], encoding: str = "utf-8", errors: str = "replace", separator: str = "&"
 ) -> dict[str, list[Any]]:
@@ -75,6 +77,7 @@ def parse_multipart(
     value is a list of values for that field. For non-file fields, the value
     is a list of strings.
     """
+
 @type_check_only
 class _Environ(Protocol):
     def __getitem__(self, k: str, /) -> str: ...
@@ -86,6 +89,7 @@ def parse_header(line: str) -> tuple[str, dict[str, str]]:
     Return the main content-type and a dictionary of options.
 
     """
+
 def test(environ: _Environ = ...) -> None:
     """Robust test CGI script, usable as main program.
 
@@ -93,22 +97,22 @@ def test(environ: _Environ = ...) -> None:
     the script in HTML form.
 
     """
+
 def print_environ(environ: _Environ = ...) -> None:
-    """Dump the shell environment as HTML.
-"""
+    """Dump the shell environment as HTML."""
+
 def print_form(form: dict[str, Any]) -> None:
-    """Dump the contents of a form as HTML.
-"""
+    """Dump the contents of a form as HTML."""
+
 def print_directory() -> None:
-    """Dump the current directory as HTML.
-"""
+    """Dump the current directory as HTML."""
+
 def print_environ_usage() -> None:
-    """Dump a list of environment variables used by CGI as HTML.
-"""
+    """Dump a list of environment variables used by CGI as HTML."""
 
 class MiniFieldStorage:
-    """Like FieldStorage, for use when no file uploads are possible.
-"""
+    """Like FieldStorage, for use when no file uploads are possible."""
+
     # The first five "Any" attributes here are always None, but mypy doesn't support that
     filename: Any
     list: Any
@@ -121,8 +125,7 @@ class MiniFieldStorage:
     name: Any
     value: Any
     def __init__(self, name: Any, value: Any) -> None:
-        """Constructor from field name and value.
-"""
+        """Constructor from field name and value."""
 
 class FieldStorage:
     """Store a sequence of fields, reading multipart/form-data.
@@ -166,6 +169,7 @@ class FieldStorage:
     directory and unlinking them as soon as they have been opened.
 
     """
+
     FieldStorageClass: _type | None
     keep_blank_values: int
     strict_parsing: int
@@ -245,30 +249,31 @@ class FieldStorage:
             if there are more than n fields read by parse_qsl().
 
         """
+
     def __enter__(self) -> Self: ...
     def __exit__(self, *args: Unused) -> None: ...
     def __iter__(self) -> Iterator[str]: ...
     def __getitem__(self, key: str) -> Any:
-        """Dictionary style indexing.
-"""
+        """Dictionary style indexing."""
+
     def getvalue(self, key: str, default: Any = None) -> Any:
-        """Dictionary style get() method, including 'value' lookup.
-"""
+        """Dictionary style get() method, including 'value' lookup."""
+
     def getfirst(self, key: str, default: Any = None) -> Any:
-        """ Return the first value received.
-"""
+        """Return the first value received."""
+
     def getlist(self, key: str) -> _list[Any]:
-        """ Return list of received values.
-"""
+        """Return list of received values."""
+
     def keys(self) -> _list[str]:
-        """Dictionary style keys() method.
-"""
+        """Dictionary style keys() method."""
+
     def __contains__(self, key: str) -> bool:
-        """Dictionary style __contains__ method.
-"""
+        """Dictionary style __contains__ method."""
+
     def __len__(self) -> int:
-        """Dictionary style len(x) support.
-"""
+        """Dictionary style len(x) support."""
+
     def __bool__(self) -> bool: ...
     def __del__(self) -> None: ...
     # Returns bytes or str IO depending on an internal flag
