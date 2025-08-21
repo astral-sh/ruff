@@ -10,7 +10,7 @@ from _asyncio import (
     _unregister_task as _unregister_task,
 )
 from collections.abc import AsyncIterator, Awaitable, Coroutine, Generator, Iterable, Iterator
-from typing import Any, Literal, Protocol, TypeVar, overload, type_check_only
+from typing import Any, Final, Literal, Protocol, TypeVar, overload, type_check_only
 from typing_extensions import TypeAlias
 
 from . import _CoroutineLike
@@ -84,9 +84,9 @@ else:
 
 _TaskYieldType: TypeAlias = Future[object] | None
 
-FIRST_COMPLETED = concurrent.futures.FIRST_COMPLETED
-FIRST_EXCEPTION = concurrent.futures.FIRST_EXCEPTION
-ALL_COMPLETED = concurrent.futures.ALL_COMPLETED
+FIRST_COMPLETED: Final = concurrent.futures.FIRST_COMPLETED
+FIRST_EXCEPTION: Final = concurrent.futures.FIRST_EXCEPTION
+ALL_COMPLETED: Final = concurrent.futures.ALL_COMPLETED
 
 if sys.version_info >= (3, 13):
     @type_check_only

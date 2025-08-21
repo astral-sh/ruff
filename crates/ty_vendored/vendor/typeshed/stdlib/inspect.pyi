@@ -640,6 +640,7 @@ class Signature:
         to parameters (simulating 'functools.partial' behavior.)
     """
 
+    __slots__ = ("_return_annotation", "_parameters")
     def __init__(
         self, parameters: Sequence[Parameter] | None = None, *, return_annotation: Any = ..., __validate_parameters__: bool = True
     ) -> None:
@@ -842,6 +843,7 @@ class Parameter:
         `Parameter.KEYWORD_ONLY`, `Parameter.VAR_KEYWORD`.
     """
 
+    __slots__ = ("_name", "_kind", "_default", "_annotation")
     def __init__(self, name: str, kind: _ParameterKind, *, default: Any = ..., annotation: Any = ...) -> None: ...
     empty = _empty
 
@@ -890,6 +892,7 @@ class BoundArguments:
         Dict of keyword arguments values.
     """
 
+    __slots__ = ("arguments", "_signature", "__weakref__")
     arguments: OrderedDict[str, Any]
     @property
     def args(self) -> tuple[Any, ...]: ...

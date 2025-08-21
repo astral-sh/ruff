@@ -9,9 +9,10 @@ class _Loader(Protocol):
     @overload
     def __call__(self, href: FileDescriptorOrPath, parse: Literal["text"], encoding: str | None = None) -> str: ...
 
-XINCLUDE: Final[str]
-XINCLUDE_INCLUDE: Final[str]
-XINCLUDE_FALLBACK: Final[str]
+XINCLUDE: Final = "{http://www.w3.org/2001/XInclude}"
+
+XINCLUDE_INCLUDE: Final = "{http://www.w3.org/2001/XInclude}include"
+XINCLUDE_FALLBACK: Final = "{http://www.w3.org/2001/XInclude}fallback"
 
 DEFAULT_MAX_INCLUSION_DEPTH: Final = 6
 

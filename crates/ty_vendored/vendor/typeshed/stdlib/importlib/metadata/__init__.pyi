@@ -168,6 +168,7 @@ if sys.version_info >= (3, 12):
         An immutable collection of selectable EntryPoint objects.
         """
 
+        __slots__ = ()
         def __getitem__(self, name: str) -> EntryPoint:  # type: ignore[override]
             """
             Get the EntryPoint in self matching name.

@@ -16,7 +16,7 @@ CHECK_CRC64: Final = 4
 CHECK_SHA256: Final = 10
 CHECK_ID_MAX: Final = 15
 CHECK_UNKNOWN: Final = 16
-FILTER_LZMA1: int  # v big number
+FILTER_LZMA1: Final[int]  # v big number
 FILTER_LZMA2: Final = 33
 FILTER_DELTA: Final = 3
 FILTER_X86: Final = 4
@@ -33,7 +33,7 @@ MF_BT4: Final = 20
 MODE_FAST: Final = 1
 MODE_NORMAL: Final = 2
 PRESET_DEFAULT: Final = 6
-PRESET_EXTREME: int  # v big number
+PRESET_EXTREME: Final[int]  # v big number
 
 @final
 class LZMADecompressor:

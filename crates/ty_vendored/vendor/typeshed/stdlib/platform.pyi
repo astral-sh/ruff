@@ -259,7 +259,7 @@ def python_compiler() -> str:
 
     """
 
-def platform(aliased: bool = ..., terse: bool = ...) -> str:
+def platform(aliased: bool = False, terse: bool = False) -> str:
     """Returns a single string identifying the underlying platform
     with as much useful information as possible (but no more :).
 

@@ -217,7 +217,7 @@ class ZipFile:
         def __init__(
             self,
             file: StrPath | _ZipWritable,
-            mode: Literal["w", "x"] = ...,
+            mode: Literal["w", "x"],
             compression: int = 0,
             allowZip64: bool = True,
             compresslevel: int | None = None,
@@ -229,7 +229,7 @@ class ZipFile:
         def __init__(
             self,
             file: StrPath | _ZipReadableTellable,
-            mode: Literal["a"] = ...,
+            mode: Literal["a"],
             compression: int = 0,
             allowZip64: bool = True,
             compresslevel: int | None = None,
@@ -268,7 +268,7 @@ class ZipFile:
         def __init__(
             self,
             file: StrPath | _ZipWritable,
-            mode: Literal["w", "x"] = ...,
+            mode: Literal["w", "x"],
             compression: int = 0,
             allowZip64: bool = True,
             compresslevel: int | None = None,
@@ -279,7 +279,7 @@ class ZipFile:
         def __init__(
             self,
             file: StrPath | _ZipReadableTellable,
-            mode: Literal["a"] = ...,
+            mode: Literal["a"],
             compression: int = 0,
             allowZip64: bool = True,
             compresslevel: int | None = None,
@@ -417,6 +417,29 @@ class PyZipFile(ZipFile):
 class ZipInfo:
     """Class with attributes describing each file in the ZIP archive."""
 
+    __slots__ = (
+        "orig_filename",
+        "filename",
+        "date_time",
+        "compress_type",
+        "compress_level",
+        "comment",
+        "extra",
+        "create_system",
+        "create_version",
+        "extract_version",
+        "reserved",
+        "flag_bits",
+        "volume",
+        "internal_attr",
+        "external_attr",
+        "header_offset",
+        "CRC",
+        "compress_size",
+        "file_size",
+        "_raw_time",
+        "_end_offset",
+    )
     filename: str
     date_time: _DateTuple
     compress_type: int

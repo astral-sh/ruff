@@ -154,8 +154,9 @@ impl SpecialFormType {
             | Self::Intersection
             | Self::CallableTypeOf
             | Self::Protocol  // actually `_ProtocolMeta` at runtime but this is what typeshed says
-            | Self::Generic  // actually `type` at runtime but this is what typeshed says
             | Self::ReadOnly => KnownClass::SpecialForm,
+
+            Self::Generic => KnownClass::Type,
 
             Self::List
             | Self::Dict
