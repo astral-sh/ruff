@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.12.10
+
+### Preview features
+
+- \[`flake8-simplify`\] Implement fix for `maxsplit` without separator (`SIM905`) ([#19851](https://github.com/astral-sh/ruff/pull/19851))
+- \[`flake8-use-pathlib`\] Add fixes for `PTH102` and `PTH103` ([#19514](https://github.com/astral-sh/ruff/pull/19514))
+
+### Bug fixes
+
+- \[`isort`\] Handle multiple continuation lines after module docstring (`I002`) ([#19818](https://github.com/astral-sh/ruff/pull/19818))
+- \[`pyupgrade`\] Avoid reporting `__future__` features as unnecessary when they are used (`UP010`) ([#19769](https://github.com/astral-sh/ruff/pull/19769))
+- \[`pyupgrade`\] Handle nested `Optional`s (`UP045`) ([#19770](https://github.com/astral-sh/ruff/pull/19770))
+
+### Rule changes
+
+- \[`pycodestyle`\] Make `E731` fix unsafe instead of display-only for class assignments ([#19700](https://github.com/astral-sh/ruff/pull/19700))
+- \[`pyflakes`\] Add secondary annotation showing previous definition (`F811`) ([#19900](https://github.com/astral-sh/ruff/pull/19900))
+
+### Documentation
+
+- Fix description of global config file discovery strategy ([#19188](https://github.com/astral-sh/ruff/pull/19188))
+- Update outdated links to <https://typing.python.org/en/latest/source/stubs.html> ([#19992](https://github.com/astral-sh/ruff/pull/19992))
+- \[`flake8-annotations`\] Remove unused import in example (`ANN401`) ([#20000](https://github.com/astral-sh/ruff/pull/20000))
+
 ## 0.12.9
 
 ### Preview features
