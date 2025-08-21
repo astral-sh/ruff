@@ -596,8 +596,29 @@ impl Project {
     }
 
     /// Resolve the project settings after deserialization.
-    pub fn resolve_settings(&self, db: &dyn Db) -> Result<(), ToSettingsError> {
-        let metadata = self.metadata(db);
+    ///
+    /// Returns `Ok(true)` if the settings were resolved and the `Project` was updated,
+    /// or returns `Ok(false)` if a new `Project` should be created.
+    pub fn resolve_settings(
+        &self,
+        metadata: &ProjectMetadata,
+        db: &mut dyn Db,
+    ) -> Result<bool, ToSettingsError> {
+        // Invalid project metadata.
+        if self.root(db) != metadata.root() {
+            return Ok(false);
+        }
+
+        // Reload the project if the metadata has changed.
+        if self.metadata(db) != metadata {
+            self.reload(db, metadata.clone());
+        }
+
+        // Otherwise, resolve the settings and diagnostics, which are not persisted.
+        //
+        // Note that we use the new `ProjectMetadata` here instead of the one that was
+        // persisted to ensure the `ValueSource` fields are updated even if the metadata
+        // values compare equal (but may come from new sources).
         let (settings, diagnostics) = metadata.options().to_settings(db, metadata.root())?;
 
         self.raw_settings(db)
@@ -608,7 +629,10 @@ impl Project {
             .set(diagnostics)
             .expect("`Project::resolve_settings` should only be called once");
 
-        Ok(())
+        // And reload the project files, because we don't know if those have changed.
+        self.reload_files(db);
+
+        Ok(true)
     }
 
     /// Loads all existing [`Project`]s in the database.

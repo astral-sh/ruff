@@ -174,8 +174,7 @@ impl ProjectDatabase {
         }
 
         for project in Project::load_all(self) {
-            if project.metadata(self) == metadata {
-                project.resolve_settings(self)?;
+            if project.resolve_settings(metadata, self)? {
                 self.project = Some(project);
                 break;
             }
