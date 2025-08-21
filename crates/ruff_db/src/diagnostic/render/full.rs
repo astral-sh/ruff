@@ -702,6 +702,67 @@ print()
         ");
     }
 
+    /// Test that we remap notebook cell line numbers in the diff as well as the main diagnostic.
+    #[test]
+    fn notebook_output_with_diff() {
+        let (mut env, diagnostics) = create_notebook_diagnostics(DiagnosticFormat::Full);
+        env.show_fix_diff(true);
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r"
+        error[unused-import][*]: `os` imported but unused
+         --> notebook.ipynb:cell 1:2:8
+          |
+        1 | # cell 1
+        2 | import os
+          |        ^^
+          |
+        help: Remove unused import: `os`
+
+        ℹ Safe fix
+        1 1 | # cell 1
+        2   |-import os
+        3 2 | # cell 2
+        4 3 | import math
+        5 4 | 
+
+        error[unused-import][*]: `math` imported but unused
+         --> notebook.ipynb:cell 2:2:8
+          |
+        1 | # cell 2
+        2 | import math
+          |        ^^^^
+        3 |
+        4 | print('hello world')
+          |
+        help: Remove unused import: `math`
+
+        ℹ Safe fix
+        1 1 | # cell 1
+        2 2 | import os
+        3 3 | # cell 2
+        4   |-import math
+        5 4 | 
+        6 5 | print('hello world')
+        7 6 | # cell 3
+
+        error[unused-variable]: Local variable `x` is assigned to but never used
+         --> notebook.ipynb:cell 3:4:5
+          |
+        2 | def foo():
+        3 |     print()
+        4 |     x = 1
+          |     ^
+          |
+        help: Remove assignment to unused variable `x`
+
+        ℹ Unsafe fix
+        7  7  | # cell 3
+        8  8  | def foo():
+        9  9  |     print()
+        10    |-    x = 1
+        11 10 |
+        ");
+    }
+
     /// Carriage return (`\r`) is a valid line-ending in Python, so we should normalize this to a
     /// line feed (`\n`) for rendering. Otherwise we report a single long line for this case.
     #[test]
