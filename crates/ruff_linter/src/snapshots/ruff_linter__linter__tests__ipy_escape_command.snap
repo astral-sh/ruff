@@ -14,7 +14,6 @@ F401 [*] `os` imported but unused
 help: Remove unused import: `os`
 
 ℹ Safe fix
---cell 1------------------------------------------------------------------------
 2 2 | 
 3 3 | %matplotlib inline
 4 4 | 
@@ -32,6 +31,5 @@ F401 [*] `sys` imported but unused
 help: Remove unused import: `sys`
 
 ℹ Safe fix
---cell 2------------------------------------------------------------------------
 1 1 | %%timeit
 2   |-import sys
