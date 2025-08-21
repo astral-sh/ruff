@@ -18,6 +18,7 @@ use crate::semantic_index::{
     BindingWithConstraints, DeclarationWithConstraint, SemanticIndex, attribute_declarations,
     attribute_scopes,
 };
+use crate::types::constraints::{Constraints, IteratorConstraintsExtension};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{INVALID_LEGACY_TYPE_VARIABLE, INVALID_TYPE_ALIAS_TYPE};
 use crate::types::enums::enum_metadata;
@@ -28,10 +29,10 @@ use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signatu
 use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
     ApplyTypeMappingVisitor, BareTypeAliasType, Binding, BoundSuperError, BoundSuperType,
-    CallableType, DataclassParams, DeprecatedInstance, HasRelationToVisitor, KnownInstanceType,
-    NormalizedVisitor, PropertyInstanceType, StringLiteralType, TypeAliasType, TypeMapping,
-    TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, VarianceInferable,
-    declaration_type, infer_definition_types, todo_type,
+    CallableType, DataclassParams, DeprecatedInstance, HasRelationToVisitor, IsEquivalentVisitor,
+    KnownInstanceType, NormalizedVisitor, PropertyInstanceType, StringLiteralType, TypeAliasType,
+    TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind,
+    VarianceInferable, declaration_type, infer_definition_types, todo_type,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet, Program,
@@ -49,7 +50,7 @@ use crate::{
     },
     types::{
         CallArguments, CallError, CallErrorKind, MetaclassCandidate, UnionBuilder, UnionType,
-        cyclic::PairVisitor, definition_expression_type,
+        definition_expression_type,
     },
 };
 use indexmap::IndexSet;
@@ -536,64 +537,88 @@ impl<'db> ClassType<'db> {
 
     /// Return `true` if `other` is present in this class's MRO.
     pub(super) fn is_subclass_of(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
-        self.has_relation_to_impl(db, other, TypeRelation::Subtyping, &PairVisitor::new(true))
+        self.when_subclass_of(db, other)
     }
 
-    pub(super) fn has_relation_to_impl(
+    pub(super) fn when_subclass_of<C: Constraints<'db>>(
+        self,
+        db: &'db dyn Db,
+        other: ClassType<'db>,
+    ) -> C {
+        self.has_relation_to_impl(
+            db,
+            other,
+            TypeRelation::Subtyping,
+            &HasRelationToVisitor::new(C::always_satisfiable(db)),
+        )
+    }
+
+    pub(super) fn has_relation_to_impl<C: Constraints<'db>>(
         self,
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
-        visitor: &HasRelationToVisitor<'db>,
-    ) -> bool {
-        self.iter_mro(db).any(|base| {
+        visitor: &HasRelationToVisitor<'db, C>,
+    ) -> C {
+        self.iter_mro(db).when_any(db, |base| {
             match base {
                 ClassBase::Dynamic(_) => match relation {
-                    TypeRelation::Subtyping => other.is_object(db),
-                    TypeRelation::Assignability => !other.is_final(db),
+                    TypeRelation::Subtyping => C::from_bool(db, other.is_object(db)),
+                    TypeRelation::Assignability => C::from_bool(db, !other.is_final(db)),
                 },
 
                 // Protocol and Generic are not represented by a ClassType.
-                ClassBase::Protocol | ClassBase::Generic => false,
+                ClassBase::Protocol | ClassBase::Generic => C::unsatisfiable(db),
 
                 ClassBase::Class(base) => match (base, other) {
-                    (ClassType::NonGeneric(base), ClassType::NonGeneric(other)) => base == other,
+                    (ClassType::NonGeneric(base), ClassType::NonGeneric(other)) => {
+                        C::from_bool(db, base == other)
+                    }
                     (ClassType::Generic(base), ClassType::Generic(other)) => {
-                        base.origin(db) == other.origin(db)
-                            && base.specialization(db).has_relation_to_impl(
+                        C::from_bool(db, base.origin(db) == other.origin(db)).and(db, || {
+                            base.specialization(db).has_relation_to_impl(
                                 db,
                                 other.specialization(db),
                                 relation,
                                 visitor,
                             )
+                        })
                     }
                     (ClassType::Generic(_), ClassType::NonGeneric(_))
-                    | (ClassType::NonGeneric(_), ClassType::Generic(_)) => false,
+                    | (ClassType::NonGeneric(_), ClassType::Generic(_)) => C::unsatisfiable(db),
                 },
 
                 ClassBase::TypedDict => {
                     // TODO: Implement subclassing and assignability for TypedDicts.
-                    true
+                    C::always_satisfiable(db)
                 }
             }
         })
     }
 
-    pub(super) fn is_equivalent_to(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
+    pub(super) fn is_equivalent_to_impl<C: Constraints<'db>>(
+        self,
+        db: &'db dyn Db,
+        other: ClassType<'db>,
+        visitor: &IsEquivalentVisitor<'db, C>,
+    ) -> C {
         if self == other {
-            return true;
+            return C::always_satisfiable(db);
         }
 
         match (self, other) {
             // A non-generic class is never equivalent to a generic class.
             // Two non-generic classes are only equivalent if they are equal (handled above).
-            (ClassType::NonGeneric(_), _) | (_, ClassType::NonGeneric(_)) => false,
+            (ClassType::NonGeneric(_), _) | (_, ClassType::NonGeneric(_)) => C::unsatisfiable(db),
 
             (ClassType::Generic(this), ClassType::Generic(other)) => {
-                this.origin(db) == other.origin(db)
-                    && this
-                        .specialization(db)
-                        .is_equivalent_to(db, other.specialization(db))
+                C::from_bool(db, this.origin(db) == other.origin(db)).and(db, || {
+                    this.specialization(db).is_equivalent_to_impl(
+                        db,
+                        other.specialization(db),
+                        visitor,
+                    )
+                })
             }
         }
     }
@@ -1611,6 +1636,15 @@ impl<'db> ClassLiteral<'db> {
         // participate, so we should not return `True` if we find `Any/Unknown` in the MRO.
         self.iter_mro(db, specialization)
             .contains(&ClassBase::Class(other))
+    }
+
+    pub(super) fn when_subclass_of<C: Constraints<'db>>(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+        other: ClassType<'db>,
+    ) -> C {
+        C::from_bool(db, self.is_subclass_of(db, specialization, other))
     }
 
     /// Return `true` if this class constitutes a typed dict specification (inherits from
@@ -4184,6 +4218,14 @@ impl KnownClass {
     pub(super) fn is_subclass_of<'db>(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
         self.try_to_class_literal_without_logging(db)
             .is_ok_and(|class| class.is_subclass_of(db, None, other))
+    }
+
+    pub(super) fn when_subclass_of<'db, C: Constraints<'db>>(
+        self,
+        db: &'db dyn Db,
+        other: ClassType<'db>,
+    ) -> C {
+        C::from_bool(db, self.is_subclass_of(db, other))
     }
 
     /// Return the module in which we should look up the definition for this class
