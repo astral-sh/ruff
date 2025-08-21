@@ -138,11 +138,7 @@ impl<'a> YieldTracker<'a> {
         }
     }
 
-    fn check_terminating_branch(&mut self, yields: &[&'a Expr]) {
-        self.report_excess(yields);
-    }
-
-    fn merge_continuing_branch(&mut self, yields: &[&'a Expr]) {
+    fn propagate_yields(&mut self, yields: &[&'a Expr]) {
         self.report_excess(yields);
         let scope = self
             .scopes
@@ -171,6 +167,14 @@ impl<'a> YieldTracker<'a> {
         }
     }
 
+    fn get_max_yields(&self, branches: &[Vec<&'a Expr>]) -> Vec<&'a Expr> {
+        branches
+            .iter()
+            .max_by_key(|branch| branch.len())
+            .cloned()
+            .unwrap_or_default()
+    }
+
     fn clear_yields_in_current_scope(&mut self) {
         self.scopes
             .last_mut()
@@ -196,27 +200,26 @@ impl<'a> YieldTracker<'a> {
         self.visit_body(orelse);
     }
 
-    // For exclusive branches propagate maximum yield count
     fn handle_exclusive_branches(&mut self, branch_count: usize) {
-        let mut max_yields_in_returning_branches = Vec::new();
-        let mut max_yields_in_nonreturning_branches = Vec::new();
+        let mut returning_branches = Vec::new();
+        let mut continuing_branches = Vec::new();
+
         for _ in 0..branch_count {
             let (branch_yields, branch_returns) = self.pop_scope();
-
             self.report_excess(&branch_yields);
 
             if branch_returns {
-                if branch_yields.len() > max_yields_in_returning_branches.len() {
-                    max_yields_in_returning_branches = branch_yields;
-                }
+                returning_branches.push(branch_yields);
             } else {
-                if branch_yields.len() > max_yields_in_nonreturning_branches.len() {
-                    max_yields_in_nonreturning_branches = branch_yields;
-                }
+                continuing_branches.push(branch_yields);
             }
         }
-        self.check_terminating_branch(&max_yields_in_returning_branches);
-        self.merge_continuing_branch(&max_yields_in_nonreturning_branches);
+
+        let max_returning = self.get_max_yields(&returning_branches);
+        let max_continuing = self.get_max_yields(&continuing_branches);
+
+        self.report_excess(&max_returning);
+        self.propagate_yields(&max_continuing);
     }
 }
 
@@ -332,7 +335,7 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldTracker<'a> {
                     max_path.extend(finally_yields.clone());
 
                     // This branch terminates because finally returns
-                    self.check_terminating_branch(&max_path);
+                    self.report_excess(&max_path);
                     // Clear current scope because finally returns
                     self.clear_yields_in_current_scope();
                 } else {
@@ -344,7 +347,7 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldTracker<'a> {
                     // Check except branches that return and don't propagate yields
                     let mut exception_return = max_yields_in_returning_except_branch;
                     exception_return.extend(finally_yields.clone());
-                    self.check_terminating_branch(&exception_return);
+                    self.report_excess(&exception_return);
 
                     let mut exception_no_return = max_yields_in_nonreturning_except_branch;
                     exception_no_return.extend(finally_yields.clone());
@@ -361,16 +364,16 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldTracker<'a> {
                         let mut valid_try_return = try_yields.clone();
                         // Finally is executed even if else returns
                         valid_try_return.extend(finally_yields.clone());
-                        self.check_terminating_branch(&valid_try_return);
+                        self.report_excess(&valid_try_return);
 
                         // Propagate the non-returning exception
-                        self.merge_continuing_branch(&exception_no_return);
+                        self.propagate_yields(&exception_no_return);
                     } else {
                         if else_returns {
                             // Finally is executed even if else returns
                             // Check returning path and propagate the non-returning exception
-                            self.check_terminating_branch(&try_else_finally);
-                            self.merge_continuing_branch(&exception_no_return);
+                            self.report_excess(&try_else_finally);
+                            self.propagate_yields(&exception_no_return);
                         } else {
                             // No returns, we propagate yields along the path with maximum yields
                             let max_yield_path =
@@ -379,7 +382,7 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldTracker<'a> {
                                 } else {
                                     exception_no_return
                                 };
-                            self.merge_continuing_branch(&max_yield_path);
+                            self.propagate_yields(&max_yield_path);
                         }
                     }
                 }
@@ -403,7 +406,7 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldTracker<'a> {
                         self.emit_multiple_violations(&body_yields);
                     }
                 }
-                self.merge_continuing_branch(&else_yields);
+                self.propagate_yields(&else_yields);
                 if else_returns {
                     // If else returns, don't propagate yield count
                     self.clear_yields_in_current_scope();
