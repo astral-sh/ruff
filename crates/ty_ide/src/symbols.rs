@@ -86,7 +86,11 @@ pub(crate) fn symbols_for_file(
 
     let mut visitor = SymbolVisitor::new(options);
     visitor.visit_body(&module.syntax().body);
-    visitor.symbols
+    let mut symbols = visitor.symbols;
+    if let Some(ref query) = options.query_string {
+        symbols.retain(|symbol| is_pattern_in_symbol(query, &symbol.name));
+    }
+    symbols
 }
 
 struct SymbolVisitor<'a> {
@@ -115,13 +119,6 @@ impl<'a> SymbolVisitor<'a> {
     }
 
     fn add_symbol(&mut self, symbol: SymbolInfo) {
-        // Filter by query string if provided
-        if let Some(ref query) = self.options.query_string {
-            if !Self::is_pattern_in_symbol(query, &symbol.name) {
-                return;
-            }
-        }
-
         if self.options.hierarchical {
             if let Some(parent) = self.symbol_stack.last_mut() {
                 parent.children.push(symbol);
@@ -151,27 +148,6 @@ impl<'a> SymbolVisitor<'a> {
 
     fn is_constant_name(name: &str) -> bool {
         name.chars().all(|c| c.is_ascii_uppercase() || c == '_')
-    }
-
-    /// Returns true if symbol name contains all characters in the query
-    /// string in order. The comparison is case insensitive.
-    fn is_pattern_in_symbol(query_string: &str, symbol_name: &str) -> bool {
-        let typed_lower = query_string.to_lowercase();
-        let symbol_lower = symbol_name.to_lowercase();
-        let typed_chars: Vec<char> = typed_lower.chars().collect();
-        let symbol_chars: Vec<char> = symbol_lower.chars().collect();
-
-        let mut typed_pos = 0;
-        let mut symbol_pos = 0;
-
-        while typed_pos < typed_chars.len() && symbol_pos < symbol_chars.len() {
-            if typed_chars[typed_pos] == symbol_chars[symbol_pos] {
-                typed_pos += 1;
-            }
-            symbol_pos += 1;
-        }
-
-        typed_pos == typed_chars.len()
     }
 }
 
@@ -306,4 +282,25 @@ impl SourceOrderVisitor<'_> for SymbolVisitor<'_> {
             }
         }
     }
+}
+
+/// Returns true if symbol name contains all characters in the query
+/// string in order. The comparison is case insensitive.
+fn is_pattern_in_symbol(query_string: &str, symbol_name: &str) -> bool {
+    let typed_lower = query_string.to_lowercase();
+    let symbol_lower = symbol_name.to_lowercase();
+    let typed_chars: Vec<char> = typed_lower.chars().collect();
+    let symbol_chars: Vec<char> = symbol_lower.chars().collect();
+
+    let mut typed_pos = 0;
+    let mut symbol_pos = 0;
+
+    while typed_pos < typed_chars.len() && symbol_pos < symbol_chars.len() {
+        if typed_chars[typed_pos] == symbol_chars[symbol_pos] {
+            typed_pos += 1;
+        }
+        symbol_pos += 1;
+    }
+
+    typed_pos == typed_chars.len()
 }
