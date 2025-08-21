@@ -3,12 +3,13 @@ use std::num::NonZeroUsize;
 
 use anstyle::Style;
 use ruff_notebook::NotebookIndex;
-use similar::{ChangeTag, InlineChange, TextDiff};
+use rustc_hash::FxHashMap;
+use similar::{ChangeTag, TextDiff};
 
 use ruff_annotate_snippets::Renderer as AnnotateRenderer;
 use ruff_diagnostics::{Applicability, Fix};
 use ruff_source_file::OneIndexed;
-use ruff_text_size::{Ranged, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::diagnostic::render::{FileResolver, Resolved};
 use crate::diagnostic::stylesheet::{DiagnosticStylesheet, fmt_styled};
@@ -107,21 +108,29 @@ impl std::fmt::Display for Diff<'_> {
         let source_code = self.diagnostic_source.as_source_code();
         let source_text = source_code.text();
 
-        // TODO(dhruvmanila): Add support for Notebook cells once it's user-facing
-        let mut output = String::with_capacity(source_text.len());
-        let mut last_end = TextSize::default();
-
-        for edit in self.fix.edits() {
-            output.push_str(source_code.slice(TextRange::new(last_end, edit.start())));
-            output.push_str(edit.content().unwrap_or_default());
-            last_end = edit.end();
+        // Partition the source code into ranges for each cell. If `self.notebook_index` is `None`,
+        // indicating a regular script file, all the lines will be in one "cell" under the `None`
+        // key.
+        let mut cells: FxHashMap<Option<OneIndexed>, TextRange> = FxHashMap::default();
+        for line in source_code.line_starts() {
+            let index = source_code.line_index(*line);
+            let cell = if let Some(notebook_index) = &self.notebook_index {
+                // We add a trailing newline to cells, so there's one extra line start without an
+                // actual cell index.
+                let Some(index) = notebook_index.cell(index) else {
+                    continue;
+                };
+                Some(index)
+            } else {
+                None
+            };
+            cells
+                .entry(cell)
+                .and_modify(|range| {
+                    *range = TextRange::new(range.start(), source_code.line_end(index));
+                })
+                .or_insert(source_code.line_range(index));
         }
-
-        output.push_str(&source_text[usize::from(last_end)..]);
-
-        let diff = TextDiff::from_lines(source_text, &output);
-
-        let mut display_lines = Vec::new();
 
         let message = match self.fix.applicability() {
             // TODO(zanieb): Adjust this messaging once it's user-facing
@@ -134,77 +143,105 @@ impl std::fmt::Display for Diff<'_> {
         // we're getting rid of this soon anyway, so I didn't think it was worth adding another
         // style to the stylesheet temporarily. The color doesn't appear at all in the snapshot
         // tests, which is the only place these are currently used.
-        display_lines.push(DisplayLine::Header {
-            message,
-            style: self.stylesheet.separator,
-        });
+        writeln!(f, "ℹ {}", fmt_styled(message, self.stylesheet.separator))?;
 
-        let (largest_old, largest_new) = diff
-            .ops()
-            .last()
-            .map(|op| (op.old_range().start, op.new_range().start))
-            .unwrap_or_default();
-
-        let digit_with = OneIndexed::from_zero_indexed(largest_new.max(largest_old)).digits();
-
-        for (idx, group) in diff.grouped_ops(3).iter().enumerate() {
-            if idx > 0 {
-                display_lines.push(DisplayLine::Hline { cell: None });
+        for (cell, range) in cells {
+            println!("<<< cell {cell:?} >>>");
+            println!("```\n{}\n```", source_code.slice(range));
+            if let Some(cell) = cell {
+                writeln!(f, "-- cell {cell:-<72}")?;
             }
-            let mut last_cell = None;
-            for op in group {
-                for change in diff.iter_inline_changes(op) {
-                    let sign = match change.tag() {
-                        ChangeTag::Delete => "-",
-                        ChangeTag::Insert => "+",
-                        ChangeTag::Equal => " ",
-                    };
 
-                    let line_style = LineStyle::from(change.tag(), self.stylesheet);
+            let input = source_code.slice(range);
 
-                    let old_index = change.old_index().map(OneIndexed::from_zero_indexed);
-                    let new_index = change.new_index().map(OneIndexed::from_zero_indexed);
+            let mut output = String::with_capacity(input.len());
+            let mut last_end = range.start();
 
-                    let (old_index, new_index) = if let Some(notebook_index) = &self.notebook_index
-                    {
-                        let cell = old_index
-                            .or(new_index)
-                            .and_then(|index| notebook_index.cell(index));
-                        if cell != last_cell {
-                            display_lines.push(DisplayLine::Hline { cell });
-                        }
-                        last_cell = cell;
-                        let old_index = old_index.map(|old_index| {
-                            notebook_index.cell_row(old_index).unwrap_or_default()
-                        });
-                        let new_index = new_index.map(|new_index| {
-                            notebook_index.cell_row(new_index).unwrap_or_default()
-                        });
-                        (old_index, new_index)
-                    } else {
-                        (old_index, new_index)
-                    };
-
-                    display_lines.push(DisplayLine::Diff {
-                        old: Line {
-                            index: old_index,
-                            width: digit_with,
-                        },
-                        new: Line {
-                            index: new_index,
-                            width: digit_with,
-                        },
-                        sign,
-                        change,
-                        style: line_style,
-                        emphasis: self.stylesheet.emphasis,
-                    });
+            for edit in self.fix.edits() {
+                if edit.start() > last_end && edit.start() < range.end() {
+                    output.push_str(source_code.slice(TextRange::new(last_end, edit.start())));
+                    output.push_str(edit.content().unwrap_or_default());
+                    last_end = edit.end();
                 }
             }
-        }
 
-        for line in display_lines {
-            write!(f, "{line}")?;
+            output.push_str(&source_text[usize::from(last_end)..usize::from(range.end())]);
+
+            let diff = TextDiff::from_lines(input, &output);
+
+            let (largest_old, largest_new) = diff
+                .ops()
+                .last()
+                .map(|op| (op.old_range().start, op.new_range().start))
+                .unwrap_or_default();
+
+            let digit_with = OneIndexed::from_zero_indexed(largest_new.max(largest_old)).digits();
+
+            for (idx, group) in diff.grouped_ops(3).iter().enumerate() {
+                if idx > 0 {
+                    writeln!(f, "{:-^1$}", "-", 80)?;
+                }
+                for op in group {
+                    for change in diff.iter_inline_changes(op) {
+                        let sign = match change.tag() {
+                            ChangeTag::Delete => "-",
+                            ChangeTag::Insert => "+",
+                            ChangeTag::Equal => " ",
+                        };
+
+                        let line_style = LineStyle::from(change.tag(), self.stylesheet);
+
+                        let old_index = change.old_index().map(OneIndexed::from_zero_indexed);
+                        let new_index = change.new_index().map(OneIndexed::from_zero_indexed);
+
+                        let (old_index, new_index) =
+                            if let Some(notebook_index) = &self.notebook_index {
+                                let old_index = old_index.map(|old_index| {
+                                    notebook_index.cell_row(old_index).unwrap_or_default()
+                                });
+                                let new_index = new_index.map(|new_index| {
+                                    notebook_index.cell_row(new_index).unwrap_or_default()
+                                });
+                                (old_index, new_index)
+                            } else {
+                                (old_index, new_index)
+                            };
+
+                        write!(
+                            f,
+                            "{} {} |{sign}",
+                            Line {
+                                index: old_index,
+                                width: digit_with,
+                            },
+                            Line {
+                                index: new_index,
+                                width: digit_with,
+                            },
+                            sign = fmt_styled(line_style.apply_to(sign), self.stylesheet.emphasis),
+                        )?;
+
+                        for (emphasized, value) in change.iter_strings_lossy() {
+                            let value = show_nonprinting(&value);
+                            if emphasized {
+                                write!(
+                                    f,
+                                    "{}",
+                                    fmt_styled(
+                                        line_style.apply_to(&value),
+                                        self.stylesheet.emphasis
+                                    )
+                                )?;
+                            } else {
+                                write!(f, "{}", line_style.apply_to(&value))?;
+                            }
+                        }
+                        if change.missing_newline() {
+                            writeln!(f)?;
+                        }
+                    }
+                }
+            }
         }
 
         Ok(())
@@ -251,65 +288,6 @@ impl std::fmt::Display for Line {
             }
             Some(idx) => write!(f, "{:<width$}", idx, width = self.width.get()),
         }
-    }
-}
-
-enum DisplayLine<'a> {
-    /// A header line like `ℹ Safe fix`.
-    Header { message: &'static str, style: Style },
-    /// A horizontal line, used for separating groups.
-    ///
-    /// If `cell` is `Some`, include the cell number in the line.
-    Hline { cell: Option<OneIndexed> },
-    Diff {
-        old: Line,
-        new: Line,
-        sign: &'static str,
-        change: InlineChange<'a, str>,
-        style: LineStyle,
-        emphasis: Style,
-    },
-}
-
-impl std::fmt::Display for DisplayLine<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            DisplayLine::Header { message, style } => {
-                writeln!(f, "ℹ {}", fmt_styled(message, *style))?
-            }
-            DisplayLine::Hline { cell } => match cell {
-                Some(cell) => writeln!(f, "-- cell {cell:-<72}")?,
-                None => writeln!(f, "{:-^1$}", "-", 80)?,
-            },
-            DisplayLine::Diff {
-                old,
-                new,
-                sign,
-                change,
-                style,
-                emphasis,
-            } => {
-                write!(
-                    f,
-                    "{old} {new} |{sign}",
-                    sign = fmt_styled(style.apply_to(sign), *emphasis),
-                )?;
-
-                for (emphasized, value) in change.iter_strings_lossy() {
-                    let value = show_nonprinting(&value);
-                    if emphasized {
-                        write!(f, "{}", fmt_styled(style.apply_to(&value), *emphasis))?;
-                    } else {
-                        write!(f, "{}", style.apply_to(&value))?;
-                    }
-                }
-                if change.missing_newline() {
-                    writeln!(f)?;
-                }
-            }
-        }
-
-        Ok(())
     }
 }
 
@@ -749,9 +727,7 @@ print()
         1 1 | # cell 1
         2   |-import os
         -- cell 2-----------------------------------------------------------------------
-        1 2 | # cell 2
-        2 1 | import math
-        3 2 | 
+        -- cell 3-----------------------------------------------------------------------
 
         error[unused-import][*]: `math` imported but unused
          --> notebook.ipynb:cell 2:2:8
@@ -766,15 +742,12 @@ print()
 
         ℹ Safe fix
         -- cell 1-----------------------------------------------------------------------
-        1 1 | # cell 1
-        2 2 | import os
         -- cell 2-----------------------------------------------------------------------
         1 1 | # cell 2
         2   |-import math
-        3 2 | 
-        4 3 | print('hello world')
+        1 2 | 
+        2 1 | print('hello world')
         -- cell 3-----------------------------------------------------------------------
-        1 4 | # cell 3
 
         error[unused-variable]: Local variable `x` is assigned to but never used
          --> notebook.ipynb:cell 3:4:5
@@ -787,12 +760,12 @@ print()
         help: Remove assignment to unused variable `x`
 
         ℹ Unsafe fix
-        -- cell 3-----------------------------------------------------------------------
-        1  1  | # cell 3
-        2  2  | def foo():
-        3  3  |     print()
-        4     |-    x = 1
-        5  4  |
+        --cell 3------------------------------------------------------------------------
+        1 1 | # cell 3
+        2 2 | def foo():
+        1 1 |     print()
+        2   |-    x = 1
+        3 2 |
         ");
     }
 

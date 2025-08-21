@@ -105,6 +105,12 @@ impl<'src, 'index> SourceCode<'src, 'index> {
     pub fn line_count(&self) -> usize {
         self.index.line_count()
     }
+
+    /// Returns the [byte offsets](TextSize) for every line
+    #[inline]
+    pub fn line_starts(&self) -> &[TextSize] {
+        self.index.line_starts()
+    }
 }
 
 impl PartialEq<Self> for SourceCode<'_, '_> {
