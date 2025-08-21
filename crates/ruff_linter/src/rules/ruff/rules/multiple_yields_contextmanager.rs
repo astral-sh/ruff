@@ -11,7 +11,7 @@ use crate::rules::ruff::helpers::function_def_visit_sourceorder_except_body;
 use crate::{FixAvailability, Violation};
 
 /// ## What it does
-/// Checks that a function decorated with `contextlib.contextmanager` yields at most once.
+/// Checks that a function decorated with `contextlib.contextmanager` or `contextlib.asynccontextmanager` yields at most once.
 ///
 /// ### Why is this bad?
 /// A context manager must yield exactly once. Multiple yields cause a runtime error.
@@ -24,6 +24,15 @@ use crate::{FixAvailability, Violation};
 ///     yield "first value"  # This yield is expected
 ///     print("Cleanup")
 ///     yield "second value"  # This violates the protocol
+/// ```
+///
+/// Use instead:
+/// ```python
+/// @contextlib.contextmanager
+/// def good_context_manager():
+///     print("Setting up")
+///     yield "only value"  # Single yield is correct
+///     print("Cleanup")
 /// ```
 /// ## References
 /// - [Python documentation: contextlib.contextmanager](https://docs.python.org/3/library/contextlib.html#contextlib.contextmanager)
