@@ -7,10 +7,11 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::{QualifiedName, QualifiedNameBuilder};
 use ruff_python_ast::{self as ast, Alias, Stmt, StmtRef};
 use ruff_python_semantic::{NameImport, Scope};
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix;
+use crate::preview::is_separate_unused_import_diag_enabled;
 use crate::{AlwaysFixableViolation, Applicability, Fix};
 
 /// ## What it does
@@ -35,6 +36,11 @@ use crate::{AlwaysFixableViolation, Applicability, Fix};
 /// print("Hello, world!")
 /// ```
 ///
+/// ## Preview
+///
+/// When [preview] is enabled, this rule creates separate diagnostics
+/// for each unused import instead of grouping them together.
+///
 /// ## Fix safety
 /// This fix is marked unsafe if applying it would delete a comment.
 ///
@@ -43,6 +49,8 @@ use crate::{AlwaysFixableViolation, Applicability, Fix};
 ///
 /// ## References
 /// - [Python documentation: `__future__` — Future statement definitions](https://docs.python.org/3/library/__future__.html)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct UnnecessaryFutureImport {
     pub names: Vec<String>,
@@ -163,46 +171,67 @@ pub(crate) fn unnecessary_future_import(checker: &Checker, scope: &Scope) {
             }
         }
     }
-
-    for (node_id, unused_aliases) in unused_imports {
-        let mut diagnostic = checker.report_diagnostic(
-            UnnecessaryFutureImport {
-                names: unused_aliases
-                    .iter()
-                    .map(|alias| alias.name.to_string())
-                    .sorted()
-                    .collect(),
-            },
-            checker.semantic().statement(node_id).range(),
-        );
-
-        diagnostic.try_set_fix(|| {
-            let statement = checker.semantic().statement(node_id);
-            let parent = checker.semantic().parent_statement(node_id);
-            let edit = fix::edits::remove_unused_imports(
-                unused_aliases
-                    .iter()
-                    .map(|alias| &alias.name)
-                    .map(ast::Identifier::as_str),
-                statement,
-                parent,
-                checker.locator(),
-                checker.stylist(),
-                checker.indexer(),
-            )?;
-
-            let range = edit.range();
-            let applicability = if checker.comment_ranges().intersects(range) {
-                Applicability::Unsafe
-            } else {
-                Applicability::Safe
-            };
-
-            Ok(
-                Fix::applicable_edit(edit, applicability).isolate(Checker::isolation(
-                    checker.semantic().current_statement_parent_id(),
-                )),
-            )
-        });
+    if is_separate_unused_import_diag_enabled(checker.settings()) {
+        for (node_id, unused_aliases) in unused_imports {
+            for unused_alias in unused_aliases {
+                create_diagnostic(checker, &[unused_alias], unused_alias.range(), node_id);
+            }
+        }
+    } else {
+        for (node_id, unused_aliases) in unused_imports {
+            create_diagnostic(
+                checker,
+                unused_aliases.as_slice(),
+                checker.semantic().statement(node_id).range(),
+                node_id,
+            );
+        }
     }
+}
+
+fn create_diagnostic(
+    checker: &Checker,
+    unused_aliases: &[&Alias],
+    range: TextRange,
+    node_id: NodeId,
+) {
+    let mut diagnostic = checker.report_diagnostic(
+        UnnecessaryFutureImport {
+            names: unused_aliases
+                .iter()
+                .map(|alias| alias.name.to_string())
+                .sorted()
+                .collect(),
+        },
+        range,
+    );
+
+    diagnostic.try_set_fix(|| {
+        let statement = checker.semantic().statement(node_id);
+        let parent = checker.semantic().parent_statement(node_id);
+        let edit = fix::edits::remove_unused_imports(
+            unused_aliases
+                .iter()
+                .map(|alias| &alias.name)
+                .map(ast::Identifier::as_str),
+            statement,
+            parent,
+            checker.locator(),
+            checker.stylist(),
+            checker.indexer(),
+        )?;
+
+        let range = edit.range();
+        let applicability = if checker.comment_ranges().intersects(range) {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        };
+
+        Ok(
+            Fix::applicable_edit(edit, applicability).isolate(Checker::isolation(
+                checker.semantic().current_statement_parent_id(),
+            )),
+        )
+    });
 }
