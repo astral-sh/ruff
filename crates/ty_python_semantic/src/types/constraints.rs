@@ -16,7 +16,7 @@ pub(crate) trait Constraints<'db>: Clone + Sized {
     /// Returns whether this constraint set always holds
     fn is_always(&self, db: &'db dyn Db) -> bool;
 
-    /// Updates this constraint set to hold the union of itself and another constraint set. Returns
+    /// Updates this constraint set to hold the union of itself and another constraint set.
     fn union(&mut self, db: &'db dyn Db, other: Self) -> &Self;
 
     /// Updates this constraint set to hold the intersection of itself and another constraint set.
