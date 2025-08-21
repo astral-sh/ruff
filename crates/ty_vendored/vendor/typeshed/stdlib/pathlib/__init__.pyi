@@ -46,6 +46,31 @@ class PurePath(PathLike[str]):
     """
 
     if sys.version_info >= (3, 13):
+        __slots__ = (
+            "_raw_paths",
+            "_drv",
+            "_root",
+            "_tail_cached",
+            "_str",
+            "_str_normcase_cached",
+            "_parts_normcase_cached",
+            "_hash",
+        )
+    elif sys.version_info >= (3, 12):
+        __slots__ = (
+            "_raw_paths",
+            "_drv",
+            "_root",
+            "_tail_cached",
+            "_str",
+            "_str_normcase_cached",
+            "_parts_normcase_cached",
+            "_lines_cached",
+            "_hash",
+        )
+    else:
+        __slots__ = ("_drv", "_root", "_parts", "_str", "_hash", "_pparts", "_cached_cparts")
+    if sys.version_info >= (3, 13):
         parser: ClassVar[types.ModuleType]
         def full_match(self, pattern: StrPath, *, case_sensitive: bool | None = None) -> bool:
             """
@@ -240,12 +265,16 @@ class PurePosixPath(PurePath):
     However, you can also instantiate it directly on any system.
     """
 
+    __slots__ = ()
+
 class PureWindowsPath(PurePath):
     """PurePath subclass for Windows systems.
 
     On a Windows system, instantiating a PurePath should return this object.
     However, you can also instantiate it directly on any system.
     """
+
+    __slots__ = ()
 
 class Path(PurePath):
     """PurePath subclass that can make system calls.
@@ -257,6 +286,12 @@ class Path(PurePath):
     but cannot instantiate a WindowsPath on a POSIX system or vice versa.
     """
 
+    if sys.version_info >= (3, 14):
+        __slots__ = ("_info",)
+    elif sys.version_info >= (3, 10):
+        __slots__ = ()
+    else:
+        __slots__ = ("_accessor",)
     if sys.version_info >= (3, 12):
         def __new__(cls, *args: StrPath, **kwargs: Unused) -> Self: ...  # pyright: ignore[reportInconsistentConstructor]
     else:
@@ -737,7 +772,7 @@ class Path(PurePath):
                 """
     if sys.version_info >= (3, 12):
         def walk(
-            self, top_down: bool = ..., on_error: Callable[[OSError], object] | None = ..., follow_symlinks: bool = ...
+            self, top_down: bool = True, on_error: Callable[[OSError], object] | None = None, follow_symlinks: bool = False
         ) -> Iterator[tuple[Self, list[str], list[str]]]:
             """Walk the directory tree from this directory, similar to os.walk()."""
 
@@ -747,11 +782,15 @@ class PosixPath(Path, PurePosixPath):
     On a POSIX system, instantiating a Path should return this object.
     """
 
+    __slots__ = ()
+
 class WindowsPath(Path, PureWindowsPath):
     """Path subclass for Windows systems.
 
     On a Windows system, instantiating a Path should return this object.
     """
+
+    __slots__ = ()
 
 if sys.version_info >= (3, 13):
     class UnsupportedOperation(NotImplementedError):

@@ -26,12 +26,12 @@ _T = TypeVar("_T")
 _P = ParamSpec("_P")
 
 # available after calling `curses.initscr()`
-LINES: int
-COLS: int
+LINES: Final[int]
+COLS: Final[int]
 
 # available after calling `curses.start_color()`
-COLORS: int
-COLOR_PAIRS: int
+COLORS: Final[int]
+COLOR_PAIRS: Final[int]
 
 def wrapper(func: Callable[Concatenate[window, _P], _T], /, *arg: _P.args, **kwds: _P.kwargs) -> _T:
     """Wrapper function that initializes curses and calls another function,

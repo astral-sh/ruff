@@ -4,9 +4,9 @@ from re import Pattern
 from sre_constants import *
 from sre_constants import _NamedIntConstant
 from sre_parse import SubPattern
-from typing import Any
+from typing import Any, Final
 
-MAXCODE: int
+MAXCODE: Final[int]
 
 def dis(code: list[_NamedIntConstant]) -> None: ...
 def isstring(obj: Any) -> bool: ...
