@@ -2344,17 +2344,25 @@ impl<'db> ClassLiteral<'db> {
             .collect()
     }
 
-    /// Returns a list of all annotated attributes defined in the body of this class. This is similar
-    /// to the `__annotations__` attribute at runtime, but also contains default values.
+    /// Returns a map of all annotated attributes defined in the body of this class.
+    /// This extends the `__annotations__` attribute at runtime by also including default values
+    /// and computed field properties.
     ///
     /// For a class body like
     /// ```py
-    /// @dataclass
+    /// @dataclass(kw_only=True)
     /// class C:
     ///     x: int
-    ///     y: str = "a"
+    ///     y: str = "hello"
+    ///     z: float = field(kw_only=False, default=1.0)
     /// ```
-    /// we return a map `{"x": (int, None), "y": (str, Some(Literal["a"]))}`.
+    /// we return a map `{"x": Field, "y": Field, "z": Field}` where each `Field` contains
+    /// the annotated type, default value (if any), and field properties.
+    ///
+    /// **Important**: The returned `Field` objects represent our full understanding of the fields,
+    /// including properties inherited from class-level dataclass parameters (like `kw_only=True`)
+    /// and dataclass-transform parameters (like `kw_only_default=True`). They do not represent
+    /// only what is explicitly specified in each field definition.
     pub(super) fn own_fields(
         self,
         db: &'db dyn Db,
