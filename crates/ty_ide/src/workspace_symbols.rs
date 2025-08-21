@@ -28,7 +28,7 @@ pub fn workspace_symbols(db: &dyn Db, query: &str) -> Vec<WorkspaceSymbolInfo> {
 
         for symbol in file_symbols {
             results.push(WorkspaceSymbolInfo {
-                symbol,
+                symbol: symbol.clone(),
                 file: *file,
             });
         }

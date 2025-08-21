@@ -8,7 +8,7 @@ pub fn document_symbols_with_options(
     file: File,
     options: &SymbolsOptions,
 ) -> Vec<SymbolInfo> {
-    symbols_for_file(db, file, options)
+    symbols_for_file(db, file, options).cloned().collect()
 }
 
 /// Get all document symbols for a file (hierarchical by default).
@@ -94,13 +94,13 @@ class MyClass:
     class_var = 100
     typed_class_var: str = 'class_typed'
     annotated_class_var: float
-    
+
     def __init__(self):
         self.instance_var = 0
-    
+
     def public_method(self):
         return self.instance_var
-    
+
     def _private_method(self):
         pass
 
@@ -256,10 +256,10 @@ def standalone_function():
             "
 class OuterClass:
     OUTER_CONSTANT = 100
-    
+
     def outer_method(self):
         return self.OUTER_CONSTANT
-    
+
     class InnerClass:
         def inner_method(self):
             pass
