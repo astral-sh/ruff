@@ -211,7 +211,7 @@ impl std::fmt::Display for Diff<'_> {
                             let value = show_nonprinting(&value);
                             let styled = fmt_styled(value, style);
                             if emphasized {
-                                write!(f, "{}", fmt_styled(styled, self.stylesheet.underline))?;
+                                write!(f, "{}", fmt_styled(styled, self.stylesheet.emphasis))?;
                             } else {
                                 write!(f, "{styled}")?;
                             }
