@@ -14,7 +14,7 @@
 //! This module provides the machinery for representing the "under what constraints" part of that
 //! question. An individual constraint restricts the specialization a single typevar to be within a
 //! particular lower and upper bound. You can then build up more complex constraint sets using
-//! union, intersection, and negation (just like types themselves).
+//! union, intersection, and negation operations (just like types themselves).
 //!
 //! NOTE: This module is currently in a transitional state: we've added a trait that our constraint
 //! set implementations will conform to, and updated all of our type property implementations to
