@@ -56,7 +56,6 @@ pub(crate) fn covering_node(root: AnyNodeRef, range: TextRange) -> CoveringNode 
 }
 
 /// The node with a minimal range that fully contains the search range.
-#[derive(Clone)]
 pub(crate) struct CoveringNode<'a> {
     /// The covering node, along with all of its ancestors up to the
     /// root. The root is always the first element and the covering
