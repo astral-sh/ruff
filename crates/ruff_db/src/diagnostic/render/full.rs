@@ -190,7 +190,7 @@ impl std::fmt::Display for Diff<'_> {
 
                         write!(
                             f,
-                            "{} {} |{sign}",
+                            "{} {} |{}",
                             Line {
                                 index: old_index,
                                 width: digit_with,
@@ -199,7 +199,7 @@ impl std::fmt::Display for Diff<'_> {
                                 index: new_index,
                                 width: digit_with,
                             },
-                            sign = fmt_styled(line_style.apply_to(sign), self.stylesheet.emphasis),
+                            fmt_styled(line_style.apply_to(sign), self.stylesheet.emphasis),
                         )?;
 
                         for (emphasized, value) in change.iter_strings_lossy() {
@@ -210,7 +210,7 @@ impl std::fmt::Display for Diff<'_> {
                                     "{}",
                                     fmt_styled(
                                         line_style.apply_to(&value),
-                                        self.stylesheet.emphasis
+                                        self.stylesheet.underline
                                     )
                                 )?;
                             } else {
