@@ -304,3 +304,41 @@ fn is_pattern_in_symbol(query_string: &str, symbol_name: &str) -> bool {
 
     typed_pos == typed_chars.len()
 }
+
+#[cfg(test)]
+mod tests {
+    fn matches(query: &str, symbol: &str) -> bool {
+        super::is_pattern_in_symbol(query, symbol)
+    }
+
+    #[test]
+    fn various_yes() {
+        assert!(matches("", ""));
+        assert!(matches("", "a"));
+        assert!(matches("", "abc"));
+
+        assert!(matches("a", "a"));
+        assert!(matches("a", "abc"));
+        assert!(matches("a", "xaz"));
+        assert!(matches("a", "xza"));
+
+        assert!(matches("abc", "abc"));
+        assert!(matches("abc", "axbyc"));
+        assert!(matches("abc", "waxbycz"));
+        assert!(matches("abc", "WAXBYCZ"));
+        assert!(matches("ABC", "waxbycz"));
+        assert!(matches("ABC", "WAXBYCZ"));
+        assert!(matches("aBc", "wAXbyCZ"));
+
+        assert!(matches("δ", "Δ"));
+        assert!(matches("δΘπ", "ΔθΠ"));
+    }
+
+    #[test]
+    fn various_no() {
+        assert!(!matches("a", ""));
+        assert!(!matches("abc", "bac"));
+        assert!(!matches("abcd", "abc"));
+        assert!(!matches("δΘπ", "θΔΠ"));
+    }
+}
