@@ -672,7 +672,7 @@ impl GotoTarget<'_> {
                 }
                 Some(AnyNodeRef::ExprAttribute(attribute)) => {
                     // Check if this is seemingly a callable being invoked (the `y` in `x.y(...)`)
-                    let grandparent_expr = covering_node.ancestors().nth(1);
+                    let grandparent_expr = covering_node.ancestors().nth(2);
                     let attribute_expr = attribute.into();
                     if let Some(AnyNodeRef::ExprCall(call)) = grandparent_expr {
                         if ruff_python_ast::ExprRef::from(&call.func) == attribute_expr {
@@ -716,11 +716,14 @@ impl GotoTarget<'_> {
 impl Ranged for GotoTarget<'_> {
     fn range(&self) -> TextRange {
         match self {
-            GotoTarget::Expression(expression) => match expression {
+            GotoTarget::Call {
+                callable: expression,
+                ..
+            }
+            | GotoTarget::Expression(expression) => match expression {
                 ast::ExprRef::Attribute(attribute) => attribute.attr.range,
                 _ => expression.range(),
             },
-            GotoTarget::Call { callable, .. } => callable.range(),
             GotoTarget::FunctionDef(function) => function.name.range,
             GotoTarget::ClassDef(class) => class.name.range,
             GotoTarget::Parameter(parameter) => parameter.name.range,
