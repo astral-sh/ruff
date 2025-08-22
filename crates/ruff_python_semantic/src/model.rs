@@ -1345,7 +1345,8 @@ impl<'a> SemanticModel<'a> {
         self.scopes[scope_id].parent
     }
 
-    /// Returns the first parent of the given [`Scope`] that is not of [`ScopeKind::Type`] or [`ScopeKind::ClassCell`], if any.
+    /// Returns the first parent of the given [`Scope`] that is not of [`ScopeKind::Type`] or
+    /// [`ScopeKind::ClassCell`], if any.
     pub fn first_non_type_parent_scope(&self, scope: &Scope) -> Option<&Scope<'a>> {
         let mut current_scope = scope;
         while let Some(parent) = self.parent_scope(current_scope) {
@@ -1358,7 +1359,8 @@ impl<'a> SemanticModel<'a> {
         None
     }
 
-    /// Returns the first parent of the given [`ScopeId`] that is not of [`ScopeKind::Type`] or [`ScopeKind::ClassCell`], if any.
+    /// Returns the first parent of the given [`ScopeId`] that is not of [`ScopeKind::Type`] or
+    /// [`ScopeKind::ClassCell`], if any.
     pub fn first_non_type_parent_scope_id(&self, scope_id: ScopeId) -> Option<ScopeId> {
         let mut current_scope_id = scope_id;
         while let Some(parent_id) = self.parent_scope_id(current_scope_id) {
