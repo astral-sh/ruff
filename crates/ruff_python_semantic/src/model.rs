@@ -650,21 +650,17 @@ impl<'a> SemanticModel<'a> {
             }
         }
 
-        let mut seen_function = false;
         let mut class_variables_visible = true;
         for (index, scope_id) in self.scopes.ancestor_ids(scope_id).enumerate() {
             let scope = &self.scopes[scope_id];
             if scope.kind.is_class() {
-                if seen_function && matches!(symbol, "__class__") {
-                    return None;
-                }
                 if !class_variables_visible {
                     continue;
                 }
             }
 
-            class_variables_visible = scope.kind.is_type() && index == 0;
-            seen_function |= scope.kind.is_function();
+            class_variables_visible =
+                (scope.kind.is_type() && index == 0) || (scope.kind.is_class_cell() && index == 1);
 
             if let Some(binding_id) = scope.get(symbol) {
                 match self.bindings[binding_id].kind {
@@ -778,15 +774,13 @@ impl<'a> SemanticModel<'a> {
             }
 
             if scope.kind.is_class() {
-                if seen_function && matches!(symbol, "__class__") {
-                    return None;
-                }
                 if !class_variables_visible {
                     continue;
                 }
             }
 
-            class_variables_visible = scope.kind.is_type() && index == 0;
+            class_variables_visible =
+                (scope.kind.is_type() && index == 0) || (scope.kind.is_class_cell() && index == 1);
             seen_function |= scope.kind.is_function();
 
             if let Some(binding_id) = scope.get(symbol) {
