@@ -321,6 +321,7 @@ class PlaygroundServer
             : mapCompletionKind(completion.kind),
         insertText: completion.name,
         documentation: completion.documentation,
+        detail: completion.detail,
         // TODO(micha): It's unclear why this field is required for monaco but not VS Code.
         //  and omitting it works just fine? The LSP doesn't expose this information right now
         //  which is why we go with undefined for now.
