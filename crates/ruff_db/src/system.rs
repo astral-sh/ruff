@@ -46,7 +46,7 @@ pub type Result<T> = std::io::Result<T>;
 ///    * File watching isn't supported.
 ///
 /// Abstracting the system also enables tests to use a more efficient in-memory file system.
-pub trait System: Debug {
+pub trait System: Debug + Sync + Send {
     /// Reads the metadata of the file or directory at `path`.
     ///
     /// This function will traverse symbolic links to query information about the destination file.
@@ -197,6 +197,8 @@ pub trait System: Debug {
     fn as_any(&self) -> &dyn std::any::Any;
 
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any;
+
+    fn dyn_clone(&self) -> Box<dyn System>;
 }
 
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]

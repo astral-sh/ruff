@@ -1,3 +1,8 @@
+#![warn(
+    clippy::disallowed_methods,
+    reason = "Prefer System trait methods over std methods in ty crates"
+)]
+
 use std::{collections::HashMap, hash::BuildHasher};
 
 use ordermap::OrderMap;
