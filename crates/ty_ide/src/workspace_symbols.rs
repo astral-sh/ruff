@@ -10,7 +10,6 @@ pub fn workspace_symbols(db: &dyn Db, query: &str) -> Vec<WorkspaceSymbolInfo> {
         return Vec::new();
     }
 
-    let mut results = Vec::new();
     let project = db.project();
 
     let options = SymbolsOptions {
@@ -19,22 +18,34 @@ pub fn workspace_symbols(db: &dyn Db, query: &str) -> Vec<WorkspaceSymbolInfo> {
         query_string: Some(query.into()),
     };
 
-    // Get all files in the project
     let files = project.files(db);
+    let results = std::sync::Mutex::new(Vec::new());
+    {
+        let db = db.dyn_clone();
+        let files = &files;
+        let options = &options;
+        let results = &results;
 
-    // For each file, extract symbols and add them to results
-    for file in files.iter() {
-        let file_symbols = symbols_for_file(db, *file, &options);
-
-        for symbol in file_symbols {
-            results.push(WorkspaceSymbolInfo {
-                symbol: symbol.clone(),
-                file: *file,
-            });
-        }
+        rayon::scope(move |s| {
+            // For each file, extract symbols and add them to results
+            for file in files.iter() {
+                let db = db.dyn_clone();
+                s.spawn(move |_| {
+                    for symbol in symbols_for_file(&*db, *file, options) {
+                        // It seems like we could do better here than
+                        // locking `results` for every single symbol,
+                        // but this works pretty well as it is.
+                        results.lock().unwrap().push(WorkspaceSymbolInfo {
+                            symbol: symbol.clone(),
+                            file: *file,
+                        });
+                    }
+                });
+            }
+        });
     }
 
-    results
+    results.into_inner().unwrap()
 }
 
 /// A symbol found in the workspace, including the file it was found in.
