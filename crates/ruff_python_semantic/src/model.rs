@@ -431,6 +431,9 @@ impl<'a> SemanticModel<'a> {
             // Allow class variables to be visible for an additional scope level
             // when a type scope is seen — this covers the type scope present between
             // function and class definitions and their parent class scope.
+            //
+            // Also allow an additional level beyond that to cover the implicit
+            // `__class__` closure created around methods and enclosing the type scope.
             class_variables_visible =
                 (scope.kind.is_type() && index == 0) || (scope.kind.is_class_cell() && index == 1);
 
