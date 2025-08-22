@@ -498,7 +498,7 @@ pub struct EnvironmentOptions {
         default = r#"[]"#,
         value_type = "list[str]",
         example = r#"
-            extra-paths = ["~/shared/my-search-path"]
+            extra-paths = ["./shared/my-search-path"]
         "#
     )]
     pub extra_paths: Option<Vec<RelativePathBuf>>,

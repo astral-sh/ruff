@@ -80,7 +80,7 @@ impl Server {
         );
 
         let version = ruff_db::program_version().unwrap_or("Unknown");
-        tracing::debug!("Version: {version}");
+        tracing::info!("Version: {version}");
 
         connection.initialize_finish(
             id,

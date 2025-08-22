@@ -29,9 +29,9 @@ impl BackgroundDocumentRequestHandler for InlayHintRequestHandler {
         _client: &Client,
         params: InlayHintParams,
     ) -> crate::server::Result<Option<Vec<lsp_types::InlayHint>>> {
-        if snapshot
-            .workspace_settings()
-            .is_language_services_disabled()
+        let workspace_settings = snapshot.workspace_settings();
+        if workspace_settings.is_language_services_disabled()
+            || !workspace_settings.inlay_hints().any_enabled()
         {
             return Ok(None);
         }
@@ -47,7 +47,7 @@ impl BackgroundDocumentRequestHandler for InlayHintRequestHandler {
             .range
             .to_text_range(&source, &index, snapshot.encoding());
 
-        let inlay_hints = inlay_hints(db, file, range, snapshot.workspace_settings().inlay_hints());
+        let inlay_hints = inlay_hints(db, file, range, workspace_settings.inlay_hints());
 
         let inlay_hints = inlay_hints
             .into_iter()

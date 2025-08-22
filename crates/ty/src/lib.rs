@@ -62,6 +62,10 @@ pub(crate) fn version() -> Result<()> {
 }
 
 fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
+    // Enabled ANSI colors on Windows 10.
+    #[cfg(windows)]
+    assert!(colored::control::set_virtual_terminal(true).is_ok());
+
     set_colored_override(args.color);
 
     let verbosity = args.verbosity.level();

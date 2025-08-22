@@ -988,6 +988,28 @@ class D:  # error: [duplicate-kw-only]
         z: float
 ```
 
+`KW_ONLY` should only affect fields declared after it within the same class, not fields in
+subclasses:
+
+```py
+from dataclasses import dataclass, KW_ONLY
+
+@dataclass
+class D:
+    x: int
+    _: KW_ONLY
+    y: str
+
+@dataclass
+class E(D):
+    z: bytes
+
+# This should work: x=1 (positional), z=b"foo" (positional), y="foo" (keyword-only)
+E(1, b"foo", y="foo")
+
+reveal_type(E.__init__)  # revealed: (self: E, x: int, z: bytes, *, y: str) -> None
+```
+
 ## Other special cases
 
 ### `dataclasses.dataclass`

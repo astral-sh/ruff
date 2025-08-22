@@ -198,7 +198,7 @@ def standalone_function():
         12 |     typed_class_var: str = 'class_typed'
         13 |     annotated_class_var: float
            |     ^^^^^^^^^^^^^^^^^^^
-        14 |     
+        14 |
         15 |     def __init__(self):
            |
         info: Field annotated_class_var
@@ -207,7 +207,7 @@ def standalone_function():
           --> main.py:15:9
            |
         13 |     annotated_class_var: float
-        14 |     
+        14 |
         15 |     def __init__(self):
            |         ^^^^^^^^
         16 |         self.instance_var = 0
@@ -218,7 +218,7 @@ def standalone_function():
           --> main.py:18:9
            |
         16 |         self.instance_var = 0
-        17 |     
+        17 |
         18 |     def public_method(self):
            |         ^^^^^^^^^^^^^
         19 |         return self.instance_var
@@ -229,7 +229,7 @@ def standalone_function():
           --> main.py:21:9
            |
         19 |         return self.instance_var
-        20 |     
+        20 |
         21 |     def _private_method(self):
            |         ^^^^^^^^^^^^^^^
         22 |         pass
@@ -282,7 +282,7 @@ class OuterClass:
         2 | class OuterClass:
         3 |     OUTER_CONSTANT = 100
           |     ^^^^^^^^^^^^^^
-        4 |     
+        4 |
         5 |     def outer_method(self):
           |
         info: Constant OUTER_CONSTANT
@@ -291,7 +291,7 @@ class OuterClass:
          --> main.py:5:9
           |
         3 |     OUTER_CONSTANT = 100
-        4 |     
+        4 |
         5 |     def outer_method(self):
           |         ^^^^^^^^^^^^
         6 |         return self.OUTER_CONSTANT
@@ -302,7 +302,7 @@ class OuterClass:
           --> main.py:8:11
            |
          6 |         return self.OUTER_CONSTANT
-         7 |     
+         7 |
          8 |     class InnerClass:
            |           ^^^^^^^^^^
          9 |         def inner_method(self):

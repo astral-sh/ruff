@@ -83,7 +83,7 @@ if sys.version_info >= (3, 14):
             owner: object = None,
             format: Format = Format.VALUE,  # noqa: Y011
         ) -> AnnotationForm: ...
-        @deprecated("Use ForwardRef.evaluate() or typing.evaluate_forward_ref() instead.")
+        @deprecated("Use `ForwardRef.evaluate()` or `typing.evaluate_forward_ref()` instead.")
         def _evaluate(
             self,
             globalns: dict[str, Any] | None,

@@ -11,6 +11,7 @@ on:
       - "crates/ruff_python_parser"
       - ".github/workflows/mypy_primer.yaml"
       - ".github/workflows/mypy_primer_comment.yaml"
+      - "scripts/mypy_primer.sh"
       - "Cargo.lock"
       - "!**.md"
 

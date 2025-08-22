@@ -128,21 +128,21 @@ if sys.platform == "win32":
     WAIT_TIMEOUT: Final = 258
 
     if sys.version_info >= (3, 10):
-        LOCALE_NAME_INVARIANT: str
-        LOCALE_NAME_MAX_LENGTH: int
-        LOCALE_NAME_SYSTEM_DEFAULT: str
-        LOCALE_NAME_USER_DEFAULT: str | None
+        LOCALE_NAME_INVARIANT: Final[str]
+        LOCALE_NAME_MAX_LENGTH: Final[int]
+        LOCALE_NAME_SYSTEM_DEFAULT: Final[str]
+        LOCALE_NAME_USER_DEFAULT: Final[str | None]
 
-        LCMAP_FULLWIDTH: int
-        LCMAP_HALFWIDTH: int
-        LCMAP_HIRAGANA: int
-        LCMAP_KATAKANA: int
-        LCMAP_LINGUISTIC_CASING: int
-        LCMAP_LOWERCASE: int
-        LCMAP_SIMPLIFIED_CHINESE: int
-        LCMAP_TITLECASE: int
-        LCMAP_TRADITIONAL_CHINESE: int
-        LCMAP_UPPERCASE: int
+        LCMAP_FULLWIDTH: Final[int]
+        LCMAP_HALFWIDTH: Final[int]
+        LCMAP_HIRAGANA: Final[int]
+        LCMAP_KATAKANA: Final[int]
+        LCMAP_LINGUISTIC_CASING: Final[int]
+        LCMAP_LOWERCASE: Final[int]
+        LCMAP_SIMPLIFIED_CHINESE: Final[int]
+        LCMAP_TITLECASE: Final[int]
+        LCMAP_TRADITIONAL_CHINESE: Final[int]
+        LCMAP_UPPERCASE: Final[int]
 
     if sys.version_info >= (3, 12):
         COPYFILE2_CALLBACK_CHUNK_STARTED: Final = 1

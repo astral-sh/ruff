@@ -1,8 +1,8 @@
 from _curses import window
-from typing import final
+from typing import Final, final
 
-__version__: str
-version: str
+__version__: Final[str]
+version: Final[str]
 
 class error(Exception): ...
 
