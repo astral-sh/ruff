@@ -15,7 +15,7 @@ pub struct InlayHint {
 }
 
 impl InlayHint {
-    pub fn type_hint<'db>(position: TextSize, ty: Type, db: &'db dyn Db) -> Self {
+    pub fn type_hint(position: TextSize, ty: Type, db: &dyn Db) -> Self {
         Self {
             position,
             kind: InlayHintKind::Type,
@@ -58,8 +58,8 @@ impl From<String> for InlayHintLabel {
     }
 }
 
-pub fn inlay_hints<'db>(
-    db: &'db dyn Db,
+pub fn inlay_hints(
+    db: &dyn Db,
     file: File,
     range: TextRange,
     settings: &InlayHintSettings,
@@ -138,7 +138,7 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
         self.hints.push(InlayHint::type_hint(position, ty, self.db));
     }
 
-    fn add_call_argument_name(&mut self, position: TextSize, name: String) {
+    fn add_call_argument_name(&mut self, position: TextSize, name: &str) {
         if !self.settings.call_argument_names {
             return;
         }
@@ -148,7 +148,7 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
         }
 
         self.hints
-            .push(InlayHint::call_argument_name(position, &name));
+            .push(InlayHint::call_argument_name(position, name));
     }
 }
 
@@ -214,10 +214,7 @@ impl SourceOrderVisitor<'_> for InlayHintVisitor<'_, '_> {
 
                 for (index, arg_or_keyword) in call.arguments.arguments_source_order().enumerate() {
                     if let Some(name) = argument_names.get(&index) {
-                        self.add_call_argument_name(
-                            arg_or_keyword.range().start(),
-                            name.to_string(),
-                        );
+                        self.add_call_argument_name(arg_or_keyword.range().start(), name);
                     }
                     self.visit_expr(arg_or_keyword.value());
                 }
