@@ -654,6 +654,112 @@ reveal_type(a)  # revealed: Literal["�"]
 reveal_type(b)  # revealed: Literal["�"]
 ```
 
+### Very long literal
+
+```py
+string = "very long stringgggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg"
+
+a, *b = string
+reveal_type(a)  # revealed: LiteralString
+reveal_type(b)  # revealed: list[LiteralString]
+```
+
+## Bytes
+
+### Simple unpacking
+
+```py
+a, b = b"ab"
+reveal_type(a)  # revealed: Literal[97]
+reveal_type(b)  # revealed: Literal[98]
+```
+
+### Uneven unpacking (1)
+
+```py
+# error: [invalid-assignment] "Not enough values to unpack: Expected 3"
+a, b, c = b"ab"
+reveal_type(a)  # revealed: Unknown
+reveal_type(b)  # revealed: Unknown
+reveal_type(c)  # revealed: Unknown
+```
+
+### Uneven unpacking (2)
+
+```py
+# error: [invalid-assignment] "Too many values to unpack: Expected 2"
+a, b = b"abc"
+reveal_type(a)  # revealed: Unknown
+reveal_type(b)  # revealed: Unknown
+```
+
+### Starred expression (1)
+
+```py
+# error: [invalid-assignment] "Not enough values to unpack: Expected at least 3"
+(a, *b, c, d) = b"ab"
+reveal_type(a)  # revealed: Unknown
+reveal_type(b)  # revealed: list[Unknown]
+reveal_type(c)  # revealed: Unknown
+reveal_type(d)  # revealed: Unknown
+```
+
+```py
+# error: [invalid-assignment] "Not enough values to unpack: Expected at least 3"
+(a, b, *c, d) = b"a"
+reveal_type(a)  # revealed: Unknown
+reveal_type(b)  # revealed: Unknown
+reveal_type(c)  # revealed: list[Unknown]
+reveal_type(d)  # revealed: Unknown
+```
+
+### Starred expression (2)
+
+```py
+(a, *b, c) = b"ab"
+reveal_type(a)  # revealed: Literal[97]
+reveal_type(b)  # revealed: list[Never]
+reveal_type(c)  # revealed: Literal[98]
+```
+
+### Starred expression (3)
+
+```py
+(a, *b, c) = b"abc"
+reveal_type(a)  # revealed: Literal[97]
+reveal_type(b)  # revealed: list[Literal[98]]
+reveal_type(c)  # revealed: Literal[99]
+```
+
+### Starred expression (4)
+
+```py
+(a, *b, c, d) = b"abcdef"
+reveal_type(a)  # revealed: Literal[97]
+reveal_type(b)  # revealed: list[Literal[98, 99, 100]]
+reveal_type(c)  # revealed: Literal[101]
+reveal_type(d)  # revealed: Literal[102]
+```
+
+### Starred expression (5)
+
+```py
+(a, b, *c) = b"abcd"
+reveal_type(a)  # revealed: Literal[97]
+reveal_type(b)  # revealed: Literal[98]
+reveal_type(c)  # revealed: list[Literal[99, 100]]
+```
+
+### Very long literal
+
+```py
+too_long = b"very long bytes stringggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg"
+
+a, *b = too_long
+reveal_type(a)  # revealed: int
+reveal_type(b)  # revealed: list[int]
+```
+
 ## Union
 
 ### Same types

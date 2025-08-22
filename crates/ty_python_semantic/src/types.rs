@@ -4974,16 +4974,12 @@ impl<'db> Type<'db> {
             };
         }
 
-        match self {
-            Type::NominalInstance(nominal) => {
-                if let Some(spec) = nominal.tuple_spec(db) {
-                    return Ok(spec);
-                }
-            }
+        let special_case = match self {
+            Type::NominalInstance(nominal) => nominal.tuple_spec(db),
             Type::GenericAlias(alias) if alias.origin(db).is_tuple(db) => {
-                return Ok(Cow::Owned(TupleSpec::homogeneous(todo_type!(
+                Some(Cow::Owned(TupleSpec::homogeneous(todo_type!(
                     "*tuple[] annotations"
-                ))));
+                ))))
             }
             Type::StringLiteral(string_literal_ty) => {
                 let string_literal = string_literal_ty.value(db);
@@ -4994,9 +4990,9 @@ impl<'db> Type<'db> {
                             .map(|c| Type::string_literal(db, &c.to_string())),
                     )
                 } else {
-                    TupleSpec::homogeneous(self)
+                    TupleSpec::homogeneous(Type::LiteralString)
                 };
-                return Ok(Cow::Owned(spec));
+                Some(Cow::Owned(spec))
             }
             Type::BytesLiteral(bytes) => {
                 let bytes_literal = bytes.value(db);
@@ -5009,7 +5005,7 @@ impl<'db> Type<'db> {
                 } else {
                     TupleSpec::homogeneous(KnownClass::Int.to_instance(db))
                 };
-                return Ok(Cow::Owned(spec));
+                Some(Cow::Owned(spec))
             }
             Type::Never => {
                 // The dunder logic below would have us return `tuple[Never, ...]`, which eagerly
@@ -5017,25 +5013,27 @@ impl<'db> Type<'db> {
                 // index into the tuple. Using `tuple[Unknown, ...]` avoids these false positives.
                 // TODO: Consider removing this special case, and instead hide the indexing
                 // diagnostic in unreachable code.
-                return Ok(Cow::Owned(TupleSpec::homogeneous(Type::unknown())));
+                Some(Cow::Owned(TupleSpec::homogeneous(Type::unknown())))
             }
             Type::TypeAlias(alias) => {
-                return alias.value_type(db).try_iterate_with_mode(db, mode);
+                Some(alias.value_type(db).try_iterate_with_mode(db, mode)?)
             }
             Type::NonInferableTypeVar(tvar) => match tvar.typevar(db).bound_or_constraints(db) {
                 Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                    return bound.try_iterate_with_mode(db, mode);
+                    Some(bound.try_iterate_with_mode(db, mode)?)
                 }
                 // TODO: could we create a "union of tuple specs"...?
                 // (Same question applies to the `Type::Union()` branch lower down)
-                Some(TypeVarBoundOrConstraints::Constraints(_)) | None => {}
+                Some(TypeVarBoundOrConstraints::Constraints(_)) | None => None
             },
             Type::TypeVar(_) => unreachable!(
                 "should not be able to iterate over type variable {} in inferable position",
                 self.display(db)
             ),
-            Type::Dynamic(_)
-            | Type::FunctionLiteral(_)
+            // N.B. These special cases aren't strictly necessary, they're just obvious optimizations
+            Type::LiteralString | Type::Dynamic(_) => Some(Cow::Owned(TupleSpec::homogeneous(self))),
+
+            Type::FunctionLiteral(_)
             | Type::GenericAlias(_)
             | Type::BoundMethod(_)
             | Type::MethodWrapper(_)
@@ -5061,10 +5059,13 @@ impl<'db> Type<'db> {
             | Type::IntLiteral(_)
             | Type::BooleanLiteral(_)
             | Type::EnumLiteral(_)
-            | Type::LiteralString
             | Type::BoundSuper(_)
             | Type::TypeIs(_)
-            | Type::TypedDict(_) => {}
+            | Type::TypedDict(_) => None
+        };
+
+        if let Some(special_case) = special_case {
+            return Ok(special_case);
         }
 
         let try_call_dunder_getitem = || {
