@@ -451,12 +451,6 @@ impl Ranged for Binding<'_> {
 #[newtype_index]
 pub struct BindingId;
 
-impl BindingId {
-    pub const fn dunder_class_id() -> Self {
-        BindingId::from_u32(u32::MAX)
-    }
-}
-
 /// The bindings in a program.
 ///
 /// Bindings are indexed by [`BindingId`]
