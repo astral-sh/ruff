@@ -2935,6 +2935,7 @@ dependencies = [
  "tracing-subscriber",
  "ty",
  "ty_project",
+ "ty_python_semantic",
  "ty_static",
  "url",
 ]
