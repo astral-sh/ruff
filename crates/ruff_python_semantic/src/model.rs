@@ -2640,16 +2640,16 @@ pub enum ReadResult {
     /// The `x` in `print(x)` is resolved to the binding of `x` in `x = 1`.
     Resolved(BindingId),
 
-    /// The read reference is resolved to a context-specific, implicit global (e.g., `__class__`
+    /// The read reference is resolved to a context-specific, implicit global (e.g., `__qualname__`
     /// within a class scope).
     ///
     /// For example, given:
     /// ```python
     /// class C:
-    ///    print(__class__)
+    ///    print(__qualname__)
     /// ```
     ///
-    /// The `__class__` in `print(__class__)` is resolved to the implicit global `__class__`.
+    /// The `__qualname__` in `print(__qualname__)` is resolved to the implicit global `__qualname__`.
     ImplicitGlobal,
 
     /// The read reference is unresolved, but at least one of the containing scopes contains a
