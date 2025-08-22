@@ -69,7 +69,7 @@ impl fmt::Display for DiagnosticsDiff {
         if !self.removed.is_empty() {
             writeln!(f, "--- Removed ---")?;
             for diagnostic in &self.removed {
-                writeln!(f, "{}", print_messages(&[diagnostic.clone()]))?;
+                writeln!(f, "{}", print_messages(std::slice::from_ref(diagnostic)))?;
             }
             writeln!(f)?;
         }
@@ -77,7 +77,7 @@ impl fmt::Display for DiagnosticsDiff {
         if !self.added.is_empty() {
             writeln!(f, "--- Added ---")?;
             for diagnostic in &self.added {
-                writeln!(f, "{}", print_messages(&[diagnostic.clone()]))?;
+                writeln!(f, "{}", print_messages(std::slice::from_ref(diagnostic)))?;
             }
             writeln!(f)?;
         }
