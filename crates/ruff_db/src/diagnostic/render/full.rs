@@ -1,5 +1,4 @@
 use std::borrow::Cow;
-use std::collections::BTreeMap;
 use std::num::NonZeroUsize;
 
 use anstyle::Style;
@@ -108,28 +107,23 @@ impl std::fmt::Display for Diff<'_> {
         let source_code = self.diagnostic_source.as_source_code();
         let source_text = source_code.text();
 
-        // Partition the source code into ranges for each cell. If `self.notebook_index` is `None`,
-        // indicating a regular script file, all the lines will be in one "cell" under the `None`
-        // key.
+        // Partition the source code into end offsets for each cell. If `self.notebook_index` is
+        // `None`, indicating a regular script file, all the lines will be in one "cell" under the
+        // `None` key.
         let cells = if let Some(notebook_index) = &self.notebook_index {
-            let mut cells: BTreeMap<Option<OneIndexed>, TextRange> = BTreeMap::default();
-            for line in source_code.line_starts() {
-                let index = source_code.line_index(*line);
-                // We add a trailing newline to cells, so there's one extra line start without an
-                // actual cell index.
-                let Some(cell) = notebook_index.cell(index) else {
-                    continue;
-                };
-                cells
-                    .entry(Some(cell))
-                    .and_modify(|range| {
-                        *range = TextRange::new(range.start(), source_code.line_end(index));
-                    })
-                    .or_insert(source_code.line_range(index));
+            let mut last_cell = OneIndexed::MIN;
+            let mut cells: Vec<(Option<OneIndexed>, TextSize)> = Vec::new();
+            for (row, cell) in notebook_index.iter() {
+                if cell != last_cell {
+                    let offset = source_code.line_start(row);
+                    cells.push((Some(last_cell), offset));
+                    last_cell = cell;
+                }
             }
+            cells.push((Some(last_cell), source_text.text_len()));
             cells
         } else {
-            BTreeMap::from_iter([(None, TextRange::at(TextSize::ZERO, source_text.text_len()))])
+            vec![(None, source_text.text_len())]
         };
 
         let message = match self.fix.applicability() {
@@ -145,7 +139,10 @@ impl std::fmt::Display for Diff<'_> {
         // tests, which is the only place these are currently used.
         writeln!(f, "ℹ {}", fmt_styled(message, self.stylesheet.separator))?;
 
-        for (cell, range) in cells {
+        let mut last_end = TextSize::ZERO;
+        for (cell, offset) in cells {
+            let range = TextRange::new(last_end, offset);
+            last_end = offset;
             let input = source_code.slice(range);
 
             let mut output = String::with_capacity(input.len());
