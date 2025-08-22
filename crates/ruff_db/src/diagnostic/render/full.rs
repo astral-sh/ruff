@@ -9,7 +9,7 @@ use similar::{ChangeTag, TextDiff};
 use ruff_annotate_snippets::Renderer as AnnotateRenderer;
 use ruff_diagnostics::{Applicability, Fix};
 use ruff_source_file::OneIndexed;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::diagnostic::render::{FileResolver, Resolved};
 use crate::diagnostic::stylesheet::{DiagnosticStylesheet, fmt_styled};
@@ -111,26 +111,26 @@ impl std::fmt::Display for Diff<'_> {
         // Partition the source code into ranges for each cell. If `self.notebook_index` is `None`,
         // indicating a regular script file, all the lines will be in one "cell" under the `None`
         // key.
-        let mut cells: BTreeMap<Option<OneIndexed>, TextRange> = BTreeMap::default();
-        for line in source_code.line_starts() {
-            let index = source_code.line_index(*line);
-            let cell = if let Some(notebook_index) = &self.notebook_index {
+        let cells = if let Some(notebook_index) = &self.notebook_index {
+            let mut cells: BTreeMap<Option<OneIndexed>, TextRange> = BTreeMap::default();
+            for line in source_code.line_starts() {
+                let index = source_code.line_index(*line);
                 // We add a trailing newline to cells, so there's one extra line start without an
                 // actual cell index.
-                let Some(index) = notebook_index.cell(index) else {
+                let Some(cell) = notebook_index.cell(index) else {
                     continue;
                 };
-                Some(index)
-            } else {
-                None
-            };
+                cells
+                    .entry(Some(cell))
+                    .and_modify(|range| {
+                        *range = TextRange::new(range.start(), source_code.line_end(index));
+                    })
+                    .or_insert(source_code.line_range(index));
+            }
             cells
-                .entry(cell)
-                .and_modify(|range| {
-                    *range = TextRange::new(range.start(), source_code.line_end(index));
-                })
-                .or_insert(source_code.line_range(index));
-        }
+        } else {
+            BTreeMap::from_iter([(None, TextRange::at(TextSize::ZERO, source_text.text_len()))])
+        };
 
         let message = match self.fix.applicability() {
             // TODO(zanieb): Adjust this messaging once it's user-facing
