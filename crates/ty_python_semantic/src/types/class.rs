@@ -28,11 +28,12 @@ use crate::types::infer::nearest_enclosing_class;
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
-    ApplyTypeMappingVisitor, BareTypeAliasType, Binding, BoundSuperError, BoundSuperType,
-    CallableType, DataclassParams, DeprecatedInstance, HasRelationToVisitor, IsEquivalentVisitor,
-    KnownInstanceType, NormalizedVisitor, PropertyInstanceType, StringLiteralType, TypeAliasType,
-    TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind,
-    VarianceInferable, declaration_type, infer_definition_types, todo_type,
+    ApplyTypeMappingVisitor, Binding, BoundSuperError, BoundSuperType, CallableType,
+    DataclassParams, DeprecatedInstance, HasRelationToVisitor, IsEquivalentVisitor,
+    KnownInstanceType, ManualPEP695TypeAliasType, NormalizedVisitor, PropertyInstanceType,
+    StringLiteralType, TypeAliasType, TypeMapping, TypeRelation, TypeVarBoundOrConstraints,
+    TypeVarInstance, TypeVarKind, VarianceInferable, declaration_type, infer_definition_types,
+    todo_type,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet, Program,
@@ -4935,7 +4936,7 @@ impl KnownClass {
                     return;
                 };
                 overload.set_return_type(Type::KnownInstance(KnownInstanceType::TypeAliasType(
-                    TypeAliasType::Bare(BareTypeAliasType::new(
+                    TypeAliasType::ManualPEP695(ManualPEP695TypeAliasType::new(
                         db,
                         ast::name::Name::new(name.value(db)),
                         containing_assignment,
