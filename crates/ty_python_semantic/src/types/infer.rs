@@ -4996,25 +4996,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Add search paths information to the diagnostic
             // Use the same search paths function that is used in actual module resolution
-            let mut search_paths_list: Vec<String> = Vec::new();
-            let mut path_index = 1;
-
-            // Use the same search paths that are used in actual module resolution
-            for path in diagnostic_search_paths(self.db()) {
-                let kind = if path.is_standard_library() {
-                    if path.as_system_path().is_some() {
-                        "custom stdlib"
+            let search_paths_list: Vec<String> = diagnostic_search_paths(self.db())
+                .enumerate()
+                .map(|(index, path)| {
+                    let kind = if path.is_standard_library() {
+                        if path.as_system_path().is_some() {
+                            "custom stdlib"
+                        } else {
+                            "vendored stdlib"
+                        }
+                    } else if path.is_first_party() {
+                        "first-party"
                     } else {
-                        "vendored stdlib"
-                    }
-                } else if path.is_first_party() {
-                    "first-party"
-                } else {
-                    "site-packages"
-                };
-                search_paths_list.push(format!("  {}. {} ({})", path_index, path, kind));
-                path_index += 1;
-            }
+                        "site-packages"
+                    };
+                    format!("  {}. {} ({})", index + 1, path, kind)
+                })
+                .collect();
 
             if !search_paths_list.is_empty() {
                 diagnostic.info(format_args!(
