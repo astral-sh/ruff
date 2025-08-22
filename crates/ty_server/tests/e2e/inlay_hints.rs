@@ -51,7 +51,7 @@ foo(1)
           "character": 4
         },
         "label": "a=",
-        "kind": 1
+        "kind": 2
       }
     ]
     "#);
