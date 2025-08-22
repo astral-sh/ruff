@@ -55,7 +55,7 @@ pub enum InlayHintKind {
 
 #[derive(Debug, Clone)]
 pub struct InlayHintLabel {
-    pub parts: SmallVec<[InlayHintLabelPart; 1]>,
+    pub parts: SmallVec<[InlayHintLabelPart; 2]>,
 }
 
 impl InlayHintLabel {

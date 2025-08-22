@@ -448,7 +448,7 @@ impl Workspace {
         Ok(result
             .into_iter()
             .map(|hint| InlayHint {
-                markdown: hint.display(),
+                markdown: hint.display().to_string(),
                 position: Position::from_text_size(
                     hint.position,
                     &index,
