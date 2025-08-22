@@ -17,7 +17,6 @@ help: Remove assignment to unused variable `foo1`
 2   |-    foo1 = %matplotlib --list
   2 |+    %matplotlib --list
 3 3 |     foo2: list[str] = %matplotlib --list
-   ::: cell 2
 
 F841 [*] Local variable `foo2` is assigned to but never used
  --> unused_variable.ipynb:cell 1:3:5
@@ -35,7 +34,6 @@ help: Remove assignment to unused variable `foo2`
 2 2 |     foo1 = %matplotlib --list
 3   |-    foo2: list[str] = %matplotlib --list
   3 |+    %matplotlib --list
-   ::: cell 2
 
 F841 [*] Local variable `bar1` is assigned to but never used
  --> unused_variable.ipynb:cell 2:2:5
@@ -48,7 +46,6 @@ F841 [*] Local variable `bar1` is assigned to but never used
 help: Remove assignment to unused variable `bar1`
 
 ℹ Unsafe fix
-   ::: cell 1
    ::: cell 2
 1 1 | def f():
 2   |-    bar1 = !pwd
@@ -66,7 +63,6 @@ F841 [*] Local variable `bar2` is assigned to but never used
 help: Remove assignment to unused variable `bar2`
 
 ℹ Unsafe fix
-   ::: cell 1
    ::: cell 2
 1 1 | def f():
 2 2 |     bar1 = !pwd

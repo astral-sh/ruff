@@ -151,12 +151,19 @@ impl std::fmt::Display for Diff<'_> {
             let mut output = String::with_capacity(input.len());
             let mut last_end = range.start();
 
+            let mut applied = 0;
             for edit in self.fix.edits() {
                 if range.contains_range(edit.range()) {
                     output.push_str(source_code.slice(TextRange::new(last_end, edit.start())));
                     output.push_str(edit.content().unwrap_or_default());
                     last_end = edit.end();
+                    applied += 1;
                 }
+            }
+
+            // No edits were applied, so there's no need to diff.
+            if applied == 0 {
+                continue;
             }
 
             output.push_str(&source_text[usize::from(last_end)..usize::from(range.end())]);
@@ -713,8 +720,6 @@ print()
            ::: cell 1
         1 1 | # cell 1
         2   |-import os
-           ::: cell 2
-           ::: cell 3
 
         error[unused-import][*]: `math` imported but unused
          --> notebook.ipynb:cell 2:2:8
@@ -728,13 +733,11 @@ print()
         help: Remove unused import: `math`
 
         ℹ Safe fix
-           ::: cell 1
            ::: cell 2
         1 1 | # cell 2
         2   |-import math
         3 2 | 
         4 3 | print('hello world')
-           ::: cell 3
 
         error[unused-variable]: Local variable `x` is assigned to but never used
          --> notebook.ipynb:cell 3:4:5
@@ -747,8 +750,6 @@ print()
         help: Remove assignment to unused variable `x`
 
         ℹ Unsafe fix
-           ::: cell 1
-           ::: cell 2
            ::: cell 3
         1 1 | # cell 3
         2 2 | def foo():

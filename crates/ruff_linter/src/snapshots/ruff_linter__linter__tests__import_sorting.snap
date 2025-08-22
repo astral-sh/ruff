@@ -18,8 +18,6 @@ help: Organize imports
 1 3 | from pathlib import Path
 2   |-import random
 3   |-import math
-   ::: cell 2
-   ::: cell 3
 
 I001 [*] Import block is un-sorted or un-formatted
  --> isort.ipynb:cell 2:1:1
@@ -33,7 +31,6 @@ I001 [*] Import block is un-sorted or un-formatted
 help: Organize imports
 
 ℹ Safe fix
-   ::: cell 1
    ::: cell 2
   1 |+import collections
 1 2 | from typing import Any
@@ -43,7 +40,6 @@ help: Organize imports
 3 5 | # Newline should be added here
 4 6 | def foo():
 5 7 |     pass
-   ::: cell 3
 
 I001 [*] Import block is un-sorted or un-formatted
  --> isort.ipynb:cell 3:1:1
@@ -57,8 +53,6 @@ I001 [*] Import block is un-sorted or un-formatted
 help: Organize imports
 
 ℹ Safe fix
-   ::: cell 1
-   ::: cell 2
    ::: cell 3
   1 |+import sys
 1 2 | from pathlib import Path
@@ -79,8 +73,6 @@ I001 [*] Import block is un-sorted or un-formatted
 help: Organize imports
 
 ℹ Safe fix
-   ::: cell 1
-   ::: cell 2
    ::: cell 3
 4 4 | %matplotlib \
 5 5 |     --inline
