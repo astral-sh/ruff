@@ -287,7 +287,7 @@ fn show_nonprinting(s: &str) -> Cow<'_, str> {
 
 #[cfg(test)]
 mod tests {
-    use ruff_diagnostics::Applicability;
+    use ruff_diagnostics::{Applicability, Fix};
     use ruff_text_size::{TextLen, TextRange, TextSize};
 
     use crate::diagnostic::{
@@ -735,6 +735,46 @@ print()
         help: Remove assignment to unused variable `x`
 
         ℹ Unsafe fix
+        1 1 | # cell 3
+        2 2 | def foo():
+        3 3 |     print()
+        4   |-    x = 1
+        5 4 |
+        ");
+    }
+
+    #[test]
+    fn notebook_output_with_diff_spanning_cells() {
+        let (mut env, mut diagnostics) = create_notebook_diagnostics(DiagnosticFormat::Full);
+        env.show_fix_diff(true);
+
+        // Move all of the edits from the later diagnostics to the first diagnostic to simulate a
+        // single diagnostic with edits in different cells.
+        let mut diagnostic = diagnostics.swap_remove(0);
+        let fix = diagnostic.fix_mut().unwrap();
+        let mut edits = fix.edits().to_vec();
+        for diag in diagnostics {
+            edits.extend_from_slice(diag.fix().unwrap().edits());
+        }
+        *fix = Fix::unsafe_edits(edits.remove(0), edits);
+
+        insta::assert_snapshot!(env.render(&diagnostic), @r"
+        error[unused-import]: `os` imported but unused
+         --> notebook.ipynb:cell 1:2:8
+          |
+        1 | # cell 1
+        2 | import os
+          |        ^^
+          |
+        help: Remove unused import: `os`
+
+        ℹ Unsafe fix
+        1 1 | # cell 1
+        2   |-import os
+        1 1 | # cell 2
+        2   |-import math
+        3 2 | 
+        4 3 | print('hello world')
         1 1 | # cell 3
         2 2 | def foo():
         3 3 |     print()
