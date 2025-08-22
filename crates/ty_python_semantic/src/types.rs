@@ -9231,12 +9231,14 @@ fn value_type_cycle_initial<'db>(_db: &'db dyn Db, _self: PEP695TypeAliasType<'d
     Type::Never
 }
 
+/// A PEP 695 `types.TypeAliasType` created by manually calling the constructor.
+///
 /// # Ordering
 /// Ordering is based on the type alias's salsa-assigned id and not on its values.
 /// The id may change between runs, or when the alias was garbage collected and recreated.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
-pub struct BareTypeAliasType<'db> {
+pub struct ManualPEP695TypeAliasType<'db> {
     #[returns(ref)]
     pub name: ast::name::Name,
     pub definition: Option<Definition<'db>>,
@@ -9244,17 +9246,17 @@ pub struct BareTypeAliasType<'db> {
 }
 
 // The Salsa heap is tracked separately.
-impl get_size2::GetSize for BareTypeAliasType<'_> {}
+impl get_size2::GetSize for ManualPEP695TypeAliasType<'_> {}
 
-fn walk_bare_type_alias<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
+fn walk_manual_pep_695_type_alias<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
-    type_alias: BareTypeAliasType<'db>,
+    type_alias: ManualPEP695TypeAliasType<'db>,
     visitor: &V,
 ) {
     visitor.visit_type(db, type_alias.value(db));
 }
 
-impl<'db> BareTypeAliasType<'db> {
+impl<'db> ManualPEP695TypeAliasType<'db> {
     fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         Self::new(
             db,
@@ -9272,7 +9274,7 @@ pub enum TypeAliasType<'db> {
     /// A type alias defined using the PEP 695 `type` statement.
     PEP695(PEP695TypeAliasType<'db>),
     /// A type alias defined by manually instantiating the PEP 695 `types.TypeAliasType`.
-    Bare(BareTypeAliasType<'db>),
+    ManualPEP695(ManualPEP695TypeAliasType<'db>),
 }
 
 fn walk_type_alias_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -9284,8 +9286,8 @@ fn walk_type_alias_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
         TypeAliasType::PEP695(type_alias) => {
             walk_pep_695_type_alias(db, type_alias, visitor);
         }
-        TypeAliasType::Bare(type_alias) => {
-            walk_bare_type_alias(db, type_alias, visitor);
+        TypeAliasType::ManualPEP695(type_alias) => {
+            walk_manual_pep_695_type_alias(db, type_alias, visitor);
         }
     }
 }
@@ -9296,8 +9298,8 @@ impl<'db> TypeAliasType<'db> {
             TypeAliasType::PEP695(type_alias) => {
                 TypeAliasType::PEP695(type_alias.normalized_impl(db, visitor))
             }
-            TypeAliasType::Bare(type_alias) => {
-                TypeAliasType::Bare(type_alias.normalized_impl(db, visitor))
+            TypeAliasType::ManualPEP695(type_alias) => {
+                TypeAliasType::ManualPEP695(type_alias.normalized_impl(db, visitor))
             }
         }
     }
@@ -9305,21 +9307,21 @@ impl<'db> TypeAliasType<'db> {
     pub(crate) fn name(self, db: &'db dyn Db) -> &'db str {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.name(db),
-            TypeAliasType::Bare(type_alias) => type_alias.name(db),
+            TypeAliasType::ManualPEP695(type_alias) => type_alias.name(db),
         }
     }
 
     pub(crate) fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
         match self {
             TypeAliasType::PEP695(type_alias) => Some(type_alias.definition(db)),
-            TypeAliasType::Bare(type_alias) => type_alias.definition(db),
+            TypeAliasType::ManualPEP695(type_alias) => type_alias.definition(db),
         }
     }
 
     pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.value_type(db),
-            TypeAliasType::Bare(type_alias) => type_alias.value(db),
+            TypeAliasType::ManualPEP695(type_alias) => type_alias.value(db),
         }
     }
 }
