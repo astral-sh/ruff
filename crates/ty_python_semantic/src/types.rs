@@ -45,7 +45,7 @@ use crate::types::constraints::{
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{INVALID_AWAIT, INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
 pub use crate::types::display::DisplaySettings;
-use crate::types::enums::{enum_member_literals, enum_metadata, is_single_member_enum};
+use crate::types::enums::{enum_metadata, is_single_member_enum};
 use crate::types::function::{
     DataclassTransformerParams, FunctionDecorators, FunctionSpans, FunctionType, KnownFunction,
 };
@@ -4987,23 +4987,29 @@ impl<'db> Type<'db> {
             }
             Type::StringLiteral(string_literal_ty) => {
                 let string_literal = string_literal_ty.value(db);
-                if string_literal.len() < MAX_TUPLE_LENGTH {
-                    return Ok(Cow::Owned(TupleSpec::heterogeneous(
+                let spec = if string_literal.len() < MAX_TUPLE_LENGTH {
+                    TupleSpec::heterogeneous(
                         string_literal
                             .chars()
                             .map(|c| Type::string_literal(db, &c.to_string())),
-                    )));
-                }
+                    )
+                } else {
+                    TupleSpec::homogeneous(self)
+                };
+                return Ok(Cow::Owned(spec));
             }
             Type::BytesLiteral(bytes) => {
                 let bytes_literal = bytes.value(db);
-                if bytes_literal.len() < MAX_TUPLE_LENGTH {
-                    return Ok(Cow::Owned(TupleSpec::heterogeneous(
+                let spec = if bytes_literal.len() < MAX_TUPLE_LENGTH {
+                    TupleSpec::heterogeneous(
                         bytes_literal
                             .iter()
                             .map(|b| Type::IntLiteral(i64::from(*b))),
-                    )));
-                }
+                    )
+                } else {
+                    TupleSpec::homogeneous(KnownClass::Int.to_instance(db))
+                };
+                return Ok(Cow::Owned(spec));
             }
             Type::Never => {
                 // The dunder logic below would have us return `tuple[Never, ...]`, which eagerly
@@ -5028,15 +5034,6 @@ impl<'db> Type<'db> {
                 "should not be able to iterate over type variable {} in inferable position",
                 self.display(db)
             ),
-            Type::ClassLiteral(class) => {
-                if let Some(enum_members) = enum_member_literals(db, class, None) {
-                    if enum_metadata(db, class)
-                        .is_some_and(|metadata| metadata.members.len() < MAX_TUPLE_LENGTH)
-                    {
-                        return Ok(Cow::Owned(TupleSpec::heterogeneous(enum_members)));
-                    }
-                }
-            }
             Type::Dynamic(_)
             | Type::FunctionLiteral(_)
             | Type::GenericAlias(_)
@@ -5047,6 +5044,11 @@ impl<'db> Type<'db> {
             | Type::DataclassTransformer(_)
             | Type::Callable(_)
             | Type::ModuleLiteral(_)
+            // We could infer a precise tuple spec for enum classes with members,
+            // but it's not clear whether that's worth the added complexity:
+            // you'd have to check that `EnumMeta.__iter__` is not overridden for it to be sound
+            // (enums can have `EnumMeta` subclasses as their metaclasses).
+            | Type::ClassLiteral(_)
             | Type::SubclassOf(_)
             | Type::ProtocolInstance(_)
             | Type::SpecialForm(_)
