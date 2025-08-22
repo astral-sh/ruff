@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::ExprCall;
@@ -127,10 +128,10 @@ pub(crate) fn os_symlink(checker: &Checker, call: &ExprCall, segments: &[&str]) 
             .and_then(|expr| {
                 let code = locator.slice(expr.range());
                 expr.as_boolean_literal_expr()
-                    .is_none_or(|bl| bl.value)
+                    .is_some_and(|bl| !bl.value)
                     .then_some(format!(", target_is_directory={code}"))
             })
-            .unwrap_or_default();
+            .ok_or_else(|| anyhow!("Non-boolean value passed for `target_is_directory`."))?;
 
         let replacement = if is_pathlib_path_call(checker, dst) {
             format!("{dst_code}.symlink_to({src_code}{target_is_directory})")
