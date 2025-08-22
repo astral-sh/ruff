@@ -425,6 +425,7 @@ impl Workspace {
                 documentation: completion
                     .documentation
                     .map(|documentation| documentation.render_plaintext()),
+                detail: completion.inner.ty.display(&self.db).to_string().into(),
             })
             .collect())
     }
@@ -914,6 +915,8 @@ pub struct Completion {
     pub kind: Option<CompletionKind>,
     #[wasm_bindgen(getter_with_clone)]
     pub documentation: Option<String>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub detail: Option<String>,
 }
 
 #[wasm_bindgen]
