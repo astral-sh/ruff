@@ -167,10 +167,9 @@ impl UvFormatCommand {
         path: &Path,
         range_with_index: Option<(TextRange, &LineIndex, &str)>,
     ) -> Command {
-        // TODO(zanieb): We actually want to invoke `uv format` here, but that needs to be released
-        // first! So for now, we're using this as a placeholder to test the experience.
-        let mut command = Command::new("uvx");
-        command.arg("ruff");
+        // TODO(zanieb): We should probably check the uv version to make sure it supports
+        // `uv format` or add a special error message when the subcommand doesn't exist
+        let mut command = Command::new("uv");
         command.arg("format");
 
         let target_version = format!(
