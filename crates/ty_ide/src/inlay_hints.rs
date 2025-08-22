@@ -1,9 +1,12 @@
+use std::fmt;
+
 use crate::Db;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor, TraversalSignal};
 use ruff_python_ast::{AnyNodeRef, Expr, Stmt};
 use ruff_text_size::{Ranged, TextRange, TextSize};
+use smallvec::{SmallVec, smallvec};
 use ty_python_semantic::types::{Type, inlay_hint_function_argument_details};
 use ty_python_semantic::{HasType, SemanticModel};
 
@@ -16,23 +19,31 @@ pub struct InlayHint {
 
 impl InlayHint {
     pub fn type_hint(position: TextSize, ty: Type, db: &dyn Db) -> Self {
+        let mut label = InlayHintLabel::simple(ty.display(db).to_string(), None);
+
+        label.prepend_str(": ");
+
         Self {
             position,
             kind: InlayHintKind::Type,
-            label: format!(": {}", ty.display(db)).into(),
+            label,
         }
     }
 
     pub fn call_argument_name(position: TextSize, name: &str) -> Self {
+        let mut label = InlayHintLabel::simple(name.to_string(), None);
+
+        label.append_str("=");
+
         Self {
             position,
             kind: InlayHintKind::CallArgumentName,
-            label: format!("{name}=").into(),
+            label,
         }
     }
 
-    pub fn display(&self) -> String {
-        self.label.text.clone()
+    pub fn display(&self) -> InlayHintDisplay<'_> {
+        InlayHintDisplay { inlay_hint: self }
     }
 }
 
@@ -42,20 +53,80 @@ pub enum InlayHintKind {
     CallArgumentName,
 }
 
-#[derive(Default, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct InlayHintLabel {
-    pub text: String,
+    pub parts: SmallVec<[InlayHintLabelPart; 1]>,
+}
 
-    pub target: Option<crate::NavigationTarget>,
+impl InlayHintLabel {
+    pub fn simple(s: impl Into<String>, target: Option<crate::NavigationTarget>) -> InlayHintLabel {
+        InlayHintLabel {
+            parts: smallvec![InlayHintLabelPart {
+                text: s.into(),
+                target,
+            }],
+        }
+    }
+
+    pub fn prepend_str(&mut self, s: &str) {
+        match &mut *self.parts {
+            [InlayHintLabelPart { text, target: None }, ..] => text.insert_str(0, s),
+            _ => self.parts.insert(
+                0,
+                InlayHintLabelPart {
+                    text: s.into(),
+                    target: None,
+                },
+            ),
+        }
+    }
+
+    pub fn append_str(&mut self, s: &str) {
+        match &mut *self.parts {
+            [.., InlayHintLabelPart { text, target: None }] => text.push_str(s),
+            _ => self.parts.push(InlayHintLabelPart {
+                text: s.into(),
+                target: None,
+            }),
+        }
+    }
 }
 
 impl From<String> for InlayHintLabel {
     fn from(s: String) -> Self {
         Self {
-            text: s,
-            target: None,
+            parts: smallvec![InlayHintLabelPart {
+                text: s,
+                target: None,
+            }],
         }
     }
+}
+
+pub struct InlayHintDisplay<'a> {
+    pub inlay_hint: &'a InlayHint,
+}
+
+impl<'a> InlayHintDisplay<'a> {
+    pub fn new(label: &'a InlayHint) -> Self {
+        Self { inlay_hint: label }
+    }
+}
+
+impl fmt::Display for InlayHintDisplay<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
+        for part in &self.inlay_hint.label.parts {
+            write!(f, "{}", part.text)?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Default, Debug, Clone)]
+pub struct InlayHintLabelPart {
+    pub text: String,
+
+    pub target: Option<crate::NavigationTarget>,
 }
 
 pub fn inlay_hints(

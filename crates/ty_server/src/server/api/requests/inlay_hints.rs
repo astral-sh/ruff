@@ -79,10 +79,14 @@ fn inlay_hint_kind(inlay_hint_kind: &InlayHintKind) -> lsp_types::InlayHintKind 
 }
 
 fn inlay_hint_label(inlay_hint_label: &InlayHintLabel) -> lsp_types::InlayHintLabel {
-    lsp_types::InlayHintLabel::LabelParts(vec![lsp_types::InlayHintLabelPart {
-        value: inlay_hint_label.text.clone(),
-        location: None,
-        tooltip: None,
-        command: None,
-    }])
+    let mut label_parts = Vec::new();
+    for part in &inlay_hint_label.parts {
+        label_parts.push(lsp_types::InlayHintLabelPart {
+            value: part.text.clone(),
+            location: None,
+            tooltip: None,
+            command: None,
+        });
+    }
+    lsp_types::InlayHintLabel::LabelParts(label_parts)
 }
