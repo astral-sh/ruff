@@ -427,7 +427,7 @@ impl Session {
     /// Returns a mutable iterator over all project databases that have been initialized to this point.
     ///
     /// This iterator will only yield the default project database if it has been used.
-    fn projects_mut(&mut self) -> impl Iterator<Item = &'_ mut ProjectDatabase> + '_ {
+    pub(crate) fn projects_mut(&mut self) -> impl Iterator<Item = &'_ mut ProjectDatabase> + '_ {
         self.project_states_mut().map(|project| &mut project.db)
     }
 
