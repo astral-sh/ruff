@@ -215,6 +215,8 @@ unexpected_cfgs = { level = "warn", check-cfg = [
 
 [workspace.lints.clippy]
 pedantic = { level = "warn", priority = -2 }
+# Enabled at the crate level
+disallowed_methods = "allow"
 # Allowed pedantic lints
 char_lit_as_u8 = "allow"
 collapsible_else_if = "allow"
@@ -252,6 +254,7 @@ unused_peekable = "warn"
 
 # Diagnostics are not actionable: Enable once https://github.com/rust-lang/rust-clippy/issues/13774 is resolved.
 large_stack_arrays = "allow"
+
 
 [profile.release]
 # Note that we set these explicitly, and these values

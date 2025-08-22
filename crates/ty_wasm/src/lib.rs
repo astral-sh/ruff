@@ -1209,6 +1209,10 @@ impl System for WasmSystem {
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
+
+    fn dyn_clone(&self) -> Box<dyn System> {
+        Box::new(self.clone())
+    }
 }
 
 fn not_found() -> std::io::Error {
