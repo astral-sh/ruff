@@ -54,7 +54,7 @@ PTH211 `os.symlink` should be replaced by `Path.symlink_to`
    |
 help: Replace with `Path(...).symlink_to(...)`
 
-PTH211 `os.symlink` should be replaced by `Path.symlink_to`
+PTH211 [*] `os.symlink` should be replaced by `Path.symlink_to`
   --> PTH211.py:18:1
    |
 17 | os.symlink(src="usr/bin/python", dst="tmp/python", unknown=True)
@@ -64,6 +64,16 @@ PTH211 `os.symlink` should be replaced by `Path.symlink_to`
 20 | os.symlink(src="usr/bin/python", dst="tmp/python", dir_fd=None)
    |
 help: Replace with `Path(...).symlink_to(...)`
+
+ℹ Safe fix
+15 15 | os.close(fd)
+16 16 | 
+17 17 | os.symlink(src="usr/bin/python", dst="tmp/python", unknown=True)
+18    |-os.symlink("usr/bin/python",  dst="tmp/python", target_is_directory=False)
+   18 |+Path("tmp/python").symlink_to("usr/bin/python", target_is_directory=False)
+19 19 | 
+20 20 | os.symlink(src="usr/bin/python", dst="tmp/python", dir_fd=None)
+21 21 | 
 
 PTH211 `os.symlink` should be replaced by `Path.symlink_to`
   --> PTH211.py:20:1
