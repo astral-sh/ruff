@@ -131,6 +131,9 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         &self,
         db: &'db dyn Db,
     ) -> impl Iterator<Item = Vec<CallArguments<'a, 'db>>> + '_ {
+        /// Maximum number of argument lists that can be generated in a single expansion step.
+        static MAX_EXPANSIONS: usize = 512;
+
         /// Represents the state of the expansion process.
         ///
         /// This is useful to avoid cloning the initial types vector if none of the types can be
@@ -172,7 +175,16 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                 index += 1;
             };
 
-            let mut expanded_arguments = Vec::with_capacity(expanded_types.len() * previous.len());
+            let expansion_size = expanded_types.len() * previous.len();
+            if expansion_size > MAX_EXPANSIONS {
+                tracing::debug!(
+                    "Skipping argument type expansion as it would exceed the \
+                    maximum number of expansions ({MAX_EXPANSIONS})"
+                );
+                return None;
+            }
+
+            let mut expanded_arguments = Vec::with_capacity(expansion_size);
 
             for pre_expanded_types in previous.iter() {
                 for subtype in &expanded_types {
