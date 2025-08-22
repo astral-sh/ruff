@@ -93,6 +93,10 @@ impl System for OsSystem {
         })
     }
 
+    fn read_to_end(&self, path: &SystemPath) -> Result<Vec<u8>> {
+        std::fs::read(path.as_std_path())
+    }
+
     fn read_to_string(&self, path: &SystemPath) -> Result<String> {
         std::fs::read_to_string(path.as_std_path())
     }
@@ -357,7 +361,7 @@ impl WritableSystem for OsSystem {
         std::fs::File::create_new(path).map(drop)
     }
 
-    fn write_file(&self, path: &SystemPath, content: &str) -> Result<()> {
+    fn write_file(&self, path: &SystemPath, content: &[u8]) -> Result<()> {
         std::fs::write(path.as_std_path(), content)
     }
 

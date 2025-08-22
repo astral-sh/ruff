@@ -88,7 +88,9 @@ pub struct Project {
     /// salsa allocated table for `Project`.
     ///
     /// This field is uninitialized temporarily after deserialization,
-    /// until `Project::resolve_settings` is called.
+    /// until `Project::resolve_settings` is called. We use a `OnceLock`
+    /// to initialize it without bumping the Salsa revision, as we know
+    /// the settings will remain the same if the metadata has not changed.
     #[returns(ref)]
     raw_settings: OnceLock<Box<Settings>>,
 
@@ -119,7 +121,10 @@ pub struct Project {
     /// Diagnostics that were generated when resolving the project settings.
     ///
     /// This field is uninitialized temporarily after deserialization,
-    /// until `Project::resolve_settings` is called.
+    /// until `Project::resolve_settings` is called. We use a `OnceLock`
+    /// to initialize it without bumping the Salsa revision, as we know
+    /// the settings diagnostics will remain the same if the metadata has
+    /// not changed.
     #[returns(ref)]
     raw_settings_diagnostics: OnceLock<Vec<OptionDiagnostic>>,
 
@@ -145,10 +150,11 @@ type ProjectFields = (
 ///
 /// Notably, this type does not contain the `settings` or `settings_diagnostics` fields, as the
 /// resolved settings contain types that are not easily serializable.
+///
+/// It also doesn't include the `IndexedFiles`, as those always need to be reloaded anyways.
 #[derive(serde::Deserialize)]
 struct ProjectWire {
     open_fileset: FxHashSet<File>,
-    file_set: IndexedFiles,
     metadata: Box<ProjectMetadata>,
     included_paths_list: Vec<SystemPathBuf>,
     check_mode: CheckMode,
@@ -158,7 +164,6 @@ struct ProjectWire {
 #[derive(serde::Serialize)]
 struct ProjectWireRef<'a> {
     open_fileset: &'a FxHashSet<File>,
-    file_set: &'a IndexedFiles,
     metadata: &'a ProjectMetadata,
     included_paths_list: &'a Vec<SystemPathBuf>,
     check_mode: &'a CheckMode,
@@ -599,12 +604,12 @@ impl Project {
     ///
     /// Returns `Ok(true)` if the settings were resolved and the `Project` was updated,
     /// or returns `Ok(false)` if a new `Project` should be created.
-    pub fn resolve_settings(
+    pub fn resolve_deserialized_settings(
         &self,
         metadata: &ProjectMetadata,
         db: &mut dyn Db,
     ) -> Result<bool, ToSettingsError> {
-        // Invalid project metadata.
+        // Incompatible project metadata.
         if self.root(db) != metadata.root() {
             return Ok(false);
         }
@@ -621,6 +626,9 @@ impl Project {
         // values compare equal (but may come from new sources).
         let (settings, diagnostics) = metadata.options().to_settings(db, metadata.root())?;
 
+        // Note that we use interior mutability here to avoid bumping the Salsa revision
+        // for these fields because we know that the settings and settings diagnostics will
+        // not change if the metadata compared equal.
         self.raw_settings(db)
             .set(Box::new(settings))
             .expect("`Project::resolve_settings` should only be called once");
@@ -629,8 +637,14 @@ impl Project {
             .set(diagnostics)
             .expect("`Project::resolve_settings` should only be called once");
 
-        // And reload the project files, because we don't know if those have changed.
-        self.reload_files(db);
+        // Note that `IndexedFiles` are not deserialized, so this is already set to
+        // `IndexedFiles::lazy`. However, we need to make sure any queries that depend
+        // on the file set are invalidated.
+        //
+        // TODO: This currently causes the persisted `infer_scope_types` query to be
+        // re-executed, because `semantic_index` has a dependency on the file set. See
+        // if we can work around this with a intermediate query.
+        self.set_file_set(db).to(IndexedFiles::lazy());
 
         Ok(true)
     }
@@ -639,7 +653,7 @@ impl Project {
     pub fn load_all(db: &dyn Db) -> Vec<Project> {
         Project::ingredient(db)
             .entries(db.zalsa())
-            .map(|(key, _)| salsa::plumbing::FromId::from_id(key.key_index()))
+            .map(|entry| entry.as_struct())
             .collect()
     }
 
@@ -649,7 +663,7 @@ impl Project {
     {
         let (
             open_fileset,
-            file_set,
+            _file_set,
             metadata,
             _settings,
             included_paths_list,
@@ -659,7 +673,6 @@ impl Project {
 
         ProjectWireRef {
             open_fileset,
-            file_set,
             metadata,
             included_paths_list,
             check_mode,
@@ -675,7 +688,7 @@ impl Project {
 
         Ok((
             wire.open_fileset,
-            wire.file_set,
+            IndexedFiles::lazy(),
             wire.metadata,
             OnceLock::new(),
             wire.included_paths_list,

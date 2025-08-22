@@ -940,7 +940,9 @@ mod lint_name_serde {
                 let registry = registry
                     .expect("must set the `LintRegistryGuard` when deserializing a `LintName`");
 
-                registry(name).ok_or(serde::de::Error::custom("invalid `LintName`"))
+                registry(name).ok_or(serde::de::Error::custom(format!(
+                    "invalid `LintName` {name}"
+                )))
             })
         }
     }

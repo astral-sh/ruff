@@ -114,8 +114,8 @@ impl MemoryFileSystem {
         matches!(by_path.get(&normalized), Some(Entry::Directory(_)))
     }
 
-    pub fn read_to_string(&self, path: impl AsRef<SystemPath>) -> Result<String> {
-        fn read_to_string(fs: &MemoryFileSystem, path: &SystemPath) -> Result<String> {
+    pub fn read_to_end(&self, path: impl AsRef<SystemPath>) -> Result<Vec<u8>> {
+        fn read_to_end(fs: &MemoryFileSystem, path: &SystemPath) -> Result<Vec<u8>> {
             let by_path = fs.inner.by_path.read().unwrap();
             let normalized = fs.normalize_path(path);
 
@@ -127,19 +127,32 @@ impl MemoryFileSystem {
             }
         }
 
-        read_to_string(self, path.as_ref())
+        read_to_end(self, path.as_ref())
     }
 
-    pub(crate) fn read_virtual_path_to_string(
+    pub fn read_to_string(&self, path: impl AsRef<SystemPath>) -> Result<String> {
+        self.read_to_end(path)
+            .and_then(|bytes| String::from_utf8(bytes).map_err(io::Error::other))
+    }
+
+    pub(crate) fn read_virtual_path_to_end(
         &self,
         path: impl AsRef<SystemVirtualPath>,
-    ) -> Result<String> {
+    ) -> Result<Vec<u8>> {
         let virtual_files = self.inner.virtual_files.read().unwrap();
         let file = virtual_files
             .get(&path.as_ref().to_path_buf())
             .ok_or_else(not_found)?;
 
         Ok(file.content.clone())
+    }
+
+    pub(crate) fn read_virtual_path_to_string(
+        &self,
+        path: impl AsRef<SystemVirtualPath>,
+    ) -> Result<String> {
+        self.read_virtual_path_to_end(path)
+            .and_then(|bytes| String::from_utf8(bytes).map_err(io::Error::other))
     }
 
     pub fn exists(&self, path: &SystemPath) -> bool {
@@ -161,7 +174,7 @@ impl MemoryFileSystem {
         match by_path.entry(normalized) {
             btree_map::Entry::Vacant(entry) => {
                 entry.insert(Entry::File(File {
-                    content: String::new(),
+                    content: Vec::new(),
                     last_modified: file_time_now(),
                 }));
 
@@ -177,13 +190,17 @@ impl MemoryFileSystem {
     /// Stores a new file in the file system.
     ///
     /// The operation overrides the content for an existing file with the same normalized `path`.
-    pub fn write_file(&self, path: impl AsRef<SystemPath>, content: impl ToString) -> Result<()> {
+    pub fn write_file(
+        &self,
+        path: impl AsRef<SystemPath>,
+        content: impl Into<Vec<u8>>,
+    ) -> Result<()> {
         let mut by_path = self.inner.by_path.write().unwrap();
 
         let normalized = self.normalize_path(path.as_ref());
 
         let file = get_or_create_file(&mut by_path, &normalized)?;
-        file.content = content.to_string();
+        file.content = content.into();
         file.last_modified = file_time_now();
 
         Ok(())
@@ -214,7 +231,7 @@ impl MemoryFileSystem {
     pub fn write_file_all(
         &self,
         path: impl AsRef<SystemPath>,
-        content: impl ToString,
+        content: impl Into<Vec<u8>>,
     ) -> Result<()> {
         let path = path.as_ref();
 
@@ -228,19 +245,23 @@ impl MemoryFileSystem {
     /// Stores a new virtual file in the file system.
     ///
     /// The operation overrides the content for an existing virtual file with the same `path`.
-    pub fn write_virtual_file(&self, path: impl AsRef<SystemVirtualPath>, content: impl ToString) {
+    pub fn write_virtual_file(
+        &self,
+        path: impl AsRef<SystemVirtualPath>,
+        content: impl Into<Vec<u8>>,
+    ) {
         let path = path.as_ref();
         let mut virtual_files = self.inner.virtual_files.write().unwrap();
 
         match virtual_files.entry(path.to_path_buf()) {
             std::collections::hash_map::Entry::Vacant(entry) => {
                 entry.insert(File {
-                    content: content.to_string(),
+                    content: content.into(),
                     last_modified: file_time_now(),
                 });
             }
             std::collections::hash_map::Entry::Occupied(mut entry) => {
-                entry.get_mut().content = content.to_string();
+                entry.get_mut().content = content.into();
             }
         }
     }
@@ -468,7 +489,7 @@ impl Entry {
 
 #[derive(Debug)]
 struct File {
-    content: String,
+    content: Vec<u8>,
     last_modified: FileTime,
 }
 
@@ -533,7 +554,7 @@ fn get_or_create_file<'a>(
 
     let entry = paths.entry(normalized.to_path_buf()).or_insert_with(|| {
         Entry::File(File {
-            content: String::new(),
+            content: Vec::new(),
             last_modified: file_time_now(),
         })
     });

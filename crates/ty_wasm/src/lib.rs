@@ -1154,6 +1154,10 @@ impl System for WasmSystem {
         self.fs.canonicalize(path)
     }
 
+    fn read_to_end(&self, path: &SystemPath) -> ruff_db::system::Result<Vec<u8>> {
+        self.fs.read_to_end(path)
+    }
+
     fn read_to_string(&self, path: &SystemPath) -> ruff_db::system::Result<String> {
         self.fs.read_to_string(path)
     }

@@ -6,12 +6,12 @@ use std::{cmp, fmt, io};
 pub use self::changes::ChangeResult;
 use crate::metadata::settings::file_settings;
 use crate::metadata::value::{ValueSource, ValueSourceGuard};
-use crate::{CollectReporter, DEFAULT_LINT_REGISTRY, default_lints_registry};
+use crate::{CollectReporter, DEFAULT_LINT_REGISTRY};
 use crate::{ProgressReporter, Project, ProjectMetadata};
 use ruff_db::Db as SourceDb;
 use ruff_db::diagnostic::{Diagnostic, LintRegistryGuard};
 use ruff_db::files::{File, FileRoot, Files};
-use ruff_db::system::System;
+use ruff_db::system::{System, SystemPath};
 use ruff_db::vendored::VendoredFileSystem;
 use salsa::{Database, Event, Setter};
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
@@ -72,8 +72,8 @@ impl ProjectDatabase {
         //
         // TODO: Use the `program_settings` to compute the key for the database's persistent
         //       cache, to support multiple persistent caches for different configurations.
-        if let Ok(path) = std::env::var(EnvVars::TY_PERSIST) {
-            if let Err(err) = db.deserialize(&path, &project_metadata) {
+        if let Ok(path) = db.system().env_var(EnvVars::TY_PERSIST) {
+            if let Err(err) = db.deserialize(SystemPath::new(&path), &project_metadata) {
                 tracing::warn!("failed to read from persistent cache: {err:?}");
             }
         }
@@ -138,21 +138,24 @@ impl ProjectDatabase {
     }
 
     /// Deserialize the database from the persistent cache.
-    pub fn deserialize(&mut self, path: &str, metadata: &ProjectMetadata) -> anyhow::Result<()> {
+    fn deserialize(&mut self, path: &SystemPath, metadata: &ProjectMetadata) -> anyhow::Result<()> {
         // Read from the persistent cache.
-        let contents = match std::fs::read(path) {
+        let contents = match self.system.read_to_end(path) {
             Ok(contents) => contents,
             Err(err) if err.kind() == io::ErrorKind::NotFound => return Ok(()),
             Err(err) => return Err(err.into()),
         };
 
-        let _value_source = ValueSourceGuard::new(ValueSource::Cli, false);
         let _lint_registry = LintRegistryGuard::new(|name| {
-            default_lints_registry()
+            ty_python_semantic::default_lint_registry()
                 .get(name)
                 .map(|lint| lint.name())
                 .ok()
         });
+
+        // We have to a `ValueSource` to deserialize the `ProjectMetadata`, but we end up using
+        // the new `metadata` value to resolve the settings, so this value doesn't really matter.
+        let _value_source = ValueSourceGuard::new(ValueSource::Cli, false);
 
         // Deserialize the database.
         let mut decoder = bincode::serde::BorrowedSerdeDecoder::from_slice(
@@ -164,6 +167,9 @@ impl ProjectDatabase {
         <dyn salsa::Database>::deserialize(self, decoder.as_deserializer())?;
 
         // Sync any deserialized inputs.
+        //
+        // TODO: Consider parallelizing the work here similar to `ProjectFilesFilter::collect_vec`,
+        // as the stat(2) calls can be expensive on large projects.
         for file in File::load_all(self) {
             file.sync(self);
             self.files.seed(file, self);
@@ -174,7 +180,7 @@ impl ProjectDatabase {
         }
 
         for project in Project::load_all(self) {
-            if project.resolve_settings(metadata, self)? {
+            if project.resolve_deserialized_settings(metadata, self)? {
                 self.project = Some(project);
                 break;
             }
@@ -184,13 +190,20 @@ impl ProjectDatabase {
     }
 
     /// Persist the current state of the database to disk.
-    pub fn persist(&mut self, path: &str) -> anyhow::Result<()> {
+    pub fn persist(&mut self, path: &SystemPath) -> anyhow::Result<()> {
+        if self.system.as_writable().is_none() {
+            return Ok(());
+        }
+
         let contents = bincode::serde::encode_to_vec(
             <dyn salsa::Database>::as_serialize(self),
             bincode::config::standard(),
         )?;
 
-        std::fs::write(path, contents)?;
+        self.system
+            .as_writable()
+            .unwrap()
+            .write_file(path, &contents)?;
 
         Ok(())
     }

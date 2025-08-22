@@ -20,7 +20,7 @@ use crate::{IOErrorDiagnostic, Project};
 /// so no query can be depending on the contents of the indexed files before that. All subsequent mutations to
 /// the indexed files must go through `IndexedMut`, which uses the Salsa setter `project.set_file_set` to
 /// ensure that Salsa always knows when the set of indexed files have changed.
-#[derive(Debug, get_size2::GetSize, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, get_size2::GetSize)]
 pub struct IndexedFiles {
     state: std::sync::Mutex<State>,
 }

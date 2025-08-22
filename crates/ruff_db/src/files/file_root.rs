@@ -38,9 +38,10 @@ impl FileRoot {
 
     /// Loads all existing [`FileRoot`]s in the database.
     pub fn load_all(db: &dyn Db) -> Vec<FileRoot> {
+        // TODO: Prune deleted paths.
         FileRoot::ingredient(db)
             .entries(db.zalsa())
-            .map(|(key, _)| salsa::plumbing::FromId::from_id(key.key_index()))
+            .map(|entry| entry.as_struct())
             .collect()
     }
 }
@@ -72,22 +73,25 @@ pub(super) struct FileRoots {
 }
 
 impl FileRoots {
-    /// Tries to add a new root for `path` and returns the root.
+    /// Tries to add a new root for `path`.
     ///
     /// The root isn't added nor is the file root's kind updated if a root for `path` already exists.
+    ///
+    /// Returns `Ok(root)` if the `FileRoot` was successfully added, and returns `Err(root)` with
+    /// the previous root if one already existed at that path.
     pub(super) fn try_add(
         &mut self,
         db: &dyn Db,
         path: SystemPathBuf,
         create_root: impl FnOnce(SystemPathBuf) -> FileRoot,
-    ) -> FileRoot {
+    ) -> Result<FileRoot, FileRoot> {
         // SAFETY: Guaranteed to succeed because `path` is a UTF-8 that only contains Unicode characters.
         let normalized_path = path.as_std_path().to_slash().unwrap();
 
         if let Ok(existing) = self.by_path.at(&normalized_path) {
             // Only if it is an exact match
             if existing.value.path(db) == &*path {
-                return *existing.value;
+                return Err(*existing.value);
             }
         }
 
@@ -107,7 +111,7 @@ impl FileRoots {
         self.by_path.insert(route, root).unwrap();
         self.roots.push(root);
 
-        root
+        Ok(root)
     }
 
     /// Returns the closest root for `path` or `None` if no root contains `path`.

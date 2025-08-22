@@ -201,12 +201,15 @@ impl Files {
         let mut roots = self.inner.roots.write().unwrap();
 
         let absolute = SystemPath::absolute(path, db.system().current_directory());
-        roots.try_add(db, absolute, |absolute| {
+
+        let (Ok(root) | Err(root)) = roots.try_add(db, absolute, |absolute| {
             FileRoot::builder(absolute, kind, FileRevision::now())
                 .durability(Durability::HIGH)
                 .revision_durability(kind.durability())
                 .new(db)
-        })
+        });
+
+        root
     }
 
     /// Updates the revision of the root for `path`.
@@ -268,25 +271,47 @@ impl Files {
 
     /// Seed the files with an existing [`File`] instance.
     pub fn seed(&self, file: File, db: &dyn Db) {
-        match file.path(db) {
-            FilePath::System(path) => {
-                self.inner.system_by_path.insert(path.clone(), file);
-            }
-            FilePath::SystemVirtual(path) => {
-                self.inner
-                    .system_virtual_by_path
-                    .insert(path.clone(), VirtualFile(file));
-            }
-            FilePath::Vendored(path) => {
-                self.inner.vendored_by_path.insert(path.clone(), file);
-            }
-        }
+        let seeded = match file.path(db) {
+            FilePath::System(path) => self
+                .inner
+                .system_by_path
+                .insert(path.clone(), file)
+                .is_none(),
+            FilePath::SystemVirtual(path) => self
+                .inner
+                .system_virtual_by_path
+                .insert(path.clone(), VirtualFile(file))
+                .is_none(),
+            FilePath::Vendored(path) => self
+                .inner
+                .vendored_by_path
+                .insert(path.clone(), file)
+                .is_none(),
+        };
+
+        // Recreating a `File` input means the persisted queries depending on that file
+        // will be invalidated.
+        assert!(
+            seeded,
+            "unexpected `File` input recreated for path `{}`",
+            file.path(db)
+        );
     }
 
     /// Seed the files with an existing [`FileRoot`] instance.
     pub fn seed_root(&self, root: FileRoot, db: &dyn Db) {
         let mut roots = self.inner.roots.write().unwrap();
-        roots.try_add(db, root.path(db).to_path_buf(), |_| root);
+        let seeded = roots
+            .try_add(db, root.path(db).to_path_buf(), |_| root)
+            .is_ok();
+
+        // Recreating a `FileRoot` input means the persisted queries depending on that file
+        // root will be invalidated.
+        assert!(
+            seeded,
+            "unexpected `FileRoot` input recreated for path `{}`",
+            root.path(db)
+        );
     }
 }
 
@@ -445,9 +470,10 @@ impl File {
 
     /// Loads all existing [`File`]s in the database.
     pub fn load_all(db: &dyn Db) -> Vec<File> {
+        // TODO: Prune deleted paths.
         File::ingredient(db)
             .entries(db.zalsa())
-            .map(|(key, _)| salsa::plumbing::FromId::from_id(key.key_index()))
+            .map(|entry| entry.as_struct())
             .collect()
     }
 

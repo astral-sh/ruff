@@ -43,6 +43,8 @@ impl EnvVars {
     /// Used to enable persistent caching at the specified path.
     ///
     /// This improves performance and memory usage by caching to disk across ty runs.
+    /// Note that this feature is currently experimental and may result in decreased
+    /// performance.
     #[attr_hidden]
     pub const TY_PERSIST: &'static str = "TY_PERSIST";
 
