@@ -17,7 +17,6 @@ os.close(fd)
 os.symlink(src="usr/bin/python", dst="tmp/python", unknown=True)
 os.symlink("usr/bin/python",  dst="tmp/python", target_is_directory=False)
 
-os.symlink("usr/bin/python", "tmp/python", target_is_directory
-= True)
-
 os.symlink(src="usr/bin/python", dst="tmp/python", dir_fd=None)
+
+os.symlink("usr/bin/python",  dst="tmp/python", target_is_directory=     True    )
