@@ -126,7 +126,8 @@ pub(crate) fn os_symlink(checker: &Checker, call: &ExprCall, segments: &[&str]) 
             .find_argument_value("target_is_directory", 2)
             .and_then(|expr| {
                 let code = locator.slice(expr.range());
-                (!code.eq("False")).then(|| format!(", target_is_directory={code}"))
+                (!expr.as_boolean_literal_expr().is_some_and(|bl| !bl.value))
+                    .then_some(format!(", target_is_directory={code}"))
             })
             .unwrap_or_default();
 
