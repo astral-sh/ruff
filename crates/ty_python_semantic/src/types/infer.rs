@@ -64,7 +64,7 @@ use super::string_annotation::{
 use super::subclass_of::SubclassOfInner;
 use super::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::module_name::{ModuleName, ModuleNameResolutionError};
-use crate::module_resolver::{KnownModule, file_to_module, resolve_module};
+use crate::module_resolver::{KnownModule, SearchPath, file_to_module, resolve_module};
 use crate::node_key::NodeKey;
 use crate::place::{
     Boundness, ConsideredDefinitions, LookupError, Place, PlaceAndQualifiers,
@@ -4998,14 +4998,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Get all system paths (this includes first-party and site-packages)
             for path in crate::module_resolver::system_module_search_paths(self.db()) {
-                search_paths.push(format!("  {}. {}", path_index, path));
+                search_paths.push(format!(
+                    "  {}. {} (first-party or site-packages)",
+                    path_index, path
+                ));
                 path_index += 1;
             }
 
-            // Note about vendored stdlib (since it's not included in system paths)
+            // Add vendored stdlib path - create it and display it
+            let vendored_stdlib = SearchPath::vendored_stdlib();
             search_paths.push(format!(
-                "  {}. <vendored stdlib> (built-in Python standard library)",
-                path_index
+                "  {}. {} (vendored Python standard library)",
+                path_index, vendored_stdlib
             ));
 
             diagnostic.info(format_args!(
