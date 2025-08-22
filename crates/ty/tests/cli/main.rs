@@ -263,6 +263,9 @@ fn cli_arguments_are_relative_to_the_current_directory() -> anyhow::Result<()> {
     3 |
     4 | stat = add(10, 15)
       |
+    info: Searched in the following paths:
+      1. <temp_dir>/ (first-party)
+      2. vendored://stdlib (vendored stdlib)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
 
@@ -489,6 +492,9 @@ fn check_specific_paths() -> anyhow::Result<()> {
     3 |
     4 | print(z)
       |
+    info: Searched in the following paths:
+      1. <temp_dir>/ (first-party)
+      2. vendored://stdlib (vendored stdlib)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
 
@@ -498,6 +504,9 @@ fn check_specific_paths() -> anyhow::Result<()> {
     2 | import does_not_exist  # error: unresolved-import
       |        ^^^^^^^^^^^^^^
       |
+    info: Searched in the following paths:
+      1. <temp_dir>/ (first-party)
+      2. vendored://stdlib (vendored stdlib)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
 
@@ -524,6 +533,9 @@ fn check_specific_paths() -> anyhow::Result<()> {
     3 |
     4 | print(z)
       |
+    info: Searched in the following paths:
+      1. <temp_dir>/ (first-party)
+      2. vendored://stdlib (vendored stdlib)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
 
@@ -533,6 +545,9 @@ fn check_specific_paths() -> anyhow::Result<()> {
     2 | import does_not_exist  # error: unresolved-import
       |        ^^^^^^^^^^^^^^
       |
+    info: Searched in the following paths:
+      1. <temp_dir>/ (first-party)
+      2. vendored://stdlib (vendored stdlib)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
 

@@ -333,6 +333,10 @@ import bar",
       |        ^^^
     2 | import bar
       |
+    info: Searched in the following paths:
+      1. <temp_dir>/ (first-party)
+      2. vendored://stdlib (vendored stdlib)
+      3. <temp_dir>/strange-venv-location/lib/python3.13/site-packages (site-packages)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
 
@@ -378,6 +382,11 @@ fn lib64_site_packages_directory_on_unix() -> anyhow::Result<()> {
     1 | import foo, bar, baz
       |                  ^^^
       |
+    info: Searched in the following paths:
+      1. <temp_dir>/ (first-party)
+      2. vendored://stdlib (vendored stdlib)
+      3. <temp_dir>/.venv/lib/python3.13/site-packages (site-packages)
+      4. <temp_dir>/.venv/lib64/python3.13/site-packages (site-packages)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
 
@@ -1273,6 +1282,9 @@ home = ./
     3 | from package1 import ChildConda
     4 | from package1 import WorkingVenv
       |
+    info: Searched in the following paths:
+      1. <temp_dir>/project (first-party)
+      2. vendored://stdlib (vendored stdlib)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
 
@@ -1285,6 +1297,9 @@ home = ./
     4 | from package1 import WorkingVenv
     5 | from package1 import BaseConda
       |
+    info: Searched in the following paths:
+      1. <temp_dir>/project (first-party)
+      2. vendored://stdlib (vendored stdlib)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
 
@@ -1297,6 +1312,9 @@ home = ./
       |      ^^^^^^^^
     5 | from package1 import BaseConda
       |
+    info: Searched in the following paths:
+      1. <temp_dir>/project (first-party)
+      2. vendored://stdlib (vendored stdlib)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
 
@@ -1308,6 +1326,9 @@ home = ./
     5 | from package1 import BaseConda
       |      ^^^^^^^^
       |
+    info: Searched in the following paths:
+      1. <temp_dir>/project (first-party)
+      2. vendored://stdlib (vendored stdlib)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
 
@@ -1716,6 +1737,10 @@ fn default_root_tests_package() -> anyhow::Result<()> {
     4 |
     5 | print(f"{foo} {bar}")
       |
+    info: Searched in the following paths:
+      1. <temp_dir>/ (first-party)
+      2. <temp_dir>/src (first-party)
+      3. vendored://stdlib (vendored stdlib)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
 
