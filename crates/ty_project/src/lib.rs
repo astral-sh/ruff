@@ -28,9 +28,9 @@ use std::panic::{AssertUnwindSafe, UnwindSafe};
 use std::sync::Arc;
 use thiserror::Error;
 use tracing::error;
-use ty_python_semantic::lint::{LintRegistry, LintRegistryBuilder, RuleSelection};
+use ty_python_semantic::add_inferred_python_version_hint_to_diagnostic;
+use ty_python_semantic::lint::RuleSelection;
 use ty_python_semantic::types::check_types;
-use ty_python_semantic::{add_inferred_python_version_hint_to_diagnostic, register_lints};
 
 mod db;
 mod files;
@@ -38,15 +38,6 @@ mod glob;
 pub mod metadata;
 mod walk;
 pub mod watch;
-
-pub static DEFAULT_LINT_REGISTRY: std::sync::LazyLock<LintRegistry> =
-    std::sync::LazyLock::new(default_lints_registry);
-
-pub fn default_lints_registry() -> LintRegistry {
-    let mut builder = LintRegistryBuilder::default();
-    register_lints(&mut builder);
-    builder.build()
-}
 
 /// The project as a Salsa ingredient.
 ///
