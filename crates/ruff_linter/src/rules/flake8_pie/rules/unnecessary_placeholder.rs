@@ -83,9 +83,7 @@ impl AlwaysFixableViolation for UnnecessaryPlaceholder {
 
 /// PIE790
 pub(crate) fn unnecessary_placeholder(checker: &Checker, body: &[Stmt]) {
-    let body_len = body.len();
-
-    if body_len < 2 {
+    if body.len() < 2 {
         return;
     }
 
