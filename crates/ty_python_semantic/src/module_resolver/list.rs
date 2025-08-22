@@ -363,6 +363,11 @@ fn is_python_extension(ext: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    #![expect(
+        clippy::disallowed_methods,
+        reason = "These are tests, so it's fine to do I/O by-passing System."
+    )]
+
     use camino::{Utf8Component, Utf8Path};
     use ruff_db::Db as _;
     use ruff_db::files::{File, FilePath, FileRootKind};

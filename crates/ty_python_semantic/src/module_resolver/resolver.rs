@@ -1115,6 +1115,10 @@ impl fmt::Display for RelaxedModuleName {
 
 #[cfg(test)]
 mod tests {
+    #![expect(
+        clippy::disallowed_methods,
+        reason = "These are tests, so it's fine to do I/O by-passing System."
+    )]
     use ruff_db::Db;
     use ruff_db::files::{File, FilePath, system_path_to_file};
     use ruff_db::system::{DbWithTestSystem as _, DbWithWritableSystem as _};
