@@ -2484,6 +2484,15 @@ impl<'a> Checker<'a> {
                 .ancestor_ids(self.semantic.scope_id)
                 .find_or_last(|scope_id| !self.semantic.scopes[*scope_id].kind.is_generator())
                 .unwrap_or(self.semantic.scope_id)
+        }
+        // Similarly, `__class__` references bind to the nearest enclosing implicit closure added
+        // around each method definition.
+        else if name == "__class__" {
+            self.semantic
+                .scopes
+                .ancestor_ids(self.semantic.scope_id)
+                .find_or_last(|scope_id| self.semantic.scopes[*scope_id].kind.is_class_cell())
+                .unwrap_or(self.semantic.scope_id)
         } else {
             self.semantic.scope_id
         };
