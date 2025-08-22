@@ -4999,16 +4999,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let search_paths_list: Vec<String> = diagnostic_search_paths(self.db())
                 .enumerate()
                 .map(|(index, path)| {
-                    let kind = if path.is_standard_library() {
-                        if path.as_system_path().is_some() {
-                            "custom stdlib"
-                        } else {
-                            "vendored stdlib"
-                        }
-                    } else if path.is_first_party() {
-                        "first-party"
-                    } else {
-                        "site-packages"
+                    let kind = match path.is_standard_library() {
+                        true => match path.as_system_path() {
+                            Some(_) => "custom stdlib",
+                            None => "vendored stdlib",
+                        },
+                        false => match path.is_first_party() {
+                            true => "first-party",
+                            false => "site-packages",
+                        },
                     };
                     format!("  {}. {} ({})", index + 1, path, kind)
                 })
