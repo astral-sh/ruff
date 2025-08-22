@@ -64,7 +64,9 @@ use super::string_annotation::{
 use super::subclass_of::SubclassOfInner;
 use super::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::module_name::{ModuleName, ModuleNameResolutionError};
-use crate::module_resolver::{KnownModule, SearchPath, file_to_module, resolve_module};
+use crate::module_resolver::{
+    KnownModule, diagnostic_search_paths, file_to_module, resolve_module,
+};
 use crate::node_key::NodeKey;
 use crate::place::{
     Boundness, ConsideredDefinitions, LookupError, Place, PlaceAndQualifiers,
@@ -4993,29 +4995,33 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             // Add search paths information to the diagnostic
-            let mut search_paths: Vec<String> = Vec::new();
+            // Use the same search paths function that is used in actual module resolution
+            let mut search_paths_list: Vec<String> = Vec::new();
             let mut path_index = 1;
 
-            // Get all system paths (this includes first-party and site-packages)
-            for path in crate::module_resolver::system_module_search_paths(self.db()) {
-                search_paths.push(format!(
-                    "  {}. {} (first-party or site-packages)",
-                    path_index, path
-                ));
+            // Use the same search paths that are used in actual module resolution
+            for path in diagnostic_search_paths(self.db()) {
+                let kind = if path.is_standard_library() {
+                    if path.as_system_path().is_some() {
+                        "custom stdlib"
+                    } else {
+                        "vendored stdlib"
+                    }
+                } else if path.is_first_party() {
+                    "first-party"
+                } else {
+                    "site-packages"
+                };
+                search_paths_list.push(format!("  {}. {} ({})", path_index, path, kind));
                 path_index += 1;
             }
 
-            // Add vendored stdlib path - create it and display it
-            let vendored_stdlib = SearchPath::vendored_stdlib();
-            search_paths.push(format!(
-                "  {}. {} (vendored Python standard library)",
-                path_index, vendored_stdlib
-            ));
-
-            diagnostic.info(format_args!(
-                "Searched in the following paths:\n{}",
-                search_paths.join("\n")
-            ));
+            if !search_paths_list.is_empty() {
+                diagnostic.info(format_args!(
+                    "Searched in the following paths:\n{}",
+                    search_paths_list.join("\n")
+                ));
+            }
 
             diagnostic.info(
                 "make sure your Python environment is properly configured: \
