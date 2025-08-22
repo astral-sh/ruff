@@ -72,6 +72,7 @@ use crate::place::{
     module_type_implicit_global_declaration, module_type_implicit_global_symbol, place,
     place_from_bindings, place_from_declarations, typing_extensions_symbol,
 };
+
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::{HasScopedUseId, ScopedUseId};
 use crate::semantic_index::definition::{
@@ -4960,11 +4961,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let Some(builder) = self.context.report_lint(&UNRESOLVED_IMPORT, range) else {
             return;
         };
+
         let mut diagnostic = builder.into_diagnostic(format_args!(
             "Cannot resolve imported module `{}{}`",
             ".".repeat(level as usize),
             module.unwrap_or_default()
         ));
+
         if level == 0 {
             if let Some(module_name) = module.and_then(ModuleName::new) {
                 let program = Program::get(self.db());
@@ -4988,6 +4991,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
             }
+
+            // Add search paths information to the diagnostic
+            let mut search_paths: Vec<String> = Vec::new();
+            let mut path_index = 1;
+
+            // Get all system paths (this includes first-party and site-packages)
+            for path in crate::module_resolver::system_module_search_paths(self.db()) {
+                search_paths.push(format!("  {}. {}", path_index, path));
+                path_index += 1;
+            }
+
+            // Note about vendored stdlib (since it's not included in system paths)
+            search_paths.push(format!(
+                "  {}. <vendored stdlib> (built-in Python standard library)",
+                path_index
+            ));
+
+            diagnostic.info(format_args!(
+                "Searched in the following paths:\n{}",
+                search_paths.join("\n")
+            ));
 
             diagnostic.info(
                 "make sure your Python environment is properly configured: \
