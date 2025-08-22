@@ -548,53 +548,78 @@ pub(crate) fn compare_with_tuple(checker: &Checker, expr: &Expr) {
         }
 
         // Create a `x in (a, b)` expression.
-        let node = ast::ExprTuple {
+        let tuple_node = ast::ExprTuple {
             elts: comparators.into_iter().cloned().collect(),
             ctx: ExprContext::Load,
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
             parenthesized: true,
         };
-        let node1 = ast::ExprName {
+        let name_node = ast::ExprName {
             id: id.clone(),
             ctx: ExprContext::Load,
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
         };
-        let node2 = ast::ExprCompare {
-            left: Box::new(node1.into()),
+        let compare_node = ast::ExprCompare {
+            left: Box::new(name_node.into()),
             ops: Box::from([CmpOp::In]),
-            comparators: Box::from([node.into()]),
+            comparators: Box::from([tuple_node.into()]),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
         };
-        let in_expr = node2.into();
+        let in_expr = compare_node.into();
+
         let mut diagnostic = checker.report_diagnostic(
             CompareWithTuple {
                 replacement: checker.generator().expr(&in_expr),
             },
             expr.range(),
         );
-        let unmatched: Vec<Expr> = values
-            .iter()
-            .enumerate()
-            .filter(|(index, _)| !indices.contains(index))
-            .map(|(_, elt)| elt.clone())
-            .collect();
-        let in_expr = if unmatched.is_empty() {
+
+        // Build the replacement expression, preserving order
+        let replacement_expr = if indices.len() == values.len() {
+            // All expressions are part of the same comparison group
             in_expr
         } else {
-            // Wrap in a `x in (a, b) or ...` boolean operation.
-            let node = ast::ExprBoolOp {
-                op: BoolOp::Or,
-                values: iter::once(in_expr).chain(unmatched).collect(),
-                range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
-            };
-            node.into()
+            // We need to preserve the order of expressions
+            let mut new_values = Vec::new();
+            let mut in_expr_inserted = false;
+
+            for (index, value) in values.iter().enumerate() {
+                if indices.contains(&index) {
+                    // This is part of the comparison group
+                    if !in_expr_inserted {
+                        // Insert the `in` expression at the position of the first match
+                        new_values.push(in_expr.clone());
+                        in_expr_inserted = true;
+                    }
+                    // Skip the original equality comparison (it's now part of the `in` expression)
+                } else {
+                    // This is an unrelated expression, preserve it in its original position
+                    new_values.push(value.clone());
+                }
+            }
+
+            if new_values.len() == 1 {
+                // Only one expression left, no need for BoolOp
+                new_values
+                    .pop()
+                    .expect("new_values should have exactly one element")
+            } else {
+                // Multiple expressions, wrap in BoolOp
+                let bool_op = ast::ExprBoolOp {
+                    op: BoolOp::Or,
+                    values: new_values,
+                    range: TextRange::default(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                };
+                bool_op.into()
+            }
         };
+
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-            checker.generator().expr(&in_expr),
+            checker.generator().expr(&replacement_expr),
             expr.range(),
         )));
     }
