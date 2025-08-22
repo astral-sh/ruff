@@ -446,10 +446,16 @@ impl Ranged for Binding<'_> {
 /// ID uniquely identifying a [Binding] in a program.
 ///
 /// Using a `u32` to identify [Binding]s should be sufficient because Ruff only supports documents with a
-/// size smaller than or equal to `u32::max`. A document with the size of `u32::max` must have fewer than `u32::max`
+/// size smaller than or equal to `u32::MAX`. A document with the size of `u32::MAX` must have fewer than `u32::MAX`
 /// bindings because bindings must be separated by whitespace (and have an assignment).
 #[newtype_index]
 pub struct BindingId;
+
+impl BindingId {
+    pub const fn dunder_class_id() -> Self {
+        BindingId::from_u32(u32::MAX)
+    }
+}
 
 /// The bindings in a program.
 ///
@@ -672,6 +678,9 @@ pub enum BindingKind<'a> {
     /// Stores the ID of the binding that was shadowed in the enclosing
     /// scope, if any.
     UnboundException(Option<BindingId>),
+
+    /// TODO
+    ClassCell,
 }
 
 bitflags! {

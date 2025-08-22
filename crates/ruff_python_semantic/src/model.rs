@@ -404,22 +404,11 @@ impl<'a> SemanticModel<'a> {
             }
         }
 
-        let mut seen_function = false;
         let mut import_starred = false;
         let mut class_variables_visible = true;
         for (index, scope_id) in self.scopes.ancestor_ids(self.scope_id).enumerate() {
             let scope = &self.scopes[scope_id];
             if scope.kind.is_class() {
-                // Allow usages of `__class__` within methods, e.g.:
-                //
-                // ```python
-                // class Foo:
-                //     def __init__(self):
-                //         print(__class__)
-                // ```
-                if seen_function && matches!(name.id.as_str(), "__class__") {
-                    return ReadResult::ImplicitGlobal;
-                }
                 // Do not allow usages of class symbols unless it is the immediate parent
                 // (excluding type scopes), e.g.:
                 //
@@ -442,7 +431,8 @@ impl<'a> SemanticModel<'a> {
             // Allow class variables to be visible for an additional scope level
             // when a type scope is seen — this covers the type scope present between
             // function and class definitions and their parent class scope.
-            class_variables_visible = scope.kind.is_type() && index == 0;
+            class_variables_visible =
+                (scope.kind.is_type() && index == 0) || (scope.kind.is_class_cell() && index == 1);
 
             if let Some(binding_id) = scope.get(name.id.as_str()) {
                 // Mark the binding as used.
@@ -614,7 +604,6 @@ impl<'a> SemanticModel<'a> {
                 }
             }
 
-            seen_function |= scope.kind.is_function();
             import_starred = import_starred || scope.uses_star_imports();
         }
 
@@ -1353,11 +1342,11 @@ impl<'a> SemanticModel<'a> {
         self.scopes[scope_id].parent
     }
 
-    /// Returns the first parent of the given [`Scope`] that is not of [`ScopeKind::Type`], if any.
+    /// Returns the first parent of the given [`Scope`] that is not of [`ScopeKind::Type`] or [`ScopeKind::ClassCell`], if any.
     pub fn first_non_type_parent_scope(&self, scope: &Scope) -> Option<&Scope<'a>> {
         let mut current_scope = scope;
         while let Some(parent) = self.parent_scope(current_scope) {
-            if parent.kind.is_type() {
+            if matches!(parent.kind, ScopeKind::Type | ScopeKind::ClassCell) {
                 current_scope = parent;
             } else {
                 return Some(parent);
@@ -1366,11 +1355,14 @@ impl<'a> SemanticModel<'a> {
         None
     }
 
-    /// Returns the first parent of the given [`ScopeId`] that is not of [`ScopeKind::Type`], if any.
+    /// Returns the first parent of the given [`ScopeId`] that is not of [`ScopeKind::Type`] or [`ScopeKind::ClassCell`], if any.
     pub fn first_non_type_parent_scope_id(&self, scope_id: ScopeId) -> Option<ScopeId> {
         let mut current_scope_id = scope_id;
         while let Some(parent_id) = self.parent_scope_id(current_scope_id) {
-            if self.scopes[parent_id].kind.is_type() {
+            if matches!(
+                self.scopes[parent_id].kind,
+                ScopeKind::Type | ScopeKind::ClassCell
+            ) {
                 current_scope_id = parent_id;
             } else {
                 return Some(parent_id);
