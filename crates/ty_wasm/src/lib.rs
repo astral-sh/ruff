@@ -455,6 +455,7 @@ impl Workspace {
                     &source,
                     self.position_encoding,
                 ),
+                kind: hint.content.into(),
             })
             .collect())
     }
@@ -978,12 +979,30 @@ impl From<ty_python_semantic::CompletionKind> for CompletionKind {
 }
 
 #[wasm_bindgen]
+#[derive(Debug, Clone, PartialEq, Eq, Copy)]
+pub enum InlayHintKind {
+    Type,
+    Parameter,
+}
+
+impl From<ty_ide::InlayHintContent<'_>> for InlayHintKind {
+    fn from(kind: ty_ide::InlayHintContent) -> Self {
+        match kind {
+            ty_ide::InlayHintContent::Type(_) => Self::Type,
+            ty_ide::InlayHintContent::CallArgumentName(_) => Self::Parameter,
+        }
+    }
+}
+
+#[wasm_bindgen]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InlayHint {
     #[wasm_bindgen(getter_with_clone)]
     pub markdown: String,
 
     pub position: Position,
+
+    pub kind: InlayHintKind,
 }
 
 #[wasm_bindgen]

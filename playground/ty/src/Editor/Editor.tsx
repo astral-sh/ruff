@@ -27,6 +27,7 @@ import {
   type FileHandle,
   DocumentHighlight,
   DocumentHighlightKind,
+  InlayHintKind,
 } from "ty_wasm";
 import { FileId, ReadonlyFiles } from "../Playground";
 import { isPythonFile } from "./Files";
@@ -405,6 +406,15 @@ class PlaygroundServer
       return undefined;
     }
 
+    function mapInlayHintKind(kind: InlayHintKind): languages.InlayHintKind {
+      switch (kind) {
+        case InlayHintKind.Type:
+          return languages.InlayHintKind.Type;
+        case InlayHintKind.Parameter:
+          return languages.InlayHintKind.Parameter;
+      }
+    }
+
     return {
       dispose: () => {},
       hints: inlayHints.map((hint) => ({
@@ -413,6 +423,7 @@ class PlaygroundServer
           lineNumber: hint.position.line,
           column: hint.position.column,
         },
+        kind: mapInlayHintKind(hint.kind),
       })),
     };
   }
