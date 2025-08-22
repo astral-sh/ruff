@@ -7,22 +7,22 @@ input_file: crates/ruff_python_parser/resources/valid/expressions/t_string.py
 ```
 Module(
     ModModule {
-        node_index: AtomicNodeIndex(..),
+        node_index: NodeIndex(None),
         range: 0..864,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 18..21,
                     value: TString(
                         ExprTString {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 18..21,
                             value: TStringValue {
                                 inner: Single(
                                     TString {
                                         range: 18..21,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         elements: [],
                                         flags: TStringFlags {
                                             quote_style: Double,
@@ -38,17 +38,17 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 22..25,
                     value: TString(
                         ExprTString {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 22..25,
                             value: TStringValue {
                                 inner: Single(
                                     TString {
                                         range: 22..25,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         elements: [],
                                         flags: TStringFlags {
                                             quote_style: Double,
@@ -64,17 +64,17 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 26..29,
                     value: TString(
                         ExprTString {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 26..29,
                             value: TStringValue {
                                 inner: Single(
                                     TString {
                                         range: 26..29,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         elements: [],
                                         flags: TStringFlags {
                                             quote_style: Single,
@@ -90,17 +90,17 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 30..37,
                     value: TString(
                         ExprTString {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 30..37,
                             value: TStringValue {
                                 inner: Single(
                                     TString {
                                         range: 30..37,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         elements: [],
                                         flags: TStringFlags {
                                             quote_style: Double,
@@ -116,17 +116,17 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 38..45,
                     value: TString(
                         ExprTString {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 38..45,
                             value: TStringValue {
                                 inner: Single(
                                     TString {
                                         range: 38..45,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         elements: [],
                                         flags: TStringFlags {
                                             quote_style: Single,
@@ -142,31 +142,31 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 47..56,
                     value: TString(
                         ExprTString {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 47..56,
                             value: TStringValue {
                                 inner: Single(
                                     TString {
                                         range: 47..56,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         elements: [
                                             Interpolation(
                                                 InterpolatedElement {
                                                     range: 49..55,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     expression: StringLiteral(
                                                         ExprStringLiteral {
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             range: 50..54,
                                                             value: StringLiteralValue {
                                                                 inner: Single(
                                                                     StringLiteral {
                                                                         range: 50..54,
-                                                                        node_index: AtomicNodeIndex(..),
+                                                                        node_index: NodeIndex(None),
                                                                         value: " t",
                                                                         flags: StringLiteralFlags {
                                                                             quote_style: Double,
@@ -198,25 +198,25 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 57..67,
                     value: TString(
                         ExprTString {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 57..67,
                             value: TStringValue {
                                 inner: Single(
                                     TString {
                                         range: 57..67,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         elements: [
                                             Interpolation(
                                                 InterpolatedElement {
                                                     range: 59..66,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     expression: Name(
                                                         ExprName {
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             range: 60..63,
                                                             id: Name("foo"),
                                                             ctx: Load,
@@ -242,30 +242,30 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 68..75,
                     value: TString(
                         ExprTString {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 68..75,
                             value: TStringValue {
                                 inner: Single(
                                     TString {
                                         range: 68..75,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         elements: [
                                             Interpolation(
                                                 InterpolatedElement {
                                                     range: 70..74,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     expression: Tuple(
                                                         ExprTuple {
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             range: 71..73,
                                                             elts: [
                                                                 NumberLiteral(
                                                                     ExprNumberLiteral {
-                                                                        node_index: AtomicNodeIndex(..),
+                                                                        node_index: NodeIndex(None),
                                                                         range: 71..72,
                                                                         value: Int(
                                                                             3,
@@ -297,29 +297,29 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 76..86,
                     value: TString(
                         ExprTString {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 76..86,
                             value: TStringValue {
                                 inner: Single(
                                     TString {
                                         range: 76..86,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         elements: [
                                             Interpolation(
                                                 InterpolatedElement {
                                                     range: 78..85,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     expression: Compare(
                                                         ExprCompare {
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             range: 79..83,
                                                             left: NumberLiteral(
                                                                 ExprNumberLiteral {
-                                                                    node_index: AtomicNodeIndex(..),
+                                                                    node_index: NodeIndex(None),
                                                                     range: 79..80,
                                                                     value: Int(
                                                                         3,
@@ -332,7 +332,7 @@ Module(
                                                             comparators: [
                                                                 NumberLiteral(
                                                                     ExprNumberLiteral {
-                                                                        node_index: AtomicNodeIndex(..),
+                                                                        node_index: NodeIndex(None),
                                                                         range: 82..83,
                                                                         value: Int(
                                                                             4,
@@ -347,7 +347,7 @@ Module(
                                                     format_spec: Some(
                                                         InterpolatedStringFormatSpec {
                                                             range: 84..84,
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             elements: [],
                                                         },
                                                     ),
@@ -368,25 +368,25 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 87..102,
                     value: TString(
                         ExprTString {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 87..102,
                             value: TStringValue {
                                 inner: Single(
                                     TString {
                                         range: 87..102,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         elements: [
                                             Interpolation(
                                                 InterpolatedElement {
                                                     range: 89..101,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     expression: NumberLiteral(
                                                         ExprNumberLiteral {
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             range: 90..91,
                                                             value: Int(
                                                                 3,
@@ -398,21 +398,21 @@ Module(
                                                     format_spec: Some(
                                                         InterpolatedStringFormatSpec {
                                                             range: 92..100,
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             elements: [
                                                                 Interpolation(
                                                                     InterpolatedElement {
                                                                         range: 92..97,
-                                                                        node_index: AtomicNodeIndex(..),
+                                                                        node_index: NodeIndex(None),
                                                                         expression: StringLiteral(
                                                                             ExprStringLiteral {
-                                                                                node_index: AtomicNodeIndex(..),
+                                                                                node_index: NodeIndex(None),
                                                                                 range: 93..96,
                                                                                 value: StringLiteralValue {
                                                                                     inner: Single(
                                                                                         StringLiteral {
                                                                                             range: 93..96,
-                                                                                            node_index: AtomicNodeIndex(..),
+                                                                                            node_index: NodeIndex(None),
                                                                                             value: "}",
                                                                                             flags: StringLiteralFlags {
                                                                                                 quote_style: Double,
@@ -432,7 +432,7 @@ Module(
                                                                 Literal(
                                                                     InterpolatedStringLiteralElement {
                                                                         range: 97..100,
-                                                                        node_index: AtomicNodeIndex(..),
+                                                                        node_index: NodeIndex(None),
                                                                         value: ">10",
                                                                     },
                                                                 ),
@@ -456,25 +456,25 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 103..118,
                     value: TString(
                         ExprTString {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 103..118,
                             value: TStringValue {
                                 inner: Single(
                                     TString {
                                         range: 103..118,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         elements: [
                                             Interpolation(
                                                 InterpolatedElement {
                                                     range: 105..117,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     expression: NumberLiteral(
                                                         ExprNumberLiteral {
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             range: 106..107,
                                                             value: Int(
                                                                 3,
@@ -486,21 +486,21 @@ Module(
                                                     format_spec: Some(
                                                         InterpolatedStringFormatSpec {
                                                             range: 108..116,
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             elements: [
                                                                 Interpolation(
                                                                     InterpolatedElement {
                                                                         range: 108..113,
-                                                                        node_index: AtomicNodeIndex(..),
+                                                                        node_index: NodeIndex(None),
                                                                         expression: StringLiteral(
                                                                             ExprStringLiteral {
-                                                                                node_index: AtomicNodeIndex(..),
+                                                                                node_index: NodeIndex(None),
                                                                                 range: 109..112,
                                                                                 value: StringLiteralValue {
                                                                                     inner: Single(
                                                                                         StringLiteral {
                                                                                             range: 109..112,
-                                                                                            node_index: AtomicNodeIndex(..),
+                                                                                            node_index: NodeIndex(None),
                                                                                             value: "{",
                                                                                             flags: StringLiteralFlags {
                                                                                                 quote_style: Double,
@@ -520,7 +520,7 @@ Module(
                                                                 Literal(
                                                                     InterpolatedStringLiteralElement {
                                                                         range: 113..116,
-                                                                        node_index: AtomicNodeIndex(..),
+                                                                        node_index: NodeIndex(None),
                                                                         value: ">10",
                                                                     },
                                                                 ),
@@ -544,25 +544,25 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 119..133,
                     value: TString(
                         ExprTString {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 119..133,
                             value: TStringValue {
                                 inner: Single(
                                     TString {
                                         range: 119..133,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         elements: [
                                             Interpolation(
                                                 InterpolatedElement {
                                                     range: 121..132,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     expression: Name(
                                                         ExprName {
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             range: 124..127,
                                                             id: Name("foo"),
                                                             ctx: Load,
@@ -593,25 +593,25 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 134..154,
                     value: TString(
                         ExprTString {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 134..154,
                             value: TStringValue {
                                 inner: Single(
                                     TString {
                                         range: 134..154,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         elements: [
                                             Interpolation(
                                                 InterpolatedElement {
                                                     range: 136..153,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     expression: Name(
                                                         ExprName {
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             range: 139..142,
                                                             id: Name("foo"),
                                                             ctx: Load,
@@ -627,12 +627,12 @@ Module(
                                                     format_spec: Some(
                                                         InterpolatedStringFormatSpec {
                                                             range: 147..152,
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             elements: [
                                                                 Literal(
                                                                     InterpolatedStringLiteralElement {
                                                                         range: 147..152,
-                                                                        node_index: AtomicNodeIndex(..),
+                                                                        node_index: NodeIndex(None),
                                                                         value: ".3f  ",
                                                                     },
                                                                 ),
@@ -656,25 +656,25 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 155..173,
                     value: TString(
                         ExprTString {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 155..173,
                             value: TStringValue {
                                 inner: Single(
                                     TString {
                                         range: 155..173,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         elements: [
                                             Interpolation(
                                                 InterpolatedElement {
                                                     range: 157..172,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     expression: Name(
                                                         ExprName {
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             range: 160..163,
                                                             id: Name("foo"),
                                                             ctx: Load,
@@ -705,30 +705,30 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 174..190,
                     value: TString(
                         ExprTString {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 174..190,
                             value: TStringValue {
                                 inner: Single(
                                     TString {
                                         range: 174..190,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         elements: [
                                             Interpolation(
                                                 InterpolatedElement {
                                                     range: 176..189,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     expression: Tuple(
                                                         ExprTuple {
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             range: 179..183,
                                                             elts: [
                                                                 NumberLiteral(
                                                                     ExprNumberLiteral {
-                                                                        node_index: AtomicNodeIndex(..),
+                                                                        node_index: NodeIndex(None),
                                                                         range: 179..180,
                                                                         value: Int(
                                                                             1,
@@ -737,7 +737,7 @@ Module(
                                                                 ),
                                                                 NumberLiteral(
                                                                     ExprNumberLiteral {
-                                                                        node_index: AtomicNodeIndex(..),
+                                                                        node_index: NodeIndex(None),
                                                                         range: 182..183,
                                                                         value: Int(
                                                                             2,
@@ -774,39 +774,39 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 191..217,
                     value: TString(
                         ExprTString {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 191..217,
                             value: TStringValue {
                                 inner: Single(
                                     TString {
                                         range: 191..217,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         elements: [
                                             Interpolation(
                                                 InterpolatedElement {
                                                     range: 193..216,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     expression: TString(
                                                         ExprTString {
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             range: 194..210,
                                                             value: TStringValue {
                                                                 inner: Single(
                                                                     TString {
                                                                         range: 194..210,
-                                                                        node_index: AtomicNodeIndex(..),
+                                                                        node_index: NodeIndex(None),
                                                                         elements: [
                                                                             Interpolation(
                                                                                 InterpolatedElement {
                                                                                     range: 196..209,
-                                                                                    node_index: AtomicNodeIndex(..),
+                                                                                    node_index: NodeIndex(None),
                                                                                     expression: NumberLiteral(
                                                                                         ExprNumberLiteral {
-                                                                                            node_index: AtomicNodeIndex(..),
+                                                                                            node_index: NodeIndex(None),
                                                                                             range: 197..203,
                                                                                             value: Float(
                                                                                                 3.1415,
@@ -823,12 +823,12 @@ Module(
                                                                                     format_spec: Some(
                                                                                         InterpolatedStringFormatSpec {
                                                                                             range: 205..208,
-                                                                                            node_index: AtomicNodeIndex(..),
+                                                                                            node_index: NodeIndex(None),
                                                                                             elements: [
                                                                                                 Literal(
                                                                                                     InterpolatedStringLiteralElement {
                                                                                                         range: 205..208,
-                                                                                                        node_index: AtomicNodeIndex(..),
+                                                                                                        node_index: NodeIndex(None),
                                                                                                         value: ".1f",
                                                                                                     },
                                                                                                 ),
@@ -853,12 +853,12 @@ Module(
                                                     format_spec: Some(
                                                         InterpolatedStringFormatSpec {
                                                             range: 211..215,
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             elements: [
                                                                 Literal(
                                                                     InterpolatedStringLiteralElement {
                                                                         range: 211..215,
-                                                                        node_index: AtomicNodeIndex(..),
+                                                                        node_index: NodeIndex(None),
                                                                         value: "*^20",
                                                                     },
                                                                 ),
@@ -882,30 +882,30 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 219..255,
                     value: Dict(
                         ExprDict {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 219..255,
                             items: [
                                 DictItem {
                                     key: Some(
                                         TString(
                                             ExprTString {
-                                                node_index: AtomicNodeIndex(..),
+                                                node_index: NodeIndex(None),
                                                 range: 220..250,
                                                 value: TStringValue {
                                                     inner: Concatenated(
                                                         [
                                                             TString {
                                                                 range: 220..227,
-                                                                node_index: AtomicNodeIndex(..),
+                                                                node_index: NodeIndex(None),
                                                                 elements: [
                                                                     Literal(
                                                                         InterpolatedStringLiteralElement {
                                                                             range: 222..226,
-                                                                            node_index: AtomicNodeIndex(..),
+                                                                            node_index: NodeIndex(None),
                                                                             value: "foo ",
                                                                         },
                                                                     ),
@@ -918,26 +918,26 @@ Module(
                                                             },
                                                             TString {
                                                                 range: 228..243,
-                                                                node_index: AtomicNodeIndex(..),
+                                                                node_index: NodeIndex(None),
                                                                 elements: [
                                                                     Literal(
                                                                         InterpolatedStringLiteralElement {
                                                                             range: 230..234,
-                                                                            node_index: AtomicNodeIndex(..),
+                                                                            node_index: NodeIndex(None),
                                                                             value: "bar ",
                                                                         },
                                                                     ),
                                                                     Interpolation(
                                                                         InterpolatedElement {
                                                                             range: 234..241,
-                                                                            node_index: AtomicNodeIndex(..),
+                                                                            node_index: NodeIndex(None),
                                                                             expression: BinOp(
                                                                                 ExprBinOp {
-                                                                                    node_index: AtomicNodeIndex(..),
+                                                                                    node_index: NodeIndex(None),
                                                                                     range: 235..240,
                                                                                     left: Name(
                                                                                         ExprName {
-                                                                                            node_index: AtomicNodeIndex(..),
+                                                                                            node_index: NodeIndex(None),
                                                                                             range: 235..236,
                                                                                             id: Name("x"),
                                                                                             ctx: Load,
@@ -946,7 +946,7 @@ Module(
                                                                                     op: Add,
                                                                                     right: Name(
                                                                                         ExprName {
-                                                                                            node_index: AtomicNodeIndex(..),
+                                                                                            node_index: NodeIndex(None),
                                                                                             range: 239..240,
                                                                                             id: Name("y"),
                                                                                             ctx: Load,
@@ -962,7 +962,7 @@ Module(
                                                                     Literal(
                                                                         InterpolatedStringLiteralElement {
                                                                             range: 241..242,
-                                                                            node_index: AtomicNodeIndex(..),
+                                                                            node_index: NodeIndex(None),
                                                                             value: " ",
                                                                         },
                                                                     ),
@@ -975,12 +975,12 @@ Module(
                                                             },
                                                             TString {
                                                                 range: 244..250,
-                                                                node_index: AtomicNodeIndex(..),
+                                                                node_index: NodeIndex(None),
                                                                 elements: [
                                                                     Literal(
                                                                         InterpolatedStringLiteralElement {
                                                                             range: 246..249,
-                                                                            node_index: AtomicNodeIndex(..),
+                                                                            node_index: NodeIndex(None),
                                                                             value: "baz",
                                                                         },
                                                                     ),
@@ -999,7 +999,7 @@ Module(
                                     ),
                                     value: NumberLiteral(
                                         ExprNumberLiteral {
-                                            node_index: AtomicNodeIndex(..),
+                                            node_index: NodeIndex(None),
                                             range: 252..254,
                                             value: Int(
                                                 10,
@@ -1014,11 +1014,11 @@ Module(
             ),
             Match(
                 StmtMatch {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 256..347,
                     subject: Name(
                         ExprName {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 262..265,
                             id: Name("foo"),
                             ctx: Load,
@@ -1027,20 +1027,20 @@ Module(
                     cases: [
                         MatchCase {
                             range: 271..295,
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             pattern: MatchValue(
                                 PatternMatchValue {
                                     range: 276..281,
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     value: StringLiteral(
                                         ExprStringLiteral {
-                                            node_index: AtomicNodeIndex(..),
+                                            node_index: NodeIndex(None),
                                             range: 276..281,
                                             value: StringLiteralValue {
                                                 inner: Single(
                                                     StringLiteral {
                                                         range: 276..281,
-                                                        node_index: AtomicNodeIndex(..),
+                                                        node_index: NodeIndex(None),
                                                         value: "one",
                                                         flags: StringLiteralFlags {
                                                             quote_style: Double,
@@ -1058,7 +1058,7 @@ Module(
                             body: [
                                 Pass(
                                     StmtPass {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 291..295,
                                     },
                                 ),
@@ -1066,14 +1066,14 @@ Module(
                         },
                         MatchCase {
                             range: 300..347,
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             pattern: MatchValue(
                                 PatternMatchValue {
                                     range: 305..333,
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     value: StringLiteral(
                                         ExprStringLiteral {
-                                            node_index: AtomicNodeIndex(..),
+                                            node_index: NodeIndex(None),
                                             range: 305..333,
                                             value: StringLiteralValue {
                                                 inner: Concatenated(
@@ -1081,7 +1081,7 @@ Module(
                                                         strings: [
                                                             StringLiteral {
                                                                 range: 305..318,
-                                                                node_index: AtomicNodeIndex(..),
+                                                                node_index: NodeIndex(None),
                                                                 value: "implicitly ",
                                                                 flags: StringLiteralFlags {
                                                                     quote_style: Double,
@@ -1091,7 +1091,7 @@ Module(
                                                             },
                                                             StringLiteral {
                                                                 range: 319..333,
-                                                                node_index: AtomicNodeIndex(..),
+                                                                node_index: NodeIndex(None),
                                                                 value: "concatenated",
                                                                 flags: StringLiteralFlags {
                                                                     quote_style: Double,
@@ -1112,7 +1112,7 @@ Module(
                             body: [
                                 Pass(
                                     StmtPass {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 343..347,
                                     },
                                 ),
@@ -1123,32 +1123,32 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 349..366,
                     value: TString(
                         ExprTString {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 349..366,
                             value: TStringValue {
                                 inner: Single(
                                     TString {
                                         range: 349..366,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         elements: [
                                             Literal(
                                                 InterpolatedStringLiteralElement {
                                                     range: 351..352,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     value: "\\",
                                                 },
                                             ),
                                             Interpolation(
                                                 InterpolatedElement {
                                                     range: 352..357,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     expression: Name(
                                                         ExprName {
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             range: 353..356,
                                                             id: Name("foo"),
                                                             ctx: Load,
@@ -1162,17 +1162,17 @@ Module(
                                             Literal(
                                                 InterpolatedStringLiteralElement {
                                                     range: 357..358,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     value: "\\",
                                                 },
                                             ),
                                             Interpolation(
                                                 InterpolatedElement {
                                                     range: 358..365,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     expression: Name(
                                                         ExprName {
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             range: 359..362,
                                                             id: Name("bar"),
                                                             ctx: Load,
@@ -1183,12 +1183,12 @@ Module(
                                                     format_spec: Some(
                                                         InterpolatedStringFormatSpec {
                                                             range: 363..364,
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             elements: [
                                                                 Literal(
                                                                     InterpolatedStringLiteralElement {
                                                                         range: 363..364,
-                                                                        node_index: AtomicNodeIndex(..),
+                                                                        node_index: NodeIndex(None),
                                                                         value: "\\",
                                                                     },
                                                                 ),
@@ -1212,22 +1212,22 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 367..381,
                     value: TString(
                         ExprTString {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 367..381,
                             value: TStringValue {
                                 inner: Single(
                                     TString {
                                         range: 367..381,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         elements: [
                                             Literal(
                                                 InterpolatedStringLiteralElement {
                                                     range: 369..380,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     value: "\\{foo\\}",
                                                 },
                                             ),
@@ -1246,25 +1246,25 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 382..422,
                     value: TString(
                         ExprTString {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 382..422,
                             value: TStringValue {
                                 inner: Single(
                                     TString {
                                         range: 382..422,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         elements: [
                                             Interpolation(
                                                 InterpolatedElement {
                                                     range: 386..419,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     expression: Name(
                                                         ExprName {
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             range: 392..395,
                                                             id: Name("foo"),
                                                             ctx: Load,
@@ -1275,12 +1275,12 @@ Module(
                                                     format_spec: Some(
                                                         InterpolatedStringFormatSpec {
                                                             range: 396..418,
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             elements: [
                                                                 Literal(
                                                                     InterpolatedStringLiteralElement {
                                                                         range: 396..418,
-                                                                        node_index: AtomicNodeIndex(..),
+                                                                        node_index: NodeIndex(None),
                                                                         value: "x\n        y\n        z\n",
                                                                     },
                                                                 ),
@@ -1304,25 +1304,25 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 423..441,
                     value: TString(
                         ExprTString {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 423..441,
                             value: TStringValue {
                                 inner: Single(
                                     TString {
                                         range: 423..441,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         elements: [
                                             Interpolation(
                                                 InterpolatedElement {
                                                     range: 425..440,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     expression: Name(
                                                         ExprName {
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             range: 430..433,
                                                             id: Name("foo"),
                                                             ctx: Load,
@@ -1353,32 +1353,32 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 443..488,
                     value: TString(
                         ExprTString {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 443..488,
                             value: TStringValue {
                                 inner: Single(
                                     TString {
                                         range: 443..488,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         elements: [
                                             Literal(
                                                 InterpolatedStringLiteralElement {
                                                     range: 445..452,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     value: "normal ",
                                                 },
                                             ),
                                             Interpolation(
                                                 InterpolatedElement {
                                                     range: 452..457,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     expression: Name(
                                                         ExprName {
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             range: 453..456,
                                                             id: Name("foo"),
                                                             ctx: Load,
@@ -1392,17 +1392,17 @@ Module(
                                             Literal(
                                                 InterpolatedStringLiteralElement {
                                                     range: 457..470,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     value: " {another} ",
                                                 },
                                             ),
                                             Interpolation(
                                                 InterpolatedElement {
                                                     range: 470..475,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     expression: Name(
                                                         ExprName {
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             range: 471..474,
                                                             id: Name("bar"),
                                                             ctx: Load,
@@ -1416,17 +1416,17 @@ Module(
                                             Literal(
                                                 InterpolatedStringLiteralElement {
                                                     range: 475..478,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     value: " {",
                                                 },
                                             ),
                                             Interpolation(
                                                 InterpolatedElement {
                                                     range: 478..485,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     expression: Name(
                                                         ExprName {
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             range: 479..484,
                                                             id: Name("three"),
                                                             ctx: Load,
@@ -1440,7 +1440,7 @@ Module(
                                             Literal(
                                                 InterpolatedStringLiteralElement {
                                                     range: 485..487,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     value: "}",
                                                 },
                                             ),
@@ -1459,32 +1459,32 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 489..531,
                     value: TString(
                         ExprTString {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 489..531,
                             value: TStringValue {
                                 inner: Single(
                                     TString {
                                         range: 489..531,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         elements: [
                                             Literal(
                                                 InterpolatedStringLiteralElement {
                                                     range: 491..498,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     value: "normal ",
                                                 },
                                             ),
                                             Interpolation(
                                                 InterpolatedElement {
                                                     range: 498..505,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     expression: Name(
                                                         ExprName {
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             range: 499..502,
                                                             id: Name("foo"),
                                                             ctx: Load,
@@ -1498,17 +1498,17 @@ Module(
                                             Literal(
                                                 InterpolatedStringLiteralElement {
                                                     range: 505..506,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     value: " ",
                                                 },
                                             ),
                                             Interpolation(
                                                 InterpolatedElement {
                                                     range: 506..513,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     expression: Name(
                                                         ExprName {
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             range: 507..510,
                                                             id: Name("bar"),
                                                             ctx: Load,
@@ -1522,17 +1522,17 @@ Module(
                                             Literal(
                                                 InterpolatedStringLiteralElement {
                                                     range: 513..514,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     value: " ",
                                                 },
                                             ),
                                             Interpolation(
                                                 InterpolatedElement {
                                                     range: 514..521,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     expression: Name(
                                                         ExprName {
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             range: 515..518,
                                                             id: Name("baz"),
                                                             ctx: Load,
@@ -1546,17 +1546,17 @@ Module(
                                             Literal(
                                                 InterpolatedStringLiteralElement {
                                                     range: 521..522,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     value: " ",
                                                 },
                                             ),
                                             Interpolation(
                                                 InterpolatedElement {
                                                     range: 522..530,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     expression: Name(
                                                         ExprName {
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             range: 523..529,
                                                             id: Name("foobar"),
                                                             ctx: Load,
@@ -1582,32 +1582,32 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 532..551,
                     value: TString(
                         ExprTString {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 532..551,
                             value: TStringValue {
                                 inner: Single(
                                     TString {
                                         range: 532..551,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         elements: [
                                             Literal(
                                                 InterpolatedStringLiteralElement {
                                                     range: 534..541,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     value: "normal ",
                                                 },
                                             ),
                                             Interpolation(
                                                 InterpolatedElement {
                                                     range: 541..550,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     expression: Name(
                                                         ExprName {
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             range: 542..543,
                                                             id: Name("x"),
                                                             ctx: Load,
@@ -1618,12 +1618,12 @@ Module(
                                                     format_spec: Some(
                                                         InterpolatedStringFormatSpec {
                                                             range: 544..549,
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             elements: [
                                                                 Literal(
                                                                     InterpolatedStringLiteralElement {
                                                                         range: 544..549,
-                                                                        node_index: AtomicNodeIndex(..),
+                                                                        node_index: NodeIndex(None),
                                                                         value: "y + 2",
                                                                     },
                                                                 ),
@@ -1647,25 +1647,25 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 552..570,
                     value: TString(
                         ExprTString {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 552..570,
                             value: TStringValue {
                                 inner: Single(
                                     TString {
                                         range: 552..570,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         elements: [
                                             Interpolation(
                                                 InterpolatedElement {
                                                     range: 554..569,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     expression: Name(
                                                         ExprName {
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             range: 555..556,
                                                             id: Name("x"),
                                                             ctx: Load,
@@ -1676,28 +1676,28 @@ Module(
                                                     format_spec: Some(
                                                         InterpolatedStringFormatSpec {
                                                             range: 557..568,
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             elements: [
                                                                 Interpolation(
                                                                     InterpolatedElement {
                                                                         range: 557..568,
-                                                                        node_index: AtomicNodeIndex(..),
+                                                                        node_index: NodeIndex(None),
                                                                         expression: Call(
                                                                             ExprCall {
-                                                                                node_index: AtomicNodeIndex(..),
+                                                                                node_index: NodeIndex(None),
                                                                                 range: 558..567,
                                                                                 func: Attribute(
                                                                                     ExprAttribute {
-                                                                                        node_index: AtomicNodeIndex(..),
+                                                                                        node_index: NodeIndex(None),
                                                                                         range: 558..565,
                                                                                         value: Set(
                                                                                             ExprSet {
-                                                                                                node_index: AtomicNodeIndex(..),
+                                                                                                node_index: NodeIndex(None),
                                                                                                 range: 558..561,
                                                                                                 elts: [
                                                                                                     NumberLiteral(
                                                                                                         ExprNumberLiteral {
-                                                                                                            node_index: AtomicNodeIndex(..),
+                                                                                                            node_index: NodeIndex(None),
                                                                                                             range: 559..560,
                                                                                                             value: Int(
                                                                                                                 1,
@@ -1710,14 +1710,14 @@ Module(
                                                                                         attr: Identifier {
                                                                                             id: Name("pop"),
                                                                                             range: 562..565,
-                                                                                            node_index: AtomicNodeIndex(..),
+                                                                                            node_index: NodeIndex(None),
                                                                                         },
                                                                                         ctx: Load,
                                                                                     },
                                                                                 ),
                                                                                 arguments: Arguments {
                                                                                     range: 565..567,
-                                                                                    node_index: AtomicNodeIndex(..),
+                                                                                    node_index: NodeIndex(None),
                                                                                     args: [],
                                                                                     keywords: [],
                                                                                 },
@@ -1748,42 +1748,42 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 571..590,
                     value: TString(
                         ExprTString {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 571..590,
                             value: TStringValue {
                                 inner: Single(
                                     TString {
                                         range: 571..590,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         elements: [
                                             Interpolation(
                                                 InterpolatedElement {
                                                     range: 573..589,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     expression: Lambda(
                                                         ExprLambda {
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             range: 575..587,
                                                             parameters: Some(
                                                                 Parameters {
                                                                     range: 582..583,
-                                                                    node_index: AtomicNodeIndex(..),
+                                                                    node_index: NodeIndex(None),
                                                                     posonlyargs: [],
                                                                     args: [
                                                                         ParameterWithDefault {
                                                                             range: 582..583,
-                                                                            node_index: AtomicNodeIndex(..),
+                                                                            node_index: NodeIndex(None),
                                                                             parameter: Parameter {
                                                                                 range: 582..583,
-                                                                                node_index: AtomicNodeIndex(..),
+                                                                                node_index: NodeIndex(None),
                                                                                 name: Identifier {
                                                                                     id: Name("x"),
                                                                                     range: 582..583,
-                                                                                    node_index: AtomicNodeIndex(..),
+                                                                                    node_index: NodeIndex(None),
                                                                                 },
                                                                                 annotation: None,
                                                                             },
@@ -1797,12 +1797,12 @@ Module(
                                                             ),
                                                             body: Set(
                                                                 ExprSet {
-                                                                    node_index: AtomicNodeIndex(..),
+                                                                    node_index: NodeIndex(None),
                                                                     range: 584..587,
                                                                     elts: [
                                                                         Name(
                                                                             ExprName {
-                                                                                node_index: AtomicNodeIndex(..),
+                                                                                node_index: NodeIndex(None),
                                                                                 range: 585..586,
                                                                                 id: Name("x"),
                                                                                 ctx: Load,
@@ -1833,25 +1833,25 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 591..599,
                     value: TString(
                         ExprTString {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 591..599,
                             value: TStringValue {
                                 inner: Single(
                                     TString {
                                         range: 591..599,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         elements: [
                                             Interpolation(
                                                 InterpolatedElement {
                                                     range: 593..598,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     expression: Name(
                                                         ExprName {
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             range: 594..595,
                                                             id: Name("x"),
                                                             ctx: Load,
@@ -1882,25 +1882,25 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 600..613,
                     value: TString(
                         ExprTString {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 600..613,
                             value: TStringValue {
                                 inner: Single(
                                     TString {
                                         range: 600..613,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         elements: [
                                             Interpolation(
                                                 InterpolatedElement {
                                                     range: 602..612,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     expression: Name(
                                                         ExprName {
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             range: 607..608,
                                                             id: Name("x"),
                                                             ctx: Load,
@@ -1931,25 +1931,25 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 614..623,
                     value: TString(
                         ExprTString {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 614..623,
                             value: TStringValue {
                                 inner: Single(
                                     TString {
                                         range: 614..623,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         elements: [
                                             Interpolation(
                                                 InterpolatedElement {
                                                     range: 616..622,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     expression: Name(
                                                         ExprName {
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             range: 617..618,
                                                             id: Name("x"),
                                                             ctx: Load,
@@ -1980,25 +1980,25 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 624..638,
                     value: TString(
                         ExprTString {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 624..638,
                             value: TStringValue {
                                 inner: Single(
                                     TString {
                                         range: 624..638,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         elements: [
                                             Interpolation(
                                                 InterpolatedElement {
                                                     range: 626..637,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     expression: Name(
                                                         ExprName {
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             range: 627..628,
                                                             id: Name("x"),
                                                             ctx: Load,
@@ -2009,12 +2009,12 @@ Module(
                                                     format_spec: Some(
                                                         InterpolatedStringFormatSpec {
                                                             range: 629..636,
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             elements: [
                                                                 Literal(
                                                                     InterpolatedStringLiteralElement {
                                                                         range: 629..636,
-                                                                        node_index: AtomicNodeIndex(..),
+                                                                        node_index: NodeIndex(None),
                                                                         value: ".3f!r =",
                                                                     },
                                                                 ),
@@ -2038,25 +2038,25 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 639..655,
                     value: TString(
                         ExprTString {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 639..655,
                             value: TStringValue {
                                 inner: Single(
                                     TString {
                                         range: 639..655,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         elements: [
                                             Interpolation(
                                                 InterpolatedElement {
                                                     range: 641..654,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     expression: Name(
                                                         ExprName {
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             range: 642..643,
                                                             id: Name("x"),
                                                             ctx: Load,
@@ -2072,12 +2072,12 @@ Module(
                                                     format_spec: Some(
                                                         InterpolatedStringFormatSpec {
                                                             range: 650..653,
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             elements: [
                                                                 Literal(
                                                                     InterpolatedStringLiteralElement {
                                                                         range: 650..653,
-                                                                        node_index: AtomicNodeIndex(..),
+                                                                        node_index: NodeIndex(None),
                                                                         value: ".3f",
                                                                     },
                                                                 ),
@@ -2101,25 +2101,25 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 656..669,
                     value: TString(
                         ExprTString {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 656..669,
                             value: TStringValue {
                                 inner: Single(
                                     TString {
                                         range: 656..669,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         elements: [
                                             Interpolation(
                                                 InterpolatedElement {
                                                     range: 658..668,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     expression: Name(
                                                         ExprName {
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             range: 659..660,
                                                             id: Name("x"),
                                                             ctx: Load,
@@ -2130,12 +2130,12 @@ Module(
                                                     format_spec: Some(
                                                         InterpolatedStringFormatSpec {
                                                             range: 661..667,
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             elements: [
                                                                 Literal(
                                                                     InterpolatedStringLiteralElement {
                                                                         range: 661..667,
-                                                                        node_index: AtomicNodeIndex(..),
+                                                                        node_index: NodeIndex(None),
                                                                         value: ".3f=!r",
                                                                     },
                                                                 ),
@@ -2159,23 +2159,23 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 670..685,
                     value: TString(
                         ExprTString {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 670..685,
                             value: TStringValue {
                                 inner: Concatenated(
                                     [
                                         TString {
                                             range: 670..678,
-                                            node_index: AtomicNodeIndex(..),
+                                            node_index: NodeIndex(None),
                                             elements: [
                                                 Literal(
                                                     InterpolatedStringLiteralElement {
                                                         range: 672..677,
-                                                        node_index: AtomicNodeIndex(..),
+                                                        node_index: NodeIndex(None),
                                                         value: "hello",
                                                     },
                                                 ),
@@ -2188,15 +2188,15 @@ Module(
                                         },
                                         TString {
                                             range: 679..685,
-                                            node_index: AtomicNodeIndex(..),
+                                            node_index: NodeIndex(None),
                                             elements: [
                                                 Interpolation(
                                                     InterpolatedElement {
                                                         range: 681..684,
-                                                        node_index: AtomicNodeIndex(..),
+                                                        node_index: NodeIndex(None),
                                                         expression: Name(
                                                             ExprName {
-                                                                node_index: AtomicNodeIndex(..),
+                                                                node_index: NodeIndex(None),
                                                                 range: 682..683,
                                                                 id: Name("x"),
                                                                 ctx: Load,
@@ -2223,26 +2223,26 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 686..699,
                     value: TString(
                         ExprTString {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 686..699,
                             value: TStringValue {
                                 inner: Concatenated(
                                     [
                                         TString {
                                             range: 686..692,
-                                            node_index: AtomicNodeIndex(..),
+                                            node_index: NodeIndex(None),
                                             elements: [
                                                 Interpolation(
                                                     InterpolatedElement {
                                                         range: 688..691,
-                                                        node_index: AtomicNodeIndex(..),
+                                                        node_index: NodeIndex(None),
                                                         expression: Name(
                                                             ExprName {
-                                                                node_index: AtomicNodeIndex(..),
+                                                                node_index: NodeIndex(None),
                                                                 range: 689..690,
                                                                 id: Name("x"),
                                                                 ctx: Load,
@@ -2262,15 +2262,15 @@ Module(
                                         },
                                         TString {
                                             range: 693..699,
-                                            node_index: AtomicNodeIndex(..),
+                                            node_index: NodeIndex(None),
                                             elements: [
                                                 Interpolation(
                                                     InterpolatedElement {
                                                         range: 695..698,
-                                                        node_index: AtomicNodeIndex(..),
+                                                        node_index: NodeIndex(None),
                                                         expression: Name(
                                                             ExprName {
-                                                                node_index: AtomicNodeIndex(..),
+                                                                node_index: NodeIndex(None),
                                                                 range: 696..697,
                                                                 id: Name("y"),
                                                                 ctx: Load,
@@ -2297,26 +2297,26 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 700..715,
                     value: TString(
                         ExprTString {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 700..715,
                             value: TStringValue {
                                 inner: Concatenated(
                                     [
                                         TString {
                                             range: 700..706,
-                                            node_index: AtomicNodeIndex(..),
+                                            node_index: NodeIndex(None),
                                             elements: [
                                                 Interpolation(
                                                     InterpolatedElement {
                                                         range: 702..705,
-                                                        node_index: AtomicNodeIndex(..),
+                                                        node_index: NodeIndex(None),
                                                         expression: Name(
                                                             ExprName {
-                                                                node_index: AtomicNodeIndex(..),
+                                                                node_index: NodeIndex(None),
                                                                 range: 703..704,
                                                                 id: Name("x"),
                                                                 ctx: Load,
@@ -2336,12 +2336,12 @@ Module(
                                         },
                                         TString {
                                             range: 707..715,
-                                            node_index: AtomicNodeIndex(..),
+                                            node_index: NodeIndex(None),
                                             elements: [
                                                 Literal(
                                                     InterpolatedStringLiteralElement {
                                                         range: 709..714,
-                                                        node_index: AtomicNodeIndex(..),
+                                                        node_index: NodeIndex(None),
                                                         value: "world",
                                                     },
                                                 ),
@@ -2361,37 +2361,37 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 716..760,
                     value: TString(
                         ExprTString {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 716..760,
                             value: TStringValue {
                                 inner: Single(
                                     TString {
                                         range: 716..760,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         elements: [
                                             Literal(
                                                 InterpolatedStringLiteralElement {
                                                     range: 718..743,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     value: "Invalid args in command: ",
                                                 },
                                             ),
                                             Interpolation(
                                                 InterpolatedElement {
                                                     range: 743..759,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     expression: Tuple(
                                                         ExprTuple {
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             range: 744..758,
                                                             elts: [
                                                                 Name(
                                                                     ExprName {
-                                                                        node_index: AtomicNodeIndex(..),
+                                                                        node_index: NodeIndex(None),
                                                                         range: 744..751,
                                                                         id: Name("command"),
                                                                         ctx: Load,
@@ -2399,11 +2399,11 @@ Module(
                                                                 ),
                                                                 Starred(
                                                                     ExprStarred {
-                                                                        node_index: AtomicNodeIndex(..),
+                                                                        node_index: NodeIndex(None),
                                                                         range: 753..758,
                                                                         value: Name(
                                                                             ExprName {
-                                                                                node_index: AtomicNodeIndex(..),
+                                                                                node_index: NodeIndex(None),
                                                                                 range: 754..758,
                                                                                 id: Name("args"),
                                                                                 ctx: Load,
@@ -2437,23 +2437,23 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 761..781,
                     value: TString(
                         ExprTString {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 761..781,
                             value: TStringValue {
                                 inner: Concatenated(
                                     [
                                         TString {
                                             range: 761..767,
-                                            node_index: AtomicNodeIndex(..),
+                                            node_index: NodeIndex(None),
                                             elements: [
                                                 Literal(
                                                     InterpolatedStringLiteralElement {
                                                         range: 763..766,
-                                                        node_index: AtomicNodeIndex(..),
+                                                        node_index: NodeIndex(None),
                                                         value: "foo",
                                                     },
                                                 ),
@@ -2466,15 +2466,15 @@ Module(
                                         },
                                         TString {
                                             range: 768..774,
-                                            node_index: AtomicNodeIndex(..),
+                                            node_index: NodeIndex(None),
                                             elements: [
                                                 Interpolation(
                                                     InterpolatedElement {
                                                         range: 770..773,
-                                                        node_index: AtomicNodeIndex(..),
+                                                        node_index: NodeIndex(None),
                                                         expression: Name(
                                                             ExprName {
-                                                                node_index: AtomicNodeIndex(..),
+                                                                node_index: NodeIndex(None),
                                                                 range: 771..772,
                                                                 id: Name("x"),
                                                                 ctx: Load,
@@ -2494,12 +2494,12 @@ Module(
                                         },
                                         TString {
                                             range: 775..781,
-                                            node_index: AtomicNodeIndex(..),
+                                            node_index: NodeIndex(None),
                                             elements: [
                                                 Literal(
                                                     InterpolatedStringLiteralElement {
                                                         range: 777..780,
-                                                        node_index: AtomicNodeIndex(..),
+                                                        node_index: NodeIndex(None),
                                                         value: "bar",
                                                     },
                                                 ),
@@ -2519,23 +2519,23 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 782..832,
                     value: TString(
                         ExprTString {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 788..830,
                             value: TStringValue {
                                 inner: Concatenated(
                                     [
                                         TString {
                                             range: 788..792,
-                                            node_index: AtomicNodeIndex(..),
+                                            node_index: NodeIndex(None),
                                             elements: [
                                                 Literal(
                                                     InterpolatedStringLiteralElement {
                                                         range: 790..791,
-                                                        node_index: AtomicNodeIndex(..),
+                                                        node_index: NodeIndex(None),
                                                         value: "a",
                                                     },
                                                 ),
@@ -2548,12 +2548,12 @@ Module(
                                         },
                                         TString {
                                             range: 797..801,
-                                            node_index: AtomicNodeIndex(..),
+                                            node_index: NodeIndex(None),
                                             elements: [
                                                 Literal(
                                                     InterpolatedStringLiteralElement {
                                                         range: 799..800,
-                                                        node_index: AtomicNodeIndex(..),
+                                                        node_index: NodeIndex(None),
                                                         value: "b",
                                                     },
                                                 ),
@@ -2566,12 +2566,12 @@ Module(
                                         },
                                         TString {
                                             range: 806..810,
-                                            node_index: AtomicNodeIndex(..),
+                                            node_index: NodeIndex(None),
                                             elements: [
                                                 Literal(
                                                     InterpolatedStringLiteralElement {
                                                         range: 808..809,
-                                                        node_index: AtomicNodeIndex(..),
+                                                        node_index: NodeIndex(None),
                                                         value: "c",
                                                     },
                                                 ),
@@ -2584,12 +2584,12 @@ Module(
                                         },
                                         TString {
                                             range: 815..820,
-                                            node_index: AtomicNodeIndex(..),
+                                            node_index: NodeIndex(None),
                                             elements: [
                                                 Literal(
                                                     InterpolatedStringLiteralElement {
                                                         range: 818..819,
-                                                        node_index: AtomicNodeIndex(..),
+                                                        node_index: NodeIndex(None),
                                                         value: "d",
                                                     },
                                                 ),
@@ -2604,12 +2604,12 @@ Module(
                                         },
                                         TString {
                                             range: 825..830,
-                                            node_index: AtomicNodeIndex(..),
+                                            node_index: NodeIndex(None),
                                             elements: [
                                                 Literal(
                                                     InterpolatedStringLiteralElement {
                                                         range: 828..829,
-                                                        node_index: AtomicNodeIndex(..),
+                                                        node_index: NodeIndex(None),
                                                         value: "e",
                                                     },
                                                 ),
@@ -2631,54 +2631,54 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 844..863,
                     value: TString(
                         ExprTString {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 844..863,
                             value: TStringValue {
                                 inner: Single(
                                     TString {
                                         range: 844..863,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         elements: [
                                             Interpolation(
                                                 InterpolatedElement {
                                                     range: 846..862,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     expression: FString(
                                                         ExprFString {
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             range: 847..861,
                                                             value: FStringValue {
                                                                 inner: Single(
                                                                     FString(
                                                                         FString {
                                                                             range: 847..861,
-                                                                            node_index: AtomicNodeIndex(..),
+                                                                            node_index: NodeIndex(None),
                                                                             elements: [
                                                                                 Interpolation(
                                                                                     InterpolatedElement {
                                                                                         range: 849..860,
-                                                                                        node_index: AtomicNodeIndex(..),
+                                                                                        node_index: NodeIndex(None),
                                                                                         expression: TString(
                                                                                             ExprTString {
-                                                                                                node_index: AtomicNodeIndex(..),
+                                                                                                node_index: NodeIndex(None),
                                                                                                 range: 850..859,
                                                                                                 value: TStringValue {
                                                                                                     inner: Single(
                                                                                                         TString {
                                                                                                             range: 850..859,
-                                                                                                            node_index: AtomicNodeIndex(..),
+                                                                                                            node_index: NodeIndex(None),
                                                                                                             elements: [
                                                                                                                 Interpolation(
                                                                                                                     InterpolatedElement {
                                                                                                                         range: 852..858,
-                                                                                                                        node_index: AtomicNodeIndex(..),
+                                                                                                                        node_index: NodeIndex(None),
                                                                                                                         expression: Name(
                                                                                                                             ExprName {
-                                                                                                                                node_index: AtomicNodeIndex(..),
+                                                                                                                                node_index: NodeIndex(None),
                                                                                                                                 range: 853..857,
                                                                                                                                 id: Name("this"),
                                                                                                                                 ctx: Load,

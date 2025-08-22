@@ -215,7 +215,7 @@ pub fn parse_parenthesized_expression_range(
 ///     value: "'''\n int | str'''".to_string().into_boxed_str(),
 ///     flags: StringLiteralFlags::empty(),
 ///     range: TextRange::new(TextSize::new(0), TextSize::new(16)),
-///     node_index: AtomicNodeIndex::dummy()
+///     node_index: AtomicNodeIndex::NONE
 /// };
 /// let parsed = parse_string_annotation("'''\n int | str'''", &string);
 /// assert!(!parsed.is_ok());

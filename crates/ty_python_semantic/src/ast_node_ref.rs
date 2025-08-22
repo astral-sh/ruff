@@ -37,11 +37,14 @@ pub struct AstNodeRef<T> {
 
     /// Debug information.
     #[cfg(debug_assertions)]
-    module_addr: usize,
-    #[cfg(debug_assertions)]
     kind: ruff_python_ast::NodeKind,
     #[cfg(debug_assertions)]
     range: ruff_text_size::TextRange,
+    // Note that because the module address is not stored in release builds, `AstNodeRef`
+    // cannot implement `Eq`, as indices are only unique within a given instance of the
+    // AST.
+    #[cfg(debug_assertions)]
+    module_addr: usize,
 
     _node: PhantomData<T>,
 }
@@ -90,6 +93,20 @@ where
     }
 }
 
+#[expect(unsafe_code)]
+unsafe impl<T> salsa::Update for AstNodeRef<T> {
+    unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
+        let old_ref = unsafe { &mut (*old_pointer) };
+
+        // The equality of an `AstNodeRef` depends on both the module address and the node index,
+        // but the former is not stored in release builds to save memory. As such, AST nodes
+        // are always considered change when the AST is reparsed, which is acceptable because
+        // any change to the AST is likely to invalidate most node indices anyways.
+        *old_ref = new_value;
+        true
+    }
+}
+
 impl<T> get_size2::GetSize for AstNodeRef<T> {}
 
 #[allow(clippy::missing_fields_in_debug)]
@@ -112,19 +129,5 @@ where
             // Unfortunately we have no access to the AST here.
             f.debug_tuple("AstNodeRef").finish_non_exhaustive()
         }
-    }
-}
-
-#[expect(unsafe_code)]
-unsafe impl<T> salsa::Update for AstNodeRef<T> {
-    unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
-        let old_ref = unsafe { &mut (*old_pointer) };
-
-        // We could store the module pointer and check equality of both the module pointer
-        // and node index, but any change to the AST is likely to invalidate most node indices
-        // anyways, so we save on memory by not storing the module pointer and assuming all
-        // nodes have changed.
-        *old_ref = new_value;
-        true
     }
 }
