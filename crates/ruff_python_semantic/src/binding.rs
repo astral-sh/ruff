@@ -673,7 +673,22 @@ pub enum BindingKind<'a> {
     /// scope, if any.
     UnboundException(Option<BindingId>),
 
-    /// TODO
+    /// A binding to `__class__` in the implicit closure created around every method in a class
+    /// body, if any method refers to either `__class__` or `super`.
+    ///
+    /// ```python
+    /// class C:
+    ///     __class__  # NameError: name '__class__' is not defined
+    ///
+    ///     def f():
+    ///         print(__class__)  # allowed
+    ///
+    ///     def g():
+    ///         nonlocal __class__  # also allowed because the scope is *not* the function scope
+    /// ```
+    ///
+    /// See <https://docs.python.org/3/reference/datamodel.html#creating-the-class-object> for more
+    /// details.
     ClassCell,
 }
 
