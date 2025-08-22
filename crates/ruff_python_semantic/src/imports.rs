@@ -1,6 +1,8 @@
 use ruff_macros::CacheKey;
 use ruff_python_ast::helpers::collect_import_from_member;
 use ruff_python_ast::name::QualifiedName;
+
+#[cfg(feature = "schemars")]
 use std::borrow::Cow;
 
 use crate::{AnyImport, Imported};

@@ -1,5 +1,6 @@
 use regex::Regex;
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
+#[cfg(feature = "schemars")]
 use schemars::JsonSchema;
 use serde::de::{self};
 use serde::{Deserialize, Deserializer, Serialize};
@@ -3874,7 +3875,8 @@ pub struct AnalyzeOptions {
 
 /// Like [`LintCommonOptions`], but with any `#[serde(flatten)]` fields inlined. This leads to far,
 /// far better error messages when deserializing.
-#[derive(Debug, Clone, Default, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Default, Deserialize)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct LintOptionsWire {
     // common: LintCommonOptions
