@@ -861,7 +861,6 @@ def f(x: B, /, **kwargs: int) -> B: ...
 from overloaded import A, B, f
 from typing_extensions import reveal_type
 
-
 def _(ab: A | B, a=None):
     reveal_type(
         # error: [no-matching-overload]
@@ -901,7 +900,6 @@ def _(ab: A | B, a=None):
         )
     )
 ```
-
 
 ## Filtering based on `Any` / `Unknown`
 

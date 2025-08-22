@@ -34,90 +34,89 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/call/overloads.md
  1 | from overloaded import A, B, f
  2 | from typing_extensions import reveal_type
  3 | 
- 4 | 
- 5 | def _(ab: A | B, a=None):
- 6 |     reveal_type(
- 7 |         # error: [no-matching-overload]
- 8 |         # revealed: Unknown
- 9 |         f(
-10 |             A(),
-11 |             a1=a,
-12 |             a2=a,
-13 |             a3=a,
-14 |             a4=a,
-15 |             a5=a,
-16 |             a6=a,
-17 |             a7=a,
-18 |             a8=a,
-19 |             a9=a,
-20 |             a10=a,
-21 |             a11=a,
-22 |             a12=a,
-23 |             a13=a,
-24 |             a14=a,
-25 |             a15=a,
-26 |             a16=a,
-27 |             a17=a,
-28 |             a18=a,
-29 |             a19=a,
-30 |             a20=a,
-31 |             a21=a,
-32 |             a22=a,
-33 |             a23=a,
-34 |             a24=a,
-35 |             a25=a,
-36 |             a26=a,
-37 |             a27=a,
-38 |             a28=a,
-39 |             a29=a,
-40 |             a30=a,
-41 |         )
-42 |     )
+ 4 | def _(ab: A | B, a=None):
+ 5 |     reveal_type(
+ 6 |         # error: [no-matching-overload]
+ 7 |         # revealed: Unknown
+ 8 |         f(
+ 9 |             A(),
+10 |             a1=a,
+11 |             a2=a,
+12 |             a3=a,
+13 |             a4=a,
+14 |             a5=a,
+15 |             a6=a,
+16 |             a7=a,
+17 |             a8=a,
+18 |             a9=a,
+19 |             a10=a,
+20 |             a11=a,
+21 |             a12=a,
+22 |             a13=a,
+23 |             a14=a,
+24 |             a15=a,
+25 |             a16=a,
+26 |             a17=a,
+27 |             a18=a,
+28 |             a19=a,
+29 |             a20=a,
+30 |             a21=a,
+31 |             a22=a,
+32 |             a23=a,
+33 |             a24=a,
+34 |             a25=a,
+35 |             a26=a,
+36 |             a27=a,
+37 |             a28=a,
+38 |             a29=a,
+39 |             a30=a,
+40 |         )
+41 |     )
 ```
 
 # Diagnostics
 
 ```
 error[no-matching-overload]: No overload of function `f` matches arguments
-  --> src/mdtest_snippet.py:9:9
+  --> src/mdtest_snippet.py:8:9
    |
- 7 |           # error: [no-matching-overload]
- 8 |           # revealed: Unknown
- 9 | /         f(
-10 | |             A(),
-11 | |             a1=a,
-12 | |             a2=a,
-13 | |             a3=a,
-14 | |             a4=a,
-15 | |             a5=a,
-16 | |             a6=a,
-17 | |             a7=a,
-18 | |             a8=a,
-19 | |             a9=a,
-20 | |             a10=a,
-21 | |             a11=a,
-22 | |             a12=a,
-23 | |             a13=a,
-24 | |             a14=a,
-25 | |             a15=a,
-26 | |             a16=a,
-27 | |             a17=a,
-28 | |             a18=a,
-29 | |             a19=a,
-30 | |             a20=a,
-31 | |             a21=a,
-32 | |             a22=a,
-33 | |             a23=a,
-34 | |             a24=a,
-35 | |             a25=a,
-36 | |             a26=a,
-37 | |             a27=a,
-38 | |             a28=a,
-39 | |             a29=a,
-40 | |             a30=a,
-41 | |         )
+ 6 |           # error: [no-matching-overload]
+ 7 |           # revealed: Unknown
+ 8 | /         f(
+ 9 | |             A(),
+10 | |             a1=a,
+11 | |             a2=a,
+12 | |             a3=a,
+13 | |             a4=a,
+14 | |             a5=a,
+15 | |             a6=a,
+16 | |             a7=a,
+17 | |             a8=a,
+18 | |             a9=a,
+19 | |             a10=a,
+20 | |             a11=a,
+21 | |             a12=a,
+22 | |             a13=a,
+23 | |             a14=a,
+24 | |             a15=a,
+25 | |             a16=a,
+26 | |             a17=a,
+27 | |             a18=a,
+28 | |             a19=a,
+29 | |             a20=a,
+30 | |             a21=a,
+31 | |             a22=a,
+32 | |             a23=a,
+33 | |             a24=a,
+34 | |             a25=a,
+35 | |             a26=a,
+36 | |             a27=a,
+37 | |             a28=a,
+38 | |             a29=a,
+39 | |             a30=a,
+40 | |         )
    | |_________^
-42 |       )
+41 |       )
    |
 info: Limit of argument type expansions reached
 info: First overload defined here
@@ -140,45 +139,45 @@ info: rule `no-matching-overload` is enabled by default
 
 ```
 info[revealed-type]: Revealed type
-  --> src/mdtest_snippet.py:9:9
+  --> src/mdtest_snippet.py:8:9
    |
- 7 |           # error: [no-matching-overload]
- 8 |           # revealed: Unknown
- 9 | /         f(
-10 | |             A(),
-11 | |             a1=a,
-12 | |             a2=a,
-13 | |             a3=a,
-14 | |             a4=a,
-15 | |             a5=a,
-16 | |             a6=a,
-17 | |             a7=a,
-18 | |             a8=a,
-19 | |             a9=a,
-20 | |             a10=a,
-21 | |             a11=a,
-22 | |             a12=a,
-23 | |             a13=a,
-24 | |             a14=a,
-25 | |             a15=a,
-26 | |             a16=a,
-27 | |             a17=a,
-28 | |             a18=a,
-29 | |             a19=a,
-30 | |             a20=a,
-31 | |             a21=a,
-32 | |             a22=a,
-33 | |             a23=a,
-34 | |             a24=a,
-35 | |             a25=a,
-36 | |             a26=a,
-37 | |             a27=a,
-38 | |             a28=a,
-39 | |             a29=a,
-40 | |             a30=a,
-41 | |         )
+ 6 |           # error: [no-matching-overload]
+ 7 |           # revealed: Unknown
+ 8 | /         f(
+ 9 | |             A(),
+10 | |             a1=a,
+11 | |             a2=a,
+12 | |             a3=a,
+13 | |             a4=a,
+14 | |             a5=a,
+15 | |             a6=a,
+16 | |             a7=a,
+17 | |             a8=a,
+18 | |             a9=a,
+19 | |             a10=a,
+20 | |             a11=a,
+21 | |             a12=a,
+22 | |             a13=a,
+23 | |             a14=a,
+24 | |             a15=a,
+25 | |             a16=a,
+26 | |             a17=a,
+27 | |             a18=a,
+28 | |             a19=a,
+29 | |             a20=a,
+30 | |             a21=a,
+31 | |             a22=a,
+32 | |             a23=a,
+33 | |             a24=a,
+34 | |             a25=a,
+35 | |             a26=a,
+36 | |             a27=a,
+37 | |             a28=a,
+38 | |             a29=a,
+39 | |             a30=a,
+40 | |         )
    | |_________^ `Unknown`
-42 |       )
+41 |       )
    |
 
 ```
