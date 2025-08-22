@@ -833,6 +833,8 @@ def _(foo: Foo, ab: A | B, a=1):
 
 ### Optimization: Limit expansion size
 
+<!-- snapshot-diagnostics -->
+
 To prevent combinatorial explosion, ty limits the number of argument lists created by expanding a
 single argument.
 
