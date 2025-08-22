@@ -9,7 +9,7 @@ use crate::session::client::Client;
 use lsp_types::request::InlayHintRequest;
 use lsp_types::{InlayHintParams, Url};
 use ruff_db::source::{line_index, source_text};
-use ty_ide::inlay_hints;
+use ty_ide::{InlayHintContent, inlay_hints};
 use ty_project::ProjectDatabase;
 
 pub(crate) struct InlayHintRequestHandler;
@@ -56,7 +56,7 @@ impl BackgroundDocumentRequestHandler for InlayHintRequestHandler {
                     .position
                     .to_position(&source, &index, snapshot.encoding()),
                 label: lsp_types::InlayHintLabel::String(hint.display(db).to_string()),
-                kind: Some(lsp_types::InlayHintKind::TYPE),
+                kind: Some(inlay_hint_type(&hint.content)),
                 tooltip: None,
                 padding_left: None,
                 padding_right: None,
@@ -70,3 +70,10 @@ impl BackgroundDocumentRequestHandler for InlayHintRequestHandler {
 }
 
 impl RetriableRequestHandler for InlayHintRequestHandler {}
+
+fn inlay_hint_type(inlay_hint_content: &InlayHintContent) -> lsp_types::InlayHintKind {
+    match inlay_hint_content {
+        InlayHintContent::Type(_) => lsp_types::InlayHintKind::TYPE,
+        InlayHintContent::CallArgumentName(_) => lsp_types::InlayHintKind::PARAMETER,
+    }
+}
