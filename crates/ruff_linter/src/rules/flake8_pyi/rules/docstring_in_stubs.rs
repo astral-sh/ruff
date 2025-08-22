@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::ExprStringLiteral;
 use ruff_python_semantic::Definition;
+use ruff_python_semantic::NodeId;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -61,7 +62,10 @@ pub(crate) fn docstring_in_stubs(
         Edit::range_deletion(docstring_range)
     };
 
-    let isolation_level = Checker::isolation(checker.semantic().current_statement_id());
+    // Hard coding to 0 for POC for interaction with PIE790
+    // At the moment it removes the `...` its up for debate whether it should remove the
+    // docstring instead.
+    let isolation_level = Checker::isolation(Some(NodeId::from_u32(0)));
     let fix = Fix::unsafe_edit(edit).isolate(isolation_level);
 
     checker
