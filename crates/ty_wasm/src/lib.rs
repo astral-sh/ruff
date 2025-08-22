@@ -448,14 +448,14 @@ impl Workspace {
         Ok(result
             .into_iter()
             .map(|hint| InlayHint {
-                markdown: hint.display(&self.db).to_string(),
+                markdown: hint.display().to_string(),
                 position: Position::from_text_size(
                     hint.position,
                     &index,
                     &source,
                     self.position_encoding,
                 ),
-                kind: hint.content.into(),
+                kind: hint.kind.into(),
             })
             .collect())
     }
@@ -985,11 +985,11 @@ pub enum InlayHintKind {
     Parameter,
 }
 
-impl From<ty_ide::InlayHintContent<'_>> for InlayHintKind {
-    fn from(kind: ty_ide::InlayHintContent) -> Self {
+impl From<ty_ide::InlayHintKind> for InlayHintKind {
+    fn from(kind: ty_ide::InlayHintKind) -> Self {
         match kind {
-            ty_ide::InlayHintContent::Type(_) => Self::Type,
-            ty_ide::InlayHintContent::CallArgumentName(_) => Self::Parameter,
+            ty_ide::InlayHintKind::Type => Self::Type,
+            ty_ide::InlayHintKind::CallArgumentName => Self::Parameter,
         }
     }
 }

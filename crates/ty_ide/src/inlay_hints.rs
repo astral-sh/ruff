@@ -4,49 +4,56 @@ use ruff_db::parsed::parsed_module;
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor, TraversalSignal};
 use ruff_python_ast::{AnyNodeRef, Expr, Stmt};
 use ruff_text_size::{Ranged, TextRange, TextSize};
-use std::fmt;
-use std::fmt::Formatter;
 use ty_python_semantic::types::{Type, inlay_hint_function_argument_details};
 use ty_python_semantic::{HasType, SemanticModel};
 
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct InlayHint<'db> {
+#[derive(Debug, Clone)]
+pub struct InlayHint {
     pub position: TextSize,
-    pub content: InlayHintContent<'db>,
+    pub kind: InlayHintKind,
+    pub label: InlayHintLabel,
 }
 
-impl<'db> InlayHint<'db> {
-    pub const fn display(&self, db: &'db dyn Db) -> DisplayInlayHint<'_, 'db> {
-        self.content.display(db)
+impl InlayHint {
+    pub fn type_hint<'db>(position: TextSize, ty: Type, db: &'db dyn Db) -> Self {
+        Self {
+            position,
+            kind: InlayHintKind::Type,
+            label: format!(": {}", ty.display(db)).into(),
+        }
+    }
+
+    pub fn call_argument_name(position: TextSize, name: &str) -> Self {
+        Self {
+            position,
+            kind: InlayHintKind::CallArgumentName,
+            label: format!("{name}=").into(),
+        }
+    }
+
+    pub fn display(&self) -> String {
+        self.label.text.clone()
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub enum InlayHintContent<'db> {
-    Type(Type<'db>),
-    CallArgumentName(String),
+#[derive(Debug, Clone)]
+pub enum InlayHintKind {
+    Type,
+    CallArgumentName,
 }
 
-impl<'db> InlayHintContent<'db> {
-    pub const fn display(&self, db: &'db dyn Db) -> DisplayInlayHint<'_, 'db> {
-        DisplayInlayHint { db, hint: self }
-    }
+#[derive(Default, Debug, Clone)]
+pub struct InlayHintLabel {
+    pub text: String,
+
+    pub target: Option<crate::NavigationTarget>,
 }
 
-pub struct DisplayInlayHint<'a, 'db> {
-    db: &'db dyn Db,
-    hint: &'a InlayHintContent<'db>,
-}
-
-impl fmt::Display for DisplayInlayHint<'_, '_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self.hint {
-            InlayHintContent::Type(ty) => {
-                write!(f, ": {}", ty.display(self.db))
-            }
-            InlayHintContent::CallArgumentName(name) => {
-                write!(f, "{name}=")
-            }
+impl From<String> for InlayHintLabel {
+    fn from(s: String) -> Self {
+        Self {
+            text: s,
+            target: None,
         }
     }
 }
@@ -56,7 +63,7 @@ pub fn inlay_hints<'db>(
     file: File,
     range: TextRange,
     settings: &InlayHintSettings,
-) -> Vec<InlayHint<'db>> {
+) -> Vec<InlayHint> {
     let mut visitor = InlayHintVisitor::new(db, file, range, settings);
 
     let ast = parsed_module(db, file).load(db);
@@ -106,7 +113,7 @@ impl Default for InlayHintSettings {
 struct InlayHintVisitor<'a, 'db> {
     db: &'db dyn Db,
     model: SemanticModel<'db>,
-    hints: Vec<InlayHint<'db>>,
+    hints: Vec<InlayHint>,
     in_assignment: bool,
     range: TextRange,
     settings: &'a InlayHintSettings,
@@ -128,10 +135,7 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
         if !self.settings.variable_types {
             return;
         }
-        self.hints.push(InlayHint {
-            position,
-            content: InlayHintContent::Type(ty),
-        });
+        self.hints.push(InlayHint::type_hint(position, ty, self.db));
     }
 
     fn add_call_argument_name(&mut self, position: TextSize, name: String) {
@@ -143,10 +147,8 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
             return;
         }
 
-        self.hints.push(InlayHint {
-            position,
-            content: InlayHintContent::CallArgumentName(name),
-        });
+        self.hints
+            .push(InlayHint::call_argument_name(position, &name));
     }
 }
 
@@ -322,7 +324,7 @@ mod tests {
 
             for hint in hints {
                 let end_position = (hint.position.to_u32() as usize) + offset;
-                let hint_str = format!("[{}]", hint.display(&self.db));
+                let hint_str = format!("[{}]", hint.display());
                 buf.insert_str(end_position, &hint_str);
                 offset += hint_str.len();
             }
