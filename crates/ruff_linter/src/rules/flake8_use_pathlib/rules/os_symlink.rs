@@ -90,8 +90,10 @@ pub(crate) fn os_symlink(checker: &Checker, call: &ExprCall, segments: &[&str]) 
         return;
     }
 
-    if has_unknown_keywords_or_starred_expr(&call.arguments, &["src", "dst", "target_is_directory"])
-    {
+    if has_unknown_keywords_or_starred_expr(
+        &call.arguments,
+        &["src", "dst", "target_is_directory", "dir_fd"],
+    ) {
         return;
     }
 

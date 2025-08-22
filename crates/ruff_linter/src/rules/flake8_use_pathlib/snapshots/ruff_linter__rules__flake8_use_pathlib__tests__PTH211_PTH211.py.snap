@@ -75,3 +75,13 @@ PTH211 `os.symlink` should be replaced by `Path.symlink_to`
 21 | = True)
    |
 help: Replace with `Path(...).symlink_to(...)`
+
+PTH211 `os.symlink` should be replaced by `Path.symlink_to`
+  --> PTH211.py:23:1
+   |
+21 | = True)
+22 |
+23 | os.symlink(src="usr/bin/python", dst="tmp/python", dir_fd=None)
+   | ^^^^^^^^^^
+   |
+help: Replace with `Path(...).symlink_to(...)`
