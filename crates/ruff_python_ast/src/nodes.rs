@@ -681,6 +681,22 @@ impl TStringValue {
     pub fn elements(&self) -> impl Iterator<Item = &InterpolatedStringElement> {
         self.iter().flat_map(|tstring| tstring.elements.iter())
     }
+
+    /// Returns `true` if the node represents an empty t-string in the
+    /// sense that `__iter__` returns an empty iterable.
+    ///
+    /// Beware that empty t-strings are still truthy, i.e. `bool(t"") == True`.
+    ///
+    /// Note that a [`TStringValue`] node will always contain at least one
+    /// [`TString`] node. This method checks whether each of the constituent
+    /// t-strings (in an implicitly concatenated t-string) are empty
+    /// in the above sense.
+    pub fn is_empty_iterable(&self) -> bool {
+        match &self.inner {
+            TStringValueInner::Single(tstring) => tstring.is_empty(),
+            TStringValueInner::Concatenated(tstrings) => tstrings.iter().all(TString::is_empty),
+        }
+    }
 }
 
 impl<'a> IntoIterator for &'a TStringValue {
@@ -1181,6 +1197,10 @@ pub struct TString {
 impl TString {
     pub fn quote_style(&self) -> Quote {
         self.flags.quote_style()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.elements.is_empty()
     }
 }
 
