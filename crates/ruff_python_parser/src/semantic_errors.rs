@@ -709,13 +709,16 @@ impl SemanticSyntaxChecker {
             }
             Expr::YieldFrom(_) => {
                 Self::yield_outside_function(ctx, expr, YieldOutsideFunctionKind::YieldFrom);
-                if ctx.in_function_scope() && ctx.in_async_context(){
+                if ctx.in_function_scope() && ctx.in_async_context() {
                     // test_err yield_from_in_async_function
                     // async def f(): yield from x
-                    
-                    Self::add_error(ctx, SemanticSyntaxErrorKind::YieldFromInAsyncFunction, expr.range());
-                }
 
+                    Self::add_error(
+                        ctx,
+                        SemanticSyntaxErrorKind::YieldFromInAsyncFunction,
+                        expr.range(),
+                    );
+                }
             }
             Expr::Await(_) => {
                 Self::yield_outside_function(ctx, expr, YieldOutsideFunctionKind::Await);
@@ -1358,7 +1361,7 @@ pub enum SemanticSyntaxErrorKind {
     AnnotatedNonlocal(String),
 
     /// Represents the use of `yield from` inside an asynchronous function.
-    YieldFromInAsyncFunction
+    YieldFromInAsyncFunction,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
