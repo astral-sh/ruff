@@ -363,8 +363,41 @@ impl std::fmt::Display for TodoType {
     }
 }
 
+#[cfg(debug_assertions)]
+impl serde::Serialize for TodoType {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serde::Serialize::serialize(&(), serializer)
+    }
+}
+
+#[cfg(debug_assertions)]
+impl<'de> serde::Deserialize<'de> for TodoType {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        <()>::deserialize(deserializer)?;
+
+        // TODO: Use an enum for `TodoType` instead of a static string to enable deserialization.
+        Ok(TodoType("<deserialized>"))
+    }
+}
+
 #[cfg(not(debug_assertions))]
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
+#[derive(
+    Copy,
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+    Hash,
+    get_size2::GetSize,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 pub struct TodoType;
 
 #[cfg(not(debug_assertions))]
@@ -400,6 +433,7 @@ macro_rules! todo_type {
                 i += 1;
             }
         };
+
         $crate::types::Type::Dynamic($crate::types::DynamicType::Todo($crate::types::TodoType(
             $message,
         )))
@@ -432,7 +466,7 @@ pub(crate) use todo_type;
 /// # Ordering
 /// Ordering is based on the property instance's salsa-assigned id and not on its values.
 /// The id may change between runs, or when the property instance was garbage collected and recreated.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(persist, debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct PropertyInstanceType<'db> {
     getter: Option<Type<'db>>,
@@ -502,7 +536,7 @@ bitflags! {
     /// that were passed in. For the precise meaning of the fields, see [1].
     ///
     /// [1]: https://docs.python.org/3/library/dataclasses.html
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
     pub struct DataclassParams: u16 {
         const INIT = 0b0000_0000_0001;
         const REPR = 0b0000_0000_0010;
@@ -561,7 +595,19 @@ impl From<DataclassTransformerParams> for DataclassParams {
 
 /// Representation of a type: a set of possible values at runtime.
 ///
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[allow(clippy::unsafe_derive_deserialize)]
+#[derive(
+    Copy,
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+    Hash,
+    salsa::Update,
+    get_size2::GetSize,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 pub enum Type<'db> {
     /// The dynamic type: a statically unknown set of values
     Dynamic(DynamicType),
@@ -6577,7 +6623,9 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
 /// This is represented as an enum (with some variants using `Cow`), and not an `FnMut` trait,
 /// since we sometimes have to apply type mappings lazily (e.g., to the signature of a function
 /// literal).
-#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
+#[derive(
+    Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, serde::Serialize, serde::Deserialize,
+)]
 pub enum TypeMapping<'a, 'db> {
     /// Applies a specialization to the type
     Specialization(Specialization<'db>),
@@ -6676,7 +6724,18 @@ impl<'db> TypeMapping<'_, 'db> {
 /// Ordering within variants is based on the wrapped data's salsa-assigned id and not on its values.
 /// The id may change between runs, or when e.g. a `TypeVarInstance` was garbage-collected and recreated.
 #[derive(
-    Copy, Clone, Debug, Eq, Hash, PartialEq, salsa::Update, Ord, PartialOrd, get_size2::GetSize,
+    Copy,
+    Clone,
+    Debug,
+    Eq,
+    Hash,
+    PartialEq,
+    salsa::Update,
+    Ord,
+    PartialOrd,
+    get_size2::GetSize,
+    serde::Serialize,
+    serde::Deserialize,
 )]
 pub enum KnownInstanceType<'db> {
     /// The type of `Protocol[T]`, `Protocol[U, S]`, etc -- usually only found in a class's bases list.
@@ -6816,7 +6875,17 @@ impl<'db> KnownInstanceType<'db> {
     }
 }
 
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
+#[derive(
+    Copy,
+    Clone,
+    Debug,
+    Eq,
+    Hash,
+    PartialEq,
+    get_size2::GetSize,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 pub enum DynamicType {
     /// An explicitly annotated `typing.Any`
     Any,
@@ -6884,7 +6953,7 @@ impl std::fmt::Display for DynamicType {
 
 bitflags! {
     /// Type qualifiers that appear in an annotation expression.
-    #[derive(Copy, Clone, Debug, Eq, PartialEq, Default, salsa::Update, Hash)]
+    #[derive(Copy, Clone, Debug, Eq, PartialEq, Default, salsa::Update, Hash, serde::Serialize, serde::Deserialize)]
     pub(crate) struct TypeQualifiers: u8 {
         /// `typing.ClassVar`
         const CLASS_VAR = 1 << 0;
@@ -7125,7 +7194,7 @@ impl<'db> InvalidTypeExpression<'db> {
 }
 
 /// Data regarding a `warnings.deprecated` or `typing_extensions.deprecated` decorator.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(persist, debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct DeprecatedInstance<'db> {
     /// The message for the deprecation
@@ -7137,7 +7206,7 @@ impl get_size2::GetSize for DeprecatedInstance<'_> {}
 
 /// Contains information about instances of `dataclasses.Field`, typically created using
 /// `dataclasses.field()`.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(persist, debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct FieldInstance<'db> {
     /// The type of the default value for this field. This is derived from the `default` or
@@ -7167,7 +7236,17 @@ impl<'db> FieldInstance<'db> {
 
 /// Whether this typevar was created via the legacy `TypeVar` constructor, using PEP 695 syntax,
 /// or an implicit typevar like `Self` was used.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Eq,
+    Hash,
+    PartialEq,
+    get_size2::GetSize,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 pub enum TypeVarKind {
     /// `T = TypeVar("T")`
     Legacy,
@@ -7213,7 +7292,7 @@ pub enum TypeVarKind {
 /// # Ordering
 /// Ordering is based on the type var instance's salsa-assigned id and not on its values.
 /// The id may change between runs, or when the type var instance was garbage collected and recreated.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(persist, debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct TypeVarInstance<'db> {
     /// The name of this TypeVar (e.g. `T`)
@@ -7413,7 +7492,18 @@ impl<'db> TypeVarInstance<'db> {
 }
 
 /// Where a type variable is bound and usable.
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Hash,
+    PartialEq,
+    Eq,
+    salsa::Update,
+    get_size2::GetSize,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 pub enum BindingContext<'db> {
     /// The definition of the generic class, function, or type alias that binds this typevar.
     Definition(Definition<'db>),
@@ -7433,7 +7523,7 @@ impl<'db> BindingContext<'db> {
 
 /// A type variable that has been bound to a generic context, and which can be specialized to a
 /// concrete type.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(persist, debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct BoundTypeVarInstance<'db> {
     pub typevar: TypeVarInstance<'db>,
@@ -7534,7 +7624,18 @@ impl<'db> BoundTypeVarInstance<'db> {
 }
 
 /// Whether a typevar default is eagerly specified or lazily evaluated.
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Hash,
+    PartialEq,
+    Eq,
+    salsa::Update,
+    get_size2::GetSize,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 pub enum TypeVarDefaultEvaluation<'db> {
     /// The default type is lazily evaluated.
     Lazy,
@@ -7549,7 +7650,18 @@ impl<'db> From<Type<'db>> for TypeVarDefaultEvaluation<'db> {
 }
 
 /// Whether a typevar bound/constraints is eagerly specified or lazily evaluated.
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Hash,
+    PartialEq,
+    Eq,
+    salsa::Update,
+    get_size2::GetSize,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 pub enum TypeVarBoundOrConstraintsEvaluation<'db> {
     /// There is a lazily-evaluated upper bound.
     LazyUpperBound,
@@ -7565,7 +7677,18 @@ impl<'db> From<TypeVarBoundOrConstraints<'db>> for TypeVarBoundOrConstraintsEval
     }
 }
 
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Hash,
+    PartialEq,
+    Eq,
+    salsa::Update,
+    get_size2::GetSize,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 pub enum TypeVarBoundOrConstraints<'db> {
     UpperBound(Type<'db>),
     Constraints(UnionType<'db>),
@@ -8676,7 +8799,7 @@ impl From<bool> for Truthiness {
 /// # Ordering
 /// Ordering is based on the bounded method's salsa-assigned id and not on its values.
 /// The id may change between runs, or when the bounded method was garbage collected and recreated.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(persist, debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct BoundMethodType<'db> {
     /// The function that is being bound. Corresponds to the `__func__` attribute on a
@@ -8790,7 +8913,7 @@ impl<'db> BoundMethodType<'db> {
 /// # Ordering
 /// Ordering is based on the callable type's salsa-assigned id and not on its values.
 /// The id may change between runs, or when the callable type was garbage collected and recreated.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(persist, debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct CallableType<'db> {
     #[returns(ref)]
@@ -8934,7 +9057,18 @@ impl<'db> CallableType<'db> {
 
 /// Represents a specific instance of `types.MethodWrapperType`
 #[derive(
-    Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, salsa::Update, get_size2::GetSize,
+    Debug,
+    Copy,
+    Clone,
+    Hash,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    salsa::Update,
+    get_size2::GetSize,
+    serde::Serialize,
+    serde::Deserialize,
 )]
 pub enum MethodWrapperKind<'db> {
     /// Method wrapper for `some_function.__get__`
@@ -9076,7 +9210,18 @@ impl<'db> MethodWrapperKind<'db> {
 
 /// Represents a specific instance of `types.WrapperDescriptorType`
 #[derive(
-    Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, salsa::Update, get_size2::GetSize,
+    Debug,
+    Copy,
+    Clone,
+    Hash,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    salsa::Update,
+    get_size2::GetSize,
+    serde::Serialize,
+    serde::Deserialize,
 )]
 pub enum WrapperDescriptorKind {
     /// `FunctionType.__get__`
@@ -9090,7 +9235,7 @@ pub enum WrapperDescriptorKind {
 /// # Ordering
 /// Ordering is based on the module literal's salsa-assigned id and not on its values.
 /// The id may change between runs, or when the module literal was garbage collected and recreated.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(persist, debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct ModuleLiteralType<'db> {
     /// The imported module.
@@ -9200,7 +9345,7 @@ impl<'db> ModuleLiteralType<'db> {
 /// # Ordering
 /// Ordering is based on the type alias's salsa-assigned id and not on its values.
 /// The id may change between runs, or when the alias was garbage collected and recreated.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(persist, debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct PEP695TypeAliasType<'db> {
     #[returns(ref)]
@@ -9262,7 +9407,7 @@ fn value_type_cycle_initial<'db>(_db: &'db dyn Db, _self: PEP695TypeAliasType<'d
 /// # Ordering
 /// Ordering is based on the type alias's salsa-assigned id and not on its values.
 /// The id may change between runs, or when the alias was garbage collected and recreated.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(persist, debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct ManualPEP695TypeAliasType<'db> {
     #[returns(ref)]
@@ -9294,7 +9439,18 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
 }
 
 #[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, salsa::Update, get_size2::GetSize,
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    salsa::Update,
+    get_size2::GetSize,
+    serde::Serialize,
+    serde::Deserialize,
 )]
 pub enum TypeAliasType<'db> {
     /// A type alias defined using the PEP 695 `type` statement.
@@ -9359,7 +9515,7 @@ pub(super) struct MetaclassCandidate<'db> {
     explicit_metaclass_of: ClassLiteral<'db>,
 }
 
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(persist, debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct UnionType<'db> {
     /// The union type includes values in any of these types.
     #[returns(deref)]
@@ -9581,7 +9737,7 @@ impl<'db> UnionType<'db> {
     }
 }
 
-#[salsa::interned(debug, heap_size=IntersectionType::heap_size)]
+#[salsa::interned(persist, debug, heap_size=IntersectionType::heap_size)]
 pub struct IntersectionType<'db> {
     /// The intersection type includes only values in all of these types.
     #[returns(ref)]
@@ -9790,7 +9946,7 @@ impl<'db> IntersectionType<'db> {
 /// # Ordering
 /// Ordering is based on the string literal's salsa-assigned id and not on its value.
 /// The id may change between runs, or when the string literal was garbage collected and recreated.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(persist, debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct StringLiteralType<'db> {
     #[returns(deref)]
@@ -9818,7 +9974,7 @@ impl<'db> StringLiteralType<'db> {
 /// # Ordering
 /// Ordering is based on the byte literal's salsa-assigned id and not on its value.
 /// The id may change between runs, or when the byte literal was garbage collected and recreated.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(persist, debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct BytesLiteralType<'db> {
     #[returns(deref)]
@@ -9843,7 +9999,7 @@ impl<'db> BytesLiteralType<'db> {
 ///     NO = 0
 ///     YES = 1
 /// ```
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(persist, debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct EnumLiteralType<'db> {
     /// A reference to the enum class this literal belongs to
@@ -9864,7 +10020,18 @@ impl<'db> EnumLiteralType<'db> {
 
 /// Type that represents the set of all inhabitants (`dict` instances) that conform to
 /// a given `TypedDict` schema.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, salsa::Update, Hash, get_size2::GetSize)]
+#[derive(
+    Debug,
+    Copy,
+    Clone,
+    PartialEq,
+    Eq,
+    salsa::Update,
+    Hash,
+    get_size2::GetSize,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 pub struct TypedDictType<'db> {
     /// A reference to the class (inheriting from `typing.TypedDict`) that specifies the
     /// schema of this `TypedDict`.
@@ -9945,7 +10112,17 @@ impl BoundSuperError<'_> {
     }
 }
 
-#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, get_size2::GetSize)]
+#[derive(
+    Debug,
+    Copy,
+    Clone,
+    Hash,
+    PartialEq,
+    Eq,
+    get_size2::GetSize,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 pub enum SuperOwnerKind<'db> {
     Dynamic(DynamicType),
     Class(ClassType<'db>),
@@ -10034,7 +10211,7 @@ impl<'db> From<SuperOwnerKind<'db>> for Type<'db> {
 }
 
 /// Represent a bound super object like `super(PivotClass, owner)`
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(persist, debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct BoundSuperType<'db> {
     pub pivot_class: ClassBase<'db>,
     pub owner: SuperOwnerKind<'db>,
@@ -10243,7 +10420,7 @@ impl<'db> BoundSuperType<'db> {
     }
 }
 
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(persist, debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct TypeIsType<'db> {
     return_type: Type<'db>,
     /// The ID of the scope to which the place belongs

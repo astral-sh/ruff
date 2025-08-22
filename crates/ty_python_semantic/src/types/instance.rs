@@ -117,7 +117,18 @@ impl<'db> Type<'db> {
 }
 
 /// A type representing the set of runtime objects which are instances of a certain nominal class.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(
+    Copy,
+    Clone,
+    Debug,
+    Eq,
+    PartialEq,
+    Hash,
+    salsa::Update,
+    get_size2::GetSize,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 pub struct NominalInstanceType<'db>(
     // Keep this field private, so that the only way of constructing `NominalInstanceType` instances
     // is through the `Type::instance` constructor function.
@@ -399,7 +410,18 @@ impl<'db> From<NominalInstanceType<'db>> for Type<'db> {
 /// [`NominalInstanceType`] is split into two variants internally as a pure
 /// optimization to avoid having to materialize the [`ClassType`] for tuple
 /// instances where it would be unnecessary (this is somewhat expensive!).
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(
+    Debug,
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Hash,
+    salsa::Update,
+    get_size2::GetSize,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 enum NominalInstanceInner<'db> {
     /// A tuple type, e.g. `tuple[int, str]`.
     ///
@@ -429,7 +451,18 @@ impl<'db> VarianceInferable<'db> for NominalInstanceType<'db> {
 /// A `ProtocolInstanceType` represents the set of all possible runtime objects
 /// that conform to the interface described by a certain protocol.
 #[derive(
-    Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, PartialOrd, Ord, get_size2::GetSize,
+    Copy,
+    Clone,
+    Debug,
+    Eq,
+    PartialEq,
+    Hash,
+    salsa::Update,
+    PartialOrd,
+    Ord,
+    get_size2::GetSize,
+    serde::Serialize,
+    serde::Deserialize,
 )]
 pub struct ProtocolInstanceType<'db> {
     pub(super) inner: Protocol<'db>,
@@ -633,7 +666,18 @@ impl<'db> VarianceInferable<'db> for ProtocolInstanceType<'db> {
 /// An enumeration of the two kinds of protocol types: those that originate from a class
 /// definition in source code, and those that are synthesized from a set of members.
 #[derive(
-    Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, PartialOrd, Ord, get_size2::GetSize,
+    Copy,
+    Clone,
+    Debug,
+    Eq,
+    PartialEq,
+    Hash,
+    salsa::Update,
+    PartialOrd,
+    Ord,
+    get_size2::GetSize,
+    serde::Serialize,
+    serde::Deserialize,
 )]
 pub(super) enum Protocol<'db> {
     FromClass(ClassType<'db>),
@@ -685,7 +729,18 @@ mod synthesized_protocol {
     /// The constructor method of this type maintains the invariant that a synthesized protocol type
     /// is always constructed from a *normalized* protocol interface.
     #[derive(
-        Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, PartialOrd, Ord, get_size2::GetSize,
+        Copy,
+        Clone,
+        Debug,
+        Eq,
+        PartialEq,
+        Hash,
+        salsa::Update,
+        PartialOrd,
+        Ord,
+        get_size2::GetSize,
+        serde::Serialize,
+        serde::Deserialize,
     )]
     pub(in crate::types) struct SynthesizedProtocolType<'db>(ProtocolInterface<'db>);
 

@@ -127,7 +127,7 @@ impl<'db> Deref for ProtocolClassLiteral<'db> {
 /// # Ordering
 /// Ordering is based on the protocol interface member's salsa-assigned id and not on its members.
 /// The id may change between runs, or when the protocol instance members was garbage collected and recreated.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(persist, debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub(super) struct ProtocolInterface<'db> {
     #[returns(ref)]
@@ -318,7 +318,17 @@ impl<'db> VarianceInferable<'db> for ProtocolInterface<'db> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(
+    Debug,
+    PartialEq,
+    Eq,
+    Clone,
+    Hash,
+    salsa::Update,
+    get_size2::GetSize,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 pub(super) struct ProtocolMemberData<'db> {
     kind: ProtocolMemberKind<'db>,
     qualifiers: TypeQualifiers,
@@ -403,7 +413,18 @@ impl<'db> ProtocolMemberData<'db> {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, salsa::Update, Hash, get_size2::GetSize)]
+#[derive(
+    Debug,
+    Copy,
+    Clone,
+    PartialEq,
+    Eq,
+    salsa::Update,
+    Hash,
+    get_size2::GetSize,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 enum ProtocolMemberKind<'db> {
     Method(CallableType<'db>),
     Property(PropertyInstanceType<'db>),

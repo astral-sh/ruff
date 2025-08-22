@@ -18,6 +18,7 @@ impl EnvVars {
     pub const TY_LOG: &'static str = "TY_LOG";
 
     /// If set to `"1"` or `"true"`, ty will enable flamegraph profiling.
+    ///
     /// This creates a `tracing.folded` file that can be used to generate flame graphs
     /// for performance analysis.
     pub const TY_LOG_PROFILE: &'static str = "TY_LOG_PROFILE";
@@ -38,6 +39,14 @@ impl EnvVars {
     /// This isn't the same as a thread limit. ty may spawn additional threads
     /// when necessary, e.g. to watch for file system changes or a dedicated UI thread.
     pub const TY_MAX_PARALLELISM: &'static str = "TY_MAX_PARALLELISM";
+
+    /// Used to enable persistent caching at the specified path.
+    ///
+    /// This improves performance and memory usage by caching to disk across ty runs.
+    /// Note that this feature is currently experimental and may result in decreased
+    /// performance.
+    #[attr_hidden]
+    pub const TY_PERSIST: &'static str = "TY_PERSIST";
 
     /// Used to detect an activated virtual environment.
     pub const VIRTUAL_ENV: &'static str = "VIRTUAL_ENV";

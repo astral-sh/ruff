@@ -186,6 +186,10 @@ impl System for MdtestSystem {
         }
     }
 
+    fn read_to_end(&self, path: &SystemPath) -> ruff_db::system::Result<Vec<u8>> {
+        self.as_system().read_to_end(&self.normalize_path(path))
+    }
+
     fn read_to_string(&self, path: &SystemPath) -> ruff_db::system::Result<String> {
         self.as_system().read_to_string(&self.normalize_path(path))
     }
@@ -279,7 +283,7 @@ impl WritableSystem for MdtestSystem {
         self.as_system().create_new_file(&self.normalize_path(path))
     }
 
-    fn write_file(&self, path: &SystemPath, content: &str) -> ruff_db::system::Result<()> {
+    fn write_file(&self, path: &SystemPath, content: &[u8]) -> ruff_db::system::Result<()> {
         self.as_system()
             .write_file(&self.normalize_path(path), content)
     }

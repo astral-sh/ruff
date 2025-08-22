@@ -260,6 +260,9 @@ name = "bitflags"
 version = "2.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6a65b545ab31d687cff52899d4890855fec459eb6afe0da6417b8a18da87aa29"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "bitvec"
@@ -1027,6 +1030,16 @@ name = "equivalent"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "877a4ace8713b0bcf2a4e7eec82529c029f1d0619886d18145fea96c3ffe5c0f"
+
+[[package]]
+name = "erased-serde"
+version = "0.4.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e004d887f51fcb9fef17317a2f3525c887d8aa3f4f50fed920816a688284a5b7"
+dependencies = [
+ "serde",
+ "typeid",
+]
 
 [[package]]
 name = "errno"
@@ -3451,12 +3464,13 @@ checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
 [[package]]
 name = "salsa"
 version = "0.23.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=a3ffa22cb26756473d56f867aedec3fd907c4dd9#a3ffa22cb26756473d56f867aedec3fd907c4dd9"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=a0e7a06#a0e7a0660c93136f23bf08b4f1604eee3d1f6b11"
 dependencies = [
  "boxcar",
  "compact_str",
  "crossbeam-queue",
  "crossbeam-utils",
+ "erased-serde",
  "hashbrown 0.15.5",
  "hashlink",
  "indexmap",
@@ -3467,6 +3481,7 @@ dependencies = [
  "rustc-hash",
  "salsa-macro-rules",
  "salsa-macros",
+ "serde",
  "smallvec",
  "thin-vec",
  "tracing",
@@ -3475,12 +3490,12 @@ dependencies = [
 [[package]]
 name = "salsa-macro-rules"
 version = "0.23.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=a3ffa22cb26756473d56f867aedec3fd907c4dd9#a3ffa22cb26756473d56f867aedec3fd907c4dd9"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=a0e7a06#a0e7a0660c93136f23bf08b4f1604eee3d1f6b11"
 
 [[package]]
 name = "salsa-macros"
 version = "0.23.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=a3ffa22cb26756473d56f867aedec3fd907c4dd9#a3ffa22cb26756473d56f867aedec3fd907c4dd9"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=a0e7a06#a0e7a0660c93136f23bf08b4f1604eee3d1f6b11"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3700,6 +3715,9 @@ name = "smallvec"
 version = "1.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "snapbox"
@@ -3904,6 +3922,9 @@ name = "thin-vec"
 version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "144f754d318415ac792f9d69fc87abbbfc043ce2ef041c60f16ad828f638717d"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "thiserror"
@@ -4261,6 +4282,7 @@ name = "ty_project"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "bincode 2.0.1",
  "camino",
  "colored 3.0.0",
  "crossbeam",
@@ -4290,6 +4312,7 @@ dependencies = [
  "tracing",
  "ty_combine",
  "ty_python_semantic",
+ "ty_static",
  "ty_vendored",
 ]
 
@@ -4460,6 +4483,12 @@ name = "typed-arena"
 version = "2.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6af6ae20167a9ece4bcb41af5b80f8a1f1df981f6391189ce00fd257af04126a"
+
+[[package]]
+name = "typeid"
+version = "1.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bc7d623258602320d5c55d1bc22793b57daff0ec7efc270ea7d55ce1d5f5471c"
 
 [[package]]
 name = "typenum"

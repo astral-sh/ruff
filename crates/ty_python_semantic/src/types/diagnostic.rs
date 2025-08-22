@@ -1759,7 +1759,7 @@ declare_lint! {
 }
 
 /// A collection of type check diagnostics.
-#[derive(Default, Eq, PartialEq, get_size2::GetSize)]
+#[derive(Default, Eq, PartialEq, get_size2::GetSize, serde::Serialize, serde::Deserialize)]
 pub struct TypeCheckDiagnostics {
     diagnostics: Vec<Diagnostic>,
     used_suppressions: FxHashSet<FileSuppressionId>,

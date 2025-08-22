@@ -11,12 +11,12 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
-ruff_db = { workspace = true }
+ruff_db = { workspace = true, features = ["serde"] }
 ruff_annotate_snippets = { workspace = true }
 ruff_index = { workspace = true, features = ["salsa"] }
 ruff_macros = { workspace = true }
 ruff_memory_usage = { workspace = true }
-ruff_python_ast = { workspace = true, features = ["salsa"] }
+ruff_python_ast = { workspace = true, features = ["salsa", "serde"] }
 ruff_python_parser = { workspace = true }
 ruff_python_stdlib = { workspace = true }
 ruff_source_file = { workspace = true }
@@ -42,7 +42,7 @@ tracing = { workspace = true }
 rustc-hash = { workspace = true }
 hashbrown = { workspace = true }
 schemars = { workspace = true, optional = true }
-serde = { workspace = true, optional = true }
+serde = { workspace = true }
 smallvec = { workspace = true }
 static_assertions = { workspace = true }
 test-case = { workspace = true }
@@ -68,7 +68,6 @@ quickcheck = { version = "1.0.3", default-features = false }
 quickcheck_macros = { version = "1.0.0" }
 
 [features]
-serde = ["ruff_db/serde", "dep:serde", "ruff_python_ast/serde"]
 testing = []
 
 [lints]

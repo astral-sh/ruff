@@ -74,7 +74,7 @@ pub(crate) enum TypeshedVersionsParseErrorKind {
     VersionParseError(#[from] PythonVersionDeserializationError),
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
+#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize, serde::Serialize, serde::Deserialize)]
 pub(crate) struct TypeshedVersions(FxHashMap<ModuleName, PyVersionRange>);
 
 impl TypeshedVersions {
@@ -230,7 +230,9 @@ impl fmt::Display for TypeshedVersions {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, get_size2::GetSize)]
+#[derive(
+    Debug, Clone, Eq, PartialEq, Hash, get_size2::GetSize, serde::Serialize, serde::Deserialize,
+)]
 pub(crate) enum PyVersionRange {
     AvailableFrom(RangeFrom<PythonVersion>),
     AvailableWithin(RangeInclusive<PythonVersion>),

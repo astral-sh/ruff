@@ -23,8 +23,8 @@ use crossbeam::channel as crossbeam_channel;
 use rayon::ThreadPoolBuilder;
 use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, Severity};
 use ruff_db::files::File;
-use ruff_db::max_parallelism;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
+use ruff_db::{Db as _, max_parallelism};
 use salsa::Database;
 use ty_project::metadata::options::ProjectOptionsOverrides;
 use ty_project::watch::ProjectWatcher;
@@ -169,6 +169,13 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
             );
         }
         Err(_) => {}
+    }
+
+    // Write the database to the persistent cache.
+    if let Ok(path) = db.system().env_var(EnvVars::TY_PERSIST) {
+        if let Err(err) = db.persist(SystemPath::new(&path)) {
+            tracing::warn!("failed to write to persistent cache: {err:?}");
+        }
     }
 
     std::mem::forget(db);

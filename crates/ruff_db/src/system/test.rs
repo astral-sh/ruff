@@ -75,6 +75,10 @@ impl System for TestSystem {
         self.system().canonicalize_path(path)
     }
 
+    fn read_to_end(&self, path: &SystemPath) -> Result<Vec<u8>> {
+        self.system().read_to_end(path)
+    }
+
     fn read_to_string(&self, path: &SystemPath) -> Result<String> {
         self.system().read_to_string(path)
     }
@@ -165,7 +169,7 @@ impl WritableSystem for TestSystem {
         self.system().create_new_file(path)
     }
 
-    fn write_file(&self, path: &SystemPath, content: &str) -> Result<()> {
+    fn write_file(&self, path: &SystemPath, content: &[u8]) -> Result<()> {
         self.system().write_file(path, content)
     }
 
@@ -185,7 +189,9 @@ pub trait DbWithWritableSystem: Db + Sized {
     /// Writes the content of the given file and notifies the Db about the change.
     fn write_file(&mut self, path: impl AsRef<SystemPath>, content: impl AsRef<str>) -> Result<()> {
         let path = path.as_ref();
-        match self.writable_system().write_file(path, content.as_ref()) {
+        let content = content.as_ref();
+
+        match self.writable_system().write_file(path, content.as_bytes()) {
             Ok(()) => {
                 File::sync_path(self, path);
                 Ok(())
@@ -198,7 +204,8 @@ pub trait DbWithWritableSystem: Db + Sized {
                         File::sync_path(self, ancestor);
                     }
 
-                    self.writable_system().write_file(path, content.as_ref())?;
+                    self.writable_system()
+                        .write_file(path, content.as_bytes())?;
                     File::sync_path(self, path);
 
                     Ok(())
@@ -243,8 +250,14 @@ pub trait DbWithTestSystem: Db + Sized {
     ///
     /// ## Panics
     /// If the db isn't using the [`InMemorySystem`].
-    fn write_virtual_file(&mut self, path: impl AsRef<SystemVirtualPath>, content: impl ToString) {
+    fn write_virtual_file(
+        &mut self,
+        path: impl AsRef<SystemVirtualPath>,
+        content: impl Into<Vec<u8>>,
+    ) {
         let path = path.as_ref();
+        let content = content.into();
+
         self.test_system()
             .memory_file_system()
             .write_virtual_file(path, content);
@@ -320,6 +333,10 @@ impl System for InMemorySystem {
 
     fn canonicalize_path(&self, path: &SystemPath) -> Result<SystemPathBuf> {
         self.memory_fs.canonicalize(path)
+    }
+
+    fn read_to_end(&self, path: &SystemPath) -> Result<Vec<u8>> {
+        self.memory_fs.read_to_end(path)
     }
 
     fn read_to_string(&self, path: &SystemPath) -> Result<String> {
@@ -412,7 +429,7 @@ impl WritableSystem for InMemorySystem {
         self.memory_fs.create_new_file(path)
     }
 
-    fn write_file(&self, path: &SystemPath, content: &str) -> Result<()> {
+    fn write_file(&self, path: &SystemPath, content: &[u8]) -> Result<()> {
         self.memory_fs.write_file(path, content)
     }
 

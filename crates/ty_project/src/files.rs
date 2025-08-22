@@ -102,7 +102,7 @@ impl Default for IndexedFiles {
     }
 }
 
-#[derive(Debug, get_size2::GetSize)]
+#[derive(Debug, get_size2::GetSize, serde::Serialize, serde::Deserialize)]
 enum State {
     /// The files of a package haven't been indexed yet.
     Lazy,
@@ -150,7 +150,7 @@ pub struct Indexed<'db> {
     _lifetime: PhantomData<&'db ()>,
 }
 
-#[derive(Debug, get_size2::GetSize)]
+#[derive(Debug, get_size2::GetSize, serde::Serialize, serde::Deserialize)]
 struct IndexedInner {
     files: FxHashSet<File>,
     diagnostics: Vec<IOErrorDiagnostic>,

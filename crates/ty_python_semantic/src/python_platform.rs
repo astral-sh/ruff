@@ -1,12 +1,7 @@
 use std::fmt::{Display, Formatter};
 
 /// The target platform to assume when resolving types.
-#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize, ruff_macros::RustDoc),
-    serde(rename_all = "kebab-case")
-)]
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, ruff_macros::RustDoc)]
 pub enum PythonPlatform {
     /// Do not make any assumptions about the target platform.
     All,
@@ -16,25 +11,52 @@ pub enum PythonPlatform {
     /// We use a string (instead of individual enum variants), as the set of possible platforms
     /// may change over time. See <https://docs.python.org/3/library/sys.html#sys.platform> for
     /// some known platform identifiers.
-    #[cfg_attr(feature = "serde", serde(untagged))]
     Identifier(String),
+}
+
+impl serde::Serialize for PythonPlatform {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serde::Serialize::serialize(&self.as_ref(), serializer)
+    }
+}
+
+impl<'de> serde::de::Deserialize<'de> for PythonPlatform {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let platform = String::deserialize(deserializer)?;
+        match platform.as_str() {
+            "all" => Ok(PythonPlatform::All),
+            _ => Ok(PythonPlatform::Identifier(platform)),
+        }
+    }
 }
 
 impl From<String> for PythonPlatform {
     fn from(platform: String) -> Self {
         match platform.as_str() {
             "all" => PythonPlatform::All,
-            _ => PythonPlatform::Identifier(platform.to_string()),
+            _ => PythonPlatform::Identifier(platform),
+        }
+    }
+}
+
+impl AsRef<str> for PythonPlatform {
+    fn as_ref(&self) -> &str {
+        match self {
+            PythonPlatform::All => "all",
+            PythonPlatform::Identifier(platform) => platform,
         }
     }
 }
 
 impl Display for PythonPlatform {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            PythonPlatform::All => f.write_str("all"),
-            PythonPlatform::Identifier(name) => f.write_str(name),
-        }
+        f.write_str(self.as_ref())
     }
 }
 

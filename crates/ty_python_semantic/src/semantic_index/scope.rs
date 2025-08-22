@@ -14,7 +14,13 @@ use crate::{
 };
 
 /// A cross-module identifier of a scope that can be used as a salsa query parameter.
-#[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
+///
+/// This type is an interned struct as opposed to a tracked struct as it is the input of
+/// the `infer_scope_types` query, which is the root query of the persistent cache.
+///
+/// Additionally, this type disables garbage collection, as garbage collectable interned values are volatile,
+/// and would cause `infer_scope_types` to have a dependency on every single `ScopeId` in the file.
+#[salsa::interned(persist, debug, revisions=usize::MAX, heap_size=ruff_memory_usage::heap_size)]
 pub struct ScopeId<'db> {
     pub file: File,
 
@@ -70,7 +76,8 @@ impl<'db> ScopeId<'db> {
 
 /// ID that uniquely identifies a scope inside of a module.
 #[newtype_index]
-#[derive(salsa::Update, get_size2::GetSize)]
+#[allow(clippy::unsafe_derive_deserialize)]
+#[derive(salsa::Update, get_size2::GetSize, serde::Serialize, serde::Deserialize)]
 pub struct FileScopeId;
 
 impl FileScopeId {

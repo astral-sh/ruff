@@ -57,8 +57,8 @@ anyhow = { version = "1.0.80" }
 arc-swap = { version = "1.7.1" }
 assert_fs = { version = "1.1.0" }
 argfile = { version = "0.2.0" }
-bincode = { version = "2.0.0" }
-bitflags = { version = "2.5.0" }
+bincode = { version = "2.0.0", features = ["serde"] }
+bitflags = { version = "2.5.0", features = ["serde"] }
 bitvec = { version = "1.0.1", default-features = false, features = [
     "alloc",
 ] }
@@ -126,7 +126,7 @@ memchr = { version = "2.7.1" }
 mimalloc = { version = "0.1.39" }
 natord = { version = "1.0.9" }
 notify = { version = "8.0.0" }
-ordermap = { version = "0.5.0" }
+ordermap = { version = "0.5.0", features = ["serde"] }
 path-absolutize = { version = "3.1.1" }
 path-slash = { version = "0.2.1" }
 pathdiff = { version = "0.2.1" }
@@ -143,24 +143,25 @@ regex-automata = { version = "0.4.9" }
 rustc-hash = { version = "2.0.0" }
 rustc-stable-hash = { version = "0.1.2" }
 # When updating salsa, make sure to also update the revision in `fuzz/Cargo.toml`
-salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "a3ffa22cb26756473d56f867aedec3fd907c4dd9", default-features = false, features = [
+salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "a0e7a06", default-features = false, features = [
     "compact_str",
     "macros",
     "salsa_unstable",
     "inventory",
+    "persistence",
 ] }
 schemars = { version = "0.8.16" }
 seahash = { version = "4.1.0" }
-serde = { version = "1.0.197", features = ["derive"] }
+serde = { version = "1.0.197", features = ["derive", "rc"] }
 serde-wasm-bindgen = { version = "0.6.4" }
-serde_json = { version = "1.0.113" }
+serde_json = { version = "1.0.142" }
 serde_test = { version = "1.0.152" }
 serde_with = { version = "3.6.0", default-features = false, features = [
     "macros",
 ] }
 shellexpand = { version = "3.0.0" }
 similar = { version = "2.4.0", features = ["inline"] }
-smallvec = { version = "1.13.2", features = ["union", "const_generics", "const_new"] }
+smallvec = { version = "1.13.2", features = ["union", "const_generics", "const_new", "serde"] }
 snapbox = { version = "0.6.0", features = [
     "diff",
     "term-svg",

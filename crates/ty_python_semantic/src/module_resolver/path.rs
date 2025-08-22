@@ -449,7 +449,9 @@ impl From<SitePackagesDiscoveryError> for SearchPathValidationError {
 
 type SearchPathResult<T> = Result<T, SearchPathValidationError>;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize, serde::Serialize, serde::Deserialize,
+)]
 enum SearchPathInner {
     Extra(SystemPathBuf),
     FirstParty(SystemPathBuf),
@@ -487,7 +489,9 @@ enum SearchPathInner {
 /// or the "Editable" category. For the "First-party", "Site-packages"
 /// and "Standard-library" categories, however, there will always be exactly
 /// one search path from that category in any given list of search paths.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize, serde::Serialize, serde::Deserialize,
+)]
 pub struct SearchPath(Arc<SearchPathInner>);
 
 impl SearchPath {

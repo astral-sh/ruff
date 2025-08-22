@@ -37,7 +37,7 @@ pub struct AstNodeRef<T> {
 
     /// Debug information.
     #[cfg(debug_assertions)]
-    kind: ruff_python_ast::NodeKind,
+    kind: Option<ruff_python_ast::NodeKind>,
     #[cfg(debug_assertions)]
     range: ruff_text_size::TextRange,
     // Note that because the module address is not stored in release builds, `AstNodeRef`
@@ -68,7 +68,7 @@ where
             #[cfg(debug_assertions)]
             module_addr: module_ref.module().addr(),
             #[cfg(debug_assertions)]
-            kind: AnyNodeRef::from(node).kind(),
+            kind: Some(AnyNodeRef::from(node).kind()),
             #[cfg(debug_assertions)]
             range: node.range(),
             _node: PhantomData,
@@ -81,7 +81,7 @@ where
     /// different file or Salsa revision than the module to which the node belongs.
     pub fn node<'ast>(&self, module_ref: &'ast ParsedModuleRef) -> &'ast T {
         #[cfg(debug_assertions)]
-        assert_eq!(module_ref.module().addr(), self.module_addr);
+        assert!(self.module_addr == 0 || module_ref.module().addr() == self.module_addr);
 
         // The user guarantees that the module is from the same file and Salsa
         // revision, so the file contents cannot have changed.
@@ -108,6 +108,33 @@ unsafe impl<T> salsa::Update for AstNodeRef<T> {
 }
 
 impl<T> get_size2::GetSize for AstNodeRef<T> {}
+
+impl<T> serde::Serialize for AstNodeRef<T> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.index.serialize(serializer)
+    }
+}
+
+impl<'de, T> serde::Deserialize<'de> for AstNodeRef<T> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Ok(AstNodeRef {
+            #[cfg(debug_assertions)]
+            module_addr: 0,
+            #[cfg(debug_assertions)]
+            kind: None,
+            #[cfg(debug_assertions)]
+            range: ruff_text_size::TextRange::default(),
+            index: NodeIndex::deserialize(deserializer)?,
+            _node: PhantomData,
+        })
+    }
+}
 
 #[allow(clippy::missing_fields_in_debug)]
 impl<T> Debug for AstNodeRef<T>

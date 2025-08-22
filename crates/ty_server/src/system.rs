@@ -199,6 +199,15 @@ impl System for LSPSystem {
         self.native_system.path_exists_case_sensitive(path, prefix)
     }
 
+    fn read_to_end(&self, path: &SystemPath) -> Result<Vec<u8>> {
+        let document = self.system_path_to_document_ref(path);
+
+        match document {
+            Some(DocumentQuery::Text { document, .. }) => Ok(document.contents().into()),
+            _ => self.native_system.read_to_end(path),
+        }
+    }
+
     fn read_to_string(&self, path: &SystemPath) -> Result<String> {
         let document = self.system_path_to_document_ref(path);
 
