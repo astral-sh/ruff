@@ -4917,6 +4917,10 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         mode: EvaluationMode,
     ) -> Result<Cow<'db, TupleSpec<'db>>, IterationError<'db>> {
+        // We will not infer precise heterogeneous tuple specs for literals with lengths above this threshold.
+        // The threshold here is somewhat arbitrary and conservative; it could be increased if needed.
+        // However, it's probably very rare to need heterogeneous unpacking inference for long string literals
+        // or bytes literals, and creating long heterogeneous tuple specs has a performance cost.
         const MAX_TUPLE_LENGTH: usize = 128;
 
         if mode.is_async() {
