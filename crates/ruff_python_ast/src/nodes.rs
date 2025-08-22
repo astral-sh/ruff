@@ -515,7 +515,7 @@ impl FStringValue {
 
     /// Returns `true` if the node represents an empty f-string literal.
     ///
-    /// Noteh that a [`FStringValue`] node will always have >= 1 [`FStringPart`]s inside it.
+    /// Note that a [`FStringValue`] node will always have >= 1 [`FStringPart`]s inside it.
     /// This method checks whether the value of the concatenated parts is equal to the empty
     /// f-string, not whether the f-string has 0 parts inside it.
     pub fn is_empty_literal(&self) -> bool {
