@@ -45,7 +45,6 @@ impl AlwaysFixableViolation for ExplicitStringConcatenation {
         "Remove redundant '+' operator to implicitly concatenate".to_string()
     }
 }
-
 /// ISC003
 pub(crate) fn explicit(checker: &Checker, expr: &Expr) {
     // If the user sets `allow-multiline` to `false`, then we should allow explicitly concatenated
@@ -80,11 +79,41 @@ pub(crate) fn explicit(checker: &Checker, expr: &Expr) {
                     .locator()
                     .contains_line_break(TextRange::new(left.end(), right.start()))
             {
-                checker
-                    .report_diagnostic(ExplicitStringConcatenation, expr.range())
-                    .set_fix(generate_fix(checker, bin_op));
+                // Only report violations for expressions that are inside brackets
+                if is_inside_brackets(checker, expr.range()) {
+                    let mut diagnostic =
+                        checker.report_diagnostic(ExplicitStringConcatenation, expr.range());
+                    diagnostic.set_fix(generate_fix(checker, bin_op));
+                }
             }
         }
+    }
+}
+
+fn is_inside_brackets(checker: &Checker, expr_range: TextRange) -> bool {
+    let locator = checker.locator();
+
+    // Get the current statement that contains this expression
+    if let Some(stmt) = checker.semantic().current_statements().next() {
+        let stmt_source = locator.slice(stmt.range());
+        let expr_start_in_stmt = expr_range.start() - stmt.start();
+        let expr_end_in_stmt = expr_range.end() - stmt.start();
+
+        // Look for brackets within the statement
+        let before_expr = &stmt_source[..expr_start_in_stmt.to_usize()];
+        let after_expr = &stmt_source[expr_end_in_stmt.to_usize()..];
+
+        // Check for parentheses or curly braces
+        let has_opening_bracket = before_expr.rfind('(').is_some()
+            || before_expr.rfind('{').is_some()
+            || before_expr.rfind('[').is_some();
+        let has_closing_bracket = after_expr.find(')').is_some()
+            || after_expr.find('}').is_some()
+            || after_expr.find(']').is_some();
+
+        has_opening_bracket && has_closing_bracket
+    } else {
+        false
     }
 }
 
