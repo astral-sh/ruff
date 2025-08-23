@@ -456,60 +456,60 @@ impl SourceOrderVisitor<'_> for SymbolVisitor {
 
             Stmt::Assign(assign) => {
                 // Include assignments only when we're in global or class scope
-                if !self.in_function {
-                    for target in &assign.targets {
-                        if let Expr::Name(name) = target {
-                            let kind = if Self::is_constant_name(name.id.as_str()) {
-                                SymbolKind::Constant
-                            } else if self
-                                .iter_symbol_stack()
-                                .any(|s| s.kind == SymbolKind::Class)
-                            {
-                                SymbolKind::Field
-                            } else {
-                                SymbolKind::Variable
-                            };
+                if self.in_function {
+                    return;
+                }
+                for target in &assign.targets {
+                    let Expr::Name(name) = target else { continue };
+                    let kind = if Self::is_constant_name(name.id.as_str()) {
+                        SymbolKind::Constant
+                    } else if self
+                        .iter_symbol_stack()
+                        .any(|s| s.kind == SymbolKind::Class)
+                    {
+                        SymbolKind::Field
+                    } else {
+                        SymbolKind::Variable
+                    };
 
-                            let symbol = SymbolTree {
-                                parent: None,
-                                name: name.id.to_string(),
-                                kind,
-                                name_range: name.range(),
-                                full_range: stmt.range(),
-                            };
-
-                            self.add_symbol(symbol);
-                        }
-                    }
+                    let symbol = SymbolTree {
+                        parent: None,
+                        name: name.id.to_string(),
+                        kind,
+                        name_range: name.range(),
+                        full_range: stmt.range(),
+                    };
+                    self.add_symbol(symbol);
                 }
             }
 
             Stmt::AnnAssign(ann_assign) => {
                 // Include assignments only when we're in global or class scope
-                if !self.in_function {
-                    if let Expr::Name(name) = &*ann_assign.target {
-                        let kind = if Self::is_constant_name(name.id.as_str()) {
-                            SymbolKind::Constant
-                        } else if self
-                            .iter_symbol_stack()
-                            .any(|s| s.kind == SymbolKind::Class)
-                        {
-                            SymbolKind::Field
-                        } else {
-                            SymbolKind::Variable
-                        };
-
-                        let symbol = SymbolTree {
-                            parent: None,
-                            name: name.id.to_string(),
-                            kind,
-                            name_range: name.range(),
-                            full_range: stmt.range(),
-                        };
-
-                        self.add_symbol(symbol);
-                    }
+                if self.in_function {
+                    return;
                 }
+                let Expr::Name(name) = &*ann_assign.target else {
+                    return;
+                };
+                let kind = if Self::is_constant_name(name.id.as_str()) {
+                    SymbolKind::Constant
+                } else if self
+                    .iter_symbol_stack()
+                    .any(|s| s.kind == SymbolKind::Class)
+                {
+                    SymbolKind::Field
+                } else {
+                    SymbolKind::Variable
+                };
+
+                let symbol = SymbolTree {
+                    parent: None,
+                    name: name.id.to_string(),
+                    kind,
+                    name_range: name.range(),
+                    full_range: stmt.range(),
+                };
+                self.add_symbol(symbol);
             }
 
             _ => {
