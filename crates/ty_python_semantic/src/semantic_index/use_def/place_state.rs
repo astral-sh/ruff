@@ -201,6 +201,13 @@ impl EnclosingSnapshot {
             }
         }
     }
+
+    pub(crate) fn bindings(&self) -> Option<&Bindings> {
+        match self {
+            Self::Constraint(_) => None,
+            Self::Bindings(bindings) => Some(bindings),
+        }
+    }
 }
 
 /// Live bindings for a single place at some point in control flow. Each live binding comes
@@ -227,6 +234,10 @@ impl Bindings {
         for binding in &self.live_bindings {
             reachability_constraints.mark_used(binding.reachability_constraint);
         }
+    }
+
+    pub(super) fn len(&self) -> usize {
+        self.live_bindings.len()
     }
 }
 

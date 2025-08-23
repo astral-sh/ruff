@@ -427,37 +427,32 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     ///     inner()
     ///     inner2()
     /// ```
-    fn sweep_lazy_snapshots(&mut self, bound_place: ScopedPlaceId) {
-        let current_scope = self.current_scope();
-        let current_place_table = &self.place_tables[current_scope];
-        let Some(bound_symbol) = bound_place.as_symbol() else {
-            return;
-        };
+    fn sweep_lazy_snapshots(&mut self, popped_scope_id: FileScopeId) {
         // Retain only snapshots that are either eager
-        //     || (enclosing_scope != current_scope && current_scope is not a visible ancestor of enclosing_scope)
+        //     || (enclosing_scope != popped_scope && popped_scope is not a visible ancestor of enclosing_scope)
         //     || enclosing_place is not a symbol or not reassigned
         // <=> remove those that are lazy
-        //     && (enclosing_scope == current_scope || current_scope is a visible ancestor of enclosing_scope)
+        //     && (enclosing_scope == popped_scope || popped_scope is a visible ancestor of enclosing_scope)
         //     && enclosing_place is a symbol and reassigned
-        self.enclosing_snapshots.retain(|key, _| {
+        self.enclosing_snapshots.retain(|key, snapshot_id| {
+            let popped_place_table = &self.place_tables[popped_scope_id];
             key.nested_laziness.is_eager()
-                || (key.enclosing_scope != current_scope
+                || (key.enclosing_scope != popped_scope_id
                     && VisibleAncestorsIter::new(&self.scopes, key.enclosing_scope)
-                        .all(|(ancestor, _)| ancestor != current_scope))
-                || !key
-                    .enclosing_place
-                    .as_symbol()
-                    .is_some_and(|enclosing_symbol| {
-                        let name = &self.place_tables[key.enclosing_scope]
-                            .symbol(enclosing_symbol)
-                            .name();
-                        current_place_table
-                            .symbol_id(name)
-                            .is_some_and(|symbol_id| {
-                                symbol_id == bound_symbol
-                                    && current_place_table.symbol(symbol_id).is_reassigned()
-                            })
+                        .all(|(ancestor, _)| ancestor != popped_scope_id))
+                || !key.enclosing_place.as_symbol().is_some_and(|symbol_id| {
+                    let name = &self.place_tables[key.enclosing_scope]
+                        .symbol(symbol_id)
+                        .name();
+                    popped_place_table.symbol_id(name).is_some_and(|symbol_id| {
+                        popped_place_table.symbol(symbol_id).is_reassigned()
+                            && !self.use_def_maps[popped_scope_id].bindings_are_unchanged(
+                                &self.use_def_maps[key.enclosing_scope],
+                                *snapshot_id,
+                                symbol_id,
+                            )
                     })
+                })
         });
     }
 
@@ -499,6 +494,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .scope_stack
             .pop()
             .expect("Root scope should be present");
+
+        self.sweep_lazy_snapshots(popped_scope_id);
 
         let children_end = self.scopes.next_index();
 
@@ -579,7 +576,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     #[track_caller]
     fn mark_place_bound(&mut self, id: ScopedPlaceId) {
         self.current_place_table_mut().mark_bound(id);
-        self.sweep_lazy_snapshots(id);
     }
 
     #[track_caller]
@@ -785,6 +781,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// Records that all remaining statements in the current block are unreachable.
     fn mark_unreachable(&mut self) {
         self.current_use_def_map_mut().mark_unreachable();
+        self.sweep_lazy_snapshots(self.current_scope());
     }
 
     /// Records a reachability constraint that always evaluates to "ambiguous".

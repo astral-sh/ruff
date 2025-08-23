@@ -1220,6 +1220,24 @@ impl<'db> UseDefMapBuilder<'db> {
         }
     }
 
+    pub(super) fn bindings_are_unchanged(
+        &self,
+        enclosing_map: &Self,
+        enclosing_snapshot_id: ScopedEnclosingSnapshotId,
+        symbol_id: ScopedSymbolId,
+    ) -> bool {
+        enclosing_map.enclosing_snapshots[enclosing_snapshot_id]
+            .bindings()
+            .is_some_and(|captured_bindings| {
+                let terminal_bindings = self.symbol_states[symbol_id].bindings();
+                captured_bindings.len() == terminal_bindings.len()
+                    && captured_bindings
+                        .iter()
+                        .zip(terminal_bindings.iter())
+                        .all(|(a, b)| a.binding == b.binding)
+            })
+    }
+
     /// Take a snapshot of the current visible-places state.
     pub(super) fn snapshot(&self) -> FlowSnapshot {
         FlowSnapshot {
