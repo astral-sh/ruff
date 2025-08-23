@@ -6257,7 +6257,9 @@ impl<'db> Type<'db> {
             }),
 
             Type::KnownInstance(known_instance) => match known_instance {
-                KnownInstanceType::TypeAliasType(alias) => Ok(Type::TypeAlias(*alias)),
+                KnownInstanceType::TypeAliasType(alias) | KnownInstanceType::TypeAlias(alias) => {
+                    Ok(Type::TypeAlias(*alias))
+                }
                 KnownInstanceType::TypeVar(typevar) => {
                     let index = semantic_index(db, scope_id.file(db));
                     Ok(bind_typevar(
@@ -6353,7 +6355,7 @@ impl<'db> Type<'db> {
                     )
                     .unwrap_or(*self))
                 }
-                SpecialFormType::TypeAlias => Ok(Type::Dynamic(DynamicType::TodoTypeAlias)),
+                SpecialFormType::TypeAlias => Ok(*self),
                 SpecialFormType::TypedDict => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec::smallvec_inline![
                         InvalidTypeExpression::TypedDict
@@ -7490,6 +7492,10 @@ pub enum KnownInstanceType<'db> {
     /// A single instance of `typing.TypeAliasType` (PEP 695 type alias)
     TypeAliasType(TypeAliasType<'db>),
 
+    /// A single instance of a PEP 613 type alias (in other words, an arbitrary type form at
+    /// runtime.)
+    TypeAlias(TypeAliasType<'db>),
+
     /// A single instance of `warnings.deprecated` or `typing_extensions.deprecated`
     Deprecated(DeprecatedInstance<'db>),
 
@@ -7514,7 +7520,7 @@ fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
         KnownInstanceType::TypeVar(typevar) => {
             visitor.visit_type_var_type(db, typevar);
         }
-        KnownInstanceType::TypeAliasType(type_alias) => {
+        KnownInstanceType::TypeAliasType(type_alias) | KnownInstanceType::TypeAlias(type_alias) => {
             visitor.visit_type_alias_type(db, type_alias);
         }
         KnownInstanceType::Deprecated(_) | KnownInstanceType::ConstraintSet(_) => {
@@ -7538,7 +7544,7 @@ impl<'db> KnownInstanceType<'db> {
                 Self::SubscriptedGeneric(context.normalized_impl(db, visitor))
             }
             Self::TypeVar(typevar) => Self::TypeVar(typevar.normalized_impl(db, visitor)),
-            Self::TypeAliasType(type_alias) => {
+            Self::TypeAliasType(type_alias) | Self::TypeAlias(type_alias) => {
                 Self::TypeAliasType(type_alias.normalized_impl(db, visitor))
             }
             Self::Deprecated(deprecated) => {
@@ -7561,6 +7567,8 @@ impl<'db> KnownInstanceType<'db> {
                 KnownClass::GenericAlias
             }
             Self::TypeAliasType(_) => KnownClass::TypeAliasType,
+            // A PEP 613 type alias could be any type form object at runtime:
+            Self::TypeAlias(_) => KnownClass::Object,
             Self::Deprecated(_) => KnownClass::Deprecated,
             Self::Field(_) => KnownClass::Field,
             Self::ConstraintSet(_) => KnownClass::ConstraintSet,
@@ -7617,6 +7625,7 @@ impl<'db> KnownInstanceType<'db> {
                             f.write_str("typing.TypeAliasType")
                         }
                     }
+                    KnownInstanceType::TypeAlias(alias) => f.write_str(alias.name(self.db)),
                     // This is a legacy `TypeVar` _outside_ of any generic class or function, so we render
                     // it as an instance of `typing.TypeVar`. Inside of a generic class or function, we'll
                     // have a `Type::TypeVar(_)`, which is rendered as the typevar's name.
@@ -7684,9 +7693,6 @@ pub enum DynamicType<'db> {
     /// A special Todo-variant for PEP-695 `ParamSpec` types. A temporary variant to detect and special-
     /// case the handling of these types in `Callable` annotations.
     TodoPEP695ParamSpec,
-    /// A special Todo-variant for type aliases declared using `typing.TypeAlias`.
-    /// A temporary variant to detect and special-case the handling of these aliases in autocomplete suggestions.
-    TodoTypeAlias,
     /// A special Todo-variant for `Unpack[Ts]`, so that we can treat it specially in `Generic[Unpack[Ts]]`
     TodoUnpack,
     /// A type that is determined to be divergent during type inference for a recursive function.
@@ -7721,13 +7727,6 @@ impl std::fmt::Display for DynamicType<'_> {
             DynamicType::TodoUnpack => {
                 if cfg!(debug_assertions) {
                     f.write_str("@Todo(typing.Unpack)")
-                } else {
-                    f.write_str("@Todo")
-                }
-            }
-            DynamicType::TodoTypeAlias => {
-                if cfg!(debug_assertions) {
-                    f.write_str("@Todo(Support for `typing.TypeAlias`)")
                 } else {
                     f.write_str("@Todo")
                 }
@@ -10779,12 +10778,14 @@ impl<'db> ModuleLiteralType<'db> {
     }
 }
 
+/// A PEP 695 type alias, created by the `type` statement.
+///
 /// # Ordering
 /// Ordering is based on the type alias's salsa-assigned id and not on its values.
 /// The id may change between runs, or when the alias was garbage collected and recreated.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
-pub struct PEP695TypeAliasType<'db> {
+pub struct PEP695TypeAlias<'db> {
     #[returns(ref)]
     pub name: ast::name::Name,
 
@@ -10794,25 +10795,25 @@ pub struct PEP695TypeAliasType<'db> {
 }
 
 // The Salsa heap is tracked separately.
-impl get_size2::GetSize for PEP695TypeAliasType<'_> {}
+impl get_size2::GetSize for PEP695TypeAlias<'_> {}
 
 fn walk_pep_695_type_alias<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
-    type_alias: PEP695TypeAliasType<'db>,
+    type_alias: PEP695TypeAlias<'db>,
     visitor: &V,
 ) {
     visitor.visit_type(db, type_alias.value_type(db));
 }
 
 #[salsa::tracked]
-impl<'db> PEP695TypeAliasType<'db> {
+impl<'db> PEP695TypeAlias<'db> {
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         let scope = self.rhs_scope(db);
         let type_alias_stmt_node = scope.node(db).expect_type_alias();
         semantic_index(db, scope.file(db)).expect_single_definition(type_alias_stmt_node)
     }
 
-    #[salsa::tracked(cycle_fn=value_type_cycle_recover, cycle_initial=value_type_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(cycle_fn=pep695_alias_value_type_cycle_recover, cycle_initial=pep695_alias_value_type_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
         let scope = self.rhs_scope(db);
         let module = parsed_module(db, scope.file(db)).load(db);
@@ -10836,7 +10837,7 @@ impl<'db> PEP695TypeAliasType<'db> {
         self,
         db: &'db dyn Db,
         f: impl FnOnce(GenericContext<'db>) -> Specialization<'db>,
-    ) -> PEP695TypeAliasType<'db> {
+    ) -> PEP695TypeAlias<'db> {
         match self.generic_context(db) {
             None => self,
 
@@ -10847,12 +10848,7 @@ impl<'db> PEP695TypeAliasType<'db> {
                 // `typing.TypeAliasType` internally, and pass the specialization through to the value type,
                 // except when resolving to an instance of the type alias, or its display representation.
                 let specialization = f(generic_context);
-                PEP695TypeAliasType::new(
-                    db,
-                    self.name(db),
-                    self.rhs_scope(db),
-                    Some(specialization),
-                )
+                PEP695TypeAlias::new(db, self.name(db), self.rhs_scope(db), Some(specialization))
             }
         }
     }
@@ -10889,28 +10885,31 @@ fn generic_context_cycle_recover<'db>(
     _db: &'db dyn Db,
     _value: &Option<GenericContext<'db>>,
     _count: u32,
-    _self: PEP695TypeAliasType<'db>,
+    _self: PEP695TypeAlias<'db>,
 ) -> salsa::CycleRecoveryAction<Option<GenericContext<'db>>> {
     salsa::CycleRecoveryAction::Iterate
 }
 
 fn generic_context_cycle_initial<'db>(
     _db: &'db dyn Db,
-    _self: PEP695TypeAliasType<'db>,
+    _self: PEP695TypeAlias<'db>,
 ) -> Option<GenericContext<'db>> {
     None
 }
 
-fn value_type_cycle_recover<'db>(
+fn pep695_alias_value_type_cycle_recover<'db>(
     _db: &'db dyn Db,
     _value: &Type<'db>,
     _count: u32,
-    _self: PEP695TypeAliasType<'db>,
+    _self: PEP695TypeAlias<'db>,
 ) -> salsa::CycleRecoveryAction<Type<'db>> {
     salsa::CycleRecoveryAction::Iterate
 }
 
-fn value_type_cycle_initial<'db>(_db: &'db dyn Db, _self: PEP695TypeAliasType<'db>) -> Type<'db> {
+fn pep695_alias_value_type_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _self: PEP695TypeAlias<'db>,
+) -> Type<'db> {
     Type::Never
 }
 
@@ -10921,7 +10920,7 @@ fn value_type_cycle_initial<'db>(_db: &'db dyn Db, _self: PEP695TypeAliasType<'d
 /// The id may change between runs, or when the alias was garbage collected and recreated.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
-pub struct ManualPEP695TypeAliasType<'db> {
+pub struct ManualPEP695TypeAlias<'db> {
     #[returns(ref)]
     pub name: ast::name::Name,
     pub definition: Option<Definition<'db>>,
@@ -10929,17 +10928,17 @@ pub struct ManualPEP695TypeAliasType<'db> {
 }
 
 // The Salsa heap is tracked separately.
-impl get_size2::GetSize for ManualPEP695TypeAliasType<'_> {}
+impl get_size2::GetSize for ManualPEP695TypeAlias<'_> {}
 
 fn walk_manual_pep_695_type_alias<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
-    type_alias: ManualPEP695TypeAliasType<'db>,
+    type_alias: ManualPEP695TypeAlias<'db>,
     visitor: &V,
 ) {
     visitor.visit_type(db, type_alias.value(db));
 }
 
-impl<'db> ManualPEP695TypeAliasType<'db> {
+impl<'db> ManualPEP695TypeAlias<'db> {
     fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         Self::new(
             db,
@@ -10950,14 +10949,89 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
     }
 }
 
+/// A PEP 613 type alias, annotated with `: typing.TypeAlias`.
+///
+/// # Ordering
+/// Ordering is based on the type alias's salsa-assigned id and not on its values.
+/// The id may change between runs, or when the alias was garbage collected and recreated.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[derive(PartialOrd, Ord)]
+pub struct PEP613TypeAlias<'db> {
+    #[returns(ref)]
+    pub name: ast::name::Name,
+
+    /// The definition that created this type alias.
+    pub definition: Definition<'db>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for PEP613TypeAlias<'_> {}
+
+fn walk_pep_613_type_alias<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    type_alias: PEP613TypeAlias<'db>,
+    visitor: &V,
+) {
+    visitor.visit_type(db, type_alias.value_type(db));
+}
+
+#[salsa::tracked]
+impl<'db> PEP613TypeAlias<'db> {
+    /// The type that this type alias refers to.
+    #[salsa::tracked(cycle_fn=pep613_alias_value_type_cycle_recover, cycle_initial=pep613_alias_value_type_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
+        let definition = self.definition(db);
+        let module = parsed_module(db, definition.file(db)).load(db);
+        let value_node = self
+            .definition(db)
+            .kind(db)
+            .as_annotated_assignment()
+            // SAFETY: type inference won't create a PEP 613 type alias for any definition other
+            // than an annotated assignment.
+            .unwrap()
+            .value(&module)
+            // SAFETY: type inference won't create a PEP 613 type alias for an annotated assignment
+            // with no right-hand side.
+            .unwrap();
+        definition_expression_type(db, definition, value_node)
+    }
+
+    fn normalized_impl(self, _db: &'db dyn Db, _visitor: &NormalizedVisitor<'db>) -> Self {
+        self
+    }
+}
+
+fn pep613_alias_value_type_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &Type<'db>,
+    _count: u32,
+    _self: PEP613TypeAlias<'db>,
+) -> salsa::CycleRecoveryAction<Type<'db>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn pep613_alias_value_type_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _self: PEP613TypeAlias<'db>,
+) -> Type<'db> {
+    Type::Never
+}
+
+/// Represents a type alias, whether PEP 695 or PEP 613.
+///
+/// PEP 613 type aliases are annotated with `: typing.TypeAlias`. PEP 695 type aliases are created
+/// via instances of `types.TypeAliasType`, whether manually instantiated or via the `type`
+/// statement.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, salsa::Update, get_size2::GetSize,
 )]
 pub enum TypeAliasType<'db> {
     /// A type alias defined using the PEP 695 `type` statement.
-    PEP695(PEP695TypeAliasType<'db>),
+    PEP695(PEP695TypeAlias<'db>),
     /// A type alias defined by manually instantiating the PEP 695 `types.TypeAliasType`.
-    ManualPEP695(ManualPEP695TypeAliasType<'db>),
+    ManualPEP695(ManualPEP695TypeAlias<'db>),
+    /// A type alias defined with an annotation of the PEP 613 `typing.TypeAlias` type.
+    PEP613(PEP613TypeAlias<'db>),
 }
 
 fn walk_type_alias_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -10975,6 +11049,9 @@ fn walk_type_alias_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
         TypeAliasType::ManualPEP695(type_alias) => {
             walk_manual_pep_695_type_alias(db, type_alias, visitor);
         }
+        TypeAliasType::PEP613(type_alias) => {
+            walk_pep_613_type_alias(db, type_alias, visitor);
+        }
     }
 }
 
@@ -10987,6 +11064,9 @@ impl<'db> TypeAliasType<'db> {
             TypeAliasType::ManualPEP695(type_alias) => {
                 TypeAliasType::ManualPEP695(type_alias.normalized_impl(db, visitor))
             }
+            TypeAliasType::PEP613(type_alias) => {
+                TypeAliasType::PEP613(type_alias.normalized_impl(db, visitor))
+            }
         }
     }
 
@@ -10994,6 +11074,7 @@ impl<'db> TypeAliasType<'db> {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.name(db),
             TypeAliasType::ManualPEP695(type_alias) => type_alias.name(db),
+            TypeAliasType::PEP613(type_alias) => type_alias.name(db),
         }
     }
 
@@ -11001,6 +11082,7 @@ impl<'db> TypeAliasType<'db> {
         match self {
             TypeAliasType::PEP695(type_alias) => Some(type_alias.definition(db)),
             TypeAliasType::ManualPEP695(type_alias) => type_alias.definition(db),
+            TypeAliasType::PEP613(type_alias) => Some(type_alias.definition(db)),
         }
     }
 
@@ -11008,13 +11090,14 @@ impl<'db> TypeAliasType<'db> {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.value_type(db),
             TypeAliasType::ManualPEP695(type_alias) => type_alias.value(db),
+            TypeAliasType::PEP613(type_alias) => type_alias.value_type(db),
         }
     }
 
-    pub(crate) fn as_pep_695_type_alias(self) -> Option<PEP695TypeAliasType<'db>> {
+    pub(crate) fn as_pep_695_type_alias(self) -> Option<PEP695TypeAlias<'db>> {
         match self {
             TypeAliasType::PEP695(type_alias) => Some(type_alias),
-            TypeAliasType::ManualPEP695(_) => None,
+            _ => None,
         }
     }
 
@@ -11022,14 +11105,14 @@ impl<'db> TypeAliasType<'db> {
         // TODO: Add support for generic non-PEP695 type aliases.
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.generic_context(db),
-            TypeAliasType::ManualPEP695(_) => None,
+            TypeAliasType::ManualPEP695(_) | TypeAliasType::PEP613(_) => None,
         }
     }
 
     pub(crate) fn specialization(self, db: &'db dyn Db) -> Option<Specialization<'db>> {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.specialization(db),
-            TypeAliasType::ManualPEP695(_) => None,
+            TypeAliasType::ManualPEP695(_) | TypeAliasType::PEP613(_) => None,
         }
     }
 
@@ -11042,7 +11125,7 @@ impl<'db> TypeAliasType<'db> {
             TypeAliasType::PEP695(type_alias) => {
                 TypeAliasType::PEP695(type_alias.apply_specialization(db, f))
             }
-            TypeAliasType::ManualPEP695(_) => self,
+            TypeAliasType::ManualPEP695(_) | TypeAliasType::PEP613(_) => self,
         }
     }
 }

@@ -693,6 +693,15 @@ impl DefinitionKind<'_> {
         }
     }
 
+    pub(crate) const fn as_annotated_assignment(
+        &self,
+    ) -> Option<&AnnotatedAssignmentDefinitionKind> {
+        match self {
+            DefinitionKind::AnnotatedAssignment(annotated_assignment) => Some(annotated_assignment),
+            _ => None,
+        }
+    }
+
     pub(crate) fn is_import(&self) -> bool {
         matches!(
             self,

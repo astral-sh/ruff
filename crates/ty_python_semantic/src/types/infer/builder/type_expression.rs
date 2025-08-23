@@ -811,6 +811,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     self.infer_type_expression(slice);
                     todo_type!("Generic manual PEP-695 type alias")
                 }
+                KnownInstanceType::TypeAliasType(TypeAliasType::PEP613(_)) => {
+                    unreachable!("PEP 613 type aliases are not KnownInstance::TypeAliasType");
+                }
+                KnownInstanceType::TypeAlias(_) => {
+                    self.infer_type_expression(&subscript.slice);
+                    todo_type!("Generic PEP-613 type alias")
+                }
             },
             Type::Dynamic(DynamicType::Todo(_)) => {
                 self.infer_type_expression(slice);
