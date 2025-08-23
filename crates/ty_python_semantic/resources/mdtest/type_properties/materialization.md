@@ -459,3 +459,36 @@ def contravariant(top: Top[ContravariantCallable], bottom: Bottom[ContravariantC
     reveal_type(top)  # revealed: (GenericContravariant[object], /) -> None
     reveal_type(bottom)  # revealed: (GenericContravariant[Never], /) -> None
 ```
+
+## Invalid use
+
+`Top[]` and `Bottom[]` are special forms that take a single argument.
+
+It is invalid to use them without a type argument.
+
+```py
+from ty_extensions import Bottom, Top
+
+def _(
+    just_top: Top,  # error: [invalid-type-form]
+    just_bottom: Bottom,  # error: [invalid-type-form]
+): ...
+```
+
+It is also invalid to use multiple arguments:
+
+```py
+def _(
+    top_two: Top[int, str],  # error: [invalid-type-form]
+    bottom_two: Bottom[int, str],  # error: [invalid-type-form]
+): ...
+```
+
+The argument must be a type expression:
+
+```py
+def _(
+    top_1: Top[1],  # error: [invalid-type-form]
+    bottom_1: Bottom[1],  # error: [invalid-type-form]
+): ...
+```
