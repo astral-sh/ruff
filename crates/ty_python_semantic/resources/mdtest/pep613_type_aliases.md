@@ -114,7 +114,7 @@ f([1, "foo"])
 Adapted from <https://github.com/pypa/packaging/blob/main/src/packaging/_parser.py>:
 
 ```py
-from typing import Union, Sequence, TypeAlias
+from typing import Union, TypeAlias
 
 MarkerAtom: TypeAlias = Union[str, Sequence["MarkerAtom"]]
 MarkerList: TypeAlias = Sequence[Union["MarkerList", MarkerAtom, str]]
@@ -123,4 +123,18 @@ def f(marker_list: MarkerList):
     reveal_type(marker_list)  # revealed: MarkerList
     for item in marker_list:
         reveal_type(item)  # revealed: MarkerList | MarkerAtom | str
+```
+
+### Invalid examples
+
+#### No value
+
+```py
+from typing import TypeAlias
+
+# TODO: error
+Bad: TypeAlias
+
+def f(x: Bad):
+    reveal_type(x)  # revealed: Unknown
 ```
