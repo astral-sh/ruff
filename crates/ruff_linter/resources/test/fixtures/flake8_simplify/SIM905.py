@@ -131,6 +131,13 @@ print(" x ".rsplit(sep=None, maxsplit=0))
 print("  x  ".rsplit(maxsplit=0))
 print("  x  ".rsplit(sep=None, maxsplit=0))
 
+# https://github.com/astral-sh/ruff/issues/19610
+r"1" "\n".split("1")  # [r"", "\n"]
+r"" "\"".split("1")  # ['"']
+r"1" """
+""".split("1")  # [r"", "\n"]
+r"\n" "\n'\"".split("1")  # ["\\n\n'\""]
+
 # https://github.com/astral-sh/ruff/issues/19581 - embedded quotes in raw strings
 r"""simple@example.com
 very.common@example.com
