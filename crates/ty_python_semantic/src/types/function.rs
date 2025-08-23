@@ -1168,10 +1168,6 @@ pub enum KnownFunction {
     AllMembers,
     /// `ty_extensions.has_member`
     HasMember,
-    /// `ty_extensions.top_materialization`
-    TopMaterialization,
-    /// `ty_extensions.bottom_materialization`
-    BottomMaterialization,
     /// `ty_extensions.reveal_protocol_interface`
     RevealProtocolInterface,
 }
@@ -1232,8 +1228,6 @@ impl KnownFunction {
             | Self::IsSingleValued
             | Self::IsSingleton
             | Self::IsSubtypeOf
-            | Self::TopMaterialization
-            | Self::BottomMaterialization
             | Self::GenericContext
             | Self::DunderAllNames
             | Self::EnumMembers
@@ -1569,8 +1563,6 @@ pub(crate) mod tests {
                 | KnownFunction::IsSingleValued
                 | KnownFunction::IsAssignableTo
                 | KnownFunction::IsEquivalentTo
-                | KnownFunction::TopMaterialization
-                | KnownFunction::BottomMaterialization
                 | KnownFunction::HasMember
                 | KnownFunction::RevealProtocolInterface
                 | KnownFunction::AllMembers => KnownModule::TyExtensions,
