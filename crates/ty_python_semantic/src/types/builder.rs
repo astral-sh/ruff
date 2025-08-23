@@ -204,9 +204,17 @@ enum ReduceResult<'db> {
 // representations, so that we can make large unions of literals fast in all operations.
 const MAX_UNION_LITERALS: usize = 200;
 
+enum SimplificationStrategy {
+    /// Attempt to fully simplify the union: eliminate subtypes and unpack aliases.
+    Full,
+    /// Leave the union mostly as-given: eliminate equivalent types only.
+    Minimal,
+}
+
 pub(crate) struct UnionBuilder<'db> {
     elements: Vec<UnionElement<'db>>,
     db: &'db dyn Db,
+    simplification_strategy: SimplificationStrategy,
 }
 
 impl<'db> UnionBuilder<'db> {
@@ -214,7 +222,19 @@ impl<'db> UnionBuilder<'db> {
         Self {
             db,
             elements: vec![],
+            // default to full simplification: unions we synthetically create should be
+            // fully simplified, only user-provided unions should not
+            simplification_strategy: SimplificationStrategy::Full,
         }
+    }
+
+    pub(crate) fn minimal_simplify(mut self) -> Self {
+        self.simplification_strategy = SimplificationStrategy::Minimal;
+        self
+    }
+
+    fn should_simplify_full(&self) -> bool {
+        matches!(self.simplification_strategy, SimplificationStrategy::Full)
     }
 
     pub(crate) fn is_empty(&self) -> bool {
@@ -246,7 +266,9 @@ impl<'db> UnionBuilder<'db> {
             }
             // Adding `Never` to a union is a no-op.
             Type::Never => {}
-            Type::TypeAlias(alias) => self.add_in_place(alias.value_type(self.db)),
+            Type::TypeAlias(alias) if self.should_simplify_full() => {
+                self.add_in_place(alias.value_type(self.db));
+            }
             // If adding a string literal, look for an existing `UnionElement::StringLiterals` to
             // add it to, or an existing element that is a super-type of string literals, which
             // means we shouldn't add it. Otherwise, add a new `UnionElement::StringLiterals`
@@ -426,6 +448,8 @@ impl<'db> UnionBuilder<'db> {
                     None
                 };
 
+                let should_simplify_full = self.should_simplify_full();
+
                 let mut to_remove = SmallVec::<[usize; 2]>::new();
                 let ty_negated = ty.negate(self.db);
 
@@ -452,10 +476,10 @@ impl<'db> UnionBuilder<'db> {
                     }
 
                     if ty.is_equivalent_to(self.db, element_type)
-                        || ty.is_subtype_of(self.db, element_type)
+                        || (should_simplify_full && ty.is_subtype_of(self.db, element_type))
                     {
                         return;
-                    } else if element_type.is_subtype_of(self.db, ty) {
+                    } else if should_simplify_full && element_type.is_subtype_of(self.db, ty) {
                         to_remove.push(index);
                     } else if ty_negated.is_subtype_of(self.db, element_type) {
                         // We add `ty` to the union. We just checked that `~ty` is a subtype of an

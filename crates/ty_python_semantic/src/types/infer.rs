@@ -10288,7 +10288,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
             }
             ast::Expr::BinOp(binary) if binary.op == ast::Operator::BitOr => {
-                let union_ty = UnionType::from_elements(
+                let union_ty = UnionType::from_elements_minimal_simplify(
                     self.db(),
                     [
                         self.infer_subclass_of_type_expression(&binary.left),
@@ -10314,7 +10314,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let parameters_ty = match self.infer_expression(value) {
                     Type::SpecialForm(SpecialFormType::Union) => match &**parameters {
                         ast::Expr::Tuple(tuple) => {
-                            let ty = UnionType::from_elements(
+                            let ty = UnionType::from_elements_minimal_simplify(
                                 self.db(),
                                 tuple
                                     .iter()
@@ -10552,7 +10552,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
             SpecialFormType::Union => match arguments_slice {
                 ast::Expr::Tuple(t) => {
-                    let union_ty = UnionType::from_elements(
+                    let union_ty = UnionType::from_elements_minimal_simplify(
                         db,
                         t.iter().map(|elt| self.infer_type_expression(elt)),
                     );
