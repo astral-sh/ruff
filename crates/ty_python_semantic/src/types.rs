@@ -4143,21 +4143,6 @@ impl<'db> Type<'db> {
                     .into()
                 }
 
-                Some(KnownFunction::TopMaterialization | KnownFunction::BottomMaterialization) => {
-                    Binding::single(
-                        self,
-                        Signature::new(
-                            Parameters::new([Parameter::positional_only(Some(Name::new_static(
-                                "type",
-                            )))
-                            .type_form()
-                            .with_annotated_type(Type::any())]),
-                            Some(Type::any()),
-                        ),
-                    )
-                    .into()
-                }
-
                 Some(KnownFunction::AssertType) => Binding::single(
                     self,
                     Signature::new(
@@ -5741,6 +5726,8 @@ impl<'db> Type<'db> {
 
                 SpecialFormType::Optional
                 | SpecialFormType::Not
+                | SpecialFormType::Top
+                | SpecialFormType::Bottom
                 | SpecialFormType::TypeOf
                 | SpecialFormType::TypeIs
                 | SpecialFormType::TypeGuard
