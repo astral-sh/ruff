@@ -206,3 +206,10 @@ def issue_19153_2():
     for (o, p), x in [("op", "x")]:
         v[x] = o, p
     return v
+
+
+def issue_19153_3():
+    v = {}
+    for o, (x,) in ["ox"]: 
+        v[(x,)] = o 
+    return v

@@ -438,3 +438,26 @@ help: Replace for loop with dict comprehension
 207     |-        v[x] = o, p
     205 |+    v = {x: (o, p) for (o, p), x in [("op", "x")]}
 208 206 |     return v
+209 207 | 
+210 208 | 
+
+PERF403 [*] Use a dictionary comprehension instead of a for-loop
+   --> PERF403.py:214:9
+    |
+212 |     v = {}
+213 |     for o, (x,) in ["ox"]: 
+214 |         v[(x,)] = o 
+    |         ^^^^^^^^^^^
+215 |     return v
+    |
+help: Replace for loop with dict comprehension
+
+ℹ Unsafe fix
+209 209 | 
+210 210 | 
+211 211 | def issue_19153_3():
+212     |-    v = {}
+213     |-    for o, (x,) in ["ox"]: 
+214     |-        v[(x,)] = o 
+    212 |+    v = {(x,): o for o, (x,) in ["ox"]} 
+215 213 |     return v
