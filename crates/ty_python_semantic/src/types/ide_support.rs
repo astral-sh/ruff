@@ -12,7 +12,7 @@ use crate::semantic_index::{
 };
 use crate::types::call::{CallArguments, MatchedArgument};
 use crate::types::signatures::Signature;
-use crate::types::{ClassBase, ClassLiteral, DynamicType, KnownClass, KnownInstanceType, Type};
+use crate::types::{ClassBase, ClassLiteral, KnownClass, KnownInstanceType, Type};
 use crate::{Db, HasType, NameKind, SemanticModel};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::parsed_module;
@@ -226,7 +226,6 @@ impl<'db> AllMembers<'db> {
                             Type::KnownInstance(
                                 KnownInstanceType::TypeVar(_) | KnownInstanceType::TypeAliasType(_),
                             ) => continue,
-                            Type::Dynamic(DynamicType::TodoTypeAlias) => continue,
                             _ => {}
                         }
                     }
