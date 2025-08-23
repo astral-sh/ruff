@@ -1,4 +1,4 @@
-use crate::symbols::{SymbolInfo, SymbolsOptions, symbols_for_file};
+use crate::symbols::{QueryPattern, SymbolInfo, symbols_for_file_global_only};
 use ruff_db::files::File;
 use ty_project::Db;
 
@@ -12,31 +12,26 @@ pub fn workspace_symbols(db: &dyn Db, query: &str) -> Vec<WorkspaceSymbolInfo> {
 
     let project = db.project();
 
-    let options = SymbolsOptions {
-        hierarchical: false, // Workspace symbols are always flat
-        global_only: false,
-        query_string: Some(query.into()),
-    };
-
+    let query = QueryPattern::new(query);
     let files = project.files(db);
     let results = std::sync::Mutex::new(Vec::new());
     {
         let db = db.dyn_clone();
         let files = &files;
-        let options = &options;
         let results = &results;
+        let query = &query;
 
         rayon::scope(move |s| {
             // For each file, extract symbols and add them to results
             for file in files.iter() {
                 let db = db.dyn_clone();
                 s.spawn(move |_| {
-                    for symbol in symbols_for_file(&*db, *file, options) {
+                    for (_, symbol) in symbols_for_file_global_only(&*db, *file).search(query) {
                         // It seems like we could do better here than
                         // locking `results` for every single symbol,
                         // but this works pretty well as it is.
                         results.lock().unwrap().push(WorkspaceSymbolInfo {
-                            symbol: symbol.clone(),
+                            symbol: symbol.to_owned(),
                             file: *file,
                         });
                     }
@@ -52,7 +47,7 @@ pub fn workspace_symbols(db: &dyn Db, query: &str) -> Vec<WorkspaceSymbolInfo> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WorkspaceSymbolInfo {
     /// The symbol information
-    pub symbol: SymbolInfo,
+    pub symbol: SymbolInfo<'static>,
     /// The file containing the symbol
     pub file: File,
 }
