@@ -10,7 +10,7 @@ pub use resolver::{resolve_module, resolve_real_module};
 use ruff_db::system::SystemPath;
 
 use crate::Db;
-pub(crate) use resolver::{SearchPathIterator, search_paths, ModuleResolveMode};
+pub(crate) use resolver::{ModuleResolveMode, SearchPathIterator, search_paths};
 
 mod list;
 mod module;
