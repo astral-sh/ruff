@@ -1,5 +1,10 @@
 # PEP 613 explicit type aliases
 
+```toml
+[environment]
+python-version = "3.10"
+```
+
 Explicit type aliases were introduced in PEP 613. They are defined using an annotated-assignment
 statement, annotated with `typing.TypeAlias`:
 
@@ -11,7 +16,7 @@ from typing import TypeAlias
 MyInt: TypeAlias = int
 
 def f(x: MyInt):
-    reveal_type(x)  # revealed: MyInt
+    reveal_type(x)  # revealed: int
 
 f(1)
 ```
@@ -30,7 +35,7 @@ from typing import TypeAlias, Union
 IntOrStr: TypeAlias = Union[int, str]
 
 def f(x: IntOrStr):
-    reveal_type(x)  # revealed: IntOrStr
+    reveal_type(x)  # revealed: int | str
     if isinstance(x, int):
         reveal_type(x)  # revealed: int
     else:
@@ -42,18 +47,13 @@ f("foo")
 
 ### New syntax
 
-```toml
-[environment]
-python-version = "3.10"
-```
-
 ```py
 from typing import TypeAlias
 
 IntOrStr: TypeAlias = int | str
 
 def f(x: IntOrStr):
-    reveal_type(x)  # revealed: IntOrStr
+    reveal_type(x)  # revealed: int | str
     if isinstance(x, int):
         reveal_type(x)  # revealed: int
     else:
@@ -75,7 +75,7 @@ from typing import Union, TypeAlias
 MiniJSON: TypeAlias = Union[int, str, list["MiniJSON"]]
 
 def f(x: MiniJSON):
-    reveal_type(x)  # revealed: MiniJSON
+    reveal_type(x)  # revealed: int | str | list[MiniJSON]
     if isinstance(x, int):
         reveal_type(x)  # revealed: int
     elif isinstance(x, str):
@@ -90,18 +90,13 @@ f([1, "foo"])
 
 ### New syntax
 
-```toml
-[environment]
-python-version = "3.10"
-```
-
 ```py
 from typing import TypeAlias
 
 MiniJSON: TypeAlias = int | str | list["MiniJSON"]
 
 def f(x: MiniJSON):
-    reveal_type(x)  # revealed: MiniJSON
+    reveal_type(x)  # revealed: int | str | list[MiniJSON]
     if isinstance(x, int):
         reveal_type(x)  # revealed: int
     elif isinstance(x, str):

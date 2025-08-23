@@ -49,10 +49,7 @@ impl<'db> ClassBase<'db> {
             ClassBase::Dynamic(DynamicType::Any) => "Any",
             ClassBase::Dynamic(DynamicType::Unknown) => "Unknown",
             ClassBase::Dynamic(
-                DynamicType::Todo(_)
-                | DynamicType::TodoPEP695ParamSpec
-                | DynamicType::TodoTypeAlias
-                | DynamicType::TodoUnpack,
+                DynamicType::Todo(_) | DynamicType::TodoPEP695ParamSpec | DynamicType::TodoUnpack,
             ) => "@Todo",
             ClassBase::Protocol => "Protocol",
             ClassBase::Generic => "Generic",
@@ -163,6 +160,7 @@ impl<'db> ClassBase<'db> {
                 KnownInstanceType::SubscriptedGeneric(_) => Some(Self::Generic),
                 KnownInstanceType::SubscriptedProtocol(_) => Some(Self::Protocol),
                 KnownInstanceType::TypeAliasType(_)
+                | KnownInstanceType::TypeAlias(_)
                 | KnownInstanceType::TypeVar(_)
                 | KnownInstanceType::Deprecated(_)
                 | KnownInstanceType::Field(_) => None,
