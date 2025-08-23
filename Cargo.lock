@@ -4241,11 +4241,13 @@ name = "ty_ide"
 version = "0.0.0"
 dependencies = [
  "bitflags 2.9.2",
+ "get-size2",
  "insta",
  "itertools 0.14.0",
  "rayon",
  "regex",
  "ruff_db",
+ "ruff_index",
  "ruff_memory_usage",
  "ruff_python_ast",
  "ruff_python_parser",
