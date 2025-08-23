@@ -10,8 +10,7 @@ pub use resolver::{resolve_module, resolve_real_module};
 use ruff_db::system::SystemPath;
 
 use crate::Db;
-use crate::module_resolver::resolver::{ModuleResolveMode, search_paths};
-pub(crate) use resolver::SearchPathIterator;
+pub(crate) use resolver::{SearchPathIterator, search_paths, ModuleResolveMode};
 
 mod list;
 mod module;
@@ -29,12 +28,6 @@ pub fn system_module_search_paths(db: &dyn Db) -> SystemModuleSearchPathsIter<'_
         // and we don't care about the "real" stdlib
         inner: search_paths(db, ModuleResolveMode::StubsAllowed),
     }
-}
-
-/// Returns an iterator over all search paths used in module resolution for diagnostics
-/// This includes the same paths and order used by the actual module resolver
-pub(crate) fn diagnostic_search_paths(db: &dyn Db) -> SearchPathIterator<'_> {
-    search_paths(db, ModuleResolveMode::StubsAllowed)
 }
 
 pub struct SystemModuleSearchPathsIter<'db> {

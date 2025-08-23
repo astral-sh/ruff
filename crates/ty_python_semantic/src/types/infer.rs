@@ -65,7 +65,7 @@ use super::subclass_of::SubclassOfInner;
 use super::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::module_name::{ModuleName, ModuleNameResolutionError};
 use crate::module_resolver::{
-    KnownModule, diagnostic_search_paths, file_to_module, resolve_module,
+    KnownModule, ModuleResolveMode, file_to_module, resolve_module, search_paths,
 };
 use crate::node_key::NodeKey;
 use crate::place::{
@@ -4996,26 +4996,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Add search paths information to the diagnostic
             // Use the same search paths function that is used in actual module resolution
-            let search_paths_list: Vec<String> = diagnostic_search_paths(self.db())
-                .enumerate()
-                .map(|(index, path)| {
-                    let kind = if path.is_standard_library() {
-                        match path.as_system_path() {
-                            Some(_) => "custom stdlib",
-                            None => "vendored stdlib",
-                        }
-                    } else if path.is_first_party() {
-                        "first-party"
-                    } else {
-                        "site-packages"
-                    };
-                    format!("  {}. {} ({})", index + 1, path, kind)
-                })
-                .collect();
+            let search_paths_list: Vec<String> =
+                search_paths(self.db(), ModuleResolveMode::StubsAllowed)
+                    .enumerate()
+                    .map(|(index, path)| {
+                        format!("  {}. {} ({})", index + 1, path, path.describe_kind())
+                    })
+                    .collect();
 
             if !search_paths_list.is_empty() {
                 diagnostic.info(format_args!(
-                    "Searched in the following paths:\n{}",
+                    "Searched in the following paths during module resolution:\n{}",
                     search_paths_list.join("\n")
                 ));
             }
