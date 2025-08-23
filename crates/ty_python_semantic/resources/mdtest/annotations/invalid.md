@@ -91,6 +91,7 @@ async def outer():  # avoid unrelated syntax errors on yield, yield from, and aw
         l: await baz(),  # error: [invalid-type-form] "`await` expressions are not allowed in type expressions"
         m: (yield 1),  # error: [invalid-type-form] "`yield` expressions are not allowed in type expressions"
         n: (yield from [1]),  # error: [invalid-type-form] "`yield from` expressions are not allowed in type expressions"
+        # error: [invalid-syntax] "`yield from` statement in async function; use `async for` instead"
         o: 1 < 2,  # error: [invalid-type-form] "Comparison expressions are not allowed in type expressions"
         p: bar(),  # error: [invalid-type-form] "Function calls are not allowed in type expressions"
         q: int | f"foo",  # error: [invalid-type-form] "F-strings are not allowed in type expressions"
