@@ -24,6 +24,12 @@ Not: _SpecialForm
 Intersection: _SpecialForm
 TypeOf: _SpecialForm
 CallableTypeOf: _SpecialForm
+# Top[T] evaluates to the top materialization of T, a type that is a supertype
+# of every materialization of T.
+Top: _SpecialForm
+# Bottom[T] evaluates to the bottom materialization of T, a type that is a subtype
+# of every materialization of T.
+Bottom: _SpecialForm
 
 # ty treats annotations of `float` to mean `float | int`, and annotations of `complex`
 # to mean `complex | float | int`. This is to support a typing-system special case [1].
@@ -55,12 +61,6 @@ def dunder_all_names(module: Any) -> Any: ...
 
 # List all members of an enum.
 def enum_members[E: type[Enum]](enum: E) -> tuple[str, ...]: ...
-
-# Returns the type that's an upper bound of materializing the given (gradual) type.
-def top_materialization(type: Any) -> Any: ...
-
-# Returns the type that's a lower bound of materializing the given (gradual) type.
-def bottom_materialization(type: Any) -> Any: ...
 
 # Returns a tuple of all members of the given object, similar to `dir(obj)` and
 # `inspect.getmembers(obj)`, with at least the following differences:

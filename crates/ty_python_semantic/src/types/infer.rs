@@ -10599,6 +10599,54 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 ty
             }
+            SpecialFormType::Top => {
+                let arguments = if let ast::Expr::Tuple(tuple) = arguments_slice {
+                    &*tuple.elts
+                } else {
+                    std::slice::from_ref(arguments_slice)
+                };
+                let num_arguments = arguments.len();
+                let arg = if num_arguments == 1 {
+                    self.infer_type_expression(&arguments[0])
+                } else {
+                    for argument in arguments {
+                        self.infer_type_expression(argument);
+                    }
+                    report_invalid_argument_number_to_special_form(
+                        &self.context,
+                        subscript,
+                        special_form,
+                        num_arguments,
+                        1,
+                    );
+                    Type::unknown()
+                };
+                arg.top_materialization(db)
+            }
+            SpecialFormType::Bottom => {
+                let arguments = if let ast::Expr::Tuple(tuple) = arguments_slice {
+                    &*tuple.elts
+                } else {
+                    std::slice::from_ref(arguments_slice)
+                };
+                let num_arguments = arguments.len();
+                let arg = if num_arguments == 1 {
+                    self.infer_type_expression(&arguments[0])
+                } else {
+                    for argument in arguments {
+                        self.infer_type_expression(argument);
+                    }
+                    report_invalid_argument_number_to_special_form(
+                        &self.context,
+                        subscript,
+                        special_form,
+                        num_arguments,
+                        1,
+                    );
+                    Type::unknown()
+                };
+                arg.bottom_materialization(db)
+            }
             SpecialFormType::TypeOf => {
                 let arguments = if let ast::Expr::Tuple(tuple) = arguments_slice {
                     &*tuple.elts
