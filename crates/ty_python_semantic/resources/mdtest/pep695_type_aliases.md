@@ -264,3 +264,17 @@ def f(marker_list: MarkerList):
     for item in marker_list:
         reveal_type(item)  # revealed: list[MarkerList | MarkerAtom | str] | int | list[MarkerAtom] | str
 ```
+
+#### With Optional
+
+```py
+from typing import Optional, Union
+
+type MarkerAtom = Optional[list["MarkerAtom"]]
+type MarkerList = list[Optional[Union["MarkerList", MarkerAtom, str]]]
+
+def f(marker_list: MarkerList):
+    reveal_type(marker_list)  # revealed: list[MarkerList | MarkerAtom | str | None]
+    for item in marker_list:
+        reveal_type(item)  # revealed: list[MarkerList | MarkerAtom | str | None] | list[MarkerAtom] | None | str
+```
