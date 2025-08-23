@@ -282,7 +282,9 @@ impl LocalReferencesFinder<'_> {
         // where the identifier might be a multi-part module name.
         let offset = covering_node.node().start();
 
-        if let Some(goto_target) = GotoTarget::from_covering_node(covering_node, offset) {
+        if let Some(goto_target) =
+            GotoTarget::from_covering_node(self.db, self.file, covering_node, offset)
+        {
             // Get the definitions for this goto target
             if let Some(current_definitions_nav) = goto_target
                 .get_definition_targets(self.file, self.db, ImportAliasResolution::PreserveAliases)
