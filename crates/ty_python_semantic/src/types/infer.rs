@@ -4696,6 +4696,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
+        // Handle assignments to `TYPE_CHECKING`.
         if target
             .as_name_expr()
             .is_some_and(|name| &name.id == "TYPE_CHECKING")
@@ -4724,6 +4725,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             declared.inner = Type::BooleanLiteral(true);
         }
 
+        // If the target of an assignment is not one of the place expressions we support,
+        // then they are not definitions, so we can only be here if the target is in a form supported as a place expression.
+        // In this case, we can simply store types in `target` below, instead of calling `infer_expression` (which would return `Never`).
+        debug_assert!(PlaceExpr::try_from_expr(target).is_some());
+
         // Handle PEP 613 type aliases.
         if matches!(
             declared.inner,
@@ -4744,11 +4750,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Type::unknown()
             };
             // TODO diagnostic if qualifiers are not empty
-            self.add_declaration_with_binding(
-                target.into(),
-                definition,
-                &DeclaredAndInferredType::AreTheSame(ty.into()),
-            );
+            if value.is_some() || self.in_stub() {
+                self.add_declaration_with_binding(
+                    target.into(),
+                    definition,
+                    &DeclaredAndInferredType::AreTheSame(ty.into()),
+                );
+            } else {
+                self.add_declaration(target.into(), definition, ty.into());
+            }
             return;
         }
 
@@ -4760,11 +4770,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 declared.inner = Type::SpecialForm(special_form);
             }
         }
-
-        // If the target of an assignment is not one of the place expressions we support,
-        // then they are not definitions, so we can only be here if the target is in a form supported as a place expression.
-        // In this case, we can simply store types in `target` below, instead of calling `infer_expression` (which would return `Never`).
-        debug_assert!(PlaceExpr::try_from_expr(target).is_some());
 
         if let Some(value) = value {
             let inferred_ty = self.infer_maybe_standalone_expression(value);

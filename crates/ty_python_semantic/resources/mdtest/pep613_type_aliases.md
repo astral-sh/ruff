@@ -116,13 +116,13 @@ Adapted from <https://github.com/pypa/packaging/blob/main/src/packaging/_parser.
 ```py
 from typing import Union, TypeAlias
 
-MarkerAtom: TypeAlias = Union[str, Sequence["MarkerAtom"]]
-MarkerList: TypeAlias = Sequence[Union["MarkerList", MarkerAtom, str]]
+MarkerAtom: TypeAlias = Union[int, list["MarkerAtom"]]
+MarkerList: TypeAlias = list[Union["MarkerList", MarkerAtom, str]]
 
 def f(marker_list: MarkerList):
-    reveal_type(marker_list)  # revealed: MarkerList
+    reveal_type(marker_list)  # revealed: list[MarkerList | MarkerAtom | str]
     for item in marker_list:
-        reveal_type(item)  # revealed: MarkerList | MarkerAtom | str
+        reveal_type(item)  # revealed: list[MarkerList | MarkerAtom | str] | int | list[MarkerAtom] | str
 ```
 
 ### Invalid examples
@@ -134,6 +134,28 @@ from typing import TypeAlias
 
 # TODO: error
 Bad: TypeAlias
+
+# Nested function so we don't emit unresolved-reference for `Bad`:
+def _():
+    def f(x: Bad):
+        reveal_type(x)  # revealed: Unknown
+```
+
+#### No value, in stub
+
+`stub.pyi`:
+
+```pyi
+from typing import TypeAlias
+
+# TODO: error
+Bad: TypeAlias
+```
+
+`main.py`:
+
+```py
+from stub import Bad
 
 def f(x: Bad):
     reveal_type(x)  # revealed: Unknown
