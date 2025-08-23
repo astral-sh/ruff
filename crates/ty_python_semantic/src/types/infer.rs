@@ -9776,7 +9776,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     ast::Operator::BitOr => {
                         let left_ty = self.infer_type_expression(&binary.left);
                         let right_ty = self.infer_type_expression(&binary.right);
-                        UnionType::from_elements(self.db(), [left_ty, right_ty])
+                        UnionType::from_elements_minimal_simplify(self.db(), [left_ty, right_ty])
                     }
                     // anything else is an invalid annotation:
                     op => {
