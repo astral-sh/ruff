@@ -273,7 +273,7 @@ mod place_state;
 pub(crate) enum SnapshotCompleteness {
     /// The snapshot is complete and can be used alone to determine the type of place.
     Complete,
-    /// The snapshot is incomplete and must take into account other reachable definitions within its scope.
+    /// The snapshot is incomplete and must take into account other reachable definitions in the enclosing scope.
     Incomplete(ScopedSymbolId, ScopedEnclosingSnapshotId),
 }
 
