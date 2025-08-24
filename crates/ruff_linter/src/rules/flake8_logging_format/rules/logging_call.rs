@@ -38,8 +38,7 @@ fn logging_f_string(
         .f_strings()
         .next()
         .map(|f| f.flags.quote_str())
-        .unwrap_or("\"")
-        .to_string();
+        .unwrap_or("\"");
 
     for f in f_string.value.f_strings() {
         for element in &f.elements {
