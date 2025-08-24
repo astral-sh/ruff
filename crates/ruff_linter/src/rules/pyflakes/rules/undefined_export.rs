@@ -1,5 +1,6 @@
-use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+
+use crate::Violation;
 
 /// ## What it does
 /// Checks for undefined names in `__all__`.

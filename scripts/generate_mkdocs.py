@@ -8,6 +8,7 @@ import re
 import shutil
 import subprocess
 from collections.abc import Sequence
+from itertools import chain
 from pathlib import Path
 from typing import NamedTuple
 
@@ -53,7 +54,6 @@ SECTIONS: list[Section] = [
     Section("Contributing", "contributing.md", generated=True),
 ]
 
-
 LINK_REWRITES: dict[str, str] = {
     "https://docs.astral.sh/ruff/": "index.md",
     "https://docs.astral.sh/ruff/configuration/": "configuration.md",
@@ -61,8 +61,8 @@ LINK_REWRITES: dict[str, str] = {
         "configuration.md#config-file-discovery"
     ),
     "https://docs.astral.sh/ruff/contributing/": "contributing.md",
+    "https://docs.astral.sh/ruff/editors": "editors/index.md",
     "https://docs.astral.sh/ruff/editors/setup": "editors/setup.md",
-    "https://docs.astral.sh/ruff/integrations/": "integrations.md",
     "https://docs.astral.sh/ruff/faq/#how-does-ruffs-linter-compare-to-flake8": (
         "faq.md#how-does-ruffs-linter-compare-to-flake8"
     ),
@@ -257,10 +257,18 @@ def main() -> None:
     config["plugins"].append(
         {
             "redirects": {
-                "redirect_maps": {
-                    f"rules/{rule['code']}.md": f"rules/{rule['name']}.md"
-                    for rule in rules
-                },
+                "redirect_maps": dict(
+                    chain.from_iterable(
+                        [
+                            (f"rules/{rule['code']}.md", f"rules/{rule['name']}.md"),
+                            (
+                                f"rules/{rule['code'].lower()}.md",
+                                f"rules/{rule['name']}.md",
+                            ),
+                        ]
+                        for rule in rules
+                    )
+                ),
             },
         },
     )

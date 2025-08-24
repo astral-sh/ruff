@@ -1,0 +1,54 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: instance_layout_conflict.md - Tests for ty's `instance-layout-conflict` error code - `__slots__`: incompatible tuples
+mdtest path: crates/ty_python_semantic/resources/mdtest/instance_layout_conflict.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | class A:
+ 2 |     __slots__ = ("a", "b")
+ 3 | 
+ 4 | class B:
+ 5 |     __slots__ = ("c", "d")
+ 6 | 
+ 7 | class C(  # error: [instance-layout-conflict]
+ 8 |     A,
+ 9 |     B,
+10 | ): ...
+```
+
+# Diagnostics
+
+```
+error[instance-layout-conflict]: Class will raise `TypeError` at runtime due to incompatible bases
+  --> src/mdtest_snippet.py:7:7
+   |
+ 5 |       __slots__ = ("c", "d")
+ 6 |
+ 7 |   class C(  # error: [instance-layout-conflict]
+   |  _______^
+ 8 | |     A,
+ 9 | |     B,
+10 | | ): ...
+   | |_^ Bases `A` and `B` cannot be combined in multiple inheritance
+   |
+info: Two classes cannot coexist in a class's MRO if their instances have incompatible memory layouts
+  --> src/mdtest_snippet.py:8:5
+   |
+ 7 | class C(  # error: [instance-layout-conflict]
+ 8 |     A,
+   |     - `A` instances have a distinct memory layout because `A` defines non-empty `__slots__`
+ 9 |     B,
+   |     - `B` instances have a distinct memory layout because `B` defines non-empty `__slots__`
+10 | ): ...
+   |
+info: rule `instance-layout-conflict` is enabled by default
+
+```

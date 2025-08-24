@@ -1,8 +1,8 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 use crate::rules::flake8_2020::helpers::is_sys;
@@ -168,7 +168,7 @@ impl Violation for SysVersionSlice1 {
 }
 
 /// YTT101, YTT102, YTT301, YTT303
-pub(crate) fn subscript(checker: &mut Checker, value: &Expr, slice: &Expr) {
+pub(crate) fn subscript(checker: &Checker, value: &Expr, slice: &Expr) {
     if is_sys(value, "version", checker.semantic()) {
         match slice {
             Expr::Slice(ast::ExprSlice {
@@ -176,20 +176,17 @@ pub(crate) fn subscript(checker: &mut Checker, value: &Expr, slice: &Expr) {
                 upper: Some(upper),
                 step: None,
                 range: _,
+                node_index: _,
             }) => {
                 if let Expr::NumberLiteral(ast::ExprNumberLiteral {
                     value: ast::Number::Int(i),
                     ..
                 }) = upper.as_ref()
                 {
-                    if *i == 1 && checker.enabled(Rule::SysVersionSlice1) {
-                        checker
-                            .diagnostics
-                            .push(Diagnostic::new(SysVersionSlice1, value.range()));
-                    } else if *i == 3 && checker.enabled(Rule::SysVersionSlice3) {
-                        checker
-                            .diagnostics
-                            .push(Diagnostic::new(SysVersionSlice3, value.range()));
+                    if *i == 1 && checker.is_rule_enabled(Rule::SysVersionSlice1) {
+                        checker.report_diagnostic(SysVersionSlice1, value.range());
+                    } else if *i == 3 && checker.is_rule_enabled(Rule::SysVersionSlice3) {
+                        checker.report_diagnostic(SysVersionSlice3, value.range());
                     }
                 }
             }
@@ -198,14 +195,10 @@ pub(crate) fn subscript(checker: &mut Checker, value: &Expr, slice: &Expr) {
                 value: ast::Number::Int(i),
                 ..
             }) => {
-                if *i == 2 && checker.enabled(Rule::SysVersion2) {
-                    checker
-                        .diagnostics
-                        .push(Diagnostic::new(SysVersion2, value.range()));
-                } else if *i == 0 && checker.enabled(Rule::SysVersion0) {
-                    checker
-                        .diagnostics
-                        .push(Diagnostic::new(SysVersion0, value.range()));
+                if *i == 2 && checker.is_rule_enabled(Rule::SysVersion2) {
+                    checker.report_diagnostic(SysVersion2, value.range());
+                } else if *i == 0 && checker.is_rule_enabled(Rule::SysVersion0) {
+                    checker.report_diagnostic(SysVersion0, value.range());
                 }
             }
 

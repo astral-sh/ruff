@@ -1,11 +1,12 @@
-use crate::server::{client::Notifier, Result};
-use crate::session::DocumentSnapshot;
+use crate::server::Result;
+use crate::session::{Client, DocumentSnapshot};
 use anyhow::Context;
 use lsp_types::{self as types, request as req};
 use regex::Regex;
-use ruff_diagnostics::FixAvailability;
+use ruff_linter::FixAvailability;
 use ruff_linter::registry::{Linter, Rule, RuleNamespace};
 use ruff_source_file::OneIndexed;
+use std::fmt::Write;
 
 pub(crate) struct Hover;
 
@@ -14,12 +15,12 @@ impl super::RequestHandler for Hover {
 }
 
 impl super::BackgroundDocumentRequestHandler for Hover {
-    fn document_url(params: &types::HoverParams) -> std::borrow::Cow<lsp_types::Url> {
+    fn document_url(params: &types::HoverParams) -> std::borrow::Cow<'_, lsp_types::Url> {
         std::borrow::Cow::Borrowed(&params.text_document_position_params.text_document.uri)
     }
     fn run_with_snapshot(
         snapshot: DocumentSnapshot,
-        _notifier: Notifier,
+        _client: &Client,
         params: types::HoverParams,
     ) -> Result<Option<types::Hover>> {
         Ok(hover(&snapshot, &params.text_document_position_params))
@@ -84,12 +85,16 @@ pub(crate) fn hover(
 
 fn format_rule_text(rule: Rule) -> String {
     let mut output = String::new();
-    output.push_str(&format!("# {} ({})", rule.as_ref(), rule.noqa_code()));
+    let _ = write!(&mut output, "# {} ({})", rule.name(), rule.noqa_code());
     output.push('\n');
     output.push('\n');
 
     let (linter, _) = Linter::parse_code(&rule.noqa_code().to_string()).unwrap();
-    output.push_str(&format!("Derived from the **{}** linter.", linter.name()));
+    let _ = write!(
+        &mut output,
+        "Derived from the **{}** linter.",
+        linter.name()
+    );
     output.push('\n');
     output.push('\n');
 

@@ -1,32 +1,37 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/re_lexing/triple_quoted_fstring_2.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: NodeIndex(None),
         range: 0..183,
         body: [
             Expr(
                 StmtExpr {
+                    node_index: NodeIndex(None),
                     range: 167..183,
                     value: FString(
                         ExprFString {
+                            node_index: NodeIndex(None),
                             range: 167..183,
                             value: FStringValue {
                                 inner: Single(
                                     FString(
                                         FString {
                                             range: 167..183,
+                                            node_index: NodeIndex(None),
                                             elements: [
-                                                Expression(
-                                                    FStringExpressionElement {
+                                                Interpolation(
+                                                    InterpolatedElement {
                                                         range: 171..180,
+                                                        node_index: NodeIndex(None),
                                                         expression: Name(
                                                             ExprName {
+                                                                node_index: NodeIndex(None),
                                                                 range: 172..175,
                                                                 id: Name("foo"),
                                                                 ctx: Load,
@@ -35,12 +40,14 @@ Module(
                                                         debug_text: None,
                                                         conversion: None,
                                                         format_spec: Some(
-                                                            FStringFormatSpec {
+                                                            InterpolatedStringFormatSpec {
                                                                 range: 176..180,
+                                                                node_index: NodeIndex(None),
                                                                 elements: [
                                                                     Literal(
-                                                                        FStringLiteralElement {
+                                                                        InterpolatedStringLiteralElement {
                                                                             range: 176..180,
+                                                                            node_index: NodeIndex(None),
                                                                             value: ".3f\n",
                                                                         },
                                                                     ),

@@ -49,10 +49,23 @@ Decimal(float(" nan "))          # Decimal(" nan ")
 Decimal(float(" +nan "))         # Decimal(" +nan ")
 # In this one case, " -nan ", the fix has to be
 # `Decimal(" nan ")`` because `Decimal("-nan") != Decimal(float("-nan"))`
-Decimal(float(" -nan "))         # Decimal(" nan ")
+Decimal(float(" -nan "))         # Decimal("nan")
 Decimal(float(" inf "))          # Decimal(" inf ")
 Decimal(float(" +inf "))         # Decimal(" +inf ")
 Decimal(float(" -inf "))         # Decimal(" -inf ")
 Decimal(float(" infinity "))     # Decimal(" infinity ")
 Decimal(float(" +infinity "))    # Decimal(" +infinity ")
 Decimal(float(" -infinity "))    # Decimal(" -infinity ")
+
+# Escape sequence handling in "-nan" case
+# Here we do not bother respecting the original whitespace
+# and other trivia when offering a fix.
+# https://github.com/astral-sh/ruff/issues/16771
+Decimal(float("\x2dnan"))
+Decimal(float("\x20\x2dnan"))
+Decimal(float("\x20\u002dnan"))
+Decimal(float("\x20\U0000002dnan"))
+Decimal(float("\N{space}\N{hyPHen-MINus}nan"))
+Decimal(float("\x20\N{character tabulation}\N{hyphen-minus}nan"))
+Decimal(float("   -" "nan"))
+Decimal(float("-nAn"))

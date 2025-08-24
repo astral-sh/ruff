@@ -1,11 +1,10 @@
-use ruff_diagnostics::Diagnostic;
-use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_semantic::{BindingKind, Scope, ScopeId};
 use ruff_source_file::SourceRow;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_builtins::helpers::shadows_builtin;
 
@@ -37,7 +36,7 @@ use crate::rules::flake8_builtins::helpers::shadows_builtin;
 /// ```
 ///
 /// Builtins can be marked as exceptions to this rule via the
-/// [`lint.flake8-builtins.builtins-ignorelist`] configuration option, or
+/// [`lint.flake8-builtins.ignorelist`] configuration option, or
 /// converted to the appropriate dunder method. Methods decorated with
 /// `@typing.override` or `@typing_extensions.override` are also
 /// ignored.
@@ -55,7 +54,7 @@ use crate::rules::flake8_builtins::helpers::shadows_builtin;
 /// ```
 ///
 /// ## Options
-/// - `lint.flake8-builtins.builtins-ignorelist`
+/// - `lint.flake8-builtins.ignorelist`
 #[derive(ViolationMetadata)]
 pub(crate) struct BuiltinAttributeShadowing {
     kind: Kind,
@@ -84,7 +83,6 @@ pub(crate) fn builtin_attribute_shadowing(
     scope_id: ScopeId,
     scope: &Scope,
     class_def: &ast::StmtClassDef,
-    diagnostics: &mut Vec<Diagnostic>,
 ) {
     for (name, binding_id) in scope.all_bindings() {
         let binding = checker.semantic().binding(binding_id);
@@ -99,8 +97,8 @@ pub(crate) fn builtin_attribute_shadowing(
         if shadows_builtin(
             name,
             checker.source_type,
-            &checker.settings.flake8_builtins.builtins_ignorelist,
-            checker.settings.target_version,
+            &checker.settings().flake8_builtins.ignorelist,
+            checker.target_version(),
         ) {
             // Ignore explicit overrides.
             if class_def.decorator_list.iter().any(|decorator| {
@@ -136,14 +134,14 @@ pub(crate) fn builtin_attribute_shadowing(
                         == Some(scope_id)
                 })
             {
-                diagnostics.push(Diagnostic::new(
+                checker.report_diagnostic(
                     BuiltinAttributeShadowing {
                         kind,
                         name: name.to_string(),
                         row: checker.compute_source_row(binding.start()),
                     },
                     reference.range(),
-                ));
+                );
             }
         }
     }

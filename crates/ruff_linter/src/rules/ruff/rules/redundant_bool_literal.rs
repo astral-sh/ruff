@@ -1,5 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Expr;
 use ruff_python_semantic::analyze::typing::traverse_literal;
 use ruff_text_size::Ranged;
@@ -7,6 +6,7 @@ use ruff_text_size::Ranged;
 use bitflags::bitflags;
 
 use crate::checkers::ast::Checker;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `Literal[True, False]` type annotations.
@@ -48,7 +48,7 @@ use crate::checkers::ast::Checker;
 /// Further, the `Literal` slice may contain trailing-line comments which the fix would remove.
 ///
 /// ## References
-/// - [Typing documentation: Legal parameters for `Literal` at type check time](https://typing.readthedocs.io/en/latest/spec/literal.html#legal-parameters-for-literal-at-type-check-time)
+/// - [Typing documentation: Legal parameters for `Literal` at type check time](https://typing.python.org/en/latest/spec/literal.html#legal-parameters-for-literal-at-type-check-time)
 /// - [Python documentation: Boolean type - `bool`](https://docs.python.org/3/library/stdtypes.html#boolean-type-bool)
 ///
 /// [mypy]: https://github.com/python/mypy/blob/master/mypy/typeops.py#L985
@@ -81,7 +81,7 @@ impl Violation for RedundantBoolLiteral {
 }
 
 /// RUF038
-pub(crate) fn redundant_bool_literal<'a>(checker: &mut Checker, literal_expr: &'a Expr) {
+pub(crate) fn redundant_bool_literal<'a>(checker: &Checker, literal_expr: &'a Expr) {
     if !checker.semantic().seen_typing() {
         return;
     }
@@ -111,7 +111,7 @@ pub(crate) fn redundant_bool_literal<'a>(checker: &mut Checker, literal_expr: &'
     let seen_others = seen_expr.contains(BooleanLiteral::OTHER);
 
     let mut diagnostic =
-        Diagnostic::new(RedundantBoolLiteral { seen_others }, literal_expr.range());
+        checker.report_diagnostic(RedundantBoolLiteral { seen_others }, literal_expr.range());
 
     // Provide a [`Fix`] when the complete `Literal` can be replaced. Applying the fix
     // can leave an unused import to be fixed by the `unused-import` rule.
@@ -123,8 +123,6 @@ pub(crate) fn redundant_bool_literal<'a>(checker: &mut Checker, literal_expr: &'
             )));
         }
     }
-
-    checker.diagnostics.push(diagnostic);
 }
 
 bitflags! {

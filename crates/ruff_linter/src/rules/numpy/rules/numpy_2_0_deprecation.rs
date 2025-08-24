@@ -1,6 +1,5 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::name::{QualifiedName, QualifiedNameBuilder};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::name::QualifiedNameBuilder;
 use ruff_python_ast::statement_visitor::StatementVisitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr};
@@ -9,6 +8,8 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
+use crate::rules::numpy::helpers::{AttributeSearcher, ImportSearcher};
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for uses of NumPy functions and constants that were removed from
@@ -31,7 +32,7 @@ use crate::importer::ImportRequest;
 /// This rule flags all uses of removed members, along with automatic fixes for
 /// any backwards-compatible replacements.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// import numpy as np
 ///
@@ -156,7 +157,7 @@ enum Compatibility {
 }
 
 /// NPY201
-pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn numpy_2_0_deprecation(checker: &Checker, expr: &Expr) {
     let semantic = checker.semantic();
 
     if !semantic.seen_module(Modules::NUMPY) {
@@ -268,13 +269,17 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
         ["numpy", "deprecate"] => Replacement {
             existing: "deprecate",
             details: Details::Manual {
-                guideline: Some("Emit `DeprecationWarning` with `warnings.warn` directly, or use `typing.deprecated`."),
+                guideline: Some(
+                    "Emit `DeprecationWarning` with `warnings.warn` directly, or use `typing.deprecated`.",
+                ),
             },
         },
         ["numpy", "deprecate_with_doc"] => Replacement {
             existing: "deprecate_with_doc",
             details: Details::Manual {
-                guideline: Some("Emit `DeprecationWarning` with `warnings.warn` directly, or use `typing.deprecated`."),
+                guideline: Some(
+                    "Emit `DeprecationWarning` with `warnings.warn` directly, or use `typing.deprecated`.",
+                ),
             },
         },
         ["numpy", "disp"] => Replacement {
@@ -292,14 +297,14 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
         ["numpy", "find_common_type"] => Replacement {
             existing: "find_common_type",
             details: Details::Manual {
-                guideline: Some("Use `numpy.promote_types` or `numpy.result_type` instead. To achieve semantics for the `scalar_types` argument, use `numpy.result_type` and pass the Python values `0`, `0.0`, or `0j`."),
+                guideline: Some(
+                    "Use `numpy.promote_types` or `numpy.result_type` instead. To achieve semantics for the `scalar_types` argument, use `numpy.result_type` and pass the Python values `0`, `0.0`, or `0j`.",
+                ),
             },
         },
         ["numpy", "get_array_wrap"] => Replacement {
             existing: "get_array_wrap",
-            details: Details::Manual {
-                guideline: None,
-            },
+            details: Details::Manual { guideline: None },
         },
         ["numpy", "float_"] => Replacement {
             existing: "float_",
@@ -357,9 +362,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
         },
         ["numpy", "issctype"] => Replacement {
             existing: "issctype",
-            details: Details::Manual {
-                guideline: None,
-            },
+            details: Details::Manual { guideline: None },
         },
         ["numpy", "issubclass_"] => Replacement {
             existing: "issubclass_",
@@ -385,9 +388,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
         },
         ["numpy", "maximum_sctype"] => Replacement {
             existing: "maximum_sctype",
-            details: Details::Manual {
-                guideline: None,
-            },
+            details: Details::Manual { guideline: None },
         },
         ["numpy", existing @ ("NaN" | "NAN")] => Replacement {
             existing,
@@ -439,9 +440,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
         },
         ["numpy", "obj2sctype"] => Replacement {
             existing: "obj2sctype",
-            details: Details::Manual {
-                guideline: None,
-            },
+            details: Details::Manual { guideline: None },
         },
         ["numpy", "PINF"] => Replacement {
             existing: "PINF",
@@ -493,15 +492,11 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
         },
         ["numpy", "sctype2char"] => Replacement {
             existing: "sctype2char",
-            details: Details::Manual {
-                guideline: None,
-            },
+            details: Details::Manual { guideline: None },
         },
         ["numpy", "sctypes"] => Replacement {
             existing: "sctypes",
-            details: Details::Manual {
-                guideline: None,
-            },
+            details: Details::Manual { guideline: None },
         },
         ["numpy", "seterrobj"] => Replacement {
             existing: "seterrobj",
@@ -672,7 +667,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         Numpy2Deprecation {
             existing: replacement.existing.to_string(),
             migration_guide: replacement.details.guideline(),
@@ -705,8 +700,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
             Edit::range_replacement(python_expr.to_string(), expr.range()),
         )),
         Details::Manual { guideline: _ } => {}
-    };
-    checker.diagnostics.push(diagnostic);
+    }
 }
 
 /// Ignore attempts to access a `numpy` member via its deprecated name
@@ -822,57 +816,6 @@ fn try_block_contains_undeprecated_attribute(
     attribute_searcher.found_attribute
 }
 
-/// AST visitor that searches an AST tree for [`ast::ExprAttribute`] nodes
-/// that match a certain [`QualifiedName`].
-struct AttributeSearcher<'a> {
-    attribute_to_find: QualifiedName<'a>,
-    semantic: &'a SemanticModel<'a>,
-    found_attribute: bool,
-}
-
-impl<'a> AttributeSearcher<'a> {
-    fn new(attribute_to_find: QualifiedName<'a>, semantic: &'a SemanticModel<'a>) -> Self {
-        Self {
-            attribute_to_find,
-            semantic,
-            found_attribute: false,
-        }
-    }
-}
-
-impl Visitor<'_> for AttributeSearcher<'_> {
-    fn visit_expr(&mut self, expr: &'_ Expr) {
-        if self.found_attribute {
-            return;
-        }
-        if expr.is_attribute_expr()
-            && self
-                .semantic
-                .resolve_qualified_name(expr)
-                .is_some_and(|qualified_name| qualified_name == self.attribute_to_find)
-        {
-            self.found_attribute = true;
-            return;
-        }
-        ast::visitor::walk_expr(self, expr);
-    }
-
-    fn visit_stmt(&mut self, stmt: &ruff_python_ast::Stmt) {
-        if !self.found_attribute {
-            ast::visitor::walk_stmt(self, stmt);
-        }
-    }
-
-    fn visit_body(&mut self, body: &[ruff_python_ast::Stmt]) {
-        for stmt in body {
-            self.visit_stmt(stmt);
-            if self.found_attribute {
-                return;
-            }
-        }
-    }
-}
-
 /// Given an [`ast::StmtTry`] node, does the `try` branch of that node
 /// contain any [`ast::StmtImportFrom`] nodes that indicate the numpy
 /// member is being imported from the non-deprecated location?
@@ -891,50 +834,4 @@ fn try_block_contains_undeprecated_import(
     let mut import_searcher = ImportSearcher::new(path, name);
     import_searcher.visit_body(&try_node.body);
     import_searcher.found_import
-}
-
-/// AST visitor that searches an AST tree for [`ast::StmtImportFrom`] nodes
-/// that match a certain [`QualifiedName`].
-struct ImportSearcher<'a> {
-    module: &'a str,
-    name: &'a str,
-    found_import: bool,
-}
-
-impl<'a> ImportSearcher<'a> {
-    fn new(module: &'a str, name: &'a str) -> Self {
-        Self {
-            module,
-            name,
-            found_import: false,
-        }
-    }
-}
-
-impl StatementVisitor<'_> for ImportSearcher<'_> {
-    fn visit_stmt(&mut self, stmt: &ast::Stmt) {
-        if self.found_import {
-            return;
-        }
-        if let ast::Stmt::ImportFrom(ast::StmtImportFrom { module, names, .. }) = stmt {
-            if module.as_ref().is_some_and(|module| module == self.module)
-                && names
-                    .iter()
-                    .any(|ast::Alias { name, .. }| name == self.name)
-            {
-                self.found_import = true;
-                return;
-            }
-        }
-        ast::statement_visitor::walk_stmt(self, stmt);
-    }
-
-    fn visit_body(&mut self, body: &[ruff_python_ast::Stmt]) {
-        for stmt in body {
-            self.visit_stmt(stmt);
-            if self.found_import {
-                return;
-            }
-        }
-    }
 }

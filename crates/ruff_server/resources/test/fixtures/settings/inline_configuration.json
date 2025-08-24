@@ -1,0 +1,16 @@
+{
+  "settings": {
+    "configuration": {
+      "line-length": 100,
+      "lint": {
+        "extend-select": ["I001"]
+      },
+      "format": {
+        "quote-style": "single"
+      }
+    },
+    "lint": {
+      "extendSelect": ["RUF001"]
+    }
+  }
+}

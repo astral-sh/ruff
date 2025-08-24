@@ -80,3 +80,20 @@ def f():
     from typing import cast, Annotated, Literal
 
     cast(list[Annotated["list['Literal[\"A\"]']", "Foo"]], ['A'])
+
+
+def f():
+    from typing import cast
+
+    cast(
+        int  # TC006
+        , 6.0
+    )
+
+
+def f():
+    # Keyword arguments
+    from typing import cast
+
+    cast(typ=int, val=3.0)  # TC006
+    cast(val=3.0, typ=int)  # TC006

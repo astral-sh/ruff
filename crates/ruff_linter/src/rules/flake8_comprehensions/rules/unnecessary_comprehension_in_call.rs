@@ -1,12 +1,13 @@
-use ruff_diagnostics::{Diagnostic, FixAvailability};
-use ruff_diagnostics::{Edit, Fix, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::{self as ast, Expr, Keyword};
 use ruff_text_size::{Ranged, TextSize};
 
+use crate::FixAvailability;
 use crate::checkers::ast::Checker;
+use crate::preview::is_comprehension_with_min_max_sum_enabled;
 use crate::rules::flake8_comprehensions::fixes;
+use crate::{Edit, Fix, Violation};
 
 /// ## What it does
 /// Checks for unnecessary list or set comprehensions passed to builtin functions that take an iterable.
@@ -41,7 +42,7 @@ use crate::rules::flake8_comprehensions::fixes;
 /// short-circuiting it may not improve performance. (It may even slightly regress performance,
 /// though the difference will usually be small.)
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// any([x.id for x in bar])
 /// all([x.id for x in bar])
@@ -88,7 +89,7 @@ impl Violation for UnnecessaryComprehensionInCall {
 
 /// C419
 pub(crate) fn unnecessary_comprehension_in_call(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     func: &Expr,
     args: &[Expr],
@@ -125,7 +126,7 @@ pub(crate) fn unnecessary_comprehension_in_call(
     if !(matches!(
         builtin_function,
         SupportedBuiltins::Any | SupportedBuiltins::All
-    ) || (checker.settings.preview.is_enabled()
+    ) || (is_comprehension_with_min_max_sum_enabled(checker.settings())
         && matches!(
             builtin_function,
             SupportedBuiltins::Sum | SupportedBuiltins::Min | SupportedBuiltins::Max
@@ -135,13 +136,13 @@ pub(crate) fn unnecessary_comprehension_in_call(
     }
 
     let mut diagnostic = match (arg, builtin_function.duplication_variance()) {
-        (Expr::ListComp(_), _) => Diagnostic::new(
+        (Expr::ListComp(_), _) => checker.report_diagnostic(
             UnnecessaryComprehensionInCall {
                 comprehension_kind: ComprehensionKind::List,
             },
             arg.range(),
         ),
-        (Expr::SetComp(_), DuplicationVariance::Invariant) => Diagnostic::new(
+        (Expr::SetComp(_), DuplicationVariance::Invariant) => checker.report_diagnostic(
             UnnecessaryComprehensionInCall {
                 comprehension_kind: ComprehensionKind::Set,
             },
@@ -174,7 +175,6 @@ pub(crate) fn unnecessary_comprehension_in_call(
 
         diagnostic.set_fix(Fix::unsafe_edits(collection_start, [collection_end]));
     }
-    checker.diagnostics.push(diagnostic);
 }
 
 /// Return `true` if the [`Expr`] contains an `await` expression.

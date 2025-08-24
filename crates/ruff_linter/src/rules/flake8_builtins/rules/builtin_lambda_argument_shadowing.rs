@@ -1,8 +1,8 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::ExprLambda;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_builtins::helpers::shadows_builtin;
 
@@ -16,10 +16,10 @@ use crate::rules::flake8_builtins::helpers::shadows_builtin;
 /// builtin, and vice versa.
 ///
 /// Builtins can be marked as exceptions to this rule via the
-/// [`lint.flake8-builtins.builtins-ignorelist`] configuration option.
+/// [`lint.flake8-builtins.ignorelist`] configuration option.
 ///
 /// ## Options
-/// - `lint.flake8-builtins.builtins-ignorelist`
+/// - `lint.flake8-builtins.ignorelist`
 #[derive(ViolationMetadata)]
 pub(crate) struct BuiltinLambdaArgumentShadowing {
     name: String,
@@ -34,24 +34,24 @@ impl Violation for BuiltinLambdaArgumentShadowing {
 }
 
 /// A006
-pub(crate) fn builtin_lambda_argument_shadowing(checker: &mut Checker, lambda: &ExprLambda) {
+pub(crate) fn builtin_lambda_argument_shadowing(checker: &Checker, lambda: &ExprLambda) {
     let Some(parameters) = lambda.parameters.as_ref() else {
         return;
     };
     for param in parameters.iter_non_variadic_params() {
-        let name = &param.parameter.name;
+        let name = param.name();
         if shadows_builtin(
-            name.as_ref(),
+            name,
             checker.source_type,
-            &checker.settings.flake8_builtins.builtins_ignorelist,
-            checker.settings.target_version,
+            &checker.settings().flake8_builtins.ignorelist,
+            checker.target_version(),
         ) {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(
                 BuiltinLambdaArgumentShadowing {
                     name: name.to_string(),
                 },
                 name.range(),
-            ));
+            );
         }
     }
 }

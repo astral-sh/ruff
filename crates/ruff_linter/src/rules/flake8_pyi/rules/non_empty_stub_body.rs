@@ -1,10 +1,10 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_ast::{self as ast, Stmt};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for non-empty function stub bodies.
@@ -26,7 +26,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## References
-/// - [Typing documentation - Writing and Maintaining Stub Files](https://typing.readthedocs.io/en/latest/guides/writing_stubs.html)
+/// - [Typing documentation - Writing and Maintaining Stub Files](https://typing.python.org/en/latest/guides/writing_stubs.html)
 #[derive(ViolationMetadata)]
 pub(crate) struct NonEmptyStubBody;
 
@@ -42,7 +42,7 @@ impl AlwaysFixableViolation for NonEmptyStubBody {
 }
 
 /// PYI010
-pub(crate) fn non_empty_stub_body(checker: &mut Checker, body: &[Stmt]) {
+pub(crate) fn non_empty_stub_body(checker: &Checker, body: &[Stmt]) {
     // Ignore multi-statement bodies (covered by PYI048).
     let [stmt] = body else {
         return;
@@ -59,16 +59,20 @@ pub(crate) fn non_empty_stub_body(checker: &mut Checker, body: &[Stmt]) {
     }
 
     // Ignore `...` (the desired case).
-    if let Stmt::Expr(ast::StmtExpr { value, range: _ }) = stmt {
+    if let Stmt::Expr(ast::StmtExpr {
+        value,
+        range: _,
+        node_index: _,
+    }) = stmt
+    {
         if value.is_ellipsis_literal_expr() {
             return;
         }
     }
 
-    let mut diagnostic = Diagnostic::new(NonEmptyStubBody, stmt.range());
+    let mut diagnostic = checker.report_diagnostic(NonEmptyStubBody, stmt.range());
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         "...".to_string(),
         stmt.range(),
     )));
-    checker.diagnostics.push(diagnostic);
 }

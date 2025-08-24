@@ -1,9 +1,9 @@
 use ruff_python_ast::{ExceptHandler, Expr, Stmt};
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_bandit::helpers::is_untyped_exception;
 
@@ -38,6 +38,9 @@ use crate::rules::flake8_bandit::helpers::is_untyped_exception;
 ///         logging.exception("Error occurred")
 /// ```
 ///
+/// ## Options
+/// - `lint.flake8-bandit.check-typed-exception`
+///
 /// ## References
 /// - [Common Weakness Enumeration: CWE-703](https://cwe.mitre.org/data/definitions/703.html)
 /// - [Python documentation: `logging`](https://docs.python.org/3/library/logging.html)
@@ -53,7 +56,7 @@ impl Violation for TryExceptContinue {
 
 /// S112
 pub(crate) fn try_except_continue(
-    checker: &mut Checker,
+    checker: &Checker,
     except_handler: &ExceptHandler,
     type_: Option<&Expr>,
     body: &[Stmt],
@@ -61,9 +64,7 @@ pub(crate) fn try_except_continue(
 ) {
     if matches!(body, [Stmt::Continue(_)]) {
         if check_typed_exception || is_untyped_exception(type_, checker.semantic()) {
-            checker
-                .diagnostics
-                .push(Diagnostic::new(TryExceptContinue, except_handler.range()));
+            checker.report_diagnostic(TryExceptContinue, except_handler.range());
         }
     }
 }

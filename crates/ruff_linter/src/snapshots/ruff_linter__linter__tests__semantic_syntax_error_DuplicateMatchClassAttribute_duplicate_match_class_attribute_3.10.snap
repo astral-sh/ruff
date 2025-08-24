@@ -1,0 +1,11 @@
+---
+source: crates/ruff_linter/src/linter.rs
+---
+invalid-syntax: attribute name `x` repeated in class pattern
+ --> <filename>:3:21
+  |
+2 | match x:
+3 |     case Point(x=1, x=2):
+  |                     ^
+4 |         pass
+  |

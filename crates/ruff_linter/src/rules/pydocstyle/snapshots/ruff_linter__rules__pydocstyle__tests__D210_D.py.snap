@@ -1,14 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-D.py:288:5: D210 [*] No whitespaces allowed surrounding docstring text
+D210 [*] No whitespaces allowed surrounding docstring text
+   --> D.py:288:5
     |
 286 | @expect('D210: No whitespaces allowed surrounding docstring text')
 287 | def endswith():
 288 |     """Whitespace at the end. """
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D210
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     |
-    = help: Trim surrounding whitespace
+help: Trim surrounding whitespace
 
 ℹ Safe fix
 285 285 | 
@@ -20,14 +21,15 @@ D.py:288:5: D210 [*] No whitespaces allowed surrounding docstring text
 290 290 | 
 291 291 | @expect('D210: No whitespaces allowed surrounding docstring text')
 
-D.py:293:5: D210 [*] No whitespaces allowed surrounding docstring text
+D210 [*] No whitespaces allowed surrounding docstring text
+   --> D.py:293:5
     |
 291 | @expect('D210: No whitespaces allowed surrounding docstring text')
 292 | def around():
 293 |     """ Whitespace at everywhere. """
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D210
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     |
-    = help: Trim surrounding whitespace
+help: Trim surrounding whitespace
 
 ℹ Safe fix
 290 290 | 
@@ -39,7 +41,8 @@ D.py:293:5: D210 [*] No whitespaces allowed surrounding docstring text
 295 295 | 
 296 296 | @expect('D210: No whitespaces allowed surrounding docstring text')
 
-D.py:299:5: D210 [*] No whitespaces allowed surrounding docstring text
+D210 [*] No whitespaces allowed surrounding docstring text
+   --> D.py:299:5
     |
 297 |   @expect('D213: Multi-line docstring summary should start at the second line')
 298 |   def multiline():
@@ -47,9 +50,9 @@ D.py:299:5: D210 [*] No whitespaces allowed surrounding docstring text
 300 | |
 301 | |     This is the end.
 302 | |     """
-    | |_______^ D210
+    | |_______^
     |
-    = help: Trim surrounding whitespace
+help: Trim surrounding whitespace
 
 ℹ Safe fix
 296 296 | @expect('D210: No whitespaces allowed surrounding docstring text')
@@ -61,11 +64,12 @@ D.py:299:5: D210 [*] No whitespaces allowed surrounding docstring text
 301 301 |     This is the end.
 302 302 |     """
 
-D.py:581:5: D210 No whitespaces allowed surrounding docstring text
+D210 No whitespaces allowed surrounding docstring text
+   --> D.py:581:5
     |
 579 |         "or exclamation point (not '\"')")
 580 | def endswith_quote():
 581 |     """Whitespace at the end, but also a quote" """
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D210
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     |
-    = help: Trim surrounding whitespace
+help: Trim surrounding whitespace

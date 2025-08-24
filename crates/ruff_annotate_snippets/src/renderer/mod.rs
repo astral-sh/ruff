@@ -100,7 +100,7 @@ impl Renderer {
         self
     }
 
-    // Set the terminal width
+    /// Set the terminal width
     pub const fn term_width(mut self, term_width: usize) -> Self {
         self.term_width = term_width;
         self

@@ -1,11 +1,11 @@
 use anyhow::Context;
-use lsp_types::{self as types, request as req, Range};
+use lsp_types::{self as types, Range, request as req};
 
 use crate::edit::{RangeExt, ToRangeExt};
 use crate::resolve::is_document_excluded_for_formatting;
+use crate::server::Result;
 use crate::server::api::LSPResult;
-use crate::server::{client::Notifier, Result};
-use crate::session::{DocumentQuery, DocumentSnapshot};
+use crate::session::{Client, DocumentQuery, DocumentSnapshot};
 use crate::{PositionEncoding, TextDocument};
 
 pub(crate) struct FormatRange;
@@ -18,7 +18,7 @@ impl super::BackgroundDocumentRequestHandler for FormatRange {
     super::define_document_url!(params: &types::DocumentRangeFormattingParams);
     fn run_with_snapshot(
         snapshot: DocumentSnapshot,
-        _notifier: Notifier,
+        _client: &Client,
         params: types::DocumentRangeFormattingParams,
     ) -> Result<super::FormatResponse> {
         format_document_range(&snapshot, params.range)
@@ -46,19 +46,17 @@ fn format_text_document_range(
     query: &DocumentQuery,
     encoding: PositionEncoding,
 ) -> Result<super::FormatResponse> {
-    let file_resolver_settings = query.settings().file_resolver();
-    let formatter_settings = query.settings().formatter();
+    let settings = query.settings();
+    let file_path = query.virtual_file_path();
 
     // If the document is excluded, return early.
-    if let Some(file_path) = query.file_path() {
-        if is_document_excluded_for_formatting(
-            &file_path,
-            file_resolver_settings,
-            formatter_settings,
-            text_document.language_id(),
-        ) {
-            return Ok(None);
-        }
+    if is_document_excluded_for_formatting(
+        &file_path,
+        &settings.file_resolver,
+        &settings.formatter,
+        text_document.language_id(),
+    ) {
+        return Ok(None);
     }
 
     let text = text_document.contents();
@@ -67,8 +65,9 @@ fn format_text_document_range(
     let formatted_range = crate::format::format_range(
         text_document,
         query.source_type(),
-        formatter_settings,
+        &settings.formatter,
         range,
+        &file_path,
     )
     .with_failure_code(lsp_server::ErrorCode::InternalError)?;
 

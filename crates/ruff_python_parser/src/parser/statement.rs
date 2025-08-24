@@ -1,25 +1,25 @@
 use compact_str::CompactString;
-use std::fmt::Display;
-
-use rustc_hash::{FxBuildHasher, FxHashSet};
+use std::fmt::{Display, Write};
 
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
-    self as ast, ExceptHandler, Expr, ExprContext, IpyEscapeKind, Operator, Stmt, WithItem,
+    self as ast, AtomicNodeIndex, ExceptHandler, Expr, ExprContext, IpyEscapeKind, Operator,
+    PythonVersion, Stmt, WithItem,
 };
-use ruff_text_size::{Ranged, TextSize};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::parser::expression::{ParsedExpr, EXPR_SET};
+use crate::error::StarTupleKind;
+use crate::parser::expression::{EXPR_SET, ParsedExpr};
 use crate::parser::progress::ParserProgress;
 use crate::parser::{
-    helpers, FunctionKind, Parser, RecoveryContext, RecoveryContextKind, WithItemKind,
+    FunctionKind, Parser, RecoveryContext, RecoveryContextKind, WithItemKind, helpers,
 };
 use crate::token::{TokenKind, TokenValue};
 use crate::token_set::TokenSet;
-use crate::{Mode, ParseErrorType};
+use crate::{Mode, ParseErrorType, UnsupportedSyntaxErrorKind};
 
-use super::expression::ExpressionContext;
 use super::Parenthesized;
+use super::expression::ExpressionContext;
 
 /// Tokens that represent compound statements.
 const COMPOUND_STMT_SET: TokenSet = TokenSet::new([
@@ -304,7 +304,7 @@ impl<'src> Parser<'src> {
                         op,
                         start,
                     ))
-                } else if self.mode == Mode::Ipython && self.at(TokenKind::Question) {
+                } else if self.options.mode == Mode::Ipython && self.at(TokenKind::Question) {
                     Stmt::IpyEscapeCommand(
                         self.parse_ipython_help_end_escape_command_statement(&parsed_expr),
                     )
@@ -312,6 +312,7 @@ impl<'src> Parser<'src> {
                     Stmt::Expr(ast::StmtExpr {
                         range: self.node_range(start),
                         value: Box::new(parsed_expr.expr),
+                        node_index: AtomicNodeIndex::NONE,
                     })
                 }
             }
@@ -367,6 +368,7 @@ impl<'src> Parser<'src> {
         ast::StmtDelete {
             targets,
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -388,15 +390,63 @@ impl<'src> Parser<'src> {
         // return x := 1
         // return *x and y
         let value = self.at_expr().then(|| {
-            Box::new(
-                self.parse_expression_list(ExpressionContext::starred_bitwise_or())
-                    .expr,
-            )
+            let parsed_expr = self.parse_expression_list(ExpressionContext::starred_bitwise_or());
+
+            // test_ok iter_unpack_return_py37
+            // # parse_options: {"target-version": "3.7"}
+            // rest = (4, 5, 6)
+            // def f(): return (1, 2, 3, *rest)
+
+            // test_ok iter_unpack_return_py38
+            // # parse_options: {"target-version": "3.8"}
+            // rest = (4, 5, 6)
+            // def f(): return 1, 2, 3, *rest
+
+            // test_err iter_unpack_return_py37
+            // # parse_options: {"target-version": "3.7"}
+            // rest = (4, 5, 6)
+            // def f(): return 1, 2, 3, *rest
+            self.check_tuple_unpacking(
+                &parsed_expr,
+                UnsupportedSyntaxErrorKind::StarTuple(StarTupleKind::Return),
+            );
+
+            Box::new(parsed_expr.expr)
         });
 
         ast::StmtReturn {
             range: self.node_range(start),
             value,
+            node_index: AtomicNodeIndex::NONE,
+        }
+    }
+
+    /// Report [`UnsupportedSyntaxError`]s for each starred element in `expr` if it is an
+    /// unparenthesized tuple.
+    ///
+    /// This method can be used to check for tuple unpacking in `return`, `yield`, and `for`
+    /// statements, which are only allowed after [Python 3.8] and [Python 3.9], respectively.
+    ///
+    /// [Python 3.8]: https://github.com/python/cpython/issues/76298
+    /// [Python 3.9]: https://github.com/python/cpython/issues/90881
+    pub(super) fn check_tuple_unpacking(&mut self, expr: &Expr, kind: UnsupportedSyntaxErrorKind) {
+        if kind.is_supported(self.options.target_version) {
+            return;
+        }
+
+        let Expr::Tuple(ast::ExprTuple {
+            elts,
+            parenthesized: false,
+            ..
+        }) = expr
+        else {
+            return;
+        };
+
+        for elt in elts {
+            if elt.is_starred_expr() {
+                self.add_unsupported_syntax_error(kind, elt.range());
+            }
         }
     }
 
@@ -473,6 +523,7 @@ impl<'src> Parser<'src> {
             range: self.node_range(start),
             exc,
             cause,
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -513,6 +564,7 @@ impl<'src> Parser<'src> {
         ast::StmtImport {
             range: self.node_range(start),
             names,
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -624,6 +676,7 @@ impl<'src> Parser<'src> {
             names,
             level: leading_dots,
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -640,9 +693,11 @@ impl<'src> Parser<'src> {
                 name: ast::Identifier {
                     id: Name::new_static("*"),
                     range,
+                    node_index: AtomicNodeIndex::NONE,
                 },
                 asname: None,
                 range,
+                node_index: AtomicNodeIndex::NONE,
             };
         }
 
@@ -675,6 +730,7 @@ impl<'src> Parser<'src> {
             range: self.node_range(start),
             name,
             asname,
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -703,6 +759,7 @@ impl<'src> Parser<'src> {
         ast::Identifier {
             id: Name::from(dotted_name),
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -718,6 +775,7 @@ impl<'src> Parser<'src> {
         self.bump(TokenKind::Pass);
         ast::StmtPass {
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -733,6 +791,7 @@ impl<'src> Parser<'src> {
         self.bump(TokenKind::Continue);
         ast::StmtContinue {
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -748,6 +807,7 @@ impl<'src> Parser<'src> {
         self.bump(TokenKind::Break);
         ast::StmtBreak {
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -797,6 +857,7 @@ impl<'src> Parser<'src> {
             test: Box::new(test.expr),
             msg,
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -835,6 +896,7 @@ impl<'src> Parser<'src> {
         ast::StmtGlobal {
             range: self.node_range(start),
             names,
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -850,12 +912,14 @@ impl<'src> Parser<'src> {
         self.bump(TokenKind::Nonlocal);
 
         // test_err nonlocal_stmt_trailing_comma
-        // nonlocal ,
-        // nonlocal x,
-        // nonlocal x, y,
+        // def _():
+        //     nonlocal ,
+        //     nonlocal x,
+        //     nonlocal x, y,
 
         // test_err nonlocal_stmt_expression
-        // nonlocal x + 1
+        // def _():
+        //     nonlocal x + 1
         let names = self.parse_comma_separated_list_into_vec(
             RecoveryContextKind::Identifiers,
             Parser::parse_identifier,
@@ -863,7 +927,8 @@ impl<'src> Parser<'src> {
 
         if names.is_empty() {
             // test_err nonlocal_stmt_empty
-            // nonlocal
+            // def _():
+            //     nonlocal
             self.add_error(
                 ParseErrorType::EmptyNonlocalNames,
                 self.current_token_range(),
@@ -871,11 +936,13 @@ impl<'src> Parser<'src> {
         }
 
         // test_ok nonlocal_stmt
-        // nonlocal x
-        // nonlocal x, y, z
+        // def _():
+        //     nonlocal x
+        //     nonlocal x, y, z
         ast::StmtNonlocal {
             range: self.node_range(start),
             names,
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -888,7 +955,21 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/simple_stmts.html#the-type-statement>
     fn parse_type_alias_statement(&mut self) -> ast::StmtTypeAlias {
         let start = self.node_start();
+        let type_range = self.current_token_range();
         self.bump(TokenKind::Type);
+
+        // test_ok type_stmt_py312
+        // # parse_options: {"target-version": "3.12"}
+        // type x = int
+
+        // test_err type_stmt_py311
+        // # parse_options: {"target-version": "3.11"}
+        // type x = int
+
+        self.add_unsupported_syntax_error(
+            UnsupportedSyntaxErrorKind::TypeAliasStatement,
+            type_range,
+        );
 
         let mut name = Expr::Name(self.parse_name());
         helpers::set_expr_ctx(&mut name, ExprContext::Store);
@@ -911,9 +992,10 @@ impl<'src> Parser<'src> {
 
         ast::StmtTypeAlias {
             name: Box::new(name),
-            type_params,
+            type_params: type_params.map(Box::new),
             value: Box::new(value.expr),
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -932,11 +1014,16 @@ impl<'src> Parser<'src> {
         };
 
         let range = self.node_range(start);
-        if self.mode != Mode::Ipython {
+        if self.options.mode != Mode::Ipython {
             self.add_error(ParseErrorType::UnexpectedIpythonEscapeCommand, range);
         }
 
-        ast::StmtIpyEscapeCommand { range, kind, value }
+        ast::StmtIpyEscapeCommand {
+            range,
+            kind,
+            value,
+            node_index: AtomicNodeIndex::NONE,
+        }
     }
 
     /// Parses an IPython help end escape command at the statement level.
@@ -965,7 +1052,7 @@ impl<'src> Parser<'src> {
                         ..
                     }) = &**slice
                     {
-                        buffer.push_str(&format!("{integer}"));
+                        let _ = write!(buffer, "{integer}");
                     } else {
                         parser.add_error(
                             ParseErrorType::OtherError(
@@ -1032,6 +1119,7 @@ impl<'src> Parser<'src> {
             value: value.into_boxed_str(),
             kind,
             range: self.node_range(parsed_expr.start()),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -1062,10 +1150,10 @@ impl<'src> Parser<'src> {
         // a + b
 
         // test_err assign_stmt_invalid_value_expr
-        // x = *a and b
-        // x = *yield x
-        // x = *yield from x
-        // x = *lambda x: x
+        // x = (*a and b,)
+        // x = (42, *yield x)
+        // x = (42, *yield from x)
+        // x = (*lambda x: x,)
         // x = x := 1
 
         let mut value =
@@ -1099,6 +1187,7 @@ impl<'src> Parser<'src> {
             targets,
             value: Box::new(value.expr),
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -1178,6 +1267,7 @@ impl<'src> Parser<'src> {
             value,
             simple,
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -1232,6 +1322,7 @@ impl<'src> Parser<'src> {
             op,
             value: Box::new(value.expr),
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -1287,6 +1378,7 @@ impl<'src> Parser<'src> {
             body,
             elif_else_clauses,
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -1330,6 +1422,7 @@ impl<'src> Parser<'src> {
             test,
             body,
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -1377,6 +1470,9 @@ impl<'src> Parser<'src> {
         let mut mixed_except_ranges = Vec::new();
         let handlers = self.parse_clauses(Clause::Except, |p| {
             let (handler, kind) = p.parse_except_clause();
+            if let ExceptClauseKind::Star(range) = kind {
+                p.add_unsupported_syntax_error(UnsupportedSyntaxErrorKind::ExceptStar, range);
+            }
             if is_star.is_none() {
                 is_star = Some(kind.is_star());
             } else if is_star != Some(kind.is_star()) {
@@ -1457,6 +1553,18 @@ impl<'src> Parser<'src> {
             );
         }
 
+        // test_ok except_star_py311
+        // # parse_options: {"target-version": "3.11"}
+        // try: ...
+        // except* ValueError: ...
+
+        // test_err except_star_py310
+        // # parse_options: {"target-version": "3.10"}
+        // try: ...
+        // except* ValueError: ...
+        // except* KeyError: ...
+        // except    *     Error: ...
+
         ast::StmtTry {
             body: try_body,
             handlers,
@@ -1464,6 +1572,7 @@ impl<'src> Parser<'src> {
             finalbody,
             is_star,
             range: self.node_range(try_start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -1476,8 +1585,9 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
         self.bump(TokenKind::Except);
 
+        let star_token_range = self.current_token_range();
         let block_kind = if self.eat(TokenKind::Star) {
-            ExceptClauseKind::Star
+            ExceptClauseKind::Star(star_token_range)
         } else {
             ExceptClauseKind::Normal
         };
@@ -1500,25 +1610,50 @@ impl<'src> Parser<'src> {
                     ..
                 })
             ) {
-                // test_err except_stmt_unparenthesized_tuple
-                // try:
-                //     pass
-                // except x, y:
-                //     pass
-                // except x, y as exc:
-                //     pass
-                // try:
-                //     pass
-                // except* x, y:
-                //     pass
-                // except* x, y as eg:
-                //     pass
-                self.add_error(
-                    ParseErrorType::OtherError(
-                        "Multiple exception types must be parenthesized".to_string(),
-                    ),
-                    &parsed_expr,
-                );
+                if self.at(TokenKind::As) {
+                    // test_err except_stmt_unparenthesized_tuple_as
+                    // try:
+                    //     pass
+                    // except x, y as exc:
+                    //     pass
+                    // try:
+                    //     pass
+                    // except* x, y as eg:
+                    //     pass
+                    self.add_error(
+                        ParseErrorType::OtherError(
+                            "Multiple exception types must be parenthesized when using `as`"
+                                .to_string(),
+                        ),
+                        &parsed_expr,
+                    );
+                } else {
+                    // test_err except_stmt_unparenthesized_tuple_no_as_py313
+                    // # parse_options: {"target-version": "3.13"}
+                    // try:
+                    //     pass
+                    // except x, y:
+                    //     pass
+                    // try:
+                    //     pass
+                    // except* x, y:
+                    //     pass
+
+                    // test_ok except_stmt_unparenthesized_tuple_no_as_py314
+                    // # parse_options: {"target-version": "3.14"}
+                    // try:
+                    //     pass
+                    // except x, y:
+                    //     pass
+                    // try:
+                    //     pass
+                    // except* x, y:
+                    //     pass
+                    self.add_unsupported_syntax_error(
+                        UnsupportedSyntaxErrorKind::UnparenthesizedExceptionTypes,
+                        parsed_expr.range(),
+                    );
+                }
             }
             Some(Box::new(parsed_expr.expr))
         } else {
@@ -1587,6 +1722,7 @@ impl<'src> Parser<'src> {
                 name,
                 body: except_body,
                 range: self.node_range(start),
+                node_index: AtomicNodeIndex::NONE,
             }),
             block_kind,
         )
@@ -1658,6 +1794,28 @@ impl<'src> Parser<'src> {
         // for target in x := 1: ...
         let iter = self.parse_expression_list(ExpressionContext::starred_bitwise_or());
 
+        // test_ok for_iter_unpack_py39
+        // # parse_options: {"target-version": "3.9"}
+        // for x in *a,  b: ...
+        // for x in  a, *b: ...
+        // for x in *a, *b: ...
+
+        // test_ok for_iter_unpack_py38
+        // # parse_options: {"target-version": "3.8"}
+        // for x in (*a,  b): ...
+        // for x in ( a, *b): ...
+        // for x in (*a, *b): ...
+
+        // test_err for_iter_unpack_py38
+        // # parse_options: {"target-version": "3.8"}
+        // for x in *a,  b: ...
+        // for x in  a, *b: ...
+        // for x in *a, *b: ...
+        self.check_tuple_unpacking(
+            &iter,
+            UnsupportedSyntaxErrorKind::UnparenthesizedUnpackInFor,
+        );
+
         self.expect(TokenKind::Colon);
 
         let body = self.parse_body(Clause::For);
@@ -1676,6 +1834,7 @@ impl<'src> Parser<'src> {
             body,
             orelse,
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -1723,6 +1882,7 @@ impl<'src> Parser<'src> {
             body,
             orelse,
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -1756,6 +1916,21 @@ impl<'src> Parser<'src> {
         // x = 10
         let type_params = self.try_parse_type_params();
 
+        // test_ok function_type_params_py312
+        // # parse_options: {"target-version": "3.12"}
+        // def foo[T](): ...
+
+        // test_err function_type_params_py311
+        // # parse_options: {"target-version": "3.11"}
+        // def foo[T](): ...
+        // def foo[](): ...
+        if let Some(ast::TypeParams { range, .. }) = &type_params {
+            self.add_unsupported_syntax_error(
+                UnsupportedSyntaxErrorKind::TypeParameterList,
+                *range,
+            );
+        }
+
         // test_ok function_def_parameter_range
         // def foo(
         //     first: int,
@@ -1775,7 +1950,6 @@ impl<'src> Parser<'src> {
                 // test_ok function_def_valid_return_expr
                 // def foo() -> int | str: ...
                 // def foo() -> lambda x: x: ...
-                // def foo() -> (yield x): ...
                 // def foo() -> int if True else str: ...
 
                 // test_err function_def_invalid_return_expr
@@ -1838,6 +2012,7 @@ impl<'src> Parser<'src> {
             is_async: false,
             returns,
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -1870,6 +2045,21 @@ impl<'src> Parser<'src> {
         // x = 10
         let type_params = self.try_parse_type_params();
 
+        // test_ok class_type_params_py312
+        // # parse_options: {"target-version": "3.12"}
+        // class Foo[S: (str, bytes), T: float, *Ts, **P]: ...
+
+        // test_err class_type_params_py311
+        // # parse_options: {"target-version": "3.11"}
+        // class Foo[S: (str, bytes), T: float, *Ts, **P]: ...
+        // class Foo[]: ...
+        if let Some(ast::TypeParams { range, .. }) = &type_params {
+            self.add_unsupported_syntax_error(
+                UnsupportedSyntaxErrorKind::TypeParameterList,
+                *range,
+            );
+        }
+
         // test_ok class_def_arguments
         // class Foo: ...
         // class Foo(): ...
@@ -1892,6 +2082,7 @@ impl<'src> Parser<'src> {
             type_params: type_params.map(Box::new),
             arguments,
             body,
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -1918,6 +2109,7 @@ impl<'src> Parser<'src> {
             body,
             is_async: false,
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -1935,8 +2127,49 @@ impl<'src> Parser<'src> {
             return vec![];
         }
 
+        let open_paren_range = self.current_token_range();
+
         if self.at(TokenKind::Lpar) {
             if let Some(items) = self.try_parse_parenthesized_with_items() {
+                // test_ok tuple_context_manager_py38
+                // # parse_options: {"target-version": "3.8"}
+                // with (
+                //   foo,
+                //   bar,
+                //   baz,
+                // ) as tup: ...
+
+                // test_err tuple_context_manager_py38
+                // # parse_options: {"target-version": "3.8"}
+                // # these cases are _syntactically_ valid before Python 3.9 because the `with` item
+                // # is parsed as a tuple, but this will always cause a runtime error, so we flag it
+                // # anyway
+                // with (foo, bar): ...
+                // with (
+                //   open('foo.txt')) as foo: ...
+                // with (
+                //   foo,
+                //   bar,
+                //   baz,
+                // ): ...
+                // with (foo,): ...
+
+                // test_ok parenthesized_context_manager_py39
+                // # parse_options: {"target-version": "3.9"}
+                // with (foo as x, bar as y): ...
+                // with (foo, bar as y): ...
+                // with (foo as x, bar): ...
+
+                // test_err parenthesized_context_manager_py38
+                // # parse_options: {"target-version": "3.8"}
+                // with (foo as x, bar as y): ...
+                // with (foo, bar as y): ...
+                // with (foo as x, bar): ...
+                self.add_unsupported_syntax_error(
+                    UnsupportedSyntaxErrorKind::ParenthesizedContextManager,
+                    open_paren_range,
+                );
+
                 self.expect(TokenKind::Rpar);
                 items
             } else {
@@ -2145,6 +2378,7 @@ impl<'src> Parser<'src> {
                 range: self.node_range(start),
                 context_expr: context_expr.expr,
                 optional_vars,
+                node_index: AtomicNodeIndex::NONE,
             },
         }
     }
@@ -2213,6 +2447,7 @@ impl<'src> Parser<'src> {
                     subject: Box::new(subject),
                     cases,
                     range: self.node_range(start),
+                    node_index: AtomicNodeIndex::NONE,
                 })
             }
             TokenKind::Newline if matches!(self.peek2(), (TokenKind::Indent, TokenKind::Case)) => {
@@ -2235,6 +2470,7 @@ impl<'src> Parser<'src> {
                     subject: Box::new(subject),
                     cases,
                     range: self.node_range(start),
+                    node_index: AtomicNodeIndex::NONE,
                 })
             }
             _ => {
@@ -2257,15 +2493,32 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
         self.bump(TokenKind::Match);
 
+        let match_range = self.node_range(start);
+
         let subject = self.parse_match_subject_expression();
         self.expect(TokenKind::Colon);
 
         let cases = self.parse_match_body();
 
+        // test_err match_before_py310
+        // # parse_options: { "target-version": "3.9" }
+        // match 2:
+        //     case 1:
+        //         pass
+
+        // test_ok match_after_py310
+        // # parse_options: { "target-version": "3.10" }
+        // match 2:
+        //     case 1:
+        //         pass
+
+        self.add_unsupported_syntax_error(UnsupportedSyntaxErrorKind::Match, match_range);
+
         ast::StmtMatch {
             subject: Box::new(subject),
             cases,
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -2444,6 +2697,7 @@ impl<'src> Parser<'src> {
             guard,
             body,
             range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -2523,6 +2777,84 @@ impl<'src> Parser<'src> {
             let decorator_start = self.node_start();
             self.bump(TokenKind::At);
 
+            let parsed_expr = self.parse_named_expression_or_higher(ExpressionContext::default());
+
+            if self.options.target_version < PythonVersion::PY39 {
+                // test_ok decorator_expression_dotted_ident_py38
+                // # parse_options: { "target-version": "3.8" }
+                // @buttons.clicked.connect
+                // def spam(): ...
+
+                // test_ok decorator_expression_identity_hack_py38
+                // # parse_options: { "target-version": "3.8" }
+                // def _(x): return x
+                // @_(buttons[0].clicked.connect)
+                // def spam(): ...
+
+                // test_ok decorator_expression_eval_hack_py38
+                // # parse_options: { "target-version": "3.8" }
+                // @eval("buttons[0].clicked.connect")
+                // def spam(): ...
+
+                // test_ok decorator_expression_py39
+                // # parse_options: { "target-version": "3.9" }
+                // @buttons[0].clicked.connect
+                // def spam(): ...
+                // @(x := lambda x: x)(foo)
+                // def bar(): ...
+
+                // test_err decorator_expression_py38
+                // # parse_options: { "target-version": "3.8" }
+                // @buttons[0].clicked.connect
+                // def spam(): ...
+
+                // test_err decorator_named_expression_py37
+                // # parse_options: { "target-version": "3.7" }
+                // @(x := lambda x: x)(foo)
+                // def bar(): ...
+
+                // test_err decorator_dict_literal_py38
+                // # parse_options: { "target-version": "3.8" }
+                // @{3: 3}
+                // def bar(): ...
+
+                // test_err decorator_float_literal_py38
+                // # parse_options: { "target-version": "3.8" }
+                // @3.14
+                // def bar(): ...
+
+                // test_ok decorator_await_expression_py39
+                // # parse_options: { "target-version": "3.9" }
+                // async def foo():
+                //     @await bar
+                //     def baz(): ...
+
+                // test_err decorator_await_expression_py38
+                // # parse_options: { "target-version": "3.8" }
+                // async def foo():
+                //     @await bar
+                //     def baz(): ...
+
+                // test_err decorator_non_toplevel_call_expression_py38
+                // # parse_options: { "target-version": "3.8" }
+                // @foo().bar()
+                // def baz(): ...
+
+                let relaxed_decorator_error = match &parsed_expr.expr {
+                    Expr::Call(expr_call) => {
+                        helpers::detect_invalid_pre_py39_decorator_node(&expr_call.func)
+                    }
+                    expr => helpers::detect_invalid_pre_py39_decorator_node(expr),
+                };
+
+                if let Some((error, range)) = relaxed_decorator_error {
+                    self.add_unsupported_syntax_error(
+                        UnsupportedSyntaxErrorKind::RelaxedDecorator(error),
+                        range,
+                    );
+                }
+            }
+
             // test_err decorator_invalid_expression
             // @*x
             // @(*x)
@@ -2530,11 +2862,11 @@ impl<'src> Parser<'src> {
             // @yield x
             // @yield from x
             // def foo(): ...
-            let parsed_expr = self.parse_named_expression_or_higher(ExpressionContext::default());
 
             decorators.push(ast::Decorator {
                 expression: parsed_expr.expr,
                 range: self.node_range(decorator_start),
+                node_index: AtomicNodeIndex::NONE,
             });
 
             // test_err decorator_missing_newline
@@ -2686,16 +3018,41 @@ impl<'src> Parser<'src> {
                             // def foo(*args: *int or str): ...
                             // def foo(*args: *yield x): ...
                             // # def foo(*args: **int): ...
-                            self.parse_conditional_expression_or_higher_impl(
+                            let parsed_expr = self.parse_conditional_expression_or_higher_impl(
                                 ExpressionContext::starred_bitwise_or(),
-                            )
+                            );
+
+                            // test_ok param_with_star_annotation_py311
+                            // # parse_options: {"target-version": "3.11"}
+                            // def foo(*args: *Ts): ...
+
+                            // test_ok param_with_star_annotation_py310
+                            // # parse_options: {"target-version": "3.10"}
+                            // # regression tests for https://github.com/astral-sh/ruff/issues/16874
+                            // # starred parameters are fine, just not the annotation
+                            // from typing import Annotated, Literal
+                            // def foo(*args: Ts): ...
+                            // def foo(*x: Literal["this should allow arbitrary strings"]): ...
+                            // def foo(*x: Annotated[str, "this should allow arbitrary strings"]): ...
+                            // def foo(*args: str, **kwds: int): ...
+                            // def union(*x: A | B): ...
+
+                            // test_err param_with_star_annotation_py310
+                            // # parse_options: {"target-version": "3.10"}
+                            // def foo(*args: *Ts): ...
+                            if parsed_expr.is_starred_expr() {
+                                self.add_unsupported_syntax_error(
+                                    UnsupportedSyntaxErrorKind::StarAnnotation,
+                                    parsed_expr.range(),
+                                );
+                            }
+
+                            parsed_expr
                         }
                         AllowStarAnnotation::No => {
                             // test_ok param_with_annotation
                             // def foo(arg: int): ...
                             // def foo(arg: lambda x: x): ...
-                            // def foo(arg: (yield x)): ...
-                            // def foo(arg: (x := int)): ...
 
                             // test_err param_with_invalid_annotation
                             // def foo(arg: *int): ...
@@ -2723,6 +3080,7 @@ impl<'src> Parser<'src> {
             range: self.node_range(start),
             name,
             annotation,
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -2772,6 +3130,7 @@ impl<'src> Parser<'src> {
             range: self.node_range(start),
             parameter,
             default,
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -2974,6 +3333,21 @@ impl<'src> Parser<'src> {
                         // first time, otherwise it's a user error.
                         std::mem::swap(&mut parameters.args, &mut parameters.posonlyargs);
                         seen_positional_only_separator = true;
+
+                        // test_ok pos_only_py38
+                        // # parse_options: {"target-version": "3.8"}
+                        // def foo(a, /): ...
+
+                        // test_err pos_only_py37
+                        // # parse_options: {"target-version": "3.7"}
+                        // def foo(a, /): ...
+                        // def foo(a, /, b, /): ...
+                        // def foo(a, *args, /, b): ...
+                        // def foo(a, //): ...
+                        parser.add_unsupported_syntax_error(
+                            UnsupportedSyntaxErrorKind::PositionalOnlyParameter,
+                            slash_range,
+                        );
                     }
 
                     last_keyword_only_separator_range = None;
@@ -3034,10 +3408,6 @@ impl<'src> Parser<'src> {
 
         parameters.range = self.node_range(start);
 
-        // test_err params_duplicate_names
-        // def foo(a, a=10, *a, a, a: str, **a): ...
-        self.validate_parameters(&parameters);
-
         parameters
     }
 
@@ -3078,6 +3448,7 @@ impl<'src> Parser<'src> {
         ast::TypeParams {
             range: self.node_range(start),
             type_params,
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -3140,6 +3511,7 @@ impl<'src> Parser<'src> {
                 range: self.node_range(start),
                 name,
                 default,
+                node_index: AtomicNodeIndex::NONE,
             })
 
         // test_ok type_param_param_spec
@@ -3179,6 +3551,7 @@ impl<'src> Parser<'src> {
                 range: self.node_range(start),
                 name,
                 default,
+                node_index: AtomicNodeIndex::NONE,
             })
             // test_ok type_param_type_var
             // type X[T] = int
@@ -3211,6 +3584,7 @@ impl<'src> Parser<'src> {
                 None
             };
 
+            let equal_token_start = self.node_start();
             let default = if self.eat(TokenKind::Equal) {
                 if self.at_expr() {
                     // test_err type_param_type_var_invalid_default_expr
@@ -3236,11 +3610,32 @@ impl<'src> Parser<'src> {
                 None
             };
 
+            // test_ok type_param_default_py313
+            // # parse_options: {"target-version": "3.13"}
+            // type X[T = int] = int
+            // def f[T = int](): ...
+            // class C[T = int](): ...
+
+            // test_err type_param_default_py312
+            // # parse_options: {"target-version": "3.12"}
+            // type X[T = int] = int
+            // def f[T = int](): ...
+            // class C[T = int](): ...
+            // class D[S, T = int, U = uint](): ...
+
+            if default.is_some() {
+                self.add_unsupported_syntax_error(
+                    UnsupportedSyntaxErrorKind::TypeParamDefault,
+                    self.node_range(equal_token_start),
+                );
+            }
+
             ast::TypeParam::TypeVar(ast::TypeParamTypeVar {
                 range: self.node_range(start),
                 name,
                 bound,
                 default,
+                node_index: AtomicNodeIndex::NONE,
             })
         }
     }
@@ -3304,25 +3699,6 @@ impl<'src> Parser<'src> {
         }
     }
 
-    /// Validate that the given parameters doesn't have any duplicate names.
-    ///
-    /// Report errors for all the duplicate names found.
-    fn validate_parameters(&mut self, parameters: &ast::Parameters) {
-        let mut all_arg_names =
-            FxHashSet::with_capacity_and_hasher(parameters.len(), FxBuildHasher);
-
-        for parameter in parameters {
-            let range = parameter.name().range();
-            let param_name = parameter.name().as_str();
-            if !all_arg_names.insert(param_name) {
-                self.add_error(
-                    ParseErrorType::DuplicateParameter(param_name.to_string()),
-                    range,
-                );
-            }
-        }
-    }
-
     /// Classify the `match` soft keyword token.
     ///
     /// # Panics
@@ -3373,6 +3749,7 @@ impl<'src> Parser<'src> {
             | TokenKind::Complex
             | TokenKind::String
             | TokenKind::FStringStart
+            | TokenKind::TStringStart
             | TokenKind::Lbrace
             | TokenKind::Tilde
             | TokenKind::Ellipsis
@@ -3619,12 +3996,14 @@ enum ExceptClauseKind {
     /// A normal except clause e.g., `except Exception as e: ...`.
     Normal,
     /// An except clause with a star e.g., `except *: ...`.
-    Star,
+    ///
+    /// Contains the star's [`TextRange`] for error reporting.
+    Star(TextRange),
 }
 
 impl ExceptClauseKind {
     const fn is_star(self) -> bool {
-        matches!(self, ExceptClauseKind::Star)
+        matches!(self, ExceptClauseKind::Star(..))
     }
 }
 

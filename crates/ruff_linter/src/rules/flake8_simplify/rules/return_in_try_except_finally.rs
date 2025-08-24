@@ -1,9 +1,9 @@
 use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -56,7 +56,7 @@ fn find_return(stmts: &[Stmt]) -> Option<&Stmt> {
 
 /// SIM107
 pub(crate) fn return_in_try_except_finally(
-    checker: &mut Checker,
+    checker: &Checker,
     body: &[Stmt],
     handlers: &[ExceptHandler],
     finalbody: &[Stmt],
@@ -69,10 +69,7 @@ pub(crate) fn return_in_try_except_finally(
 
     if try_has_return || except_has_return {
         if let Some(finally_return) = find_return(finalbody) {
-            checker.diagnostics.push(Diagnostic::new(
-                ReturnInTryExceptFinally,
-                finally_return.range(),
-            ));
+            checker.report_diagnostic(ReturnInTryExceptFinally, finally_return.range());
         }
     }
 }

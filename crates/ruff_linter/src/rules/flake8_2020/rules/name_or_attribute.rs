@@ -1,9 +1,9 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Expr;
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -46,7 +46,7 @@ impl Violation for SixPY3 {
 }
 
 /// YTT202
-pub(crate) fn name_or_attribute(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn name_or_attribute(checker: &Checker, expr: &Expr) {
     if !checker.semantic().seen_module(Modules::SIX) {
         return;
     }
@@ -56,8 +56,6 @@ pub(crate) fn name_or_attribute(checker: &mut Checker, expr: &Expr) {
         .resolve_qualified_name(expr)
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["six", "PY3"]))
     {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(SixPY3, expr.range()));
+        checker.report_diagnostic(SixPY3, expr.range());
     }
 }

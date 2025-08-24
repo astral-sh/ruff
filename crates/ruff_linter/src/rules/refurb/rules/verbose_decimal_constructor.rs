@@ -1,11 +1,13 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_trivia::PythonWhitespace;
 use ruff_text_size::Ranged;
 use std::borrow::Cow;
 
 use crate::checkers::ast::Checker;
+use crate::linter::float::as_non_finite_float_string_literal;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for unnecessary string literal or float casts in `Decimal`
@@ -23,14 +25,21 @@ use crate::checkers::ast::Checker;
 /// Prefer the more concise form of argument passing for `Decimal`
 /// constructors, as it's more readable and idiomatic.
 ///
+/// Note that this rule does not flag quoted float literals such as `Decimal("0.1")`, which will
+/// produce a more precise `Decimal` value than the unquoted `Decimal(0.1)`.
+///
 /// ## Example
 /// ```python
+/// from decimal import Decimal
+///
 /// Decimal("0")
 /// Decimal(float("Infinity"))
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// from decimal import Decimal
+///
 /// Decimal(0)
 /// Decimal("Infinity")
 /// ```
@@ -57,7 +66,7 @@ impl Violation for VerboseDecimalConstructor {
 }
 
 /// FURB157
-pub(crate) fn verbose_decimal_constructor(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCall) {
     if !checker
         .semantic()
         .resolve_qualified_name(&call.func)
@@ -71,7 +80,7 @@ pub(crate) fn verbose_decimal_constructor(checker: &mut Checker, call: &ast::Exp
         return;
     };
 
-    let diagnostic = match value {
+    match value {
         Expr::StringLiteral(ast::ExprStringLiteral {
             value: str_literal, ..
         }) => {
@@ -96,7 +105,7 @@ pub(crate) fn verbose_decimal_constructor(checker: &mut Checker, call: &ast::Exp
 
             // Early return if we now have an empty string
             // or a very long string:
-            if (rest.len() > PYTHONINTMAXSTRDIGITS) || (rest.len() == 0) {
+            if (rest.len() > PYTHONINTMAXSTRDIGITS) || (rest.is_empty()) {
                 return;
             }
 
@@ -106,7 +115,7 @@ pub(crate) fn verbose_decimal_constructor(checker: &mut Checker, call: &ast::Exp
             // Verify that the rest of the string is a valid integer.
             if !rest.bytes().all(|c| c.is_ascii_digit()) {
                 return;
-            };
+            }
 
             // If all the characters are zeros, then the value is zero.
             let rest = match (unary, rest.is_empty()) {
@@ -120,7 +129,7 @@ pub(crate) fn verbose_decimal_constructor(checker: &mut Checker, call: &ast::Exp
             };
 
             let replacement = format!("{unary}{rest}");
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 VerboseDecimalConstructor {
                     replacement: replacement.clone(),
                 },
@@ -131,8 +140,6 @@ pub(crate) fn verbose_decimal_constructor(checker: &mut Checker, call: &ast::Exp
                 replacement,
                 value.range(),
             )));
-
-            diagnostic
         }
         Expr::Call(ast::ExprCall {
             func, arguments, ..
@@ -140,47 +147,29 @@ pub(crate) fn verbose_decimal_constructor(checker: &mut Checker, call: &ast::Exp
             // Must be a call to the `float` builtin.
             if !checker.semantic().match_builtin_expr(func, "float") {
                 return;
-            };
+            }
 
             // Must have exactly one argument, which is a string literal.
-            if arguments.keywords.len() != 0 {
+            if !arguments.keywords.is_empty() {
                 return;
-            };
+            }
             let [float] = arguments.args.as_ref() else {
                 return;
             };
-            let Some(float) = float.as_string_literal_expr() else {
+            let Some(float_str) = as_non_finite_float_string_literal(float) else {
                 return;
             };
 
-            let trimmed = float.value.to_str().trim();
-            let mut matches_non_finite_keyword = false;
-            for non_finite_keyword in [
-                "inf",
-                "+inf",
-                "-inf",
-                "infinity",
-                "+infinity",
-                "-infinity",
-                "nan",
-                "+nan",
-                "-nan",
-            ] {
-                if trimmed.eq_ignore_ascii_case(non_finite_keyword) {
-                    matches_non_finite_keyword = true;
-                    break;
-                }
-            }
-            if !matches_non_finite_keyword {
-                return;
-            }
-
             let mut replacement = checker.locator().slice(float).to_string();
             // `Decimal(float("-nan")) == Decimal("nan")`
-            if trimmed.eq_ignore_ascii_case("-nan") {
-                replacement.remove(replacement.find('-').unwrap());
+            if float_str == "-nan" {
+                // Here we do not attempt to remove just the '-' character.
+                // It may have been encoded (e.g. as '\N{hyphen-minus}')
+                // in the original source slice, and the added complexity
+                // does not make sense for this edge case.
+                replacement = "\"nan\"".to_string();
             }
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 VerboseDecimalConstructor {
                     replacement: replacement.clone(),
                 },
@@ -191,15 +180,9 @@ pub(crate) fn verbose_decimal_constructor(checker: &mut Checker, call: &ast::Exp
                 replacement,
                 value.range(),
             )));
-
-            diagnostic
         }
-        _ => {
-            return;
-        }
-    };
-
-    checker.diagnostics.push(diagnostic);
+        _ => {}
+    }
 }
 
 // ```console

@@ -1,14 +1,13 @@
-use ruff_python_ast::Expr;
+use ruff_python_ast::{Arguments, Expr, ExprCall};
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-
 use crate::rules::flake8_comprehensions::fixes;
+use crate::{AlwaysFixableViolation, Fix};
 
-use super::helpers;
+use crate::rules::flake8_comprehensions::helpers;
 
 /// ## What it does
 /// Checks for unnecessary `list()` calls around list comprehensions.
@@ -16,7 +15,7 @@ use super::helpers;
 /// ## Why is this bad?
 /// It is redundant to use a `list()` call around a list comprehension.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// list([f(x) for x in foo])
 /// ```
@@ -44,12 +43,29 @@ impl AlwaysFixableViolation for UnnecessaryListCall {
 }
 
 /// C411
-pub(crate) fn unnecessary_list_call(
-    checker: &mut Checker,
-    expr: &Expr,
-    func: &Expr,
-    args: &[Expr],
-) {
+pub(crate) fn unnecessary_list_call(checker: &Checker, expr: &Expr, call: &ExprCall) {
+    let ExprCall {
+        func,
+        arguments,
+        range: _,
+        node_index: _,
+    } = call;
+
+    if !arguments.keywords.is_empty() {
+        return;
+    }
+
+    if arguments.args.len() > 1 {
+        return;
+    }
+
+    let Arguments {
+        range: _,
+        node_index: _,
+        args,
+        keywords: _,
+    } = arguments;
+
     let Some(argument) = helpers::first_argument_with_matching_function("list", func, args) else {
         return;
     };
@@ -59,10 +75,9 @@ pub(crate) fn unnecessary_list_call(
     if !checker.semantic().has_builtin_binding("list") {
         return;
     }
-    let mut diagnostic = Diagnostic::new(UnnecessaryListCall, expr.range());
+    let mut diagnostic = checker.report_diagnostic(UnnecessaryListCall, expr.range());
     diagnostic.try_set_fix(|| {
         fixes::fix_unnecessary_list_call(expr, checker.locator(), checker.stylist())
             .map(Fix::unsafe_edit)
     });
-    checker.diagnostics.push(diagnostic);
 }

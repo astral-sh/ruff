@@ -67,7 +67,7 @@ impl ScriptTag {
         let mut lines = contents.lines();
 
         // Ensure that the first line is exactly `# /// script`.
-        if !lines.next().is_some_and(|line| line == "# /// script") {
+        if lines.next().is_none_or(|line| line != "# /// script") {
             return None;
         }
 

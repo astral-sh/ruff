@@ -1,47 +1,117 @@
 use std::cmp::Reverse;
 
-use ruff_diagnostics::Edit;
 use ruff_python_ast::helpers::{map_callable, map_subscript};
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::visitor::transformer::{walk_expr, Transformer};
-use ruff_python_ast::{self as ast, Decorator, Expr};
+use ruff_python_ast::str::Quote;
+use ruff_python_ast::visitor::transformer::{Transformer, walk_expr};
+use ruff_python_ast::{self as ast, Decorator, Expr, StringLiteralFlags};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_parser::typing::parse_type_annotation;
 use ruff_python_semantic::{
-    analyze, Binding, BindingKind, Modules, NodeId, ResolvedReference, ScopeKind, SemanticModel,
+    Binding, BindingKind, Modules, NodeId, ScopeKind, SemanticModel, analyze,
 };
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::rules::flake8_type_checking::settings::Settings;
+use crate::Edit;
 use crate::Locator;
+use crate::settings::LinterSettings;
 
-/// Returns `true` if the [`ResolvedReference`] is in a typing-only context _or_ a runtime-evaluated
-/// context (with quoting enabled).
-pub(crate) fn is_typing_reference(reference: &ResolvedReference, settings: &Settings) -> bool {
-    reference.in_type_checking_block()
-        // if we're not in a type checking block, we necessarily need to be within a
-        // type definition to be considered a typing reference
-        || (reference.in_type_definition()
-            && (reference.in_typing_only_annotation()
-                || reference.in_string_type_definition()
-                || (settings.quote_annotations && reference.in_runtime_evaluated_annotation())))
+/// Represents the kind of an existing or potential typing-only annotation.
+///
+/// Note that the order of variants is important here. `Runtime` has the highest precedence when
+/// calling [`TypingReference::combine`] on two references, followed by `Future`, `Quote`, and
+/// `TypingOnly` with the lowest precedence.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum TypingReference {
+    /// The reference is in a runtime-evaluated context.
+    Runtime,
+    /// The reference is in a runtime-evaluated context, but the
+    /// `lint.future-annotations` setting is enabled.
+    ///
+    /// This takes precedence if both quoting and future imports are enabled.
+    Future,
+    /// The reference is in a runtime-evaluated context, but the
+    /// `lint.flake8-type-checking.quote-annotations` setting is enabled.
+    Quote,
+    /// The reference is in a typing-only context.
+    TypingOnly,
+}
+
+impl TypingReference {
+    /// Determine the kind of [`TypingReference`] for all references to a binding.
+    pub(crate) fn from_references(
+        binding: &Binding,
+        semantic: &SemanticModel,
+        settings: &LinterSettings,
+    ) -> Self {
+        let references = binding
+            .references()
+            .map(|reference_id| semantic.reference(reference_id));
+        let mut kind = Self::TypingOnly;
+        for reference in references {
+            if reference.in_type_checking_block() {
+                kind = kind.combine(Self::TypingOnly);
+                continue;
+            }
+
+            // if we're not in a type checking block, we necessarily need to be within a
+            // type definition to be considered a typing reference
+            if !reference.in_type_definition() {
+                return Self::Runtime;
+            }
+
+            if reference.in_typing_only_annotation() || reference.in_string_type_definition() {
+                kind = kind.combine(Self::TypingOnly);
+                continue;
+            }
+
+            // prefer `from __future__ import annotations` to quoting
+            if settings.future_annotations()
+                && !reference.in_typing_only_annotation()
+                && reference.in_runtime_evaluated_annotation()
+            {
+                kind = kind.combine(Self::Future);
+                continue;
+            }
+
+            if settings.flake8_type_checking.quote_annotations
+                && reference.in_runtime_evaluated_annotation()
+            {
+                kind = kind.combine(Self::Quote);
+                continue;
+            }
+
+            return Self::Runtime;
+        }
+
+        kind
+    }
+
+    /// Logically combine two `TypingReference`s into one.
+    ///
+    /// `TypingReference::Runtime` has the highest precedence, followed by
+    /// `TypingReference::Future`, `TypingReference::Quote`, and then `TypingReference::TypingOnly`.
+    fn combine(self, other: TypingReference) -> TypingReference {
+        self.min(other)
+    }
+
+    fn is_runtime(self) -> bool {
+        matches!(self, Self::Runtime)
+    }
 }
 
 /// Returns `true` if the [`Binding`] represents a runtime-required import.
 pub(crate) fn is_valid_runtime_import(
     binding: &Binding,
     semantic: &SemanticModel,
-    settings: &Settings,
+    settings: &LinterSettings,
 ) -> bool {
     if matches!(
         binding.kind,
         BindingKind::Import(..) | BindingKind::FromImport(..) | BindingKind::SubmoduleImport(..)
     ) {
         binding.context.is_runtime()
-            && binding
-                .references()
-                .map(|reference_id| semantic.reference(reference_id))
-                .any(|reference| !is_typing_reference(reference, settings))
+            && TypingReference::from_references(binding, semantic, settings).is_runtime()
     } else {
         false
     }
@@ -215,7 +285,7 @@ pub(crate) fn is_singledispatch_implementation(
 
         if attribute.attr.as_str() != "register" {
             return false;
-        };
+        }
 
         let Some(id) = semantic.lookup_attribute(attribute.value.as_ref()) else {
             return false;
@@ -249,6 +319,7 @@ pub(crate) fn quote_annotation(
     semantic: &SemanticModel,
     stylist: &Stylist,
     locator: &Locator,
+    flags: StringLiteralFlags,
 ) -> Edit {
     let expr = semantic.expression(node_id).expect("Expression not found");
     if let Some(parent_id) = semantic.parent_expression_id(node_id) {
@@ -258,7 +329,7 @@ pub(crate) fn quote_annotation(
                     // If we're quoting the value of a subscript, we need to quote the entire
                     // expression. For example, when quoting `DataFrame` in `DataFrame[int]`, we
                     // should generate `"DataFrame[int]"`.
-                    return quote_annotation(parent_id, semantic, stylist, locator);
+                    return quote_annotation(parent_id, semantic, stylist, locator, flags);
                 }
             }
             Some(Expr::Attribute(parent)) => {
@@ -266,7 +337,7 @@ pub(crate) fn quote_annotation(
                     // If we're quoting the value of an attribute, we need to quote the entire
                     // expression. For example, when quoting `DataFrame` in `pd.DataFrame`, we
                     // should generate `"pd.DataFrame"`.
-                    return quote_annotation(parent_id, semantic, stylist, locator);
+                    return quote_annotation(parent_id, semantic, stylist, locator, flags);
                 }
             }
             Some(Expr::Call(parent)) => {
@@ -274,7 +345,7 @@ pub(crate) fn quote_annotation(
                     // If we're quoting the function of a call, we need to quote the entire
                     // expression. For example, when quoting `DataFrame` in `DataFrame()`, we
                     // should generate `"DataFrame()"`.
-                    return quote_annotation(parent_id, semantic, stylist, locator);
+                    return quote_annotation(parent_id, semantic, stylist, locator, flags);
                 }
             }
             Some(Expr::BinOp(parent)) => {
@@ -282,14 +353,14 @@ pub(crate) fn quote_annotation(
                     // If we're quoting the left or right side of a binary operation, we need to
                     // quote the entire expression. For example, when quoting `DataFrame` in
                     // `DataFrame | Series`, we should generate `"DataFrame | Series"`.
-                    return quote_annotation(parent_id, semantic, stylist, locator);
+                    return quote_annotation(parent_id, semantic, stylist, locator, flags);
                 }
             }
             _ => {}
         }
     }
 
-    quote_type_expression(expr, semantic, stylist, locator)
+    quote_type_expression(expr, semantic, stylist, locator, flags)
 }
 
 /// Wrap a type expression in quotes.
@@ -305,9 +376,10 @@ pub(crate) fn quote_type_expression(
     semantic: &SemanticModel,
     stylist: &Stylist,
     locator: &Locator,
+    flags: StringLiteralFlags,
 ) -> Edit {
     // Quote the entire expression.
-    let quote_annotator = QuoteAnnotator::new(semantic, stylist, locator);
+    let quote_annotator = QuoteAnnotator::new(semantic, stylist, locator, flags);
 
     Edit::range_replacement(quote_annotator.into_annotation(expr), expr.range())
 }
@@ -336,6 +408,7 @@ pub(crate) struct QuoteAnnotator<'a> {
     semantic: &'a SemanticModel<'a>,
     stylist: &'a Stylist<'a>,
     locator: &'a Locator<'a>,
+    flags: StringLiteralFlags,
 }
 
 impl<'a> QuoteAnnotator<'a> {
@@ -343,11 +416,13 @@ impl<'a> QuoteAnnotator<'a> {
         semantic: &'a SemanticModel<'a>,
         stylist: &'a Stylist<'a>,
         locator: &'a Locator<'a>,
+        flags: StringLiteralFlags,
     ) -> Self {
         Self {
             semantic,
             stylist,
             locator,
+            flags,
         }
     }
 
@@ -357,16 +432,13 @@ impl<'a> QuoteAnnotator<'a> {
         let generator = Generator::from(self.stylist);
         // we first generate the annotation with the inverse quote, so we can
         // generate the string literal with the preferred quote
-        let subgenerator = Generator::new(
-            self.stylist.indentation(),
-            self.stylist.quote().opposite(),
-            self.stylist.line_ending(),
-        );
+        let subgenerator = Generator::new(self.stylist.indentation(), self.stylist.line_ending());
         let annotation = subgenerator.expr(&expr_without_forward_references);
         generator.expr(&Expr::from(ast::StringLiteral {
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             value: annotation.into_boxed_str(),
-            flags: ast::StringLiteralFlags::default(),
+            flags: self.flags,
         }))
     }
 
@@ -376,6 +448,12 @@ impl<'a> QuoteAnnotator<'a> {
         if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice {
             if !elts.is_empty() {
                 self.visit_expr(&mut elts[0]);
+                // The outer annotation will use the preferred quote.
+                // As such, any quotes found in metadata elements inside an `Annotated` slice
+                // should use the opposite quote to the preferred quote.
+                for elt in elts.iter_mut().skip(1) {
+                    QuoteRewriter::new(self.stylist).visit_expr(elt);
+                }
             }
         }
     }
@@ -390,8 +468,10 @@ impl Transformer for QuoteAnnotator<'_> {
                         .semantic
                         .match_typing_qualified_name(&qualified_name, "Literal")
                     {
-                        // we don't want to modify anything inside `Literal`
-                        // so skip visiting this subscripts' slice
+                        // The outer annotation will use the preferred quote.
+                        // As such, any quotes found inside a `Literal` slice
+                        // should use the opposite quote to the preferred quote.
+                        QuoteRewriter::new(self.stylist).visit_expr(slice);
                     } else if self
                         .semantic
                         .match_typing_qualified_name(&qualified_name, "Annotated")
@@ -418,5 +498,26 @@ impl Transformer for QuoteAnnotator<'_> {
                 walk_expr(self, expr);
             }
         }
+    }
+}
+
+/// A [`Transformer`] struct that rewrites all strings in an expression
+/// to use a specified quotation style
+#[derive(Debug)]
+struct QuoteRewriter {
+    preferred_inner_quote: Quote,
+}
+
+impl QuoteRewriter {
+    fn new(stylist: &Stylist) -> Self {
+        Self {
+            preferred_inner_quote: stylist.quote().opposite(),
+        }
+    }
+}
+
+impl Transformer for QuoteRewriter {
+    fn visit_string_literal(&self, literal: &mut ast::StringLiteral) {
+        literal.flags = literal.flags.with_quote_style(self.preferred_inner_quote);
     }
 }

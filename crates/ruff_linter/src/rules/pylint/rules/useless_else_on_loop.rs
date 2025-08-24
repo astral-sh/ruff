@@ -1,8 +1,7 @@
 use anyhow::Result;
 
 use ast::whitespace::indentation;
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier;
 use ruff_python_ast::{self as ast, ExceptHandler, MatchCase, Stmt};
 use ruff_python_codegen::Stylist;
@@ -10,9 +9,10 @@ use ruff_python_index::Indexer;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::fix::edits::adjust_indentation;
-use crate::Locator;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `else` clauses on loops without a `break` statement.
@@ -63,19 +63,14 @@ impl Violation for UselessElseOnLoop {
 }
 
 /// PLW0120
-pub(crate) fn useless_else_on_loop(
-    checker: &mut Checker,
-    stmt: &Stmt,
-    body: &[Stmt],
-    orelse: &[Stmt],
-) {
+pub(crate) fn useless_else_on_loop(checker: &Checker, stmt: &Stmt, body: &[Stmt], orelse: &[Stmt]) {
     if orelse.is_empty() || loop_exits_early(body) {
         return;
     }
 
     let else_range = identifier::else_(stmt, checker.locator().contents()).expect("else clause");
 
-    let mut diagnostic = Diagnostic::new(UselessElseOnLoop, else_range);
+    let mut diagnostic = checker.report_diagnostic(UselessElseOnLoop, else_range);
     diagnostic.try_set_fix(|| {
         remove_else(
             stmt,
@@ -86,7 +81,6 @@ pub(crate) fn useless_else_on_loop(
             checker.stylist(),
         )
     });
-    checker.diagnostics.push(diagnostic);
 }
 
 /// Returns `true` if the given body contains a `break` statement.

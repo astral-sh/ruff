@@ -1,10 +1,10 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, ExprContext, Operator};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for uses of the `+` operator to concatenate collections.
@@ -32,6 +32,12 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// foo = [2, 3, 4]
 /// bar = [1, *foo, 5, 6]
 /// ```
+///
+/// ## Fix safety
+///
+/// The fix is always marked as unsafe because the `+` operator uses the `__add__` magic method and
+/// `*`-unpacking uses the `__iter__` magic method. Both of these could have custom
+/// implementations, causing the fix to change program behaviour.
 ///
 /// ## References
 /// - [PEP 448 – Additional Unpacking Generalizations](https://peps.python.org/pep-0448/)
@@ -72,6 +78,7 @@ fn make_splat_elts(
         value: Box::from(splat_element.clone()),
         ctx: ExprContext::Load,
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     let splat = node.into();
     if splat_at_left {
@@ -95,6 +102,7 @@ fn concatenate_expressions(expr: &Expr) -> Option<(Expr, Type)> {
         op: Operator::Add,
         right,
         range: _,
+        node_index: _,
     }) = expr
     else {
         return None;
@@ -139,6 +147,10 @@ fn concatenate_expressions(expr: &Expr) -> Option<(Expr, Type)> {
         Expr::Call(_) | Expr::Attribute(_) | Expr::Name(_) => {
             make_splat_elts(splat_element, other_elements, splat_at_left)
         }
+        // Subscripts are also considered safe-ish to splat if the indexer is a slice.
+        Expr::Subscript(ast::ExprSubscript { slice, .. }) if matches!(&**slice, Expr::Slice(_)) => {
+            make_splat_elts(splat_element, other_elements, splat_at_left)
+        }
         // If the splat element is itself a list/tuple, insert them in the other list/tuple.
         Expr::List(ast::ExprList { elts, .. }) if matches!(type_, Type::List) => {
             other_elements.iter().chain(elts).cloned().collect()
@@ -154,12 +166,14 @@ fn concatenate_expressions(expr: &Expr) -> Option<(Expr, Type)> {
             elts: new_elts,
             ctx: ExprContext::Load,
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         }
         .into(),
         Type::Tuple => ast::ExprTuple {
             elts: new_elts,
             ctx: ExprContext::Load,
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             parenthesized: true,
         }
         .into(),
@@ -169,7 +183,7 @@ fn concatenate_expressions(expr: &Expr) -> Option<(Expr, Type)> {
 }
 
 /// RUF005
-pub(crate) fn collection_literal_concatenation(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn collection_literal_concatenation(checker: &Checker, expr: &Expr) {
     // If the expression is already a child of an addition, we'll have analyzed it already.
     if matches!(
         checker.semantic().current_expression_parent(),
@@ -190,7 +204,7 @@ pub(crate) fn collection_literal_concatenation(checker: &mut Checker, expr: &Exp
         Type::Tuple => format!("({})", checker.generator().expr(&new_expr)),
         Type::List => checker.generator().expr(&new_expr),
     };
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         CollectionLiteralConcatenation {
             expression: SourceCodeSnippet::new(contents.clone()),
         },
@@ -207,5 +221,4 @@ pub(crate) fn collection_literal_concatenation(checker: &mut Checker, expr: &Exp
             expr.range(),
         )));
     }
-    checker.diagnostics.push(diagnostic);
 }

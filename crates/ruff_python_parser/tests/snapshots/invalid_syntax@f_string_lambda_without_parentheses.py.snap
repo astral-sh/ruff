@@ -1,45 +1,54 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/f_string_lambda_without_parentheses.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: NodeIndex(None),
         range: 0..17,
         body: [
             Expr(
                 StmtExpr {
+                    node_index: NodeIndex(None),
                     range: 0..16,
                     value: FString(
                         ExprFString {
+                            node_index: NodeIndex(None),
                             range: 0..16,
                             value: FStringValue {
                                 inner: Single(
                                     FString(
                                         FString {
                                             range: 0..16,
+                                            node_index: NodeIndex(None),
                                             elements: [
-                                                Expression(
-                                                    FStringExpressionElement {
+                                                Interpolation(
+                                                    InterpolatedElement {
                                                         range: 2..12,
+                                                        node_index: NodeIndex(None),
                                                         expression: Lambda(
                                                             ExprLambda {
+                                                                node_index: NodeIndex(None),
                                                                 range: 3..12,
                                                                 parameters: Some(
                                                                     Parameters {
                                                                         range: 10..11,
+                                                                        node_index: NodeIndex(None),
                                                                         posonlyargs: [],
                                                                         args: [
                                                                             ParameterWithDefault {
                                                                                 range: 10..11,
+                                                                                node_index: NodeIndex(None),
                                                                                 parameter: Parameter {
                                                                                     range: 10..11,
+                                                                                    node_index: NodeIndex(None),
                                                                                     name: Identifier {
                                                                                         id: Name("x"),
                                                                                         range: 10..11,
+                                                                                        node_index: NodeIndex(None),
                                                                                     },
                                                                                     annotation: None,
                                                                                 },
@@ -53,6 +62,7 @@ Module(
                                                                 ),
                                                                 body: Name(
                                                                     ExprName {
+                                                                        node_index: NodeIndex(None),
                                                                         range: 12..12,
                                                                         id: Name(""),
                                                                         ctx: Invalid,
@@ -66,8 +76,9 @@ Module(
                                                     },
                                                 ),
                                                 Literal(
-                                                    FStringLiteralElement {
+                                                    InterpolatedStringLiteralElement {
                                                         range: 12..14,
+                                                        node_index: NodeIndex(None),
                                                         value: " x",
                                                     },
                                                 ),
@@ -111,5 +122,5 @@ Module(
 
   |
 1 | f"{lambda x: x}"
-  |               ^ Syntax Error: Expected an f-string element or the end of the f-string
+  |               ^ Syntax Error: Expected an element of or the end of the f-string
   |

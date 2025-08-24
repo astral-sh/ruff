@@ -1,5 +1,5 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use crate::Violation;
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::Expr;
 use ruff_python_semantic::Modules;
@@ -45,7 +45,7 @@ impl Violation for AirflowVariableNameTaskIdMismatch {
 }
 
 /// AIR001
-pub(crate) fn variable_name_task_id(checker: &mut Checker, targets: &[Expr], value: &Expr) {
+pub(crate) fn variable_name_task_id(checker: &Checker, targets: &[Expr], value: &Expr) {
     if !checker.semantic().seen_module(Modules::AIRFLOW) {
         return;
     }
@@ -110,11 +110,10 @@ pub(crate) fn variable_name_task_id(checker: &mut Checker, targets: &[Expr], val
         return;
     }
 
-    let diagnostic = Diagnostic::new(
+    checker.report_diagnostic(
         AirflowVariableNameTaskIdMismatch {
             task_id: task_id.to_string(),
         },
         target.range(),
     );
-    checker.diagnostics.push(diagnostic);
 }

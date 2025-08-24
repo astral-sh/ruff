@@ -1,13 +1,14 @@
 use std::cmp::Ordering;
-use std::fmt::Formatter;
+use std::fmt::{Formatter, Write as _};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
 
+use crate::commands::completions::config::{OptionString, OptionStringParser};
 use anyhow::bail;
 use clap::builder::{TypedValueParser, ValueParserFactory};
-use clap::{command, Parser, Subcommand};
+use clap::{Parser, Subcommand, command};
 use colored::Colorize;
 use itertools::Itertools;
 use path_absolutize::path_dedot;
@@ -21,11 +22,12 @@ use ruff_linter::settings::types::{
     PythonVersion, UnsafeFixes,
 };
 use ruff_linter::{RuleParser, RuleSelector, RuleSelectorParser};
-use ruff_source_file::{LineIndex, OneIndexed};
+use ruff_options_metadata::{OptionEntry, OptionsMetadata};
+use ruff_python_ast as ast;
+use ruff_source_file::{LineIndex, OneIndexed, PositionEncoding};
 use ruff_text_size::TextRange;
 use ruff_workspace::configuration::{Configuration, RuleSelection};
 use ruff_workspace::options::{Options, PycodestyleOptions};
-use ruff_workspace::options_base::{OptionEntry, OptionsMetadata};
 use ruff_workspace::resolver::ConfigurationTransformer;
 use rustc_hash::FxHashMap;
 use toml;
@@ -91,7 +93,7 @@ pub struct Args {
     pub(crate) global_options: GlobalConfigArgs,
 }
 
-#[allow(clippy::large_enum_variant)]
+#[expect(clippy::large_enum_variant)]
 #[derive(Debug, clap::Subcommand)]
 pub enum Command {
     /// Run Ruff on the given files or directories.
@@ -114,7 +116,11 @@ pub enum Command {
     /// List or describe the available configuration options.
     Config {
         /// Config key to show
-        option: Option<String>,
+        #[arg(
+            value_parser = OptionStringParser,
+            hide_possible_values = true
+        )]
+        option: Option<OptionString>,
         /// Output format
         #[arg(long, value_enum, default_value = "text")]
         output_format: HelpFormat,
@@ -163,6 +169,9 @@ pub struct AnalyzeGraphCommand {
     /// Attempt to detect imports from string literals.
     #[clap(long)]
     detect_string_imports: bool,
+    /// The minimum number of dots in a string import to consider it a valid import.
+    #[clap(long)]
+    min_dots: Option<usize>,
     /// Enable preview mode. Use `--no-preview` to disable.
     #[arg(long, overrides_with("no_preview"))]
     preview: bool,
@@ -171,11 +180,14 @@ pub struct AnalyzeGraphCommand {
     /// The minimum Python version that should be supported.
     #[arg(long, value_enum)]
     target_version: Option<PythonVersion>,
+    /// Path to a virtual environment to use for resolving additional dependencies
+    #[arg(long)]
+    python: Option<PathBuf>,
 }
 
 // The `Parser` derive is for ruff_dev, for ruff `Args` would be sufficient
 #[derive(Clone, Debug, clap::Parser)]
-#[allow(clippy::struct_excessive_bools)]
+#[expect(clippy::struct_excessive_bools)]
 pub struct CheckCommand {
     /// List of files or directories to check.
     #[clap(help = "List of files or directories to check [default: .]")]
@@ -437,7 +449,7 @@ pub struct CheckCommand {
 }
 
 #[derive(Clone, Debug, clap::Parser)]
-#[allow(clippy::struct_excessive_bools)]
+#[expect(clippy::struct_excessive_bools)]
 pub struct FormatCommand {
     /// List of files or directories to format.
     #[clap(help = "List of files or directories to format [default: .]")]
@@ -521,6 +533,10 @@ pub struct FormatCommand {
     /// The option can only be used when formatting a single file. Range formatting of notebooks is unsupported.
     #[clap(long, help_heading = "Editor options", verbatim_doc_comment)]
     pub range: Option<FormatRange>,
+
+    /// Exit with a non-zero status code if any files were modified via format, even if all files were formatted successfully.
+    #[arg(long, help_heading = "Miscellaneous", alias = "exit-non-zero-on-fix")]
+    pub exit_non_zero_on_format: bool,
 }
 
 #[derive(Copy, Clone, Debug, clap::Parser)]
@@ -547,7 +563,7 @@ pub enum HelpFormat {
     Json,
 }
 
-#[allow(clippy::module_name_repetitions)]
+#[expect(clippy::module_name_repetitions)]
 #[derive(Debug, Default, Clone, clap::Args)]
 pub struct LogLevelArgs {
     /// Enable verbose logging.
@@ -722,7 +738,7 @@ impl CheckCommand {
             preview: resolve_bool_arg(self.preview, self.no_preview).map(PreviewMode::from),
             respect_gitignore: resolve_bool_arg(self.respect_gitignore, self.no_respect_gitignore),
             select: self.select,
-            target_version: self.target_version,
+            target_version: self.target_version.map(ast::PythonVersion::from),
             unfixable: self.unfixable,
             // TODO(charlie): Included in `pyproject.toml`, but not inherited.
             cache_dir: self.cache_dir,
@@ -756,6 +772,7 @@ impl FormatCommand {
             no_cache: self.no_cache,
             stdin_filename: self.stdin_filename,
             range: self.range,
+            exit_non_zero_on_format: self.exit_non_zero_on_format,
         };
 
         let cli_overrides = ExplicitConfigOverrides {
@@ -764,7 +781,7 @@ impl FormatCommand {
             exclude: self.exclude,
             preview: resolve_bool_arg(self.preview, self.no_preview).map(PreviewMode::from),
             force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
-            target_version: self.target_version,
+            target_version: self.target_version.map(ast::PythonVersion::from),
             cache_dir: self.cache_dir,
             extension: self.extension,
             ..ExplicitConfigOverrides::default()
@@ -785,6 +802,7 @@ impl AnalyzeGraphCommand {
         let format_arguments = AnalyzeGraphArgs {
             files: self.files,
             direction: self.direction,
+            python: self.python,
         };
 
         let cli_overrides = ExplicitConfigOverrides {
@@ -793,8 +811,9 @@ impl AnalyzeGraphCommand {
             } else {
                 None
             },
+            string_imports_min_dots: self.min_dots,
             preview: resolve_bool_arg(self.preview, self.no_preview).map(PreviewMode::from),
-            target_version: self.target_version,
+            target_version: self.target_version.map(ast::PythonVersion::from),
             ..ExplicitConfigOverrides::default()
         };
 
@@ -823,7 +842,7 @@ enum InvalidConfigFlagReason {
     ValidTomlButInvalidRuffSchema(toml::de::Error),
     /// It was a valid ruff config file, but the user tried to pass a
     /// value for `extend` as part of the config override.
-    // `extend` is special, because it affects which config files we look at
+    /// `extend` is special, because it affects which config files we look at
     /// in the first place. We currently only parse --config overrides *after*
     /// we've combined them with all the arguments from the various config files
     /// that we found, so trying to override `extend` as part of a --config
@@ -962,12 +981,13 @@ A `--config` flag must either be a path to a `.toml` configuration file
             .is_some_and(|ext| ext.eq_ignore_ascii_case("toml"))
         {
             if !value.contains('=') {
-                tip.push_str(&format!(
+                let _ = write!(
+                    &mut tip,
                     "
 
 It looks like you were trying to pass a path to a configuration file.
 The path `{value}` does not point to a configuration file"
-                ));
+                );
             }
         } else if let Some((key, value)) = value.split_once('=') {
             let key = key.trim_ascii();
@@ -981,7 +1001,8 @@ The path `{value}` does not point to a configuration file"
                         .map(|(name, _)| format!("- `{key}.{name}`"))
                         .join("\n");
 
-                    tip.push_str(&format!(
+                    let _ = write!(
+                        &mut tip,
                         "
 
 `{key}` is a table of configuration options.
@@ -990,13 +1011,14 @@ Did you want to override one of the table's subkeys?
 Possible choices:
 
 {prefixed_subfields}"
-                    ));
+                    );
                 }
                 _ => {
-                    tip.push_str(&format!(
+                    let _ = write!(
+                        &mut tip,
                         "\n\n{}:\n\n{underlying_error}",
                         config_parse_error.description()
-                    ));
+                    );
                 }
             }
         }
@@ -1013,7 +1035,7 @@ Possible choices:
 
 /// CLI settings that are distinct from configuration (commands, lists of files,
 /// etc.).
-#[allow(clippy::struct_excessive_bools)]
+#[expect(clippy::struct_excessive_bools)]
 pub struct CheckArguments {
     pub add_noqa: bool,
     pub diff: bool,
@@ -1032,7 +1054,7 @@ pub struct CheckArguments {
 
 /// CLI settings that are distinct from configuration (commands, lists of files,
 /// etc.).
-#[allow(clippy::struct_excessive_bools)]
+#[expect(clippy::struct_excessive_bools)]
 pub struct FormatArguments {
     pub check: bool,
     pub no_cache: bool,
@@ -1040,6 +1062,7 @@ pub struct FormatArguments {
     pub files: Vec<PathBuf>,
     pub stdin_filename: Option<PathBuf>,
     pub range: Option<FormatRange>,
+    pub exit_non_zero_on_format: bool,
 }
 
 /// A text range specified by line and column numbers.
@@ -1054,8 +1077,9 @@ impl FormatRange {
     ///
     /// Returns an empty range if the start range is past the end of `source`.
     pub(super) fn to_text_range(self, source: &str, line_index: &LineIndex) -> TextRange {
-        let start_byte_offset = line_index.offset(self.start.line, self.start.column, source);
-        let end_byte_offset = line_index.offset(self.end.line, self.end.column, source);
+        let start_byte_offset =
+            line_index.offset(self.start.into(), source, PositionEncoding::Utf32);
+        let end_byte_offset = line_index.offset(self.end.into(), source, PositionEncoding::Utf32);
 
         TextRange::new(start_byte_offset, end_byte_offset)
     }
@@ -1106,10 +1130,10 @@ impl std::fmt::Display for FormatRangeParseError {
                 write!(
                     f,
                     "the start position '{start_invalid}' is greater than the end position '{end_invalid}'.\n  {tip} Try switching start and end: '{end}-{start}'",
-                    start_invalid=start.to_string().bold().yellow(),
-                    end_invalid=end.to_string().bold().yellow(),
-                    start=start.to_string().green().bold(),
-                    end=end.to_string().green().bold()
+                    start_invalid = start.to_string().bold().yellow(),
+                    end_invalid = end.to_string().bold().yellow(),
+                    start = start.to_string().green().bold(),
+                    end = end.to_string().green().bold()
                 )
             }
             FormatRangeParseError::InvalidStart(inner) => inner.write(f, true),
@@ -1124,6 +1148,15 @@ impl std::error::Error for FormatRangeParseError {}
 pub struct LineColumn {
     pub line: OneIndexed,
     pub column: OneIndexed,
+}
+
+impl From<LineColumn> for ruff_source_file::SourceLocation {
+    fn from(value: LineColumn) -> Self {
+        Self {
+            line: value.line,
+            character_offset: value.column,
+        }
+    }
 }
 
 impl std::fmt::Display for LineColumn {
@@ -1201,30 +1234,36 @@ impl LineColumnParseError {
 
         match self {
             LineColumnParseError::ColumnParseError(inner) => {
-                write!(f, "the {range}s column is not a valid number ({inner})'\n  {tip} The format is 'line:column'.")
+                write!(
+                    f,
+                    "the {range}s column is not a valid number ({inner})'\n  {tip} The format is 'line:column'."
+                )
             }
             LineColumnParseError::LineParseError(inner) => {
-                write!(f, "the {range} line is not a valid number ({inner})\n  {tip} The format is 'line:column'.")
+                write!(
+                    f,
+                    "the {range} line is not a valid number ({inner})\n  {tip} The format is 'line:column'."
+                )
             }
             LineColumnParseError::ZeroColumnIndex { line } => {
                 write!(
                     f,
                     "the {range} column is 0, but it should be 1 or greater.\n  {tip} The column numbers start at 1.\n  {tip} Try {suggestion} instead.",
-                    suggestion=format!("{line}:1").green().bold()
+                    suggestion = format!("{line}:1").green().bold()
                 )
             }
             LineColumnParseError::ZeroLineIndex { column } => {
                 write!(
                     f,
                     "the {range} line is 0, but it should be 1 or greater.\n  {tip} The line numbers start at 1.\n  {tip} Try {suggestion} instead.",
-                    suggestion=format!("1:{column}").green().bold()
+                    suggestion = format!("1:{column}").green().bold()
                 )
             }
             LineColumnParseError::ZeroLineAndColumnIndex => {
                 write!(
                     f,
                     "the {range} line and column are both 0, but they should be 1 or greater.\n  {tip} The line and column numbers start at 1.\n  {tip} Try {suggestion} instead.",
-                    suggestion="1:1".to_string().green().bold()
+                    suggestion = "1:1".to_string().green().bold()
                 )
             }
         }
@@ -1236,12 +1275,12 @@ impl LineColumnParseError {
 pub struct AnalyzeGraphArgs {
     pub files: Vec<PathBuf>,
     pub direction: Direction,
+    pub python: Option<PathBuf>,
 }
 
 /// Configuration overrides provided via dedicated CLI flags:
 /// `--line-length`, `--respect-gitignore`, etc.
 #[derive(Clone, Default)]
-#[allow(clippy::struct_excessive_bools)]
 struct ExplicitConfigOverrides {
     dummy_variable_rgx: Option<Regex>,
     exclude: Option<Vec<FilePattern>>,
@@ -1258,7 +1297,7 @@ struct ExplicitConfigOverrides {
     preview: Option<PreviewMode>,
     respect_gitignore: Option<bool>,
     select: Option<Vec<RuleSelector>>,
-    target_version: Option<PythonVersion>,
+    target_version: Option<ast::PythonVersion>,
     unfixable: Option<Vec<RuleSelector>>,
     // TODO(charlie): Captured in pyproject.toml as a default, but not part of `Settings`.
     cache_dir: Option<PathBuf>,
@@ -1270,6 +1309,7 @@ struct ExplicitConfigOverrides {
     show_fixes: Option<bool>,
     extension: Option<Vec<ExtensionPair>>,
     detect_string_imports: Option<bool>,
+    string_imports_min_dots: Option<usize>,
 }
 
 impl ConfigurationTransformer for ExplicitConfigOverrides {
@@ -1356,6 +1396,9 @@ impl ConfigurationTransformer for ExplicitConfigOverrides {
         }
         if let Some(detect_string_imports) = &self.detect_string_imports {
             config.analyze.detect_string_imports = Some(*detect_string_imports);
+        }
+        if let Some(string_imports_min_dots) = &self.string_imports_min_dots {
+            config.analyze.string_imports_min_dots = Some(*string_imports_min_dots);
         }
 
         config

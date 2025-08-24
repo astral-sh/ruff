@@ -2,15 +2,16 @@
 //! command-line options. Structure is optimized for internal usage, as opposed
 //! to external visibility or parsing.
 
-use path_absolutize::path_dedot;
 use regex::Regex;
 use rustc_hash::FxHashSet;
 use std::fmt::{Display, Formatter};
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
+use types::CompiledPerFileTargetVersionList;
 
 use crate::codes::RuleCodePrefix;
 use ruff_macros::CacheKey;
+use ruff_python_ast::PythonVersion;
 
 use crate::line_width::LineLength;
 use crate::registry::{Linter, Rule};
@@ -21,10 +22,8 @@ use crate::rules::{
     flake8_self, flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe,
     pep8_naming, pycodestyle, pydoclint, pydocstyle, pyflakes, pylint, pyupgrade, ruff,
 };
-use crate::settings::types::{
-    CompiledPerFileIgnoreList, ExtensionMapping, FilePatternSet, PythonVersion,
-};
-use crate::{codes, RuleSelector};
+use crate::settings::types::{CompiledPerFileIgnoreList, ExtensionMapping, FilePatternSet};
+use crate::{RuleSelector, codes, fs};
 
 use super::line_width::IndentWidth;
 
@@ -211,6 +210,7 @@ macro_rules! display_settings {
 }
 
 #[derive(Debug, Clone, CacheKey)]
+#[expect(clippy::struct_excessive_bools)]
 pub struct LinterSettings {
     pub exclude: FilePatternSet,
     pub extension: ExtensionMapping,
@@ -220,7 +220,21 @@ pub struct LinterSettings {
     pub per_file_ignores: CompiledPerFileIgnoreList,
     pub fix_safety: FixSafetyTable,
 
-    pub target_version: PythonVersion,
+    /// The non-path-resolved Python version specified by the `target-version` input option.
+    ///
+    /// If you have a `Checker` available, see its `target_version` method instead.
+    ///
+    /// Otherwise, see [`LinterSettings::resolve_target_version`] for a way to obtain the Python
+    /// version for a given file, while respecting the overrides in `per_file_target_version`.
+    pub unresolved_target_version: TargetVersion,
+    /// Path-specific overrides to `unresolved_target_version`.
+    ///
+    /// If you have a `Checker` available, see its `target_version` method instead.
+    ///
+    /// Otherwise, see [`LinterSettings::resolve_target_version`] for a way to check a given
+    /// [`Path`] against these patterns, while falling back to `unresolved_target_version` if none
+    /// of them match.
+    pub per_file_target_version: CompiledPerFileTargetVersionList,
     pub preview: PreviewMode,
     pub explicit_preview_rules: bool,
 
@@ -237,6 +251,8 @@ pub struct LinterSettings {
     pub line_length: LineLength,
     pub task_tags: Vec<String>,
     pub typing_modules: Vec<String>,
+    pub typing_extensions: bool,
+    pub future_annotations: bool,
 
     // Plugins
     pub flake8_annotations: flake8_annotations::settings::Settings,
@@ -282,7 +298,8 @@ impl Display for LinterSettings {
                 self.per_file_ignores,
                 self.fix_safety | nested,
 
-                self.target_version | debug,
+                self.unresolved_target_version,
+                self.per_file_target_version,
                 self.preview,
                 self.explicit_preview_rules,
                 self.extension | debug,
@@ -299,6 +316,7 @@ impl Display for LinterSettings {
                 self.line_length,
                 self.task_tags | array,
                 self.typing_modules | array,
+                self.typing_extensions,
             ]
         }
         writeln!(f, "\n# Linter Plugins")?;
@@ -362,7 +380,7 @@ impl LinterSettings {
     pub fn for_rule(rule_code: Rule) -> Self {
         Self {
             rules: RuleTable::from_iter([rule_code]),
-            target_version: PythonVersion::latest(),
+            unresolved_target_version: PythonVersion::latest().into(),
             ..Self::default()
         }
     }
@@ -370,7 +388,7 @@ impl LinterSettings {
     pub fn for_rules(rules: impl IntoIterator<Item = Rule>) -> Self {
         Self {
             rules: RuleTable::from_iter(rules),
-            target_version: PythonVersion::latest(),
+            unresolved_target_version: PythonVersion::latest().into(),
             ..Self::default()
         }
     }
@@ -378,7 +396,8 @@ impl LinterSettings {
     pub fn new(project_root: &Path) -> Self {
         Self {
             exclude: FilePatternSet::default(),
-            target_version: PythonVersion::default(),
+            unresolved_target_version: TargetVersion(None),
+            per_file_target_version: CompiledPerFileTargetVersionList::default(),
             project_root: project_root.to_path_buf(),
             rules: DEFAULT_SELECTORS
                 .iter()
@@ -398,7 +417,7 @@ impl LinterSettings {
             per_file_ignores: CompiledPerFileIgnoreList::default(),
             fix_safety: FixSafetyTable::default(),
 
-            src: vec![path_dedot::CWD.clone(), path_dedot::CWD.join("src")],
+            src: vec![fs::get_cwd().to_path_buf(), fs::get_cwd().join("src")],
             // Needs duplicating
             tab_size: IndentWidth::default(),
             line_length: LineLength::default(),
@@ -435,18 +454,81 @@ impl LinterSettings {
             preview: PreviewMode::default(),
             explicit_preview_rules: false,
             extension: ExtensionMapping::default(),
+            typing_extensions: true,
+            future_annotations: false,
         }
     }
 
     #[must_use]
     pub fn with_target_version(mut self, target_version: PythonVersion) -> Self {
-        self.target_version = target_version;
+        self.unresolved_target_version = target_version.into();
         self
+    }
+
+    /// Resolve the [`TargetVersion`] to use for linting.
+    ///
+    /// This method respects the per-file version overrides in
+    /// [`LinterSettings::per_file_target_version`] and falls back on
+    /// [`LinterSettings::unresolved_target_version`] if none of the override patterns match.
+    pub fn resolve_target_version(&self, path: &Path) -> TargetVersion {
+        self.per_file_target_version
+            .is_match(path)
+            .map_or(self.unresolved_target_version, TargetVersion::from)
+    }
+
+    pub fn future_annotations(&self) -> bool {
+        // TODO(brent) we can just access the field directly once this is stabilized.
+        self.future_annotations && crate::preview::is_add_future_annotations_imports_enabled(self)
     }
 }
 
 impl Default for LinterSettings {
     fn default() -> Self {
-        Self::new(path_dedot::CWD.as_path())
+        Self::new(fs::get_cwd())
+    }
+}
+
+/// A thin wrapper around `Option<PythonVersion>` to clarify the reason for different `unwrap`
+/// calls in various places.
+///
+/// For example, we want to default to `PythonVersion::latest()` for parsing and detecting semantic
+/// syntax errors because this will minimize version-related diagnostics when the Python version is
+/// unset. In contrast, we want to default to `PythonVersion::default()` for lint rules. These
+/// correspond to the [`TargetVersion::parser_version`] and [`TargetVersion::linter_version`]
+/// methods, respectively.
+#[derive(Debug, Clone, Copy, CacheKey)]
+pub struct TargetVersion(pub Option<PythonVersion>);
+
+impl TargetVersion {
+    /// Return the [`PythonVersion`] to use for parsing.
+    ///
+    /// This will be either the Python version specified by the user or the latest supported
+    /// version if unset.
+    pub fn parser_version(&self) -> PythonVersion {
+        self.0.unwrap_or_else(PythonVersion::latest)
+    }
+
+    /// Return the [`PythonVersion`] to use for version-dependent lint rules.
+    ///
+    /// This will either be the Python version specified by the user or the default Python version
+    /// if unset.
+    pub fn linter_version(&self) -> PythonVersion {
+        self.0.unwrap_or_default()
+    }
+}
+
+impl From<PythonVersion> for TargetVersion {
+    fn from(value: PythonVersion) -> Self {
+        Self(Some(value))
+    }
+}
+
+impl Display for TargetVersion {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        // manual inlining of display_settings!
+        match self.0 {
+            Some(value) => write!(f, "{value}"),
+            None => f.write_str("none"),
+        }
     }
 }

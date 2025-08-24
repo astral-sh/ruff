@@ -2,14 +2,14 @@ use std::cell::Cell;
 use std::marker::PhantomData;
 use std::num::NonZeroU8;
 
-use ruff_text_size::TextRange;
 #[allow(clippy::enum_glob_use)]
 use Tag::*;
+use ruff_text_size::TextRange;
 
 use crate::format_element::tag::{Condition, Tag};
 use crate::prelude::tag::{DedentMode, GroupMode, LabelId};
 use crate::prelude::*;
-use crate::{write, Argument, Arguments, FormatContext, FormatOptions, GroupId, TextSize};
+use crate::{Argument, Arguments, FormatContext, FormatOptions, GroupId, TextSize, write};
 use crate::{Buffer, VecBuffer};
 
 /// A line break that only gets printed if the enclosing `Group` doesn't fit on a single line.
@@ -340,7 +340,7 @@ impl<Context> Format<Context> for SourcePosition {
 /// Creates a text from a dynamic string.
 ///
 /// This is done by allocating a new string internally.
-pub fn text(text: &str) -> Text {
+pub fn text(text: &str) -> Text<'_> {
     debug_assert_no_newlines(text);
 
     Text { text }
@@ -402,7 +402,10 @@ where
 }
 
 fn debug_assert_no_newlines(text: &str) {
-    debug_assert!(!text.contains('\r'), "The content '{text}' contains an unsupported '\\r' line terminator character but text must only use line feeds '\\n' as line separator. Use '\\n' instead of '\\r' and '\\r\\n' to insert a line break in strings.");
+    debug_assert!(
+        !text.contains('\r'),
+        "The content '{text}' contains an unsupported '\\r' line terminator character but text must only use line feeds '\\n' as line separator. Use '\\n' instead of '\\r' and '\\r\\n' to insert a line break in strings."
+    );
 }
 
 /// Pushes some content to the end of the current line.
@@ -456,7 +459,10 @@ fn debug_assert_no_newlines(text: &str) {
 /// # }
 /// ```
 #[inline]
-pub fn line_suffix<Content, Context>(inner: &Content, reserved_width: u32) -> LineSuffix<Context>
+pub fn line_suffix<Content, Context>(
+    inner: &Content,
+    reserved_width: u32,
+) -> LineSuffix<'_, Context>
 where
     Content: Format<Context>,
 {
@@ -594,7 +600,10 @@ impl<Context> Format<Context> for LineSuffixBoundary {
 /// Use `Memoized.inspect(f)?.has_label(LabelId::of::<SomeLabelId>()` if you need to know if some content breaks that should
 /// only be written later.
 #[inline]
-pub fn labelled<Content, Context>(label_id: LabelId, content: &Content) -> FormatLabelled<Context>
+pub fn labelled<Content, Context>(
+    label_id: LabelId,
+    content: &Content,
+) -> FormatLabelled<'_, Context>
 where
     Content: Format<Context>,
 {
@@ -697,7 +706,7 @@ impl<Context> Format<Context> for Space {
 /// # }
 /// ```
 #[inline]
-pub fn indent<Content, Context>(content: &Content) -> Indent<Context>
+pub fn indent<Content, Context>(content: &Content) -> Indent<'_, Context>
 where
     Content: Format<Context>,
 {
@@ -768,7 +777,7 @@ impl<Context> std::fmt::Debug for Indent<'_, Context> {
 /// # }
 /// ```
 #[inline]
-pub fn dedent<Content, Context>(content: &Content) -> Dedent<Context>
+pub fn dedent<Content, Context>(content: &Content) -> Dedent<'_, Context>
 where
     Content: Format<Context>,
 {
@@ -843,7 +852,7 @@ impl<Context> std::fmt::Debug for Dedent<'_, Context> {
 ///
 /// This resembles the behaviour of Prettier's `align(Number.NEGATIVE_INFINITY, content)` IR element.
 #[inline]
-pub fn dedent_to_root<Content, Context>(content: &Content) -> Dedent<Context>
+pub fn dedent_to_root<Content, Context>(content: &Content) -> Dedent<'_, Context>
 where
     Content: Format<Context>,
 {
@@ -957,7 +966,7 @@ where
 ///
 /// - tab indentation: Printer indents the expression with two tabs because the `align` increases the indentation level.
 /// - space indentation: Printer indents the expression by 4 spaces (one indentation level) **and** 2 spaces for the align.
-pub fn align<Content, Context>(count: u8, content: &Content) -> Align<Context>
+pub fn align<Content, Context>(count: u8, content: &Content) -> Align<'_, Context>
 where
     Content: Format<Context>,
 {
@@ -1027,7 +1036,7 @@ impl<Context> std::fmt::Debug for Align<'_, Context> {
 /// # }
 /// ```
 #[inline]
-pub fn block_indent<Context>(content: &impl Format<Context>) -> BlockIndent<Context> {
+pub fn block_indent<Context>(content: &impl Format<Context>) -> BlockIndent<'_, Context> {
     BlockIndent {
         content: Argument::new(content),
         mode: IndentMode::Block,
@@ -1098,7 +1107,7 @@ pub fn block_indent<Context>(content: &impl Format<Context>) -> BlockIndent<Cont
 /// # }
 /// ```
 #[inline]
-pub fn soft_block_indent<Context>(content: &impl Format<Context>) -> BlockIndent<Context> {
+pub fn soft_block_indent<Context>(content: &impl Format<Context>) -> BlockIndent<'_, Context> {
     BlockIndent {
         content: Argument::new(content),
         mode: IndentMode::Soft,
@@ -1172,7 +1181,9 @@ pub fn soft_block_indent<Context>(content: &impl Format<Context>) -> BlockIndent
 /// # }
 /// ```
 #[inline]
-pub fn soft_line_indent_or_space<Context>(content: &impl Format<Context>) -> BlockIndent<Context> {
+pub fn soft_line_indent_or_space<Context>(
+    content: &impl Format<Context>,
+) -> BlockIndent<'_, Context> {
     BlockIndent {
         content: Argument::new(content),
         mode: IndentMode::SoftLineOrSpace,
@@ -1305,7 +1316,9 @@ impl<Context> std::fmt::Debug for BlockIndent<'_, Context> {
 /// # Ok(())
 /// # }
 /// ```
-pub fn soft_space_or_block_indent<Context>(content: &impl Format<Context>) -> BlockIndent<Context> {
+pub fn soft_space_or_block_indent<Context>(
+    content: &impl Format<Context>,
+) -> BlockIndent<'_, Context> {
     BlockIndent {
         content: Argument::new(content),
         mode: IndentMode::SoftSpace,
@@ -1385,10 +1398,10 @@ pub fn soft_space_or_block_indent<Context>(content: &impl Format<Context>) -> Bl
 /// # }
 /// ```
 #[inline]
-pub fn group<Context>(content: &impl Format<Context>) -> Group<Context> {
+pub fn group<Context>(content: &impl Format<Context>) -> Group<'_, Context> {
     Group {
         content: Argument::new(content),
-        group_id: None,
+        id: None,
         should_expand: false,
     }
 }
@@ -1396,14 +1409,14 @@ pub fn group<Context>(content: &impl Format<Context>) -> Group<Context> {
 #[derive(Copy, Clone)]
 pub struct Group<'a, Context> {
     content: Argument<'a, Context>,
-    group_id: Option<GroupId>,
+    id: Option<GroupId>,
     should_expand: bool,
 }
 
 impl<Context> Group<'_, Context> {
     #[must_use]
-    pub fn with_group_id(mut self, group_id: Option<GroupId>) -> Self {
-        self.group_id = group_id;
+    pub fn with_id(mut self, group_id: Option<GroupId>) -> Self {
+        self.id = group_id;
         self
     }
 
@@ -1429,7 +1442,7 @@ impl<Context> Format<Context> for Group<'_, Context> {
         };
 
         f.write_element(FormatElement::Tag(StartGroup(
-            tag::Group::new().with_id(self.group_id).with_mode(mode),
+            tag::Group::new().with_id(self.id).with_mode(mode),
         )));
 
         Arguments::from(&self.content).fmt(f)?;
@@ -1443,7 +1456,7 @@ impl<Context> Format<Context> for Group<'_, Context> {
 impl<Context> std::fmt::Debug for Group<'_, Context> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Group")
-            .field("group_id", &self.group_id)
+            .field("id", &self.id)
             .field("should_expand", &self.should_expand)
             .field("content", &"{{content}}")
             .finish()
@@ -1548,7 +1561,7 @@ impl<Context> std::fmt::Debug for Group<'_, Context> {
 #[inline]
 pub fn best_fit_parenthesize<Context>(
     content: &impl Format<Context>,
-) -> BestFitParenthesize<Context> {
+) -> BestFitParenthesize<'_, Context> {
     BestFitParenthesize {
         content: Argument::new(content),
         group_id: None,
@@ -1642,7 +1655,7 @@ impl<Context> std::fmt::Debug for BestFitParenthesize<'_, Context> {
 ///         soft_line_break(),
 ///         if_group_breaks(&token(")"))
 ///     ])
-///     .with_group_id(Some(parentheses_id))
+///     .with_id(Some(parentheses_id))
 ///     .fmt(f)
 /// });
 ///
@@ -1688,7 +1701,7 @@ impl<Context> std::fmt::Debug for BestFitParenthesize<'_, Context> {
 pub fn conditional_group<Content, Context>(
     content: &Content,
     condition: Condition,
-) -> ConditionalGroup<Context>
+) -> ConditionalGroup<'_, Context>
 where
     Content: Format<Context>,
 {
@@ -1849,7 +1862,7 @@ impl<Context> Format<Context> for ExpandParent {
 /// # }
 /// ```
 #[inline]
-pub fn if_group_breaks<Content, Context>(content: &Content) -> IfGroupBreaks<Context>
+pub fn if_group_breaks<Content, Context>(content: &Content) -> IfGroupBreaks<'_, Context>
 where
     Content: Format<Context>,
 {
@@ -1930,7 +1943,7 @@ where
 /// # }
 /// ```
 #[inline]
-pub fn if_group_fits_on_line<Content, Context>(flat_content: &Content) -> IfGroupBreaks<Context>
+pub fn if_group_fits_on_line<Content, Context>(flat_content: &Content) -> IfGroupBreaks<'_, Context>
 where
     Content: Format<Context>,
 {
@@ -1991,7 +2004,7 @@ impl<Context> IfGroupBreaks<'_, Context> {
     ///                 })),
     ///                 token("]")
     ///             ],
-    ///         ).with_group_id(Some(group_id))
+    ///         ).with_id(Some(group_id))
     ///     ])
     /// })])?;
     ///
@@ -2046,7 +2059,7 @@ impl<Context> std::fmt::Debug for IfGroupBreaks<'_, Context> {
 /// let id = f.group_id("head");
 ///
 /// write!(f, [
-///     group(&token("Head")).with_group_id(Some(id)),
+///     group(&token("Head")).with_id(Some(id)),
 ///     if_group_breaks(&indent(&token("indented"))).with_group_id(Some(id)),
 ///     if_group_fits_on_line(&token("indented")).with_group_id(Some(id))
 /// ])
@@ -2071,7 +2084,7 @@ impl<Context> std::fmt::Debug for IfGroupBreaks<'_, Context> {
 ///     let group_id = f.group_id("header");
 ///
 ///     write!(f, [
-///         group(&token("(aLongHeaderThatBreaksForSomeReason) =>")).with_group_id(Some(group_id)),
+///         group(&token("(aLongHeaderThatBreaksForSomeReason) =>")).with_id(Some(group_id)),
 ///         indent_if_group_breaks(&format_args![hard_line_break(), token("a => b")], group_id)
 ///     ])
 /// });
@@ -2101,7 +2114,7 @@ impl<Context> std::fmt::Debug for IfGroupBreaks<'_, Context> {
 ///     let group_id = f.group_id("header");
 ///
 ///     write!(f, [
-///         group(&token("(aLongHeaderThatBreaksForSomeReason) =>")).with_group_id(Some(group_id)),
+///         group(&token("(aLongHeaderThatBreaksForSomeReason) =>")).with_id(Some(group_id)),
 ///         indent_if_group_breaks(&format_args![hard_line_break(), token("a => b")], group_id)
 ///     ])
 /// });
@@ -2119,7 +2132,7 @@ impl<Context> std::fmt::Debug for IfGroupBreaks<'_, Context> {
 pub fn indent_if_group_breaks<Content, Context>(
     content: &Content,
     group_id: GroupId,
-) -> IndentIfGroupBreaks<Context>
+) -> IndentIfGroupBreaks<'_, Context>
 where
     Content: Format<Context>,
 {
@@ -2202,7 +2215,7 @@ impl<Context> std::fmt::Debug for IndentIfGroupBreaks<'_, Context> {
 /// # Ok(())
 /// # }
 /// ```
-pub fn fits_expanded<Content, Context>(content: &Content) -> FitsExpanded<Context>
+pub fn fits_expanded<Content, Context>(content: &Content) -> FitsExpanded<'_, Context>
 where
     Content: Format<Context>,
 {
@@ -2564,7 +2577,7 @@ impl<'a, Context> BestFitting<'a, Context> {
     /// # Panics
     ///
     /// When the slice contains less than two variants.
-    pub fn from_arguments_unchecked(variants: Arguments<'a, Context>) -> Self {
+    pub const fn from_arguments_unchecked(variants: Arguments<'a, Context>) -> Self {
         assert!(
             variants.0.len() >= 2,
             "Requires at least the least expanded and most expanded variants"
@@ -2572,7 +2585,7 @@ impl<'a, Context> BestFitting<'a, Context> {
 
         Self {
             variants,
-            mode: BestFittingMode::default(),
+            mode: BestFittingMode::FirstLine,
         }
     }
 

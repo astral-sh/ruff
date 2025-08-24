@@ -1,9 +1,9 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
 /// ## What it does
 /// Checks for unnecessary default type arguments for `Generator` and
@@ -20,7 +20,7 @@ use crate::checkers::ast::Checker;
 /// Omitting type arguments that match the default values can make the code
 /// more concise and easier to read.
 ///
-/// ## Examples
+/// ## Example
 ///
 /// ```python
 /// from collections.abc import Generator, AsyncGenerator
@@ -74,7 +74,7 @@ impl AlwaysFixableViolation for UnnecessaryDefaultTypeArgs {
 }
 
 /// UP043
-pub(crate) fn unnecessary_default_type_args(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn unnecessary_default_type_args(checker: &Checker, expr: &Expr) {
     let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr else {
         return;
     };
@@ -83,6 +83,7 @@ pub(crate) fn unnecessary_default_type_args(checker: &mut Checker, expr: &Expr) 
         elts,
         ctx: _,
         range: _,
+        node_index: _,
         parenthesized: _,
     }) = slice.as_ref()
     else {
@@ -102,7 +103,7 @@ pub(crate) fn unnecessary_default_type_args(checker: &mut Checker, expr: &Expr) 
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(UnnecessaryDefaultTypeArgs, expr.range());
+    let mut diagnostic = checker.report_diagnostic(UnnecessaryDefaultTypeArgs, expr.range());
 
     let applicability = if checker
         .comment_ranges()
@@ -126,17 +127,18 @@ pub(crate) fn unnecessary_default_type_args(checker: &mut Checker, expr: &Expr) 
                             elts: valid_elts,
                             ctx: ast::ExprContext::Load,
                             range: TextRange::default(),
+                            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                             parenthesized: true,
                         })
                     }),
                     ctx: ast::ExprContext::Load,
                     range: TextRange::default(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 })),
             expr.range(),
         ),
         applicability,
     ));
-    checker.diagnostics.push(diagnostic);
 }
 
 /// Trim trailing `None` literals from the given elements.

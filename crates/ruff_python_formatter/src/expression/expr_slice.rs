@@ -1,10 +1,10 @@
-use ruff_formatter::{write, FormatError};
-use ruff_python_ast::{AnyNodeRef, AstNode};
+use ruff_formatter::{FormatError, write};
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{Expr, ExprSlice, ExprUnaryOp, UnaryOp};
 use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::comments::{dangling_comments, SourceComment};
+use crate::comments::{SourceComment, dangling_comments};
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
 
@@ -21,6 +21,7 @@ impl FormatNodeRule<ExprSlice> for FormatExprSlice {
             upper,
             step,
             range,
+            node_index: _,
         } = item;
 
         let (first_colon, second_colon) = find_colons(
@@ -36,7 +37,7 @@ impl FormatNodeRule<ExprSlice> for FormatExprSlice {
         // to handle newlines and spacing, or the node is None and we insert the corresponding
         // slice of dangling comments
         let comments = f.context().comments().clone();
-        let slice_dangling_comments = comments.dangling(item.as_any_node_ref());
+        let slice_dangling_comments = comments.dangling(item);
         // Put the dangling comments (where the nodes are missing) into buckets
         let first_colon_partition_index =
             slice_dangling_comments.partition_point(|x| x.start() < first_colon.start());
@@ -60,9 +61,9 @@ impl FormatNodeRule<ExprSlice> for FormatExprSlice {
 
         // Handle spacing around the colon(s)
         // https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#slices
-        let lower_simple = lower.as_ref().map_or(true, |expr| is_simple_expr(expr));
-        let upper_simple = upper.as_ref().map_or(true, |expr| is_simple_expr(expr));
-        let step_simple = step.as_ref().map_or(true, |expr| is_simple_expr(expr));
+        let lower_simple = lower.as_ref().is_none_or(|expr| is_simple_expr(expr));
+        let upper_simple = upper.as_ref().is_none_or(|expr| is_simple_expr(expr));
+        let step_simple = step.as_ref().is_none_or(|expr| is_simple_expr(expr));
         let all_simple = lower_simple && upper_simple && step_simple;
 
         // lower
@@ -232,6 +233,7 @@ pub(crate) fn assign_comment_in_slice(
         upper,
         step: _,
         range,
+        node_index: _,
     } = expr_slice;
 
     let (first_colon, second_colon) =

@@ -46,6 +46,12 @@ pub struct Settings {
     pub banned_module_level_imports: Vec<String>,
 }
 
+impl Settings {
+    pub fn banned_module_level_imports(&self) -> impl Iterator<Item = &str> {
+        self.banned_module_level_imports.iter().map(AsRef::as_ref)
+    }
+}
+
 impl Display for Settings {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         display_settings! {

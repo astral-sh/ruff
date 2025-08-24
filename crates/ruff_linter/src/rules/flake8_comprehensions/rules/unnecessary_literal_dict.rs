@@ -1,13 +1,12 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, Keyword};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-
 use crate::rules::flake8_comprehensions::fixes;
+use crate::{AlwaysFixableViolation, Fix};
 
-use super::helpers;
+use crate::rules::flake8_comprehensions::helpers;
 
 /// ## What it does
 /// Checks for unnecessary list or tuple literals.
@@ -16,7 +15,7 @@ use super::helpers;
 /// It's unnecessary to use a list or tuple literal within a call to `dict()`.
 /// It can be rewritten as a dict literal (`{}`).
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// dict([(1, 2), (3, 4)])
 /// dict(((1, 2), (3, 4)))
@@ -52,7 +51,7 @@ impl AlwaysFixableViolation for UnnecessaryLiteralDict {
 
 /// C406 (`dict([(1, 2)])`)
 pub(crate) fn unnecessary_literal_dict(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     func: &Expr,
     args: &[Expr],
@@ -78,10 +77,10 @@ pub(crate) fn unnecessary_literal_dict(
     if !checker.semantic().has_builtin_binding("dict") {
         return;
     }
-    let mut diagnostic = Diagnostic::new(UnnecessaryLiteralDict { obj_type: kind }, expr.range());
+    let mut diagnostic =
+        checker.report_diagnostic(UnnecessaryLiteralDict { obj_type: kind }, expr.range());
     diagnostic
         .try_set_fix(|| fixes::fix_unnecessary_literal_dict(expr, checker).map(Fix::unsafe_edit));
-    checker.diagnostics.push(diagnostic);
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

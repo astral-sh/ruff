@@ -4,17 +4,17 @@ use std::fmt::{Debug, Display, Formatter};
 use anyhow::Result;
 use itertools::Itertools;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::{self as ast, Expr, ExprSlice, ExprSubscript, ExprTuple, Parameters, Stmt};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::importer::{ImportRequest, Importer};
-use crate::Locator;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for lambda expressions and function definitions that can be replaced with a function from
@@ -90,7 +90,7 @@ impl Violation for ReimplementedOperator {
 }
 
 /// FURB118
-pub(crate) fn reimplemented_operator(checker: &mut Checker, target: &FunctionLike) {
+pub(crate) fn reimplemented_operator(checker: &Checker, target: &FunctionLike) {
     // Ignore methods.
     // Methods can be defined via a `def` statement in a class scope,
     // or via a lambda appearing on the right-hand side of an assignment in a class scope.
@@ -104,6 +104,13 @@ pub(crate) fn reimplemented_operator(checker: &mut Checker, target: &FunctionLik
         return;
     }
 
+    // Skip decorated functions
+    if let FunctionLike::Function(func) = target {
+        if !func.decorator_list.is_empty() {
+            return;
+        }
+    }
+
     let Some(params) = target.parameters() else {
         return;
     };
@@ -112,7 +119,7 @@ pub(crate) fn reimplemented_operator(checker: &mut Checker, target: &FunctionLik
         return;
     };
     let fix = target.try_fix(&operator, checker.importer(), checker.semantic());
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         ReimplementedOperator {
             operator,
             target: target.kind(),
@@ -120,7 +127,6 @@ pub(crate) fn reimplemented_operator(checker: &mut Checker, target: &FunctionLik
         target.range(),
     );
     diagnostic.try_set_optional_fix(|| fix);
-    checker.diagnostics.push(diagnostic);
 }
 
 /// Candidate for lambda expression or function definition consisting of a return statement.
@@ -273,7 +279,7 @@ fn itemgetter_op(expr: &ExprSubscript, params: &Parameters, locator: &Locator) -
     // The argument to the lambda must match the subscripted value, as in: `lambda x: x[1]`.
     if !is_same_expression(arg, &expr.value) {
         return None;
-    };
+    }
 
     // The subscripted expression can't contain references to the argument, as in: `lambda x: x[x]`.
     if any_over_expr(expr.slice.as_ref(), &|expr| is_same_expression(arg, expr)) {
@@ -456,11 +462,11 @@ fn match_arguments(
 /// Returns `true` if the given argument is the "same" as the given expression. For example, if
 /// the argument has a default, it is not considered the same as any expression; if both match the
 /// same name, they are considered the same.
-fn is_same_expression(arg: &ast::ParameterWithDefault, expr: &Expr) -> bool {
-    if arg.default.is_some() {
+fn is_same_expression(param: &ast::ParameterWithDefault, expr: &Expr) -> bool {
+    if param.default.is_some() {
         false
     } else if let Expr::Name(name) = expr {
-        name.id == arg.parameter.name.as_str()
+        name.id == param.name().as_str()
     } else {
         false
     }

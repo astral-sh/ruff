@@ -5,8 +5,8 @@ use itertools::Itertools;
 
 use ruff_text_size::{TextRange, TextSize};
 
-use crate::schema::{Cell, SourceValue};
 use crate::CellMetadata;
+use crate::schema::{Cell, SourceValue};
 
 impl fmt::Display for SourceValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -66,7 +66,7 @@ impl Cell {
                     .metadata
                     .vscode
                     .as_ref()
-                    .map_or(true, |vscode| vscode.language_id == "python") =>
+                    .is_none_or(|vscode| vscode.language_id == "python") =>
             {
                 &cell.source
             }

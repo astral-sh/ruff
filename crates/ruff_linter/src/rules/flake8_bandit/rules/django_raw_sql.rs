@@ -1,9 +1,9 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -18,7 +18,7 @@ use crate::checkers::ast::Checker;
 /// from django.db.models.expressions import RawSQL
 /// from django.contrib.auth.models import User
 ///
-/// User.objects.annotate(val=("%secure" % "nos", []))
+/// User.objects.annotate(val=RawSQL("%s" % input_param, []))
 /// ```
 ///
 /// ## References
@@ -35,7 +35,7 @@ impl Violation for DjangoRawSql {
 }
 
 /// S611
-pub(crate) fn django_raw_sql(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn django_raw_sql(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::DJANGO) {
         return;
     }
@@ -55,9 +55,7 @@ pub(crate) fn django_raw_sql(checker: &mut Checker, call: &ast::ExprCall) {
             .find_argument_value("sql", 0)
             .is_some_and(Expr::is_string_literal_expr)
         {
-            checker
-                .diagnostics
-                .push(Diagnostic::new(DjangoRawSql, call.func.range()));
+            checker.report_diagnostic(DjangoRawSql, call.func.range());
         }
     }
 }

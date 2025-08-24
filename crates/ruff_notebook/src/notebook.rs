@@ -5,10 +5,10 @@ use serde_json::error::Category;
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::fs::File;
+use std::io;
 use std::io::{BufReader, Cursor, Read, Seek, SeekFrom, Write};
 use std::path::Path;
 use std::sync::OnceLock;
-use std::{io, iter};
 use thiserror::Error;
 
 use ruff_diagnostics::{SourceMap, SourceMarker};
@@ -18,7 +18,7 @@ use ruff_text_size::TextSize;
 use crate::cell::CellOffsets;
 use crate::index::NotebookIndex;
 use crate::schema::{Cell, RawNotebook, SortAlphabetically, SourceValue};
-use crate::{schema, CellMetadata, RawNotebookMetadata};
+use crate::{CellMetadata, RawNotebookMetadata, schema};
 
 /// Run round-trip source code generation on a given Jupyter notebook file path.
 pub fn round_trip(path: &Path) -> anyhow::Result<String> {
@@ -43,7 +43,9 @@ pub enum NotebookError {
     Io(#[from] io::Error),
     #[error(transparent)]
     Json(serde_json::Error),
-    #[error("Expected a Jupyter Notebook, which must be internally stored as JSON, but this file isn't valid JSON: {0}")]
+    #[error(
+        "Expected a Jupyter Notebook, which must be internally stored as JSON, but this file isn't valid JSON: {0}"
+    )]
     InvalidJson(serde_json::Error),
     #[error("This file does not match the schema expected of Jupyter Notebooks: {0}")]
     InvalidSchema(serde_json::Error),
@@ -177,7 +179,7 @@ impl Notebook {
                 };
                 if id.is_none() {
                     loop {
-                        let new_id = uuid::Builder::from_random_bytes(rng.gen())
+                        let new_id = uuid::Builder::from_random_bytes(rng.random())
                             .into_uuid()
                             .as_simple()
                             .to_string();
@@ -340,9 +342,10 @@ impl Notebook {
                     }
                 }
             };
-            row_to_cell.extend(
-                iter::repeat(OneIndexed::from_zero_indexed(cell_index as usize)).take(line_count),
-            );
+            row_to_cell.extend(std::iter::repeat_n(
+                OneIndexed::from_zero_indexed(cell_index as usize),
+                line_count,
+            ));
             row_to_row_in_cell.extend((0..line_count).map(OneIndexed::from_zero_indexed));
         }
 

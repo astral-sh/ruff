@@ -1,9 +1,9 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -45,7 +45,7 @@ impl Violation for MapIntVersionParsing {
 }
 
 /// RUF048
-pub(crate) fn map_int_version_parsing(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn map_int_version_parsing(checker: &Checker, call: &ast::ExprCall) {
     let semantic = checker.semantic();
 
     let Some((first, second)) = map_call_with_two_arguments(semantic, call) else {
@@ -53,9 +53,7 @@ pub(crate) fn map_int_version_parsing(checker: &mut Checker, call: &ast::ExprCal
     };
 
     if is_dunder_version_split_dot(second) && semantic.match_builtin_expr(first, "int") {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(MapIntVersionParsing, call.range()));
+        checker.report_diagnostic(MapIntVersionParsing, call.range());
     }
 }
 
@@ -70,8 +68,10 @@ fn map_call_with_two_arguments<'a>(
                 args,
                 keywords,
                 range: _,
+                node_index: _,
             },
         range: _,
+        node_index: _,
     } = call;
 
     if !keywords.is_empty() {
@@ -84,7 +84,7 @@ fn map_call_with_two_arguments<'a>(
 
     if !semantic.match_builtin_expr(func, "map") {
         return None;
-    };
+    }
 
     Some((first, second))
 }
@@ -102,8 +102,11 @@ fn is_dunder_version_split_dot(expr: &ast::Expr) -> bool {
         return false;
     }
 
-    let Some(ast::Expr::StringLiteral(ast::ExprStringLiteral { value, range: _ })) =
-        arguments.find_argument_value("sep", 0)
+    let Some(ast::Expr::StringLiteral(ast::ExprStringLiteral {
+        value,
+        range: _,
+        node_index: _,
+    })) = arguments.find_argument_value("sep", 0)
     else {
         return false;
     };

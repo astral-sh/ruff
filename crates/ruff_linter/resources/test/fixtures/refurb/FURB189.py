@@ -8,7 +8,7 @@ class SetOnceMappingMixin:
         if key in self:
             raise KeyError(str(key) + ' already set')
         return super().__setitem__(key, value)
-    
+
 
 class CaseInsensitiveEnumMeta(EnumMeta):
     pass
@@ -21,6 +21,12 @@ class L(list):
     pass
 
 class S(str):
+    pass
+
+class SubscriptDict(dict[str, str]):
+    pass
+
+class SubscriptList(list[str]):
     pass
 
 # currently not detected

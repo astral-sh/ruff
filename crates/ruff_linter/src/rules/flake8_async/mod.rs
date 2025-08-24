@@ -9,11 +9,11 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
-    use crate::assert_messages;
+    use crate::assert_diagnostics;
     use crate::registry::Rule;
-    use crate::settings::types::PythonVersion;
     use crate::settings::LinterSettings;
     use crate::test::test_path;
+    use ruff_python_ast::PythonVersion;
 
     #[test_case(Rule::CancelScopeNoCheckpoint, Path::new("ASYNC100.py"))]
     #[test_case(Rule::TrioSyncCall, Path::new("ASYNC105.py"))]
@@ -34,7 +34,7 @@ mod tests {
             Path::new("flake8_async").join(path).as_path(),
             &LinterSettings::for_rule(rule_code),
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -44,11 +44,11 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_async").join(path),
             &LinterSettings {
-                target_version: PythonVersion::Py310,
+                unresolved_target_version: PythonVersion::PY310.into(),
                 ..LinterSettings::for_rule(Rule::AsyncFunctionWithTimeout)
             },
         )?;
-        assert_messages!(path.file_name().unwrap().to_str().unwrap(), diagnostics);
+        assert_diagnostics!(path.file_name().unwrap().to_str().unwrap(), diagnostics);
         Ok(())
     }
 }

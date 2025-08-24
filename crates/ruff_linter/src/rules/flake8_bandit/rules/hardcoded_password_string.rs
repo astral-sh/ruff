@@ -1,11 +1,11 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
-use super::super::helpers::{matches_password_name, string_literal};
+use crate::rules::flake8_bandit::helpers::{matches_password_name, string_literal};
 
 /// ## What it does
 /// Checks for potential uses of hardcoded passwords in strings.
@@ -72,42 +72,40 @@ fn password_target(target: &Expr) -> Option<&str> {
 
 /// S105
 pub(crate) fn compare_to_hardcoded_password_string(
-    checker: &mut Checker,
+    checker: &Checker,
     left: &Expr,
     comparators: &[Expr],
 ) {
-    checker
-        .diagnostics
-        .extend(comparators.iter().filter_map(|comp| {
-            string_literal(comp).filter(|string| !string.is_empty())?;
-            let name = password_target(left)?;
-            Some(Diagnostic::new(
-                HardcodedPasswordString {
-                    name: name.to_string(),
-                },
-                comp.range(),
-            ))
-        }));
+    for comp in comparators {
+        if string_literal(comp).is_none_or(str::is_empty) {
+            continue;
+        }
+        let Some(name) = password_target(left) else {
+            continue;
+        };
+        checker.report_diagnostic(
+            HardcodedPasswordString {
+                name: name.to_string(),
+            },
+            comp.range(),
+        );
+    }
 }
 
 /// S105
-pub(crate) fn assign_hardcoded_password_string(
-    checker: &mut Checker,
-    value: &Expr,
-    targets: &[Expr],
-) {
+pub(crate) fn assign_hardcoded_password_string(checker: &Checker, value: &Expr, targets: &[Expr]) {
     if string_literal(value)
         .filter(|string| !string.is_empty())
         .is_some()
     {
         for target in targets {
             if let Some(name) = password_target(target) {
-                checker.diagnostics.push(Diagnostic::new(
+                checker.report_diagnostic(
                     HardcodedPasswordString {
                         name: name.to_string(),
                     },
                     value.range(),
-                ));
+                );
                 return;
             }
         }

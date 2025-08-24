@@ -1,9 +1,9 @@
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
+use crate::Mode;
 use crate::error::LexicalError;
 use crate::lexer::{Lexer, LexerCheckpoint};
 use crate::token::{Token, TokenFlags, TokenKind, TokenValue};
-use crate::Mode;
 
 /// Token source for the parser that skips over any trivia tokens.
 #[derive(Debug)]
@@ -166,6 +166,21 @@ impl<'src> TokenSource<'src> {
         self.tokens.truncate(tokens_position);
     }
 
+    /// Returns a slice of [`Token`] that are within the given `range`.
+    pub(crate) fn in_range(&self, range: TextRange) -> &[Token] {
+        let start = self
+            .tokens
+            .iter()
+            .rposition(|tok| tok.start() == range.start());
+        let end = self.tokens.iter().rposition(|tok| tok.end() == range.end());
+
+        let (Some(start), Some(end)) = (start, end) else {
+            return &self.tokens;
+        };
+
+        &self.tokens[start..=end]
+    }
+
     /// Consumes the token source, returning the collected tokens, comment ranges, and any errors
     /// encountered during lexing. The token collection includes both the trivia and non-trivia
     /// tokens.
@@ -195,7 +210,7 @@ pub(crate) struct TokenSourceCheckpoint {
 /// of `contents`.
 ///
 /// See [#9546](https://github.com/astral-sh/ruff/pull/9546) for a more detailed explanation.
-#[allow(dead_code)]
+#[expect(dead_code)]
 fn allocate_tokens_vec(contents: &str) -> Vec<Token> {
     let lower_bound = contents.len().saturating_mul(15) / 100;
     Vec::with_capacity(lower_bound)

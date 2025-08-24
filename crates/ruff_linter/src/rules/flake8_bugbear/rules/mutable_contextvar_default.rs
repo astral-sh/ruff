@@ -1,12 +1,12 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr};
-use ruff_python_semantic::analyze::typing::{is_immutable_func, is_mutable_expr, is_mutable_func};
 use ruff_python_semantic::Modules;
+use ruff_python_semantic::analyze::typing::{is_immutable_func, is_mutable_expr, is_mutable_func};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -68,7 +68,7 @@ impl Violation for MutableContextvarDefault {
 }
 
 /// B039
-pub(crate) fn mutable_contextvar_default(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn mutable_contextvar_default(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::CONTEXTVARS) {
         return;
     }
@@ -82,7 +82,7 @@ pub(crate) fn mutable_contextvar_default(checker: &mut Checker, call: &ast::Expr
     };
 
     let extend_immutable_calls: Vec<QualifiedName> = checker
-        .settings
+        .settings()
         .flake8_bugbear
         .extend_immutable_calls
         .iter()
@@ -102,8 +102,6 @@ pub(crate) fn mutable_contextvar_default(checker: &mut Checker, call: &ast::Expr
                 matches!(qualified_name.segments(), ["contextvars", "ContextVar"])
             })
     {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(MutableContextvarDefault, default.range()));
+        checker.report_diagnostic(MutableContextvarDefault, default.range());
     }
 }

@@ -1,13 +1,13 @@
 use ruff_python_ast::{self as ast, ExceptHandler, Expr, ExprContext};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::fix::edits::pad;
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::{Name, UnqualifiedName};
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
+use crate::fix::edits::pad;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for uses of exceptions that alias `OSError`.
@@ -64,14 +64,14 @@ fn is_alias(expr: &Expr, semantic: &SemanticModel) -> bool {
                 [
                     "" | "builtins",
                     "EnvironmentError" | "IOError" | "WindowsError"
-                ] | ["mmap" | "select" | "socket" | "os", "error"]
+                ] | ["mmap" | "resource" | "select" | "socket" | "os", "error"]
             )
         })
 }
 
 /// Create a [`Diagnostic`] for a single target, like an [`Expr::Name`].
-fn atom_diagnostic(checker: &mut Checker, target: &Expr) {
-    let mut diagnostic = Diagnostic::new(
+fn atom_diagnostic(checker: &Checker, target: &Expr) {
+    let mut diagnostic = checker.report_diagnostic(
         OSErrorAlias {
             name: UnqualifiedName::from_expr(target).map(|name| name.to_string()),
         },
@@ -88,12 +88,11 @@ fn atom_diagnostic(checker: &mut Checker, target: &Expr) {
             import_edit,
         ))
     });
-    checker.diagnostics.push(diagnostic);
 }
 
 /// Create a [`Diagnostic`] for a tuple of expressions.
-fn tuple_diagnostic(checker: &mut Checker, tuple: &ast::ExprTuple, aliases: &[&Expr]) {
-    let mut diagnostic = Diagnostic::new(OSErrorAlias { name: None }, tuple.range());
+fn tuple_diagnostic(checker: &Checker, tuple: &ast::ExprTuple, aliases: &[&Expr]) {
+    let mut diagnostic = checker.report_diagnostic(OSErrorAlias { name: None }, tuple.range());
     let semantic = checker.semantic();
     if semantic.has_builtin_binding("OSError") {
         // Filter out any `OSErrors` aliases.
@@ -117,6 +116,7 @@ fn tuple_diagnostic(checker: &mut Checker, tuple: &ast::ExprTuple, aliases: &[&E
                 id: Name::new_static("OSError"),
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             };
             remaining.insert(0, node.into());
         }
@@ -128,6 +128,7 @@ fn tuple_diagnostic(checker: &mut Checker, tuple: &ast::ExprTuple, aliases: &[&E
                 elts: remaining,
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 parenthesized: true,
             };
             format!("({})", checker.generator().expr(&node.into()))
@@ -138,11 +139,10 @@ fn tuple_diagnostic(checker: &mut Checker, tuple: &ast::ExprTuple, aliases: &[&E
             tuple.range(),
         )));
     }
-    checker.diagnostics.push(diagnostic);
 }
 
 /// UP024
-pub(crate) fn os_error_alias_handlers(checker: &mut Checker, handlers: &[ExceptHandler]) {
+pub(crate) fn os_error_alias_handlers(checker: &Checker, handlers: &[ExceptHandler]) {
     for handler in handlers {
         let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { type_, .. }) = handler;
         let Some(expr) = type_.as_ref() else {
@@ -172,14 +172,14 @@ pub(crate) fn os_error_alias_handlers(checker: &mut Checker, handlers: &[ExceptH
 }
 
 /// UP024
-pub(crate) fn os_error_alias_call(checker: &mut Checker, func: &Expr) {
+pub(crate) fn os_error_alias_call(checker: &Checker, func: &Expr) {
     if is_alias(func, checker.semantic()) {
         atom_diagnostic(checker, func);
     }
 }
 
 /// UP024
-pub(crate) fn os_error_alias_raise(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn os_error_alias_raise(checker: &Checker, expr: &Expr) {
     if matches!(expr, Expr::Name(_) | Expr::Attribute(_)) {
         if is_alias(expr, checker.semantic()) {
             atom_diagnostic(checker, expr);

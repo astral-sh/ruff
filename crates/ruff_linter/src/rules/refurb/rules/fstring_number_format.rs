@@ -1,10 +1,11 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{self as ast, Expr, ExprCall};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::{self as ast, Expr, ExprCall, Number, PythonVersion, UnaryOp};
+use ruff_source_file::find_newline;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for uses of `bin(...)[2:]` (or `hex`, or `oct`) to convert
@@ -24,6 +25,11 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// ```python
 /// print(f"{1337:b}")
 /// ```
+///
+/// ## Fix safety
+/// The fix is only marked as safe for integer literals, all other cases
+/// are display-only, as they may change the runtime behaviour of the program
+/// or introduce syntax errors.
 #[derive(ViolationMetadata)]
 pub(crate) struct FStringNumberFormat {
     replacement: Option<SourceCodeSnippet>,
@@ -62,7 +68,7 @@ impl Violation for FStringNumberFormat {
 }
 
 /// FURB116
-pub(crate) fn fstring_number_format(checker: &mut Checker, subscript: &ast::ExprSubscript) {
+pub(crate) fn fstring_number_format(checker: &Checker, subscript: &ast::ExprSubscript) {
     // The slice must be exactly `[2:]`.
     let Expr::Slice(ast::ExprSlice {
         lower: Some(lower),
@@ -110,22 +116,36 @@ pub(crate) fn fstring_number_format(checker: &mut Checker, subscript: &ast::Expr
         return;
     };
 
-    // Generate a replacement, if possible.
-    let replacement = if matches!(
+    // float and complex numbers are false positives, ignore them.
+    if matches!(
         arg,
-        Expr::NumberLiteral(_) | Expr::Name(_) | Expr::Attribute(_)
+        Expr::NumberLiteral(ast::ExprNumberLiteral {
+            value: Number::Float(_) | Number::Complex { .. },
+            ..
+        })
     ) {
-        let inner_source = checker.locator().slice(arg);
+        return;
+    }
 
-        let quote = checker.stylist().quote();
-        let shorthand = base.shorthand();
-
-        Some(format!("f{quote}{{{inner_source}:{shorthand}}}{quote}"))
+    let maybe_number = if let Some(maybe_number) = arg
+        .as_unary_op_expr()
+        .filter(|unary_expr| unary_expr.op == UnaryOp::UAdd)
+        .map(|unary_expr| &unary_expr.operand)
+    {
+        maybe_number
     } else {
-        None
+        arg
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let applicability = if matches!(maybe_number, Expr::NumberLiteral(_)) {
+        Applicability::Safe
+    } else {
+        Applicability::DisplayOnly
+    };
+
+    let replacement = try_create_replacement(checker, arg, base);
+
+    let mut diagnostic = checker.report_diagnostic(
         FStringNumberFormat {
             replacement: replacement.as_deref().map(SourceCodeSnippet::from_str),
             base,
@@ -134,13 +154,50 @@ pub(crate) fn fstring_number_format(checker: &mut Checker, subscript: &ast::Expr
     );
 
     if let Some(replacement) = replacement {
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            replacement,
-            subscript.range(),
-        )));
+        let edit = Edit::range_replacement(replacement, subscript.range());
+        diagnostic.set_fix(Fix::applicable_edit(edit, applicability));
+    }
+}
+
+/// Generate a replacement, if possible.
+fn try_create_replacement(checker: &Checker, arg: &Expr, base: Base) -> Option<String> {
+    if !matches!(
+        arg,
+        Expr::NumberLiteral(_) | Expr::Name(_) | Expr::Attribute(_) | Expr::UnaryOp(_)
+    ) {
+        return None;
     }
 
-    checker.diagnostics.push(diagnostic);
+    let inner_source = checker.locator().slice(arg);
+
+    // On Python 3.11 and earlier, trying to replace an `arg` that contains a backslash
+    // would create a `SyntaxError` in the f-string.
+    if checker.target_version() <= PythonVersion::PY311 && inner_source.contains('\\') {
+        return None;
+    }
+
+    // On Python 3.11 and earlier, trying to replace an `arg` that spans multiple lines
+    // would create a `SyntaxError` in the f-string.
+    if checker.target_version() <= PythonVersion::PY311 && find_newline(inner_source).is_some() {
+        return None;
+    }
+
+    let quote = checker.stylist().quote();
+    let shorthand = base.shorthand();
+
+    // If the `arg` contains double quotes we need to create the f-string with single quotes
+    // to avoid a `SyntaxError` in Python 3.11 and earlier.
+    if checker.target_version() <= PythonVersion::PY311 && inner_source.contains(quote.as_str()) {
+        return None;
+    }
+
+    // If the `arg` contains a brace add an space before it to avoid a `SyntaxError`
+    // in the f-string.
+    if inner_source.starts_with('{') {
+        Some(format!("f{quote}{{ {inner_source}:{shorthand}}}{quote}"))
+    } else {
+        Some(format!("f{quote}{{{inner_source}:{shorthand}}}{quote}"))
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

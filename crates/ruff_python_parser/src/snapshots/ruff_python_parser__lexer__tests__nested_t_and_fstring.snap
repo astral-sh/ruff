@@ -1,0 +1,226 @@
+---
+source: crates/ruff_python_parser/src/lexer.rs
+expression: lex_source(source)
+---
+## Tokens
+```
+[
+    (
+        TStringStart,
+        0..2,
+        TokenFlags(
+            DOUBLE_QUOTES | T_STRING,
+        ),
+    ),
+    (
+        InterpolatedStringMiddle(
+            "foo ",
+        ),
+        2..6,
+        TokenFlags(
+            DOUBLE_QUOTES | T_STRING,
+        ),
+    ),
+    (
+        Lbrace,
+        6..7,
+    ),
+    (
+        FStringStart,
+        7..9,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
+    ),
+    (
+        InterpolatedStringMiddle(
+            "bar ",
+        ),
+        9..13,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
+    ),
+    (
+        Lbrace,
+        13..14,
+    ),
+    (
+        Name(
+            Name("x"),
+        ),
+        14..15,
+    ),
+    (
+        Plus,
+        16..17,
+    ),
+    (
+        TStringStart,
+        18..20,
+        TokenFlags(
+            DOUBLE_QUOTES | T_STRING,
+        ),
+    ),
+    (
+        Lbrace,
+        20..21,
+    ),
+    (
+        Name(
+            Name("wow"),
+        ),
+        21..24,
+    ),
+    (
+        Rbrace,
+        24..25,
+    ),
+    (
+        TStringEnd,
+        25..26,
+        TokenFlags(
+            DOUBLE_QUOTES | T_STRING,
+        ),
+    ),
+    (
+        Rbrace,
+        26..27,
+    ),
+    (
+        FStringEnd,
+        27..28,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
+    ),
+    (
+        Rbrace,
+        28..29,
+    ),
+    (
+        InterpolatedStringMiddle(
+            " baz",
+        ),
+        29..33,
+        TokenFlags(
+            DOUBLE_QUOTES | T_STRING,
+        ),
+    ),
+    (
+        TStringEnd,
+        33..34,
+        TokenFlags(
+            DOUBLE_QUOTES | T_STRING,
+        ),
+    ),
+    (
+        FStringStart,
+        35..37,
+        TokenFlags(
+            F_STRING,
+        ),
+    ),
+    (
+        InterpolatedStringMiddle(
+            "foo ",
+        ),
+        37..41,
+        TokenFlags(
+            F_STRING,
+        ),
+    ),
+    (
+        Lbrace,
+        41..42,
+    ),
+    (
+        TStringStart,
+        42..44,
+        TokenFlags(
+            T_STRING,
+        ),
+    ),
+    (
+        InterpolatedStringMiddle(
+            "bar",
+        ),
+        44..47,
+        TokenFlags(
+            T_STRING,
+        ),
+    ),
+    (
+        TStringEnd,
+        47..48,
+        TokenFlags(
+            T_STRING,
+        ),
+    ),
+    (
+        Exclamation,
+        48..49,
+    ),
+    (
+        Name(
+            Name("r"),
+        ),
+        49..50,
+    ),
+    (
+        Rbrace,
+        50..51,
+    ),
+    (
+        InterpolatedStringMiddle(
+            " some ",
+        ),
+        51..57,
+        TokenFlags(
+            F_STRING,
+        ),
+    ),
+    (
+        Lbrace,
+        57..58,
+    ),
+    (
+        FStringStart,
+        58..60,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
+    ),
+    (
+        InterpolatedStringMiddle(
+            "another",
+        ),
+        60..67,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
+    ),
+    (
+        FStringEnd,
+        67..68,
+        TokenFlags(
+            DOUBLE_QUOTES | F_STRING,
+        ),
+    ),
+    (
+        Rbrace,
+        68..69,
+    ),
+    (
+        FStringEnd,
+        69..70,
+        TokenFlags(
+            F_STRING,
+        ),
+    ),
+    (
+        Newline,
+        70..70,
+    ),
+]
+```

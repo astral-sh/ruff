@@ -1,10 +1,10 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_const_true;
 use ruff_python_ast::{Expr, ExprAttribute, ExprCall};
 use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -18,7 +18,7 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Example
 /// ```python
-/// import flask
+/// from flask import Flask
 ///
 /// app = Flask()
 ///
@@ -27,7 +27,9 @@ use crate::checkers::ast::Checker;
 ///
 /// Use instead:
 /// ```python
-/// import flask
+/// import os
+///
+/// from flask import Flask
 ///
 /// app = Flask()
 ///
@@ -47,7 +49,7 @@ impl Violation for FlaskDebugTrue {
 }
 
 /// S201
-pub(crate) fn flask_debug_true(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn flask_debug_true(checker: &Checker, call: &ExprCall) {
     let Expr::Attribute(ExprAttribute { attr, value, .. }) = call.func.as_ref() else {
         return;
     };
@@ -67,8 +69,6 @@ pub(crate) fn flask_debug_true(checker: &mut Checker, call: &ExprCall) {
     if typing::resolve_assignment(value, checker.semantic())
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["flask", "Flask"]))
     {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(FlaskDebugTrue, debug_argument.range()));
+        checker.report_diagnostic(FlaskDebugTrue, debug_argument.range());
     }
 }

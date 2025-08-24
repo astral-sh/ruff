@@ -1,19 +1,21 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use std::fmt::Write;
+
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::{self as ast, Expr, Parameter, ParameterWithDefault};
+use ruff_python_ast::{self as ast, Expr, Parameter};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_index::Indexer;
+use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::function_type::is_stub;
 use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
-use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::{indentation_at_offset, textwrap};
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 
-use crate::checkers::ast::Checker;
 use crate::Locator;
+use crate::checkers::ast::Checker;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for uses of mutable objects as function argument defaults.
@@ -66,6 +68,12 @@ use crate::Locator;
 /// ## Options
 /// - `lint.flake8-bugbear.extend-immutable-calls`
 ///
+/// ## Fix safety
+///
+/// This fix is marked as unsafe because it replaces the mutable default with `None`
+/// and initializes it in the function body, which may not be what the user intended,
+/// as described above.
+///
 /// ## References
 /// - [Python documentation: Default Argument Values](https://docs.python.org/3/tutorial/controlflow.html#default-argument-values)
 #[derive(ViolationMetadata)]
@@ -85,24 +93,19 @@ impl Violation for MutableArgumentDefault {
 }
 
 /// B006
-pub(crate) fn mutable_argument_default(checker: &mut Checker, function_def: &ast::StmtFunctionDef) {
+pub(crate) fn mutable_argument_default(checker: &Checker, function_def: &ast::StmtFunctionDef) {
     // Skip stub files
     if checker.source_type.is_stub() {
         return;
     }
 
-    for ParameterWithDefault {
-        parameter,
-        default,
-        range: _,
-    } in function_def.parameters.iter_non_variadic_params()
-    {
-        let Some(default) = default else {
+    for parameter in function_def.parameters.iter_non_variadic_params() {
+        let Some(default) = parameter.default() else {
             continue;
         };
 
         let extend_immutable_calls: Vec<QualifiedName> = checker
-            .settings
+            .settings()
             .flake8_bugbear
             .extend_immutable_calls
             .iter()
@@ -110,16 +113,16 @@ pub(crate) fn mutable_argument_default(checker: &mut Checker, function_def: &ast
             .collect();
 
         if is_mutable_expr(default, checker.semantic())
-            && !parameter.annotation.as_ref().is_some_and(|expr| {
+            && !parameter.annotation().is_some_and(|expr| {
                 is_immutable_annotation(expr, checker.semantic(), extend_immutable_calls.as_slice())
             })
         {
-            let mut diagnostic = Diagnostic::new(MutableArgumentDefault, default.range());
+            let mut diagnostic = checker.report_diagnostic(MutableArgumentDefault, default.range());
 
             // If the function body is on the same line as the function def, do not fix
             if let Some(fix) = move_initialization(
                 function_def,
-                parameter,
+                &parameter.parameter,
                 default,
                 checker.semantic(),
                 checker.locator(),
@@ -129,14 +132,13 @@ pub(crate) fn mutable_argument_default(checker: &mut Checker, function_def: &ast
             ) {
                 diagnostic.set_fix(fix);
             }
-            checker.diagnostics.push(diagnostic);
         }
     }
 }
 
 /// Generate a [`Fix`] to move a mutable argument default initialization
 /// into the function body.
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 fn move_initialization(
     function_def: &ast::StmtFunctionDef,
     parameter: &Parameter,
@@ -165,14 +167,15 @@ fn move_initialization(
 
     // Add an `if`, to set the argument to its original value if still `None`.
     let mut content = String::new();
-    content.push_str(&format!("if {} is None:", parameter.name.as_str()));
+    let _ = write!(&mut content, "if {} is None:", parameter.name());
     content.push_str(stylist.line_ending().as_str());
     content.push_str(stylist.indentation());
-    content.push_str(&format!(
+    let _ = write!(
+        &mut content,
         "{} = {}",
-        parameter.name.as_str(),
+        parameter.name(),
         generator.expr(default)
-    ));
+    );
     content.push_str(stylist.line_ending().as_str());
 
     // Determine the indentation depth of the function body.
@@ -209,7 +212,7 @@ fn move_initialization(
             }
         } else {
             break;
-        };
+        }
     }
 
     let initialization_edit = Edit::insertion(content, pos);

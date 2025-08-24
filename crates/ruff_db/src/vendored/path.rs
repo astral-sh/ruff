@@ -17,6 +17,10 @@ impl VendoredPath {
         unsafe { &*(path as *const Utf8Path as *const VendoredPath) }
     }
 
+    pub fn file_name(&self) -> Option<&str> {
+        self.0.file_name()
+    }
+
     pub fn to_path_buf(&self) -> VendoredPathBuf {
         VendoredPathBuf(self.0.to_path_buf())
     }
@@ -33,7 +37,7 @@ impl VendoredPath {
         self.0.as_std_path()
     }
 
-    pub fn components(&self) -> Utf8Components {
+    pub fn components(&self) -> Utf8Components<'_> {
         self.0.components()
     }
 
@@ -86,6 +90,12 @@ impl ToOwned for VendoredPath {
 #[repr(transparent)]
 #[derive(Debug, Eq, PartialEq, Clone, Hash)]
 pub struct VendoredPathBuf(Utf8PathBuf);
+
+impl get_size2::GetSize for VendoredPathBuf {
+    fn get_heap_size(&self) -> usize {
+        self.0.capacity()
+    }
+}
 
 impl Default for VendoredPathBuf {
     fn default() -> Self {

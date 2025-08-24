@@ -1,5 +1,4 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, Stmt};
@@ -7,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix;
+use crate::{AlwaysFixableViolation, Fix};
 
 /// ## What it does
 /// Checks for functions that end with an unnecessary `return` or
@@ -44,13 +44,13 @@ impl AlwaysFixableViolation for UselessReturn {
 
 /// PLR1711
 pub(crate) fn useless_return(
-    checker: &mut Checker,
+    checker: &Checker,
     stmt: &Stmt,
     body: &[Stmt],
     returns: Option<&Expr>,
 ) {
     // Skip functions that have a return annotation that is not `None`.
-    if !returns.map_or(true, Expr::is_none_literal_expr) {
+    if !returns.is_none_or(Expr::is_none_literal_expr) {
         return;
     }
 
@@ -61,7 +61,12 @@ pub(crate) fn useless_return(
     };
 
     // Verify that the last statement is a return statement.
-    let Stmt::Return(ast::StmtReturn { value, range: _ }) = &last_stmt else {
+    let Stmt::Return(ast::StmtReturn {
+        value,
+        range: _,
+        node_index: _,
+    }) = &last_stmt
+    else {
         return;
     };
 
@@ -72,7 +77,12 @@ pub(crate) fn useless_return(
 
     // Skip functions that consist of a docstring and a return statement.
     if body.len() == 2 {
-        if let Stmt::Expr(ast::StmtExpr { value, range: _ }) = &body[0] {
+        if let Stmt::Expr(ast::StmtExpr {
+            value,
+            range: _,
+            node_index: _,
+        }) = &body[0]
+        {
             if value.is_string_literal_expr() {
                 return;
             }
@@ -82,10 +92,10 @@ pub(crate) fn useless_return(
     // Verify that the return statement is either bare or returns `None`.
     if !value
         .as_ref()
-        .map_or(true, |expr| expr.is_none_literal_expr())
+        .is_none_or(|expr| expr.is_none_literal_expr())
     {
         return;
-    };
+    }
 
     // Finally: verify that there are no _other_ return statements in the function.
     let mut visitor = ReturnStatementVisitor::default();
@@ -94,10 +104,9 @@ pub(crate) fn useless_return(
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(UselessReturn, last_stmt.range());
+    let mut diagnostic = checker.report_diagnostic(UselessReturn, last_stmt.range());
     let edit = fix::edits::delete_stmt(last_stmt, Some(stmt), checker.locator(), checker.indexer());
     diagnostic.set_fix(Fix::safe_edit(edit).isolate(Checker::isolation(
         checker.semantic().current_statement_id(),
     )));
-    checker.diagnostics.push(diagnostic);
 }

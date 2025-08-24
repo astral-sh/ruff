@@ -1,11 +1,11 @@
 use itertools::Itertools;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Stmt;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for consecutive `global` (or `nonlocal`) statements.
@@ -53,7 +53,7 @@ impl AlwaysFixableViolation for RepeatedGlobal {
 }
 
 /// FURB154
-pub(crate) fn repeated_global(checker: &mut Checker, mut suite: &[Stmt]) {
+pub(crate) fn repeated_global(checker: &Checker, mut suite: &[Stmt]) {
     while let Some(idx) = suite
         .iter()
         .position(|stmt| GlobalKind::from_stmt(stmt).is_some())
@@ -74,25 +74,23 @@ pub(crate) fn repeated_global(checker: &mut Checker, mut suite: &[Stmt]) {
         // diagnostic.
         if let [first, .., last] = globals_sequence {
             let range = first.range().cover(last.range());
-            checker.diagnostics.push(
-                Diagnostic::new(RepeatedGlobal { global_kind }, range).with_fix(Fix::safe_edit(
-                    Edit::range_replacement(
-                        format!(
-                            "{global_kind} {}",
-                            globals_sequence
-                                .iter()
-                                .flat_map(|stmt| match stmt {
-                                    Stmt::Global(stmt) => &stmt.names,
-                                    Stmt::Nonlocal(stmt) => &stmt.names,
-                                    _ => unreachable!(),
-                                })
-                                .map(ruff_python_ast::Identifier::id)
-                                .format(", ")
-                        ),
-                        range,
+            checker
+                .report_diagnostic(RepeatedGlobal { global_kind }, range)
+                .set_fix(Fix::safe_edit(Edit::range_replacement(
+                    format!(
+                        "{global_kind} {}",
+                        globals_sequence
+                            .iter()
+                            .flat_map(|stmt| match stmt {
+                                Stmt::Global(stmt) => &stmt.names,
+                                Stmt::Nonlocal(stmt) => &stmt.names,
+                                _ => unreachable!(),
+                            })
+                            .map(ruff_python_ast::Identifier::id)
+                            .format(", ")
                     ),
-                )),
-            );
+                    range,
+                )));
         }
 
         suite = next_suite;

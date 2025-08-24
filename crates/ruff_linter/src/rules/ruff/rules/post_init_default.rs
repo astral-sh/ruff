@@ -1,16 +1,17 @@
 use anyhow::Context;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
+use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_semantic::{Scope, ScopeKind};
 use ruff_python_trivia::{indentation_at_offset, textwrap};
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 
+use crate::{Edit, Fix, FixAvailability, Violation};
 use crate::{checkers::ast::Checker, importer::ImportRequest};
 
-use super::helpers::{dataclass_kind, DataclassKind};
+use crate::rules::ruff::helpers::{DataclassKind, dataclass_kind};
 
 /// ## What it does
 /// Checks for `__post_init__` dataclass methods with parameter defaults.
@@ -61,6 +62,12 @@ use super::helpers::{dataclass_kind, DataclassKind};
 /// foo = Foo()  # Prints '1 2'.
 /// ```
 ///
+/// ## Fix safety
+///
+/// This fix is always marked as unsafe because, although switching to `InitVar` is usually correct,
+/// it is incorrect when the parameter is not intended to be part of the public API or when the value
+/// is meant to be shared across all instances.
+///
 /// ## References
 /// - [Python documentation: Post-init processing](https://docs.python.org/3/library/dataclasses.html#post-init-processing)
 /// - [Python documentation: Init-only variables](https://docs.python.org/3/library/dataclasses.html#init-only-variables)
@@ -83,7 +90,7 @@ impl Violation for PostInitDefault {
 }
 
 /// RUF033
-pub(crate) fn post_init_default(checker: &mut Checker, function_def: &ast::StmtFunctionDef) {
+pub(crate) fn post_init_default(checker: &Checker, function_def: &ast::StmtFunctionDef) {
     if &function_def.name != "__post_init__" {
         return;
     }
@@ -102,18 +109,12 @@ pub(crate) fn post_init_default(checker: &mut Checker, function_def: &ast::StmtF
     }
 
     let mut stopped_fixes = false;
-    let mut diagnostics = vec![];
 
-    for ast::ParameterWithDefault {
-        parameter,
-        default,
-        range: _,
-    } in function_def.parameters.iter_non_variadic_params()
-    {
-        let Some(default) = default else {
+    for parameter in function_def.parameters.iter_non_variadic_params() {
+        let Some(default) = parameter.default() else {
             continue;
         };
-        let mut diagnostic = Diagnostic::new(PostInitDefault, default.range());
+        let mut diagnostic = checker.report_diagnostic(PostInitDefault, default.range());
 
         if !stopped_fixes {
             diagnostic.try_set_fix(|| {
@@ -122,13 +123,9 @@ pub(crate) fn post_init_default(checker: &mut Checker, function_def: &ast::StmtF
             // Need to stop fixes as soon as there is a parameter we cannot fix.
             // Otherwise, we risk a syntax error (a parameter without a default
             // following parameter with a default).
-            stopped_fixes |= diagnostic.fix.is_none();
+            stopped_fixes |= diagnostic.fix().is_none();
         }
-
-        diagnostics.push(diagnostic);
     }
-
-    checker.diagnostics.extend(diagnostics);
 }
 
 /// Generate a [`Fix`] to transform a `__post_init__` default argument into a
@@ -136,10 +133,11 @@ pub(crate) fn post_init_default(checker: &mut Checker, function_def: &ast::StmtF
 fn use_initvar(
     current_scope: &Scope,
     post_init_def: &ast::StmtFunctionDef,
-    parameter: &ast::Parameter,
+    parameter_with_default: &ast::ParameterWithDefault,
     default: &ast::Expr,
     checker: &Checker,
 ) -> anyhow::Result<Fix> {
+    let parameter = &parameter_with_default.parameter;
     if current_scope.has(&parameter.name) {
         return Err(anyhow::anyhow!(
             "Cannot add a `{}: InitVar` field to the class body, as a field by that name already exists",
@@ -155,22 +153,29 @@ fn use_initvar(
         checker.semantic(),
     )?;
 
+    let locator = checker.locator();
+
+    let default_loc = parenthesized_range(
+        default.into(),
+        parameter_with_default.into(),
+        checker.comment_ranges(),
+        checker.source(),
+    )
+    .unwrap_or(default.range());
+
     // Delete the default value. For example,
     // - def __post_init__(self, foo: int = 0) -> None: ...
     // + def __post_init__(self, foo: int) -> None: ...
-    let default_edit = Edit::deletion(parameter.end(), default.end());
+    let default_edit = Edit::deletion(parameter.end(), default_loc.end());
 
     // Add `dataclasses.InitVar` field to class body.
-    let locator = checker.locator();
-
     let content = {
+        let default = locator.slice(default_loc);
         let parameter_name = locator.slice(&parameter.name);
-        let default = locator.slice(default);
         let line_ending = checker.stylist().line_ending().as_str();
 
         if let Some(annotation) = &parameter
-            .annotation
-            .as_deref()
+            .annotation()
             .map(|annotation| locator.slice(annotation))
         {
             format!("{parameter_name}: {initvar_binding}[{annotation}] = {default}{line_ending}")

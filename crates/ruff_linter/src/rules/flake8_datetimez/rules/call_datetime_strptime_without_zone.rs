@@ -1,11 +1,11 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::Modules;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
-use super::helpers::DatetimeModuleAntipattern;
+use crate::rules::flake8_datetimez::helpers::DatetimeModuleAntipattern;
 
 /// ## What it does
 /// Checks for uses of `datetime.datetime.strptime()` that lead to naive
@@ -84,7 +84,7 @@ impl Violation for CallDatetimeStrptimeWithoutZone {
 }
 
 /// DTZ007
-pub(crate) fn call_datetime_strptime_without_zone(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn call_datetime_strptime_without_zone(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::DATETIME) {
         return;
     }
@@ -132,17 +132,14 @@ pub(crate) fn call_datetime_strptime_without_zone(checker: &mut Checker, call: &
             }
             _ => {}
         }
-    };
+    }
 
     let semantic = checker.semantic();
     if let Some(antipattern) = find_antipattern(
         semantic.current_expression_grandparent(),
         semantic.current_expression_parent(),
     ) {
-        checker.diagnostics.push(Diagnostic::new(
-            CallDatetimeStrptimeWithoutZone(antipattern),
-            call.range,
-        ));
+        checker.report_diagnostic(CallDatetimeStrptimeWithoutZone(antipattern), call.range);
     }
 }
 

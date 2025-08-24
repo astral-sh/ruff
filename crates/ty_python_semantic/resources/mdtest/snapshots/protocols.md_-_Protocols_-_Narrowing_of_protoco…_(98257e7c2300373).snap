@@ -1,0 +1,243 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: protocols.md - Protocols - Narrowing of protocols
+mdtest path: crates/ty_python_semantic/resources/mdtest/protocols.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing_extensions import Protocol, reveal_type
+ 2 | 
+ 3 | class HasX(Protocol):
+ 4 |     x: int
+ 5 | 
+ 6 | def f(arg: object, arg2: type):
+ 7 |     if isinstance(arg, HasX):  # error: [invalid-argument-type]
+ 8 |         reveal_type(arg)  # revealed: HasX
+ 9 |     else:
+10 |         reveal_type(arg)  # revealed: ~HasX
+11 | 
+12 |     if issubclass(arg2, HasX):  # error: [invalid-argument-type]
+13 |         reveal_type(arg2)  # revealed: type[HasX]
+14 |     else:
+15 |         reveal_type(arg2)  # revealed: type & ~type[HasX]
+16 | from typing import runtime_checkable
+17 | 
+18 | @runtime_checkable
+19 | class RuntimeCheckableHasX(Protocol):
+20 |     x: int
+21 | 
+22 | def f(arg: object):
+23 |     if isinstance(arg, RuntimeCheckableHasX):  # no error!
+24 |         reveal_type(arg)  # revealed: RuntimeCheckableHasX
+25 |     else:
+26 |         reveal_type(arg)  # revealed: ~RuntimeCheckableHasX
+27 | @runtime_checkable
+28 | class OnlyMethodMembers(Protocol):
+29 |     def method(self) -> None: ...
+30 | 
+31 | def f(arg1: type, arg2: type):
+32 |     if issubclass(arg1, RuntimeCheckableHasX):  # TODO: should emit an error here (has non-method members)
+33 |         reveal_type(arg1)  # revealed: type[RuntimeCheckableHasX]
+34 |     else:
+35 |         reveal_type(arg1)  # revealed: type & ~type[RuntimeCheckableHasX]
+36 | 
+37 |     if issubclass(arg2, OnlyMethodMembers):  # no error!
+38 |         reveal_type(arg2)  # revealed: type[OnlyMethodMembers]
+39 |     else:
+40 |         reveal_type(arg2)  # revealed: type & ~type[OnlyMethodMembers]
+```
+
+# Diagnostics
+
+```
+error[invalid-argument-type]: Class `HasX` cannot be used as the second argument to `isinstance`
+ --> src/mdtest_snippet.py:7:8
+  |
+6 | def f(arg: object, arg2: type):
+7 |     if isinstance(arg, HasX):  # error: [invalid-argument-type]
+  |        ^^^^^^^^^^^^^^^^^^^^^ This call will raise `TypeError` at runtime
+8 |         reveal_type(arg)  # revealed: HasX
+9 |     else:
+  |
+info: `HasX` is declared as a protocol class, but it is not declared as runtime-checkable
+ --> src/mdtest_snippet.py:3:7
+  |
+1 | from typing_extensions import Protocol, reveal_type
+2 |
+3 | class HasX(Protocol):
+  |       ^^^^^^^^^^^^^^ `HasX` declared here
+4 |     x: int
+  |
+info: A protocol class can only be used in `isinstance` checks if it is decorated with `@typing.runtime_checkable` or `@typing_extensions.runtime_checkable`
+info: See https://docs.python.org/3/library/typing.html#typing.runtime_checkable
+info: rule `invalid-argument-type` is enabled by default
+
+```
+
+```
+info[revealed-type]: Revealed type
+  --> src/mdtest_snippet.py:8:21
+   |
+ 6 | def f(arg: object, arg2: type):
+ 7 |     if isinstance(arg, HasX):  # error: [invalid-argument-type]
+ 8 |         reveal_type(arg)  # revealed: HasX
+   |                     ^^^ `HasX`
+ 9 |     else:
+10 |         reveal_type(arg)  # revealed: ~HasX
+   |
+
+```
+
+```
+info[revealed-type]: Revealed type
+  --> src/mdtest_snippet.py:10:21
+   |
+ 8 |         reveal_type(arg)  # revealed: HasX
+ 9 |     else:
+10 |         reveal_type(arg)  # revealed: ~HasX
+   |                     ^^^ `~HasX`
+11 |
+12 |     if issubclass(arg2, HasX):  # error: [invalid-argument-type]
+   |
+
+```
+
+```
+error[invalid-argument-type]: Class `HasX` cannot be used as the second argument to `issubclass`
+  --> src/mdtest_snippet.py:12:8
+   |
+10 |         reveal_type(arg)  # revealed: ~HasX
+11 |
+12 |     if issubclass(arg2, HasX):  # error: [invalid-argument-type]
+   |        ^^^^^^^^^^^^^^^^^^^^^^ This call will raise `TypeError` at runtime
+13 |         reveal_type(arg2)  # revealed: type[HasX]
+14 |     else:
+   |
+info: `HasX` is declared as a protocol class, but it is not declared as runtime-checkable
+ --> src/mdtest_snippet.py:3:7
+  |
+1 | from typing_extensions import Protocol, reveal_type
+2 |
+3 | class HasX(Protocol):
+  |       ^^^^^^^^^^^^^^ `HasX` declared here
+4 |     x: int
+  |
+info: A protocol class can only be used in `issubclass` checks if it is decorated with `@typing.runtime_checkable` or `@typing_extensions.runtime_checkable`
+info: See https://docs.python.org/3/library/typing.html#typing.runtime_checkable
+info: rule `invalid-argument-type` is enabled by default
+
+```
+
+```
+info[revealed-type]: Revealed type
+  --> src/mdtest_snippet.py:13:21
+   |
+12 |     if issubclass(arg2, HasX):  # error: [invalid-argument-type]
+13 |         reveal_type(arg2)  # revealed: type[HasX]
+   |                     ^^^^ `type[HasX]`
+14 |     else:
+15 |         reveal_type(arg2)  # revealed: type & ~type[HasX]
+   |
+
+```
+
+```
+info[revealed-type]: Revealed type
+  --> src/mdtest_snippet.py:15:21
+   |
+13 |         reveal_type(arg2)  # revealed: type[HasX]
+14 |     else:
+15 |         reveal_type(arg2)  # revealed: type & ~type[HasX]
+   |                     ^^^^ `type & ~type[HasX]`
+16 | from typing import runtime_checkable
+   |
+
+```
+
+```
+info[revealed-type]: Revealed type
+  --> src/mdtest_snippet.py:24:21
+   |
+22 | def f(arg: object):
+23 |     if isinstance(arg, RuntimeCheckableHasX):  # no error!
+24 |         reveal_type(arg)  # revealed: RuntimeCheckableHasX
+   |                     ^^^ `RuntimeCheckableHasX`
+25 |     else:
+26 |         reveal_type(arg)  # revealed: ~RuntimeCheckableHasX
+   |
+
+```
+
+```
+info[revealed-type]: Revealed type
+  --> src/mdtest_snippet.py:26:21
+   |
+24 |         reveal_type(arg)  # revealed: RuntimeCheckableHasX
+25 |     else:
+26 |         reveal_type(arg)  # revealed: ~RuntimeCheckableHasX
+   |                     ^^^ `~RuntimeCheckableHasX`
+27 | @runtime_checkable
+28 | class OnlyMethodMembers(Protocol):
+   |
+
+```
+
+```
+info[revealed-type]: Revealed type
+  --> src/mdtest_snippet.py:33:21
+   |
+31 | def f(arg1: type, arg2: type):
+32 |     if issubclass(arg1, RuntimeCheckableHasX):  # TODO: should emit an error here (has non-method members)
+33 |         reveal_type(arg1)  # revealed: type[RuntimeCheckableHasX]
+   |                     ^^^^ `type[RuntimeCheckableHasX]`
+34 |     else:
+35 |         reveal_type(arg1)  # revealed: type & ~type[RuntimeCheckableHasX]
+   |
+
+```
+
+```
+info[revealed-type]: Revealed type
+  --> src/mdtest_snippet.py:35:21
+   |
+33 |         reveal_type(arg1)  # revealed: type[RuntimeCheckableHasX]
+34 |     else:
+35 |         reveal_type(arg1)  # revealed: type & ~type[RuntimeCheckableHasX]
+   |                     ^^^^ `type & ~type[RuntimeCheckableHasX]`
+36 |
+37 |     if issubclass(arg2, OnlyMethodMembers):  # no error!
+   |
+
+```
+
+```
+info[revealed-type]: Revealed type
+  --> src/mdtest_snippet.py:38:21
+   |
+37 |     if issubclass(arg2, OnlyMethodMembers):  # no error!
+38 |         reveal_type(arg2)  # revealed: type[OnlyMethodMembers]
+   |                     ^^^^ `type[OnlyMethodMembers]`
+39 |     else:
+40 |         reveal_type(arg2)  # revealed: type & ~type[OnlyMethodMembers]
+   |
+
+```
+
+```
+info[revealed-type]: Revealed type
+  --> src/mdtest_snippet.py:40:21
+   |
+38 |         reveal_type(arg2)  # revealed: type[OnlyMethodMembers]
+39 |     else:
+40 |         reveal_type(arg2)  # revealed: type & ~type[OnlyMethodMembers]
+   |                     ^^^^ `type & ~type[OnlyMethodMembers]`
+   |
+
+```

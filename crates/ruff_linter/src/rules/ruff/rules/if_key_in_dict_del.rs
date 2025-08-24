@@ -1,9 +1,9 @@
-use crate::checkers::ast::Checker;
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{CmpOp, Expr, ExprName, ExprSubscript, Stmt, StmtIf};
 use ruff_python_semantic::analyze::typing;
-use ruff_python_semantic::SemanticModel;
+
+use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
 type Key = Expr;
 type Dict = ExprName;
@@ -44,7 +44,7 @@ impl AlwaysFixableViolation for IfKeyInDictDel {
 }
 
 /// RUF051
-pub(crate) fn if_key_in_dict_del(checker: &mut Checker, stmt: &StmtIf) {
+pub(crate) fn if_key_in_dict_del(checker: &Checker, stmt: &StmtIf) {
     let [Stmt::Delete(delete)] = &stmt.body[..] else {
         return;
     };
@@ -60,15 +60,15 @@ pub(crate) fn if_key_in_dict_del(checker: &mut Checker, stmt: &StmtIf) {
         return;
     }
 
-    if !is_known_to_be_of_type_dict(checker.semantic(), test_dict) {
+    if !typing::is_known_to_be_of_type_dict(checker.semantic(), test_dict) {
         return;
     }
 
     let fix = replace_with_dict_pop_fix(checker, stmt, test_dict, test_key);
 
-    let diagnostic = Diagnostic::new(IfKeyInDictDel, delete.range);
-
-    checker.diagnostics.push(diagnostic.with_fix(fix));
+    checker
+        .report_diagnostic(IfKeyInDictDel, delete.range)
+        .set_fix(fix);
 }
 
 fn extract_dict_and_key_from_test(test: &Expr) -> Option<(&Dict, &Key)> {
@@ -125,14 +125,6 @@ fn is_same_key(test: &Key, del: &Key) -> bool {
 
 fn is_same_dict(test: &Dict, del: &Dict) -> bool {
     test.id.as_str() == del.id.as_str()
-}
-
-fn is_known_to_be_of_type_dict(semantic: &SemanticModel, dict: &Dict) -> bool {
-    let Some(binding) = semantic.only_binding(dict).map(|id| semantic.binding(id)) else {
-        return false;
-    };
-
-    typing::is_dict(binding, semantic)
 }
 
 fn replace_with_dict_pop_fix(checker: &Checker, stmt: &StmtIf, dict: &Dict, key: &Key) -> Fix {

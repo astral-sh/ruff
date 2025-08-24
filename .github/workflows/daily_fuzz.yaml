@@ -31,15 +31,15 @@ jobs:
     # Don't run the cron job on forks:
     if: ${{ github.repository == 'astral-sh/ruff' || github.event_name != 'schedule' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@e92bafb6253dcd438e0484186d7669ea7a8ca1cc # v6.4.3
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install mold"
-        uses: rui314/setup-mold@v1
-      - uses: Swatinem/rust-cache@v2
+        uses: rui314/setup-mold@7344740a9418dcdcb481c7df83d9fbd1d5072d7d # v1
+      - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
       - name: Build ruff
         # A debug build means the script runs slower once it gets started,
         # but this is outweighed by the fact that a release build takes *much* longer to compile in CI
@@ -65,7 +65,7 @@ jobs:
     permissions:
       issues: write
     steps:
-      - uses: actions/github-script@v7
+      - uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |

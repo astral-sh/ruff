@@ -1,12 +1,12 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, CmpOp, Expr};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 
-use super::super::helpers::is_sys;
+use crate::rules::flake8_2020::helpers::is_sys;
 
 /// ## What it does
 /// Checks for comparisons that test `sys.version` against string literals,
@@ -52,17 +52,20 @@ impl Violation for SysVersionCmpStr3 {
 
 /// ## What it does
 /// Checks for equality comparisons against the major version returned by
-/// `sys.version_info` (e.g., `sys.version_info[0] == 3`).
+/// `sys.version_info` (e.g., `sys.version_info[0] == 3` or `sys.version_info[0] != 3`).
 ///
 /// ## Why is this bad?
 /// Using `sys.version_info[0] == 3` to verify that the major version is
 /// Python 3 or greater will fail if the major version number is ever
 /// incremented (e.g., to Python 4). This is likely unintended, as code
 /// that uses this comparison is likely intended to be run on Python 2,
-/// but would now run on Python 4 too.
+/// but would now run on Python 4 too. Similarly, using `sys.version_info[0] != 3`
+/// to check for Python 2 will also fail if the major version number is
+/// incremented.
 ///
 /// Instead, use `>=` to check if the major version number is 3 or greater,
-/// to future-proof the code.
+/// or `<` to check if the major version number is less than 3, to future-proof
+/// the code.
 ///
 /// ## Example
 /// ```python
@@ -88,12 +91,18 @@ impl Violation for SysVersionCmpStr3 {
 /// - [Python documentation: `sys.version`](https://docs.python.org/3/library/sys.html#sys.version)
 /// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
 #[derive(ViolationMetadata)]
-pub(crate) struct SysVersionInfo0Eq3;
+pub(crate) struct SysVersionInfo0Eq3 {
+    eq: bool,
+}
 
 impl Violation for SysVersionInfo0Eq3 {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "`sys.version_info[0] == 3` referenced (python4), use `>=`".to_string()
+        if self.eq {
+            "`sys.version_info[0] == 3` referenced (python4), use `>=`".to_string()
+        } else {
+            "`sys.version_info[0] != 3` referenced (python4), use `<`".to_string()
+        }
     }
 }
 
@@ -223,7 +232,7 @@ impl Violation for SysVersionCmpStr10 {
 }
 
 /// YTT103, YTT201, YTT203, YTT204, YTT302
-pub(crate) fn compare(checker: &mut Checker, left: &Expr, ops: &[CmpOp], comparators: &[Expr]) {
+pub(crate) fn compare(checker: &Checker, left: &Expr, ops: &[CmpOp], comparators: &[Expr]) {
     match left {
         Expr::Subscript(ast::ExprSubscript { value, slice, .. })
             if is_sys(value, "version_info", checker.semantic()) =>
@@ -235,33 +244,36 @@ pub(crate) fn compare(checker: &mut Checker, left: &Expr, ops: &[CmpOp], compara
             {
                 if *i == 0 {
                     if let (
-                        [CmpOp::Eq | CmpOp::NotEq],
-                        [Expr::NumberLiteral(ast::ExprNumberLiteral {
-                            value: ast::Number::Int(n),
-                            ..
-                        })],
+                        [operator @ (CmpOp::Eq | CmpOp::NotEq)],
+                        [
+                            Expr::NumberLiteral(ast::ExprNumberLiteral {
+                                value: ast::Number::Int(n),
+                                ..
+                            }),
+                        ],
                     ) = (ops, comparators)
                     {
-                        if *n == 3 && checker.enabled(Rule::SysVersionInfo0Eq3) {
-                            checker
-                                .diagnostics
-                                .push(Diagnostic::new(SysVersionInfo0Eq3, left.range()));
+                        if *n == 3 && checker.is_rule_enabled(Rule::SysVersionInfo0Eq3) {
+                            checker.report_diagnostic(
+                                SysVersionInfo0Eq3 {
+                                    eq: matches!(*operator, CmpOp::Eq),
+                                },
+                                left.range(),
+                            );
                         }
                     }
                 } else if *i == 1 {
                     if let (
                         [CmpOp::Lt | CmpOp::LtE | CmpOp::Gt | CmpOp::GtE],
-                        [Expr::NumberLiteral(ast::ExprNumberLiteral {
-                            value: ast::Number::Int(_),
-                            ..
-                        })],
+                        [
+                            Expr::NumberLiteral(ast::ExprNumberLiteral {
+                                value: ast::Number::Int(_),
+                                ..
+                            }),
+                        ],
                     ) = (ops, comparators)
                     {
-                        if checker.enabled(Rule::SysVersionInfo1CmpInt) {
-                            checker
-                                .diagnostics
-                                .push(Diagnostic::new(SysVersionInfo1CmpInt, left.range()));
-                        }
+                        checker.report_diagnostic_if_enabled(SysVersionInfo1CmpInt, left.range());
                     }
                 }
             }
@@ -272,17 +284,15 @@ pub(crate) fn compare(checker: &mut Checker, left: &Expr, ops: &[CmpOp], compara
         {
             if let (
                 [CmpOp::Lt | CmpOp::LtE | CmpOp::Gt | CmpOp::GtE],
-                [Expr::NumberLiteral(ast::ExprNumberLiteral {
-                    value: ast::Number::Int(_),
-                    ..
-                })],
+                [
+                    Expr::NumberLiteral(ast::ExprNumberLiteral {
+                        value: ast::Number::Int(_),
+                        ..
+                    }),
+                ],
             ) = (ops, comparators)
             {
-                if checker.enabled(Rule::SysVersionInfoMinorCmpInt) {
-                    checker
-                        .diagnostics
-                        .push(Diagnostic::new(SysVersionInfoMinorCmpInt, left.range()));
-                }
+                checker.report_diagnostic_if_enabled(SysVersionInfoMinorCmpInt, left.range());
             }
         }
 
@@ -296,15 +306,9 @@ pub(crate) fn compare(checker: &mut Checker, left: &Expr, ops: &[CmpOp], compara
         ) = (ops, comparators)
         {
             if value.len() == 1 {
-                if checker.enabled(Rule::SysVersionCmpStr10) {
-                    checker
-                        .diagnostics
-                        .push(Diagnostic::new(SysVersionCmpStr10, left.range()));
-                }
-            } else if checker.enabled(Rule::SysVersionCmpStr3) {
-                checker
-                    .diagnostics
-                    .push(Diagnostic::new(SysVersionCmpStr3, left.range()));
+                checker.report_diagnostic_if_enabled(SysVersionCmpStr10, left.range());
+            } else {
+                checker.report_diagnostic_if_enabled(SysVersionCmpStr3, left.range());
             }
         }
     }

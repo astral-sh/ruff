@@ -1,9 +1,9 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, ExprAttribute};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -63,7 +63,7 @@ impl Violation for OsSepSplit {
 }
 
 /// PTH206
-pub(crate) fn os_sep_split(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn os_sep_split(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::OS) {
         return;
     }
@@ -74,7 +74,7 @@ pub(crate) fn os_sep_split(checker: &mut Checker, call: &ast::ExprCall) {
 
     if attr.as_str() != "split" {
         return;
-    };
+    }
 
     // Match `.split(os.sep)` or `.split(sep=os.sep)`, but avoid cases in which a `maxsplit` is
     // specified.
@@ -94,7 +94,5 @@ pub(crate) fn os_sep_split(checker: &mut Checker, call: &ast::ExprCall) {
         return;
     }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(OsSepSplit, attr.range()));
+    checker.report_diagnostic(OsSepSplit, attr.range());
 }

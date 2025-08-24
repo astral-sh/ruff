@@ -1,13 +1,13 @@
 use itertools::Itertools;
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{
-    parenthesize::{parentheses_iterator, parenthesized_range},
     BoolOp, CmpOp, Expr, ExprBoolOp, ExprCompare,
+    parenthesize::{parentheses_iterator, parenthesized_range},
 };
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Check for chained boolean operations that can be simplified.
@@ -49,7 +49,7 @@ impl AlwaysFixableViolation for BooleanChainedComparison {
 }
 
 /// PLR1716
-pub(crate) fn boolean_chained_comparison(checker: &mut Checker, expr_bool_op: &ExprBoolOp) {
+pub(crate) fn boolean_chained_comparison(checker: &Checker, expr_bool_op: &ExprBoolOp) {
     // early exit for non `and` boolean operations
     if expr_bool_op.op != BoolOp::And {
         return;
@@ -69,96 +69,93 @@ pub(crate) fn boolean_chained_comparison(checker: &mut Checker, expr_bool_op: &E
         .iter()
         .map(|expr| expr.as_compare_expr().unwrap());
 
-    let diagnostics = compare_expressions
-        .tuple_windows()
-        .filter(|(left_compare, right_compare)| {
-            are_compare_expr_simplifiable(left_compare, right_compare)
-        })
-        .filter_map(|(left_compare, right_compare)| {
-            let Expr::Name(left_compare_right) = left_compare.comparators.last()? else {
-                return None;
-            };
+    for (left_compare, right_compare) in
+        compare_expressions
+            .tuple_windows()
+            .filter(|(left_compare, right_compare)| {
+                are_compare_expr_simplifiable(left_compare, right_compare)
+            })
+    {
+        let Some(Expr::Name(left_compare_right)) = left_compare.comparators.last() else {
+            continue;
+        };
 
-            let Expr::Name(right_compare_left) = &*right_compare.left else {
-                return None;
-            };
+        let Expr::Name(right_compare_left) = &*right_compare.left else {
+            continue;
+        };
 
-            if left_compare_right.id() != right_compare_left.id() {
-                return None;
+        if left_compare_right.id() != right_compare_left.id() {
+            continue;
+        }
+
+        let left_paren_count = parentheses_iterator(
+            left_compare.into(),
+            Some(expr_bool_op.into()),
+            comment_ranges,
+            locator.contents(),
+        )
+        .count();
+
+        let right_paren_count = parentheses_iterator(
+            right_compare.into(),
+            Some(expr_bool_op.into()),
+            comment_ranges,
+            locator.contents(),
+        )
+        .count();
+
+        // Create the edit that removes the comparison operator
+
+        // In `a<(b) and ((b))<c`, we need to handle the
+        // parentheses when specifying the fix range.
+        let left_compare_right_range = parenthesized_range(
+            left_compare_right.into(),
+            left_compare.into(),
+            comment_ranges,
+            locator.contents(),
+        )
+        .unwrap_or(left_compare_right.range());
+        let right_compare_left_range = parenthesized_range(
+            right_compare_left.into(),
+            right_compare.into(),
+            comment_ranges,
+            locator.contents(),
+        )
+        .unwrap_or(right_compare_left.range());
+        let edit = Edit::range_replacement(
+            locator.slice(left_compare_right_range).to_string(),
+            TextRange::new(
+                left_compare_right_range.start(),
+                right_compare_left_range.end(),
+            ),
+        );
+
+        // Balance left and right parentheses
+        let fix = match left_paren_count.cmp(&right_paren_count) {
+            std::cmp::Ordering::Less => {
+                let balance_parens_edit = Edit::insertion(
+                    "(".repeat(right_paren_count - left_paren_count),
+                    left_compare.start(),
+                );
+                Fix::safe_edits(edit, [balance_parens_edit])
             }
+            std::cmp::Ordering::Equal => Fix::safe_edit(edit),
+            std::cmp::Ordering::Greater => {
+                let balance_parens_edit = Edit::insertion(
+                    ")".repeat(left_paren_count - right_paren_count),
+                    right_compare.end(),
+                );
+                Fix::safe_edits(edit, [balance_parens_edit])
+            }
+        };
 
-            let left_paren_count = parentheses_iterator(
-                left_compare.into(),
-                Some(expr_bool_op.into()),
-                comment_ranges,
-                locator.contents(),
-            )
-            .count();
+        let mut diagnostic = checker.report_diagnostic(
+            BooleanChainedComparison,
+            TextRange::new(left_compare.start(), right_compare.end()),
+        );
 
-            let right_paren_count = parentheses_iterator(
-                right_compare.into(),
-                Some(expr_bool_op.into()),
-                comment_ranges,
-                locator.contents(),
-            )
-            .count();
-
-            // Create the edit that removes the comparison operator
-
-            // In `a<(b) and ((b))<c`, we need to handle the
-            // parentheses when specifying the fix range.
-            let left_compare_right_range = parenthesized_range(
-                left_compare_right.into(),
-                left_compare.into(),
-                comment_ranges,
-                locator.contents(),
-            )
-            .unwrap_or(left_compare_right.range());
-            let right_compare_left_range = parenthesized_range(
-                right_compare_left.into(),
-                right_compare.into(),
-                comment_ranges,
-                locator.contents(),
-            )
-            .unwrap_or(right_compare_left.range());
-            let edit = Edit::range_replacement(
-                locator.slice(left_compare_right_range).to_string(),
-                TextRange::new(
-                    left_compare_right_range.start(),
-                    right_compare_left_range.end(),
-                ),
-            );
-
-            // Balance left and right parentheses
-            let fix = match left_paren_count.cmp(&right_paren_count) {
-                std::cmp::Ordering::Less => {
-                    let balance_parens_edit = Edit::insertion(
-                        "(".repeat(right_paren_count - left_paren_count),
-                        left_compare.start(),
-                    );
-                    Fix::safe_edits(edit, [balance_parens_edit])
-                }
-                std::cmp::Ordering::Equal => Fix::safe_edit(edit),
-                std::cmp::Ordering::Greater => {
-                    let balance_parens_edit = Edit::insertion(
-                        ")".repeat(left_paren_count - right_paren_count),
-                        right_compare.end(),
-                    );
-                    Fix::safe_edits(edit, [balance_parens_edit])
-                }
-            };
-
-            let mut diagnostic = Diagnostic::new(
-                BooleanChainedComparison,
-                TextRange::new(left_compare.start(), right_compare.end()),
-            );
-
-            diagnostic.set_fix(fix);
-
-            Some(diagnostic)
-        });
-
-    checker.diagnostics.extend(diagnostics);
+        diagnostic.set_fix(fix);
+    }
 }
 
 /// Checks whether two compare expressions are simplifiable

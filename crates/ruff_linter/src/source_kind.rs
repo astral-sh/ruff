@@ -16,15 +16,47 @@ use colored::Colorize;
 use crate::fs;
 use crate::text_helpers::ShowNonprinting;
 
-#[derive(Clone, Debug, PartialEq, is_macro::Is)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SourceKind {
     /// The source contains Python source code.
     Python(String),
     /// The source contains a Jupyter notebook.
-    IpyNotebook(Notebook),
+    IpyNotebook(Box<Notebook>),
 }
 
 impl SourceKind {
+    pub fn ipy_notebook(notebook: Notebook) -> Self {
+        SourceKind::IpyNotebook(Box::new(notebook))
+    }
+
+    pub fn as_ipy_notebook(&self) -> Option<&Notebook> {
+        match self {
+            SourceKind::IpyNotebook(notebook) => Some(notebook),
+            SourceKind::Python(_) => None,
+        }
+    }
+
+    pub fn as_python(&self) -> Option<&str> {
+        match self {
+            SourceKind::Python(code) => Some(code),
+            SourceKind::IpyNotebook(_) => None,
+        }
+    }
+
+    pub fn expect_python(self) -> String {
+        match self {
+            SourceKind::Python(code) => code,
+            SourceKind::IpyNotebook(_) => panic!("expected python code"),
+        }
+    }
+
+    pub fn expect_ipy_notebook(self) -> Notebook {
+        match self {
+            SourceKind::IpyNotebook(notebook) => *notebook,
+            SourceKind::Python(_) => panic!("expected ipy notebook"),
+        }
+    }
+
     #[must_use]
     pub(crate) fn updated(&self, new_source: String, source_map: &SourceMap) -> Self {
         match self {
@@ -52,7 +84,7 @@ impl SourceKind {
             let notebook = Notebook::from_path(path)?;
             Ok(notebook
                 .is_python_notebook()
-                .then_some(Self::IpyNotebook(notebook)))
+                .then_some(Self::IpyNotebook(Box::new(notebook))))
         } else {
             let contents = std::fs::read_to_string(path)?;
             Ok(Some(Self::Python(contents)))
@@ -69,7 +101,7 @@ impl SourceKind {
             let notebook = Notebook::from_source_code(&source_code)?;
             Ok(notebook
                 .is_python_notebook()
-                .then_some(Self::IpyNotebook(notebook)))
+                .then_some(Self::IpyNotebook(Box::new(notebook))))
         } else {
             Ok(Some(Self::Python(source_code)))
         }

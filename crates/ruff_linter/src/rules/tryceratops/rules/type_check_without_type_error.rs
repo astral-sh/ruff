@@ -1,11 +1,11 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::map_callable;
-use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
+use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
 use ruff_python_ast::{self as ast, Expr, Stmt, StmtIf};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -92,16 +92,14 @@ fn check_type_check_test(semantic: &SemanticModel, test: &Expr) -> bool {
     }
 }
 
-fn check_raise(checker: &mut Checker, exc: &Expr, item: &Stmt) {
+fn check_raise(checker: &Checker, exc: &Expr, item: &Stmt) {
     if is_builtin_exception(exc, checker.semantic()) {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(TypeCheckWithoutTypeError, item.range()));
+        checker.report_diagnostic(TypeCheckWithoutTypeError, item.range());
     }
 }
 
 /// Search the body of an if-condition for raises.
-fn check_body(checker: &mut Checker, body: &[Stmt]) {
+fn check_body(checker: &Checker, body: &[Stmt]) {
     for item in body {
         if has_control_flow(item) {
             return;
@@ -145,7 +143,7 @@ fn is_builtin_exception(expr: &Expr, semantic: &SemanticModel) -> bool {
 
 /// TRY004
 pub(crate) fn type_check_without_type_error(
-    checker: &mut Checker,
+    checker: &Checker,
     stmt_if: &StmtIf,
     parent: Option<&Stmt>,
 ) {

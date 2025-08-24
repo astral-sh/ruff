@@ -1,14 +1,13 @@
 use ruff_python_ast::{self as ast, Expr};
 
-use ruff_diagnostics::Violation;
-use ruff_diagnostics::{Diagnostic, DiagnosticKind};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
-use crate::rules::pandas_vet::helpers::{test_expression, Resolution};
+use crate::rules::pandas_vet::helpers::{Resolution, test_expression};
 
 /// ## What it does
 /// Checks for uses of `.ix` on Pandas objects.
@@ -143,22 +142,13 @@ impl Violation for PandasUseOfDotIat {
     }
 }
 
-pub(crate) fn subscript(checker: &mut Checker, value: &Expr, expr: &Expr) {
+pub(crate) fn subscript(checker: &Checker, value: &Expr, expr: &Expr) {
     if !checker.semantic().seen_module(Modules::PANDAS) {
         return;
     }
 
     let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = value else {
         return;
-    };
-
-    let violation: DiagnosticKind = match attr.as_str() {
-        "ix" if checker.settings.rules.enabled(Rule::PandasUseOfDotIx) => PandasUseOfDotIx.into(),
-        "at" if checker.settings.rules.enabled(Rule::PandasUseOfDotAt) => PandasUseOfDotAt.into(),
-        "iat" if checker.settings.rules.enabled(Rule::PandasUseOfDotIat) => {
-            PandasUseOfDotIat.into()
-        }
-        _ => return,
     };
 
     // Avoid flagging on non-DataFrames (e.g., `{"a": 1}.at[0]`), and on irrelevant bindings
@@ -170,7 +160,21 @@ pub(crate) fn subscript(checker: &mut Checker, value: &Expr, expr: &Expr) {
         return;
     }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(violation, expr.range()));
+    let range = expr.range();
+
+    match attr.as_str() {
+        // PD007
+        "ix" if checker.is_rule_enabled(Rule::PandasUseOfDotIx) => {
+            checker.report_diagnostic(PandasUseOfDotIx, range)
+        }
+        // PD008
+        "at" if checker.is_rule_enabled(Rule::PandasUseOfDotAt) => {
+            checker.report_diagnostic(PandasUseOfDotAt, range)
+        }
+        // PD009
+        "iat" if checker.is_rule_enabled(Rule::PandasUseOfDotIat) => {
+            checker.report_diagnostic(PandasUseOfDotIat, range)
+        }
+        _ => return,
+    };
 }

@@ -18,7 +18,8 @@ fn lint_select() {
 
     When breaking ties between enabled and disabled rules (via `select` and
     `ignore`, respectively), more specific prefixes override less
-    specific prefixes.
+    specific prefixes. `ignore` takes precedence over `select` if the
+    same prefix appears in both.
 
     Default value: ["E4", "E7", "E9", "F"]
     Type: list[RuleSelector]
@@ -41,7 +42,7 @@ fn lint_select_json() {
     exit_code: 0
     ----- stdout -----
     {
-      "doc": "A list of rule codes or prefixes to enable. Prefixes can specify exact\nrules (like `F841`), entire categories (like `F`), or anything in\nbetween.\n\nWhen breaking ties between enabled and disabled rules (via `select` and\n`ignore`, respectively), more specific prefixes override less\nspecific prefixes.",
+      "doc": "A list of rule codes or prefixes to enable. Prefixes can specify exact\nrules (like `F841`), entire categories (like `F`), or anything in\nbetween.\n\nWhen breaking ties between enabled and disabled rules (via `select` and\n`ignore`, respectively), more specific prefixes override less\nspecific prefixes. `ignore` takes precedence over `select` if the\nsame prefix appears in both.",
       "default": "[\"E4\", \"E7\", \"E9\", \"F\"]",
       "value_type": "list[RuleSelector]",
       "scope": null,

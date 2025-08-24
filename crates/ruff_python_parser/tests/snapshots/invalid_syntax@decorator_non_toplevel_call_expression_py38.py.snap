@@ -1,0 +1,111 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/decorator_non_toplevel_call_expression_py38.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..73,
+        body: [
+            FunctionDef(
+                StmtFunctionDef {
+                    node_index: NodeIndex(None),
+                    range: 45..72,
+                    is_async: false,
+                    decorator_list: [
+                        Decorator {
+                            range: 45..57,
+                            node_index: NodeIndex(None),
+                            expression: Call(
+                                ExprCall {
+                                    node_index: NodeIndex(None),
+                                    range: 46..57,
+                                    func: Attribute(
+                                        ExprAttribute {
+                                            node_index: NodeIndex(None),
+                                            range: 46..55,
+                                            value: Call(
+                                                ExprCall {
+                                                    node_index: NodeIndex(None),
+                                                    range: 46..51,
+                                                    func: Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 46..49,
+                                                            id: Name("foo"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    arguments: Arguments {
+                                                        range: 49..51,
+                                                        node_index: NodeIndex(None),
+                                                        args: [],
+                                                        keywords: [],
+                                                    },
+                                                },
+                                            ),
+                                            attr: Identifier {
+                                                id: Name("bar"),
+                                                range: 52..55,
+                                                node_index: NodeIndex(None),
+                                            },
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    arguments: Arguments {
+                                        range: 55..57,
+                                        node_index: NodeIndex(None),
+                                        args: [],
+                                        keywords: [],
+                                    },
+                                },
+                            ),
+                        },
+                    ],
+                    name: Identifier {
+                        id: Name("baz"),
+                        range: 62..65,
+                        node_index: NodeIndex(None),
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 65..67,
+                        node_index: NodeIndex(None),
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 69..72,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 69..72,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Unsupported Syntax Errors
+
+  |
+1 | # parse_options: { "target-version": "3.8" }
+2 | @foo().bar()
+  |  ^^^^^ Syntax Error: Cannot use a call expression in a decorator on Python 3.8 unless it is the top-level expression or it occurs in the argument list of a top-level call expression (relaxed decorator syntax was added in Python 3.9)
+3 | def baz(): ...
+  |

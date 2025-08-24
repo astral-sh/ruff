@@ -1,0 +1,10 @@
+---
+source: crates/ruff_linter/src/linter.rs
+---
+invalid-syntax: Starred expression cannot be used here
+ --> <filename>:2:5
+  |
+2 | for *x in range(10):
+  |     ^^
+3 |     pass
+  |

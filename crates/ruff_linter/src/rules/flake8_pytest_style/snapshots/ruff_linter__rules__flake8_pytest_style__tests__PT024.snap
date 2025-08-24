@@ -1,15 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
-snapshot_kind: text
 ---
-PT024.py:14:1: PT024 [*] `pytest.mark.asyncio` is unnecessary for fixtures
+PT024 [*] `pytest.mark.asyncio` is unnecessary for fixtures
+  --> PT024.py:14:1
    |
 14 | @pytest.mark.asyncio()
-   | ^^^^^^^^^^^^^^^^^^^^^^ PT024
+   | ^^^^^^^^^^^^^^^^^^^^^^
 15 | @pytest.fixture()
 16 | async def my_fixture():  # Error before
    |
-   = help: Remove `pytest.mark.asyncio`
+help: Remove `pytest.mark.asyncio`
 
 ℹ Safe fix
 11 11 |     pass
@@ -20,14 +20,15 @@ PT024.py:14:1: PT024 [*] `pytest.mark.asyncio` is unnecessary for fixtures
 16 15 | async def my_fixture():  # Error before
 17 16 |     return 0
 
-PT024.py:20:1: PT024 [*] `pytest.mark.asyncio` is unnecessary for fixtures
+PT024 [*] `pytest.mark.asyncio` is unnecessary for fixtures
+  --> PT024.py:20:1
    |
 20 | @pytest.mark.asyncio
-   | ^^^^^^^^^^^^^^^^^^^^ PT024
+   | ^^^^^^^^^^^^^^^^^^^^
 21 | @pytest.fixture()
 22 | async def my_fixture():  # Error before no parens
    |
-   = help: Remove `pytest.mark.asyncio`
+help: Remove `pytest.mark.asyncio`
 
 ℹ Safe fix
 17 17 |     return 0
@@ -38,15 +39,16 @@ PT024.py:20:1: PT024 [*] `pytest.mark.asyncio` is unnecessary for fixtures
 22 21 | async def my_fixture():  # Error before no parens
 23 22 |     return 0
 
-PT024.py:27:1: PT024 [*] `pytest.mark.asyncio` is unnecessary for fixtures
+PT024 [*] `pytest.mark.asyncio` is unnecessary for fixtures
+  --> PT024.py:27:1
    |
 26 | @pytest.fixture()
 27 | @pytest.mark.asyncio()
-   | ^^^^^^^^^^^^^^^^^^^^^^ PT024
+   | ^^^^^^^^^^^^^^^^^^^^^^
 28 | async def my_fixture():  # Error after
 29 |     return 0
    |
-   = help: Remove `pytest.mark.asyncio`
+help: Remove `pytest.mark.asyncio`
 
 ℹ Safe fix
 24 24 | 
@@ -57,15 +59,16 @@ PT024.py:27:1: PT024 [*] `pytest.mark.asyncio` is unnecessary for fixtures
 29 28 |     return 0
 30 29 | 
 
-PT024.py:33:1: PT024 [*] `pytest.mark.asyncio` is unnecessary for fixtures
+PT024 [*] `pytest.mark.asyncio` is unnecessary for fixtures
+  --> PT024.py:33:1
    |
 32 | @pytest.fixture()
 33 | @pytest.mark.asyncio
-   | ^^^^^^^^^^^^^^^^^^^^ PT024
+   | ^^^^^^^^^^^^^^^^^^^^
 34 | async def my_fixture():  # Error after no parens
 35 |     return 0
    |
-   = help: Remove `pytest.mark.asyncio`
+help: Remove `pytest.mark.asyncio`
 
 ℹ Safe fix
 30 30 | 

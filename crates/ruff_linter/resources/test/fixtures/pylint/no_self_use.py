@@ -140,3 +140,15 @@ class Foo:
     def unused_message_2(self, x):
         msg = ""
         raise NotImplementedError(x)
+
+class TPerson:
+    def developer_greeting(self, name):  # [no-self-use]
+        print(t"Greetings {name}!")
+
+    def greeting_1(self):
+        print(t"Hello from {self.name} !")
+
+    def tstring(self, x):
+        msg = t"{x}"
+        raise NotImplementedError(msg)
+

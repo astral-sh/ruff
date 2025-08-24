@@ -1,21 +1,21 @@
 use itertools::Itertools;
 use regex::Regex;
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::{map_callable, map_subscript};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{self as ast, visitor, Expr, Stmt};
+use ruff_python_ast::{self as ast, Expr, Stmt, visitor};
 use ruff_python_semantic::analyze::visibility::is_staticmethod;
 use ruff_python_semantic::analyze::{function_type, visibility};
 use ruff_python_semantic::{Definition, SemanticModel};
 use ruff_source_file::NewlineWithTrailingNewline;
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::docstrings::Docstring;
 use crate::docstrings::sections::{SectionContext, SectionContexts, SectionKind};
 use crate::docstrings::styles::SectionStyle;
-use crate::docstrings::Docstring;
 use crate::registry::Rule;
 use crate::rules::pydocstyle::settings::Convention;
 
@@ -371,6 +371,9 @@ impl Violation for DocstringExtraneousYields {
 ///
 /// ## Example
 /// ```python
+/// class FasterThanLightError(ArithmeticError): ...
+///
+///
 /// def calculate_speed(distance: float, time: float) -> float:
 ///     """Calculate speed as distance divided by time.
 ///
@@ -389,6 +392,9 @@ impl Violation for DocstringExtraneousYields {
 ///
 /// Use instead:
 /// ```python
+/// class FasterThanLightError(ArithmeticError): ...
+///
+///
 /// def calculate_speed(distance: float, time: float) -> float:
 ///     """Calculate speed as distance divided by time.
 ///
@@ -693,7 +699,7 @@ fn parse_parameters_numpy(content: &str) -> Vec<&str> {
 ///
 /// Attempts to parse using the specified [`SectionStyle`], falling back to the other style if no
 /// entries are found.
-fn parse_raises(content: &str, style: Option<SectionStyle>) -> Vec<QualifiedName> {
+fn parse_raises(content: &str, style: Option<SectionStyle>) -> Vec<QualifiedName<'_>> {
     match style {
         Some(SectionStyle::Google) => parse_raises_google(content),
         Some(SectionStyle::Numpy) => parse_raises_numpy(content),
@@ -715,7 +721,7 @@ fn parse_raises(content: &str, style: Option<SectionStyle>) -> Vec<QualifiedName
 ///     FasterThanLightError: If speed is greater than the speed of light.
 ///     DivisionByZero: If attempting to divide by zero.
 /// ```
-fn parse_raises_google(content: &str) -> Vec<QualifiedName> {
+fn parse_raises_google(content: &str) -> Vec<QualifiedName<'_>> {
     let mut entries: Vec<QualifiedName> = Vec::new();
     for potential in content.lines() {
         let Some(colon_idx) = potential.find(':') else {
@@ -737,7 +743,7 @@ fn parse_raises_google(content: &str) -> Vec<QualifiedName> {
 /// DivisionByZero
 ///     If attempting to divide by zero.
 /// ```
-fn parse_raises_numpy(content: &str) -> Vec<QualifiedName> {
+fn parse_raises_numpy(content: &str) -> Vec<QualifiedName<'_>> {
     let mut entries: Vec<QualifiedName> = Vec::new();
     let mut lines = content.lines();
     let Some(dashes) = lines.next() else {
@@ -769,7 +775,7 @@ impl Ranged for YieldEntry {
     }
 }
 
-#[allow(clippy::enum_variant_names)]
+#[expect(clippy::enum_variant_names)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ReturnEntryKind {
     NotNone,
@@ -920,6 +926,7 @@ impl<'a> Visitor<'a> for BodyVisitor<'a> {
             }
             Stmt::Return(ast::StmtReturn {
                 range,
+                node_index: _,
                 value: Some(value),
             }) => {
                 self.returns.push(ReturnEntry {
@@ -931,7 +938,11 @@ impl<'a> Visitor<'a> for BodyVisitor<'a> {
                     },
                 });
             }
-            Stmt::Return(ast::StmtReturn { range, value: None }) => {
+            Stmt::Return(ast::StmtReturn {
+                range,
+                node_index: _,
+                value: None,
+            }) => {
                 self.returns.push(ReturnEntry {
                     range: *range,
                     kind: ReturnEntryKind::ImplicitNone,
@@ -948,6 +959,7 @@ impl<'a> Visitor<'a> for BodyVisitor<'a> {
         match expr {
             Expr::Yield(ast::ExprYield {
                 range,
+                node_index: _,
                 value: Some(value),
             }) => {
                 self.yields.push(YieldEntry {
@@ -955,7 +967,11 @@ impl<'a> Visitor<'a> for BodyVisitor<'a> {
                     is_none_yield: value.is_none_literal_expr(),
                 });
             }
-            Expr::Yield(ast::ExprYield { range, value: None }) => {
+            Expr::Yield(ast::ExprYield {
+                range,
+                node_index: _,
+                value: None,
+            }) => {
                 self.yields.push(YieldEntry {
                     range: *range,
                     is_none_yield: true,
@@ -1040,7 +1056,7 @@ impl<'a> GeneratorOrIteratorArguments<'a> {
         match self {
             Self::Unparameterized => true,
             Self::Single(_) => true,
-            Self::Several(elements) => elements.get(2).map_or(true, Expr::is_none_literal_expr),
+            Self::Several(elements) => elements.get(2).is_none_or(Expr::is_none_literal_expr),
         }
     }
 }
@@ -1052,16 +1068,24 @@ fn generator_annotation_arguments<'a>(
 ) -> Option<GeneratorOrIteratorArguments<'a>> {
     let qualified_name = semantic.resolve_qualified_name(map_subscript(expr))?;
     match qualified_name.segments() {
-        ["typing" | "typing_extensions", "Iterable" | "AsyncIterable" | "Iterator" | "AsyncIterator"]
-        | ["collections", "abc", "Iterable" | "AsyncIterable" | "Iterator" | "AsyncIterator"] => {
-            match expr {
-                Expr::Subscript(ast::ExprSubscript { slice, .. }) => {
-                    Some(GeneratorOrIteratorArguments::Single(slice))
-                }
-                _ => Some(GeneratorOrIteratorArguments::Unparameterized),
+        [
+            "typing" | "typing_extensions",
+            "Iterable" | "AsyncIterable" | "Iterator" | "AsyncIterator",
+        ]
+        | [
+            "collections",
+            "abc",
+            "Iterable" | "AsyncIterable" | "Iterator" | "AsyncIterator",
+        ] => match expr {
+            Expr::Subscript(ast::ExprSubscript { slice, .. }) => {
+                Some(GeneratorOrIteratorArguments::Single(slice))
             }
-        }
-        ["typing" | "typing_extensions", "Generator" | "AsyncGenerator"]
+            _ => Some(GeneratorOrIteratorArguments::Unparameterized),
+        },
+        [
+            "typing" | "typing_extensions",
+            "Generator" | "AsyncGenerator",
+        ]
         | ["collections", "abc", "Generator" | "AsyncGenerator"] => match expr {
             Expr::Subscript(ast::ExprSubscript { slice, .. }) => {
                 if let Expr::Tuple(tuple) = &**slice {
@@ -1127,20 +1151,18 @@ fn is_one_line(docstring: &Docstring) -> bool {
 
 /// DOC201, DOC202, DOC402, DOC403, DOC501, DOC502
 pub(crate) fn check_docstring(
-    checker: &mut Checker,
+    checker: &Checker,
     definition: &Definition,
     docstring: &Docstring,
     section_contexts: &SectionContexts,
     convention: Option<Convention>,
 ) {
-    let mut diagnostics = Vec::new();
-
     // Only check function docstrings.
     let Some(function_def) = definition.as_function_def() else {
         return;
     };
 
-    if checker.settings.pydoclint.ignore_one_line_docstrings && is_one_line(docstring) {
+    if checker.settings().pydoclint.ignore_one_line_docstrings && is_one_line(docstring) {
         return;
     }
 
@@ -1168,10 +1190,10 @@ pub(crate) fn check_docstring(
     };
 
     let signature_parameters =
-        parameters_from_signature(docstring, semantic, &checker.settings.dummy_variable_rgx);
+        parameters_from_signature(docstring, semantic, &checker.settings().dummy_variable_rgx);
 
     // DOC101
-    if checker.enabled(Rule::DocstringMissingParameter) {
+    if checker.is_rule_enabled(Rule::DocstringMissingParameter) {
         let mut missing_parameters = Vec::new();
         for signature_param in &signature_parameters {
             if !docstring_sections
@@ -1193,22 +1215,21 @@ pub(crate) fn check_docstring(
             } else {
                 docstring.range()
             };
-            let diagnostic = Diagnostic::new(
+            checker.report_diagnostic(
                 DocstringMissingParameter {
                     ids: missing_parameters,
                 },
                 range,
             );
-            diagnostics.push(diagnostic);
         }
     }
 
     // DOC201
-    if checker.enabled(Rule::DocstringMissingReturns) {
+    if checker.is_rule_enabled(Rule::DocstringMissingReturns) {
         if should_document_returns(function_def)
             && !returns_documented(docstring, &docstring_sections, convention)
         {
-            let extra_property_decorators = checker.settings.pydocstyle.property_decorators();
+            let extra_property_decorators = checker.settings().pydocstyle.property_decorators();
             if !definition.is_property(extra_property_decorators, semantic) {
                 if !body_entries.returns.is_empty() {
                     match function_def.returns.as_deref() {
@@ -1223,10 +1244,8 @@ pub(crate) fn check_docstring(
                                     semantic,
                                 )
                             {
-                                diagnostics.push(Diagnostic::new(
-                                    DocstringMissingReturns,
-                                    docstring.range(),
-                                ));
+                                checker
+                                    .report_diagnostic(DocstringMissingReturns, docstring.range());
                             }
                         }
                         None if body_entries
@@ -1234,8 +1253,7 @@ pub(crate) fn check_docstring(
                             .iter()
                             .any(|entry| !entry.is_none_return()) =>
                         {
-                            diagnostics
-                                .push(Diagnostic::new(DocstringMissingReturns, docstring.range()));
+                            checker.report_diagnostic(DocstringMissingReturns, docstring.range());
                         }
                         _ => {}
                     }
@@ -1245,21 +1263,19 @@ pub(crate) fn check_docstring(
     }
 
     // DOC402
-    if checker.enabled(Rule::DocstringMissingYields) {
+    if checker.is_rule_enabled(Rule::DocstringMissingYields) {
         if !yields_documented(docstring, &docstring_sections, convention) {
             if !body_entries.yields.is_empty() {
                 match function_def.returns.as_deref() {
                     Some(returns)
                         if !generator_annotation_arguments(returns, semantic).is_some_and(
-                            |arguments| arguments.first().map_or(true, Expr::is_none_literal_expr),
+                            |arguments| arguments.first().is_none_or(Expr::is_none_literal_expr),
                         ) =>
                     {
-                        diagnostics
-                            .push(Diagnostic::new(DocstringMissingYields, docstring.range()));
+                        checker.report_diagnostic(DocstringMissingYields, docstring.range());
                     }
                     None if body_entries.yields.iter().any(|entry| !entry.is_none_yield) => {
-                        diagnostics
-                            .push(Diagnostic::new(DocstringMissingYields, docstring.range()));
+                        checker.report_diagnostic(DocstringMissingYields, docstring.range());
                     }
                     _ => {}
                 }
@@ -1268,7 +1284,7 @@ pub(crate) fn check_docstring(
     }
 
     // DOC501
-    if checker.enabled(Rule::DocstringMissingException) {
+    if checker.is_rule_enabled(Rule::DocstringMissingException) {
         for body_raise in &body_entries.raised_exceptions {
             let Some(name) = body_raise.qualified_name.segments().last() else {
                 continue;
@@ -1286,13 +1302,12 @@ pub(crate) fn check_docstring(
                         .ends_with(exception.segments())
                 })
             }) {
-                let diagnostic = Diagnostic::new(
+                checker.report_diagnostic(
                     DocstringMissingException {
                         id: (*name).to_string(),
                     },
                     docstring.range(),
                 );
-                diagnostics.push(diagnostic);
             }
         }
     }
@@ -1301,7 +1316,7 @@ pub(crate) fn check_docstring(
     // document that it raises an exception without including the exception in the implementation.
     if !visibility::is_abstract(&function_def.decorator_list, semantic) {
         // DOC102
-        if checker.enabled(Rule::DocstringExtraneousParameter) {
+        if checker.is_rule_enabled(Rule::DocstringExtraneousParameter) {
             if let Some(docstring_params) = docstring_sections.parameters {
                 let mut extraneous_parameters = Vec::new();
                 for docstring_param in &docstring_params.parameters {
@@ -1313,41 +1328,38 @@ pub(crate) fn check_docstring(
                     }
                 }
                 if !extraneous_parameters.is_empty() {
-                    let diagnostic = Diagnostic::new(
+                    checker.report_diagnostic(
                         DocstringExtraneousParameter {
                             ids: extraneous_parameters,
                         },
                         docstring_params.range(),
                     );
-                    diagnostics.push(diagnostic);
                 }
             }
         }
 
         // DOC202
-        if checker.enabled(Rule::DocstringExtraneousReturns) {
+        if checker.is_rule_enabled(Rule::DocstringExtraneousReturns) {
             if docstring_sections.returns.is_some() {
                 if body_entries.returns.is_empty()
                     || body_entries.returns.iter().all(ReturnEntry::is_implicit)
                 {
-                    let diagnostic = Diagnostic::new(DocstringExtraneousReturns, docstring.range());
-                    diagnostics.push(diagnostic);
+                    checker.report_diagnostic(DocstringExtraneousReturns, docstring.range());
                 }
             }
         }
 
         // DOC403
-        if checker.enabled(Rule::DocstringExtraneousYields) {
+        if checker.is_rule_enabled(Rule::DocstringExtraneousYields) {
             if docstring_sections.yields.is_some() {
                 if body_entries.yields.is_empty() {
-                    let diagnostic = Diagnostic::new(DocstringExtraneousYields, docstring.range());
-                    diagnostics.push(diagnostic);
+                    checker.report_diagnostic(DocstringExtraneousYields, docstring.range());
                 }
             }
         }
 
         // DOC502
-        if checker.enabled(Rule::DocstringExtraneousException) {
+        if checker.is_rule_enabled(Rule::DocstringExtraneousException) {
             if let Some(docstring_raises) = docstring_sections.raises {
                 let mut extraneous_exceptions = Vec::new();
                 for docstring_raise in &docstring_raises.raised_exceptions {
@@ -1361,17 +1373,14 @@ pub(crate) fn check_docstring(
                     }
                 }
                 if !extraneous_exceptions.is_empty() {
-                    let diagnostic = Diagnostic::new(
+                    checker.report_diagnostic(
                         DocstringExtraneousException {
                             ids: extraneous_exceptions,
                         },
                         docstring.range(),
                     );
-                    diagnostics.push(diagnostic);
                 }
             }
         }
     }
-
-    checker.diagnostics.extend(diagnostics);
 }

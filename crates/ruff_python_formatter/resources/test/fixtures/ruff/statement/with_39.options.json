@@ -1,6 +1,6 @@
 [
   {
-    "target_version": "py39",
+    "target_version": "3.9",
     "preview": "enabled"
   }
 ]

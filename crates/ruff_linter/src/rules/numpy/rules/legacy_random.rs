@@ -1,10 +1,10 @@
 use ruff_python_ast::Expr;
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -28,7 +28,7 @@ use crate::checkers::ast::Checker;
 /// See the documentation on [Random Sampling] and [NEP 19] for further
 /// details.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// import numpy as np
 ///
@@ -59,7 +59,7 @@ impl Violation for NumpyLegacyRandom {
 }
 
 /// NPY002
-pub(crate) fn legacy_random(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn legacy_random(checker: &Checker, expr: &Expr) {
     if !checker.semantic().seen_module(Modules::NUMPY) {
         return;
     }
@@ -137,11 +137,11 @@ pub(crate) fn legacy_random(checker: &mut Checker, expr: &Expr) {
                 }
             })
     {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(
             NumpyLegacyRandom {
                 method_name: method_name.to_string(),
             },
             expr.range(),
-        ));
+        );
     }
 }

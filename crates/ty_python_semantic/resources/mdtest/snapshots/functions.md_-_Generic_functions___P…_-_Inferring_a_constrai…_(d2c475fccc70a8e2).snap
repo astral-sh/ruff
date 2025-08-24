@@ -1,0 +1,102 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: functions.md - Generic functions: PEP 695 syntax - Inferring a constrained typevar
+mdtest path: crates/ty_python_semantic/resources/mdtest/generics/pep695/functions.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing_extensions import reveal_type
+ 2 | 
+ 3 | def f[T: (int, None)](x: T) -> T:
+ 4 |     return x
+ 5 | 
+ 6 | reveal_type(f(1))  # revealed: int
+ 7 | reveal_type(f(True))  # revealed: int
+ 8 | reveal_type(f(None))  # revealed: None
+ 9 | # error: [invalid-argument-type]
+10 | reveal_type(f("string"))  # revealed: Unknown
+```
+
+# Diagnostics
+
+```
+info[revealed-type]: Revealed type
+ --> src/mdtest_snippet.py:6:13
+  |
+4 |     return x
+5 |
+6 | reveal_type(f(1))  # revealed: int
+  |             ^^^^ `int`
+7 | reveal_type(f(True))  # revealed: int
+8 | reveal_type(f(None))  # revealed: None
+  |
+
+```
+
+```
+info[revealed-type]: Revealed type
+ --> src/mdtest_snippet.py:7:13
+  |
+6 | reveal_type(f(1))  # revealed: int
+7 | reveal_type(f(True))  # revealed: int
+  |             ^^^^^^^ `int`
+8 | reveal_type(f(None))  # revealed: None
+9 | # error: [invalid-argument-type]
+  |
+
+```
+
+```
+info[revealed-type]: Revealed type
+  --> src/mdtest_snippet.py:8:13
+   |
+ 6 | reveal_type(f(1))  # revealed: int
+ 7 | reveal_type(f(True))  # revealed: int
+ 8 | reveal_type(f(None))  # revealed: None
+   |             ^^^^^^^ `None`
+ 9 | # error: [invalid-argument-type]
+10 | reveal_type(f("string"))  # revealed: Unknown
+   |
+
+```
+
+```
+info[revealed-type]: Revealed type
+  --> src/mdtest_snippet.py:10:13
+   |
+ 8 | reveal_type(f(None))  # revealed: None
+ 9 | # error: [invalid-argument-type]
+10 | reveal_type(f("string"))  # revealed: Unknown
+   |             ^^^^^^^^^^^ `Unknown`
+   |
+
+```
+
+```
+error[invalid-argument-type]: Argument to function `f` is incorrect
+  --> src/mdtest_snippet.py:10:15
+   |
+ 8 | reveal_type(f(None))  # revealed: None
+ 9 | # error: [invalid-argument-type]
+10 | reveal_type(f("string"))  # revealed: Unknown
+   |               ^^^^^^^^ Argument type `Literal["string"]` does not satisfy constraints of type variable `T`
+   |
+info: Type variable defined here
+ --> src/mdtest_snippet.py:3:7
+  |
+1 | from typing_extensions import reveal_type
+2 |
+3 | def f[T: (int, None)](x: T) -> T:
+  |       ^^^^^^^^^^^^^^
+4 |     return x
+  |
+info: rule `invalid-argument-type` is enabled by default
+
+```

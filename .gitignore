@@ -29,6 +29,10 @@ tracing.folded
 tracing-flamechart.svg
 tracing-flamegraph.svg
 
+# insta
+*.rs.pending-snap
+
+
 ###
 # Rust.gitignore
 ###

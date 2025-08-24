@@ -55,7 +55,7 @@ impl TryFrom<&str> for FormatSummary {
                 FieldType::Auto => autos.push(autos.len()),
                 FieldType::Index(i) => indices.push(i),
                 FieldType::Keyword(k) => keywords.push(Name::from(k)),
-            };
+            }
 
             let nested = FormatString::from_str(format_spec)?;
             for nested_part in nested.format_parts {
@@ -67,7 +67,7 @@ impl TryFrom<&str> for FormatSummary {
                     FieldType::Auto => autos.push(autos.len()),
                     FieldType::Index(i) => indices.push(i),
                     FieldType::Keyword(k) => keywords.push(Name::from(k)),
-                };
+                }
                 has_nested_parts = true;
             }
         }

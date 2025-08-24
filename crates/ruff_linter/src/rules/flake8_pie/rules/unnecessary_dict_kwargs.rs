@@ -1,40 +1,70 @@
 use itertools::Itertools;
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::fix::edits::{remove_argument, Parentheses};
+use crate::fix::edits::{Parentheses, remove_argument};
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for unnecessary `dict` kwargs.
 ///
 /// ## Why is this bad?
 /// If the `dict` keys are valid identifiers, they can be passed as keyword
-/// arguments directly.
+/// arguments directly, without constructing unnecessary dictionary.
+/// This also makes code more type-safe as type checkers often cannot
+/// precisely verify dynamic keyword arguments.
 ///
 /// ## Example
+///
 /// ```python
 /// def foo(bar):
 ///     return bar + 1
 ///
 ///
 /// print(foo(**{"bar": 2}))  # prints 3
+///
+/// # No typing errors, but results in an exception at runtime.
+/// print(foo(**{"bar": 2, "baz": 3}))
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// def foo(bar):
 ///     return bar + 1
 ///
 ///
 /// print(foo(bar=2))  # prints 3
+///
+/// # Typing error detected: No parameter named "baz".
+/// print(foo(bar=2, baz=3))
 /// ```
+///
+/// ## Fix safety
+///
+/// This rule's fix is marked as unsafe for dictionaries with comments interleaved between
+/// the items, as comments may be removed.
+///
+/// For example, the fix would be marked as unsafe in the following case:
+///
+/// ```python
+/// foo(
+///     **{
+///         # comment
+///         "x": 1.0,
+///         # comment
+///         "y": 2.0,
+///     }
+/// )
+/// ```
+///
+/// as this is converted to `foo(x=1.0, y=2.0)` without any of the comments.
 ///
 /// ## References
 /// - [Python documentation: Dictionary displays](https://docs.python.org/3/reference/expressions.html#dictionary-displays)
@@ -56,7 +86,7 @@ impl Violation for UnnecessaryDictKwargs {
 }
 
 /// PIE804
-pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn unnecessary_dict_kwargs(checker: &Checker, call: &ast::ExprCall) {
     let mut duplicate_keywords = None;
     for keyword in &*call.arguments.keywords {
         // keyword is a spread operator (indicated by None).
@@ -70,14 +100,13 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, call: &ast::ExprCal
 
         // Ex) `foo(**{**bar})`
         if let [ast::DictItem { key: None, value }] = dict.items.as_slice() {
-            let diagnostic = Diagnostic::new(UnnecessaryDictKwargs, keyword.range());
             let edit = Edit::range_replacement(
                 format!("**{}", checker.locator().slice(value)),
                 keyword.range(),
             );
             checker
-                .diagnostics
-                .push(diagnostic.with_fix(Fix::safe_edit(edit)));
+                .report_diagnostic(UnnecessaryDictKwargs, keyword.range())
+                .set_fix(Fix::safe_edit(edit));
             continue;
         }
 
@@ -91,7 +120,7 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, call: &ast::ExprCal
             continue;
         }
 
-        let mut diagnostic = Diagnostic::new(UnnecessaryDictKwargs, keyword.range());
+        let mut diagnostic = checker.report_diagnostic(UnnecessaryDictKwargs, keyword.range());
 
         if dict.is_empty() {
             diagnostic.try_set_fix(|| {
@@ -100,6 +129,7 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, call: &ast::ExprCal
                     &call.arguments,
                     Parentheses::Preserve,
                     checker.locator().contents(),
+                    checker.comment_ranges(),
                 )
                 .map(Fix::safe_edit)
             });
@@ -115,7 +145,7 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, call: &ast::ExprCal
                     .iter()
                     .all(|kwarg| !duplicate_keywords.contains(kwarg))
                 {
-                    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                    let edit = Edit::range_replacement(
                         kwargs
                             .iter()
                             .zip(dict.iter_values())
@@ -136,12 +166,18 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, call: &ast::ExprCal
                             })
                             .join(", "),
                         keyword.range(),
-                    )));
+                    );
+                    diagnostic.set_fix(Fix::applicable_edit(
+                        edit,
+                        if checker.comment_ranges().intersects(dict.range()) {
+                            Applicability::Unsafe
+                        } else {
+                            Applicability::Safe
+                        },
+                    ));
                 }
             }
         }
-
-        checker.diagnostics.push(diagnostic);
     }
 }
 

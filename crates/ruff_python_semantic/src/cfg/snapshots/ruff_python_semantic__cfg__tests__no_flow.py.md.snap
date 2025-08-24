@@ -1,0 +1,89 @@
+---
+source: crates/ruff_python_semantic/src/cfg/mod.rs
+description: "This is a Mermaid graph. You can use https://mermaid.live to visualize it as a diagram."
+---
+## Function 0
+### Source
+```python
+def func(): ...
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+	node0["..."]
+	node1((("EXIT")))
+	node0==>node1
+```
+
+## Function 1
+### Source
+```python
+def func():
+    pass
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+	node0["pass"]
+	node1((("EXIT")))
+	node0==>node1
+```
+
+## Function 2
+### Source
+```python
+def func():
+    x = 1
+    x = 2
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+	node0["x = 1
+x = 2"]
+	node1((("EXIT")))
+	node0==>node1
+```
+
+## Function 3
+### Source
+```python
+def func():
+    foo()
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+	node0["foo()"]
+	node1((("EXIT")))
+	node0==>node1
+```
+
+## Function 4
+### Source
+```python
+def func():
+    from foo import bar
+
+    class C:
+        a = 1
+
+    c = C()
+    del c
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+	node0["from foo import bar
+class C:
+        a = 1
+c = C()
+del c"]
+	node1((("EXIT")))
+	node0==>node1
+```

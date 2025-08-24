@@ -11,3 +11,7 @@ list(  # comment
 list([  # comment
     1, 2
 ])
+
+# Skip when too many positional arguments
+# See https://github.com/astral-sh/ruff/issues/15810
+list([1],[2])

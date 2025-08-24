@@ -1,21 +1,23 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/valid/statement/assignment.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
-        range: 0..734,
+        node_index: NodeIndex(None),
+        range: 0..729,
         body: [
             Assign(
                 StmtAssign {
+                    node_index: NodeIndex(None),
                     range: 0..13,
                     targets: [
                         Name(
                             ExprName {
+                                node_index: NodeIndex(None),
                                 range: 0..1,
                                 id: Name("x"),
                                 ctx: Store,
@@ -24,10 +26,12 @@ Module(
                     ],
                     value: Tuple(
                         ExprTuple {
+                            node_index: NodeIndex(None),
                             range: 4..13,
                             elts: [
                                 NumberLiteral(
                                     ExprNumberLiteral {
+                                        node_index: NodeIndex(None),
                                         range: 5..6,
                                         value: Int(
                                             1,
@@ -36,6 +40,7 @@ Module(
                                 ),
                                 NumberLiteral(
                                     ExprNumberLiteral {
+                                        node_index: NodeIndex(None),
                                         range: 8..9,
                                         value: Int(
                                             2,
@@ -44,6 +49,7 @@ Module(
                                 ),
                                 NumberLiteral(
                                     ExprNumberLiteral {
+                                        node_index: NodeIndex(None),
                                         range: 11..12,
                                         value: Int(
                                             3,
@@ -59,14 +65,17 @@ Module(
             ),
             Assign(
                 StmtAssign {
+                    node_index: NodeIndex(None),
                     range: 15..33,
                     targets: [
                         Tuple(
                             ExprTuple {
+                                node_index: NodeIndex(None),
                                 range: 15..21,
                                 elts: [
                                     Name(
                                         ExprName {
+                                            node_index: NodeIndex(None),
                                             range: 16..17,
                                             id: Name("x"),
                                             ctx: Store,
@@ -74,6 +83,7 @@ Module(
                                     ),
                                     Name(
                                         ExprName {
+                                            node_index: NodeIndex(None),
                                             range: 19..20,
                                             id: Name("y"),
                                             ctx: Store,
@@ -87,10 +97,12 @@ Module(
                     ],
                     value: Tuple(
                         ExprTuple {
+                            node_index: NodeIndex(None),
                             range: 24..33,
                             elts: [
                                 NumberLiteral(
                                     ExprNumberLiteral {
+                                        node_index: NodeIndex(None),
                                         range: 25..26,
                                         value: Int(
                                             1,
@@ -99,6 +111,7 @@ Module(
                                 ),
                                 NumberLiteral(
                                     ExprNumberLiteral {
+                                        node_index: NodeIndex(None),
                                         range: 28..29,
                                         value: Int(
                                             2,
@@ -107,6 +120,7 @@ Module(
                                 ),
                                 NumberLiteral(
                                     ExprNumberLiteral {
+                                        node_index: NodeIndex(None),
                                         range: 31..32,
                                         value: Int(
                                             3,
@@ -122,14 +136,17 @@ Module(
             ),
             Assign(
                 StmtAssign {
+                    node_index: NodeIndex(None),
                     range: 35..53,
                     targets: [
                         List(
                             ExprList {
+                                node_index: NodeIndex(None),
                                 range: 35..41,
                                 elts: [
                                     Name(
                                         ExprName {
+                                            node_index: NodeIndex(None),
                                             range: 36..37,
                                             id: Name("x"),
                                             ctx: Store,
@@ -137,6 +154,7 @@ Module(
                                     ),
                                     Name(
                                         ExprName {
+                                            node_index: NodeIndex(None),
                                             range: 39..40,
                                             id: Name("y"),
                                             ctx: Store,
@@ -149,10 +167,12 @@ Module(
                     ],
                     value: Tuple(
                         ExprTuple {
+                            node_index: NodeIndex(None),
                             range: 44..53,
                             elts: [
                                 NumberLiteral(
                                     ExprNumberLiteral {
+                                        node_index: NodeIndex(None),
                                         range: 45..46,
                                         value: Int(
                                             1,
@@ -161,6 +181,7 @@ Module(
                                 ),
                                 NumberLiteral(
                                     ExprNumberLiteral {
+                                        node_index: NodeIndex(None),
                                         range: 48..49,
                                         value: Int(
                                             2,
@@ -169,6 +190,7 @@ Module(
                                 ),
                                 NumberLiteral(
                                     ExprNumberLiteral {
+                                        node_index: NodeIndex(None),
                                         range: 51..52,
                                         value: Int(
                                             3,
@@ -184,13 +206,16 @@ Module(
             ),
             Assign(
                 StmtAssign {
+                    node_index: NodeIndex(None),
                     range: 55..70,
                     targets: [
                         Attribute(
                             ExprAttribute {
+                                node_index: NodeIndex(None),
                                 range: 55..58,
                                 value: Name(
                                     ExprName {
+                                        node_index: NodeIndex(None),
                                         range: 55..56,
                                         id: Name("x"),
                                         ctx: Load,
@@ -199,6 +224,7 @@ Module(
                                 attr: Identifier {
                                     id: Name("y"),
                                     range: 57..58,
+                                    node_index: NodeIndex(None),
                                 },
                                 ctx: Store,
                             },
@@ -206,10 +232,12 @@ Module(
                     ],
                     value: Tuple(
                         ExprTuple {
+                            node_index: NodeIndex(None),
                             range: 61..70,
                             elts: [
                                 NumberLiteral(
                                     ExprNumberLiteral {
+                                        node_index: NodeIndex(None),
                                         range: 62..63,
                                         value: Int(
                                             1,
@@ -218,6 +246,7 @@ Module(
                                 ),
                                 NumberLiteral(
                                     ExprNumberLiteral {
+                                        node_index: NodeIndex(None),
                                         range: 65..66,
                                         value: Int(
                                             2,
@@ -226,6 +255,7 @@ Module(
                                 ),
                                 NumberLiteral(
                                     ExprNumberLiteral {
+                                        node_index: NodeIndex(None),
                                         range: 68..69,
                                         value: Int(
                                             3,
@@ -241,13 +271,16 @@ Module(
             ),
             Assign(
                 StmtAssign {
+                    node_index: NodeIndex(None),
                     range: 72..88,
                     targets: [
                         Subscript(
                             ExprSubscript {
+                                node_index: NodeIndex(None),
                                 range: 72..76,
                                 value: Name(
                                     ExprName {
+                                        node_index: NodeIndex(None),
                                         range: 72..73,
                                         id: Name("x"),
                                         ctx: Load,
@@ -255,6 +288,7 @@ Module(
                                 ),
                                 slice: Name(
                                     ExprName {
+                                        node_index: NodeIndex(None),
                                         range: 74..75,
                                         id: Name("y"),
                                         ctx: Load,
@@ -266,10 +300,12 @@ Module(
                     ],
                     value: Tuple(
                         ExprTuple {
+                            node_index: NodeIndex(None),
                             range: 79..88,
                             elts: [
                                 NumberLiteral(
                                     ExprNumberLiteral {
+                                        node_index: NodeIndex(None),
                                         range: 80..81,
                                         value: Int(
                                             1,
@@ -278,6 +314,7 @@ Module(
                                 ),
                                 NumberLiteral(
                                     ExprNumberLiteral {
+                                        node_index: NodeIndex(None),
                                         range: 83..84,
                                         value: Int(
                                             2,
@@ -286,6 +323,7 @@ Module(
                                 ),
                                 NumberLiteral(
                                     ExprNumberLiteral {
+                                        node_index: NodeIndex(None),
                                         range: 86..87,
                                         value: Int(
                                             3,
@@ -301,14 +339,17 @@ Module(
             ),
             Assign(
                 StmtAssign {
+                    node_index: NodeIndex(None),
                     range: 90..109,
                     targets: [
                         Tuple(
                             ExprTuple {
+                                node_index: NodeIndex(None),
                                 range: 90..97,
                                 elts: [
                                     Name(
                                         ExprName {
+                                            node_index: NodeIndex(None),
                                             range: 91..92,
                                             id: Name("x"),
                                             ctx: Store,
@@ -316,9 +357,11 @@ Module(
                                     ),
                                     Starred(
                                         ExprStarred {
+                                            node_index: NodeIndex(None),
                                             range: 94..96,
                                             value: Name(
                                                 ExprName {
+                                                    node_index: NodeIndex(None),
                                                     range: 95..96,
                                                     id: Name("y"),
                                                     ctx: Store,
@@ -335,10 +378,12 @@ Module(
                     ],
                     value: Tuple(
                         ExprTuple {
+                            node_index: NodeIndex(None),
                             range: 100..109,
                             elts: [
                                 NumberLiteral(
                                     ExprNumberLiteral {
+                                        node_index: NodeIndex(None),
                                         range: 101..102,
                                         value: Int(
                                             1,
@@ -347,6 +392,7 @@ Module(
                                 ),
                                 NumberLiteral(
                                     ExprNumberLiteral {
+                                        node_index: NodeIndex(None),
                                         range: 104..105,
                                         value: Int(
                                             2,
@@ -355,6 +401,7 @@ Module(
                                 ),
                                 NumberLiteral(
                                     ExprNumberLiteral {
+                                        node_index: NodeIndex(None),
                                         range: 107..108,
                                         value: Int(
                                             3,
@@ -370,57 +417,34 @@ Module(
             ),
             Assign(
                 StmtAssign {
-                    range: 259..268,
-                    targets: [
-                        Starred(
-                            ExprStarred {
-                                range: 259..263,
-                                value: Name(
-                                    ExprName {
-                                        range: 260..263,
-                                        id: Name("foo"),
-                                        ctx: Store,
-                                    },
-                                ),
-                                ctx: Store,
-                            },
-                        ),
-                    ],
-                    value: NumberLiteral(
-                        ExprNumberLiteral {
-                            range: 266..268,
-                            value: Int(
-                                42,
-                            ),
-                        },
-                    ),
-                },
-            ),
-            Assign(
-                StmtAssign {
-                    range: 270..291,
+                    node_index: NodeIndex(None),
+                    range: 259..280,
                     targets: [
                         List(
                             ExprList {
-                                range: 270..279,
+                                node_index: NodeIndex(None),
+                                range: 259..268,
                                 elts: [
                                     Name(
                                         ExprName {
-                                            range: 271..272,
+                                            node_index: NodeIndex(None),
+                                            range: 260..261,
                                             id: Name("x"),
                                             ctx: Store,
                                         },
                                     ),
                                     Name(
                                         ExprName {
-                                            range: 274..275,
+                                            node_index: NodeIndex(None),
+                                            range: 263..264,
                                             id: Name("y"),
                                             ctx: Store,
                                         },
                                     ),
                                     Name(
                                         ExprName {
-                                            range: 277..278,
+                                            node_index: NodeIndex(None),
+                                            range: 266..267,
                                             id: Name("z"),
                                             ctx: Store,
                                         },
@@ -432,11 +456,13 @@ Module(
                     ],
                     value: List(
                         ExprList {
-                            range: 282..291,
+                            node_index: NodeIndex(None),
+                            range: 271..280,
                             elts: [
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        range: 283..284,
+                                        node_index: NodeIndex(None),
+                                        range: 272..273,
                                         value: Int(
                                             1,
                                         ),
@@ -444,7 +470,8 @@ Module(
                                 ),
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        range: 286..287,
+                                        node_index: NodeIndex(None),
+                                        range: 275..276,
                                         value: Int(
                                             2,
                                         ),
@@ -452,7 +479,8 @@ Module(
                                 ),
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        range: 289..290,
+                                        node_index: NodeIndex(None),
+                                        range: 278..279,
                                         value: Int(
                                             3,
                                         ),
@@ -466,29 +494,34 @@ Module(
             ),
             Assign(
                 StmtAssign {
-                    range: 293..314,
+                    node_index: NodeIndex(None),
+                    range: 282..303,
                     targets: [
                         Tuple(
                             ExprTuple {
-                                range: 293..302,
+                                node_index: NodeIndex(None),
+                                range: 282..291,
                                 elts: [
                                     Name(
                                         ExprName {
-                                            range: 294..295,
+                                            node_index: NodeIndex(None),
+                                            range: 283..284,
                                             id: Name("x"),
                                             ctx: Store,
                                         },
                                     ),
                                     Name(
                                         ExprName {
-                                            range: 297..298,
+                                            node_index: NodeIndex(None),
+                                            range: 286..287,
                                             id: Name("y"),
                                             ctx: Store,
                                         },
                                     ),
                                     Name(
                                         ExprName {
-                                            range: 300..301,
+                                            node_index: NodeIndex(None),
+                                            range: 289..290,
                                             id: Name("z"),
                                             ctx: Store,
                                         },
@@ -501,11 +534,13 @@ Module(
                     ],
                     value: Tuple(
                         ExprTuple {
-                            range: 305..314,
+                            node_index: NodeIndex(None),
+                            range: 294..303,
                             elts: [
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        range: 306..307,
+                                        node_index: NodeIndex(None),
+                                        range: 295..296,
                                         value: Int(
                                             1,
                                         ),
@@ -513,7 +548,8 @@ Module(
                                 ),
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        range: 309..310,
+                                        node_index: NodeIndex(None),
+                                        range: 298..299,
                                         value: Int(
                                             2,
                                         ),
@@ -521,7 +557,8 @@ Module(
                                 ),
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        range: 312..313,
+                                        node_index: NodeIndex(None),
+                                        range: 301..302,
                                         value: Int(
                                             3,
                                         ),
@@ -536,21 +573,25 @@ Module(
             ),
             Assign(
                 StmtAssign {
-                    range: 315..324,
+                    node_index: NodeIndex(None),
+                    range: 304..313,
                     targets: [
                         Subscript(
                             ExprSubscript {
-                                range: 315..319,
+                                node_index: NodeIndex(None),
+                                range: 304..308,
                                 value: Name(
                                     ExprName {
-                                        range: 315..316,
+                                        node_index: NodeIndex(None),
+                                        range: 304..305,
                                         id: Name("x"),
                                         ctx: Load,
                                     },
                                 ),
                                 slice: NumberLiteral(
                                     ExprNumberLiteral {
-                                        range: 317..318,
+                                        node_index: NodeIndex(None),
+                                        range: 306..307,
                                         value: Int(
                                             0,
                                         ),
@@ -562,7 +603,8 @@ Module(
                     ],
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            range: 322..324,
+                            node_index: NodeIndex(None),
+                            range: 311..313,
                             value: Int(
                                 42,
                             ),
@@ -572,14 +614,17 @@ Module(
             ),
             Assign(
                 StmtAssign {
-                    range: 421..430,
+                    node_index: NodeIndex(None),
+                    range: 410..419,
                     targets: [
                         Subscript(
                             ExprSubscript {
-                                range: 421..425,
+                                node_index: NodeIndex(None),
+                                range: 410..414,
                                 value: NumberLiteral(
                                     ExprNumberLiteral {
-                                        range: 421..422,
+                                        node_index: NodeIndex(None),
+                                        range: 410..411,
                                         value: Int(
                                             5,
                                         ),
@@ -587,7 +632,8 @@ Module(
                                 ),
                                 slice: NumberLiteral(
                                     ExprNumberLiteral {
-                                        range: 423..424,
+                                        node_index: NodeIndex(None),
+                                        range: 412..413,
                                         value: Int(
                                             0,
                                         ),
@@ -599,7 +645,8 @@ Module(
                     ],
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            range: 428..430,
+                            node_index: NodeIndex(None),
+                            range: 417..419,
                             value: Int(
                                 42,
                             ),
@@ -609,25 +656,30 @@ Module(
             ),
             Assign(
                 StmtAssign {
-                    range: 431..444,
+                    node_index: NodeIndex(None),
+                    range: 420..433,
                     targets: [
                         Subscript(
                             ExprSubscript {
-                                range: 431..437,
+                                node_index: NodeIndex(None),
+                                range: 420..426,
                                 value: Name(
                                     ExprName {
-                                        range: 431..432,
+                                        node_index: NodeIndex(None),
+                                        range: 420..421,
                                         id: Name("x"),
                                         ctx: Load,
                                     },
                                 ),
                                 slice: Slice(
                                     ExprSlice {
-                                        range: 433..436,
+                                        node_index: NodeIndex(None),
+                                        range: 422..425,
                                         lower: Some(
                                             NumberLiteral(
                                                 ExprNumberLiteral {
-                                                    range: 433..434,
+                                                    node_index: NodeIndex(None),
+                                                    range: 422..423,
                                                     value: Int(
                                                         1,
                                                     ),
@@ -637,7 +689,8 @@ Module(
                                         upper: Some(
                                             NumberLiteral(
                                                 ExprNumberLiteral {
-                                                    range: 435..436,
+                                                    node_index: NodeIndex(None),
+                                                    range: 424..425,
                                                     value: Int(
                                                         2,
                                                     ),
@@ -653,11 +706,13 @@ Module(
                     ],
                     value: List(
                         ExprList {
-                            range: 440..444,
+                            node_index: NodeIndex(None),
+                            range: 429..433,
                             elts: [
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        range: 441..443,
+                                        node_index: NodeIndex(None),
+                                        range: 430..432,
                                         value: Int(
                                             42,
                                         ),
@@ -671,14 +726,17 @@ Module(
             ),
             Assign(
                 StmtAssign {
-                    range: 540..553,
+                    node_index: NodeIndex(None),
+                    range: 529..542,
                     targets: [
                         Subscript(
                             ExprSubscript {
-                                range: 540..546,
+                                node_index: NodeIndex(None),
+                                range: 529..535,
                                 value: NumberLiteral(
                                     ExprNumberLiteral {
-                                        range: 540..541,
+                                        node_index: NodeIndex(None),
+                                        range: 529..530,
                                         value: Int(
                                             5,
                                         ),
@@ -686,11 +744,13 @@ Module(
                                 ),
                                 slice: Slice(
                                     ExprSlice {
-                                        range: 542..545,
+                                        node_index: NodeIndex(None),
+                                        range: 531..534,
                                         lower: Some(
                                             NumberLiteral(
                                                 ExprNumberLiteral {
-                                                    range: 542..543,
+                                                    node_index: NodeIndex(None),
+                                                    range: 531..532,
                                                     value: Int(
                                                         1,
                                                     ),
@@ -700,7 +760,8 @@ Module(
                                         upper: Some(
                                             NumberLiteral(
                                                 ExprNumberLiteral {
-                                                    range: 544..545,
+                                                    node_index: NodeIndex(None),
+                                                    range: 533..534,
                                                     value: Int(
                                                         2,
                                                     ),
@@ -716,11 +777,13 @@ Module(
                     ],
                     value: List(
                         ExprList {
-                            range: 549..553,
+                            node_index: NodeIndex(None),
+                            range: 538..542,
                             elts: [
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        range: 550..552,
+                                        node_index: NodeIndex(None),
+                                        range: 539..541,
                                         value: Int(
                                             42,
                                         ),
@@ -734,21 +797,25 @@ Module(
             ),
             Assign(
                 StmtAssign {
-                    range: 555..567,
+                    node_index: NodeIndex(None),
+                    range: 544..556,
                     targets: [
                         Attribute(
                             ExprAttribute {
-                                range: 555..562,
+                                node_index: NodeIndex(None),
+                                range: 544..551,
                                 value: Name(
                                     ExprName {
-                                        range: 555..558,
+                                        node_index: NodeIndex(None),
+                                        range: 544..547,
                                         id: Name("foo"),
                                         ctx: Load,
                                     },
                                 ),
                                 attr: Identifier {
                                     id: Name("bar"),
-                                    range: 559..562,
+                                    range: 548..551,
+                                    node_index: NodeIndex(None),
                                 },
                                 ctx: Store,
                             },
@@ -756,7 +823,8 @@ Module(
                     ],
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            range: 565..567,
+                            node_index: NodeIndex(None),
+                            range: 554..556,
                             value: Int(
                                 42,
                             ),
@@ -766,18 +834,22 @@ Module(
             ),
             Assign(
                 StmtAssign {
-                    range: 669..681,
+                    node_index: NodeIndex(None),
+                    range: 658..670,
                     targets: [
                         Attribute(
                             ExprAttribute {
-                                range: 669..676,
+                                node_index: NodeIndex(None),
+                                range: 658..665,
                                 value: StringLiteral(
                                     ExprStringLiteral {
-                                        range: 669..674,
+                                        node_index: NodeIndex(None),
+                                        range: 658..663,
                                         value: StringLiteralValue {
                                             inner: Single(
                                                 StringLiteral {
-                                                    range: 669..674,
+                                                    range: 658..663,
+                                                    node_index: NodeIndex(None),
                                                     value: "foo",
                                                     flags: StringLiteralFlags {
                                                         quote_style: Double,
@@ -791,7 +863,8 @@ Module(
                                 ),
                                 attr: Identifier {
                                     id: Name("y"),
-                                    range: 675..676,
+                                    range: 664..665,
+                                    node_index: NodeIndex(None),
                                 },
                                 ctx: Store,
                             },
@@ -799,7 +872,8 @@ Module(
                     ],
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            range: 679..681,
+                            node_index: NodeIndex(None),
+                            range: 668..670,
                             value: Int(
                                 42,
                             ),
@@ -809,11 +883,13 @@ Module(
             ),
             Assign(
                 StmtAssign {
-                    range: 683..691,
+                    node_index: NodeIndex(None),
+                    range: 672..680,
                     targets: [
                         Name(
                             ExprName {
-                                range: 683..686,
+                                node_index: NodeIndex(None),
+                                range: 672..675,
                                 id: Name("foo"),
                                 ctx: Store,
                             },
@@ -821,7 +897,8 @@ Module(
                     ],
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            range: 689..691,
+                            node_index: NodeIndex(None),
+                            range: 678..680,
                             value: Int(
                                 42,
                             ),
@@ -831,77 +908,109 @@ Module(
             ),
             Assign(
                 StmtAssign {
-                    range: 693..703,
+                    node_index: NodeIndex(None),
+                    range: 682..695,
                     targets: [
                         List(
                             ExprList {
-                                range: 693..695,
+                                node_index: NodeIndex(None),
+                                range: 682..684,
                                 elts: [],
                                 ctx: Store,
                             },
                         ),
                     ],
-                    value: Starred(
-                        ExprStarred {
-                            range: 698..703,
-                            value: Name(
-                                ExprName {
-                                    range: 699..703,
-                                    id: Name("data"),
-                                    ctx: Load,
-                                },
-                            ),
+                    value: Tuple(
+                        ExprTuple {
+                            node_index: NodeIndex(None),
+                            range: 687..695,
+                            elts: [
+                                Starred(
+                                    ExprStarred {
+                                        node_index: NodeIndex(None),
+                                        range: 688..693,
+                                        value: Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 689..693,
+                                                id: Name("data"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
                             ctx: Load,
+                            parenthesized: true,
                         },
                     ),
                 },
             ),
             Assign(
                 StmtAssign {
-                    range: 704..714,
+                    node_index: NodeIndex(None),
+                    range: 696..709,
                     targets: [
                         Tuple(
                             ExprTuple {
-                                range: 704..706,
+                                node_index: NodeIndex(None),
+                                range: 696..698,
                                 elts: [],
                                 ctx: Store,
                                 parenthesized: true,
                             },
                         ),
                     ],
-                    value: Starred(
-                        ExprStarred {
-                            range: 709..714,
-                            value: Name(
-                                ExprName {
-                                    range: 710..714,
-                                    id: Name("data"),
-                                    ctx: Load,
-                                },
-                            ),
+                    value: Tuple(
+                        ExprTuple {
+                            node_index: NodeIndex(None),
+                            range: 701..709,
+                            elts: [
+                                Starred(
+                                    ExprStarred {
+                                        node_index: NodeIndex(None),
+                                        range: 702..707,
+                                        value: Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 703..707,
+                                                id: Name("data"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
                             ctx: Load,
+                            parenthesized: true,
                         },
                     ),
                 },
             ),
             Assign(
                 StmtAssign {
-                    range: 715..724,
+                    node_index: NodeIndex(None),
+                    range: 710..719,
                     targets: [
                         Tuple(
                             ExprTuple {
-                                range: 715..719,
+                                node_index: NodeIndex(None),
+                                range: 710..714,
                                 elts: [
                                     Name(
                                         ExprName {
-                                            range: 715..716,
+                                            node_index: NodeIndex(None),
+                                            range: 710..711,
                                             id: Name("a"),
                                             ctx: Store,
                                         },
                                     ),
                                     Name(
                                         ExprName {
-                                            range: 718..719,
+                                            node_index: NodeIndex(None),
+                                            range: 713..714,
                                             id: Name("b"),
                                             ctx: Store,
                                         },
@@ -914,7 +1023,8 @@ Module(
                     ],
                     value: Name(
                         ExprName {
-                            range: 722..724,
+                            node_index: NodeIndex(None),
+                            range: 717..719,
                             id: Name("ab"),
                             ctx: Load,
                         },
@@ -923,18 +1033,21 @@ Module(
             ),
             Assign(
                 StmtAssign {
-                    range: 725..734,
+                    node_index: NodeIndex(None),
+                    range: 720..729,
                     targets: [
                         Name(
                             ExprName {
-                                range: 725..726,
+                                node_index: NodeIndex(None),
+                                range: 720..721,
                                 id: Name("a"),
                                 ctx: Store,
                             },
                         ),
                         Name(
                             ExprName {
-                                range: 729..730,
+                                node_index: NodeIndex(None),
+                                range: 724..725,
                                 id: Name("b"),
                                 ctx: Store,
                             },
@@ -942,7 +1055,8 @@ Module(
                     ],
                     value: Name(
                         ExprName {
-                            range: 733..734,
+                            node_index: NodeIndex(None),
+                            range: 728..729,
                             id: Name("c"),
                             ctx: Load,
                         },

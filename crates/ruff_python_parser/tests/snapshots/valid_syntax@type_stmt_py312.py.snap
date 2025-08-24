@@ -1,0 +1,39 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/type_stmt_py312.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..57,
+        body: [
+            TypeAlias(
+                StmtTypeAlias {
+                    node_index: NodeIndex(None),
+                    range: 44..56,
+                    name: Name(
+                        ExprName {
+                            node_index: NodeIndex(None),
+                            range: 49..50,
+                            id: Name("x"),
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: None,
+                    value: Name(
+                        ExprName {
+                            node_index: NodeIndex(None),
+                            range: 53..56,
+                            id: Name("int"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```

@@ -1,10 +1,10 @@
 use std::io::Write;
 use std::path::PathBuf;
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use itertools::Itertools;
 
-use ruff_workspace::resolver::{python_files_in_path, PyprojectConfig, ResolvedFile};
+use ruff_workspace::resolver::{PyprojectConfig, ResolvedFile, python_files_in_path};
 
 use crate::args::ConfigArguments;
 

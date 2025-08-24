@@ -1,5 +1,5 @@
 //! Rules from [Pylint](https://pypi.org/project/pylint/).
-mod helpers;
+pub(crate) mod helpers;
 pub(crate) mod rules;
 pub mod settings;
 
@@ -9,16 +9,17 @@ mod tests {
 
     use anyhow::Result;
     use regex::Regex;
+    use ruff_python_ast::PythonVersion;
     use rustc_hash::FxHashSet;
     use test_case::test_case;
 
     use crate::registry::Rule;
-    use crate::rules::pylint;
+    use crate::rules::{flake8_tidy_imports, pylint};
 
-    use crate::settings::types::{PreviewMode, PythonVersion};
+    use crate::assert_diagnostics;
     use crate::settings::LinterSettings;
+    use crate::settings::types::PreviewMode;
     use crate::test::test_path;
-    use crate::{assert_messages, settings};
 
     #[test_case(Rule::SingledispatchMethod, Path::new("singledispatch_method.py"))]
     #[test_case(
@@ -47,6 +48,7 @@ mod tests {
     #[test_case(Rule::ComparisonWithItself, Path::new("comparison_with_itself.py"))]
     #[test_case(Rule::EqWithoutHash, Path::new("eq_without_hash.py"))]
     #[test_case(Rule::EmptyComment, Path::new("empty_comment.py"))]
+    #[test_case(Rule::EmptyComment, Path::new("empty_comment_line_continuation.py"))]
     #[test_case(Rule::ManualFromImport, Path::new("import_aliasing.py"))]
     #[test_case(Rule::IfStmtMinMax, Path::new("if_stmt_min_max.py"))]
     #[test_case(Rule::SingleStringSlots, Path::new("single_string_slots.py"))]
@@ -63,6 +65,10 @@ mod tests {
     #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_10.py"))]
     #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_11.py"))]
     #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_12.py"))]
+    #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_13.py"))]
+    #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_14.py"))]
+    #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_15.py"))]
+    #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_16.py"))]
     #[test_case(Rule::ContinueInFinally, Path::new("continue_in_finally.py"))]
     #[test_case(Rule::GlobalStatement, Path::new("global_statement.py"))]
     #[test_case(
@@ -163,6 +169,7 @@ mod tests {
     )]
     #[test_case(Rule::UselessElseOnLoop, Path::new("useless_else_on_loop.py"))]
     #[test_case(Rule::UselessImportAlias, Path::new("import_aliasing.py"))]
+    #[test_case(Rule::UselessImportAlias, Path::new("import_aliasing_2/__init__.py"))]
     #[test_case(Rule::UselessReturn, Path::new("useless_return.py"))]
     #[test_case(Rule::UselessWithLock, Path::new("useless_with_lock.py"))]
     #[test_case(Rule::UnreachableCode, Path::new("unreachable.py"))]
@@ -226,6 +233,7 @@ mod tests {
         Path::new("bad_staticmethod_argument.py")
     )]
     #[test_case(Rule::LenTest, Path::new("len_as_condition.py"))]
+    #[test_case(Rule::MissingMaxsplitArg, Path::new("missing_maxsplit_arg.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -240,7 +248,7 @@ mod tests {
                 ..LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -249,9 +257,9 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pylint/continue_in_finally.py"),
             &LinterSettings::for_rule(Rule::ContinueInFinally)
-                .with_target_version(PythonVersion::Py37),
+                .with_target_version(PythonVersion::PY37),
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -267,7 +275,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::MagicValueComparison)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -283,7 +291,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::TooManyArguments)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -296,7 +304,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::TooManyArguments)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -312,7 +320,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::TooManyPositionalArguments)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -328,7 +336,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::TooManyBranches)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -344,7 +352,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::TooManyBooleanExpressions)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -360,7 +368,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::TooManyStatements)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -376,7 +384,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::TooManyReturnStatements)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -392,7 +400,7 @@ mod tests {
                 ..LinterSettings::for_rules(vec![Rule::TooManyPublicMethods])
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -408,29 +416,44 @@ mod tests {
                 ..LinterSettings::for_rules(vec![Rule::TooManyLocals])
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
-    #[test_case(
-        Rule::RepeatedEqualityComparison,
-        Path::new("repeated_equality_comparison.py")
-    )]
-    #[test_case(Rule::InvalidEnvvarDefault, Path::new("invalid_envvar_default.py"))]
-    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!(
-            "preview__{}_{}",
-            rule_code.noqa_code(),
-            path.to_string_lossy()
-        );
+    #[test]
+    fn preview_useless_import_alias() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("pylint").join(path).as_path(),
-            &settings::LinterSettings {
+            Path::new("pylint/import_aliasing_2/__init__.py"),
+            &LinterSettings {
                 preview: PreviewMode::Enabled,
-                ..settings::LinterSettings::for_rule(rule_code)
+                ..LinterSettings::for_rule(Rule::UselessImportAlias)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn import_outside_top_level_with_banned() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pylint/import_outside_top_level_with_banned.py"),
+            &LinterSettings {
+                preview: PreviewMode::Enabled,
+                flake8_tidy_imports: flake8_tidy_imports::settings::Settings {
+                    banned_module_level_imports: vec![
+                        "foo_banned".to_string(),
+                        "pkg_banned".to_string(),
+                        "pkg.bar_banned".to_string(),
+                    ],
+                    ..Default::default()
+                },
+                ..LinterSettings::for_rules(vec![
+                    Rule::BannedModuleLevelImports,
+                    Rule::ImportOutsideTopLevel,
+                ])
+            },
+        )?;
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 }

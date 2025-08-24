@@ -35,3 +35,14 @@ def okay(obj=Class()):
 
 def error(obj=OtherClass()):
     ...
+
+
+# https://github.com/astral-sh/ruff/issues/12717
+
+from typing import NewType
+
+N = NewType("N", int)
+L = NewType("L", list[str])
+
+def okay(obj = N()): ...
+def error(obj = L()): ...

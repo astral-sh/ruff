@@ -1,11 +1,11 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::analyze::{class, function_type};
 use ruff_python_semantic::{ScopeKind, SemanticModel};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -74,7 +74,7 @@ impl Violation for CachedInstanceMethod {
 }
 
 /// B019
-pub(crate) fn cached_instance_method(checker: &mut Checker, function_def: &ast::StmtFunctionDef) {
+pub(crate) fn cached_instance_method(checker: &Checker, function_def: &ast::StmtFunctionDef) {
     let scope = checker.semantic().current_scope();
 
     // Parent scope _must_ be a class.
@@ -88,8 +88,8 @@ pub(crate) fn cached_instance_method(checker: &mut Checker, function_def: &ast::
         &function_def.decorator_list,
         scope,
         checker.semantic(),
-        &checker.settings.pep8_naming.classmethod_decorators,
-        &checker.settings.pep8_naming.staticmethod_decorators,
+        &checker.settings().pep8_naming.classmethod_decorators,
+        &checker.settings().pep8_naming.staticmethod_decorators,
     );
     if !matches!(type_, function_type::FunctionType::Method) {
         return;
@@ -102,9 +102,7 @@ pub(crate) fn cached_instance_method(checker: &mut Checker, function_def: &ast::
                 return;
             }
 
-            checker
-                .diagnostics
-                .push(Diagnostic::new(CachedInstanceMethod, decorator.range()));
+            checker.report_diagnostic(CachedInstanceMethod, decorator.range());
         }
     }
 }

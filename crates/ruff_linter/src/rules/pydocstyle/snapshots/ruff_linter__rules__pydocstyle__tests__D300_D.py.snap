@@ -1,14 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-D.py:307:5: D300 [*] Use triple double quotes `"""`
+D300 [*] Use triple double quotes `"""`
+   --> D.py:307:5
     |
 305 | @expect('D300: Use """triple double quotes""" (found \'\'\'-quotes)')
 306 | def triple_single_quotes_raw():
 307 |     r'''Summary.'''
-    |     ^^^^^^^^^^^^^^^ D300
+    |     ^^^^^^^^^^^^^^^
     |
-    = help: Convert to triple double quotes
+help: Convert to triple double quotes
 
 ℹ Safe fix
 304 304 | 
@@ -20,14 +21,15 @@ D.py:307:5: D300 [*] Use triple double quotes `"""`
 309 309 | 
 310 310 | @expect('D300: Use """triple double quotes""" (found \'\'\'-quotes)')
 
-D.py:312:5: D300 [*] Use triple double quotes `"""`
+D300 [*] Use triple double quotes `"""`
+   --> D.py:312:5
     |
 310 | @expect('D300: Use """triple double quotes""" (found \'\'\'-quotes)')
 311 | def triple_single_quotes_raw_uppercase():
 312 |     R'''Summary.'''
-    |     ^^^^^^^^^^^^^^^ D300
+    |     ^^^^^^^^^^^^^^^
     |
-    = help: Convert to triple double quotes
+help: Convert to triple double quotes
 
 ℹ Safe fix
 309 309 | 
@@ -39,14 +41,15 @@ D.py:312:5: D300 [*] Use triple double quotes `"""`
 314 314 | 
 315 315 | @expect('D300: Use """triple double quotes""" (found \'-quotes)')
 
-D.py:317:5: D300 [*] Use triple double quotes `"""`
+D300 [*] Use triple double quotes `"""`
+   --> D.py:317:5
     |
 315 | @expect('D300: Use """triple double quotes""" (found \'-quotes)')
 316 | def single_quotes_raw():
 317 |     r'Summary.'
-    |     ^^^^^^^^^^^ D300
+    |     ^^^^^^^^^^^
     |
-    = help: Convert to triple double quotes
+help: Convert to triple double quotes
 
 ℹ Safe fix
 314 314 | 
@@ -58,14 +61,15 @@ D.py:317:5: D300 [*] Use triple double quotes `"""`
 319 319 | 
 320 320 | @expect('D300: Use """triple double quotes""" (found \'-quotes)')
 
-D.py:322:5: D300 [*] Use triple double quotes `"""`
+D300 [*] Use triple double quotes `"""`
+   --> D.py:322:5
     |
 320 | @expect('D300: Use """triple double quotes""" (found \'-quotes)')
 321 | def single_quotes_raw_uppercase():
 322 |     R'Summary.'
-    |     ^^^^^^^^^^^ D300
+    |     ^^^^^^^^^^^
     |
-    = help: Convert to triple double quotes
+help: Convert to triple double quotes
 
 ℹ Safe fix
 319 319 | 
@@ -77,14 +81,15 @@ D.py:322:5: D300 [*] Use triple double quotes `"""`
 324 324 | 
 325 325 | @expect('D300: Use """triple double quotes""" (found \'-quotes)')
 
-D.py:328:5: D300 [*] Use triple double quotes `"""`
+D300 [*] Use triple double quotes `"""`
+   --> D.py:328:5
     |
 326 | @expect('D301: Use r""" if any backslashes in a docstring')
 327 | def single_quotes_raw_uppercase_backslash():
 328 |     R'Sum\mary.'
-    |     ^^^^^^^^^^^^ D300
+    |     ^^^^^^^^^^^^
     |
-    = help: Convert to triple double quotes
+help: Convert to triple double quotes
 
 ℹ Safe fix
 325 325 | @expect('D300: Use """triple double quotes""" (found \'-quotes)')
@@ -96,16 +101,17 @@ D.py:328:5: D300 [*] Use triple double quotes `"""`
 330 330 | 
 331 331 | @expect('D301: Use r""" if any backslashes in a docstring')
 
-D.py:645:5: D300 [*] Use triple double quotes `"""`
+D300 [*] Use triple double quotes `"""`
+   --> D.py:645:5
     |
 644 |   def single_line_docstring_with_an_escaped_backslash():
 645 | /     "\
 646 | |     "
-    | |_____^ D300
+    | |_____^
 647 |
 648 |   class StatementOnSameLineAsDocstring:
     |
-    = help: Convert to triple double quotes
+help: Convert to triple double quotes
 
 ℹ Safe fix
 642 642 | 
@@ -119,15 +125,16 @@ D.py:645:5: D300 [*] Use triple double quotes `"""`
 648 648 | class StatementOnSameLineAsDocstring:
 649 649 |     "After this docstring there's another statement on the same line separated by a semicolon." ; priorities=1
 
-D.py:649:5: D300 [*] Use triple double quotes `"""`
+D300 [*] Use triple double quotes `"""`
+   --> D.py:649:5
     |
 648 | class StatementOnSameLineAsDocstring:
 649 |     "After this docstring there's another statement on the same line separated by a semicolon." ; priorities=1
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D300
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 650 |     def sort_services(self):
 651 |         pass
     |
-    = help: Convert to triple double quotes
+help: Convert to triple double quotes
 
 ℹ Safe fix
 646 646 |     "
@@ -139,13 +146,14 @@ D.py:649:5: D300 [*] Use triple double quotes `"""`
 651 651 |         pass
 652 652 | 
 
-D.py:654:5: D300 [*] Use triple double quotes `"""`
+D300 [*] Use triple double quotes `"""`
+   --> D.py:654:5
     |
 653 | class StatementOnSameLineAsDocstring:
 654 |     "After this docstring there's another statement on the same line separated by a semicolon."; priorities=1
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D300
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     |
-    = help: Convert to triple double quotes
+help: Convert to triple double quotes
 
 ℹ Safe fix
 651 651 |         pass
@@ -157,15 +165,16 @@ D.py:654:5: D300 [*] Use triple double quotes `"""`
 656 656 | 
 657 657 | class CommentAfterDocstring:
 
-D.py:658:5: D300 [*] Use triple double quotes `"""`
+D300 [*] Use triple double quotes `"""`
+   --> D.py:658:5
     |
 657 | class CommentAfterDocstring:
 658 |     "After this docstring there's a comment."  # priorities=1
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D300
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 659 |     def sort_services(self):
 660 |         pass
     |
-    = help: Convert to triple double quotes
+help: Convert to triple double quotes
 
 ℹ Safe fix
 655 655 | 
@@ -177,14 +186,15 @@ D.py:658:5: D300 [*] Use triple double quotes `"""`
 660 660 |         pass
 661 661 | 
 
-D.py:664:5: D300 [*] Use triple double quotes `"""`
+D300 [*] Use triple double quotes `"""`
+   --> D.py:664:5
     |
 663 |   def newline_after_closing_quote(self):
 664 | /     "We enforce a newline after the closing quote for a multi-line docstring \
 665 | |     but continuations shouldn't be considered multi-line"
-    | |_________________________________________________________^ D300
+    | |_________________________________________________________^
     |
-    = help: Convert to triple double quotes
+help: Convert to triple double quotes
 
 ℹ Safe fix
 661 661 | 

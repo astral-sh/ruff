@@ -53,3 +53,7 @@ if TrueElement.get_element(True) == TrueElement.get_element(False):
 assert (not foo) in bar
 assert {"x": not foo} in bar
 assert [42, not foo] in bar
+
+# https://github.com/astral-sh/ruff/issues/17582
+if True == True: # No duplicated diagnostic
+    pass

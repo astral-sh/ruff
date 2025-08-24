@@ -15,6 +15,7 @@ const CONVENTIONAL_ALIASES: &[(&str, &str)] = &[
     ("matplotlib.pyplot", "plt"),
     ("networkx", "nx"),
     ("numpy", "np"),
+    ("numpy.typing", "npt"),
     ("pandas", "pd"),
     ("seaborn", "sns"),
     ("tensorflow", "tf"),

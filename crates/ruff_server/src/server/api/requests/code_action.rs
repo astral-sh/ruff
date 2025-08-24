@@ -3,13 +3,13 @@ use lsp_types::{self as types, request as req};
 use rustc_hash::FxHashSet;
 use types::{CodeActionKind, CodeActionOrCommand};
 
-use crate::edit::WorkspaceEditTracker;
-use crate::lint::{fixes_for_diagnostics, DiagnosticFix};
-use crate::server::api::LSPResult;
-use crate::server::SupportedCodeAction;
-use crate::server::{client::Notifier, Result};
-use crate::session::DocumentSnapshot;
 use crate::DIAGNOSTIC_NAME;
+use crate::edit::WorkspaceEditTracker;
+use crate::lint::{DiagnosticFix, fixes_for_diagnostics};
+use crate::server::Result;
+use crate::server::SupportedCodeAction;
+use crate::server::api::LSPResult;
+use crate::session::{Client, DocumentSnapshot};
 
 use super::code_action_resolve::{resolve_edit_for_fix_all, resolve_edit_for_organize_imports};
 
@@ -23,7 +23,7 @@ impl super::BackgroundDocumentRequestHandler for CodeActions {
     super::define_document_url!(params: &types::CodeActionParams);
     fn run_with_snapshot(
         snapshot: DocumentSnapshot,
-        _notifier: Notifier,
+        _client: &Client,
         params: types::CodeActionParams,
     ) -> Result<Option<types::CodeActionResponse>> {
         let mut response: types::CodeActionResponse = types::CodeActionResponse::default();
@@ -48,7 +48,15 @@ impl super::BackgroundDocumentRequestHandler for CodeActions {
 
         if snapshot.client_settings().fix_all() {
             if supported_code_actions.contains(&SupportedCodeAction::SourceFixAll) {
-                response.push(fix_all(&snapshot).with_failure_code(ErrorCode::InternalError)?);
+                if snapshot.is_notebook_cell() {
+                    // This is ignore here because the client requests this code action for each
+                    // cell in parallel and the server would send a workspace edit with the same
+                    // content which would result in applying the same edit multiple times
+                    // resulting in (possibly) duplicate code.
+                    tracing::debug!("Ignoring `source.fixAll` code action for a notebook cell");
+                } else {
+                    response.push(fix_all(&snapshot).with_failure_code(ErrorCode::InternalError)?);
+                }
             } else if supported_code_actions.contains(&SupportedCodeAction::NotebookSourceFixAll) {
                 response
                     .push(notebook_fix_all(&snapshot).with_failure_code(ErrorCode::InternalError)?);
@@ -57,8 +65,19 @@ impl super::BackgroundDocumentRequestHandler for CodeActions {
 
         if snapshot.client_settings().organize_imports() {
             if supported_code_actions.contains(&SupportedCodeAction::SourceOrganizeImports) {
-                response
-                    .push(organize_imports(&snapshot).with_failure_code(ErrorCode::InternalError)?);
+                if snapshot.is_notebook_cell() {
+                    // This is ignore here because the client requests this code action for each
+                    // cell in parallel and the server would send a workspace edit with the same
+                    // content which would result in applying the same edit multiple times
+                    // resulting in (possibly) duplicate code.
+                    tracing::debug!(
+                        "Ignoring `source.organizeImports` code action for a notebook cell"
+                    );
+                } else {
+                    response.push(
+                        organize_imports(&snapshot).with_failure_code(ErrorCode::InternalError)?,
+                    );
+                }
             } else if supported_code_actions
                 .contains(&SupportedCodeAction::NotebookSourceOrganizeImports)
             {

@@ -1,0 +1,12 @@
+---
+source: crates/ruff_linter/src/linter.rs
+---
+invalid-syntax: multiple assignments to name `a` in pattern
+ --> <filename>:3:14
+  |
+2 | match x:
+3 |     case [a, a]:
+  |              ^
+4 |         pass
+5 |     case _:
+  |

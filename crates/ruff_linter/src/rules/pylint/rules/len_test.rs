@@ -1,20 +1,22 @@
-use crate::checkers::ast::Checker;
-use crate::fix::snippet::SourceCodeSnippet;
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_diagnostics::Applicability;
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, ExprCall};
+use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::type_inference::{PythonType, ResolvedPythonType};
 use ruff_python_semantic::analyze::typing::find_binding_value;
-use ruff_python_semantic::{BindingId, SemanticModel};
 use ruff_text_size::Ranged;
 
+use crate::checkers::ast::Checker;
+use crate::fix::edits;
+use crate::fix::snippet::SourceCodeSnippet;
+use crate::{AlwaysFixableViolation, Edit, Fix};
+
 /// ## What it does
-/// Checks for usage of call of 'len' on sequences
-/// in boolean test context.
+/// Checks for `len` calls on sequences in a boolean test context.
 ///
 /// ## Why is this bad?
 /// Empty sequences are considered false in a boolean context.
-/// You can either remove the call to 'len'
+/// You can either remove the call to `len`
 /// or compare the length against a scalar.
 ///
 /// ## Example
@@ -32,12 +34,26 @@ use ruff_text_size::Ranged;
 /// Use instead:
 /// ```python
 /// fruits = ["orange", "apple"]
+/// vegetables = []
 ///
 /// if fruits:
 ///     print(fruits)
 ///
 /// if not vegetables:
 ///     print(vegetables)
+/// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe when the `len` call includes a comment,
+/// as the comment would be removed.
+///
+/// For example, the fix would be marked as unsafe in the following case:
+/// ```python
+/// fruits = []
+/// if len(
+///     fruits  # comment
+/// ):
+///     ...
 /// ```
 ///
 /// ## References
@@ -63,7 +79,7 @@ impl AlwaysFixableViolation for LenTest {
 }
 
 /// PLC1802
-pub(crate) fn len_test(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn len_test(checker: &Checker, call: &ExprCall) {
     let ExprCall {
         func, arguments, ..
     } = call;
@@ -90,18 +106,24 @@ pub(crate) fn len_test(checker: &mut Checker, call: &ExprCall) {
 
     let replacement = checker.locator().slice(argument.range()).to_string();
 
-    checker.diagnostics.push(
-        Diagnostic::new(
+    checker
+        .report_diagnostic(
             LenTest {
                 expression: SourceCodeSnippet::new(replacement.clone()),
             },
             call.range(),
         )
-        .with_fix(Fix::safe_edit(Edit::range_replacement(
-            replacement,
-            call.range(),
-        ))),
-    );
+        .set_fix(Fix::applicable_edit(
+            Edit::range_replacement(
+                edits::pad(replacement, call.range(), checker.locator()),
+                call.range(),
+            ),
+            if checker.comment_ranges().intersects(call.range()) {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            },
+        ));
 }
 
 fn is_indirect_sequence(expr: &Expr, semantic: &SemanticModel) -> bool {
@@ -110,12 +132,11 @@ fn is_indirect_sequence(expr: &Expr, semantic: &SemanticModel) -> bool {
     };
 
     let scope = semantic.current_scope();
-    let bindings: Vec<BindingId> = scope.get_all(name).collect();
-    let [binding_id] = bindings.as_slice() else {
+    let Some(binding_id) = scope.get(name) else {
         return false;
     };
 
-    let binding = semantic.binding(*binding_id);
+    let binding = semantic.binding(binding_id);
 
     // Attempt to find the binding's value
     let Some(binding_value) = find_binding_value(binding, semantic) else {

@@ -1,10 +1,10 @@
 use std::fmt;
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
@@ -59,7 +59,7 @@ impl Violation for UnprefixedTypeParam {
 }
 
 /// PYI001
-pub(crate) fn prefix_type_params(checker: &mut Checker, value: &Expr, targets: &[Expr]) {
+pub(crate) fn prefix_type_params(checker: &Checker, value: &Expr, targets: &[Expr]) {
     // If the typing modules were never imported, we'll never match below.
     if !checker.semantic().seen_typing() {
         return;
@@ -73,7 +73,7 @@ pub(crate) fn prefix_type_params(checker: &mut Checker, value: &Expr, targets: &
         if id.starts_with('_') {
             return;
         }
-    };
+    }
 
     let Expr::Call(ast::ExprCall { func, .. }) = value else {
         return;
@@ -106,7 +106,5 @@ pub(crate) fn prefix_type_params(checker: &mut Checker, value: &Expr, targets: &
         return;
     };
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(UnprefixedTypeParam { kind }, value.range()));
+    checker.report_diagnostic(UnprefixedTypeParam { kind }, value.range());
 }

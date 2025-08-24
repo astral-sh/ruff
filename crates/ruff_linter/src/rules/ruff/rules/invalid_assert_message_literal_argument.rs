@@ -1,12 +1,12 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Expr, StmtAssert};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for invalid use of literals in assert message argument.
+/// Checks for invalid use of literals in assert message arguments.
 ///
 /// ## Why is this bad?
 /// An assert message which is a non-string literal was likely intended
@@ -36,7 +36,7 @@ impl Violation for InvalidAssertMessageLiteralArgument {
 }
 
 /// RUF040
-pub(crate) fn invalid_assert_message_literal_argument(checker: &mut Checker, stmt: &StmtAssert) {
+pub(crate) fn invalid_assert_message_literal_argument(checker: &Checker, stmt: &StmtAssert) {
     let Some(message) = stmt.msg.as_deref() else {
         return;
     };
@@ -52,8 +52,5 @@ pub(crate) fn invalid_assert_message_literal_argument(checker: &mut Checker, stm
         return;
     }
 
-    checker.diagnostics.push(Diagnostic::new(
-        InvalidAssertMessageLiteralArgument,
-        message.range(),
-    ));
+    checker.report_diagnostic(InvalidAssertMessageLiteralArgument, message.range());
 }

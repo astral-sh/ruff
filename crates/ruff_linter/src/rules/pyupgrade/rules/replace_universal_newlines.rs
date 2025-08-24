@@ -1,11 +1,11 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::fix::edits::{remove_argument, Parentheses};
+use crate::fix::edits::{Parentheses, remove_argument};
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for uses of `subprocess.run` that set the `universal_newlines`
@@ -49,7 +49,7 @@ impl AlwaysFixableViolation for ReplaceUniversalNewlines {
 }
 
 /// UP021
-pub(crate) fn replace_universal_newlines(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn replace_universal_newlines(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::SUBPROCESS) {
         return;
     }
@@ -67,7 +67,7 @@ pub(crate) fn replace_universal_newlines(checker: &mut Checker, call: &ast::Expr
             return;
         };
 
-        let mut diagnostic = Diagnostic::new(ReplaceUniversalNewlines, arg.range());
+        let mut diagnostic = checker.report_diagnostic(ReplaceUniversalNewlines, arg.range());
 
         if call.arguments.find_keyword("text").is_some() {
             diagnostic.try_set_fix(|| {
@@ -76,6 +76,7 @@ pub(crate) fn replace_universal_newlines(checker: &mut Checker, call: &ast::Expr
                     &call.arguments,
                     Parentheses::Preserve,
                     checker.locator().contents(),
+                    checker.comment_ranges(),
                 )
                 .map(Fix::safe_edit)
             });
@@ -85,6 +86,5 @@ pub(crate) fn replace_universal_newlines(checker: &mut Checker, call: &ast::Expr
                 arg.range(),
             )));
         }
-        checker.diagnostics.push(diagnostic);
     }
 }

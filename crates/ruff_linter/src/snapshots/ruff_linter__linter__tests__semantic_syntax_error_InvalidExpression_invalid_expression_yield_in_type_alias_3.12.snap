@@ -1,0 +1,9 @@
+---
+source: crates/ruff_linter/src/linter.rs
+---
+invalid-syntax: yield expression cannot be used within a type alias
+ --> <filename>:2:11
+  |
+2 | type Y = (yield 1)
+  |           ^^^^^^^
+  |

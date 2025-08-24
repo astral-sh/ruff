@@ -1,0 +1,61 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF048 `__version__` may contain non-integral-like elements
+ --> RUF048_1.py:5:7
+  |
+5 | tuple(map(int, __version__.split(".")))
+  |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+6 | list(map(int, __version__.split(".")))
+7 | tuple(map(int, bar.__version__.split(".")))
+  |
+
+RUF048 `__version__` may contain non-integral-like elements
+ --> RUF048_1.py:6:6
+  |
+5 | tuple(map(int, __version__.split(".")))
+6 | list(map(int, __version__.split(".")))
+  |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+7 | tuple(map(int, bar.__version__.split(".")))
+8 | list(map(int, bar.__version__.split(".")))
+  |
+
+RUF048 `__version__` may contain non-integral-like elements
+ --> RUF048_1.py:7:7
+  |
+5 | tuple(map(int, __version__.split(".")))
+6 | list(map(int, __version__.split(".")))
+7 | tuple(map(int, bar.__version__.split(".")))
+  |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+8 | list(map(int, bar.__version__.split(".")))
+  |
+
+RUF048 `__version__` may contain non-integral-like elements
+  --> RUF048_1.py:8:6
+   |
+ 6 | list(map(int, __version__.split(".")))
+ 7 | tuple(map(int, bar.__version__.split(".")))
+ 8 | list(map(int, bar.__version__.split(".")))
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ 9 |
+10 | # `sep` passed as keyword argument
+   |
+
+RUF048 `__version__` may contain non-integral-like elements
+  --> RUF048_1.py:11:13
+   |
+10 | # `sep` passed as keyword argument
+11 | for part in map(int, bar.__version__.split(sep=".")):
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+12 |     print(part)
+   |
+
+RUF048 `__version__` may contain non-integral-like elements
+  --> RUF048_1.py:14:13
+   |
+12 |     print(part)
+13 |
+14 | for part in map(int, __version__.split(sep=".")):
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+15 |     print(part)
+   |

@@ -1,11 +1,11 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Expr;
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for uses of deprecated NumPy functions.
@@ -17,7 +17,7 @@ use crate::importer::ImportRequest;
 ///
 /// Prefer newer APIs over deprecated ones.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// import numpy as np
 ///
@@ -55,7 +55,7 @@ impl Violation for NumpyDeprecatedFunction {
 }
 
 /// NPY003
-pub(crate) fn deprecated_function(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn deprecated_function(checker: &Checker, expr: &Expr) {
     if !checker.semantic().seen_module(Modules::NUMPY) {
         return;
     }
@@ -73,7 +73,7 @@ pub(crate) fn deprecated_function(checker: &mut Checker, expr: &Expr) {
                 _ => None,
             })
     {
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             NumpyDeprecatedFunction {
                 existing: existing.to_string(),
                 replacement: replacement.to_string(),
@@ -89,6 +89,5 @@ pub(crate) fn deprecated_function(checker: &mut Checker, expr: &Expr) {
             let replacement_edit = Edit::range_replacement(binding, expr.range());
             Ok(Fix::safe_edits(import_edit, [replacement_edit]))
         });
-        checker.diagnostics.push(diagnostic);
     }
 }

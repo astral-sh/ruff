@@ -1,0 +1,25 @@
+---
+source: crates/ruff/tests/lint.rs
+info:
+  program: ruff
+  args:
+    - check
+    - "--no-cache"
+    - "--output-format"
+    - concise
+    - "--select"
+    - "F401,F821"
+    - "--target-version"
+    - py39
+    - input.py
+---
+success: false
+exit_code: 1
+----- stdout -----
+input.py:1:8: F401 [*] `os` imported but unused
+input.py:2:5: F821 Undefined name `y`
+input.py:3:1: invalid-syntax: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
+Found 3 errors.
+[*] 1 fixable with the `--fix` option.
+
+----- stderr -----

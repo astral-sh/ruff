@@ -1,17 +1,16 @@
 use memchr::memchr2;
-pub(crate) use normalize::{normalize_string, NormalizedString, StringNormalizer};
-use ruff_python_ast::str::Quote;
+pub(crate) use normalize::{NormalizedString, StringNormalizer, normalize_string};
 use ruff_python_ast::StringLikePart;
+use ruff_python_ast::str::{Quote, TripleQuotes};
 use ruff_python_ast::{
-    self as ast,
+    self as ast, AnyStringFlags, StringFlags,
     str_prefix::{AnyStringPrefix, StringLiteralPrefix},
-    AnyStringFlags, StringFlags,
 };
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 
-use crate::prelude::*;
 use crate::QuoteStyle;
+use crate::prelude::*;
 
 pub(crate) mod docstring;
 pub(crate) mod implicit;
@@ -86,57 +85,55 @@ pub(crate) trait StringLikeExtensions {
 
 impl StringLikeExtensions for ast::StringLike<'_> {
     fn is_multiline(&self, context: &PyFormatContext) -> bool {
+        // Helper for f-string and t-string parts
+        fn contains_line_break_or_comments(
+            elements: &ast::InterpolatedStringElements,
+            context: &PyFormatContext,
+            triple_quotes: TripleQuotes,
+        ) -> bool {
+            elements.iter().any(|element| match element {
+                ast::InterpolatedStringElement::Literal(literal) => {
+                    triple_quotes.is_yes() && context.source().contains_line_break(literal.range())
+                }
+                ast::InterpolatedStringElement::Interpolation(expression) => {
+                    // Expressions containing comments can't be joined.
+                    //
+                    // Format specifiers needs to be checked as well. For example, the
+                    // following should be considered multiline because the literal
+                    // part of the format specifier contains a newline at the end
+                    // (`.3f\n`):
+                    //
+                    // ```py
+                    // x = f"hello {a + b + c + d:.3f
+                    // } world"
+                    // ```
+                    context.comments().contains_comments(expression.into())
+                        || expression.format_spec.as_deref().is_some_and(|spec| {
+                            contains_line_break_or_comments(&spec.elements, context, triple_quotes)
+                        })
+                        || expression.debug_text.as_ref().is_some_and(|debug_text| {
+                            memchr2(b'\n', b'\r', debug_text.leading.as_bytes()).is_some()
+                                || memchr2(b'\n', b'\r', debug_text.trailing.as_bytes()).is_some()
+                        })
+                }
+            })
+        }
+
         self.parts().any(|part| match part {
             StringLikePart::String(_) | StringLikePart::Bytes(_) => {
                 part.flags().is_triple_quoted()
                     && context.source().contains_line_break(part.range())
             }
-            StringLikePart::FString(f_string) => {
-                fn contains_line_break_or_comments(
-                    elements: &ast::FStringElements,
-                    context: &PyFormatContext,
-                    is_triple_quoted: bool,
-                ) -> bool {
-                    elements.iter().any(|element| match element {
-                        ast::FStringElement::Literal(literal) => {
-                            is_triple_quoted
-                                && context.source().contains_line_break(literal.range())
-                        }
-                        ast::FStringElement::Expression(expression) => {
-                            // Expressions containing comments can't be joined.
-                            //
-                            // Format specifiers needs to be checked as well. For example, the
-                            // following should be considered multiline because the literal
-                            // part of the format specifier contains a newline at the end
-                            // (`.3f\n`):
-                            //
-                            // ```py
-                            // x = f"hello {a + b + c + d:.3f
-                            // } world"
-                            // ```
-                            context.comments().contains_comments(expression.into())
-                                || expression.format_spec.as_deref().is_some_and(|spec| {
-                                    contains_line_break_or_comments(
-                                        &spec.elements,
-                                        context,
-                                        is_triple_quoted,
-                                    )
-                                })
-                                || expression.debug_text.as_ref().is_some_and(|debug_text| {
-                                    memchr2(b'\n', b'\r', debug_text.leading.as_bytes()).is_some()
-                                        || memchr2(b'\n', b'\r', debug_text.trailing.as_bytes())
-                                            .is_some()
-                                })
-                        }
-                    })
-                }
-
-                contains_line_break_or_comments(
-                    &f_string.elements,
-                    context,
-                    f_string.flags.is_triple_quoted(),
-                )
-            }
+            StringLikePart::FString(f_string) => contains_line_break_or_comments(
+                &f_string.elements,
+                context,
+                f_string.flags.triple_quotes(),
+            ),
+            StringLikePart::TString(t_string) => contains_line_break_or_comments(
+                &t_string.elements,
+                context,
+                t_string.flags.triple_quotes(),
+            ),
         })
     }
 }

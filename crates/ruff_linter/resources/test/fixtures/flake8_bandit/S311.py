@@ -20,3 +20,8 @@ random.randbytes()
 # Unrelated
 os.urandom()
 a_lib.random()
+
+
+# https://github.com/astral-sh/ruff/issues/15522
+map(random.randrange, [])
+foo = random.randrange

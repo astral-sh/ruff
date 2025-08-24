@@ -6,17 +6,17 @@ use log::error;
 
 use ruff_linter::source_kind::SourceKind;
 use ruff_python_ast::{PySourceType, SourceType};
-use ruff_workspace::resolver::{match_exclusion, python_file_at_path, Resolver};
 use ruff_workspace::FormatterSettings;
+use ruff_workspace::resolver::{Resolver, match_exclusion, python_file_at_path};
 
+use crate::ExitStatus;
 use crate::args::{ConfigArguments, FormatArguments, FormatRange};
 use crate::commands::format::{
-    format_source, warn_incompatible_formatter_settings, FormatCommandError, FormatMode,
-    FormatResult, FormattedSource,
+    FormatCommandError, FormatMode, FormatResult, FormattedSource, format_source,
+    warn_incompatible_formatter_settings,
 };
 use crate::resolve::resolve;
 use crate::stdin::{parrot_stdin, read_from_stdin};
-use crate::ExitStatus;
 
 /// Run the formatter over a single file, read from `stdin`.
 pub(crate) fn format_stdin(

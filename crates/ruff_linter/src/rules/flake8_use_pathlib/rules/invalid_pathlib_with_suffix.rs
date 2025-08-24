@@ -1,30 +1,39 @@
 use crate::checkers::ast::Checker;
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{self as ast, StringFlags};
-use ruff_python_semantic::analyze::typing;
+use crate::{Edit, Fix, FixAvailability, Violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::{self as ast, PythonVersion, StringFlags};
 use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::analyze::typing::{self, PathlibPathChecker, TypeChecker};
 use ruff_text_size::Ranged;
 
 /// ## What it does
 /// Checks for `pathlib.Path.with_suffix()` calls where
 /// the given suffix does not have a leading dot
-/// or the given suffix is a single dot `"."`.
+/// or the given suffix is a single dot `"."` and the
+/// Python version is less than 3.14.
 ///
 /// ## Why is this bad?
 /// `Path.with_suffix()` will raise an error at runtime
 /// if the given suffix is not prefixed with a dot
-/// or it is a single dot `"."`.
+/// or, in versions prior to Python 3.14, if it is a single dot `"."`.
 ///
-/// ## Examples
+/// ## Example
 ///
 /// ```python
+/// from pathlib import Path
+///
+/// path = Path()
+///
 /// path.with_suffix("py")
 /// ```
 ///
 /// Use instead:
 ///
 /// ```python
+/// from pathlib import Path
+///
+/// path = Path()
+///
 /// path.with_suffix(".py")
 /// ```
 ///
@@ -49,9 +58,6 @@ use ruff_text_size::Ranged;
 /// No fix is offered if the suffix `"."` is given, since the intent is unclear.
 #[derive(ViolationMetadata)]
 pub(crate) struct InvalidPathlibWithSuffix {
-    // TODO: Since "." is a correct suffix in Python 3.14,
-    // we will need to update this rule and documentation
-    // once Ruff supports Python 3.14.
     single_dot: bool,
 }
 
@@ -78,7 +84,7 @@ impl Violation for InvalidPathlibWithSuffix {
 }
 
 /// PTH210
-pub(crate) fn invalid_pathlib_with_suffix(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn invalid_pathlib_with_suffix(checker: &Checker, call: &ast::ExprCall) {
     let (func, arguments) = (&call.func, &call.arguments);
 
     if !is_path_with_suffix_call(checker.semantic(), func) {
@@ -108,7 +114,15 @@ pub(crate) fn invalid_pathlib_with_suffix(checker: &mut Checker, call: &ast::Exp
     };
 
     let single_dot = string_value == ".";
-    let mut diagnostic = Diagnostic::new(InvalidPathlibWithSuffix { single_dot }, call.range);
+
+    // As of Python 3.14, a single dot is considered a valid suffix.
+    // https://docs.python.org/3.14/library/pathlib.html#pathlib.PurePath.with_suffix
+    if single_dot && checker.target_version() >= PythonVersion::PY314 {
+        return;
+    }
+
+    let mut diagnostic =
+        checker.report_diagnostic(InvalidPathlibWithSuffix { single_dot }, call.range);
     if !single_dot {
         let after_leading_quote = string.start() + first_part.flags.opener_len();
         diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
@@ -116,8 +130,6 @@ pub(crate) fn invalid_pathlib_with_suffix(checker: &mut Checker, call: &ast::Exp
             after_leading_quote,
         )));
     }
-
-    checker.diagnostics.push(diagnostic);
 }
 
 fn is_path_with_suffix_call(semantic: &SemanticModel, func: &ast::Expr) -> bool {
@@ -129,12 +141,13 @@ fn is_path_with_suffix_call(semantic: &SemanticModel, func: &ast::Expr) -> bool 
         return false;
     }
 
-    let ast::Expr::Name(name) = &**value else {
-        return false;
-    };
-    let Some(binding) = semantic.only_binding(name).map(|id| semantic.binding(id)) else {
-        return false;
-    };
-
-    typing::is_pathlib_path(binding, semantic)
+    match &**value {
+        ast::Expr::Name(name) => {
+            let Some(binding) = semantic.only_binding(name).map(|id| semantic.binding(id)) else {
+                return false;
+            };
+            typing::is_pathlib_path(binding, semantic)
+        }
+        expr => PathlibPathChecker::match_initializer(expr, semantic),
+    }
 }

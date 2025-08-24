@@ -1,0 +1,63 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/parenthesized_kwarg_py37.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..52,
+        body: [
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 43..51,
+                    value: Call(
+                        ExprCall {
+                            node_index: NodeIndex(None),
+                            range: 43..51,
+                            func: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 43..44,
+                                    id: Name("f"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 44..51,
+                                node_index: NodeIndex(None),
+                                args: [],
+                                keywords: [
+                                    Keyword {
+                                        range: 45..50,
+                                        node_index: NodeIndex(None),
+                                        arg: Some(
+                                            Identifier {
+                                                id: Name("a"),
+                                                range: 46..47,
+                                                node_index: NodeIndex(None),
+                                            },
+                                        ),
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 49..50,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ],
+                            },
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```

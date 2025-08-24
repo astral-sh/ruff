@@ -1,13 +1,13 @@
 use std::fmt;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_codegen::Stylist;
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::checkers::ast::Checker;
 use crate::Locator;
+use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for `Decimal` calls passing a float literal.
@@ -28,7 +28,7 @@ use crate::Locator;
 /// num = Decimal("1.2345")
 /// ```
 ///
-/// ## Fix Safety
+/// ## Fix safety
 /// This rule's fix is marked as unsafe because it changes the underlying value
 /// of the `Decimal` instance that is constructed. This can lead to unexpected
 /// behavior if your program relies on the previous value (whether deliberately or not).
@@ -47,7 +47,7 @@ impl AlwaysFixableViolation for DecimalFromFloatLiteral {
 }
 
 /// RUF032: `Decimal()` called with float literal argument
-pub(crate) fn decimal_from_float_literal_syntax(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn decimal_from_float_literal_syntax(checker: &Checker, call: &ast::ExprCall) {
     let Some(arg) = call.arguments.args.first() else {
         return;
     };
@@ -60,10 +60,14 @@ pub(crate) fn decimal_from_float_literal_syntax(checker: &mut Checker, call: &as
                 matches!(qualified_name.segments(), ["decimal", "Decimal"])
             })
         {
-            let diagnostic = Diagnostic::new(DecimalFromFloatLiteral, arg.range()).with_fix(
-                fix_float_literal(arg.range(), float, checker.locator(), checker.stylist()),
-            );
-            checker.diagnostics.push(diagnostic);
+            checker
+                .report_diagnostic(DecimalFromFloatLiteral, arg.range())
+                .set_fix(fix_float_literal(
+                    arg.range(),
+                    float,
+                    checker.locator(),
+                    checker.stylist(),
+                ));
         }
     }
 }

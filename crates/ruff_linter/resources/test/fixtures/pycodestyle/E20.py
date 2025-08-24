@@ -189,3 +189,18 @@ f"{ham[lower + 1  :, "columnname"]}"
 #: Okay: https://github.com/astral-sh/ruff/issues/12023
 f"{x = :.2f}"
 f"{(x) = :.2f}"
+
+# t-strings
+t"{ {'a': 1} }"
+t"{[ { {'a': 1} } ]}"
+t"normal { {t"{ { [1, 2] } }" } } normal"
+
+t"{x = :.2f}"
+t"{(x) = :.2f}"
+
+#: Okay
+t"{ham[lower +1 :, "columnname"]}"
+
+#: E203:1:13
+t"{ham[lower + 1  :, "columnname"]}"
+

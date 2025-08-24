@@ -1,8 +1,7 @@
-use ruff_diagnostics::Diagnostic;
-use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::TextRange;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_builtins::helpers::shadows_builtin;
 
@@ -17,7 +16,7 @@ use crate::rules::flake8_builtins::helpers::shadows_builtin;
 /// builtin and vice versa.
 ///
 /// Builtins can be marked as exceptions to this rule via the
-/// [`lint.flake8-builtins.builtins-ignorelist`] configuration option.
+/// [`lint.flake8-builtins.ignorelist`] configuration option.
 ///
 /// ## Example
 /// ```python
@@ -40,7 +39,7 @@ use crate::rules::flake8_builtins::helpers::shadows_builtin;
 /// ```
 ///
 /// ## Options
-/// - `lint.flake8-builtins.builtins-ignorelist`
+/// - `lint.flake8-builtins.ignorelist`
 ///
 /// ## References
 /// - [_Why is it a bad idea to name a variable `id` in Python?_](https://stackoverflow.com/questions/77552/id-is-a-bad-variable-name-in-python)
@@ -58,18 +57,27 @@ impl Violation for BuiltinVariableShadowing {
 }
 
 /// A001
-pub(crate) fn builtin_variable_shadowing(checker: &mut Checker, name: &str, range: TextRange) {
+pub(crate) fn builtin_variable_shadowing(checker: &Checker, name: &str, range: TextRange) {
+    // These should not report violations as discussed in
+    // https://github.com/astral-sh/ruff/issues/16373
+    if matches!(
+        name,
+        "__doc__" | "__name__" | "__loader__" | "__package__" | "__spec__"
+    ) {
+        return;
+    }
+
     if shadows_builtin(
         name,
         checker.source_type,
-        &checker.settings.flake8_builtins.builtins_ignorelist,
-        checker.settings.target_version,
+        &checker.settings().flake8_builtins.ignorelist,
+        checker.target_version(),
     ) {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(
             BuiltinVariableShadowing {
                 name: name.to_string(),
             },
             range,
-        ));
+        );
     }
 }

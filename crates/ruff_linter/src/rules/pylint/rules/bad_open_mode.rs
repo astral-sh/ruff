@@ -1,10 +1,10 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_stdlib::open_mode::OpenMode;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -24,13 +24,14 @@ use crate::checkers::ast::Checker;
 /// ## Example
 /// ```python
 /// with open("file", "rwx") as f:
-///     return f.read()
+///     content = f.read()
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// with open("file", "r") as f:
-///     return f.read()
+///     content = f.read()
 /// ```
 ///
 /// ## References
@@ -49,7 +50,7 @@ impl Violation for BadOpenMode {
 }
 
 /// PLW1501
-pub(crate) fn bad_open_mode(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn bad_open_mode(checker: &Checker, call: &ast::ExprCall) {
     let Some(kind) = is_open(call.func.as_ref(), checker.semantic()) else {
         return;
     };
@@ -66,12 +67,12 @@ pub(crate) fn bad_open_mode(checker: &mut Checker, call: &ast::ExprCall) {
         return;
     }
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(
         BadOpenMode {
             mode: value.to_string(),
         },
         mode.range(),
-    ));
+    );
 }
 
 #[derive(Debug, Copy, Clone)]

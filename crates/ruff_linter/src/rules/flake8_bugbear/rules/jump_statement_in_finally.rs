@@ -1,9 +1,9 @@
 use ruff_python_ast::{self as ast, Stmt};
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -53,10 +53,10 @@ impl Violation for JumpStatementInFinally {
     }
 }
 
-fn walk_stmt(checker: &mut Checker, body: &[Stmt], f: fn(&Stmt) -> bool) {
+fn walk_stmt(checker: &Checker, body: &[Stmt], f: fn(&Stmt) -> bool) {
     for stmt in body {
         if f(stmt) {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(
                 JumpStatementInFinally {
                     name: match stmt {
                         Stmt::Break(_) => "break",
@@ -67,7 +67,7 @@ fn walk_stmt(checker: &mut Checker, body: &[Stmt], f: fn(&Stmt) -> bool) {
                     .to_owned(),
                 },
                 stmt.range(),
-            ));
+            );
         }
         match stmt {
             Stmt::While(ast::StmtWhile { body, .. }) | Stmt::For(ast::StmtFor { body, .. }) => {
@@ -89,7 +89,7 @@ fn walk_stmt(checker: &mut Checker, body: &[Stmt], f: fn(&Stmt) -> bool) {
 }
 
 /// B012
-pub(crate) fn jump_statement_in_finally(checker: &mut Checker, finalbody: &[Stmt]) {
+pub(crate) fn jump_statement_in_finally(checker: &Checker, finalbody: &[Stmt]) {
     walk_stmt(checker, finalbody, |stmt| {
         matches!(stmt, Stmt::Break(_) | Stmt::Continue(_) | Stmt::Return(_))
     });

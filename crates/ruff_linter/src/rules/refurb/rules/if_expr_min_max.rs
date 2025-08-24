@@ -1,11 +1,11 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::{self as ast, CmpOp, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `if` expressions that can be replaced with `min()` or `max()`
@@ -76,7 +76,7 @@ impl Violation for IfExprMinMax {
 }
 
 /// FURB136
-pub(crate) fn if_expr_min_max(checker: &mut Checker, if_exp: &ast::ExprIf) {
+pub(crate) fn if_expr_min_max(checker: &Checker, if_exp: &ast::ExprIf) {
     let Expr::Compare(ast::ExprCompare {
         left,
         ops,
@@ -130,7 +130,7 @@ pub(crate) fn if_expr_min_max(checker: &mut Checker, if_exp: &ast::ExprIf) {
         checker.generator().expr(arg2),
     );
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         IfExprMinMax {
             min_max,
             expression: SourceCodeSnippet::from_str(checker.locator().slice(if_exp)),
@@ -145,8 +145,6 @@ pub(crate) fn if_expr_min_max(checker: &mut Checker, if_exp: &ast::ExprIf) {
             if_exp.range(),
         )));
     }
-
-    checker.diagnostics.push(diagnostic);
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

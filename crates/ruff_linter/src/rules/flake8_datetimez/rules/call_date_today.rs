@@ -1,10 +1,10 @@
 use ruff_python_ast::Expr;
 use ruff_text_size::TextRange;
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Modules;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -24,7 +24,7 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// import datetime
 ///
-/// datetime.datetime.today()
+/// datetime.date.today()
 /// ```
 ///
 /// Use instead:
@@ -57,7 +57,8 @@ impl Violation for CallDateToday {
     }
 }
 
-pub(crate) fn call_date_today(checker: &mut Checker, func: &Expr, location: TextRange) {
+/// DTZ011
+pub(crate) fn call_date_today(checker: &Checker, func: &Expr, location: TextRange) {
     if !checker.semantic().seen_module(Modules::DATETIME) {
         return;
     }
@@ -69,8 +70,6 @@ pub(crate) fn call_date_today(checker: &mut Checker, func: &Expr, location: Text
             matches!(qualified_name.segments(), ["datetime", "date", "today"])
         })
     {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(CallDateToday, location));
+        checker.report_diagnostic(CallDateToday, location);
     }
 }

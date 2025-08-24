@@ -1,5 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::visitor::Visitor;
@@ -9,6 +8,7 @@ use ruff_python_semantic::analyze::terminal::Terminal;
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -45,7 +45,7 @@ impl Violation for InvalidBoolReturnType {
 }
 
 /// PLE0304
-pub(crate) fn invalid_bool_return(checker: &mut Checker, function_def: &ast::StmtFunctionDef) {
+pub(crate) fn invalid_bool_return(checker: &Checker, function_def: &ast::StmtFunctionDef) {
     if function_def.name.as_str() != "__bool__" {
         return;
     }
@@ -68,10 +68,7 @@ pub(crate) fn invalid_bool_return(checker: &mut Checker, function_def: &ast::Stm
 
     // If there are no return statements, add a diagnostic.
     if terminal == Terminal::Implicit {
-        checker.diagnostics.push(Diagnostic::new(
-            InvalidBoolReturnType,
-            function_def.identifier(),
-        ));
+        checker.report_diagnostic(InvalidBoolReturnType, function_def.identifier());
         return;
     }
 
@@ -88,15 +85,11 @@ pub(crate) fn invalid_bool_return(checker: &mut Checker, function_def: &ast::Stm
                 ResolvedPythonType::Unknown
                     | ResolvedPythonType::Atom(PythonType::Number(NumberLike::Bool))
             ) {
-                checker
-                    .diagnostics
-                    .push(Diagnostic::new(InvalidBoolReturnType, value.range()));
+                checker.report_diagnostic(InvalidBoolReturnType, value.range());
             }
         } else {
             // Disallow implicit `None`.
-            checker
-                .diagnostics
-                .push(Diagnostic::new(InvalidBoolReturnType, stmt.range()));
+            checker.report_diagnostic(InvalidBoolReturnType, stmt.range());
         }
     }
 }

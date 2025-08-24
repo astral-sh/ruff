@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::fmt;
 use std::hash::Hasher;
-use std::num::{NonZeroU16, NonZeroU8, ParseIntError};
+use std::num::{NonZeroU8, NonZeroU16, ParseIntError};
 use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};

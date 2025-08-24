@@ -9,10 +9,13 @@ pub use locator::Locator;
 pub use noqa::generate_noqa_edits;
 #[cfg(feature = "clap")]
 pub use registry::clap_completion::RuleParser;
+pub use rule_selector::RuleSelector;
 #[cfg(feature = "clap")]
 pub use rule_selector::clap_completion::RuleSelectorParser;
-pub use rule_selector::RuleSelector;
 pub use rules::pycodestyle::rules::IOError;
+
+pub(crate) use ruff_diagnostics::{Applicability, Edit, Fix};
+pub use violation::{AlwaysFixableViolation, FixAvailability, Violation, ViolationMetadata};
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -34,6 +37,7 @@ pub mod message;
 mod noqa;
 pub mod package;
 pub mod packaging;
+pub mod preview;
 pub mod pyproject_toml;
 pub mod registry;
 mod renamer;
@@ -44,6 +48,7 @@ pub mod settings;
 pub mod source_kind;
 mod text_helpers;
 pub mod upstream_categories;
+mod violation;
 
 #[cfg(any(test, fuzzing))]
 pub mod test;

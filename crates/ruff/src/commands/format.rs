@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 use std::fs::File;
 use std::io;
-use std::io::{stderr, stdout, Write};
+use std::io::{Write, stderr, stdout};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
@@ -11,11 +11,12 @@ use itertools::Itertools;
 use log::{error, warn};
 use rayon::iter::Either::{Left, Right};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use ruff_python_parser::ParseError;
 use rustc_hash::FxHashSet;
 use thiserror::Error;
 use tracing::debug;
 
-use ruff_db::panic::{catch_unwind, PanicError};
+use ruff_db::panic::{PanicError, catch_unwind};
 use ruff_diagnostics::SourceMap;
 use ruff_linter::fs;
 use ruff_linter::logging::{DisplayParseError, LogLevel};
@@ -25,16 +26,16 @@ use ruff_linter::rules::flake8_quotes::settings::Quote;
 use ruff_linter::source_kind::{SourceError, SourceKind};
 use ruff_linter::warn_user_once;
 use ruff_python_ast::{PySourceType, SourceType};
-use ruff_python_formatter::{format_module_source, format_range, FormatModuleError, QuoteStyle};
+use ruff_python_formatter::{FormatModuleError, QuoteStyle, format_module_source, format_range};
 use ruff_source_file::LineIndex;
 use ruff_text_size::{TextLen, TextRange, TextSize};
-use ruff_workspace::resolver::{match_exclusion, python_files_in_path, ResolvedFile, Resolver};
 use ruff_workspace::FormatterSettings;
+use ruff_workspace::resolver::{ResolvedFile, Resolver, match_exclusion, python_files_in_path};
 
 use crate::args::{ConfigArguments, FormatArguments, FormatRange};
 use crate::cache::{Cache, FileCacheKey, PackageCacheMap, PackageCaches};
 use crate::resolve::resolve;
-use crate::{resolve_default_files, ExitStatus};
+use crate::{ExitStatus, resolve_default_files};
 
 #[derive(Debug, Copy, Clone, is_macro::Is)]
 pub(crate) enum FormatMode {
@@ -159,7 +160,7 @@ pub(crate) fn format(
                             }),
                             Err(error) => Err(FormatCommandError::Panic(
                                 Some(resolved_file.path().to_path_buf()),
-                                error,
+                                Box::new(error),
                             )),
                         },
                     )
@@ -213,7 +214,11 @@ pub(crate) fn format(
     match mode {
         FormatMode::Write => {
             if errors.is_empty() {
-                Ok(ExitStatus::Success)
+                if cli.exit_non_zero_on_format && results.any_formatted() {
+                    Ok(ExitStatus::Failure)
+                } else {
+                    Ok(ExitStatus::Success)
+                }
             } else {
                 Ok(ExitStatus::Error)
             }
@@ -341,7 +346,7 @@ pub(crate) fn format_source(
 ) -> Result<FormattedSource, FormatCommandError> {
     match &source_kind {
         SourceKind::Python(unformatted) => {
-            let options = settings.to_format_options(source_type, unformatted);
+            let options = settings.to_format_options(source_type, unformatted, path);
 
             let formatted = if let Some(range) = range {
                 let line_index = LineIndex::from_source_text(unformatted);
@@ -357,7 +362,7 @@ pub(crate) fn format_source(
                 })
             } else {
                 // Using `Printed::into_code` requires adding `ruff_formatter` as a direct dependency, and I suspect that Rust can optimize the closure away regardless.
-                #[allow(clippy::redundant_closure_for_method_calls)]
+                #[expect(clippy::redundant_closure_for_method_calls)]
                 format_module_source(unformatted, options).map(|formatted| formatted.into_code())
             };
 
@@ -391,7 +396,7 @@ pub(crate) fn format_source(
                 ));
             }
 
-            let options = settings.to_format_options(source_type, notebook.source_code());
+            let options = settings.to_format_options(source_type, notebook.source_code(), path);
 
             let mut output: Option<String> = None;
             let mut last: Option<TextSize> = None;
@@ -406,8 +411,12 @@ pub(crate) fn format_source(
                 let formatted =
                     format_module_source(unformatted, options.clone()).map_err(|err| {
                         if let FormatModuleError::ParseError(err) = err {
+                            // Offset the error by the start of the cell
                             DisplayParseError::from_source_kind(
-                                err,
+                                ParseError {
+                                    error: err.error,
+                                    location: err.location.checked_add(*start).unwrap(),
+                                },
                                 path.map(Path::to_path_buf),
                                 source_kind,
                             )
@@ -626,7 +635,7 @@ impl<'a> FormatResults<'a> {
 pub(crate) enum FormatCommandError {
     Ignore(#[from] ignore::Error),
     Parse(#[from] DisplayParseError),
-    Panic(Option<PathBuf>, PanicError),
+    Panic(Option<PathBuf>, Box<PanicError>),
     Read(Option<PathBuf>, SourceError),
     Format(Option<PathBuf>, FormatModuleError),
     Write(Option<PathBuf>, SourceError),
@@ -812,9 +821,14 @@ pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
             .collect();
         rule_names.sort();
         if let [rule] = rule_names.as_slice() {
-            warn_user_once!("The following rule may cause conflicts when used with the formatter: {rule}. To avoid unexpected behavior, we recommend disabling this rule, either by removing it from the `select` or `extend-select` configuration, or adding it to the `ignore` configuration.");
+            warn_user_once!(
+                "The following rule may cause conflicts when used with the formatter: {rule}. To avoid unexpected behavior, we recommend disabling this rule, either by removing it from the `lint.select` or `lint.extend-select` configuration, or adding it to the `lint.ignore` configuration."
+            );
         } else {
-            warn_user_once!("The following rules may cause conflicts when used with the formatter: {}. To avoid unexpected behavior, we recommend disabling these rules, either by removing them from the `select` or `extend-select` configuration, or adding them to the `ignore` configuration.", rule_names.join(", "));
+            warn_user_once!(
+                "The following rules may cause conflicts when used with the formatter: {}. To avoid unexpected behavior, we recommend disabling these rules, either by removing them from the `lint.select` or `lint.extend-select` configuration, or adding them to the `lint.ignore` configuration.",
+                rule_names.join(", ")
+            );
         }
     }
 
@@ -824,7 +838,9 @@ pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
         if setting.linter.rules.enabled(Rule::TabIndentation)
             && setting.formatter.indent_style.is_tab()
         {
-            warn_user_once!("The `format.indent-style=\"tab\"` option is incompatible with `W191`, which lints against all uses of tabs. We recommend disabling these rules when using the formatter, which enforces a consistent indentation style. Alternatively, set the `format.indent-style` option to `\"space\"`.");
+            warn_user_once!(
+                "The `format.indent-style=\"tab\"` option is incompatible with `W191`, which lints against all uses of tabs. We recommend disabling these rules when using the formatter, which enforces a consistent indentation style. Alternatively, set the `format.indent-style` option to `\"space\"`."
+            );
         }
 
         if !setting
@@ -837,14 +853,18 @@ pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
                 .enabled(Rule::MultiLineImplicitStringConcatenation)
             && !setting.linter.flake8_implicit_str_concat.allow_multiline
         {
-            warn_user_once!("The `lint.flake8-implicit-str-concat.allow-multiline = false` option is incompatible with the formatter unless `ISC001` is enabled. We recommend enabling `ISC001` or setting `allow-multiline=true`.");
+            warn_user_once!(
+                "The `lint.flake8-implicit-str-concat.allow-multiline = false` option is incompatible with the formatter unless `ISC001` is enabled. We recommend enabling `ISC001` or setting `allow-multiline=true`."
+            );
         }
 
         // Validate all rules that rely on tab styles.
         if setting.linter.rules.enabled(Rule::DocstringTabIndentation)
             && setting.formatter.indent_style.is_tab()
         {
-            warn_user_once!("The `format.indent-style=\"tab\"` option is incompatible with `D206`, with requires space-based indentation. We recommend disabling these rules when using the formatter, which enforces a consistent indentation style. Alternatively, set the `format.indent-style` option to `\"space\"`.");
+            warn_user_once!(
+                "The `format.indent-style=\"tab\"` option is incompatible with `D206`, with requires space-based indentation. We recommend disabling these rules when using the formatter, which enforces a consistent indentation style. Alternatively, set the `format.indent-style` option to `\"space\"`."
+            );
         }
 
         // Validate all rules that rely on custom indent widths.
@@ -853,7 +873,9 @@ pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
             Rule::IndentationWithInvalidMultipleComment,
         ]) && setting.formatter.indent_width.value() != 4
         {
-            warn_user_once!("The `format.indent-width` option with a value other than 4 is incompatible with `E111` and `E114`. We recommend disabling these rules when using the formatter, which enforces a consistent indentation width. Alternatively, set the `format.indent-width` option to `4`.");
+            warn_user_once!(
+                "The `format.indent-width` option with a value other than 4 is incompatible with `E111` and `E114`. We recommend disabling these rules when using the formatter, which enforces a consistent indentation width. Alternatively, set the `format.indent-width` option to `4`."
+            );
         }
 
         // Validate all rules that rely on quote styles.
@@ -867,10 +889,14 @@ pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
                 setting.formatter.quote_style,
             ) {
                 (Quote::Double, QuoteStyle::Single) => {
-                    warn_user_once!("The `flake8-quotes.inline-quotes=\"double\"` option is incompatible with the formatter's `format.quote-style=\"single\"`. We recommend disabling `Q000` and `Q003` when using the formatter, which enforces a consistent quote style. Alternatively, set both options to either `\"single\"` or `\"double\"`.");
+                    warn_user_once!(
+                        "The `flake8-quotes.inline-quotes=\"double\"` option is incompatible with the formatter's `format.quote-style=\"single\"`. We recommend disabling `Q000` and `Q003` when using the formatter, which enforces a consistent quote style. Alternatively, set both options to either `\"single\"` or `\"double\"`."
+                    );
                 }
                 (Quote::Single, QuoteStyle::Double) => {
-                    warn_user_once!("The `flake8-quotes.inline-quotes=\"single\"` option is incompatible with the formatter's `format.quote-style=\"double\"`. We recommend disabling `Q000` and `Q003` when using the formatter, which enforces a consistent quote style. Alternatively, set both options to either `\"single\"` or `\"double\"`.");
+                    warn_user_once!(
+                        "The `flake8-quotes.inline-quotes=\"single\"` option is incompatible with the formatter's `format.quote-style=\"double\"`. We recommend disabling `Q000` and `Q003` when using the formatter, which enforces a consistent quote style. Alternatively, set both options to either `\"single\"` or `\"double\"`."
+                    );
                 }
                 _ => {}
             }
@@ -883,7 +909,9 @@ pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
                 QuoteStyle::Single | QuoteStyle::Double
             )
         {
-            warn_user_once!("The `flake8-quotes.multiline-quotes=\"single\"` option is incompatible with the formatter. We recommend disabling `Q001` when using the formatter, which enforces double quotes for multiline strings. Alternatively, set the `flake8-quotes.multiline-quotes` option to `\"double\"`.`");
+            warn_user_once!(
+                "The `flake8-quotes.multiline-quotes=\"single\"` option is incompatible with the formatter. We recommend disabling `Q001` when using the formatter, which enforces double quotes for multiline strings. Alternatively, set the `flake8-quotes.multiline-quotes` option to `\"double\"`.`"
+            );
         }
 
         if setting.linter.rules.enabled(Rule::BadQuotesDocstring)
@@ -893,7 +921,9 @@ pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
                 QuoteStyle::Single | QuoteStyle::Double
             )
         {
-            warn_user_once!("The `flake8-quotes.multiline-quotes=\"single\"` option is incompatible with the formatter. We recommend disabling `Q002` when using the formatter, which enforces double quotes for docstrings. Alternatively, set the `flake8-quotes.docstring-quotes` option to `\"double\"`.`");
+            warn_user_once!(
+                "The `flake8-quotes.docstring-quotes=\"single\"` option is incompatible with the formatter. We recommend disabling `Q002` when using the formatter, which enforces double quotes for docstrings. Alternatively, set the `flake8-quotes.docstring-quotes` option to `\"double\"`.`"
+            );
         }
 
         // Validate all isort settings.
@@ -901,12 +931,16 @@ pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
             // The formatter removes empty lines if the value is larger than 2 but always inserts a empty line after imports.
             // Two empty lines are okay because `isort` only uses this setting for top-level imports (not in nested blocks).
             if !matches!(setting.linter.isort.lines_after_imports, 1 | 2 | -1) {
-                warn_user_once!("The isort option `isort.lines-after-imports` with a value other than `-1`, `1` or `2` is incompatible with the formatter. To avoid unexpected behavior, we recommend setting the option to one of: `2`, `1`, or `-1` (default).");
+                warn_user_once!(
+                    "The isort option `isort.lines-after-imports` with a value other than `-1`, `1` or `2` is incompatible with the formatter. To avoid unexpected behavior, we recommend setting the option to one of: `2`, `1`, or `-1` (default)."
+                );
             }
 
             // Values larger than two get reduced to one line by the formatter if the import is in a nested block.
             if setting.linter.isort.lines_between_types > 1 {
-                warn_user_once!("The isort option `isort.lines-between-types` with a value greater than 1 is incompatible with the formatter. To avoid unexpected behavior, we recommend setting the option to one of: `1` or `0` (default).");
+                warn_user_once!(
+                    "The isort option `isort.lines-between-types` with a value greater than 1 is incompatible with the formatter. To avoid unexpected behavior, we recommend setting the option to one of: `1` or `0` (default)."
+                );
             }
 
             // isort inserts a trailing comma which the formatter preserves, but only if `skip-magic-trailing-comma` isn't false.
@@ -915,11 +949,15 @@ pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
                 && !setting.linter.isort.force_single_line
             {
                 if setting.linter.isort.force_wrap_aliases {
-                    warn_user_once!("The isort option `isort.force-wrap-aliases` is incompatible with the formatter `format.skip-magic-trailing-comma=true` option. To avoid unexpected behavior, we recommend either setting `isort.force-wrap-aliases=false` or `format.skip-magic-trailing-comma=false`.");
+                    warn_user_once!(
+                        "The isort option `isort.force-wrap-aliases` is incompatible with the formatter `format.skip-magic-trailing-comma=true` option. To avoid unexpected behavior, we recommend either setting `isort.force-wrap-aliases=false` or `format.skip-magic-trailing-comma=false`."
+                    );
                 }
 
                 if setting.linter.isort.split_on_trailing_comma {
-                    warn_user_once!("The isort option `isort.split-on-trailing-comma` is incompatible with the formatter `format.skip-magic-trailing-comma=true` option. To avoid unexpected behavior, we recommend either setting `isort.split-on-trailing-comma=false` or `format.skip-magic-trailing-comma=false`.");
+                    warn_user_once!(
+                        "The isort option `isort.split-on-trailing-comma` is incompatible with the formatter `format.skip-magic-trailing-comma=true` option. To avoid unexpected behavior, we recommend either setting `isort.split-on-trailing-comma=false` or `format.skip-magic-trailing-comma=false`."
+                    );
                 }
             }
         }

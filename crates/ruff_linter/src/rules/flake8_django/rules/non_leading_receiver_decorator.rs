@@ -1,10 +1,10 @@
 use ruff_python_ast::Decorator;
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -51,7 +51,7 @@ impl Violation for DjangoNonLeadingReceiverDecorator {
 }
 
 /// DJ013
-pub(crate) fn non_leading_receiver_decorator(checker: &mut Checker, decorator_list: &[Decorator]) {
+pub(crate) fn non_leading_receiver_decorator(checker: &Checker, decorator_list: &[Decorator]) {
     if !checker.semantic().seen_module(Modules::DJANGO) {
         return;
     }
@@ -70,10 +70,7 @@ pub(crate) fn non_leading_receiver_decorator(checker: &mut Checker, decorator_li
                 })
         });
         if i > 0 && is_receiver && !seen_receiver {
-            checker.diagnostics.push(Diagnostic::new(
-                DjangoNonLeadingReceiverDecorator,
-                decorator.range(),
-            ));
+            checker.report_diagnostic(DjangoNonLeadingReceiverDecorator, decorator.range());
         }
         if !is_receiver && seen_receiver {
             seen_receiver = false;

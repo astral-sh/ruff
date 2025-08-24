@@ -1,12 +1,12 @@
 use ruff_python_ast::{self as ast, Arguments, CmpOp, Expr, ExprContext, Stmt, UnaryOp};
 use ruff_text_size::{Ranged, TextRange};
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::Name;
 use ruff_python_semantic::ScopeKind;
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for negated `==` operators.
@@ -24,6 +24,11 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// a != b
 /// ```
+///
+/// ## Fix safety
+/// The fix is marked as unsafe, as it might change the behaviour
+/// if `a` and/or `b` overrides `__eq__`/`__ne__`
+/// in such a manner that they don't return booleans.
 ///
 /// ## References
 /// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
@@ -61,6 +66,11 @@ impl AlwaysFixableViolation for NegateEqualOp {
 /// ```python
 /// a == b
 /// ```
+///
+/// ## Fix safety
+/// The fix is marked as unsafe, as it might change the behaviour
+/// if `a` and/or `b` overrides `__ne__`/`__eq__`
+/// in such a manner that they don't return booleans.
 ///
 /// ## References
 /// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
@@ -134,12 +144,7 @@ fn is_exception_check(stmt: &Stmt) -> bool {
 }
 
 /// SIM201
-pub(crate) fn negation_with_equal_op(
-    checker: &mut Checker,
-    expr: &Expr,
-    op: UnaryOp,
-    operand: &Expr,
-) {
+pub(crate) fn negation_with_equal_op(checker: &Checker, expr: &Expr, op: UnaryOp, operand: &Expr) {
     if !matches!(op, UnaryOp::Not) {
         return;
     }
@@ -148,6 +153,7 @@ pub(crate) fn negation_with_equal_op(
         ops,
         comparators,
         range: _,
+        node_index: _,
     }) = operand
     else {
         return;
@@ -168,7 +174,7 @@ pub(crate) fn negation_with_equal_op(
         }
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         NegateEqualOp {
             left: checker.generator().expr(left),
             right: checker.generator().expr(&comparators[0]),
@@ -180,17 +186,17 @@ pub(crate) fn negation_with_equal_op(
         ops: Box::from([CmpOp::NotEq]),
         comparators: comparators.clone(),
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
-    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
         checker.generator().expr(&node.into()),
         expr.range(),
     )));
-    checker.diagnostics.push(diagnostic);
 }
 
 /// SIM202
 pub(crate) fn negation_with_not_equal_op(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     op: UnaryOp,
     operand: &Expr,
@@ -203,6 +209,7 @@ pub(crate) fn negation_with_not_equal_op(
         ops,
         comparators,
         range: _,
+        node_index: _,
     }) = operand
     else {
         return;
@@ -223,7 +230,7 @@ pub(crate) fn negation_with_not_equal_op(
         }
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         NegateNotEqualOp {
             left: checker.generator().expr(left),
             right: checker.generator().expr(&comparators[0]),
@@ -235,16 +242,16 @@ pub(crate) fn negation_with_not_equal_op(
         ops: Box::from([CmpOp::Eq]),
         comparators: comparators.clone(),
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
-    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
         checker.generator().expr(&node.into()),
         expr.range(),
     )));
-    checker.diagnostics.push(diagnostic);
 }
 
 /// SIM208
-pub(crate) fn double_negation(checker: &mut Checker, expr: &Expr, op: UnaryOp, operand: &Expr) {
+pub(crate) fn double_negation(checker: &Checker, expr: &Expr, op: UnaryOp, operand: &Expr) {
     if !matches!(op, UnaryOp::Not) {
         return;
     }
@@ -252,6 +259,7 @@ pub(crate) fn double_negation(checker: &mut Checker, expr: &Expr, op: UnaryOp, o
         op: operand_op,
         operand,
         range: _,
+        node_index: _,
     }) = operand
     else {
         return;
@@ -260,7 +268,7 @@ pub(crate) fn double_negation(checker: &mut Checker, expr: &Expr, op: UnaryOp, o
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         DoubleNegation {
             expr: checker.generator().expr(operand),
         },
@@ -276,6 +284,7 @@ pub(crate) fn double_negation(checker: &mut Checker, expr: &Expr, op: UnaryOp, o
             id: Name::new_static("bool"),
             ctx: ExprContext::Load,
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         };
         let node1 = ast::ExprCall {
             func: Box::new(node.into()),
@@ -283,13 +292,14 @@ pub(crate) fn double_negation(checker: &mut Checker, expr: &Expr, op: UnaryOp, o
                 args: Box::from([*operand.clone()]),
                 keywords: Box::from([]),
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             },
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         };
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             checker.generator().expr(&node1.into()),
             expr.range(),
         )));
-    };
-    checker.diagnostics.push(diagnostic);
+    }
 }

@@ -1,10 +1,10 @@
 use ruff_python_ast::{self as ast, Comprehension, Expr, Stmt};
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::visitor::{self, Visitor};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -15,7 +15,7 @@ use crate::checkers::ast::Checker;
 /// Using the generator more than once will do nothing on the second usage.
 /// If that data is needed later, it should be stored as a list.
 ///
-/// ## Examples:
+/// ## Example:
 /// ```python
 /// import itertools
 ///
@@ -153,6 +153,7 @@ impl<'a> Visitor<'a> for GroupNameFinder<'a> {
                 body,
                 elif_else_clauses,
                 range: _,
+                node_index: _,
             }) => {
                 // base if plus branches
                 let mut if_stack = Vec::with_capacity(1 + elif_else_clauses.len());
@@ -179,6 +180,7 @@ impl<'a> Visitor<'a> for GroupNameFinder<'a> {
                 subject,
                 cases,
                 range: _,
+                node_index: _,
             }) => {
                 self.counter_stack.push(Vec::with_capacity(cases.len()));
                 self.visit_expr(subject);
@@ -210,7 +212,11 @@ impl<'a> Visitor<'a> for GroupNameFinder<'a> {
             Stmt::Continue(_) | Stmt::Break(_) => {
                 self.reset_usage_count();
             }
-            Stmt::Return(ast::StmtReturn { value, range: _ }) => {
+            Stmt::Return(ast::StmtReturn {
+                value,
+                range: _,
+                node_index: _,
+            }) => {
                 if let Some(expr) = value {
                     self.visit_expr(expr);
                 }
@@ -250,11 +256,13 @@ impl<'a> Visitor<'a> for GroupNameFinder<'a> {
                 elt,
                 generators,
                 range: _,
+                node_index: _,
             })
             | Expr::SetComp(ast::ExprSetComp {
                 elt,
                 generators,
                 range: _,
+                node_index: _,
             }) => {
                 for comprehension in generators {
                     self.visit_comprehension(comprehension);
@@ -270,6 +278,7 @@ impl<'a> Visitor<'a> for GroupNameFinder<'a> {
                 value,
                 generators,
                 range: _,
+                node_index: _,
             }) => {
                 for comprehension in generators {
                     self.visit_comprehension(comprehension);
@@ -307,7 +316,7 @@ impl<'a> Visitor<'a> for GroupNameFinder<'a> {
 
 /// B031
 pub(crate) fn reuse_of_groupby_generator(
-    checker: &mut Checker,
+    checker: &Checker,
     target: &Expr,
     body: &[Stmt],
     iter: &Expr,
@@ -339,8 +348,6 @@ pub(crate) fn reuse_of_groupby_generator(
         finder.visit_stmt(stmt);
     }
     for expr in finder.exprs {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(ReuseOfGroupbyGenerator, expr.range()));
+        checker.report_diagnostic(ReuseOfGroupbyGenerator, expr.range());
     }
 }

@@ -1,10 +1,10 @@
 use itertools::Itertools;
 use ruff_python_ast::{self as ast, Expr};
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -56,7 +56,7 @@ impl Violation for StripWithMultiCharacters {
 
 /// B005
 pub(crate) fn strip_with_multi_characters(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     func: &Expr,
     args: &[Expr],
@@ -73,8 +73,6 @@ pub(crate) fn strip_with_multi_characters(
     };
 
     if value.chars().count() > 1 && !value.chars().all_unique() {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(StripWithMultiCharacters, expr.range()));
+        checker.report_diagnostic(StripWithMultiCharacters, expr.range());
     }
 }

@@ -91,3 +91,15 @@ field25: typing.Union[typing_extensions.Literal[1], typing.Union[Literal[2], typ
 from typing import IO, Literal
 
 InlineOption = Literal["a"] | Literal["b"] | IO[str]
+
+# Should use unsafe fix when comments are deleted
+field26: (
+    # First comment
+    Literal["a", "b"]
+    # Second comment
+    | Literal["c", "d"]
+)
+field27: (
+    Literal["a", "b"]  # First comment
+    | Literal["c", "d"]  # Second comment
+)

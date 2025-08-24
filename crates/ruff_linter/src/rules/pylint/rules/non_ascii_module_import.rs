@@ -1,9 +1,9 @@
 use ruff_python_ast::Alias;
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -63,30 +63,30 @@ enum Kind {
 }
 
 /// PLC2403
-pub(crate) fn non_ascii_module_import(checker: &mut Checker, alias: &Alias) {
+pub(crate) fn non_ascii_module_import(checker: &Checker, alias: &Alias) {
     if let Some(asname) = &alias.asname {
         if asname.as_str().is_ascii() {
             return;
         }
 
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(
             NonAsciiImportName {
                 name: asname.to_string(),
                 kind: Kind::Aliased,
             },
             asname.range(),
-        ));
+        );
     } else {
         if alias.name.as_str().is_ascii() {
             return;
         }
 
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(
             NonAsciiImportName {
                 name: alias.name.to_string(),
                 kind: Kind::Unaliased,
             },
             alias.name.range(),
-        ));
+        );
     }
 }

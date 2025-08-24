@@ -1,0 +1,38 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+---
+S307 Use of possibly insecure function; consider using `ast.literal_eval`
+ --> S307.py:3:7
+  |
+1 | import os
+2 |
+3 | print(eval("1+1"))  # S307
+  |       ^^^^^^^^^^^
+4 | print(eval("os.getcwd()"))  # S307
+  |
+
+S307 Use of possibly insecure function; consider using `ast.literal_eval`
+ --> S307.py:4:7
+  |
+3 | print(eval("1+1"))  # S307
+4 | print(eval("os.getcwd()"))  # S307
+  |       ^^^^^^^^^^^^^^^^^^^
+  |
+
+S307 Use of possibly insecure function; consider using `ast.literal_eval`
+  --> S307.py:16:5
+   |
+15 | # https://github.com/astral-sh/ruff/issues/15522
+16 | map(eval, [])
+   |     ^^^^
+17 | foo = eval
+   |
+
+S307 Use of possibly insecure function; consider using `ast.literal_eval`
+  --> S307.py:17:7
+   |
+15 | # https://github.com/astral-sh/ruff/issues/15522
+16 | map(eval, [])
+17 | foo = eval
+   |       ^^^^
+   |

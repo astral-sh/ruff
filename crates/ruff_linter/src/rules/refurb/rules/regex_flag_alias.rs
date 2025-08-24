@@ -1,11 +1,11 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Expr;
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for the use of shorthand aliases for regular expression flags
@@ -31,7 +31,6 @@ use crate::importer::ImportRequest;
 /// if re.match("^hello", "hello world", re.IGNORECASE):
 ///     ...
 /// ```
-///
 #[derive(ViolationMetadata)]
 pub(crate) struct RegexFlagAlias {
     flag: RegexFlag,
@@ -51,7 +50,7 @@ impl AlwaysFixableViolation for RegexFlagAlias {
 }
 
 /// FURB167
-pub(crate) fn regex_flag_alias(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn regex_flag_alias(checker: &Checker, expr: &Expr) {
     if !checker.semantic().seen_module(Modules::RE) {
         return;
     }
@@ -74,7 +73,7 @@ pub(crate) fn regex_flag_alias(checker: &mut Checker, expr: &Expr) {
         return;
     };
 
-    let mut diagnostic = Diagnostic::new(RegexFlagAlias { flag }, expr.range());
+    let mut diagnostic = checker.report_diagnostic(RegexFlagAlias { flag }, expr.range());
     diagnostic.try_set_fix(|| {
         let (edit, binding) = checker.importer().get_or_import_symbol(
             &ImportRequest::import("re", flag.full_name()),
@@ -86,7 +85,6 @@ pub(crate) fn regex_flag_alias(checker: &mut Checker, expr: &Expr) {
             [edit],
         ))
     });
-    checker.diagnostics.push(diagnostic);
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

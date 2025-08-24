@@ -1,0 +1,151 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/decorator_named_expression_py37.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..85,
+        body: [
+            FunctionDef(
+                StmtFunctionDef {
+                    node_index: NodeIndex(None),
+                    range: 45..84,
+                    is_async: false,
+                    decorator_list: [
+                        Decorator {
+                            range: 45..69,
+                            node_index: NodeIndex(None),
+                            expression: Call(
+                                ExprCall {
+                                    node_index: NodeIndex(None),
+                                    range: 46..69,
+                                    func: Named(
+                                        ExprNamed {
+                                            node_index: NodeIndex(None),
+                                            range: 47..63,
+                                            target: Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 47..48,
+                                                    id: Name("x"),
+                                                    ctx: Store,
+                                                },
+                                            ),
+                                            value: Lambda(
+                                                ExprLambda {
+                                                    node_index: NodeIndex(None),
+                                                    range: 52..63,
+                                                    parameters: Some(
+                                                        Parameters {
+                                                            range: 59..60,
+                                                            node_index: NodeIndex(None),
+                                                            posonlyargs: [],
+                                                            args: [
+                                                                ParameterWithDefault {
+                                                                    range: 59..60,
+                                                                    node_index: NodeIndex(None),
+                                                                    parameter: Parameter {
+                                                                        range: 59..60,
+                                                                        node_index: NodeIndex(None),
+                                                                        name: Identifier {
+                                                                            id: Name("x"),
+                                                                            range: 59..60,
+                                                                            node_index: NodeIndex(None),
+                                                                        },
+                                                                        annotation: None,
+                                                                    },
+                                                                    default: None,
+                                                                },
+                                                            ],
+                                                            vararg: None,
+                                                            kwonlyargs: [],
+                                                            kwarg: None,
+                                                        },
+                                                    ),
+                                                    body: Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 62..63,
+                                                            id: Name("x"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                    arguments: Arguments {
+                                        range: 64..69,
+                                        node_index: NodeIndex(None),
+                                        args: [
+                                            Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 65..68,
+                                                    id: Name("foo"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ],
+                                        keywords: [],
+                                    },
+                                },
+                            ),
+                        },
+                    ],
+                    name: Identifier {
+                        id: Name("bar"),
+                        range: 74..77,
+                        node_index: NodeIndex(None),
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 77..79,
+                        node_index: NodeIndex(None),
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 81..84,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 81..84,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Unsupported Syntax Errors
+
+  |
+1 | # parse_options: { "target-version": "3.7" }
+2 | @(x := lambda x: x)(foo)
+  |   ^^^^^^^^^^^^^^^^ Syntax Error: Cannot use named assignment expression (`:=`) on Python 3.7 (syntax was added in Python 3.8)
+3 | def bar(): ...
+  |
+
+
+  |
+1 | # parse_options: { "target-version": "3.7" }
+2 | @(x := lambda x: x)(foo)
+  |   ^^^^^^^^^^^^^^^^ Syntax Error: Cannot use assignment expression outside function call arguments in a decorator on Python 3.7 (syntax was added in Python 3.9)
+3 | def bar(): ...
+  |

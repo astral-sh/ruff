@@ -1,11 +1,11 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, comparable::ComparableExpr};
 use ruff_text_size::{Ranged, TextSize};
 
+use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
-use crate::Locator;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for redundant `Final[Literal[...]]` annotations.
@@ -56,7 +56,7 @@ impl Violation for RedundantFinalLiteral {
 }
 
 /// PYI064
-pub(crate) fn redundant_final_literal(checker: &mut Checker, ann_assign: &ast::StmtAnnAssign) {
+pub(crate) fn redundant_final_literal(checker: &Checker, ann_assign: &ast::StmtAnnAssign) {
     if !checker.semantic().seen_typing() {
         return;
     }
@@ -97,7 +97,7 @@ pub(crate) fn redundant_final_literal(checker: &mut Checker, ann_assign: &ast::S
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         RedundantFinalLiteral {
             literal: SourceCodeSnippet::from_str(checker.locator().slice(literal.range())),
         },
@@ -113,8 +113,6 @@ pub(crate) fn redundant_final_literal(checker: &mut Checker, ann_assign: &ast::S
     } else {
         diagnostic.set_fix(generate_fix(annotation, Some(literal), checker.locator()));
     }
-
-    checker.diagnostics.push(diagnostic);
 }
 
 /// Generate a fix to convert a `Final[Literal[...]]` annotation to a `Final` annotation.

@@ -1,8 +1,8 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::pylint::helpers::in_dunder_method;
 
@@ -51,7 +51,7 @@ impl Violation for MisplacedBareRaise {
 }
 
 /// PLE0704
-pub(crate) fn misplaced_bare_raise(checker: &mut Checker, raise: &ast::StmtRaise) {
+pub(crate) fn misplaced_bare_raise(checker: &Checker, raise: &ast::StmtRaise) {
     if raise.exc.is_some() {
         return;
     }
@@ -60,11 +60,9 @@ pub(crate) fn misplaced_bare_raise(checker: &mut Checker, raise: &ast::StmtRaise
         return;
     }
 
-    if in_dunder_method("__exit__", checker.semantic(), checker.settings) {
+    if in_dunder_method("__exit__", checker.semantic(), checker.settings()) {
         return;
     }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(MisplacedBareRaise, raise.range()));
+    checker.report_diagnostic(MisplacedBareRaise, raise.range());
 }

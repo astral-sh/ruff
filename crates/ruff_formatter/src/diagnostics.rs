@@ -1,5 +1,5 @@
-use crate::prelude::TagKind;
 use crate::GroupId;
+use crate::prelude::TagKind;
 use ruff_text_size::TextRange;
 use std::error::Error;
 
@@ -29,16 +29,22 @@ pub enum FormatError {
 impl std::fmt::Display for FormatError {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            FormatError::SyntaxError {message} => {
+            FormatError::SyntaxError { message } => {
                 std::write!(fmt, "syntax error: {message}")
-            },
+            }
             FormatError::RangeError { input, tree } => std::write!(
                 fmt,
                 "formatting range {input:?} is larger than syntax tree {tree:?}"
             ),
-            FormatError::InvalidDocument(error) => std::write!(fmt, "Invalid document: {error}\n\n This is an internal Rome error. Please report if necessary."),
+            FormatError::InvalidDocument(error) => std::write!(
+                fmt,
+                "Invalid document: {error}\n\n This is an internal Rome error. Please report if necessary."
+            ),
             FormatError::PoorLayout => {
-                std::write!(fmt, "Poor layout: The formatter wasn't able to pick a good layout for your document. This is an internal Rome error. Please report if necessary.")
+                std::write!(
+                    fmt,
+                    "Poor layout: The formatter wasn't able to pick a good layout for your document. This is an internal Rome error. Please report if necessary."
+                )
             }
         }
     }
@@ -139,24 +145,37 @@ impl std::fmt::Display for InvalidDocumentError {
             InvalidDocumentError::ExpectedStart {
                 expected_start,
                 actual,
-            } => {
-                match actual {
-                    ActualStart::EndOfDocument => {
-                        std::write!(f, "Expected start tag of kind {expected_start:?} but at the end of document.")
-                    }
-                    ActualStart::Start(start) => {
-                        std::write!(f, "Expected start tag of kind {expected_start:?} but found start tag of kind {start:?}.")
-                    }
-                    ActualStart::End(end) => {
-                        std::write!(f, "Expected start tag of kind {expected_start:?} but found end tag of kind {end:?}.")
-                    }
-                    ActualStart::Content => {
-                        std::write!(f, "Expected start tag of kind {expected_start:?} but found non-tag element.")
-                    }
+            } => match actual {
+                ActualStart::EndOfDocument => {
+                    std::write!(
+                        f,
+                        "Expected start tag of kind {expected_start:?} but at the end of document."
+                    )
                 }
-            }
+                ActualStart::Start(start) => {
+                    std::write!(
+                        f,
+                        "Expected start tag of kind {expected_start:?} but found start tag of kind {start:?}."
+                    )
+                }
+                ActualStart::End(end) => {
+                    std::write!(
+                        f,
+                        "Expected start tag of kind {expected_start:?} but found end tag of kind {end:?}."
+                    )
+                }
+                ActualStart::Content => {
+                    std::write!(
+                        f,
+                        "Expected start tag of kind {expected_start:?} but found non-tag element."
+                    )
+                }
+            },
             InvalidDocumentError::UnknownGroupId { group_id } => {
-                std::write!(f, "Encountered unknown group id {group_id:?}. Ensure that the group with the id {group_id:?} exists and that the group is a parent of or comes before the element referring to it.")
+                std::write!(
+                    f,
+                    "Encountered unknown group id {group_id:?}. Ensure that the group with the id {group_id:?} exists and that the group is a parent of or comes before the element referring to it."
+                )
             }
         }
     }

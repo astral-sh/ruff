@@ -1,11 +1,11 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_source_file::NewlineWithTrailingNewline;
 use ruff_text_size::Ranged;
 use ruff_text_size::{TextLen, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 use crate::rules::pydocstyle::helpers::ends_with_backslash;
 
@@ -48,7 +48,7 @@ impl Violation for SurroundingWhitespace {
 }
 
 /// D210
-pub(crate) fn no_surrounding_whitespace(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn no_surrounding_whitespace(checker: &Checker, docstring: &Docstring) {
     let body = docstring.body();
 
     let mut lines = NewlineWithTrailingNewline::from(body.as_str());
@@ -62,8 +62,8 @@ pub(crate) fn no_surrounding_whitespace(checker: &mut Checker, docstring: &Docst
     if line == trimmed {
         return;
     }
-    let mut diagnostic = Diagnostic::new(SurroundingWhitespace, docstring.range());
-    let quote = docstring.contents.chars().last().unwrap();
+    let mut diagnostic = checker.report_diagnostic(SurroundingWhitespace, docstring.range());
+    let quote = docstring.quote_style().as_char();
     // If removing whitespace would lead to an invalid string of quote
     // characters, avoid applying the fix.
     if !trimmed.ends_with(quote) && !trimmed.starts_with(quote) && !ends_with_backslash(trimmed) {
@@ -72,5 +72,4 @@ pub(crate) fn no_surrounding_whitespace(checker: &mut Checker, docstring: &Docst
             TextRange::at(body.start(), line.text_len()),
         )));
     }
-    checker.diagnostics.push(diagnostic);
 }

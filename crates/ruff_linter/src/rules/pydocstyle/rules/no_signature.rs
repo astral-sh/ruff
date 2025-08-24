@@ -1,8 +1,8 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_source_file::UniversalNewlines;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
 
@@ -51,7 +51,7 @@ impl Violation for SignatureInDocstring {
 }
 
 /// D402
-pub(crate) fn no_signature(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn no_signature(checker: &Checker, docstring: &Docstring) {
     let Some(function) = docstring.definition.as_function_def() else {
         return;
     };
@@ -71,7 +71,7 @@ pub(crate) fn no_signature(checker: &mut Checker, docstring: &Docstring) {
             let preceded_by_word_boundary = first_line[..index]
                 .chars()
                 .next_back()
-                .map_or(true, |c| matches!(c, ' ' | '\t' | ';' | ','));
+                .is_none_or(|c| matches!(c, ' ' | '\t' | ';' | ','));
             if !preceded_by_word_boundary {
                 return false;
             }
@@ -86,8 +86,6 @@ pub(crate) fn no_signature(checker: &mut Checker, docstring: &Docstring) {
             true
         })
     {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(SignatureInDocstring, docstring.range()));
+        checker.report_diagnostic(SignatureInDocstring, docstring.range());
     }
 }

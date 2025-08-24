@@ -1,6 +1,5 @@
 use ast::{ExprContext, Operator};
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::{Expr, Stmt};
 use ruff_python_semantic::{Binding, SemanticModel, TypingOnlyBindingsStatus};
@@ -10,8 +9,9 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 use crate::rules::flake8_type_checking::helpers::quote_type_expression;
-use crate::settings::types::PythonVersion;
-use crate::settings::LinterSettings;
+use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
+use ruff_python_ast::PythonVersion;
+use ruff_python_ast::parenthesize::parenthesized_range;
 
 /// ## What it does
 /// Checks if [PEP 613] explicit type aliases contain references to
@@ -88,11 +88,15 @@ impl Violation for UnquotedTypeAlias {
 /// ## Example
 /// Given:
 /// ```python
+/// from typing import TypeAlias
+///
 /// OptInt: TypeAlias = "int | None"
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// from typing import TypeAlias
+///
 /// OptInt: TypeAlias = int | None
 /// ```
 ///
@@ -113,9 +117,9 @@ impl Violation for UnquotedTypeAlias {
 /// This rule only applies to type aliases in non-stub files. For removing quotes in other
 /// contexts or in stub files, see:
 ///
-/// - [`quoted-annotation-in-stub`](quoted-annotation-in-stub.md): A rule that
+/// - [`quoted-annotation-in-stub`][PYI020]: A rule that
 ///   removes all quoted annotations from stub files
-/// - [`quoted-annotation`](quoted-annotation.md): A rule that removes unnecessary quotes
+/// - [`quoted-annotation`][UP037]: A rule that removes unnecessary quotes
 ///   from *annotations* in runtime files.
 ///
 /// ## References
@@ -126,6 +130,8 @@ impl Violation for UnquotedTypeAlias {
 /// [PEP 604]: https://peps.python.org/pep-0604/
 /// [PEP 613]: https://peps.python.org/pep-0613/
 /// [PEP 695]: https://peps.python.org/pep-0695/#generic-type-alias
+/// [PYI020]: https://docs.astral.sh/ruff/rules/quoted-annotation-in-stub/
+/// [UP037]: https://docs.astral.sh/ruff/rules/quoted-annotation/
 #[derive(ViolationMetadata)]
 pub(crate) struct QuotedTypeAlias;
 
@@ -141,26 +147,26 @@ impl AlwaysFixableViolation for QuotedTypeAlias {
 }
 
 /// TC007
-pub(crate) fn unquoted_type_alias(checker: &Checker, binding: &Binding) -> Option<Vec<Diagnostic>> {
+pub(crate) fn unquoted_type_alias(checker: &Checker, binding: &Binding) {
     if binding.context.is_typing() {
-        return None;
+        return;
     }
 
     if !binding.is_annotated_type_alias() {
-        return None;
+        return;
     }
 
     let Some(Stmt::AnnAssign(ast::StmtAnnAssign {
         value: Some(expr), ..
     })) = binding.statement(checker.semantic())
     else {
-        return None;
+        return;
     };
 
     let mut names = Vec::new();
     collect_typing_references(checker, expr, &mut names);
     if names.is_empty() {
-        return None;
+        return;
     }
 
     // We generate a diagnostic for every name that needs to be quoted
@@ -175,15 +181,13 @@ pub(crate) fn unquoted_type_alias(checker: &Checker, binding: &Binding) -> Optio
         checker.semantic(),
         checker.stylist(),
         checker.locator(),
+        checker.default_string_flags(),
     );
-    let mut diagnostics = Vec::with_capacity(names.len());
     for name in names {
-        let mut diagnostic = Diagnostic::new(UnquotedTypeAlias, name.range());
+        let mut diagnostic = checker.report_diagnostic(UnquotedTypeAlias, name.range());
         diagnostic.set_parent(parent);
         diagnostic.set_fix(Fix::unsafe_edit(edit.clone()));
-        diagnostics.push(diagnostic);
     }
-    Some(diagnostics)
 }
 
 /// Traverses the type expression and collects `[Expr::Name]` nodes that are
@@ -247,7 +251,7 @@ fn collect_typing_references<'a>(
             // if TC004 is enabled we shouldn't emit a TC007 for a reference to
             // a binding that would emit a TC004, otherwise the fixes will never
             // stabilize and keep going in circles
-            if checker.enabled(Rule::RuntimeImportInTypeCheckingBlock)
+            if checker.is_rule_enabled(Rule::RuntimeImportInTypeCheckingBlock)
                 && checker
                     .semantic()
                     .binding(binding_id)
@@ -264,11 +268,11 @@ fn collect_typing_references<'a>(
 
 /// TC008
 pub(crate) fn quoted_type_alias(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     annotation_expr: &ast::ExprStringLiteral,
 ) {
-    if checker.enabled(Rule::RuntimeStringUnion) {
+    if checker.is_rule_enabled(Rule::RuntimeStringUnion) {
         // this should return a TC010 error instead
         if let Some(Expr::BinOp(ast::ExprBinOp {
             op: Operator::BitOr,
@@ -281,23 +285,42 @@ pub(crate) fn quoted_type_alias(
 
     // explicit type aliases require some additional checks to avoid false positives
     if checker.semantic().in_annotated_type_alias_value()
-        && quotes_are_unremovable(checker.semantic(), expr, checker.settings)
+        && quotes_are_unremovable(checker.semantic(), expr, checker.target_version())
     {
         return;
     }
 
     let range = annotation_expr.range();
-    let mut diagnostic = Diagnostic::new(QuotedTypeAlias, range);
-    let edit = Edit::range_replacement(annotation_expr.value.to_string(), range);
-    if checker
-        .comment_ranges()
-        .has_comments(expr, checker.source())
+    let mut diagnostic = checker.report_diagnostic(QuotedTypeAlias, range);
+    let fix_string = annotation_expr.value.to_string();
+    let fix_string = if (fix_string.contains('\n') || fix_string.contains('\r'))
+        && parenthesized_range(
+            // Check for parenthesis outside string ("""...""")
+            annotation_expr.into(),
+            checker.semantic().current_statement().into(),
+            checker.comment_ranges(),
+            checker.locator().contents(),
+        )
+        .is_none()
+        && parenthesized_range(
+            // Check for parenthesis inside string """(...)"""
+            expr.into(),
+            annotation_expr.into(),
+            checker.comment_ranges(),
+            checker.locator().contents(),
+        )
+        .is_none()
     {
+        format!("({fix_string})")
+    } else {
+        fix_string
+    };
+    let edit = Edit::range_replacement(fix_string, range);
+    if checker.comment_ranges().intersects(range) {
         diagnostic.set_fix(Fix::unsafe_edit(edit));
     } else {
         diagnostic.set_fix(Fix::safe_edit(edit));
     }
-    checker.diagnostics.push(diagnostic);
 }
 
 /// Traverses the type expression and checks if the expression can safely
@@ -305,7 +328,7 @@ pub(crate) fn quoted_type_alias(
 fn quotes_are_unremovable(
     semantic: &SemanticModel,
     expr: &Expr,
-    settings: &LinterSettings,
+    target_version: PythonVersion,
 ) -> bool {
     match expr {
         Expr::BinOp(ast::ExprBinOp {
@@ -313,11 +336,11 @@ fn quotes_are_unremovable(
         }) => {
             match op {
                 Operator::BitOr => {
-                    if settings.target_version < PythonVersion::Py310 {
+                    if target_version < PythonVersion::PY310 {
                         return true;
                     }
-                    quotes_are_unremovable(semantic, left, settings)
-                        || quotes_are_unremovable(semantic, right, settings)
+                    quotes_are_unremovable(semantic, left, target_version)
+                        || quotes_are_unremovable(semantic, right, target_version)
                 }
                 // for now we'll treat uses of other operators as unremovable quotes
                 // since that would make it an invalid type expression anyways. We skip
@@ -330,7 +353,7 @@ fn quotes_are_unremovable(
             value,
             ctx: ExprContext::Load,
             ..
-        }) => quotes_are_unremovable(semantic, value, settings),
+        }) => quotes_are_unremovable(semantic, value, target_version),
         Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
             // for subscripts we don't know whether it's safe to do at runtime
             // since the operation may only be available at type checking time.
@@ -338,7 +361,7 @@ fn quotes_are_unremovable(
             if !semantic.in_type_checking_block() {
                 return true;
             }
-            if quotes_are_unremovable(semantic, value, settings) {
+            if quotes_are_unremovable(semantic, value, target_version) {
                 return true;
             }
             // for `typing.Annotated`, only analyze the first argument, since the rest may
@@ -347,23 +370,23 @@ fn quotes_are_unremovable(
                 if semantic.match_typing_qualified_name(&qualified_name, "Annotated") {
                     if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() {
                         return !elts.is_empty()
-                            && quotes_are_unremovable(semantic, &elts[0], settings);
+                            && quotes_are_unremovable(semantic, &elts[0], target_version);
                     }
                     return false;
                 }
             }
-            quotes_are_unremovable(semantic, slice, settings)
+            quotes_are_unremovable(semantic, slice, target_version)
         }
         Expr::Attribute(ast::ExprAttribute { value, .. }) => {
             // for attributes we also don't know whether it's safe
             if !semantic.in_type_checking_block() {
                 return true;
             }
-            quotes_are_unremovable(semantic, value, settings)
+            quotes_are_unremovable(semantic, value, target_version)
         }
         Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
             for elt in elts {
-                if quotes_are_unremovable(semantic, elt, settings) {
+                if quotes_are_unremovable(semantic, elt, target_version) {
                     return true;
                 }
             }

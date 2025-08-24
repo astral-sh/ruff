@@ -1,11 +1,14 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_diagnostics::Applicability;
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{Comprehension, Expr, StmtFor};
 use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::analyze::typing::is_io_base_expr;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::fix::edits::pad_end;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for uses of `readlines()` when iterating over a file line-by-line.
@@ -29,6 +32,19 @@ use crate::checkers::ast::Checker;
 ///         ...
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe if there's comments in the
+/// `readlines()` call, as comments may be removed.
+///
+/// For example, the fix would be marked as unsafe in the following case:
+/// ```python
+/// with open("file.txt") as fp:
+///     for line in (  # comment
+///         fp.readlines()  # comment
+///     ):
+///         ...
+/// ```
+///
 /// ## References
 /// - [Python documentation: `io.IOBase.readlines`](https://docs.python.org/3/library/io.html#io.IOBase.readlines)
 #[derive(ViolationMetadata)]
@@ -46,16 +62,16 @@ impl AlwaysFixableViolation for ReadlinesInFor {
 }
 
 /// FURB129
-pub(crate) fn readlines_in_for(checker: &mut Checker, for_stmt: &StmtFor) {
+pub(crate) fn readlines_in_for(checker: &Checker, for_stmt: &StmtFor) {
     readlines_in_iter(checker, for_stmt.iter.as_ref());
 }
 
 /// FURB129
-pub(crate) fn readlines_in_comprehension(checker: &mut Checker, comprehension: &Comprehension) {
+pub(crate) fn readlines_in_comprehension(checker: &Checker, comprehension: &Comprehension) {
     readlines_in_iter(checker, &comprehension.iter);
 }
 
-fn readlines_in_iter(checker: &mut Checker, iter_expr: &Expr) {
+fn readlines_in_iter(checker: &Checker, iter_expr: &Expr) {
     let Expr::Call(expr_call) = iter_expr else {
         return;
     };
@@ -84,9 +100,31 @@ fn readlines_in_iter(checker: &mut Checker, iter_expr: &Expr) {
         }
     }
 
-    let mut diagnostic = Diagnostic::new(ReadlinesInFor, expr_call.range());
-    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_deletion(
-        expr_call.range().add_start(expr_attr.value.range().len()),
-    )));
-    checker.diagnostics.push(diagnostic);
+    let deletion_range = if let Some(parenthesized_range) = parenthesized_range(
+        expr_attr.value.as_ref().into(),
+        expr_attr.into(),
+        checker.comment_ranges(),
+        checker.source(),
+    ) {
+        expr_call.range().add_start(parenthesized_range.len())
+    } else {
+        expr_call.range().add_start(expr_attr.value.range().len())
+    };
+
+    let padded = pad_end(String::new(), deletion_range.end(), checker.locator());
+    let edit = if padded.is_empty() {
+        Edit::range_deletion(deletion_range)
+    } else {
+        Edit::range_replacement(padded, deletion_range)
+    };
+
+    let mut diagnostic = checker.report_diagnostic(ReadlinesInFor, expr_call.range());
+    diagnostic.set_fix(Fix::applicable_edit(
+        edit,
+        if checker.comment_ranges().intersects(iter_expr.range()) {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        },
+    ));
 }

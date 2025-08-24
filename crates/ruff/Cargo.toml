@@ -1,6 +1,6 @@
 [package]
 name = "ruff"
-version = "0.9.2"
+version = "0.12.10"
 publish = true
 authors = { workspace = true }
 edition = { workspace = true }
@@ -20,8 +20,10 @@ ruff_graph = { workspace = true, features = ["serde", "clap"] }
 ruff_linter = { workspace = true, features = ["clap"] }
 ruff_macros = { workspace = true }
 ruff_notebook = { workspace = true }
+ruff_options_metadata = { workspace = true, features = ["serde"] }
 ruff_python_ast = { workspace = true }
 ruff_python_formatter = { workspace = true }
+ruff_python_parser = { workspace = true }
 ruff_server = { workspace = true }
 ruff_source_file = { workspace = true }
 ruff_text_size = { workspace = true }
@@ -29,10 +31,9 @@ ruff_workspace = { workspace = true }
 
 anyhow = { workspace = true }
 argfile = { workspace = true }
-bincode = { workspace = true }
+bincode = { workspace = true, features = ["serde"] }
 bitflags = { workspace = true }
 cachedir = { workspace = true }
-chrono = { workspace = true }
 clap = { workspace = true, features = ["derive", "env", "wrap_help"] }
 clap_complete_command = { workspace = true }
 clearscreen = { workspace = true }
@@ -42,6 +43,7 @@ globwalk = { workspace = true }
 ignore = { workspace = true }
 is-macro = { workspace = true }
 itertools = { workspace = true }
+jiff = { workspace = true }
 log = { workspace = true }
 notify = { workspace = true }
 path-absolutize = { workspace = true, features = ["once_cell_cache"] }
@@ -66,6 +68,7 @@ ruff_linter = { workspace = true, features = ["clap", "test-rules"] }
 assert_fs = { workspace = true }
 # Avoid writing colored snapshots when running tests from the terminal
 colored = { workspace = true, features = ["no-color"] }
+dunce = { workspace = true }
 indoc = { workspace = true }
 insta = { workspace = true, features = ["filters", "json"] }
 insta-cmd = { workspace = true }
@@ -74,12 +77,15 @@ test-case = { workspace = true }
 
 [package.metadata.cargo-shear]
 # Used via macro expansion.
-ignored = ["chrono"]
+ignored = ["jiff"]
+
+[package.metadata.dist]
+dist = true
 
 [target.'cfg(target_os = "windows")'.dependencies]
 mimalloc = { workspace = true }
 
-[target.'cfg(all(not(target_os = "windows"), not(target_os = "openbsd"), not(target_os = "aix"), any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "powerpc64")))'.dependencies]
+[target.'cfg(all(not(target_os = "windows"), not(target_os = "openbsd"), not(target_os = "aix"), not(target_os = "android"), any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "powerpc64", target_arch = "riscv64")))'.dependencies]
 tikv-jemallocator = { workspace = true }
 
 [lints]

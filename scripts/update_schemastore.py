@@ -1,8 +1,12 @@
 """Update ruff.json in schemastore.
 
-This script will clone astral-sh/schemastore, update the schema and push the changes
+This script will clone `astral-sh/schemastore`, update the schema and push the changes
 to a new branch tagged with the ruff git hash. You should see a URL to create the PR
 to schemastore in the CLI.
+
+Usage:
+
+    uv run --only-dev scripts/update_schemastore.py
 """
 
 from __future__ import annotations
@@ -14,11 +18,17 @@ from subprocess import check_call, check_output
 from tempfile import TemporaryDirectory
 from typing import NamedTuple, assert_never
 
-ruff_repo = "https://github.com/astral-sh/ruff"
-root = Path(
-    check_output(["git", "rev-parse", "--show-toplevel"], text=True).strip(),
-)
-ruff_json = Path("schemas/json/ruff.json")
+# The remote URL for the `ruff` repository.
+RUFF_REPO = "https://github.com/astral-sh/ruff"
+
+# The path to the root of the `ruff` repository.
+RUFF_ROOT = Path(__file__).parent.parent
+
+# The path to the JSON schema in the `ruff` repository.
+RUFF_SCHEMA = RUFF_ROOT / "ruff.schema.json"
+
+# The path to the JSON schema in the `schemastore` repository.
+RUFF_JSON = Path("schemas/json/ruff.json")
 
 
 class SchemastoreRepos(NamedTuple):
@@ -49,7 +59,7 @@ class GitProtocol(enum.Enum):
 def update_schemastore(
     schemastore_path: Path, schemastore_repos: SchemastoreRepos
 ) -> None:
-    if not schemastore_path.is_dir():
+    if not (schemastore_path / ".git").is_dir():
         check_call(
             ["git", "clone", schemastore_repos.fork, schemastore_path, "--depth=1"]
         )
@@ -78,13 +88,13 @@ def update_schemastore(
     )
 
     # Run npm install
-    src = schemastore_path.joinpath("src")
+    src = schemastore_path / "src"
     check_call(["npm", "install"], cwd=schemastore_path)
 
     # Update the schema and format appropriately
-    schema = json.loads(root.joinpath("ruff.schema.json").read_text())
+    schema = json.loads(RUFF_SCHEMA.read_text())
     schema["$id"] = "https://json.schemastore.org/ruff.json"
-    src.joinpath(ruff_json).write_text(
+    (src / RUFF_JSON).write_text(
         json.dumps(dict(schema.items()), indent=2, ensure_ascii=False),
     )
     check_call(
@@ -93,7 +103,7 @@ def update_schemastore(
             "--plugin",
             "prettier-plugin-sort-json",
             "--write",
-            ruff_json,
+            RUFF_JSON,
         ],
         cwd=src,
     )
@@ -102,7 +112,7 @@ def update_schemastore(
     # https://stackoverflow.com/a/9393642/3549270
     if check_output(["git", "status", "-s"], cwd=schemastore_path).strip():
         # Schema has changed, commit and push
-        commit_url = f"{ruff_repo}/commit/{current_sha}"
+        commit_url = f"{RUFF_REPO}/commit/{current_sha}"
         commit_body = (
             f"This updates ruff's JSON schema to [{current_sha}]({commit_url})"
         )
@@ -146,14 +156,12 @@ def determine_git_protocol(argv: list[str] | None = None) -> GitProtocol:
 
 def main() -> None:
     schemastore_repos = determine_git_protocol().schemastore_repos()
-    schemastore_existing = root.joinpath("schemastore")
+    schemastore_existing = RUFF_ROOT / "schemastore"
     if schemastore_existing.is_dir():
         update_schemastore(schemastore_existing, schemastore_repos)
     else:
-        with TemporaryDirectory() as temp_dir:
-            update_schemastore(
-                Path(temp_dir).joinpath("schemastore"), schemastore_repos
-            )
+        with TemporaryDirectory(prefix="ruff-schemastore-") as temp_dir:
+            update_schemastore(Path(temp_dir), schemastore_repos)
 
 
 if __name__ == "__main__":

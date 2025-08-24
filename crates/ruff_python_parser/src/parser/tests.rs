@@ -1,11 +1,11 @@
-use crate::{parse, parse_expression, parse_module, Mode};
+use crate::{Mode, ParseOptions, parse, parse_expression, parse_module};
 
 #[test]
 fn test_modes() {
     let source = "a[0][1][2][3][4]";
 
-    assert!(parse(source, Mode::Expression).is_ok());
-    assert!(parse(source, Mode::Module).is_ok());
+    assert!(parse(source, ParseOptions::from(Mode::Expression)).is_ok());
+    assert!(parse(source, ParseOptions::from(Mode::Module)).is_ok());
 }
 
 #[test]
@@ -129,8 +129,31 @@ foo.bar[0].baz[1]??
 foo.bar[0].baz[2].egg??
 "
         .trim(),
-        Mode::Ipython,
+        ParseOptions::from(Mode::Ipython),
     )
     .unwrap();
     insta::assert_debug_snapshot!(parsed.syntax());
+}
+
+#[test]
+fn test_fstring_expr_inner_line_continuation_and_t_string() {
+    let source = r#"f'{\t"i}'"#;
+
+    let parsed = parse_expression(source);
+
+    let error = parsed.unwrap_err();
+
+    insta::assert_debug_snapshot!(error);
+}
+
+#[test]
+fn test_fstring_expr_inner_line_continuation_newline_t_string() {
+    let source = r#"f'{\
+t"i}'"#;
+
+    let parsed = parse_expression(source);
+
+    let error = parsed.unwrap_err();
+
+    insta::assert_debug_snapshot!(error);
 }

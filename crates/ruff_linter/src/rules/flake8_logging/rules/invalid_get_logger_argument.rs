@@ -1,10 +1,10 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for any usage of `__cached__` and `__file__` as an argument to
@@ -39,6 +39,10 @@ use crate::checkers::ast::Checker;
 /// logger = logging.getLogger(__name__)
 /// ```
 ///
+/// ## Fix safety
+/// This fix is always unsafe, as changing the arguments to `getLogger` can change the
+/// received logger object, and thus program behavior.
+///
 /// [logging documentation]: https://docs.python.org/3/library/logging.html#logger-objects
 #[derive(ViolationMetadata)]
 pub(crate) struct InvalidGetLoggerArgument;
@@ -57,7 +61,7 @@ impl Violation for InvalidGetLoggerArgument {
 }
 
 /// LOG002
-pub(crate) fn invalid_get_logger_argument(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn invalid_get_logger_argument(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::LOGGING) {
         return;
     }
@@ -84,12 +88,11 @@ pub(crate) fn invalid_get_logger_argument(checker: &mut Checker, call: &ast::Exp
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(InvalidGetLoggerArgument, expr.range());
+    let mut diagnostic = checker.report_diagnostic(InvalidGetLoggerArgument, expr.range());
     if checker.semantic().has_builtin_binding("__name__") {
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
             "__name__".to_string(),
             expr.range(),
         )));
     }
-    checker.diagnostics.push(diagnostic);
 }

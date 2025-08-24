@@ -15,6 +15,7 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
     fn fmt_fields(&self, item: &ExprLambda, f: &mut PyFormatter) -> FormatResult<()> {
         let ExprLambda {
             range: _,
+            node_index: _,
             parameters,
             body,
         } = item;

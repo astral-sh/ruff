@@ -1,5 +1,4 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::any_over_body;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr, StmtFor};
@@ -7,6 +6,7 @@ use ruff_python_semantic::analyze::typing::is_set;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for loops in which a `set` is modified during iteration.
@@ -38,6 +38,11 @@ use crate::checkers::ast::Checker;
 ///     nums.add(num + 5)
 /// ```
 ///
+/// ## Fix safety
+/// This fix is always unsafe because it changes the program’s behavior. Replacing the
+/// original set with a copy during iteration allows code that would previously raise a
+/// `RuntimeError` to run without error.
+///
 /// ## References
 /// - [Python documentation: `set`](https://docs.python.org/3/library/stdtypes.html#set)
 #[derive(ViolationMetadata)]
@@ -59,7 +64,7 @@ impl AlwaysFixableViolation for ModifiedIteratingSet {
 }
 
 /// PLE4703
-pub(crate) fn modified_iterating_set(checker: &mut Checker, for_stmt: &StmtFor) {
+pub(crate) fn modified_iterating_set(checker: &Checker, for_stmt: &StmtFor) {
     let Some(name) = for_stmt.iter.as_name_expr() else {
         return;
     };
@@ -92,7 +97,7 @@ pub(crate) fn modified_iterating_set(checker: &mut Checker, for_stmt: &StmtFor) 
     });
 
     if is_modified {
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             ModifiedIteratingSet {
                 name: name.id.clone(),
             },
@@ -102,7 +107,6 @@ pub(crate) fn modified_iterating_set(checker: &mut Checker, for_stmt: &StmtFor) 
             format!("{}.copy()", checker.locator().slice(name)),
             name.range(),
         )));
-        checker.diagnostics.push(diagnostic);
     }
 }
 

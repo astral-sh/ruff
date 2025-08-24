@@ -1,12 +1,12 @@
-use ruff_formatter::{write, FormatRuleWithOptions};
-use ruff_python_ast::{AnyNodeRef, AstNode};
+use ruff_formatter::{FormatRuleWithOptions, write};
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{Expr, ExprSubscript};
 
+use crate::expression::CallChainLayout;
 use crate::expression::expr_tuple::TupleParentheses;
 use crate::expression::parentheses::{
-    is_expression_parenthesized, parenthesized, NeedsParentheses, OptionalParentheses, Parentheses,
+    NeedsParentheses, OptionalParentheses, Parentheses, is_expression_parenthesized, parenthesized,
 };
-use crate::expression::CallChainLayout;
 use crate::prelude::*;
 
 #[derive(Default)]
@@ -27,6 +27,7 @@ impl FormatNodeRule<ExprSubscript> for FormatExprSubscript {
     fn fmt_fields(&self, item: &ExprSubscript, f: &mut PyFormatter) -> FormatResult<()> {
         let ExprSubscript {
             range: _,
+            node_index: _,
             value,
             slice,
             ctx: _,
@@ -35,7 +36,7 @@ impl FormatNodeRule<ExprSubscript> for FormatExprSubscript {
         let call_chain_layout = self.call_chain_layout.apply_in_node(item, f);
 
         let comments = f.context().comments().clone();
-        let dangling_comments = comments.dangling(item.as_any_node_ref());
+        let dangling_comments = comments.dangling(item);
         debug_assert!(
             dangling_comments.len() <= 1,
             "A subscript expression can only have a single dangling comment, the one after the bracket"

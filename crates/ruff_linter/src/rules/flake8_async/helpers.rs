@@ -24,8 +24,8 @@ impl AsyncModule {
 impl std::fmt::Display for AsyncModule {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            AsyncModule::AnyIo => write!(f, "asyncio"),
-            AsyncModule::AsyncIo => write!(f, "anyio"),
+            AsyncModule::AnyIo => write!(f, "anyio"),
+            AsyncModule::AsyncIo => write!(f, "asyncio"),
             AsyncModule::Trio => write!(f, "trio"),
         }
     }

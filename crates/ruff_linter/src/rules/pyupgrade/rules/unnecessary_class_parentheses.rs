@@ -1,9 +1,9 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for class definitions that include unnecessary parentheses after
@@ -13,7 +13,7 @@ use crate::checkers::ast::Checker;
 /// If a class definition doesn't have any bases, the parentheses are
 /// unnecessary.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// class Foo():
 ///     ...
@@ -39,7 +39,7 @@ impl AlwaysFixableViolation for UnnecessaryClassParentheses {
 }
 
 /// UP039
-pub(crate) fn unnecessary_class_parentheses(checker: &mut Checker, class_def: &ast::StmtClassDef) {
+pub(crate) fn unnecessary_class_parentheses(checker: &Checker, class_def: &ast::StmtClassDef) {
     let Some(arguments) = class_def.arguments.as_deref() else {
         return;
     };
@@ -48,10 +48,9 @@ pub(crate) fn unnecessary_class_parentheses(checker: &mut Checker, class_def: &a
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(UnnecessaryClassParentheses, arguments.range());
+    let mut diagnostic = checker.report_diagnostic(UnnecessaryClassParentheses, arguments.range());
     diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
         arguments.start(),
         arguments.end(),
     )));
-    checker.diagnostics.push(diagnostic);
 }

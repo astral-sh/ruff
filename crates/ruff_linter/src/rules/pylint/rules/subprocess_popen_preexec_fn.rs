@@ -1,10 +1,10 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use ruff_python_ast::{self as ast};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -50,7 +50,7 @@ impl Violation for SubprocessPopenPreexecFn {
 }
 
 /// PLW1509
-pub(crate) fn subprocess_popen_preexec_fn(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn subprocess_popen_preexec_fn(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::SUBPROCESS) {
         return;
     }
@@ -65,9 +65,7 @@ pub(crate) fn subprocess_popen_preexec_fn(checker: &mut Checker, call: &ast::Exp
             .find_keyword("preexec_fn")
             .filter(|keyword| !keyword.value.is_none_literal_expr())
         {
-            checker
-                .diagnostics
-                .push(Diagnostic::new(SubprocessPopenPreexecFn, keyword.range()));
+            checker.report_diagnostic(SubprocessPopenPreexecFn, keyword.range());
         }
     }
 }

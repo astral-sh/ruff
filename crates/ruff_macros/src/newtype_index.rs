@@ -48,7 +48,7 @@ pub(super) fn generate_newtype_index(item: ItemStruct) -> syn::Result<proc_macro
                 //
                 // N.B. We have to use the unchecked variant here because we're
                 // in a const context and Option::unwrap isn't const yet.
-                #[allow(unsafe_code)]
+                #[expect(unsafe_code)]
                 Self(unsafe { std::num::NonZeroU32::new_unchecked((value as u32) + 1) })
             }
 
@@ -61,7 +61,7 @@ pub(super) fn generate_newtype_index(item: ItemStruct) -> syn::Result<proc_macro
                 //
                 // N.B. We have to use the unchecked variant here because we're
                 // in a const context and Option::unwrap isn't const yet.
-                #[allow(unsafe_code)]
+                #[expect(unsafe_code)]
                 Self(unsafe { std::num::NonZeroU32::new_unchecked(value + 1) })
             }
 

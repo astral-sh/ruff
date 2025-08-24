@@ -11,11 +11,15 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
+ty = { workspace = true }
+ty_project = { workspace = true, features = ["schemars"] }
+ty_python_semantic = { workspace = true }
+ty_static = { workspace = true }
 ruff = { workspace = true }
-ruff_diagnostics = { workspace = true }
 ruff_formatter = { workspace = true }
 ruff_linter = { workspace = true, features = ["schemars"] }
 ruff_notebook = { workspace = true }
+ruff_options_metadata = { workspace = true }
 ruff_python_ast = { workspace = true }
 ruff_python_codegen = { workspace = true }
 ruff_python_formatter = { workspace = true }
@@ -30,6 +34,7 @@ imara-diff = { workspace = true }
 indicatif = { workspace = true }
 itertools = { workspace = true }
 libcst = { workspace = true }
+markdown = { version = "1.0.0" }
 pretty_assertions = { workspace = true }
 rayon = { workspace = true }
 regex = { workspace = true }
@@ -43,6 +48,7 @@ toml = { workspace = true, features = ["parse"] }
 tracing = { workspace = true }
 tracing-indicatif = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
+url = { workspace = true }
 
 [dev-dependencies]
 indoc = { workspace = true }

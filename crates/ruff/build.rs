@@ -13,7 +13,6 @@ fn main() {
 
     commit_info(&workspace_root);
 
-    #[allow(clippy::disallowed_methods)]
     let target = std::env::var("TARGET").unwrap();
     println!("cargo::rustc-env=RUST_HOST_TARGET={target}");
 }
@@ -49,7 +48,7 @@ fn commit_info(workspace_root: &Path) {
         .arg("-1")
         .arg("--date=short")
         .arg("--abbrev=9")
-        .arg("--format=%H %h %cd %(describe)")
+        .arg("--format=%H %h %cd %(describe:tags)")
         .output()
     {
         Ok(output) if output.status.success() => output,

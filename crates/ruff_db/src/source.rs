@@ -1,17 +1,15 @@
 use std::ops::Deref;
 use std::sync::Arc;
 
-use countme::Count;
-
 use ruff_notebook::Notebook;
 use ruff_python_ast::PySourceType;
 use ruff_source_file::LineIndex;
 
-use crate::files::{File, FilePath};
 use crate::Db;
+use crate::files::{File, FilePath};
 
 /// Reads the source text of a python text file (must be valid UTF8) or notebook.
-#[salsa::tracked]
+#[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
 pub fn source_text(db: &dyn Db, file: File) -> SourceText {
     let path = file.path(db);
     let _span = tracing::trace_span!("source_text", file = %path).entered();
@@ -38,11 +36,7 @@ pub fn source_text(db: &dyn Db, file: File) -> SourceText {
     };
 
     SourceText {
-        inner: Arc::new(SourceTextInner {
-            kind,
-            read_error,
-            count: Count::new(),
-        }),
+        inner: Arc::new(SourceTextInner { kind, read_error }),
     }
 }
 
@@ -65,7 +59,7 @@ fn is_notebook(path: &FilePath) -> bool {
 /// The file containing the source text can either be a text file or a notebook.
 ///
 /// Cheap cloneable in `O(1)`.
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq, get_size2::GetSize)]
 pub struct SourceText {
     inner: Arc<SourceTextInner>,
 }
@@ -75,21 +69,21 @@ impl SourceText {
     pub fn as_str(&self) -> &str {
         match &self.inner.kind {
             SourceTextKind::Text(source) => source,
-            SourceTextKind::Notebook(notebook) => notebook.source_code(),
+            SourceTextKind::Notebook { notebook } => notebook.source_code(),
         }
     }
 
     /// Returns the underlying notebook if this is a notebook file.
     pub fn as_notebook(&self) -> Option<&Notebook> {
         match &self.inner.kind {
-            SourceTextKind::Notebook(notebook) => Some(notebook),
+            SourceTextKind::Notebook { notebook } => Some(notebook),
             SourceTextKind::Text(_) => None,
         }
     }
 
     /// Returns `true` if this is a notebook source file.
     pub fn is_notebook(&self) -> bool {
-        matches!(&self.inner.kind, SourceTextKind::Notebook(_))
+        matches!(&self.inner.kind, SourceTextKind::Notebook { .. })
     }
 
     /// Returns `true` if there was an error when reading the content of the file.
@@ -114,7 +108,7 @@ impl std::fmt::Debug for SourceText {
             SourceTextKind::Text(text) => {
                 dbg.field(text);
             }
-            SourceTextKind::Notebook(notebook) => {
+            SourceTextKind::Notebook { notebook } => {
                 dbg.field(notebook);
             }
         }
@@ -123,17 +117,21 @@ impl std::fmt::Debug for SourceText {
     }
 }
 
-#[derive(Eq, PartialEq)]
+#[derive(Eq, PartialEq, get_size2::GetSize)]
 struct SourceTextInner {
-    count: Count<SourceText>,
     kind: SourceTextKind,
     read_error: Option<SourceTextError>,
 }
 
-#[derive(Eq, PartialEq)]
+#[derive(Eq, PartialEq, get_size2::GetSize)]
 enum SourceTextKind {
     Text(String),
-    Notebook(Notebook),
+    Notebook {
+        // Jupyter notebooks are not very relevant for memory profiling, and contain
+        // arbitrary JSON values that do not implement the `GetSize` trait.
+        #[get_size(ignore)]
+        notebook: Box<Notebook>,
+    },
 }
 
 impl From<String> for SourceTextKind {
@@ -144,11 +142,13 @@ impl From<String> for SourceTextKind {
 
 impl From<Notebook> for SourceTextKind {
     fn from(notebook: Notebook) -> Self {
-        SourceTextKind::Notebook(notebook)
+        SourceTextKind::Notebook {
+            notebook: Box::new(notebook),
+        }
     }
 }
 
-#[derive(Debug, thiserror::Error, PartialEq, Eq, Clone)]
+#[derive(Debug, thiserror::Error, PartialEq, Eq, Clone, get_size2::GetSize)]
 pub enum SourceTextError {
     #[error("Failed to read notebook: {0}`")]
     FailedToReadNotebook(String),
@@ -157,9 +157,9 @@ pub enum SourceTextError {
 }
 
 /// Computes the [`LineIndex`] for `file`.
-#[salsa::tracked]
+#[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
 pub fn line_index(db: &dyn Db, file: File) -> LineIndex {
-    let _span = tracing::trace_span!("line_index", file = ?file).entered();
+    let _span = tracing::trace_span!("line_index", ?file).entered();
 
     let source = source_text(db, file);
 
@@ -176,7 +176,7 @@ mod tests {
 
     use crate::files::system_path_to_file;
     use crate::source::{line_index, source_text};
-    use crate::system::{DbWithTestSystem, SystemPath};
+    use crate::system::{DbWithWritableSystem as _, SystemPath};
     use crate::tests::TestDb;
 
     #[test]
@@ -184,13 +184,13 @@ mod tests {
         let mut db = TestDb::new();
         let path = SystemPath::new("test.py");
 
-        db.write_file(path, "x = 10".to_string())?;
+        db.write_file(path, "x = 10")?;
 
         let file = system_path_to_file(&db, path).unwrap();
 
         assert_eq!(source_text(&db, file).as_str(), "x = 10");
 
-        db.write_file(path, "x = 20".to_string()).unwrap();
+        db.write_file(path, "x = 20").unwrap();
 
         assert_eq!(source_text(&db, file).as_str(), "x = 20");
 
@@ -202,7 +202,7 @@ mod tests {
         let mut db = TestDb::new();
         let path = SystemPath::new("test.py");
 
-        db.write_file(path, "x = 10".to_string())?;
+        db.write_file(path, "x = 10")?;
 
         let file = system_path_to_file(&db, path).unwrap();
 
@@ -216,9 +216,11 @@ mod tests {
 
         let events = db.take_salsa_events();
 
-        assert!(!events
-            .iter()
-            .any(|event| matches!(event.kind, EventKind::WillExecute { .. })));
+        assert!(
+            !events
+                .iter()
+                .any(|event| matches!(event.kind, EventKind::WillExecute { .. }))
+        );
 
         Ok(())
     }
@@ -228,7 +230,7 @@ mod tests {
         let mut db = TestDb::new();
         let path = SystemPath::new("test.py");
 
-        db.write_file(path, "x = 10\ny = 20".to_string())?;
+        db.write_file(path, "x = 10\ny = 20")?;
 
         let file = system_path_to_file(&db, path).unwrap();
         let index = line_index(&db, file);

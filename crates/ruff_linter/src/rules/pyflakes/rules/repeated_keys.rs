@@ -1,8 +1,7 @@
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 use std::collections::hash_map::Entry;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::{ComparableExpr, HashableExpr};
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr};
@@ -11,6 +10,7 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
 use crate::registry::Rule;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for dictionary literals that associate multiple values with the
@@ -39,6 +39,12 @@ use crate::registry::Rule;
 /// }
 /// foo["baz"]  # 2
 /// ```
+///
+/// ## Fix safety
+///
+/// This rule's fix is marked as unsafe because removing a repeated dictionary key
+/// may delete comments that are attached to the removed key-value pair. This can also change
+/// the program's behavior if the value expressions have side effects.
 ///
 /// ## References
 /// - [Python documentation: Dictionaries](https://docs.python.org/3/tutorial/datastructures.html#dictionaries)
@@ -106,6 +112,12 @@ impl Violation for MultiValueRepeatedKeyLiteral {
 /// foo[baz]  # 2
 /// ```
 ///
+/// ## Fix safety
+///
+/// This rule's fix is marked as unsafe because removing a repeated dictionary key
+/// may delete comments that are attached to the removed key-value pair. This can also change
+/// the program's behavior if the value expressions have side effects.
+///
 /// ## References
 /// - [Python documentation: Dictionaries](https://docs.python.org/3/tutorial/datastructures.html#dictionaries)
 #[derive(ViolationMetadata)]
@@ -135,7 +147,7 @@ impl Violation for MultiValueRepeatedKeyVariable {
 }
 
 /// F601, F602
-pub(crate) fn repeated_keys(checker: &mut Checker, dict: &ast::ExprDict) {
+pub(crate) fn repeated_keys(checker: &Checker, dict: &ast::ExprDict) {
     // Generate a map from key to (index, value).
     let mut seen: FxHashMap<HashableExpr, (&Expr, FxHashSet<ComparableExpr>)> =
         FxHashMap::with_capacity_and_hasher(dict.len(), FxBuildHasher);
@@ -164,8 +176,8 @@ pub(crate) fn repeated_keys(checker: &mut Checker, dict: &ast::ExprDict) {
                     | Expr::EllipsisLiteral(_)
                     | Expr::Tuple(_)
                     | Expr::FString(_) => {
-                        if checker.enabled(Rule::MultiValueRepeatedKeyLiteral) {
-                            let mut diagnostic = Diagnostic::new(
+                        if checker.is_rule_enabled(Rule::MultiValueRepeatedKeyLiteral) {
+                            let mut diagnostic = checker.report_diagnostic(
                                 MultiValueRepeatedKeyLiteral {
                                     name: SourceCodeSnippet::from_str(checker.locator().slice(key)),
                                     existing: SourceCodeSnippet::from_str(
@@ -194,12 +206,11 @@ pub(crate) fn repeated_keys(checker: &mut Checker, dict: &ast::ExprDict) {
                                     .end(),
                                 )));
                             }
-                            checker.diagnostics.push(diagnostic);
                         }
                     }
                     Expr::Name(_) => {
-                        if checker.enabled(Rule::MultiValueRepeatedKeyVariable) {
-                            let mut diagnostic = Diagnostic::new(
+                        if checker.is_rule_enabled(Rule::MultiValueRepeatedKeyVariable) {
+                            let mut diagnostic = checker.report_diagnostic(
                                 MultiValueRepeatedKeyVariable {
                                     name: SourceCodeSnippet::from_str(checker.locator().slice(key)),
                                 },
@@ -226,7 +237,6 @@ pub(crate) fn repeated_keys(checker: &mut Checker, dict: &ast::ExprDict) {
                                     .end(),
                                 )));
                             }
-                            checker.diagnostics.push(diagnostic);
                         }
                     }
                     _ => {}

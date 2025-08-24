@@ -1,7 +1,6 @@
 use std::str::FromStr;
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Expr, ExprStringLiteral, StringFlags, StringLiteral};
 use ruff_python_literal::{
     cformat::{CFormatErrorType, CFormatString},
@@ -11,6 +10,7 @@ use ruff_python_literal::{
 };
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -41,7 +41,7 @@ impl Violation for BadStringFormatCharacter {
 
 /// PLE1300
 /// Ex) `"{:z}".format("1")`
-pub(crate) fn call(checker: &mut Checker, string: &str, range: TextRange) {
+pub(crate) fn call(checker: &Checker, string: &str, range: TextRange) {
     if let Ok(format_string) = FormatString::from_str(string) {
         for part in &format_string.format_parts {
             let FormatPart::Field { format_spec, .. } = part else {
@@ -50,7 +50,7 @@ pub(crate) fn call(checker: &mut Checker, string: &str, range: TextRange) {
 
             match FormatSpec::parse(format_spec) {
                 Err(FormatSpecError::InvalidFormatType) => {
-                    checker.diagnostics.push(Diagnostic::new(
+                    checker.report_diagnostic(
                         BadStringFormatCharacter {
                             // The format type character is always the last one.
                             // More info in the official spec:
@@ -58,7 +58,7 @@ pub(crate) fn call(checker: &mut Checker, string: &str, range: TextRange) {
                             format_char: format_spec.chars().last().unwrap(),
                         },
                         range,
-                    ));
+                    );
                 }
                 Err(_) => {}
                 Ok(FormatSpec::Static(_)) => {}
@@ -70,7 +70,7 @@ pub(crate) fn call(checker: &mut Checker, string: &str, range: TextRange) {
                         if let Err(FormatSpecError::InvalidFormatType) =
                             FormatSpec::parse(&format_spec)
                         {
-                            checker.diagnostics.push(Diagnostic::new(
+                            checker.report_diagnostic(
                                 BadStringFormatCharacter {
                                     // The format type character is always the last one.
                                     // More info in the official spec:
@@ -78,7 +78,7 @@ pub(crate) fn call(checker: &mut Checker, string: &str, range: TextRange) {
                                     format_char: format_spec.chars().last().unwrap(),
                                 },
                                 range,
-                            ));
+                            );
                         }
                     }
                 }
@@ -89,9 +89,10 @@ pub(crate) fn call(checker: &mut Checker, string: &str, range: TextRange) {
 
 /// PLE1300
 /// Ex) `"%z" % "1"`
-pub(crate) fn percent(checker: &mut Checker, expr: &Expr, format_string: &ExprStringLiteral) {
+pub(crate) fn percent(checker: &Checker, expr: &Expr, format_string: &ExprStringLiteral) {
     for StringLiteral {
         value: _,
+        node_index: _,
         range,
         flags,
     } in &format_string.value
@@ -103,11 +104,8 @@ pub(crate) fn percent(checker: &mut Checker, expr: &Expr, format_string: &ExprSt
         // Parse the format string (e.g. `"%s"`) into a list of `PercentFormat`.
         if let Err(format_error) = CFormatString::from_str(string) {
             if let CFormatErrorType::UnsupportedFormatChar(format_char) = format_error.typ {
-                checker.diagnostics.push(Diagnostic::new(
-                    BadStringFormatCharacter { format_char },
-                    expr.range(),
-                ));
+                checker.report_diagnostic(BadStringFormatCharacter { format_char }, expr.range());
             }
-        };
+        }
     }
 }

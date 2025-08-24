@@ -78,3 +78,9 @@ class FakeEnum11(enum.Enum):
     A = cast(SomeType, ...)
     B = cast(SomeType, ...)  # PIE796
     C = cast(SomeType, ...)  # PIE796
+
+
+class FakeEnum12(enum.Enum):
+    A = enum.auto(), 0
+    B = enum.auto(), 1
+    C = enum.auto(), 0

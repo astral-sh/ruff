@@ -1,9 +1,9 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::helpers::is_const_false;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -46,27 +46,31 @@ impl Violation for RequestWithNoCertValidation {
 }
 
 /// S501
-pub(crate) fn request_with_no_cert_validation(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn request_with_no_cert_validation(checker: &Checker, call: &ast::ExprCall) {
     if let Some(target) = checker
         .semantic()
         .resolve_qualified_name(&call.func)
         .and_then(|qualified_name| match qualified_name.segments() {
-            ["requests", "get" | "options" | "head" | "post" | "put" | "patch" | "delete"] => {
-                Some("requests")
-            }
-            ["httpx", "get" | "options" | "head" | "post" | "put" | "patch" | "delete" | "request"
-            | "stream" | "Client" | "AsyncClient"] => Some("httpx"),
+            [
+                "requests",
+                "get" | "options" | "head" | "post" | "put" | "patch" | "delete",
+            ] => Some("requests"),
+            [
+                "httpx",
+                "get" | "options" | "head" | "post" | "put" | "patch" | "delete" | "request"
+                | "stream" | "Client" | "AsyncClient",
+            ] => Some("httpx"),
             _ => None,
         })
     {
         if let Some(keyword) = call.arguments.find_keyword("verify") {
             if is_const_false(&keyword.value) {
-                checker.diagnostics.push(Diagnostic::new(
+                checker.report_diagnostic(
                     RequestWithNoCertValidation {
                         string: target.to_string(),
                     },
                     keyword.range(),
-                ));
+                );
             }
         }
     }

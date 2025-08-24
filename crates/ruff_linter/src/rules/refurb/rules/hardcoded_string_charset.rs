@@ -1,9 +1,10 @@
-use crate::checkers::ast::Checker;
-use crate::importer::ImportRequest;
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::ExprStringLiteral;
 use ruff_text_size::TextRange;
+
+use crate::checkers::ast::Checker;
+use crate::importer::ImportRequest;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for uses of hardcoded charsets, which are defined in Python string module.
@@ -45,7 +46,12 @@ impl AlwaysFixableViolation for HardcodedStringCharset {
 }
 
 /// FURB156
-pub(crate) fn hardcoded_string_charset_literal(checker: &mut Checker, expr: &ExprStringLiteral) {
+pub(crate) fn hardcoded_string_charset_literal(checker: &Checker, expr: &ExprStringLiteral) {
+    // if the string literal is a docstring, the rule is not applied
+    if checker.semantic().in_pep_257_docstring() {
+        return;
+    }
+
     if let Some(charset) = check_charset_exact(expr.value.to_str().as_bytes()) {
         push_diagnostic(checker, expr.range, charset);
     }
@@ -87,12 +93,7 @@ impl NamedCharset {
             name,
             bytes,
             // SAFETY: The named charset is guaranteed to have only ascii bytes.
-            // TODO: replace with `.unwrap()`, when `Option::unwrap` will be stable in `const fn`
-            //  https://github.com/rust-lang/rust/issues/67441
-            ascii_char_set: match AsciiCharSet::from_bytes(bytes) {
-                Some(ascii_char_set) => ascii_char_set,
-                None => unreachable!(),
-            },
+            ascii_char_set: AsciiCharSet::from_bytes(bytes).unwrap(),
         }
     }
 }
@@ -122,9 +123,9 @@ fn check_charset_exact(bytes: &[u8]) -> Option<&NamedCharset> {
         .find(|&charset| charset.bytes == bytes)
 }
 
-fn push_diagnostic(checker: &mut Checker, range: TextRange, charset: &NamedCharset) {
+fn push_diagnostic(checker: &Checker, range: TextRange, charset: &NamedCharset) {
     let name = charset.name;
-    let mut diagnostic = Diagnostic::new(HardcodedStringCharset { name }, range);
+    let mut diagnostic = checker.report_diagnostic(HardcodedStringCharset { name }, range);
     diagnostic.try_set_fix(|| {
         let (edit, binding) = checker.importer().get_or_import_symbol(
             &ImportRequest::import("string", name),
@@ -136,5 +137,4 @@ fn push_diagnostic(checker: &mut Checker, range: TextRange, charset: &NamedChars
             [edit],
         ))
     });
-    checker.diagnostics.push(diagnostic);
 }

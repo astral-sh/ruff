@@ -1,14 +1,14 @@
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_source_file::LineRanges;
 use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
 use crate::rules::ruff::rules::sequence_sorting::{
-    sort_single_line_elements_sequence, MultilineStringSequenceValue, SequenceKind,
-    SortClassification, SortingStyle,
+    MultilineStringSequenceValue, SequenceKind, SortClassification, SortingStyle,
+    sort_single_line_elements_sequence,
 };
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `__all__` definitions that are not ordered
@@ -109,7 +109,7 @@ const SORTING_STYLE: SortingStyle = SortingStyle::Isort;
 /// Sort an `__all__` definition represented by a `StmtAssign` AST node.
 /// For example: `__all__ = ["b", "c", "a"]`.
 pub(crate) fn sort_dunder_all_assign(
-    checker: &mut Checker,
+    checker: &Checker,
     ast::StmtAssign { value, targets, .. }: &ast::StmtAssign,
 ) {
     if let [expr] = targets.as_slice() {
@@ -119,7 +119,7 @@ pub(crate) fn sort_dunder_all_assign(
 
 /// Sort an `__all__` mutation represented by a `StmtAugAssign` AST node.
 /// For example: `__all__ += ["b", "c", "a"]`.
-pub(crate) fn sort_dunder_all_aug_assign(checker: &mut Checker, node: &ast::StmtAugAssign) {
+pub(crate) fn sort_dunder_all_aug_assign(checker: &Checker, node: &ast::StmtAugAssign) {
     if node.op.is_add() {
         sort_dunder_all(checker, &node.target, &node.value);
     }
@@ -127,7 +127,7 @@ pub(crate) fn sort_dunder_all_aug_assign(checker: &mut Checker, node: &ast::Stmt
 
 /// Sort a tuple or list passed to `__all__.extend()`.
 pub(crate) fn sort_dunder_all_extend_call(
-    checker: &mut Checker,
+    checker: &Checker,
     ast::ExprCall {
         func,
         arguments: ast::Arguments { args, keywords, .. },
@@ -152,18 +152,19 @@ pub(crate) fn sort_dunder_all_extend_call(
 
 /// Sort an `__all__` definition represented by a `StmtAnnAssign` AST node.
 /// For example: `__all__: list[str] = ["b", "c", "a"]`.
-pub(crate) fn sort_dunder_all_ann_assign(checker: &mut Checker, node: &ast::StmtAnnAssign) {
+pub(crate) fn sort_dunder_all_ann_assign(checker: &Checker, node: &ast::StmtAnnAssign) {
     if let Some(value) = &node.value {
         sort_dunder_all(checker, &node.target, value);
     }
 }
 
+/// RUF022
 /// Sort a tuple or list that defines or mutates the global variable `__all__`.
 ///
 /// This routine checks whether the tuple or list is sorted, and emits a
 /// violation if it is not sorted. If the tuple/list was not sorted,
 /// it attempts to set a `Fix` on the violation.
-fn sort_dunder_all(checker: &mut Checker, target: &ast::Expr, node: &ast::Expr) {
+fn sort_dunder_all(checker: &Checker, target: &ast::Expr, node: &ast::Expr) {
     let ast::Expr::Name(ast::ExprName { id, .. }) = target else {
         return;
     };
@@ -199,15 +200,13 @@ fn sort_dunder_all(checker: &mut Checker, target: &ast::Expr, node: &ast::Expr) 
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(UnsortedDunderAll, range);
+    let mut diagnostic = checker.report_diagnostic(UnsortedDunderAll, range);
 
     if let SortClassification::UnsortedAndMaybeFixable { items } = elts_analysis {
         if let Some(fix) = create_fix(range, elts, &items, kind, checker) {
             diagnostic.set_fix(fix);
         }
     }
-
-    checker.diagnostics.push(diagnostic);
 }
 
 /// Attempt to return `Some(fix)`, where `fix` is a `Fix`

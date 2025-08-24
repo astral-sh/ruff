@@ -1,13 +1,13 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{
     Expr, ExprCall, ExprName, ExprSlice, ExprSubscript, ExprUnaryOp, Int, StmtAssign, UnaryOp,
 };
-use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for list reversals that can be performed in-place in lieu of
@@ -65,7 +65,7 @@ impl AlwaysFixableViolation for ListReverseCopy {
 }
 
 /// FURB187
-pub(crate) fn list_assign_reversed(checker: &mut Checker, assign: &StmtAssign) {
+pub(crate) fn list_assign_reversed(checker: &Checker, assign: &StmtAssign) {
     let [Expr::Name(target_expr)] = assign.targets.as_slice() else {
         return;
     };
@@ -89,18 +89,17 @@ pub(crate) fn list_assign_reversed(checker: &mut Checker, assign: &StmtAssign) {
         return;
     }
 
-    checker.diagnostics.push(
-        Diagnostic::new(
+    checker
+        .report_diagnostic(
             ListReverseCopy {
                 name: target_expr.id.to_string(),
             },
             assign.range(),
         )
-        .with_fix(Fix::unsafe_edit(Edit::range_replacement(
+        .set_fix(Fix::unsafe_edit(Edit::range_replacement(
             format!("{}.reverse()", target_expr.id),
             assign.range(),
-        ))),
-    );
+        )));
 }
 
 /// Recursively removes any `list` wrappers from the expression.
@@ -119,7 +118,7 @@ fn peel_lists(expr: &Expr) -> &Expr {
         return expr;
     }
 
-    if !func.as_name_expr().is_some_and(|name| name.id == "list") {
+    if func.as_name_expr().is_none_or(|name| name.id != "list") {
         return expr;
     }
 
@@ -175,14 +174,14 @@ fn extract_name_from_sliced_reversed(expr: &Expr) -> Option<&ExprName> {
     else {
         return None;
     };
-    if !operand
+    if operand
         .as_number_literal_expr()
         .and_then(|num| num.value.as_int())
         .and_then(Int::as_u8)
-        .is_some_and(|value| value == 1)
+        .is_none_or(|value| value != 1)
     {
         return None;
-    };
+    }
     value.as_name_expr()
 }
 

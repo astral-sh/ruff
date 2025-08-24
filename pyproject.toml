@@ -1,41 +1,41 @@
 [build-system]
-requires = ["maturin>=1.0,<2.0"]
+requires = ["maturin>=1.9,<2.0"]
 build-backend = "maturin"
 
 [project]
 name = "ruff"
-version = "0.9.2"
+version = "0.12.10"
 description = "An extremely fast Python linter and code formatter, written in Rust."
 authors = [{ name = "Astral Software Inc.", email = "hey@astral.sh" }]
 readme = "README.md"
 requires-python = ">=3.7"
 license = { file = "LICENSE" }
 keywords = [
-  "automation",
-  "flake8",
-  "pycodestyle",
-  "pyflakes",
-  "pylint",
-  "clippy",
+    "automation",
+    "flake8",
+    "pycodestyle",
+    "pyflakes",
+    "pylint",
+    "clippy",
 ]
 classifiers = [
-  "Development Status :: 5 - Production/Stable",
-  "Environment :: Console",
-  "Intended Audience :: Developers",
-  "License :: OSI Approved :: MIT License",
-  "Operating System :: OS Independent",
-  "Programming Language :: Python",
-  "Programming Language :: Python :: 3.7",
-  "Programming Language :: Python :: 3.8",
-  "Programming Language :: Python :: 3.9",
-  "Programming Language :: Python :: 3.10",
-  "Programming Language :: Python :: 3.11",
-  "Programming Language :: Python :: 3.12",
-  "Programming Language :: Python :: 3.13",
-  "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Rust",
-  "Topic :: Software Development :: Libraries :: Python Modules",
-  "Topic :: Software Development :: Quality Assurance",
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",  # for compatibility with tooling such as pip-licenses
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Rust",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Software Development :: Quality Assurance",
 ]
 
 [project.urls]
@@ -50,32 +50,57 @@ module-name = "ruff"
 python-source = "python"
 strip = true
 exclude = [
-  "crates/ruff_linter/resources/test/fixtures/**/*",
-  "crates/ruff_linter/src/rules/*/snapshots/**/*"
-]
-include = [
-  "rust-toolchain.toml"
+    "crates/ruff_linter/resources/test/fixtures/**/*",
+    "crates/ruff_linter/src/rules/*/snapshots/**/*"
 ]
 
 [tool.ruff]
+target-version = "py38"
 extend-exclude = [
-  "crates/red_knot_vendored/vendor/",
-  "crates/ruff/resources/",
-  "crates/ruff_linter/resources/",
-  "crates/ruff_python_formatter/resources/",
-  "crates/ruff_python_parser/resources/"
+    "crates/ty_vendored/vendor/",
+    "crates/ruff/resources/",
+    "crates/ruff_linter/resources/",
+    "crates/ruff_python_formatter/resources/",
+    "crates/ruff_python_parser/resources/",
+    "crates/ruff_python_semantic/resources/"
 ]
 
 [tool.ruff.lint]
-ignore = [
-  # Conflicts with the formatter
-  "COM812", "ISC001"
+select = [
+    "E", # pycodestyle (error)
+    "F", # pyflakes
+    "B", # bugbear
+    "B9",
+    "C4", # flake8-comprehensions
+    "SIM", # flake8-simplify
+    "I", # isort
+    "UP", # pyupgrade
+    "PIE", # flake8-pie
+    "PGH", # pygrep-hooks
+    "PYI", # flake8-pyi
+    "RUF",
 ]
+
+ignore = [
+    # only relevant if you run a script with `python -0`,
+    # which seems unlikely for any of the scripts in this repo
+    "B011",
+    # Leave it to the formatter to split long lines and
+    # the judgement of all of us.
+    "E501"
+]
+
+[tool.ruff.lint.isort]
+required-imports = ["from __future__ import annotations"]
+
+[tool.ruff.per-file-target-version]
+"crates/ty_python_semantic/mdtest.py" = "py310"
+"crates/ty_vendored/ty_extensions/ty_extensions.pyi" = "py312"
 
 [tool.black]
 force-exclude = '''
 /(
-  | crates/red_knot_vendored/vendor
+  | crates/ty_vendored/vendor
   | crates/ruff_linter/resources
   | crates/ruff_python_formatter/resources
   | crates/ruff_python_parser/resources
@@ -86,16 +111,21 @@ force-exclude = '''
 major_labels = []  # Ruff never uses the major version number
 minor_labels = ["breaking"]   # Bump the minor version on breaking changes
 
-changelog_ignore_labels = ["internal", "ci", "red-knot"]
+changelog_ignore_labels = ["internal", "ci", "testing", "ty"]
 
 changelog_sections.breaking = "Breaking changes"
 changelog_sections.preview = "Preview features"
+changelog_sections.bug = "Bug fixes"
 changelog_sections.rule = "Rule changes"
+changelog_sections.diagnostics = "Rule changes"
+changelog_sections.docstring = "Rule changes"
+changelog_sections.fixes = "Rule changes"
+changelog_sections.isort = "Rule changes"
+changelog_sections.performance = "Performance"
 changelog_sections.formatter = "Formatter"
 changelog_sections.server = "Server"
 changelog_sections.cli = "CLI"
 changelog_sections.configuration = "Configuration"
-changelog_sections.bug = "Bug fixes"
 changelog_sections.documentation = "Documentation"
 changelog_sections.__unknown__ = "Other changes"
 
@@ -104,11 +134,11 @@ changelog_sections.__unknown__ = "Other changes"
 changelog_contributors = false
 
 version_files = [
-  "README.md",
-  "docs/integrations.md",
-  "docs/tutorial.md",
-  "crates/ruff/Cargo.toml",
-  "crates/ruff_linter/Cargo.toml",
-  "crates/ruff_wasm/Cargo.toml",
-  "scripts/benchmarks/pyproject.toml",
+    "README.md",
+    "docs/integrations.md",
+    "docs/tutorial.md",
+    "crates/ruff/Cargo.toml",
+    "crates/ruff_linter/Cargo.toml",
+    "crates/ruff_wasm/Cargo.toml",
+    "scripts/benchmarks/pyproject.toml",
 ]

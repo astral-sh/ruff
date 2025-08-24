@@ -1,7 +1,7 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
 use crate::rules::pydocstyle::helpers::normalize_word;
@@ -50,7 +50,7 @@ impl Violation for DocstringStartsWithThis {
 }
 
 /// D404
-pub(crate) fn starts_with_this(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn starts_with_this(checker: &Checker, docstring: &Docstring) {
     let body = docstring.body();
 
     let trimmed = body.trim();
@@ -64,7 +64,5 @@ pub(crate) fn starts_with_this(checker: &mut Checker, docstring: &Docstring) {
     if normalize_word(first_word) != "this" {
         return;
     }
-    checker
-        .diagnostics
-        .push(Diagnostic::new(DocstringStartsWithThis, docstring.range()));
+    checker.report_diagnostic(DocstringStartsWithThis, docstring.range());
 }

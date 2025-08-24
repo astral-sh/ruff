@@ -1,0 +1,55 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: for.md - For loops - Bad `__getitem__` method
+mdtest path: crates/ty_python_semantic/resources/mdtest/loops/for.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing_extensions import reveal_type
+ 2 | 
+ 3 | class Iterable:
+ 4 |     # invalid because it will implicitly be passed an `int`
+ 5 |     # by the interpreter
+ 6 |     def __getitem__(self, key: str) -> int:
+ 7 |         return 42
+ 8 | 
+ 9 | # error: [not-iterable]
+10 | for x in Iterable():
+11 |     reveal_type(x)  # revealed: int
+```
+
+# Diagnostics
+
+```
+error[not-iterable]: Object of type `Iterable` is not iterable
+  --> src/mdtest_snippet.py:10:10
+   |
+ 9 | # error: [not-iterable]
+10 | for x in Iterable():
+   |          ^^^^^^^^^^
+11 |     reveal_type(x)  # revealed: int
+   |
+info: It has no `__iter__` method and its `__getitem__` method has an incorrect signature for the old-style iteration protocol
+info: `__getitem__` must be at least as permissive as `def __getitem__(self, key: int): ...` to satisfy the old-style iteration protocol
+info: rule `not-iterable` is enabled by default
+
+```
+
+```
+info[revealed-type]: Revealed type
+  --> src/mdtest_snippet.py:11:17
+   |
+ 9 | # error: [not-iterable]
+10 | for x in Iterable():
+11 |     reveal_type(x)  # revealed: int
+   |                 ^ `int`
+   |
+
+```

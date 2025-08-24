@@ -14,6 +14,8 @@ pub fn default_tmp_dirs() -> Vec<String> {
 pub struct Settings {
     pub hardcoded_tmp_directory: Vec<String>,
     pub check_typed_exception: bool,
+    pub extend_markup_names: Vec<String>,
+    pub allowed_markup_calls: Vec<String>,
 }
 
 impl Default for Settings {
@@ -21,6 +23,8 @@ impl Default for Settings {
         Self {
             hardcoded_tmp_directory: default_tmp_dirs(),
             check_typed_exception: false,
+            extend_markup_names: vec![],
+            allowed_markup_calls: vec![],
         }
     }
 }
@@ -32,7 +36,9 @@ impl Display for Settings {
             namespace = "linter.flake8_bandit",
             fields = [
                 self.hardcoded_tmp_directory | array,
-                self.check_typed_exception
+                self.check_typed_exception,
+                self.extend_markup_names | array,
+                self.allowed_markup_calls | array,
             ]
         }
         Ok(())

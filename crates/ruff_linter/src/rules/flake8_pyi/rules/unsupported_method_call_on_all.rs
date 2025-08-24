@@ -1,9 +1,9 @@
 use ruff_python_ast::{self as ast, Expr};
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -49,12 +49,14 @@ impl Violation for UnsupportedMethodCallOnAll {
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnsupportedMethodCallOnAll { name } = self;
-        format!("Calling `.{name}()` on `__all__` may not be supported by all type checkers (use `+=` instead)")
+        format!(
+            "Calling `.{name}()` on `__all__` may not be supported by all type checkers (use `+=` instead)"
+        )
     }
 }
 
 /// PYI056
-pub(crate) fn unsupported_method_call_on_all(checker: &mut Checker, func: &Expr) {
+pub(crate) fn unsupported_method_call_on_all(checker: &Checker, func: &Expr) {
     let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func else {
         return;
     };
@@ -67,12 +69,12 @@ pub(crate) fn unsupported_method_call_on_all(checker: &mut Checker, func: &Expr)
     if !is_unsupported_method(attr.as_str()) {
         return;
     }
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(
         UnsupportedMethodCallOnAll {
             name: attr.to_string(),
         },
         func.range(),
-    ));
+    );
 }
 
 fn is_unsupported_method(name: &str) -> bool {

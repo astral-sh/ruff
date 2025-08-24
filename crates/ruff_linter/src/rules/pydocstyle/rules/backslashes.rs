@@ -1,9 +1,9 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for docstrings that include backslashes, but are not defined as
@@ -58,9 +58,8 @@ impl Violation for EscapeSequenceInDocstring {
 }
 
 /// D301
-pub(crate) fn backslashes(checker: &mut Checker, docstring: &Docstring) {
-    // Docstring is already raw.
-    if docstring.leading_quote().contains(['r', 'R']) {
+pub(crate) fn backslashes(checker: &Checker, docstring: &Docstring) {
+    if docstring.is_raw_string() {
         return;
     }
 
@@ -97,16 +96,16 @@ pub(crate) fn backslashes(checker: &mut Checker, docstring: &Docstring) {
 
         // Only allow continuations (backslashes followed by newlines) and Unicode escapes.
         if !matches!(*escaped_char, '\r' | '\n' | 'u' | 'U' | 'N') {
-            let mut diagnostic = Diagnostic::new(EscapeSequenceInDocstring, docstring.range());
+            let mut diagnostic =
+                checker.report_diagnostic(EscapeSequenceInDocstring, docstring.range());
 
-            if !docstring.leading_quote().contains(['u', 'U']) {
-                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                    "r".to_owned() + docstring.contents,
-                    docstring.range(),
+            if !docstring.is_u_string() {
+                diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
+                    "r".to_string(),
+                    docstring.start(),
                 )));
             }
 
-            checker.diagnostics.push(diagnostic);
             break;
         }
     }

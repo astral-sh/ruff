@@ -17,7 +17,7 @@ impl<'fmt, Context> Argument<'fmt, Context> {
     /// Called by the [ruff_formatter::format_args] macro.
     #[doc(hidden)]
     #[inline]
-    pub fn new<F: Format<Context>>(value: &'fmt F) -> Self {
+    pub const fn new<F: Format<Context>>(value: &'fmt F) -> Self {
         Self { value }
     }
 
@@ -55,7 +55,7 @@ pub struct Arguments<'fmt, Context>(pub &'fmt [Argument<'fmt, Context>]);
 impl<'fmt, Context> Arguments<'fmt, Context> {
     #[doc(hidden)]
     #[inline]
-    pub fn new(arguments: &'fmt [Argument<'fmt, Context>]) -> Self {
+    pub const fn new(arguments: &'fmt [Argument<'fmt, Context>]) -> Self {
         Self(arguments)
     }
 
@@ -98,7 +98,7 @@ impl<'fmt, Context> From<&'fmt Argument<'fmt, Context>> for Arguments<'fmt, Cont
 mod tests {
     use crate::format_element::tag::Tag;
     use crate::prelude::*;
-    use crate::{format_args, write, FormatState, VecBuffer};
+    use crate::{FormatState, VecBuffer, format_args, write};
 
     #[test]
     fn test_nesting() {

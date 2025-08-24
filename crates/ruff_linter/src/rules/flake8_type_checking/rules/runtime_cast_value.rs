@@ -1,11 +1,11 @@
 use ruff_python_ast::Expr;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_type_checking::helpers::quote_type_expression;
+use crate::{AlwaysFixableViolation, Fix};
 
 /// ## What it does
 /// Checks for unquoted type expressions in `typing.cast()` calls.
@@ -57,25 +57,22 @@ impl AlwaysFixableViolation for RuntimeCastValue {
 }
 
 /// TC006
-pub(crate) fn runtime_cast_value(checker: &mut Checker, type_expr: &Expr) {
+pub(crate) fn runtime_cast_value(checker: &Checker, type_expr: &Expr) {
     if type_expr.is_string_literal_expr() {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(RuntimeCastValue, type_expr.range());
+    let mut diagnostic = checker.report_diagnostic(RuntimeCastValue, type_expr.range());
     let edit = quote_type_expression(
         type_expr,
         checker.semantic(),
         checker.stylist(),
         checker.locator(),
+        checker.default_string_flags(),
     );
-    if checker
-        .comment_ranges()
-        .has_comments(type_expr, checker.source())
-    {
+    if checker.comment_ranges().intersects(type_expr.range()) {
         diagnostic.set_fix(Fix::unsafe_edit(edit));
     } else {
         diagnostic.set_fix(Fix::safe_edit(edit));
     }
-    checker.diagnostics.push(diagnostic);
 }

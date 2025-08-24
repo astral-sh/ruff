@@ -1,9 +1,9 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
 use ruff_python_semantic::analyze::typing::is_list;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -45,7 +45,7 @@ impl Violation for ManualListCopy {
 }
 
 /// PERF402
-pub(crate) fn manual_list_copy(checker: &mut Checker, for_stmt: &ast::StmtFor) {
+pub(crate) fn manual_list_copy(checker: &Checker, for_stmt: &ast::StmtFor) {
     if for_stmt.is_async {
         return;
     }
@@ -69,8 +69,10 @@ pub(crate) fn manual_list_copy(checker: &mut Checker, for_stmt: &ast::StmtFor) {
                 args,
                 keywords,
                 range: _,
+                node_index: _,
             },
         range,
+        node_index: _,
     }) = value.as_ref()
     else {
         return;
@@ -93,7 +95,7 @@ pub(crate) fn manual_list_copy(checker: &mut Checker, for_stmt: &ast::StmtFor) {
     }
 
     // Only flag direct list copies (e.g., `for x in y: filtered.append(x)`).
-    if !arg.as_name_expr().is_some_and(|arg| arg.id == *id) {
+    if arg.as_name_expr().is_none_or(|arg| arg.id != *id) {
         return;
     }
 
@@ -119,7 +121,5 @@ pub(crate) fn manual_list_copy(checker: &mut Checker, for_stmt: &ast::StmtFor) {
         return;
     }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(ManualListCopy, *range));
+    checker.report_diagnostic(ManualListCopy, *range);
 }

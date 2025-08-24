@@ -1,9 +1,9 @@
 use ruff_python_ast::{self as ast, Expr};
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -27,7 +27,7 @@ use crate::checkers::ast::Checker;
 /// from gettext import gettext as _
 ///
 /// name = "Maria"
-/// _("Hello, %s!" % name)  # Looks for "Hello, Maria!".
+/// _("Hello, {}!".format(name))  # Looks for "Hello, Maria!".
 /// ```
 ///
 /// Use instead:
@@ -51,14 +51,12 @@ impl Violation for FormatInGetTextFuncCall {
 }
 
 /// INT002
-pub(crate) fn format_in_gettext_func_call(checker: &mut Checker, args: &[Expr]) {
+pub(crate) fn format_in_gettext_func_call(checker: &Checker, args: &[Expr]) {
     if let Some(first) = args.first() {
         if let Expr::Call(ast::ExprCall { func, .. }) = &first {
             if let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func.as_ref() {
                 if attr == "format" {
-                    checker
-                        .diagnostics
-                        .push(Diagnostic::new(FormatInGetTextFuncCall {}, first.range()));
+                    checker.report_diagnostic(FormatInGetTextFuncCall {}, first.range());
                 }
             }
         }

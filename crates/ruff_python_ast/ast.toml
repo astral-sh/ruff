@@ -1,0 +1,600 @@
+# This file is used by generate.py to autogenerate our Python AST data model.
+#
+# We have defined a Rust struct for each syntax node in `src/nodes.rs`.  Many of
+# these nodes belong to groups. For instance, there is a `Stmt` group
+# consisting of all of the syntax nodes that represent valid Python statements.
+#
+# There is a special group named `ungrouped` that contains syntax nodes that do
+# not belong to any group.
+#
+# Each group is defined by two sections below. The `[GROUP]` section defines
+# options that control the auto-generation for that group. The `[GROUP.nodes]`
+# section defines which syntax nodes belong to that group. The name of each
+# entry in the nodes section must match the name of the corresponding Rust
+# struct. The value of each entry defines options that control the
+# auto-generation for that syntax node.
+#
+# The following group options are available:
+#
+# add_suffix_to_is_methods: [true/false]
+#   Controls the name of the is_foo methods of the group's enums.  If false (the
+#   default), these methods will use the variant name in snake_case.  If true,
+#   then the group prefix will be moved to the end before snake_casing.  (That
+#   is, `StmtIf` will become `if_stmt`.)
+#
+# anynode_is_label: foo_bar
+#   Controls the name of the AnyNodeRef::is_foo_bar method.  The default is the
+#   group name in snake_case.
+#
+# doc:
+#   A doc comment that is added to the group's enums.
+#
+# The following syntax node options are available:
+#
+# doc:
+#  A doc comment that is added to the syntax node struct.
+#
+# derives:
+# List of derives to add to the syntax node struct. Clone, Debug, PartialEq are added by default.
+#
+# custom_source_order:
+# A boolean that specifies if this node has a custom source order visitor implementation.
+# generation of visit_source_order will be skipped for this node.
+#
+# fields:
+# List of fields in the syntax node struct. Each field is a table with the
+# following keys:
+# * name - The name of the field.
+# * type - The type of the field.  This can be a simple type name, or a type
+#   type field uses a special syntax to describe the rust type:
+#    * `Expr` - A single expression.
+#    * `Expr?` - Option type.
+#    * `Expr*` - A vector of Expr.
+#    * `&Expr*` - A boxed slice of Expr.
+#    These properties cannot be nested, for example we cannot create a vector of option types.
+# * is_annotation - If this field is a type annotation.
+#
+# source_order:
+# Defines in what order the fields appear in source
+#
+# variant:
+#   The name of the enum variant for this syntax node.  Defaults to the node
+#   name with the group prefix removed.  (That is, `StmtIf` becomes `If`.)
+
+[Mod]
+anynode_is_label = "module"
+doc = "See also [mod](https://docs.python.org/3/library/ast.html#ast.mod)"
+
+[Mod.nodes.ModModule]
+doc = "See also [Module](https://docs.python.org/3/library/ast.html#ast.Module)"
+fields = [{ name = "body", type = "Stmt*" }]
+
+[Mod.nodes.ModExpression]
+doc = "See also [Module](https://docs.python.org/3/library/ast.html#ast.Module)"
+fields = [{ name = "body", type = "Box<Expr>" }]
+
+[Stmt]
+add_suffix_to_is_methods = true
+anynode_is_label = "statement"
+doc = "See also [stmt](https://docs.python.org/3/library/ast.html#ast.stmt)"
+
+[Stmt.nodes.StmtFunctionDef]
+doc = """See also [FunctionDef](https://docs.python.org/3/library/ast.html#ast.FunctionDef)
+and [AsyncFunctionDef](https://docs.python.org/3/library/ast.html#ast.AsyncFunctionDef).
+
+This type differs from the original Python AST, as it collapses the synchronous and asynchronous variants into a single type."""
+fields = [
+  { name = "is_async", type = "bool" },
+  { name = "decorator_list", type = "Decorator*" },
+  { name = "name", type = "Identifier" },
+  { name = "type_params", type = "Box<crate::TypeParams>?" },
+  { name = "parameters", type = "Box<crate::Parameters>" },
+  { name = "returns", type = "Expr?", is_annotation = true },
+  { name = "body", type = "Stmt*" },
+]
+
+[Stmt.nodes.StmtClassDef]
+doc = "See also [ClassDef](https://docs.python.org/3/library/ast.html#ast.ClassDef)"
+fields = [
+  { name = "decorator_list", type = "Decorator*" },
+  { name = "name", type = "Identifier" },
+  { name = "type_params", type = "Box<crate::TypeParams>?" },
+  { name = "arguments", type = "Box<crate::Arguments>?" },
+  { name = "body", type = "Stmt*" },
+]
+
+[Stmt.nodes.StmtReturn]
+doc = "See also [Return](https://docs.python.org/3/library/ast.html#ast.Return)"
+fields = [{ name = "value", type = "Expr?" }]
+
+[Stmt.nodes.StmtDelete]
+doc = "See also [Delete](https://docs.python.org/3/library/ast.html#ast.Delete)"
+fields = [{ name = "targets", type = "Expr*" }]
+
+[Stmt.nodes.StmtTypeAlias]
+doc = "See also [TypeAlias](https://docs.python.org/3/library/ast.html#ast.TypeAlias)"
+fields = [
+  { name = "name", type = "Expr" },
+  { name = "type_params", type = "Box<crate::TypeParams>?" },
+  { name = "value", type = "Expr" },
+]
+
+[Stmt.nodes.StmtAssign]
+doc = "See also [Assign](https://docs.python.org/3/library/ast.html#ast.Assign)"
+fields = [
+  { name = "targets", type = "Expr*" },
+  { name = "value", type = "Expr" },
+]
+
+[Stmt.nodes.StmtAugAssign]
+doc = "See also [AugAssign](https://docs.python.org/3/library/ast.html#ast.AugAssign)"
+fields = [
+  { name = "target", type = "Expr" },
+  { name = "op", type = "Operator" },
+  { name = "value", type = "Expr" },
+]
+
+[Stmt.nodes.StmtAnnAssign]
+doc = "See also [AnnAssign](https://docs.python.org/3/library/ast.html#ast.AnnAssign)"
+fields = [
+  { name = "target", type = "Expr" },
+  { name = "annotation", type = "Expr", is_annotation = true },
+  { name = "value", type = "Expr?" },
+  { name = "simple", type = "bool" },
+]
+
+[Stmt.nodes.StmtFor]
+doc = """See also [For](https://docs.python.org/3/library/ast.html#ast.For)
+and [AsyncFor](https://docs.python.org/3/library/ast.html#ast.AsyncFor).
+
+This type differs from the original Python AST, as it collapses the synchronous and asynchronous variants into a single type."""
+fields = [
+  { name = "is_async", type = "bool" },
+  { name = "target", type = "Expr" },
+  { name = "iter", type = "Expr" },
+  { name = "body", type = "Stmt*" },
+  { name = "orelse", type = "Stmt*" },
+]
+
+[Stmt.nodes.StmtWhile]
+doc = """See also [While](https://docs.python.org/3/library/ast.html#ast.While)
+and [AsyncWhile](https://docs.python.org/3/library/ast.html#ast.AsyncWhile)."""
+fields = [
+  { name = "test", type = "Expr" },
+  { name = "body", type = "Stmt*" },
+  { name = "orelse", type = "Stmt*" },
+]
+
+[Stmt.nodes.StmtIf]
+doc = "See also [If](https://docs.python.org/3/library/ast.html#ast.If)"
+fields = [
+
+  { name = "test", type = "Expr" },
+  { name = "body", type = "Stmt*" },
+  { name = "elif_else_clauses", type = "ElifElseClause*" },
+]
+
+[Stmt.nodes.StmtWith]
+doc = """See also [With](https://docs.python.org/3/library/ast.html#ast.With)
+and [AsyncWith](https://docs.python.org/3/library/ast.html#ast.AsyncWith).
+
+This type differs from the original Python AST, as it collapses the synchronous and asynchronous variants into a single type."""
+fields = [
+  { name = "is_async", type = "bool" },
+  { name = "items", type = "WithItem*" },
+  { name = "body", type = "Stmt*" },
+]
+
+[Stmt.nodes.StmtMatch]
+doc = "See also [Match](https://docs.python.org/3/library/ast.html#ast.Match)"
+fields = [
+  { name = "subject", type = "Expr" },
+  { name = "cases", type = "MatchCase*" },
+]
+
+[Stmt.nodes.StmtRaise]
+doc = "See also [Raise](https://docs.python.org/3/library/ast.html#ast.Raise)"
+fields = [{ name = "exc", type = "Expr?" }, { name = "cause", type = "Expr?" }]
+
+[Stmt.nodes.StmtTry]
+doc = """See also [Try](https://docs.python.org/3/library/ast.html#ast.Try)
+and [TryStar](https://docs.python.org/3/library/ast.html#ast.TryStar)"""
+fields = [
+  { name = "body", type = "Stmt*" },
+  { name = "handlers", type = "ExceptHandler*" },
+  { name = "orelse", type = "Stmt*" },
+  { name = "finalbody", type = "Stmt*" },
+  { name = "is_star", type = "bool" },
+]
+
+[Stmt.nodes.StmtAssert]
+doc = "See also [Assert](https://docs.python.org/3/library/ast.html#ast.Assert)"
+fields = [{ name = "test", type = "Expr" }, { name = "msg", type = "Expr?" }]
+
+[Stmt.nodes.StmtImport]
+doc = "See also [Import](https://docs.python.org/3/library/ast.html#ast.Import)"
+fields = [{ name = "names", type = "Alias*" }]
+
+[Stmt.nodes.StmtImportFrom]
+doc = "See also [ImportFrom](https://docs.python.org/3/library/ast.html#ast.ImportFrom)"
+fields = [
+  { name = "module", type = "Identifier?" },
+  { name = "names", type = "Alias*" },
+  { name = "level", type = "u32" },
+]
+
+[Stmt.nodes.StmtGlobal]
+doc = "See also [Global](https://docs.python.org/3/library/ast.html#ast.Global)"
+fields = [{ name = "names", type = "Identifier*" }]
+
+[Stmt.nodes.StmtNonlocal]
+doc = "See also [Nonlocal](https://docs.python.org/3/library/ast.html#ast.Nonlocal)"
+fields = [{ name = "names", type = "Identifier*" }]
+
+[Stmt.nodes.StmtExpr]
+doc = "See also [Expr](https://docs.python.org/3/library/ast.html#ast.Expr)"
+fields = [{ name = "value", type = "Expr" }]
+
+[Stmt.nodes.StmtPass]
+doc = "See also [Pass](https://docs.python.org/3/library/ast.html#ast.Pass)"
+fields = []
+
+[Stmt.nodes.StmtBreak]
+doc = "See also [Break](https://docs.python.org/3/library/ast.html#ast.Break)"
+fields = []
+
+[Stmt.nodes.StmtContinue]
+doc = "See also [Continue](https://docs.python.org/3/library/ast.html#ast.Continue)"
+fields = []
+
+[Stmt.nodes.StmtIpyEscapeCommand]
+# TODO: remove crate:: prefix from IpyEscapeKind after it's auto generated
+doc = """An AST node used to represent a IPython escape command at the statement level.
+
+For example,
+```python
+%matplotlib inline
+```
+
+## Terminology
+
+Escape commands are special IPython syntax which starts with a token to identify
+the escape kind followed by the command value itself. [Escape kind] are the kind
+of escape commands that are recognized by the token: `%`, `%%`, `!`, `!!`,
+`?`, `??`, `/`, `;`, and `,`.
+
+Help command (or Dynamic Object Introspection as it's called) are the escape commands
+of the kind `?` and `??`. For example, `?str.replace`. Help end command are a subset
+of Help command where the token can be at the end of the line i.e., after the value.
+For example, `str.replace?`.
+
+Here's where things get tricky. I'll divide the help end command into two types for
+better understanding:
+1. Strict version: The token is _only_ at the end of the line. For example,
+   `str.replace?` or `str.replace??`.
+2. Combined version: Along with the `?` or `??` token, which are at the end of the
+   line, there are other escape kind tokens that are present at the start as well.
+   For example, `%matplotlib?` or `%%timeit?`.
+
+Priority comes into picture for the "Combined version" mentioned above. How do
+we determine the escape kind if there are tokens on both side of the value, i.e., which
+token to choose? The Help end command always takes priority over any other token which
+means that if there is `?`/`??` at the end then that is used to determine the kind.
+For example, in `%matplotlib?` the escape kind is determined using the `?` token
+instead of `%` token.
+
+## Syntax
+
+`<IpyEscapeKind><Command value>`
+
+The simplest form is an escape kind token followed by the command value. For example,
+`%matplotlib inline`, `/foo`, `!pwd`, etc.
+
+`<Command value><IpyEscapeKind ("?" or "??")>`
+
+The help end escape command would be the reverse of the above syntax. Here, the
+escape kind token can only be either `?` or `??` and it is at the end of the line.
+For example, `str.replace?`, `math.pi??`, etc.
+
+`<IpyEscapeKind><Command value><EscapeKind ("?" or "??")>`
+
+The final syntax is the combined version of the above two. For example, `%matplotlib?`,
+`%%timeit??`, etc.
+
+[Escape kind]: crate::IpyEscapeKind
+"""
+fields = [
+  { name = "kind", type = "IpyEscapeKind" },
+  { name = "value", type = "Box<str>" },
+]
+
+[Expr]
+add_suffix_to_is_methods = true
+anynode_is_label = "expression"
+doc = "See also [expr](https://docs.python.org/3/library/ast.html#ast.expr)"
+
+[Expr.nodes.ExprBoolOp]
+doc = "See also [BoolOp](https://docs.python.org/3/library/ast.html#ast.BoolOp)"
+fields = [{ name = "op", type = "BoolOp" }, { name = "values", type = "Expr*" }]
+custom_source_order = true
+
+[Expr.nodes.ExprNamed]
+doc = "See also [NamedExpr](https://docs.python.org/3/library/ast.html#ast.NamedExpr)"
+fields = [{ name = "target", type = "Expr" }, { name = "value", type = "Expr" }]
+
+[Expr.nodes.ExprBinOp]
+doc = "See also [BinOp](https://docs.python.org/3/library/ast.html#ast.BinOp)"
+fields = [
+  { name = "left", type = "Expr" },
+  { name = "op", type = "Operator" },
+  { name = "right", type = "Expr" },
+]
+
+[Expr.nodes.ExprUnaryOp]
+doc = "See also [UnaryOp](https://docs.python.org/3/library/ast.html#ast.UnaryOp)"
+fields = [
+  { name = "op", type = "UnaryOp" },
+  { name = "operand", type = "Expr" },
+]
+
+[Expr.nodes.ExprLambda]
+doc = "See also [Lambda](https://docs.python.org/3/library/ast.html#ast.Lambda)"
+fields = [
+  { name = "parameters", type = "Box<crate::Parameters>?" },
+  { name = "body", type = "Expr" },
+]
+
+[Expr.nodes.ExprIf]
+doc = "See also [IfExp](https://docs.python.org/3/library/ast.html#ast.IfExp)"
+fields = [
+  { name = "test", type = "Expr" },
+  { name = "body", type = "Expr" },
+  { name = "orelse", type = "Expr" },
+]
+source_order = ["body", "test", "orelse"]
+
+[Expr.nodes.ExprDict]
+doc = "See also [Dict](https://docs.python.org/3/library/ast.html#ast.Dict)"
+fields = [{ name = "items", type = "DictItem*" }]
+custom_source_order = true
+
+[Expr.nodes.ExprSet]
+doc = "See also [Set](https://docs.python.org/3/library/ast.html#ast.Set)"
+fields = [{ name = "elts", type = "Expr*" }]
+
+[Expr.nodes.ExprListComp]
+doc = "See also [ListComp](https://docs.python.org/3/library/ast.html#ast.ListComp)"
+fields = [
+  { name = "elt", type = "Expr" },
+  { name = "generators", type = "Comprehension*" },
+]
+
+[Expr.nodes.ExprSetComp]
+doc = "See also [SetComp](https://docs.python.org/3/library/ast.html#ast.SetComp)"
+fields = [
+  { name = "elt", type = "Expr" },
+  { name = "generators", type = "Comprehension*" },
+]
+
+[Expr.nodes.ExprDictComp]
+doc = "See also [DictComp](https://docs.python.org/3/library/ast.html#ast.DictComp)"
+fields = [
+  { name = "key", type = "Expr" },
+  { name = "value", type = "Expr" },
+  { name = "generators", type = "Comprehension*" },
+]
+
+[Expr.nodes.ExprGenerator]
+doc = "See also [GeneratorExp](https://docs.python.org/3/library/ast.html#ast.GeneratorExp)"
+fields = [
+  { name = "elt", type = "Expr" },
+  { name = "generators", type = "Comprehension*" },
+  { name = "parenthesized", type = "bool" },
+]
+
+[Expr.nodes.ExprAwait]
+doc = "See also [Await](https://docs.python.org/3/library/ast.html#ast.Await)"
+fields = [{ name = "value", type = "Expr" }]
+
+[Expr.nodes.ExprYield]
+doc = "See also [Yield](https://docs.python.org/3/library/ast.html#ast.Yield)"
+fields = [{ name = "value", type = "Expr?" }]
+
+[Expr.nodes.ExprYieldFrom]
+doc = "See also [YieldFrom](https://docs.python.org/3/library/ast.html#ast.YieldFrom)"
+fields = [{ name = "value", type = "Expr" }]
+
+[Expr.nodes.ExprCompare]
+doc = "See also [Compare](https://docs.python.org/3/library/ast.html#ast.Compare)"
+fields = [
+  { name = "left", type = "Expr" },
+  { name = "ops", type = "&CmpOp*" },
+  { name = "comparators", type = "&Expr*" },
+]
+# The fields must be visited simultaneously
+custom_source_order = true
+
+[Expr.nodes.ExprCall]
+doc = "See also [Call](https://docs.python.org/3/library/ast.html#ast.Call)"
+fields = [
+  { name = "func", type = "Expr" },
+  { name = "arguments", type = "Arguments" },
+]
+
+[Expr.nodes.ExprFString]
+doc = """An AST node that represents either a single-part f-string literal
+or an implicitly concatenated f-string literal.
+
+This type differs from the original Python AST `JoinedStr` in that it
+doesn't join the implicitly concatenated parts into a single string. Instead,
+it keeps them separate and provide various methods to access the parts.
+
+See also [JoinedStr](https://docs.python.org/3/library/ast.html#ast.JoinedStr)"""
+fields = [{ name = "value", type = "FStringValue" }]
+custom_source_order = true
+
+[Expr.nodes.ExprTString]
+doc = """An AST node that represents either a single-part t-string literal
+or an implicitly concatenated t-string literal.
+
+This type differs from the original Python AST `TemplateStr` in that it
+doesn't join the implicitly concatenated parts into a single string. Instead,
+it keeps them separate and provide various methods to access the parts.
+
+See also [TemplateStr](https://docs.python.org/3/library/ast.html#ast.TemplateStr)"""
+fields = [{ name = "value", type = "TStringValue" }]
+custom_source_order = true
+
+[Expr.nodes.ExprStringLiteral]
+doc = """An AST node that represents either a single-part string literal
+or an implicitly concatenated string literal."""
+fields = [{ name = "value", type = "StringLiteralValue" }]
+# Because StringLiteralValue type is an iterator and it's not clear from the type
+custom_source_order = true
+
+[Expr.nodes.ExprBytesLiteral]
+doc = """An AST node that represents either a single-part bytestring literal
+or an implicitly concatenated bytestring literal."""
+fields = [{ name = "value", type = "BytesLiteralValue" }]
+# Because BytesLiteralValue type is an iterator and it's not clear from the type
+custom_source_order = true
+
+[Expr.nodes.ExprNumberLiteral]
+fields = [{ name = "value", type = "Number" }]
+
+[Expr.nodes.ExprBooleanLiteral]
+fields = [{ name = "value", type = "bool" }]
+derives = ["Default"]
+
+[Expr.nodes.ExprNoneLiteral]
+fields = []
+derives = ["Default"]
+
+[Expr.nodes.ExprEllipsisLiteral]
+fields = []
+derives = ["Default"]
+
+[Expr.nodes.ExprAttribute]
+doc = "See also [Attribute](https://docs.python.org/3/library/ast.html#ast.Attribute)"
+fields = [
+  { name = "value", type = "Expr" },
+  { name = "attr", type = "Identifier" },
+  { name = "ctx", type = "ExprContext" },
+]
+
+[Expr.nodes.ExprSubscript]
+doc = "See also [Subscript](https://docs.python.org/3/library/ast.html#ast.Subscript)"
+fields = [
+  { name = "value", type = "Expr" },
+  { name = "slice", type = "Expr" },
+  { name = "ctx", type = "ExprContext" },
+]
+
+[Expr.nodes.ExprStarred]
+doc = "See also [Starred](https://docs.python.org/3/library/ast.html#ast.Starred)"
+fields = [
+  { name = "value", type = "Expr" },
+  { name = "ctx", type = "ExprContext" },
+]
+
+[Expr.nodes.ExprName]
+doc = "See also [Name](https://docs.python.org/3/library/ast.html#ast.Name)"
+fields = [
+  { name = "id", type = "Name" },
+  { name = "ctx", type = "ExprContext" },
+]
+
+[Expr.nodes.ExprList]
+doc = "See also [List](https://docs.python.org/3/library/ast.html#ast.List)"
+fields = [
+  { name = "elts", type = "Expr*" },
+  { name = "ctx", type = "ExprContext" },
+]
+
+[Expr.nodes.ExprTuple]
+doc = "See also [Tuple](https://docs.python.org/3/library/ast.html#ast.Tuple)"
+fields = [
+  { name = "elts", type = "Expr*" },
+  { name = "ctx", type = "ExprContext" },
+  { name = "parenthesized", type = "bool" },
+]
+
+[Expr.nodes.ExprSlice]
+doc = "See also [Slice](https://docs.python.org/3/library/ast.html#ast.Slice)"
+fields = [
+  { name = "lower", type = "Expr?" },
+  { name = "upper", type = "Expr?" },
+  { name = "step", type = "Expr?" },
+]
+
+[Expr.nodes.ExprIpyEscapeCommand]
+doc = """An AST node used to represent a IPython escape command at the expression level.
+
+For example,
+```python
+dir = !pwd
+```
+
+Here, the escape kind can only be `!` or `%` otherwise it is a syntax error.
+
+For more information related to terminology and syntax of escape commands,
+see [`StmtIpyEscapeCommand`]."""
+
+fields = [
+  { name = "kind", type = "IpyEscapeKind" },
+  { name = "value", type = "Box<str>" },
+]
+
+[ExceptHandler]
+doc = "See also [excepthandler](https://docs.python.org/3/library/ast.html#ast.excepthandler)"
+
+[ExceptHandler.nodes]
+ExceptHandlerExceptHandler = {}
+
+[InterpolatedStringElement.nodes]
+InterpolatedElement = { variant = "Interpolation" }
+InterpolatedStringLiteralElement = { variant = "Literal" }
+
+
+[Pattern]
+doc = "See also [pattern](https://docs.python.org/3/library/ast.html#ast.pattern)"
+
+[Pattern.nodes]
+PatternMatchValue = {}
+PatternMatchSingleton = {}
+PatternMatchSequence = {}
+PatternMatchMapping = {}
+PatternMatchClass = {}
+PatternMatchStar = {}
+PatternMatchAs = {}
+PatternMatchOr = {}
+
+[TypeParam]
+doc = "See also [type_param](https://docs.python.org/3/library/ast.html#ast.type_param)"
+
+[TypeParam.nodes]
+TypeParamTypeVar = {}
+TypeParamTypeVarTuple = {}
+TypeParamParamSpec = {}
+
+[ungrouped.nodes]
+InterpolatedStringFormatSpec = {}
+PatternArguments = {}
+PatternKeyword = {}
+Comprehension = {}
+Arguments = {}
+Parameters = {}
+Parameter = {}
+ParameterWithDefault = {}
+Keyword = {}
+Alias = {}
+WithItem = {}
+MatchCase = {}
+Decorator = {}
+ElifElseClause = {}
+TypeParams = {}
+FString = {}
+TString = {}
+StringLiteral = {}
+BytesLiteral = {}
+Identifier = {}

@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
-snapshot_kind: text
 ---
-F821_11.pyi:15:28: F821 Undefined name `os`
+F821 Undefined name `os`
+  --> F821_11.pyi:15:28
    |
 15 | def f(x: Callable[[VarArg("os")], None]):  # F821
-   |                            ^^ F821
+   |                            ^^
 16 |     pass
    |

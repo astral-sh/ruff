@@ -28,7 +28,7 @@ pub fn is_lowercase(s: &str) -> bool {
             _ => {
                 return s[i..]
                     .chars()
-                    .all(|c| c.is_lowercase() || !c.is_alphabetic())
+                    .all(|c| c.is_lowercase() || !c.is_alphabetic());
             }
         }
     }
@@ -65,7 +65,7 @@ pub fn is_uppercase(s: &str) -> bool {
             _ => {
                 return s[i..]
                     .chars()
-                    .all(|c| c.is_uppercase() || !c.is_alphabetic())
+                    .all(|c| c.is_uppercase() || !c.is_alphabetic());
             }
         }
     }

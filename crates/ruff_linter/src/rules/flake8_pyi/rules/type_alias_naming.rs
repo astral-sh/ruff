@@ -1,8 +1,8 @@
 use ruff_python_ast::{self as ast, Expr};
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -14,11 +14,15 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Example
 /// ```pyi
+/// from typing import TypeAlias
+///
 /// type_alias_name: TypeAlias = int
 /// ```
 ///
 /// Use instead:
 /// ```pyi
+/// from typing import TypeAlias
+///
 /// TypeAliasName: TypeAlias = int
 /// ```
 #[derive(ViolationMetadata)]
@@ -69,7 +73,9 @@ impl Violation for TSuffixedTypeAlias {
     #[derive_message_formats]
     fn message(&self) -> String {
         let Self { name } = self;
-        format!("Private type alias `{name}` should not be suffixed with `T` (the `T` suffix implies that an object is a `TypeVar`)")
+        format!(
+            "Private type alias `{name}` should not be suffixed with `T` (the `T` suffix implies that an object is a `TypeVar`)"
+        )
     }
 }
 
@@ -101,33 +107,33 @@ fn is_t_suffixed_type_alias(name: &str) -> bool {
 }
 
 /// PYI042
-pub(crate) fn snake_case_type_alias(checker: &mut Checker, target: &Expr) {
+pub(crate) fn snake_case_type_alias(checker: &Checker, target: &Expr) {
     if let Expr::Name(ast::ExprName { id, range, .. }) = target {
         if !is_snake_case_type_alias(id) {
             return;
         }
 
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(
             SnakeCaseTypeAlias {
                 name: id.to_string(),
             },
             *range,
-        ));
+        );
     }
 }
 
 /// PYI043
-pub(crate) fn t_suffixed_type_alias(checker: &mut Checker, target: &Expr) {
+pub(crate) fn t_suffixed_type_alias(checker: &Checker, target: &Expr) {
     if let Expr::Name(ast::ExprName { id, range, .. }) = target {
         if !is_t_suffixed_type_alias(id) {
             return;
         }
 
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(
             TSuffixedTypeAlias {
                 name: id.to_string(),
             },
             *range,
-        ));
+        );
     }
 }

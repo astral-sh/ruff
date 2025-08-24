@@ -1,10 +1,10 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Comprehension, Expr};
 use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Fix};
 
 use crate::rules::flake8_comprehensions::fixes;
 
@@ -15,7 +15,7 @@ use crate::rules::flake8_comprehensions::fixes;
 /// It's unnecessary to use a dict/list/set comprehension to build a data structure if the
 /// elements are unchanged. Wrap the iterable with `dict()`, `list()`, or `set()` instead.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// {a: b for a, b in iterable}
 /// [x for x in iterable]
@@ -75,7 +75,7 @@ impl AlwaysFixableViolation for UnnecessaryComprehension {
 }
 
 /// Add diagnostic for C416 based on the expression node id.
-fn add_diagnostic(checker: &mut Checker, expr: &Expr) {
+fn add_diagnostic(checker: &Checker, expr: &Expr) {
     let Some(comprehension_kind) = ComprehensionKind::try_from_expr(expr) else {
         return;
     };
@@ -85,7 +85,7 @@ fn add_diagnostic(checker: &mut Checker, expr: &Expr) {
     {
         return;
     }
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UnnecessaryComprehension {
             kind: comprehension_kind,
         },
@@ -95,12 +95,11 @@ fn add_diagnostic(checker: &mut Checker, expr: &Expr) {
         fixes::fix_unnecessary_comprehension(expr, checker.locator(), checker.stylist())
             .map(Fix::unsafe_edit)
     });
-    checker.diagnostics.push(diagnostic);
 }
 
 /// C416
 pub(crate) fn unnecessary_dict_comprehension(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     key: &Expr,
     value: &Expr,
@@ -115,9 +114,12 @@ pub(crate) fn unnecessary_dict_comprehension(
     let Expr::Tuple(ast::ExprTuple { elts, .. }) = &generator.target else {
         return;
     };
-    let [Expr::Name(ast::ExprName { id: target_key, .. }), Expr::Name(ast::ExprName {
-        id: target_value, ..
-    })] = elts.as_slice()
+    let [
+        Expr::Name(ast::ExprName { id: target_key, .. }),
+        Expr::Name(ast::ExprName {
+            id: target_value, ..
+        }),
+    ] = elts.as_slice()
     else {
         return;
     };
@@ -135,7 +137,7 @@ pub(crate) fn unnecessary_dict_comprehension(
 
 /// C416
 pub(crate) fn unnecessary_list_set_comprehension(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     elt: &Expr,
     generators: &[Comprehension],
@@ -158,14 +160,19 @@ pub(crate) fn unnecessary_list_set_comprehension(
                 }),
                 Expr::Tuple(ast::ExprTuple { elts, .. }),
             ) => {
-                let [Expr::Name(ast::ExprName { id: target_key, .. }), Expr::Name(ast::ExprName {
-                    id: target_value, ..
-                })] = target_elts.as_slice()
+                let [
+                    Expr::Name(ast::ExprName { id: target_key, .. }),
+                    Expr::Name(ast::ExprName {
+                        id: target_value, ..
+                    }),
+                ] = target_elts.as_slice()
                 else {
                     return;
                 };
-                let [Expr::Name(ast::ExprName { id: key, .. }), Expr::Name(ast::ExprName { id: value, .. })] =
-                    elts.as_slice()
+                let [
+                    Expr::Name(ast::ExprName { id: key, .. }),
+                    Expr::Name(ast::ExprName { id: value, .. }),
+                ] = elts.as_slice()
                 else {
                     return;
                 };

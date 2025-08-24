@@ -1,10 +1,9 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
-use crate::registry::Rule;
 
 /// ## What it does
 /// Checks for empty docstrings.
@@ -40,15 +39,10 @@ impl Violation for EmptyDocstring {
 }
 
 /// D419
-pub(crate) fn not_empty(checker: &mut Checker, docstring: &Docstring) -> bool {
+pub(crate) fn not_empty(checker: &Checker, docstring: &Docstring) -> bool {
     if !docstring.body().trim().is_empty() {
         return true;
     }
-
-    if checker.enabled(Rule::EmptyDocstring) {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(EmptyDocstring, docstring.range()));
-    }
+    checker.report_diagnostic_if_enabled(EmptyDocstring, docstring.range());
     false
 }

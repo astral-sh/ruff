@@ -2,12 +2,12 @@ use std::borrow::Cow;
 
 use itertools::Itertools;
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_semantic::{FromImport, Import, Imported, ResolvedReference, Scope};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::package::PackageRoot;
 
@@ -69,11 +69,7 @@ impl Violation for ImportPrivateName {
 }
 
 /// PLC2701
-pub(crate) fn import_private_name(
-    checker: &Checker,
-    scope: &Scope,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
+pub(crate) fn import_private_name(checker: &Checker, scope: &Scope) {
     for binding_id in scope.binding_ids() {
         let binding = checker.semantic().binding(binding_id);
         let Some(import) = binding.as_any_import() else {
@@ -140,10 +136,7 @@ pub(crate) fn import_private_name(
         } else {
             None
         };
-        diagnostics.push(Diagnostic::new(
-            ImportPrivateName { name, module },
-            binding.range(),
-        ));
+        checker.report_diagnostic(ImportPrivateName { name, module }, binding.range());
     }
 }
 
@@ -155,7 +148,7 @@ fn is_typing(reference: &ResolvedReference) -> bool {
         || reference.in_runtime_evaluated_annotation()
 }
 
-#[allow(clippy::struct_field_names)]
+#[expect(clippy::struct_field_names)]
 struct ImportInfo<'a> {
     module_name: &'a [&'a str],
     member_name: Cow<'a, str>,

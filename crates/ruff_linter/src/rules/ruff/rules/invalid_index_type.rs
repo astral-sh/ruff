@@ -1,10 +1,10 @@
 use ruff_python_ast::{Expr, ExprNumberLiteral, ExprSlice, ExprSubscript, Number};
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 use std::fmt;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -41,7 +41,9 @@ impl Violation for InvalidIndexType {
             is_slice,
         } = self;
         if *is_slice {
-            format!("Slice in indexed access to type `{value_type}` uses type `{index_type}` instead of an integer")
+            format!(
+                "Slice in indexed access to type `{value_type}` uses type `{index_type}` instead of an integer"
+            )
         } else {
             format!(
                 "Indexed access to type `{value_type}` uses type `{index_type}` instead of an integer or slice"
@@ -51,7 +53,7 @@ impl Violation for InvalidIndexType {
 }
 
 /// RUF016
-pub(crate) fn invalid_index_type(checker: &mut Checker, expr: &ExprSubscript) {
+pub(crate) fn invalid_index_type(checker: &Checker, expr: &ExprSubscript) {
     let ExprSubscript {
         value,
         slice: index,
@@ -88,14 +90,14 @@ pub(crate) fn invalid_index_type(checker: &mut Checker, expr: &ExprSubscript) {
     if index_type.is_literal() {
         // If the index is a literal, require an integer
         if index_type != CheckableExprType::IntLiteral {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(
                 InvalidIndexType {
                     value_type: value_type.to_string(),
                     index_type: index_type.to_string(),
                     is_slice: false,
                 },
                 index.range(),
-            ));
+            );
         }
     } else if let Expr::Slice(ExprSlice {
         lower, upper, step, ..
@@ -111,36 +113,36 @@ pub(crate) fn invalid_index_type(checker: &mut Checker, expr: &ExprSubscript) {
                     is_slice_type,
                     CheckableExprType::IntLiteral | CheckableExprType::NoneLiteral
                 ) {
-                    checker.diagnostics.push(Diagnostic::new(
+                    checker.report_diagnostic(
                         InvalidIndexType {
                             value_type: value_type.to_string(),
                             index_type: is_slice_type.to_string(),
                             is_slice: true,
                         },
                         is_slice.range(),
-                    ));
+                    );
                 }
             } else if let Some(is_slice_type) = CheckableExprType::try_from(is_slice.as_ref()) {
-                checker.diagnostics.push(Diagnostic::new(
+                checker.report_diagnostic(
                     InvalidIndexType {
                         value_type: value_type.to_string(),
                         index_type: is_slice_type.to_string(),
                         is_slice: true,
                     },
                     is_slice.range(),
-                ));
+                );
             }
         }
     } else {
         // If it's some other checkable data type, it's a violation
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(
             InvalidIndexType {
                 value_type: value_type.to_string(),
                 index_type: index_type.to_string(),
                 is_slice: false,
             },
             index.range(),
-        ));
+        );
     }
 }
 

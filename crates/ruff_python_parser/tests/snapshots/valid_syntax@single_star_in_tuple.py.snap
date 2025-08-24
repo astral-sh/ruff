@@ -1,0 +1,250 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/single_star_in_tuple.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..84,
+        body: [
+            FunctionDef(
+                StmtFunctionDef {
+                    node_index: NodeIndex(None),
+                    range: 0..20,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("f"),
+                        range: 4..5,
+                        node_index: NodeIndex(None),
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 5..7,
+                        node_index: NodeIndex(None),
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 9..20,
+                                value: Yield(
+                                    ExprYield {
+                                        node_index: NodeIndex(None),
+                                        range: 9..20,
+                                        value: Some(
+                                            Tuple(
+                                                ExprTuple {
+                                                    node_index: NodeIndex(None),
+                                                    range: 15..20,
+                                                    elts: [
+                                                        Starred(
+                                                            ExprStarred {
+                                                                node_index: NodeIndex(None),
+                                                                range: 16..18,
+                                                                value: Name(
+                                                                    ExprName {
+                                                                        node_index: NodeIndex(None),
+                                                                        range: 17..18,
+                                                                        id: Name("x"),
+                                                                        ctx: Load,
+                                                                    },
+                                                                ),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                    ],
+                                                    ctx: Load,
+                                                    parenthesized: true,
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    node_index: NodeIndex(None),
+                    range: 21..42,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("f"),
+                        range: 25..26,
+                        node_index: NodeIndex(None),
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 26..28,
+                        node_index: NodeIndex(None),
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Return(
+                            StmtReturn {
+                                node_index: NodeIndex(None),
+                                range: 30..42,
+                                value: Some(
+                                    Tuple(
+                                        ExprTuple {
+                                            node_index: NodeIndex(None),
+                                            range: 37..42,
+                                            elts: [
+                                                Starred(
+                                                    ExprStarred {
+                                                        node_index: NodeIndex(None),
+                                                        range: 38..40,
+                                                        value: Name(
+                                                            ExprName {
+                                                                node_index: NodeIndex(None),
+                                                                range: 39..40,
+                                                                id: Name("x"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ],
+                                            ctx: Load,
+                                            parenthesized: true,
+                                        },
+                                    ),
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            For(
+                StmtFor {
+                    node_index: NodeIndex(None),
+                    range: 43..62,
+                    is_async: false,
+                    target: Name(
+                        ExprName {
+                            node_index: NodeIndex(None),
+                            range: 47..48,
+                            id: Name("_"),
+                            ctx: Store,
+                        },
+                    ),
+                    iter: Tuple(
+                        ExprTuple {
+                            node_index: NodeIndex(None),
+                            range: 52..57,
+                            elts: [
+                                Starred(
+                                    ExprStarred {
+                                        node_index: NodeIndex(None),
+                                        range: 53..55,
+                                        value: Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 54..55,
+                                                id: Name("x"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: true,
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 59..62,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 59..62,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                },
+            ),
+            For(
+                StmtFor {
+                    node_index: NodeIndex(None),
+                    range: 63..83,
+                    is_async: false,
+                    target: Tuple(
+                        ExprTuple {
+                            node_index: NodeIndex(None),
+                            range: 67..72,
+                            elts: [
+                                Starred(
+                                    ExprStarred {
+                                        node_index: NodeIndex(None),
+                                        range: 68..70,
+                                        value: Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 69..70,
+                                                id: Name("x"),
+                                                ctx: Store,
+                                            },
+                                        ),
+                                        ctx: Store,
+                                    },
+                                ),
+                            ],
+                            ctx: Store,
+                            parenthesized: true,
+                        },
+                    ),
+                    iter: Name(
+                        ExprName {
+                            node_index: NodeIndex(None),
+                            range: 76..78,
+                            id: Name("xs"),
+                            ctx: Load,
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 80..83,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 80..83,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                },
+            ),
+        ],
+    },
+)
+```

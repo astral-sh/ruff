@@ -1,9 +1,10 @@
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::ExprCall;
+use ruff_python_ast::PythonVersion;
+
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_bugbear::rules::is_infinite_iterable;
-use crate::settings::types::PythonVersion;
-use ruff_diagnostics::{Diagnostic, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::ExprCall;
+use crate::{FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `itertools.batched` calls without an explicit `strict` parameter.
@@ -19,16 +20,22 @@ use ruff_python_ast::ExprCall;
 ///
 /// ## Example
 /// ```python
+/// import itertools
+///
 /// itertools.batched(iterable, n)
 /// ```
 ///
 /// Use instead if the batches must be of uniform length:
 /// ```python
+/// import itertools
+///
 /// itertools.batched(iterable, n, strict=True)
 /// ```
 ///
 /// Or if the batches can be of non-uniform length:
 /// ```python
+/// import itertools
+///
 /// itertools.batched(iterable, n, strict=False)
 /// ```
 ///
@@ -58,8 +65,8 @@ impl Violation for BatchedWithoutExplicitStrict {
 }
 
 /// B911
-pub(crate) fn batched_without_explicit_strict(checker: &mut Checker, call: &ExprCall) {
-    if checker.settings.target_version < PythonVersion::Py313 {
+pub(crate) fn batched_without_explicit_strict(checker: &Checker, call: &ExprCall) {
+    if checker.target_version() < PythonVersion::PY313 {
         return;
     }
 
@@ -86,6 +93,5 @@ pub(crate) fn batched_without_explicit_strict(checker: &mut Checker, call: &Expr
         return;
     }
 
-    let diagnostic = Diagnostic::new(BatchedWithoutExplicitStrict, call.range);
-    checker.diagnostics.push(diagnostic);
+    checker.report_diagnostic(BatchedWithoutExplicitStrict, call.range);
 }

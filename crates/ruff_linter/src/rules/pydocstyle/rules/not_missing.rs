@@ -1,14 +1,13 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility::{
-    is_call, is_init, is_magic, is_new, is_overload, is_override, Visibility,
+    Visibility, is_call, is_init, is_magic, is_new, is_overload, is_override,
 };
 use ruff_python_semantic::{Definition, Member, MemberKind, Module, ModuleKind};
 use ruff_text_size::TextRange;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::registry::Rule;
 
 /// ## What it does
 /// Checks for undocumented public module definitions.
@@ -531,7 +530,7 @@ impl Violation for UndocumentedPublicInit {
 
 /// D100, D101, D102, D103, D104, D105, D106, D107
 pub(crate) fn not_missing(
-    checker: &mut Checker,
+    checker: &Checker,
     definition: &Definition,
     visibility: Visibility,
 ) -> bool {
@@ -551,47 +550,29 @@ pub(crate) fn not_missing(
             if checker.source_type.is_ipynb() {
                 return true;
             }
-            if checker.enabled(Rule::UndocumentedPublicModule) {
-                checker.diagnostics.push(Diagnostic::new(
-                    UndocumentedPublicModule,
-                    TextRange::default(),
-                ));
-            }
+            checker.report_diagnostic_if_enabled(UndocumentedPublicModule, TextRange::default());
             false
         }
         Definition::Module(Module {
             kind: ModuleKind::Package,
             ..
         }) => {
-            if checker.enabled(Rule::UndocumentedPublicPackage) {
-                checker.diagnostics.push(Diagnostic::new(
-                    UndocumentedPublicPackage,
-                    TextRange::default(),
-                ));
-            }
+            checker.report_diagnostic_if_enabled(UndocumentedPublicPackage, TextRange::default());
             false
         }
         Definition::Member(Member {
             kind: MemberKind::Class(class),
             ..
         }) => {
-            if checker.enabled(Rule::UndocumentedPublicClass) {
-                checker
-                    .diagnostics
-                    .push(Diagnostic::new(UndocumentedPublicClass, class.identifier()));
-            }
+            checker.report_diagnostic_if_enabled(UndocumentedPublicClass, class.identifier());
             false
         }
         Definition::Member(Member {
             kind: MemberKind::NestedClass(function),
             ..
         }) => {
-            if checker.enabled(Rule::UndocumentedPublicNestedClass) {
-                checker.diagnostics.push(Diagnostic::new(
-                    UndocumentedPublicNestedClass,
-                    function.identifier(),
-                ));
-            }
+            checker
+                .report_diagnostic_if_enabled(UndocumentedPublicNestedClass, function.identifier());
             false
         }
         Definition::Member(Member {
@@ -601,12 +582,10 @@ pub(crate) fn not_missing(
             if is_overload(&function.decorator_list, checker.semantic()) {
                 true
             } else {
-                if checker.enabled(Rule::UndocumentedPublicFunction) {
-                    checker.diagnostics.push(Diagnostic::new(
-                        UndocumentedPublicFunction,
-                        function.identifier(),
-                    ));
-                }
+                checker.report_diagnostic_if_enabled(
+                    UndocumentedPublicFunction,
+                    function.identifier(),
+                );
                 false
             }
         }
@@ -619,36 +598,19 @@ pub(crate) fn not_missing(
             {
                 true
             } else if is_init(&function.name) {
-                if checker.enabled(Rule::UndocumentedPublicInit) {
-                    checker.diagnostics.push(Diagnostic::new(
-                        UndocumentedPublicInit,
-                        function.identifier(),
-                    ));
-                }
+                checker.report_diagnostic_if_enabled(UndocumentedPublicInit, function.identifier());
                 true
             } else if is_new(&function.name) || is_call(&function.name) {
-                if checker.enabled(Rule::UndocumentedPublicMethod) {
-                    checker.diagnostics.push(Diagnostic::new(
-                        UndocumentedPublicMethod,
-                        function.identifier(),
-                    ));
-                }
+                checker
+                    .report_diagnostic_if_enabled(UndocumentedPublicMethod, function.identifier());
                 true
             } else if is_magic(&function.name) {
-                if checker.enabled(Rule::UndocumentedMagicMethod) {
-                    checker.diagnostics.push(Diagnostic::new(
-                        UndocumentedMagicMethod,
-                        function.identifier(),
-                    ));
-                }
+                checker
+                    .report_diagnostic_if_enabled(UndocumentedMagicMethod, function.identifier());
                 true
             } else {
-                if checker.enabled(Rule::UndocumentedPublicMethod) {
-                    checker.diagnostics.push(Diagnostic::new(
-                        UndocumentedPublicMethod,
-                        function.identifier(),
-                    ));
-                }
+                checker
+                    .report_diagnostic_if_enabled(UndocumentedPublicMethod, function.identifier());
                 true
             }
         }

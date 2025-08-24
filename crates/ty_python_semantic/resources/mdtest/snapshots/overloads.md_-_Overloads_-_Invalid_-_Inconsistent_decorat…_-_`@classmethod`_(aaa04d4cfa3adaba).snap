@@ -1,0 +1,131 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: overloads.md - Overloads - Invalid - Inconsistent decorators - `@classmethod`
+mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from __future__ import annotations
+ 2 | 
+ 3 | from typing import overload
+ 4 | 
+ 5 | class CheckClassMethod:
+ 6 |     def __init__(self, x: int) -> None:
+ 7 |         self.x = x
+ 8 | 
+ 9 |     @overload
+10 |     @classmethod
+11 |     def try_from1(cls, x: int) -> CheckClassMethod: ...
+12 |     @overload
+13 |     def try_from1(cls, x: str) -> None: ...
+14 |     @classmethod
+15 |     # error: [invalid-overload] "Overloaded function `try_from1` does not use the `@classmethod` decorator consistently"
+16 |     def try_from1(cls, x: int | str) -> CheckClassMethod | None:
+17 |         if isinstance(x, int):
+18 |             return cls(x)
+19 |         return None
+20 | 
+21 |     @overload
+22 |     def try_from2(cls, x: int) -> CheckClassMethod: ...
+23 |     @overload
+24 |     @classmethod
+25 |     def try_from2(cls, x: str) -> None: ...
+26 |     @classmethod
+27 |     # error: [invalid-overload]
+28 |     def try_from2(cls, x: int | str) -> CheckClassMethod | None:
+29 |         if isinstance(x, int):
+30 |             return cls(x)
+31 |         return None
+32 | 
+33 |     @overload
+34 |     @classmethod
+35 |     def try_from3(cls, x: int) -> CheckClassMethod: ...
+36 |     @overload
+37 |     @classmethod
+38 |     def try_from3(cls, x: str) -> None: ...
+39 |     # error: [invalid-overload]
+40 |     def try_from3(cls, x: int | str) -> CheckClassMethod | None:
+41 |         if isinstance(x, int):
+42 |             return cls(x)
+43 |         return None
+44 | 
+45 |     @overload
+46 |     @classmethod
+47 |     def try_from4(cls, x: int) -> CheckClassMethod: ...
+48 |     @overload
+49 |     @classmethod
+50 |     def try_from4(cls, x: str) -> None: ...
+51 |     @classmethod
+52 |     def try_from4(cls, x: int | str) -> CheckClassMethod | None:
+53 |         if isinstance(x, int):
+54 |             return cls(x)
+55 |         return None
+```
+
+# Diagnostics
+
+```
+error[invalid-overload]: Overloaded function `try_from1` does not use the `@classmethod` decorator consistently
+  --> src/mdtest_snippet.py:13:9
+   |
+11 |     def try_from1(cls, x: int) -> CheckClassMethod: ...
+12 |     @overload
+13 |     def try_from1(cls, x: str) -> None: ...
+   |         --------- Missing here
+14 |     @classmethod
+15 |     # error: [invalid-overload] "Overloaded function `try_from1` does not use the `@classmethod` decorator consistently"
+16 |     def try_from1(cls, x: int | str) -> CheckClassMethod | None:
+   |         ^^^^^^^^^
+17 |         if isinstance(x, int):
+18 |             return cls(x)
+   |
+info: rule `invalid-overload` is enabled by default
+
+```
+
+```
+error[invalid-overload]: Overloaded function `try_from2` does not use the `@classmethod` decorator consistently
+  --> src/mdtest_snippet.py:28:9
+   |
+26 |     @classmethod
+27 |     # error: [invalid-overload]
+28 |     def try_from2(cls, x: int | str) -> CheckClassMethod | None:
+   |         ^^^^^^^^^
+29 |         if isinstance(x, int):
+30 |             return cls(x)
+   |
+  ::: src/mdtest_snippet.py:22:9
+   |
+21 |     @overload
+22 |     def try_from2(cls, x: int) -> CheckClassMethod: ...
+   |         --------- Missing here
+23 |     @overload
+24 |     @classmethod
+   |
+info: rule `invalid-overload` is enabled by default
+
+```
+
+```
+error[invalid-overload]: Overloaded function `try_from3` does not use the `@classmethod` decorator consistently
+  --> src/mdtest_snippet.py:40:9
+   |
+38 |     def try_from3(cls, x: str) -> None: ...
+39 |     # error: [invalid-overload]
+40 |     def try_from3(cls, x: int | str) -> CheckClassMethod | None:
+   |         ---------
+   |         |
+   |         Missing here
+41 |         if isinstance(x, int):
+42 |             return cls(x)
+   |
+info: rule `invalid-overload` is enabled by default
+
+```

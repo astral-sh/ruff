@@ -9,7 +9,7 @@
 /// modules.
 ///
 /// [builtin module]: https://docs.python.org/3/library/sys.html#sys.builtin_module_names
-#[allow(clippy::unnested_or_patterns)]
+#[expect(clippy::unnested_or_patterns)]
 pub fn is_builtin_module(minor_version: u8, module: &str) -> bool {
     matches!(
         (minor_version, module),

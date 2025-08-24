@@ -9,7 +9,11 @@ pub struct FormatStmtImport;
 
 impl FormatNodeRule<StmtImport> for FormatStmtImport {
     fn fmt_fields(&self, item: &StmtImport, f: &mut PyFormatter) -> FormatResult<()> {
-        let StmtImport { names, range: _ } = item;
+        let StmtImport {
+            names,
+            range: _,
+            node_index: _,
+        } = item;
         let names = format_with(|f| {
             f.join_with(&format_args![token(","), space()])
                 .entries(names.iter().formatted())

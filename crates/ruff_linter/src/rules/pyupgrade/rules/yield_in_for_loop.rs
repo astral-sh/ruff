@@ -1,10 +1,10 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `for` loops that can be replaced with `yield from` expressions.
@@ -15,13 +15,23 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Example
 /// ```python
-/// for x in foo:
-///     yield x
+/// def bar():
+///     for x in foo:
+///         yield x
+///
+///     global y
+///     for y in foo:
+///         yield y
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// yield from foo
+/// def bar():
+///     yield from foo
+///
+///     for _element in foo:
+///         y = _element
+///         yield y
 /// ```
 ///
 /// ## Fix safety
@@ -30,6 +40,9 @@ use crate::checkers::ast::Checker;
 /// For example, if a generator is being sent values via `send`, then rewriting
 /// to a `yield from` could lead to an attribute error if the underlying
 /// generator does not implement the `send` method.
+///
+/// Additionally, if at least one target is `global` or `nonlocal`,
+/// no fix will be offered.
 ///
 /// In most cases, however, the fix is safe, and such a modification should have
 /// no effect on the behavior of the program.
@@ -40,19 +53,21 @@ use crate::checkers::ast::Checker;
 #[derive(ViolationMetadata)]
 pub(crate) struct YieldInForLoop;
 
-impl AlwaysFixableViolation for YieldInForLoop {
+impl Violation for YieldInForLoop {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         "Replace `yield` over `for` loop with `yield from`".to_string()
     }
 
-    fn fix_title(&self) -> String {
-        "Replace with `yield from`".to_string()
+    fn fix_title(&self) -> Option<String> {
+        Some("Replace with `yield from`".to_string())
     }
 }
 
 /// UP028
-pub(crate) fn yield_in_for_loop(checker: &mut Checker, stmt_for: &ast::StmtFor) {
+pub(crate) fn yield_in_for_loop(checker: &Checker, stmt_for: &ast::StmtFor) {
     // Intentionally omit async contexts.
     if checker.semantic().in_async_context() {
         return;
@@ -65,6 +80,7 @@ pub(crate) fn yield_in_for_loop(checker: &mut Checker, stmt_for: &ast::StmtFor) 
         orelse,
         is_async: _,
         range: _,
+        node_index: _,
     } = stmt_for;
 
     // If there is an else statement, don't rewrite.
@@ -78,12 +94,18 @@ pub(crate) fn yield_in_for_loop(checker: &mut Checker, stmt_for: &ast::StmtFor) 
     };
 
     // If the body is not a yield, don't rewrite.
-    let Stmt::Expr(ast::StmtExpr { value, range: _ }) = &body else {
+    let Stmt::Expr(ast::StmtExpr {
+        value,
+        range: _,
+        node_index: _,
+    }) = &body
+    else {
         return;
     };
     let Expr::Yield(ast::ExprYield {
         value: Some(value),
         range: _,
+        node_index: _,
     }) = value.as_ref()
     else {
         return;
@@ -113,7 +135,7 @@ pub(crate) fn yield_in_for_loop(checker: &mut Checker, stmt_for: &ast::StmtFor) 
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(YieldInForLoop, stmt_for.range());
+    let mut diagnostic = checker.report_diagnostic(YieldInForLoop, stmt_for.range());
 
     let contents = checker.locator().slice(
         parenthesized_range(
@@ -130,11 +152,21 @@ pub(crate) fn yield_in_for_loop(checker: &mut Checker, stmt_for: &ast::StmtFor) 
         format!("yield from {contents}")
     };
 
-    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-        contents,
-        stmt_for.range(),
-    )));
-    checker.diagnostics.push(diagnostic);
+    if !collect_names(value).any(|name| {
+        let semantic = checker.semantic();
+        let mut bindings = semantic.current_scope().get_all(name.id.as_str());
+
+        bindings.any(|id| {
+            let binding = semantic.binding(id);
+
+            binding.is_global() || binding.is_nonlocal()
+        })
+    }) {
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+            contents,
+            stmt_for.range(),
+        )));
+    }
 }
 
 /// Return `true` if the two expressions are equivalent, and both consistent solely

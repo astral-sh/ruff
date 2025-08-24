@@ -1,6 +1,6 @@
 use ruff_text_size::TextRange;
 
-use crate::{is_python_whitespace, PythonWhitespace};
+use crate::{PythonWhitespace, is_python_whitespace};
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum SuppressionKind {

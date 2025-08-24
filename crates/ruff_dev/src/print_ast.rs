@@ -1,5 +1,4 @@
 //! Print the AST for a given Python file.
-#![allow(clippy::print_stdout, clippy::print_stderr)]
 
 use std::path::PathBuf;
 
@@ -7,7 +6,7 @@ use anyhow::Result;
 
 use ruff_linter::source_kind::SourceKind;
 use ruff_python_ast::PySourceType;
-use ruff_python_parser::{parse, AsMode};
+use ruff_python_parser::{ParseOptions, parse};
 
 #[derive(clap::Args)]
 pub(crate) struct Args {
@@ -24,7 +23,8 @@ pub(crate) fn main(args: &Args) -> Result<()> {
             args.file.display()
         )
     })?;
-    let python_ast = parse(source_kind.source_code(), source_type.as_mode())?.into_syntax();
+    let python_ast =
+        parse(source_kind.source_code(), ParseOptions::from(source_type))?.into_syntax();
     println!("{python_ast:#?}");
     Ok(())
 }

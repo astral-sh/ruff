@@ -1,11 +1,11 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::types::Node;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Comprehension, Expr, ExprContext, Stmt};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -111,6 +111,7 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
             Stmt::Return(ast::StmtReturn {
                 value: Some(value),
                 range: _,
+                node_index: _,
             }) => {
                 // Mark `return lambda: x` as safe.
                 if value.is_lambda_expr() {
@@ -128,6 +129,7 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                 func,
                 arguments,
                 range: _,
+                node_index: _,
             }) => {
                 match func.as_ref() {
                     Expr::Name(ast::ExprName { id, .. }) => {
@@ -167,6 +169,7 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                 parameters,
                 body,
                 range: _,
+                node_index: _,
             }) => {
                 if !self.safe_functions.contains(&expr) {
                     // Collect all loaded variable names.
@@ -277,7 +280,7 @@ impl<'a> Visitor<'a> for AssignedNamesVisitor<'a> {
 }
 
 /// B023
-pub(crate) fn function_uses_loop_variable(checker: &mut Checker, node: &Node) {
+pub(crate) fn function_uses_loop_variable(checker: &Checker, node: &Node) {
     // Identify any "suspicious" variables. These are defined as variables that are
     // referenced in a function or lambda body, but aren't bound as arguments.
     let suspicious_variables = {
@@ -304,14 +307,13 @@ pub(crate) fn function_uses_loop_variable(checker: &mut Checker, node: &Node) {
         // loop, flag it.
         for name in suspicious_variables {
             if reassigned_in_loop.contains(&name.id.as_str()) {
-                if !checker.flake8_bugbear_seen.contains(&name.range()) {
-                    checker.flake8_bugbear_seen.push(name.range());
-                    checker.diagnostics.push(Diagnostic::new(
+                if checker.insert_flake8_bugbear_range(name.range()) {
+                    checker.report_diagnostic(
                         FunctionUsesLoopVariable {
                             name: name.id.to_string(),
                         },
                         name.range(),
-                    ));
+                    );
                 }
             }
         }

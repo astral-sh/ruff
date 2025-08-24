@@ -17,6 +17,7 @@ fn command() -> Command {
     command.arg("analyze");
     command.arg("graph");
     command.arg("--preview");
+    command.env_clear();
     command
 }
 
@@ -56,33 +57,40 @@ fn dependencies() -> Result<()> {
         .write_str(indoc::indoc! {r#"
         def f(): pass
     "#})?;
+    root.child("ruff")
+        .child("e.pyi")
+        .write_str(indoc::indoc! {r#"
+        def f() -> None: ...
+    "#})?;
 
     insta::with_settings!({
         filters => INSTA_FILTERS.to_vec(),
     }, {
-        assert_cmd_snapshot!(command().current_dir(&root), @r###"
-            success: true
-            exit_code: 0
-            ----- stdout -----
-            {
-              "ruff/__init__.py": [],
-              "ruff/a.py": [
-                "ruff/b.py"
-              ],
-              "ruff/b.py": [
-                "ruff/c.py"
-              ],
-              "ruff/c.py": [
-                "ruff/d.py"
-              ],
-              "ruff/d.py": [
-                "ruff/e.py"
-              ],
-              "ruff/e.py": []
-            }
+        assert_cmd_snapshot!(command().current_dir(&root), @r#"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        {
+          "ruff/__init__.py": [],
+          "ruff/a.py": [
+            "ruff/b.py"
+          ],
+          "ruff/b.py": [
+            "ruff/c.py"
+          ],
+          "ruff/c.py": [
+            "ruff/d.py"
+          ],
+          "ruff/d.py": [
+            "ruff/e.py",
+            "ruff/e.pyi"
+          ],
+          "ruff/e.py": [],
+          "ruff/e.pyi": []
+        }
 
-            ----- stderr -----
-            "###);
+        ----- stderr -----
+        "#);
     });
 
     Ok(())
@@ -196,23 +204,43 @@ fn string_detection() -> Result<()> {
     insta::with_settings!({
         filters => INSTA_FILTERS.to_vec(),
     }, {
-        assert_cmd_snapshot!(command().arg("--detect-string-imports").current_dir(&root), @r###"
-            success: true
-            exit_code: 0
-            ----- stdout -----
-            {
-              "ruff/__init__.py": [],
-              "ruff/a.py": [
-                "ruff/b.py"
-              ],
-              "ruff/b.py": [
-                "ruff/c.py"
-              ],
-              "ruff/c.py": []
-            }
+        assert_cmd_snapshot!(command().arg("--detect-string-imports").current_dir(&root), @r#"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        {
+          "ruff/__init__.py": [],
+          "ruff/a.py": [
+            "ruff/b.py"
+          ],
+          "ruff/b.py": [],
+          "ruff/c.py": []
+        }
 
-            ----- stderr -----
-            "###);
+        ----- stderr -----
+        "#);
+    });
+
+    insta::with_settings!({
+        filters => INSTA_FILTERS.to_vec(),
+    }, {
+        assert_cmd_snapshot!(command().arg("--detect-string-imports").arg("--min-dots").arg("1").current_dir(&root), @r#"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        {
+          "ruff/__init__.py": [],
+          "ruff/a.py": [
+            "ruff/b.py"
+          ],
+          "ruff/b.py": [
+            "ruff/c.py"
+          ],
+          "ruff/c.py": []
+        }
+
+        ----- stderr -----
+        "#);
     });
 
     Ok(())
@@ -418,6 +446,156 @@ fn nested_imports() -> Result<()> {
 
         ----- stderr -----
         "#);
+    });
+
+    Ok(())
+}
+
+/// Test for venv resolution with the `--python` flag.
+///
+/// Based on the [albatross-virtual-workspace] example from the uv repo and the report in [#16598].
+///
+/// [albatross-virtual-workspace]: https://github.com/astral-sh/uv/tree/aa629c4a/scripts/workspaces/albatross-virtual-workspace
+/// [#16598]: https://github.com/astral-sh/ruff/issues/16598
+#[test]
+fn venv() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let root = ChildPath::new(tempdir.path());
+
+    // packages
+    // ├── albatross
+    // │   ├── check_installed_albatross.py
+    // │   ├── pyproject.toml
+    // │   └── src
+    // │       └── albatross
+    // │           └── __init__.py
+    // └── bird-feeder
+    //     ├── check_installed_bird_feeder.py
+    //     ├── pyproject.toml
+    //     └── src
+    //         └── bird_feeder
+    //             └── __init__.py
+
+    let packages = root.child("packages");
+
+    let albatross = packages.child("albatross");
+    albatross
+        .child("check_installed_albatross.py")
+        .write_str("from albatross import fly")?;
+    albatross
+        .child("pyproject.toml")
+        .write_str(indoc::indoc! {r#"
+        [project]
+        name = "albatross"
+        version = "0.1.0"
+        requires-python = ">=3.12"
+        dependencies = ["bird-feeder", "tqdm>=4,<5"]
+
+        [tool.uv.sources]
+        bird-feeder = { workspace = true }
+    "#})?;
+    albatross
+        .child("src")
+        .child("albatross")
+        .child("__init__.py")
+        .write_str("import tqdm; from bird_feeder import use")?;
+
+    let bird_feeder = packages.child("bird-feeder");
+    bird_feeder
+        .child("check_installed_bird_feeder.py")
+        .write_str("from bird_feeder import use; from albatross import fly")?;
+    bird_feeder
+        .child("pyproject.toml")
+        .write_str(indoc::indoc! {r#"
+        [project]
+        name = "bird-feeder"
+        version = "1.0.0"
+        requires-python = ">=3.12"
+        dependencies = ["anyio>=4.3.0,<5"]
+    "#})?;
+    bird_feeder
+        .child("src")
+        .child("bird_feeder")
+        .child("__init__.py")
+        .write_str("import anyio")?;
+
+    let venv = root.child(".venv");
+    let bin = venv.child("bin");
+    bin.child("python").touch()?;
+    let home = format!("home = {}", bin.to_string_lossy());
+    venv.child("pyvenv.cfg").write_str(&home)?;
+    let site_packages = venv.child("lib").child("python3.12").child("site-packages");
+    site_packages
+        .child("_albatross.pth")
+        .write_str(&albatross.join("src").to_string_lossy())?;
+    site_packages
+        .child("_bird_feeder.pth")
+        .write_str(&bird_feeder.join("src").to_string_lossy())?;
+    site_packages.child("tqdm").child("__init__.py").touch()?;
+
+    // without `--python .venv`, the result should only include dependencies within the albatross
+    // package
+    insta::with_settings!({
+        filters => INSTA_FILTERS.to_vec(),
+    }, {
+        assert_cmd_snapshot!(
+            command().arg("packages/albatross").current_dir(&root),
+            @r#"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        {
+          "packages/albatross/check_installed_albatross.py": [
+            "packages/albatross/src/albatross/__init__.py"
+          ],
+          "packages/albatross/src/albatross/__init__.py": []
+        }
+
+        ----- stderr -----
+        "#);
+    });
+
+    // with `--python .venv` both workspace and third-party dependencies are included
+    insta::with_settings!({
+        filters => INSTA_FILTERS.to_vec(),
+    }, {
+        assert_cmd_snapshot!(
+            command().args(["--python", ".venv"]).arg("packages/albatross").current_dir(&root),
+            @r#"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        {
+          "packages/albatross/check_installed_albatross.py": [
+            "packages/albatross/src/albatross/__init__.py"
+          ],
+          "packages/albatross/src/albatross/__init__.py": [
+            ".venv/lib/python3.12/site-packages/tqdm/__init__.py",
+            "packages/bird-feeder/src/bird_feeder/__init__.py"
+          ]
+        }
+
+        ----- stderr -----
+        "#);
+    });
+
+    // test the error message for a non-existent venv. it's important that the `ruff analyze graph`
+    // flag matches the ty flag used to generate the error message (`--python`)
+    insta::with_settings!({
+        filters => INSTA_FILTERS.to_vec(),
+    }, {
+        assert_cmd_snapshot!(
+            command().args(["--python", "none"]).arg("packages/albatross").current_dir(&root),
+            @r"
+        success: false
+        exit_code: 2
+        ----- stdout -----
+
+        ----- stderr -----
+        ruff failed
+          Cause: Invalid `--python` argument `none`: does not point to a Python executable or a directory on disk
+          Cause: No such file or directory (os error 2)
+        ");
     });
 
     Ok(())

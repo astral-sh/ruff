@@ -1,16 +1,16 @@
 use itertools::Itertools;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Stmt};
 use ruff_python_parser::{TokenKind, Tokens};
-use ruff_python_semantic::{Binding, Scope};
+use ruff_python_semantic::Binding;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::delete_stmt;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for the presence of unused variables in function scopes.
@@ -22,9 +22,6 @@ use crate::fix::edits::delete_stmt;
 /// If a variable is intentionally defined-but-not-used, it should be
 /// prefixed with an underscore, or some other value that adheres to the
 /// [`lint.dummy-variable-rgx`] pattern.
-///
-/// Under [preview mode](https://docs.astral.sh/ruff/preview), this rule also
-/// triggers on unused unpacked assignments (for example, `x, y = foo()`).
 ///
 /// ## Example
 /// ```python
@@ -40,6 +37,11 @@ use crate::fix::edits::delete_stmt;
 ///     x = 1
 ///     return x
 /// ```
+///
+/// ## Fix safety
+///
+/// This rule's fix is marked as unsafe because removing an unused variable assignment may
+/// delete comments that are attached to the assignment.
 ///
 /// ## Options
 /// - `lint.dummy-variable-rgx`
@@ -185,7 +187,7 @@ fn remove_unused_variable(binding: &Binding, checker: &Checker) -> Option<Fix> {
         } else {
             let name = binding.name(checker.source());
             let renamed = format!("_{name}");
-            if checker.settings.dummy_variable_rgx.is_match(&renamed) {
+            if checker.settings().dummy_variable_rgx.is_match(&renamed) {
                 let edit = Edit::range_replacement(renamed, binding.range());
 
                 return Some(Fix::unsafe_edit(edit).isolate(isolation));
@@ -249,47 +251,18 @@ fn remove_unused_variable(binding: &Binding, checker: &Checker) -> Option<Fix> {
 }
 
 /// F841
-pub(crate) fn unused_variable(checker: &Checker, scope: &Scope, diagnostics: &mut Vec<Diagnostic>) {
-    if scope.uses_locals() && scope.kind.is_function() {
+pub(crate) fn unused_variable(checker: &Checker, name: &str, binding: &Binding) {
+    if binding.is_unpacked_assignment() {
         return;
     }
 
-    for (name, binding) in scope
-        .bindings()
-        .map(|(name, binding_id)| (name, checker.semantic().binding(binding_id)))
-        .filter_map(|(name, binding)| {
-            if (binding.kind.is_assignment()
-                || binding.kind.is_named_expr_assignment()
-                || binding.kind.is_with_item_var())
-                // Stabilization depends on resolving https://github.com/astral-sh/ruff/issues/8884
-                && (!binding.is_unpacked_assignment() || checker.settings.preview.is_enabled())
-                && binding.is_unused()
-                && !binding.is_nonlocal()
-                && !binding.is_global()
-                && !checker.settings.dummy_variable_rgx.is_match(name)
-                && !matches!(
-                    name,
-                    "__tracebackhide__"
-                        | "__traceback_info__"
-                        | "__traceback_supplement__"
-                        | "__debuggerskip__"
-                )
-            {
-                return Some((name, binding));
-            }
-
-            None
-        })
-    {
-        let mut diagnostic = Diagnostic::new(
-            UnusedVariable {
-                name: name.to_string(),
-            },
-            binding.range(),
-        );
-        if let Some(fix) = remove_unused_variable(binding, checker) {
-            diagnostic.set_fix(fix);
-        }
-        diagnostics.push(diagnostic);
+    let mut diagnostic = checker.report_diagnostic(
+        UnusedVariable {
+            name: name.to_string(),
+        },
+        binding.range(),
+    );
+    if let Some(fix) = remove_unused_variable(binding, checker) {
+        diagnostic.set_fix(fix);
     }
 }

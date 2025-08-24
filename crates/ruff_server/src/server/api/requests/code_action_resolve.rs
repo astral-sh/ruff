@@ -5,13 +5,14 @@ use lsp_types::{self as types, request as req};
 
 use ruff_linter::codes::Rule;
 
+use crate::PositionEncoding;
 use crate::edit::WorkspaceEditTracker;
 use crate::fix::Fixes;
-use crate::server::api::LSPResult;
+use crate::server::Result;
 use crate::server::SupportedCodeAction;
-use crate::server::{client::Notifier, Result};
+use crate::server::api::LSPResult;
+use crate::session::Client;
 use crate::session::{DocumentQuery, DocumentSnapshot, ResolvedClientCapabilities};
-use crate::PositionEncoding;
 
 pub(crate) struct CodeActionResolve;
 
@@ -20,14 +21,14 @@ impl super::RequestHandler for CodeActionResolve {
 }
 
 impl super::BackgroundDocumentRequestHandler for CodeActionResolve {
-    fn document_url(params: &types::CodeAction) -> Cow<types::Url> {
+    fn document_url(params: &types::CodeAction) -> Cow<'_, types::Url> {
         let uri: lsp_types::Url = serde_json::from_value(params.data.clone().unwrap_or_default())
             .expect("code actions should have a URI in their data fields");
         Cow::Owned(uri)
     }
     fn run_with_snapshot(
         snapshot: DocumentSnapshot,
-        _notifier: Notifier,
+        _client: &Client,
         mut action: types::CodeAction,
     ) -> Result<types::CodeAction> {
         let query = snapshot.query();
@@ -49,6 +50,21 @@ impl super::BackgroundDocumentRequestHandler for CodeActionResolve {
             ))
             .with_failure_code(ErrorCode::InvalidParams);
         };
+
+        match action_kind {
+            SupportedCodeAction::SourceFixAll | SupportedCodeAction::SourceOrganizeImports
+                if snapshot.is_notebook_cell() =>
+            {
+                // This should never occur because we ignore generating these code actions for a
+                // notebook cell in the `textDocument/codeAction` request handler.
+                return Err(anyhow::anyhow!(
+                    "Code action resolver cannot resolve {:?} for a notebook cell",
+                    action_kind.to_kind().as_str()
+                ))
+                .with_failure_code(ErrorCode::InvalidParams);
+            }
+            _ => {}
+        }
 
         action.edit = match action_kind {
             SupportedCodeAction::SourceFixAll | SupportedCodeAction::NotebookSourceFixAll => Some(
@@ -93,7 +109,7 @@ pub(super) fn fix_all_edit(
     query: &DocumentQuery,
     encoding: PositionEncoding,
 ) -> crate::Result<Fixes> {
-    crate::fix::fix_all(query, query.settings().linter(), encoding)
+    crate::fix::fix_all(query, &query.settings().linter, encoding)
 }
 
 pub(super) fn resolve_edit_for_organize_imports(
@@ -110,7 +126,7 @@ pub(super) fn organize_imports_edit(
     query: &DocumentQuery,
     encoding: PositionEncoding,
 ) -> crate::Result<Fixes> {
-    let mut linter_settings = query.settings().linter().clone();
+    let mut linter_settings = query.settings().linter.clone();
     linter_settings.rules = [
         Rule::UnsortedImports,       // I001
         Rule::MissingRequiredImport, // I002

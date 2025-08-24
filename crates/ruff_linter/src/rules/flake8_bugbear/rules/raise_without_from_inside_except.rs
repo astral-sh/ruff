@@ -1,11 +1,11 @@
 use ruff_python_ast as ast;
 use ruff_python_ast::Stmt;
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::RaiseStatementVisitor;
 use ruff_python_ast::statement_visitor::StatementVisitor;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -68,7 +68,7 @@ impl Violation for RaiseWithoutFromInsideExcept {
 
 /// B904
 pub(crate) fn raise_without_from_inside_except(
-    checker: &mut Checker,
+    checker: &Checker,
     name: Option<&str>,
     body: &[Stmt],
 ) {
@@ -106,10 +106,7 @@ pub(crate) fn raise_without_from_inside_except(
                     .as_try_stmt()
                     .is_some_and(|try_stmt| try_stmt.is_star);
 
-                checker.diagnostics.push(Diagnostic::new(
-                    RaiseWithoutFromInsideExcept { is_star },
-                    range,
-                ));
+                checker.report_diagnostic(RaiseWithoutFromInsideExcept { is_star }, range);
             }
         }
     }

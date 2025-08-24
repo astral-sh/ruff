@@ -1,6 +1,6 @@
 [package]
 name = "ruff_linter"
-version = "0.9.2"
+version = "0.12.10"
 publish = false
 authors = { workspace = true }
 edition = { workspace = true }
@@ -13,10 +13,9 @@ license = { workspace = true }
 [lib]
 
 [dependencies]
-ruff_annotate_snippets = { workspace = true }
 ruff_cache = { workspace = true }
+ruff_db = { workspace = true, features = ["junit", "serde"] }
 ruff_diagnostics = { workspace = true, features = ["serde"] }
-ruff_index = { workspace = true }
 ruff_notebook = { workspace = true }
 ruff_macros = { workspace = true }
 ruff_python_ast = { workspace = true, features = ["serde", "cache"] }
@@ -33,17 +32,18 @@ ruff_text_size = { workspace = true }
 aho-corasick = { workspace = true }
 anyhow = { workspace = true }
 bitflags = { workspace = true }
-chrono = { workspace = true }
 clap = { workspace = true, features = ["derive", "string"], optional = true }
 colored = { workspace = true }
 fern = { workspace = true }
 glob = { workspace = true }
 globset = { workspace = true }
+hashbrown = { workspace = true }
 imperative = { workspace = true }
 is-macro = { workspace = true }
 is-wsl = { workspace = true }
 itertools = { workspace = true }
 libcst = { workspace = true }
+jiff = { workspace = true }
 log = { workspace = true }
 memchr = { workspace = true }
 natord = { workspace = true }
@@ -54,7 +54,6 @@ path-absolutize = { workspace = true, features = [
 pathdiff = { workspace = true }
 pep440_rs = { workspace = true }
 pyproject-toml = { workspace = true }
-quick-junit = { workspace = true }
 regex = { workspace = true }
 rustc-hash = { workspace = true }
 schemars = { workspace = true, optional = true }
@@ -77,6 +76,7 @@ insta = { workspace = true, features = ["filters", "json", "redactions"] }
 test-case = { workspace = true }
 # Disable colored output in tests
 colored = { workspace = true, features = ["no-color"] }
+tempfile = { workspace = true }
 
 [features]
 default = []

@@ -194,3 +194,17 @@ if foo():
     z = not foo()
 else:
     z = other
+
+
+# These two cases double as tests for f-string quote preservation. The first
+# f-string should preserve its double quotes, and the second should preserve
+# single quotes
+if cond:
+    var = "str"
+else:
+    var = f"{first}-{second}"
+
+if cond:
+    var = "str"
+else:
+    var = f'{first}-{second}'

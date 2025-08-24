@@ -1,8 +1,8 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_boolean_trap::helpers::allow_boolean_trap;
 
@@ -51,7 +51,8 @@ impl Violation for BooleanPositionalValueInCall {
     }
 }
 
-pub(crate) fn boolean_positional_value_in_call(checker: &mut Checker, call: &ast::ExprCall) {
+/// FBT003
+pub(crate) fn boolean_positional_value_in_call(checker: &Checker, call: &ast::ExprCall) {
     if allow_boolean_trap(call, checker) {
         return;
     }
@@ -61,8 +62,6 @@ pub(crate) fn boolean_positional_value_in_call(checker: &mut Checker, call: &ast
         .iter()
         .filter(|arg| arg.is_boolean_literal_expr())
     {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(BooleanPositionalValueInCall, arg.range()));
+        checker.report_diagnostic(BooleanPositionalValueInCall, arg.range());
     }
 }

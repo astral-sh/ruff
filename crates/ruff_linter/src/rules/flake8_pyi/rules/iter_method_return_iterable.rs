@@ -1,10 +1,10 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::map_subscript;
 use ruff_text_size::Ranged;
 
 use ruff_python_semantic::{Definition, Member, MemberKind};
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -86,7 +86,7 @@ impl Violation for IterMethodReturnIterable {
 }
 
 /// PYI045
-pub(crate) fn iter_method_return_iterable(checker: &mut Checker, definition: &Definition) {
+pub(crate) fn iter_method_return_iterable(checker: &Checker, definition: &Definition) {
     let Definition::Member(Member {
         kind: MemberKind::Method(function),
         ..
@@ -125,9 +125,6 @@ pub(crate) fn iter_method_return_iterable(checker: &mut Checker, definition: &De
             }
         })
     {
-        checker.diagnostics.push(Diagnostic::new(
-            IterMethodReturnIterable { is_async },
-            returns.range(),
-        ));
+        checker.report_diagnostic(IterMethodReturnIterable { is_async }, returns.range());
     }
 }

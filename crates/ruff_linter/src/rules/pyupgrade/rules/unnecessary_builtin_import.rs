@@ -1,12 +1,12 @@
 use itertools::Itertools;
 use ruff_python_ast::{Alias, Stmt};
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix;
+use crate::{AlwaysFixableViolation, Fix};
 
 /// ## What it does
 /// Checks for unnecessary imports of builtins.
@@ -54,7 +54,7 @@ impl AlwaysFixableViolation for UnnecessaryBuiltinImport {
 
 /// UP029
 pub(crate) fn unnecessary_builtin_import(
-    checker: &mut Checker,
+    checker: &Checker,
     stmt: &Stmt,
     module: &str,
     names: &[Alias],
@@ -110,7 +110,7 @@ pub(crate) fn unnecessary_builtin_import(
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UnnecessaryBuiltinImport {
             names: unused_imports
                 .iter()
@@ -138,5 +138,4 @@ pub(crate) fn unnecessary_builtin_import(
             checker.semantic().current_statement_parent_id(),
         )))
     });
-    checker.diagnostics.push(diagnostic);
 }

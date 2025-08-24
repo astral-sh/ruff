@@ -1,5 +1,4 @@
 use ruff_formatter::FormatResult;
-use ruff_python_ast::AstNode;
 use ruff_python_ast::TypeParams;
 use ruff_text_size::Ranged;
 
@@ -21,7 +20,7 @@ impl FormatNodeRule<TypeParams> for FormatTypeParams {
         //     c,
         // ] = ...
         let comments = f.context().comments().clone();
-        let dangling_comments = comments.dangling(item.as_any_node_ref());
+        let dangling_comments = comments.dangling(item);
 
         let items = format_with(|f| {
             f.join_comma_separated(item.end())

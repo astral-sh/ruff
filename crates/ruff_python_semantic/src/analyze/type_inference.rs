@@ -78,6 +78,7 @@ impl From<&Expr> for ResolvedPythonType {
             Expr::Tuple(_) => ResolvedPythonType::Atom(PythonType::Tuple),
             Expr::Generator(_) => ResolvedPythonType::Atom(PythonType::Generator),
             Expr::FString(_) => ResolvedPythonType::Atom(PythonType::String),
+            Expr::TString(_) => ResolvedPythonType::Unknown,
             Expr::StringLiteral(_) => ResolvedPythonType::Atom(PythonType::String),
             Expr::BytesLiteral(_) => ResolvedPythonType::Atom(PythonType::Bytes),
             Expr::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => match value {
@@ -217,11 +218,11 @@ impl From<&Expr> for ResolvedPythonType {
                     ) {
                         // Ex) `"Hello" % "world"`
                         (ResolvedPythonType::Atom(PythonType::String), _) => {
-                            return ResolvedPythonType::Atom(PythonType::String)
+                            return ResolvedPythonType::Atom(PythonType::String);
                         }
                         // Ex) `b"Hello" % b"world"`
                         (ResolvedPythonType::Atom(PythonType::Bytes), _) => {
-                            return ResolvedPythonType::Atom(PythonType::Bytes)
+                            return ResolvedPythonType::Atom(PythonType::Bytes);
                         }
                         // Ex) `1 % 2`
                         (
@@ -452,7 +453,7 @@ impl NumberLike {
 #[cfg(test)]
 mod tests {
     use ruff_python_ast::ModExpression;
-    use ruff_python_parser::{parse_expression, Parsed};
+    use ruff_python_parser::{Parsed, parse_expression};
 
     use crate::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 

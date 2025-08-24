@@ -8,8 +8,8 @@ use crate::prelude::tag::GroupMode;
 use crate::prelude::*;
 use crate::source_code::SourceCode;
 use crate::{
-    format, write, BufferExtensions, Format, FormatContext, FormatElement, FormatOptions,
-    FormatResult, Formatter, IndentStyle, IndentWidth, LineWidth, PrinterOptions,
+    BufferExtensions, Format, FormatContext, FormatElement, FormatOptions, FormatResult, Formatter,
+    IndentStyle, IndentWidth, LineWidth, PrinterOptions, format, write,
 };
 
 use super::tag::Tag;
@@ -222,7 +222,7 @@ impl FormatContext for IrFormatContext<'_> {
         &IrFormatOptions
     }
 
-    fn source_code(&self) -> SourceCode {
+    fn source_code(&self) -> SourceCode<'_> {
         self.source_code
     }
 }
@@ -280,7 +280,7 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                 | FormatElement::SourceCodeSlice { .. }) => {
                     fn write_escaped(element: &FormatElement, f: &mut Formatter<IrFormatContext>) {
                         let (text, text_width) = match element {
-                            #[allow(clippy::cast_possible_truncation)]
+                            #[expect(clippy::cast_possible_truncation)]
                             FormatElement::Token { text } => {
                                 (*text, TextWidth::Width(Width::new(text.len() as u32)))
                             }
@@ -610,7 +610,7 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                             }
                         }
 
-                        StartEntry | StartBestFittingEntry { .. } => {
+                        StartEntry | StartBestFittingEntry => {
                             // handled after the match for all start tags
                         }
                         EndEntry | EndBestFittingEntry => write!(f, [ContentArrayEnd])?,
@@ -630,7 +630,7 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                         | EndVerbatim => {
                             write!(f, [ContentArrayEnd, token(")")])?;
                         }
-                    };
+                    }
 
                     if tag.is_start() {
                         write!(f, [ContentArrayStart])?;
@@ -811,8 +811,8 @@ mod tests {
     use ruff_text_size::{TextRange, TextSize};
 
     use crate::prelude::*;
-    use crate::{format, format_args, write};
     use crate::{SimpleFormatContext, SourceCode};
+    use crate::{format, format_args, write};
 
     #[test]
     fn display_elements() {

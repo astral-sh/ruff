@@ -1,12 +1,12 @@
 use std::iter::Peekable;
 
 use ruff_python_ast::{
+    AnyNodeRef, Suite,
     helpers::comment_indentation_after,
     visitor::source_order::{self, SourceOrderVisitor, TraversalSignal},
-    AnyNodeRef, Suite,
 };
 use ruff_python_trivia::{
-    indentation_at_offset, CommentLinePosition, SimpleTokenizer, SuppressionKind,
+    CommentLinePosition, SimpleTokenizer, SuppressionKind, indentation_at_offset,
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -59,7 +59,7 @@ where
     fn can_skip(&mut self, node_end: TextSize) -> bool {
         self.comments
             .peek()
-            .map_or(true, |next| next.range.start() >= node_end)
+            .is_none_or(|next| next.range.start() >= node_end)
     }
 }
 
@@ -194,6 +194,10 @@ where
                 }
             }
         }
+    }
+
+    fn visit_identifier(&mut self, _identifier: &'ast ruff_python_ast::Identifier) {
+        // Skip identifiers, matching the formatter comment extraction
     }
 }
 

@@ -27,6 +27,8 @@ serde = { workspace = true, optional = true }
 smallvec = { workspace = true }
 
 [dev-dependencies]
+insta = { workspace = true, features = ["filters", "json", "redactions"] }
+test-case = { workspace = true }
 ruff_python_parser = { workspace = true }
 
 [lints]

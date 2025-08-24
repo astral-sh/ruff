@@ -1,10 +1,10 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::checkers::ast::Checker;
 use crate::Locator;
+use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for f-strings that do not contain any placeholder expressions.
@@ -68,12 +68,12 @@ impl AlwaysFixableViolation for FStringMissingPlaceholders {
 }
 
 /// F541
-pub(crate) fn f_string_missing_placeholders(checker: &mut Checker, expr: &ast::ExprFString) {
+pub(crate) fn f_string_missing_placeholders(checker: &Checker, expr: &ast::ExprFString) {
     if expr.value.f_strings().any(|f_string| {
         f_string
             .elements
             .iter()
-            .any(ast::FStringElement::is_expression)
+            .any(ast::InterpolatedStringElement::is_interpolation)
     }) {
         return;
     }
@@ -91,13 +91,13 @@ pub(crate) fn f_string_missing_placeholders(checker: &mut Checker, expr: &ast::E
             TextSize::new(1),
         );
 
-        let mut diagnostic = Diagnostic::new(FStringMissingPlaceholders, f_string.range());
+        let mut diagnostic =
+            checker.report_diagnostic(FStringMissingPlaceholders, f_string.range());
         diagnostic.set_fix(convert_f_string_to_regular_string(
             prefix_range,
             f_string.range(),
             checker.locator(),
         ));
-        checker.diagnostics.push(diagnostic);
     }
 }
 

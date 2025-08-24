@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report an issue with ty
+    url: https://github.com/astral-sh/ty/issues/new/choose
+    about: Please report issues for our type checker ty in the ty repository.
+  - name: Documentation
+    url: https://docs.astral.sh/ruff
+    about: Please consult the documentation before creating an issue.
+  - name: Community
+    url: https://discord.com/invite/astral-sh
+    about: Join our Discord community to ask questions and collaborate.

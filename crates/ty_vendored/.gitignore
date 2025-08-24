@@ -1,0 +1,4 @@
+# Do not ignore any of the vendored files. If this pattern is not present,
+# we will gitignore the `venv/` stubs in typeshed, as there is a general
+# rule to ignore `venv/` directories in the root `.gitignore`.
+!/vendor/typeshed/**/*

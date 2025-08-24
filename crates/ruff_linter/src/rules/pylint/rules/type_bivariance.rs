@@ -1,11 +1,11 @@
 use std::fmt;
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_const_true;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::pylint::helpers::type_param_name;
 
@@ -73,7 +73,7 @@ impl Violation for TypeBivariance {
 }
 
 /// PLC0131
-pub(crate) fn type_bivariance(checker: &mut Checker, value: &Expr) {
+pub(crate) fn type_bivariance(checker: &Checker, value: &Expr) {
     // If the typing modules were never imported, we'll never match below.
     if !checker.semantic().seen_typing() {
         return;
@@ -124,13 +124,13 @@ pub(crate) fn type_bivariance(checker: &mut Checker, value: &Expr) {
             return;
         };
 
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(
             TypeBivariance {
                 kind,
                 param_name: type_param_name(arguments).map(ToString::to_string),
             },
             func.range(),
-        ));
+        );
     }
 }
 

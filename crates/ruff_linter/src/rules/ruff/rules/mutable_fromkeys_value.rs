@@ -1,5 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::analyze::typing::is_mutable_expr;
@@ -9,6 +8,7 @@ use ruff_text_size::Ranged;
 use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for mutable objects passed as a value argument to `dict.fromkeys`.
@@ -65,7 +65,7 @@ impl Violation for MutableFromkeysValue {
 }
 
 /// RUF024
-pub(crate) fn mutable_fromkeys_value(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn mutable_fromkeys_value(checker: &Checker, call: &ast::ExprCall) {
     let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = call.func.as_ref() else {
         return;
     };
@@ -87,12 +87,11 @@ pub(crate) fn mutable_fromkeys_value(checker: &mut Checker, call: &ast::ExprCall
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(MutableFromkeysValue, call.range());
+    let mut diagnostic = checker.report_diagnostic(MutableFromkeysValue, call.range());
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
         generate_dict_comprehension(keys, value, checker.generator()),
         call.range(),
     )));
-    checker.diagnostics.push(diagnostic);
 }
 
 /// Format a code snippet to expression `{key: value for key in keys}`, where
@@ -103,6 +102,7 @@ fn generate_dict_comprehension(keys: &Expr, value: &Expr, generator: Generator) 
         id: Name::new_static("key"),
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     // Construct `key in keys`.
     let comp = ast::Comprehension {
@@ -110,6 +110,7 @@ fn generate_dict_comprehension(keys: &Expr, value: &Expr, generator: Generator) 
         iter: keys.clone(),
         ifs: vec![],
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         is_async: false,
     };
     // Construct the dict comprehension.
@@ -118,6 +119,7 @@ fn generate_dict_comprehension(keys: &Expr, value: &Expr, generator: Generator) 
         value: Box::new(value.clone()),
         generators: vec![comp],
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     generator.expr(&dict_comp.into())
 }

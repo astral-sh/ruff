@@ -1,14 +1,14 @@
 use ruff_python_ast::Expr;
 
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_semantic::analyze::typing::ModuleMember;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
-use crate::settings::types::PythonVersion;
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
+use ruff_python_ast::PythonVersion;
 
 /// ## What it does
 /// Checks for the use of generics that can be replaced with standard library
@@ -76,15 +76,11 @@ impl Violation for NonPEP585Annotation {
 }
 
 /// UP006
-pub(crate) fn use_pep585_annotation(
-    checker: &mut Checker,
-    expr: &Expr,
-    replacement: &ModuleMember,
-) {
+pub(crate) fn use_pep585_annotation(checker: &Checker, expr: &Expr, replacement: &ModuleMember) {
     let Some(from) = UnqualifiedName::from_expr(expr) else {
         return;
     };
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         NonPEP585Annotation {
             from: from.to_string(),
             to: replacement.to_string(),
@@ -102,7 +98,7 @@ pub(crate) fn use_pep585_annotation(
                         checker.semantic(),
                     )?;
                     let binding_edit = Edit::range_replacement(binding, expr.range());
-                    let applicability = if checker.settings.target_version >= PythonVersion::Py310 {
+                    let applicability = if checker.target_version() >= PythonVersion::PY310 {
                         Applicability::Safe
                     } else {
                         Applicability::Unsafe
@@ -126,7 +122,7 @@ pub(crate) fn use_pep585_annotation(
                     Ok(Fix::applicable_edits(
                         import_edit,
                         [reference_edit],
-                        if checker.settings.target_version >= PythonVersion::Py310 {
+                        if checker.target_version() >= PythonVersion::PY310 {
                             Applicability::Safe
                         } else {
                             Applicability::Unsafe
@@ -136,5 +132,4 @@ pub(crate) fn use_pep585_annotation(
             }
         }
     }
-    checker.diagnostics.push(diagnostic);
 }

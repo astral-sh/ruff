@@ -1,3 +1,4 @@
+use std::fmt::Write as _;
 use std::io::{self, BufWriter, Write};
 
 use anyhow::Result;
@@ -5,7 +6,7 @@ use serde::ser::SerializeSeq;
 use serde::{Serialize, Serializer};
 use strum::IntoEnumIterator;
 
-use ruff_diagnostics::FixAvailability;
+use ruff_linter::FixAvailability;
 use ruff_linter::registry::{Linter, Rule, RuleNamespace};
 
 use crate::args::HelpFormat;
@@ -18,7 +19,7 @@ struct Explanation<'a> {
     summary: &'a str,
     message_formats: &'a [&'a str],
     fix: String,
-    #[allow(clippy::struct_field_names)]
+    #[expect(clippy::struct_field_names)]
     explanation: Option<&'a str>,
     preview: bool,
 }
@@ -29,7 +30,7 @@ impl<'a> Explanation<'a> {
         let (linter, _) = Linter::parse_code(&code).unwrap();
         let fix = rule.fixable().to_string();
         Self {
-            name: rule.as_ref(),
+            name: rule.name().as_str(),
             code,
             linter: linter.name(),
             summary: rule.message_formats()[0],
@@ -43,12 +44,16 @@ impl<'a> Explanation<'a> {
 
 fn format_rule_text(rule: Rule) -> String {
     let mut output = String::new();
-    output.push_str(&format!("# {} ({})", rule.as_ref(), rule.noqa_code()));
+    let _ = write!(&mut output, "# {} ({})", rule.name(), rule.noqa_code());
     output.push('\n');
     output.push('\n');
 
     let (linter, _) = Linter::parse_code(&rule.noqa_code().to_string()).unwrap();
-    output.push_str(&format!("Derived from the **{}** linter.", linter.name()));
+    let _ = write!(
+        &mut output,
+        "Derived from the **{}** linter.",
+        linter.name()
+    );
     output.push('\n');
     output.push('\n');
 
@@ -76,7 +81,7 @@ fn format_rule_text(rule: Rule) -> String {
         output.push_str("Message formats:");
         for format in rule.message_formats() {
             output.push('\n');
-            output.push_str(&format!("* {format}"));
+            let _ = write!(&mut output, "* {format}");
         }
     }
     output
@@ -92,7 +97,7 @@ pub(crate) fn rule(rule: Rule, format: HelpFormat) -> Result<()> {
         HelpFormat::Json => {
             serde_json::to_writer_pretty(stdout, &Explanation::from_rule(&rule))?;
         }
-    };
+    }
     Ok(())
 }
 

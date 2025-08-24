@@ -1,10 +1,10 @@
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Expr, ExprCall, ExprStringLiteral};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -35,7 +35,8 @@ impl Violation for RepeatedKeywordArgument {
     }
 }
 
-pub(crate) fn repeated_keyword_argument(checker: &mut Checker, call: &ExprCall) {
+/// PLE1132
+pub(crate) fn repeated_keyword_argument(checker: &Checker, call: &ExprCall) {
     let ExprCall { arguments, .. } = call;
 
     let mut seen = FxHashSet::with_capacity_and_hasher(arguments.keywords.len(), FxBuildHasher);
@@ -44,24 +45,24 @@ pub(crate) fn repeated_keyword_argument(checker: &mut Checker, call: &ExprCall) 
         if let Some(id) = &keyword.arg {
             // Ex) `func(a=1, a=2)`
             if !seen.insert(id.as_str()) {
-                checker.diagnostics.push(Diagnostic::new(
+                checker.report_diagnostic(
                     RepeatedKeywordArgument {
                         duplicate_keyword: id.to_string(),
                     },
                     keyword.range(),
-                ));
+                );
             }
         } else if let Expr::Dict(dict) = &keyword.value {
             // Ex) `func(**{"a": 1, "a": 2})`
             for key in dict.iter_keys().flatten() {
                 if let Expr::StringLiteral(ExprStringLiteral { value, .. }) = key {
                     if !seen.insert(value.to_str()) {
-                        checker.diagnostics.push(Diagnostic::new(
+                        checker.report_diagnostic(
                             RepeatedKeywordArgument {
                                 duplicate_keyword: value.to_string(),
                             },
                             key.range(),
-                        ));
+                        );
                     }
                 }
             }

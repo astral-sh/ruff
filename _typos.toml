@@ -1,9 +1,13 @@
 [files]
 # https://github.com/crate-ci/typos/issues/868
 extend-exclude = [
-    "crates/red_knot_vendored/vendor/**/*",
+    "crates/ty_vendored/vendor/**/*",
     "**/resources/**/*",
     "**/snapshots/**/*",
+    # Completion tests tend to have a lot of incomplete
+    # words naturally. It's annoying to have to make all
+    # of them actually words. So just ignore typos here.
+    "crates/ty_ide/src/completion.rs",
 ]
 
 [default.extend-words]
@@ -23,6 +27,10 @@ extend-ignore-re = [
     # Line ignore with trailing "spellchecker:disable-line"
     "(?Rm)^.*#\\s*spellchecker:disable-line$",
     "LICENSEs",
+    # Various third party dependencies uses `typ` as struct field names (e.g., lsp_types::LogMessageParams)
+    "typ",
+    # TODO: Remove this once the `TYP` redirects are removed from `rule_redirects.rs`
+    "TYP",
 ]
 
 [default.extend-identifiers]

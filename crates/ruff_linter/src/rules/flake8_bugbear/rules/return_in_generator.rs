@@ -1,11 +1,10 @@
-use ruff_diagnostics::Diagnostic;
-use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::statement_visitor;
 use ruff_python_ast::statement_visitor::StatementVisitor;
 use ruff_python_ast::{self as ast, Expr, Stmt, StmtFunctionDef};
 use ruff_text_size::TextRange;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -91,7 +90,7 @@ impl Violation for ReturnInGenerator {
 }
 
 /// B901
-pub(crate) fn return_in_generator(checker: &mut Checker, function_def: &StmtFunctionDef) {
+pub(crate) fn return_in_generator(checker: &Checker, function_def: &StmtFunctionDef) {
     if function_def.name.id == "__await__" {
         return;
     }
@@ -101,9 +100,7 @@ pub(crate) fn return_in_generator(checker: &mut Checker, function_def: &StmtFunc
 
     if visitor.has_yield {
         if let Some(return_) = visitor.return_ {
-            checker
-                .diagnostics
-                .push(Diagnostic::new(ReturnInGenerator, return_));
+            checker.report_diagnostic(ReturnInGenerator, return_);
         }
     }
 }
@@ -129,6 +126,7 @@ impl StatementVisitor<'_> for ReturnInGeneratorVisitor {
             Stmt::Return(ast::StmtReturn {
                 value: Some(_),
                 range,
+                node_index: _,
             }) => {
                 self.return_ = Some(*range);
             }

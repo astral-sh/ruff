@@ -5,8 +5,8 @@ use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 use strum::IntoEnumIterator;
+use unicode_normalization::UnicodeNormalization;
 
-use crate::options_base::{OptionsMetadata, Visit};
 use crate::settings::LineEnding;
 use ruff_formatter::IndentStyle;
 use ruff_graph::Direction;
@@ -30,8 +30,9 @@ use ruff_linter::rules::{
 use ruff_linter::settings::types::{
     IdentifierPattern, OutputFormat, PythonVersion, RequiredVersion,
 };
-use ruff_linter::{warn_user_once, RuleSelector};
+use ruff_linter::{RuleSelector, warn_user_once};
 use ruff_macros::{CombineOptions, OptionsMetadata};
+use ruff_options_metadata::{OptionsMetadata, Visit};
 use ruff_python_ast::name::Name;
 use ruff_python_formatter::{DocstringCodeLineWidth, QuoteStyle};
 use ruff_python_semantic::NameImports;
@@ -312,9 +313,11 @@ pub struct Options {
     /// ```
     ///
     /// If both are specified, `target-version` takes precedence over
-    /// `requires-python`.
+    /// `requires-python`. See [_Inferring the Python version_](https://docs.astral.sh/ruff/configuration/#inferring-the-python-version)
+    /// for a complete description of how the `target-version` is determined
+    /// when left unspecified.
     ///
-    /// Note that a stub file can [sometimes make use of a typing feature](https://typing.readthedocs.io/en/latest/spec/distributing.html#syntax)
+    /// Note that a stub file can [sometimes make use of a typing feature](https://typing.python.org/en/latest/spec/distributing.html#syntax)
     /// before it is available at runtime, as long as the stub does not make
     /// use of new *syntax*. For example, a type checker will understand
     /// `int | str` in a stub as being a `Union` type annotation, even if the
@@ -332,6 +335,29 @@ pub struct Options {
         "#
     )]
     pub target_version: Option<PythonVersion>,
+
+    /// A list of mappings from glob-style file pattern to Python version to use when checking the
+    /// corresponding file(s).
+    ///
+    /// This may be useful for overriding the global Python version settings in `target-version` or
+    /// `requires-python` for a subset of files. For example, if you have a project with a minimum
+    /// supported Python version of 3.9 but a subdirectory of developer scripts that want to use a
+    /// newer feature like the `match` statement from Python 3.10, you can use
+    /// `per-file-target-version` to specify `"developer_scripts/*.py" = "py310"`.
+    ///
+    /// This setting is used by the linter to enforce any enabled version-specific lint rules, as
+    /// well as by the formatter for any version-specific formatting options, such as parenthesizing
+    /// context managers on Python 3.10+.
+    #[option(
+        default = "{}",
+        value_type = "dict[str, PythonVersion]",
+        scope = "per-file-target-version",
+        example = r#"
+            # Override the project-wide Python version for a developer scripts directory:
+            "scripts/*.py" = "py312"
+        "#
+    )]
+    pub per_file_target_version: Option<FxHashMap<String, PythonVersion>>,
 
     /// The directories to consider when resolving first- vs. third-party
     /// imports.
@@ -488,6 +514,40 @@ pub struct LintOptions {
         "#
     )]
     pub preview: Option<bool>,
+
+    /// Whether to allow imports from the third-party `typing_extensions` module for Python versions
+    /// before a symbol was added to the first-party `typing` module.
+    ///
+    /// Many rules try to import symbols from the `typing` module but fall back to
+    /// `typing_extensions` for earlier versions of Python. This option can be used to disable this
+    /// fallback behavior in cases where `typing_extensions` is not installed.
+    #[option(
+        default = "true",
+        value_type = "bool",
+        example = r#"
+            # Disable `typing_extensions` imports
+            typing-extensions = false
+        "#
+    )]
+    pub typing_extensions: Option<bool>,
+
+    /// Whether to allow rules to add `from __future__ import annotations` in cases where this would
+    /// simplify a fix or enable a new diagnostic.
+    ///
+    /// For example, `TC001`, `TC002`, and `TC003` can move more imports into `TYPE_CHECKING` blocks
+    /// if `__future__` annotations are enabled.
+    ///
+    /// This setting is currently in [preview](https://docs.astral.sh/ruff/preview/) and requires
+    /// preview mode to be enabled to have any effect.
+    #[option(
+        default = "false",
+        value_type = "bool",
+        example = r#"
+            # Enable `from __future__ import annotations` imports
+            future-annotations = true
+        "#
+    )]
+    pub future_annotations: Option<bool>,
 }
 
 /// Newtype wrapper for [`LintCommonOptions`] that allows customizing the JSON schema and omitting the fields from the [`OptionsMetadata`].
@@ -515,10 +575,10 @@ impl schemars::JsonSchema for DeprecatedTopLevelLintOptions {
             "DeprecatedTopLevelLintOptions"
         ))
     }
-    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+    fn json_schema(generator: &mut schemars::r#gen::SchemaGenerator) -> schemars::schema::Schema {
         use schemars::schema::Schema;
 
-        let common_schema = LintCommonOptions::json_schema(gen);
+        let common_schema = LintCommonOptions::json_schema(generator);
         let mut schema_obj = common_schema.into_object();
 
         if let Some(object) = schema_obj.object.as_mut() {
@@ -656,7 +716,8 @@ pub struct LintCommonOptions {
     ///
     /// When breaking ties between enabled and disabled rules (via `select` and
     /// `ignore`, respectively), more specific prefixes override less
-    /// specific prefixes.
+    /// specific prefixes. `ignore` takes precedence over `select` if the same
+    /// prefix appears in both.
     #[option(
         default = "[]",
         value_type = "list[RuleSelector]",
@@ -742,7 +803,8 @@ pub struct LintCommonOptions {
     ///
     /// When breaking ties between enabled and disabled rules (via `select` and
     /// `ignore`, respectively), more specific prefixes override less
-    /// specific prefixes.
+    /// specific prefixes. `ignore` takes precedence over `select` if the
+    /// same prefix appears in both.
     #[option(
         default = r#"["E4", "E7", "E9", "F"]"#,
         value_type = "list[RuleSelector]",
@@ -942,6 +1004,7 @@ pub struct LintCommonOptions {
     // WARNING: Don't add new options to this type. Add them to `LintOptions` instead.
 }
 
+/// Options for the `flake8-annotations` plugin.
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, OptionsMetadata, CombineOptions, Serialize, Deserialize,
@@ -1011,6 +1074,7 @@ impl Flake8AnnotationsOptions {
     }
 }
 
+/// Options for the `flake8-bandit` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -1043,10 +1107,57 @@ pub struct Flake8BanditOptions {
         example = "check-typed-exception = true"
     )]
     pub check_typed_exception: Option<bool>,
+
+    /// A list of additional callable names that behave like
+    /// [`markupsafe.Markup`](https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup).
+    ///
+    /// Expects to receive a list of fully-qualified names (e.g., `webhelpers.html.literal`, rather than
+    /// `literal`).
+    #[option(
+        default = "[]",
+        value_type = "list[str]",
+        example = "extend-markup-names = [\"webhelpers.html.literal\", \"my_package.Markup\"]"
+    )]
+    pub extend_markup_names: Option<Vec<String>>,
+
+    /// A list of callable names, whose result may be safely passed into
+    /// [`markupsafe.Markup`](https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup).
+    ///
+    /// Expects to receive a list of fully-qualified names (e.g., `bleach.clean`, rather than `clean`).
+    ///
+    /// This setting helps you avoid false positives in code like:
+    ///
+    /// ```python
+    /// from bleach import clean
+    /// from markupsafe import Markup
+    ///
+    /// cleaned_markup = Markup(clean(some_user_input))
+    /// ```
+    ///
+    /// Where the use of [`bleach.clean`](https://bleach.readthedocs.io/en/latest/clean.html)
+    /// usually ensures that there's no XSS vulnerability.
+    ///
+    /// Although it is not recommended, you may also use this setting to whitelist other
+    /// kinds of calls, e.g. calls to i18n translation functions, where how safe that is
+    /// will depend on the implementation and how well the translations are audited.
+    ///
+    /// Another common use-case is to wrap the output of functions that generate markup
+    /// like [`xml.etree.ElementTree.tostring`](https://docs.python.org/3/library/xml.etree.elementtree.html#xml.etree.ElementTree.tostring)
+    /// or template rendering engines where sanitization of potential user input is either
+    /// already baked in or has to happen before rendering.
+    #[option(
+        default = "[]",
+        value_type = "list[str]",
+        example = "allowed-markup-calls = [\"bleach.clean\", \"my_package.sanitize\"]"
+    )]
+    pub allowed_markup_calls: Option<Vec<String>>,
 }
 
 impl Flake8BanditOptions {
-    pub fn into_settings(self) -> ruff_linter::rules::flake8_bandit::settings::Settings {
+    pub fn into_settings(
+        self,
+        ruff_options: Option<&RuffOptions>,
+    ) -> ruff_linter::rules::flake8_bandit::settings::Settings {
         ruff_linter::rules::flake8_bandit::settings::Settings {
             hardcoded_tmp_directory: self
                 .hardcoded_tmp_directory
@@ -1055,10 +1166,25 @@ impl Flake8BanditOptions {
                 .chain(self.hardcoded_tmp_directory_extend.unwrap_or_default())
                 .collect(),
             check_typed_exception: self.check_typed_exception.unwrap_or(false),
+            extend_markup_names: self
+                .extend_markup_names
+                .or_else(|| {
+                    #[expect(deprecated)]
+                    ruff_options.and_then(|options| options.extend_markup_names.clone())
+                })
+                .unwrap_or_default(),
+            allowed_markup_calls: self
+                .allowed_markup_calls
+                .or_else(|| {
+                    #[expect(deprecated)]
+                    ruff_options.and_then(|options| options.allowed_markup_calls.clone())
+                })
+                .unwrap_or_default(),
         }
     }
 }
 
+/// Options for the `flake8-boolean-trap` plugin
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -1085,6 +1211,7 @@ impl Flake8BooleanTrapOptions {
     }
 }
 
+/// Options for the `flake8-bugbear` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -1115,36 +1242,111 @@ impl Flake8BugbearOptions {
         }
     }
 }
+
+/// Options for the `flake8-builtins` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Flake8BuiltinsOptions {
+    /// DEPRECATED: This option has been renamed to `ignorelist`. Use `ignorelist` instead.
+    ///
+    /// Ignore list of builtins.
+    ///
+    /// This option is ignored if both `ignorelist` and `builtins-ignorelist` are set.
     #[option(
         default = r#"[]"#,
         value_type = "list[str]",
         example = "builtins-ignorelist = [\"id\"]"
     )]
-    /// Ignore list of builtins.
+    #[deprecated(
+        since = "0.10.0",
+        note = "`builtins-ignorelist` has been renamed to `ignorelist`. Use that instead."
+    )]
     pub builtins_ignorelist: Option<Vec<String>>,
+
+    /// Ignore list of builtins.
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = "ignorelist = [\"id\"]"
+    )]
+    pub ignorelist: Option<Vec<String>>,
+
+    /// DEPRECATED: This option has been renamed to `allowed-modules`. Use `allowed-modules` instead.
+    ///
+    /// List of builtin module names to allow.
+    ///
+    /// This option is ignored if both `allowed-modules` and `builtins-allowed-modules` are set.
     #[option(
         default = r#"[]"#,
         value_type = "list[str]",
         example = "builtins-allowed-modules = [\"secrets\"]"
     )]
-    /// List of builtin module names to allow.
+    #[deprecated(
+        since = "0.10.0",
+        note = "`builtins-allowed-modules` has been renamed to `allowed-modules`. Use that instead."
+    )]
     pub builtins_allowed_modules: Option<Vec<String>>,
+
+    /// List of builtin module names to allow.
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = "allowed-modules = [\"secrets\"]"
+    )]
+    pub allowed_modules: Option<Vec<String>>,
+
+    /// DEPRECATED: This option has been renamed to `strict-checking`. Use `strict-checking` instead.
+    ///
+    /// Compare module names instead of full module paths.
+    ///
+    /// This option is ignored if both `strict-checking` and `builtins-strict-checking` are set.
+    #[option(
+        default = r#"false"#,
+        value_type = "bool",
+        example = "builtins-strict-checking = true"
+    )]
+    #[deprecated(
+        since = "0.10.0",
+        note = "`builtins-strict-checking` has been renamed to `strict-checking`. Use that instead."
+    )]
+    pub builtins_strict_checking: Option<bool>,
+
+    /// Compare module names instead of full module paths.
+    ///
+    /// Used by [`A005` - `stdlib-module-shadowing`](https://docs.astral.sh/ruff/rules/stdlib-module-shadowing/).
+    #[option(
+        default = r#"false"#,
+        value_type = "bool",
+        example = "strict-checking = true"
+    )]
+    pub strict_checking: Option<bool>,
 }
 
 impl Flake8BuiltinsOptions {
     pub fn into_settings(self) -> ruff_linter::rules::flake8_builtins::settings::Settings {
+        #[expect(deprecated)]
         ruff_linter::rules::flake8_builtins::settings::Settings {
-            builtins_ignorelist: self.builtins_ignorelist.unwrap_or_default(),
-            builtins_allowed_modules: self.builtins_allowed_modules.unwrap_or_default(),
+            ignorelist: self
+                .ignorelist
+                .or(self.builtins_ignorelist)
+                .unwrap_or_default(),
+            allowed_modules: self
+                .allowed_modules
+                .or(self.builtins_allowed_modules)
+                .unwrap_or_default(),
+            strict_checking: self
+                .strict_checking
+                .or(self.builtins_strict_checking)
+                // use the old default of true on non-preview
+                .unwrap_or_default(),
         }
     }
 }
+
+/// Options for the `flake8-comprehensions` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -1170,6 +1372,7 @@ impl Flake8ComprehensionsOptions {
     }
 }
 
+/// Options for the `flake8-copyright` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -1225,6 +1428,7 @@ impl Flake8CopyrightOptions {
     }
 }
 
+/// Options for the `flake8-errmsg` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -1244,6 +1448,7 @@ impl Flake8ErrMsgOptions {
     }
 }
 
+/// Options for the `flake8-gettext` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -1281,6 +1486,7 @@ impl Flake8GetTextOptions {
     }
 }
 
+/// Options for the `flake8-implicit-str-concat` plugin
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -1315,6 +1521,7 @@ impl Flake8ImplicitStrConcatOptions {
     }
 }
 
+/// Options for the `flake8-import-conventions` plugin
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -1324,7 +1531,7 @@ pub struct Flake8ImportConventionsOptions {
     /// The conventional aliases for imports. These aliases can be extended by
     /// the [`extend-aliases`](#lint_flake8-import-conventions_extend-aliases) option.
     #[option(
-        default = r#"{"altair": "alt", "matplotlib": "mpl", "matplotlib.pyplot": "plt", "numpy": "np", "pandas": "pd", "seaborn": "sns", "tensorflow": "tf", "tkinter":  "tk", "holoviews": "hv", "panel": "pn", "plotly.express": "px", "polars": "pl", "pyarrow": "pa", "xml.etree.ElementTree": "ET"}"#,
+        default = r#"{"altair": "alt", "matplotlib": "mpl", "matplotlib.pyplot": "plt", "numpy": "np", "numpy.typing": "npt", "pandas": "pd", "seaborn": "sns", "tensorflow": "tf", "tkinter":  "tk", "holoviews": "hv", "panel": "pn", "plotly.express": "px", "polars": "pl", "pyarrow": "pa", "xml.etree.ElementTree": "ET"}"#,
         value_type = "dict[str, str]",
         scope = "aliases",
         example = r#"
@@ -1444,7 +1651,9 @@ impl<'de> Deserialize<'de> for Alias {
 }
 
 impl Flake8ImportConventionsOptions {
-    pub fn into_settings(self) -> flake8_import_conventions::settings::Settings {
+    pub fn try_into_settings(
+        self,
+    ) -> anyhow::Result<flake8_import_conventions::settings::Settings> {
         let mut aliases: FxHashMap<String, String> = match self.aliases {
             Some(options_aliases) => options_aliases
                 .into_iter()
@@ -1460,14 +1669,26 @@ impl Flake8ImportConventionsOptions {
             );
         }
 
-        flake8_import_conventions::settings::Settings {
-            aliases,
+        let mut normalized_aliases: FxHashMap<String, String> = FxHashMap::default();
+        for (module, alias) in aliases {
+            let normalized_alias = alias.nfkc().collect::<String>();
+            if normalized_alias == "__debug__" {
+                anyhow::bail!(
+                    "Invalid alias for module '{module}': alias normalizes to '__debug__', which is not allowed."
+                );
+            }
+            normalized_aliases.insert(module, normalized_alias);
+        }
+
+        Ok(flake8_import_conventions::settings::Settings {
+            aliases: normalized_aliases,
             banned_aliases: self.banned_aliases.unwrap_or_default(),
             banned_from: self.banned_from.unwrap_or_default(),
-        }
+        })
     }
 }
 
+/// Options for the `flake8-pytest-style` plugin
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -1658,6 +1879,7 @@ impl Flake8PytestStyleOptions {
     }
 }
 
+/// Options for the `flake8-quotes` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -1730,6 +1952,7 @@ impl Flake8QuotesOptions {
     }
 }
 
+/// Options for the `flake8_self` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -1770,6 +1993,7 @@ impl Flake8SelfOptions {
     }
 }
 
+/// Options for the `flake8-tidy-imports` plugin
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -1804,7 +2028,8 @@ pub struct Flake8TidyImportsOptions {
 
     /// List of specific modules that may not be imported at module level, and should instead be
     /// imported lazily (e.g., within a function definition, or an `if TYPE_CHECKING:`
-    /// block, or some other nested context).
+    /// block, or some other nested context). This also affects the rule `import-outside-top-level`
+    /// if `banned-module-level-imports` is enabled.
     #[option(
         default = r#"[]"#,
         value_type = r#"list[str]"#,
@@ -1827,6 +2052,7 @@ impl Flake8TidyImportsOptions {
     }
 }
 
+/// Options for the `flake8-type-checking` plugin
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -1971,6 +2197,7 @@ impl Flake8TypeCheckingOptions {
     }
 }
 
+/// Options for the `flake8-unused-arguments` plugin
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -1994,6 +2221,7 @@ impl Flake8UnusedArgumentsOptions {
     }
 }
 
+/// Options for the `isort` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -2248,7 +2476,7 @@ pub struct IsortOptions {
     /// Use `-1` for automatic determination.
     ///
     /// Ruff uses at most one blank line after imports in typing stub files (files with `.pyi` extension) in accordance to
-    /// the typing style recommendations ([source](https://typing.readthedocs.io/en/latest/guides/writing_stubs.html#blank-lines)).
+    /// the typing style recommendations ([source](https://typing.python.org/en/latest/guides/writing_stubs.html#blank-lines)).
     ///
     /// When using the formatter, only the values `-1`, `1`, and `2` are compatible because
     /// it enforces at least one empty and at most two empty lines after imports.
@@ -2475,7 +2703,9 @@ impl IsortOptions {
         let force_sort_within_sections = self.force_sort_within_sections.unwrap_or_default();
         let lines_between_types = self.lines_between_types.unwrap_or_default();
         if force_sort_within_sections && lines_between_types != 0 {
-            warn_user_once!("`lines-between-types` is ignored when `force-sort-within-sections` is set to `true`");
+            warn_user_once!(
+                "`lines-between-types` is ignored when `force-sort-within-sections` is set to `true`"
+            );
         }
 
         // Extract any configuration options that deal with user-defined sections.
@@ -2641,6 +2871,7 @@ impl IsortOptions {
     }
 }
 
+/// Options for the `mccabe` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -2669,6 +2900,7 @@ impl McCabeOptions {
     }
 }
 
+/// Options for the `pep8-naming` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -2761,6 +2993,7 @@ impl Pep8NamingOptions {
     }
 }
 
+/// Options for the `pycodestyle` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -2835,6 +3068,7 @@ impl PycodestyleOptions {
     }
 }
 
+/// Options for the `pydocstyle` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -2919,7 +3153,7 @@ pub struct PydocstyleOptions {
         default = r#"false"#,
         value_type = "bool",
         example = r#"
-            ignore_var_parameters = true
+            ignore-var-parameters = true
         "#
     )]
     pub ignore_var_parameters: Option<bool>,
@@ -2942,6 +3176,7 @@ impl PydocstyleOptions {
     }
 }
 
+/// Options for the `pydoclint` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -2971,6 +3206,7 @@ impl PydoclintOptions {
     }
 }
 
+/// Options for the `pyflakes` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -3015,6 +3251,7 @@ impl PyflakesOptions {
     }
 }
 
+/// Options for the `pylint` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -3124,6 +3361,7 @@ impl PylintOptions {
     }
 }
 
+/// Options for the `pyupgrade` plugin.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -3179,6 +3417,7 @@ impl PyUpgradeOptions {
     }
 }
 
+/// Options for the `ruff` plugin
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
@@ -3206,6 +3445,10 @@ pub struct RuffOptions {
         default = "[]",
         value_type = "list[str]",
         example = "extend-markup-names = [\"webhelpers.html.literal\", \"my_package.Markup\"]"
+    )]
+    #[deprecated(
+        since = "0.10.0",
+        note = "The `extend-markup-names` option has been moved to the `flake8-bandit` section of the configuration."
     )]
     pub extend_markup_names: Option<Vec<String>>,
 
@@ -3239,6 +3482,10 @@ pub struct RuffOptions {
         value_type = "list[str]",
         example = "allowed-markup-calls = [\"bleach.clean\", \"my_package.sanitize\"]"
     )]
+    #[deprecated(
+        since = "0.10.0",
+        note = "The `allowed-markup-names` option has been moved to the `flake8-bandit` section of the configuration."
+    )]
     pub allowed_markup_calls: Option<Vec<String>>,
 }
 
@@ -3248,8 +3495,6 @@ impl RuffOptions {
             parenthesize_tuple_in_subscript: self
                 .parenthesize_tuple_in_subscript
                 .unwrap_or_default(),
-            extend_markup_names: self.extend_markup_names.unwrap_or_default(),
-            allowed_markup_calls: self.allowed_markup_calls.unwrap_or_default(),
         }
     }
 }
@@ -3374,7 +3619,7 @@ pub struct FormatOptions {
     /// Setting `skip-magic-trailing-comma = true` changes the formatting to:
     ///
     /// ```python
-    /// # The arguments remain on separate lines because of the trailing comma after `b`
+    /// # The arguments are collapsed to a single line because the trailing comma is ignored
     /// def test(a, b):
     ///     pass
     /// ```
@@ -3612,6 +3857,12 @@ pub struct AnalyzeOptions {
         "#
     )]
     pub detect_string_imports: Option<bool>,
+    /// The minimum number of dots in a string to consider it a valid import.
+    ///
+    /// This setting is only relevant when [`detect-string-imports`](#detect-string-imports) is enabled.
+    /// For example, if this is set to `2`, then only strings with at least two dots (e.g., `"path.to.module"`)
+    /// would be considered valid imports.
+    pub string_imports_min_dots: Option<usize>,
     /// A map from file path to the list of Python or non-Python file paths or globs that should be
     /// considered dependencies of that file, regardless of whether relevant imports are detected.
     #[option(
@@ -3682,6 +3933,8 @@ pub struct LintOptionsWire {
     pydoclint: Option<PydoclintOptions>,
     ruff: Option<RuffOptions>,
     preview: Option<bool>,
+    typing_extensions: Option<bool>,
+    future_annotations: Option<bool>,
 }
 
 impl From<LintOptionsWire> for LintOptions {
@@ -3736,10 +3989,12 @@ impl From<LintOptionsWire> for LintOptions {
             pydoclint,
             ruff,
             preview,
+            typing_extensions,
+            future_annotations,
         } = value;
 
         LintOptions {
-            #[allow(deprecated)]
+            #[expect(deprecated)]
             common: LintCommonOptions {
                 allowed_confusables,
                 dummy_variable_rgx,
@@ -3791,6 +4046,8 @@ impl From<LintOptionsWire> for LintOptions {
             pydoclint,
             ruff,
             preview,
+            typing_extensions,
+            future_annotations,
         }
     }
 }
@@ -3799,9 +4056,7 @@ impl From<LintOptionsWire> for LintOptions {
 mod tests {
     use crate::options::Flake8SelfOptions;
     use ruff_linter::rules::flake8_self;
-    use ruff_linter::settings::types::PythonVersion as LinterPythonVersion;
     use ruff_python_ast::name::Name;
-    use ruff_python_formatter::PythonVersion as FormatterPythonVersion;
 
     #[test]
     fn flake8_self_options() {
@@ -3847,30 +4102,6 @@ mod tests {
         assert_eq!(
             settings.ignore_names,
             vec![Name::new_static("_foo"), Name::new_static("_bar")]
-        );
-    }
-
-    #[test]
-    fn formatter_and_linter_target_version_have_same_default() {
-        assert_eq!(
-            FormatterPythonVersion::default().as_tuple(),
-            LinterPythonVersion::default().as_tuple()
-        );
-    }
-
-    #[test]
-    fn formatter_and_linter_target_version_have_same_latest() {
-        assert_eq!(
-            FormatterPythonVersion::latest().as_tuple(),
-            LinterPythonVersion::latest().as_tuple()
-        );
-    }
-
-    #[test]
-    fn formatter_and_linter_target_version_have_same_minimal_supported() {
-        assert_eq!(
-            FormatterPythonVersion::minimal_supported().as_tuple(),
-            LinterPythonVersion::minimal_supported().as_tuple()
         );
     }
 }

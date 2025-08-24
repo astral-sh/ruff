@@ -1,9 +1,9 @@
 use ruff_python_ast::{self as ast, Expr};
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
@@ -46,10 +46,10 @@ impl Violation for AssertOnStringLiteral {
 }
 
 /// PLW0129
-pub(crate) fn assert_on_string_literal(checker: &mut Checker, test: &Expr) {
+pub(crate) fn assert_on_string_literal(checker: &Checker, test: &Expr) {
     match test {
         Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(
                 AssertOnStringLiteral {
                     kind: if value.is_empty() {
                         Kind::Empty
@@ -58,10 +58,10 @@ pub(crate) fn assert_on_string_literal(checker: &mut Checker, test: &Expr) {
                     },
                 },
                 test.range(),
-            ));
+            );
         }
         Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(
                 AssertOnStringLiteral {
                     kind: if value.is_empty() {
                         Kind::Empty
@@ -70,17 +70,17 @@ pub(crate) fn assert_on_string_literal(checker: &mut Checker, test: &Expr) {
                     },
                 },
                 test.range(),
-            ));
+            );
         }
         Expr::FString(ast::ExprFString { value, .. }) => {
             let kind = if value.iter().all(|f_string_part| match f_string_part {
                 ast::FStringPart::Literal(literal) => literal.is_empty(),
                 ast::FStringPart::FString(f_string) => {
                     f_string.elements.iter().all(|element| match element {
-                        ast::FStringElement::Literal(ast::FStringLiteralElement {
-                            value, ..
-                        }) => value.is_empty(),
-                        ast::FStringElement::Expression(_) => false,
+                        ast::InterpolatedStringElement::Literal(
+                            ast::InterpolatedStringLiteralElement { value, .. },
+                        ) => value.is_empty(),
+                        ast::InterpolatedStringElement::Interpolation(_) => false,
                     })
                 }
             }) {
@@ -89,10 +89,10 @@ pub(crate) fn assert_on_string_literal(checker: &mut Checker, test: &Expr) {
                 ast::FStringPart::Literal(literal) => !literal.is_empty(),
                 ast::FStringPart::FString(f_string) => {
                     f_string.elements.iter().any(|element| match element {
-                        ast::FStringElement::Literal(ast::FStringLiteralElement {
-                            value, ..
-                        }) => !value.is_empty(),
-                        ast::FStringElement::Expression(_) => false,
+                        ast::InterpolatedStringElement::Literal(
+                            ast::InterpolatedStringLiteralElement { value, .. },
+                        ) => !value.is_empty(),
+                        ast::InterpolatedStringElement::Interpolation(_) => false,
                     })
                 }
             }) {
@@ -100,10 +100,7 @@ pub(crate) fn assert_on_string_literal(checker: &mut Checker, test: &Expr) {
             } else {
                 Kind::Unknown
             };
-            checker.diagnostics.push(Diagnostic::new(
-                AssertOnStringLiteral { kind },
-                test.range(),
-            ));
+            checker.report_diagnostic(AssertOnStringLiteral { kind }, test.range());
         }
         _ => {}
     }

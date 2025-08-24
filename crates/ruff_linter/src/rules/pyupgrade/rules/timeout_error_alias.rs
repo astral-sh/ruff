@@ -1,14 +1,14 @@
 use ruff_python_ast::{self as ast, ExceptHandler, Expr, ExprContext};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::fix::edits::pad;
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::PythonVersion;
 use ruff_python_ast::name::{Name, UnqualifiedName};
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
-use crate::settings::types::PythonVersion;
+use crate::fix::edits::pad;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for uses of exceptions that alias `TimeoutError`.
@@ -27,6 +27,8 @@ use crate::settings::types::PythonVersion;
 ///
 /// ## Example
 /// ```python
+/// import asyncio
+///
 /// raise asyncio.TimeoutError
 /// ```
 ///
@@ -62,7 +64,7 @@ fn is_alias(expr: &Expr, semantic: &SemanticModel, target_version: PythonVersion
     semantic
         .resolve_qualified_name(expr)
         .is_some_and(|qualified_name| {
-            if target_version >= PythonVersion::Py311 {
+            if target_version >= PythonVersion::PY311 {
                 matches!(
                     qualified_name.segments(),
                     ["socket", "timeout"] | ["asyncio", "TimeoutError"]
@@ -73,7 +75,7 @@ fn is_alias(expr: &Expr, semantic: &SemanticModel, target_version: PythonVersion
                 // fix in Python <3.10. We add an assert to make this assumption
                 // explicit.
                 assert!(
-                    target_version >= PythonVersion::Py310,
+                    target_version >= PythonVersion::PY310,
                     "lint should only be used for Python 3.10+",
                 );
                 matches!(qualified_name.segments(), ["socket", "timeout"])
@@ -82,8 +84,8 @@ fn is_alias(expr: &Expr, semantic: &SemanticModel, target_version: PythonVersion
 }
 
 /// Create a [`Diagnostic`] for a single target, like an [`Expr::Name`].
-fn atom_diagnostic(checker: &mut Checker, target: &Expr) {
-    let mut diagnostic = Diagnostic::new(
+fn atom_diagnostic(checker: &Checker, target: &Expr) {
+    let mut diagnostic = checker.report_diagnostic(
         TimeoutErrorAlias {
             name: UnqualifiedName::from_expr(target).map(|name| name.to_string()),
         },
@@ -100,12 +102,11 @@ fn atom_diagnostic(checker: &mut Checker, target: &Expr) {
             import_edit,
         ))
     });
-    checker.diagnostics.push(diagnostic);
 }
 
 /// Create a [`Diagnostic`] for a tuple of expressions.
-fn tuple_diagnostic(checker: &mut Checker, tuple: &ast::ExprTuple, aliases: &[&Expr]) {
-    let mut diagnostic = Diagnostic::new(TimeoutErrorAlias { name: None }, tuple.range());
+fn tuple_diagnostic(checker: &Checker, tuple: &ast::ExprTuple, aliases: &[&Expr]) {
+    let mut diagnostic = checker.report_diagnostic(TimeoutErrorAlias { name: None }, tuple.range());
     let semantic = checker.semantic();
     if semantic.has_builtin_binding("TimeoutError") {
         // Filter out any `TimeoutErrors` aliases.
@@ -129,6 +130,7 @@ fn tuple_diagnostic(checker: &mut Checker, tuple: &ast::ExprTuple, aliases: &[&E
                 id: Name::new_static("TimeoutError"),
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             };
             remaining.insert(0, node.into());
         }
@@ -140,6 +142,7 @@ fn tuple_diagnostic(checker: &mut Checker, tuple: &ast::ExprTuple, aliases: &[&E
                 elts: remaining,
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 parenthesized: true,
             };
             format!("({})", checker.generator().expr(&node.into()))
@@ -150,11 +153,10 @@ fn tuple_diagnostic(checker: &mut Checker, tuple: &ast::ExprTuple, aliases: &[&E
             tuple.range(),
         )));
     }
-    checker.diagnostics.push(diagnostic);
 }
 
 /// UP041
-pub(crate) fn timeout_error_alias_handlers(checker: &mut Checker, handlers: &[ExceptHandler]) {
+pub(crate) fn timeout_error_alias_handlers(checker: &Checker, handlers: &[ExceptHandler]) {
     for handler in handlers {
         let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { type_, .. }) = handler;
         let Some(expr) = type_.as_ref() else {
@@ -162,7 +164,7 @@ pub(crate) fn timeout_error_alias_handlers(checker: &mut Checker, handlers: &[Ex
         };
         match expr.as_ref() {
             Expr::Name(_) | Expr::Attribute(_) => {
-                if is_alias(expr, checker.semantic(), checker.settings.target_version) {
+                if is_alias(expr, checker.semantic(), checker.target_version()) {
                     atom_diagnostic(checker, expr);
                 }
             }
@@ -170,7 +172,7 @@ pub(crate) fn timeout_error_alias_handlers(checker: &mut Checker, handlers: &[Ex
                 // List of aliases to replace with `TimeoutError`.
                 let mut aliases: Vec<&Expr> = vec![];
                 for element in tuple {
-                    if is_alias(element, checker.semantic(), checker.settings.target_version) {
+                    if is_alias(element, checker.semantic(), checker.target_version()) {
                         aliases.push(element);
                     }
                 }
@@ -184,16 +186,16 @@ pub(crate) fn timeout_error_alias_handlers(checker: &mut Checker, handlers: &[Ex
 }
 
 /// UP041
-pub(crate) fn timeout_error_alias_call(checker: &mut Checker, func: &Expr) {
-    if is_alias(func, checker.semantic(), checker.settings.target_version) {
+pub(crate) fn timeout_error_alias_call(checker: &Checker, func: &Expr) {
+    if is_alias(func, checker.semantic(), checker.target_version()) {
         atom_diagnostic(checker, func);
     }
 }
 
 /// UP041
-pub(crate) fn timeout_error_alias_raise(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn timeout_error_alias_raise(checker: &Checker, expr: &Expr) {
     if matches!(expr, Expr::Name(_) | Expr::Attribute(_)) {
-        if is_alias(expr, checker.semantic(), checker.settings.target_version) {
+        if is_alias(expr, checker.semantic(), checker.target_version()) {
             atom_diagnostic(checker, expr);
         }
     }

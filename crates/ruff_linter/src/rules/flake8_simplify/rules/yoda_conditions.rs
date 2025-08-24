@@ -3,19 +3,19 @@ use std::cmp;
 use anyhow::Result;
 use libcst_native::CompOp;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, CmpOp, Expr, UnaryOp};
 use ruff_python_codegen::Stylist;
 use ruff_python_stdlib::str::{self};
 use ruff_text_size::Ranged;
 
+use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::cst::helpers::or_space;
 use crate::cst::matchers::{match_comparison, transform_expression};
 use crate::fix::edits::pad;
 use crate::fix::snippet::SourceCodeSnippet;
-use crate::Locator;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for conditions that position a constant on the left-hand side of the
@@ -116,6 +116,7 @@ impl From<&Expr> for ConstantLikelihood {
                 op: UnaryOp::UAdd | UnaryOp::USub | UnaryOp::Invert,
                 operand,
                 range: _,
+                node_index: _,
             }) => ConstantLikelihood::from(&**operand),
             _ => ConstantLikelihood::Unlikely,
         }
@@ -203,7 +204,7 @@ fn reverse_comparison(expr: &Expr, locator: &Locator, stylist: &Stylist) -> Resu
 
 /// SIM300
 pub(crate) fn yoda_conditions(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     left: &Expr,
     ops: &[CmpOp],
@@ -225,7 +226,7 @@ pub(crate) fn yoda_conditions(
     }
 
     if let Ok(suggestion) = reverse_comparison(expr, checker.locator(), checker.stylist()) {
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             YodaConditions {
                 suggestion: Some(SourceCodeSnippet::new(suggestion.clone())),
             },
@@ -235,11 +236,7 @@ pub(crate) fn yoda_conditions(
             pad(suggestion, expr.range(), checker.locator()),
             expr.range(),
         )));
-        checker.diagnostics.push(diagnostic);
     } else {
-        checker.diagnostics.push(Diagnostic::new(
-            YodaConditions { suggestion: None },
-            expr.range(),
-        ));
+        checker.report_diagnostic(YodaConditions { suggestion: None }, expr.range());
     }
 }

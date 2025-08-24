@@ -309,7 +309,31 @@ my_project
 
 When Ruff sees an import like `import foo`, it will then iterate over the `src` directories,
 looking for a corresponding Python module (in reality, a directory named `foo` or a file named
-`foo.py`).
+`foo.py`). For module paths with multiple components like `import foo.bar`,
+the default behavior is to search only for a directory named `foo` or a file
+named `foo.py`. However, if `preview` is enabled, Ruff will require that the full relative path `foo/bar` exists as a directory, or that `foo/bar.py` or `foo/bar.pyi` exist as files. Finally, imports of the form `from foo import bar`, Ruff will only use `foo` when determining whether a module is first-party or third-party. 
+
+If there is a directory
+whose name matches a third-party package, but does not contain Python code,
+it could happen that the above algorithm incorrectly infers an import to be first-party.
+To prevent this, you can modify the [`known-third-party`](settings.md#lint_isort_known-third-party) setting. For example, if you import
+the package `wandb` but also have a subdirectory of your `src` with
+the same name, you can add the following:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ruff.lint.isort]
+    known-third-party = ["wandb"]
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    [lint.isort]
+    known-third-party = ["wandb"]
+    ```
+
 
 If the `src` field is omitted, Ruff will default to using the "project root", along with a `"src"`
 subdirectory, as the first-party sources, to support both flat and nested project layouts.
@@ -639,7 +663,28 @@ making changes to code, even for seemingly trivial fixes. If a "safe" fix breaks
 Ruff's color output is powered by the [`colored`](https://crates.io/crates/colored) crate, which
 attempts to automatically detect whether the output stream supports color. However, you can force
 colors off by setting the `NO_COLOR` environment variable to any value (e.g., `NO_COLOR=1`), or
-force colors on by setting `FORCE_COLOR` to any non-empty value (e.g. `FORCE_COLOR=1`).
+force colors on by setting `FORCE_COLOR` to any non-empty value (e.g., `FORCE_COLOR=1`).
 
 [`colored`](https://crates.io/crates/colored) also supports the `CLICOLOR` and `CLICOLOR_FORCE`
 environment variables (see the [spec](https://bixense.com/clicolors/)).
+
+## Ruff behaves unexpectedly when using `source.*` code actions in Notebooks. What's going on? {: #source-code-actions-in-notebooks }
+
+Ruff does not support `source.organizeImports` and `source.fixAll` code actions in Jupyter Notebooks
+(`notebook.codeActionsOnSave` in VS Code). It's recommended to use the `notebook` prefixed code
+actions for the same such as `notebook.source.organizeImports` and `notebook.source.fixAll`
+respectively.
+
+Ruff requires to have a full view of the notebook to provide accurate diagnostics and fixes. For
+example, if you have a cell that imports a module and another cell that uses that module, Ruff
+needs to see both cells to mark the import as used. If Ruff were to only see one cell at a time,
+it would incorrectly mark the import as unused.
+
+When using the `source.*` code actions for a Notebook, Ruff will be asked to fix any issues for each
+cell in parallel, which can lead to unexpected behavior. For example, if a user has configured to
+run `source.organizeImports` code action on save for a Notebook, Ruff will attempt to fix the
+imports for the entire notebook corresponding to each cell. This leads to the client making the same
+changes to the notebook multiple times, which can lead to unexpected behavior
+([astral-sh/ruff-vscode#680](https://github.com/astral-sh/ruff-vscode/issues/680),
+[astral-sh/ruff-vscode#640](https://github.com/astral-sh/ruff-vscode/issues/640),
+[astral-sh/ruff-vscode#391](https://github.com/astral-sh/ruff-vscode/issues/391)).

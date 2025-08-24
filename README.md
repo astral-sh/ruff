@@ -34,8 +34,7 @@ An extremely fast Python linter and code formatter, written in Rust.
 - 🔧 Fix support, for automatic error correction (e.g., automatically remove unused imports)
 - 📏 Over [800 built-in rules](https://docs.astral.sh/ruff/rules/), with native re-implementations
     of popular Flake8 plugins, like flake8-bugbear
-- ⌨️ First-party [editor integrations](https://docs.astral.sh/ruff/integrations/) for
-    [VS Code](https://github.com/astral-sh/ruff-vscode) and [more](https://docs.astral.sh/ruff/editors/setup)
+- ⌨️ First-party [editor integrations](https://docs.astral.sh/ruff/editors) for [VS Code](https://github.com/astral-sh/ruff-vscode) and [more](https://docs.astral.sh/ruff/editors/setup)
 - 🌎 Monorepo-friendly, with [hierarchical and cascading configuration](https://docs.astral.sh/ruff/configuration/#config-file-discovery)
 
 Ruff aims to be orders of magnitude faster than alternative tools while integrating more
@@ -149,8 +148,8 @@ curl -LsSf https://astral.sh/ruff/install.sh | sh
 powershell -c "irm https://astral.sh/ruff/install.ps1 | iex"
 
 # For a specific version.
-curl -LsSf https://astral.sh/ruff/0.9.2/install.sh | sh
-powershell -c "irm https://astral.sh/ruff/0.9.2/install.ps1 | iex"
+curl -LsSf https://astral.sh/ruff/0.12.10/install.sh | sh
+powershell -c "irm https://astral.sh/ruff/0.12.10/install.ps1 | iex"
 ```
 
 You can also install Ruff via [Homebrew](https://formulae.brew.sh/formula/ruff), [Conda](https://anaconda.org/conda-forge/ruff),
@@ -183,10 +182,10 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com/) hook via [`ruff
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.9.2
+  rev: v0.12.10
   hooks:
     # Run the linter.
-    - id: ruff
+    - id: ruff-check
       args: [ --fix ]
     # Run the formatter.
     - id: ruff-format
@@ -255,7 +254,7 @@ indent-width = 4
 target-version = "py39"
 
 [lint]
-# Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`)  codes by default.
+# Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`) codes by default.
 select = ["E4", "E7", "E9", "F"]
 ignore = []
 
@@ -424,12 +423,14 @@ Ruff is used by a number of major open-source projects and companies, including:
 
 - [Albumentations](https://github.com/albumentations-team/albumentations)
 - Amazon ([AWS SAM](https://github.com/aws/serverless-application-model))
+- [Anki](https://apps.ankiweb.net/)
 - Anthropic ([Python SDK](https://github.com/anthropics/anthropic-sdk-python))
 - [Apache Airflow](https://github.com/apache/airflow)
 - AstraZeneca ([Magnus](https://github.com/AstraZeneca/magnus-core))
 - [Babel](https://github.com/python-babel/babel)
 - Benchling ([Refac](https://github.com/benchling/refac))
 - [Bokeh](https://github.com/bokeh/bokeh)
+- Capital One ([datacompy](https://github.com/capitalone/datacompy))
 - CrowdCent ([NumerBlox](https://github.com/crowdcent/numerblox)) <!-- typos: ignore -->
 - [Cryptography (PyCA)](https://github.com/pyca/cryptography)
 - CERN ([Indico](https://getindico.io/))
@@ -452,6 +453,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - ING Bank ([popmon](https://github.com/ing-bank/popmon), [probatus](https://github.com/ing-bank/probatus))
 - [Ibis](https://github.com/ibis-project/ibis)
 - [ivy](https://github.com/unifyai/ivy)
+- [JAX](https://github.com/jax-ml/jax)
 - [Jupyter](https://github.com/jupyter-server/jupyter_server)
 - [Kraken Tech](https://kraken.tech/)
 - [LangChain](https://github.com/hwchase17/langchain)
@@ -505,6 +507,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [Streamlit](https://github.com/streamlit/streamlit)
 - [The Algorithms](https://github.com/TheAlgorithms/Python)
 - [Vega-Altair](https://github.com/altair-viz/altair)
+- [Weblate](https://weblate.org/)
 - WordPress ([Openverse](https://github.com/WordPress/openverse))
 - [ZenML](https://github.com/zenml-io/zenml)
 - [Zulip](https://github.com/zulip/zulip)

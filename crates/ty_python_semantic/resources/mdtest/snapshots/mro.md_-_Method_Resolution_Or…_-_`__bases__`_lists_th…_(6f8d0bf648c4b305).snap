@@ -1,0 +1,97 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: mro.md - Method Resolution Order tests - `__bases__` lists that include objects that are not instances of `type`
+mdtest path: crates/ty_python_semantic/resources/mdtest/mro.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | class Foo(2): ...  # error: [invalid-base]
+ 2 | class Foo:
+ 3 |     def __mro_entries__(self, bases: tuple[type, ...]) -> tuple[type, ...]:
+ 4 |         return ()
+ 5 | 
+ 6 | class Bar(Foo()): ...  # error: [unsupported-base]
+ 7 | class Bad1:
+ 8 |     def __mro_entries__(self, bases, extra_arg):
+ 9 |         return ()
+10 | 
+11 | class Bad2:
+12 |     def __mro_entries__(self, bases) -> int:
+13 |         return 42
+14 | 
+15 | class BadSub1(Bad1()): ...  # error: [invalid-base]
+16 | class BadSub2(Bad2()): ...  # error: [invalid-base]
+```
+
+# Diagnostics
+
+```
+error[invalid-base]: Invalid class base with type `Literal[2]`
+ --> src/mdtest_snippet.py:1:11
+  |
+1 | class Foo(2): ...  # error: [invalid-base]
+  |           ^
+2 | class Foo:
+3 |     def __mro_entries__(self, bases: tuple[type, ...]) -> tuple[type, ...]:
+  |
+info: Definition of class `Foo` will raise `TypeError` at runtime
+info: rule `invalid-base` is enabled by default
+
+```
+
+```
+warning[unsupported-base]: Unsupported class base with type `Foo`
+ --> src/mdtest_snippet.py:6:11
+  |
+4 |         return ()
+5 |
+6 | class Bar(Foo()): ...  # error: [unsupported-base]
+  |           ^^^^^
+7 | class Bad1:
+8 |     def __mro_entries__(self, bases, extra_arg):
+  |
+info: ty cannot resolve a consistent MRO for class `Bar` due to this base
+info: Only class objects or `Any` are supported as class bases
+info: rule `unsupported-base` is enabled by default
+
+```
+
+```
+error[invalid-base]: Invalid class base with type `Bad1`
+  --> src/mdtest_snippet.py:15:15
+   |
+13 |         return 42
+14 |
+15 | class BadSub1(Bad1()): ...  # error: [invalid-base]
+   |               ^^^^^^
+16 | class BadSub2(Bad2()): ...  # error: [invalid-base]
+   |
+info: Definition of class `BadSub1` will raise `TypeError` at runtime
+info: An instance type is only a valid class base if it has a valid `__mro_entries__` method
+info: Type `Bad1` has an `__mro_entries__` method, but it cannot be called with the expected arguments
+info: Expected a signature at least as permissive as `def __mro_entries__(self, bases: tuple[type, ...], /) -> tuple[type, ...]`
+info: rule `invalid-base` is enabled by default
+
+```
+
+```
+error[invalid-base]: Invalid class base with type `Bad2`
+  --> src/mdtest_snippet.py:16:15
+   |
+15 | class BadSub1(Bad1()): ...  # error: [invalid-base]
+16 | class BadSub2(Bad2()): ...  # error: [invalid-base]
+   |               ^^^^^^
+   |
+info: Definition of class `BadSub2` will raise `TypeError` at runtime
+info: An instance type is only a valid class base if it has a valid `__mro_entries__` method
+info: Type `Bad2` has an `__mro_entries__` method, but it does not return a tuple of types
+info: rule `invalid-base` is enabled by default
+
+```

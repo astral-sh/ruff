@@ -3,15 +3,15 @@ use std::fmt::Display;
 use smallvec::SmallVec;
 
 use ast::{StmtClassDef, StmtFunctionDef};
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{self as ast, helpers::comment_indentation_after, AnyNodeRef};
-use ruff_python_trivia::{indentation_at_offset, SuppressionKind};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::{self as ast, AnyNodeRef, helpers::comment_indentation_after};
+use ruff_python_trivia::{SuppressionKind, indentation_at_offset};
 use ruff_text_size::{Ranged, TextLen, TextRange};
 
+use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::fix::edits::delete_comment;
-use crate::Locator;
+use crate::{AlwaysFixableViolation, Fix};
 
 use super::suppression_comment_visitor::{
     CaptureSuppressionComment, SuppressionComment, SuppressionCommentData,
@@ -26,7 +26,7 @@ use super::suppression_comment_visitor::{
 /// Suppression comments that do not actually prevent formatting could cause unintended changes
 /// when the formatter is run.
 ///
-/// ## Examples
+/// ## Example
 /// In the following example, all suppression comments would cause
 /// a rule violation.
 ///
@@ -49,6 +49,11 @@ use super::suppression_comment_visitor::{
 ///     # fmt: on
 ///     # yapf: enable
 /// ```
+///
+/// ## Fix safety
+///
+/// This fix is always marked as unsafe because it deletes the invalid suppression comment,
+/// rather than trying to move it to a valid position, which the user more likely intended.
 #[derive(ViolationMetadata)]
 pub(crate) struct InvalidFormatterSuppressionComment {
     reason: IgnoredReason,
@@ -69,7 +74,7 @@ impl AlwaysFixableViolation for InvalidFormatterSuppressionComment {
 }
 
 /// RUF028
-pub(crate) fn ignored_formatter_suppression_comment(checker: &mut Checker, suite: &ast::Suite) {
+pub(crate) fn ignored_formatter_suppression_comment(checker: &Checker, suite: &ast::Suite) {
     let locator = checker.locator();
     let comment_ranges: SmallVec<[SuppressionComment; 8]> = checker
         .comment_ranges()
@@ -99,10 +104,9 @@ pub(crate) fn ignored_formatter_suppression_comment(checker: &mut Checker, suite
     comments.sort();
 
     for (range, reason) in comments.ignored_comments() {
-        checker.diagnostics.push(
-            Diagnostic::new(InvalidFormatterSuppressionComment { reason }, range)
-                .with_fix(Fix::unsafe_edit(delete_comment(range, checker.locator()))),
-        );
+        checker
+            .report_diagnostic(InvalidFormatterSuppressionComment { reason }, range)
+            .set_fix(Fix::unsafe_edit(delete_comment(range, checker.locator())));
     }
 }
 
@@ -298,10 +302,11 @@ const fn is_valid_enclosing_node(node: AnyNodeRef) -> bool {
         | AnyNodeRef::ExprYieldFrom(_)
         | AnyNodeRef::ExprCompare(_)
         | AnyNodeRef::ExprCall(_)
-        | AnyNodeRef::FStringExpressionElement(_)
-        | AnyNodeRef::FStringLiteralElement(_)
-        | AnyNodeRef::FStringFormatSpec(_)
+        | AnyNodeRef::InterpolatedElement(_)
+        | AnyNodeRef::InterpolatedStringLiteralElement(_)
+        | AnyNodeRef::InterpolatedStringFormatSpec(_)
         | AnyNodeRef::ExprFString(_)
+        | AnyNodeRef::ExprTString(_)
         | AnyNodeRef::ExprStringLiteral(_)
         | AnyNodeRef::ExprBytesLiteral(_)
         | AnyNodeRef::ExprNumberLiteral(_)
@@ -339,6 +344,7 @@ const fn is_valid_enclosing_node(node: AnyNodeRef) -> bool {
         | AnyNodeRef::TypeParamTypeVarTuple(_)
         | AnyNodeRef::TypeParamParamSpec(_)
         | AnyNodeRef::FString(_)
+        | AnyNodeRef::TString(_)
         | AnyNodeRef::StringLiteral(_)
         | AnyNodeRef::BytesLiteral(_)
         | AnyNodeRef::Identifier(_) => false,

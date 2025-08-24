@@ -1,0 +1,46 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/stub_files/decorated_class_after_function.pyi
+---
+## Input
+```python
+# Issue #18865: Decorated classes below functions should be separated with blank lines
+def hello(): ...
+@lambda _, /: _
+class A: ...
+
+def world(): ...
+
+@final
+class B: ...
+```
+
+## Output
+```python
+# Issue #18865: Decorated classes below functions should be separated with blank lines
+def hello(): ...
+@lambda _, /: _
+class A: ...
+
+def world(): ...
+@final
+class B: ...
+```
+
+
+## Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -1,8 +1,10 @@
+ # Issue #18865: Decorated classes below functions should be separated with blank lines
+ def hello(): ...
++
+ @lambda _, /: _
+ class A: ...
+ 
+ def world(): ...
++
+ @final
+ class B: ...
+```

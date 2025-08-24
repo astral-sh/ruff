@@ -1,12 +1,12 @@
 use ruff_python_ast::{self as ast, ExceptHandler, Expr};
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_stdlib::logging::LoggingLevel;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::tryceratops::helpers::LoggerCandidateVisitor;
 
@@ -44,14 +44,14 @@ impl Violation for VerboseLogMessage {
 }
 
 /// TRY401
-pub(crate) fn verbose_log_message(checker: &mut Checker, handlers: &[ExceptHandler]) {
+pub(crate) fn verbose_log_message(checker: &Checker, handlers: &[ExceptHandler]) {
     for handler in handlers {
         let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { body, .. }) = handler;
 
         // Find all calls to `logging.exception`.
         let calls = {
             let mut visitor =
-                LoggerCandidateVisitor::new(checker.semantic(), &checker.settings.logger_objects);
+                LoggerCandidateVisitor::new(checker.semantic(), &checker.settings().logger_objects);
             visitor.visit_body(body);
             visitor.calls
         };
@@ -78,9 +78,7 @@ pub(crate) fn verbose_log_message(checker: &mut Checker, handlers: &[ExceptHandl
                     };
                     let binding = checker.semantic().binding(id);
                     if binding.kind.is_bound_exception() {
-                        checker
-                            .diagnostics
-                            .push(Diagnostic::new(VerboseLogMessage, expr.range()));
+                        checker.report_diagnostic(VerboseLogMessage, expr.range());
                     }
                 }
             }

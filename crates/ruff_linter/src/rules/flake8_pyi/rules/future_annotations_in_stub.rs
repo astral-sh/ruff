@@ -1,8 +1,8 @@
 use ruff_python_ast::StmtImportFrom;
 
-use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 
+use crate::{Fix, FixAvailability, Violation};
 use crate::{checkers::ast::Checker, fix};
 
 /// ## What it does
@@ -16,7 +16,7 @@ use crate::{checkers::ast::Checker, fix};
 /// statement has no effect and should be omitted.
 ///
 /// ## References
-/// - [Static Typing with Python: Type Stubs](https://typing.readthedocs.io/en/latest/source/stubs.html)
+/// - [Typing Style Guide](https://typing.python.org/en/latest/guides/writing_stubs.html#language-features)
 #[derive(ViolationMetadata)]
 pub(crate) struct FutureAnnotationsInStub;
 
@@ -34,7 +34,7 @@ impl Violation for FutureAnnotationsInStub {
 }
 
 /// PYI044
-pub(crate) fn from_future_import(checker: &mut Checker, target: &StmtImportFrom) {
+pub(crate) fn from_future_import(checker: &Checker, target: &StmtImportFrom) {
     let StmtImportFrom {
         range,
         module: Some(module_name),
@@ -47,30 +47,26 @@ pub(crate) fn from_future_import(checker: &mut Checker, target: &StmtImportFrom)
 
     if module_name != "__future__" {
         return;
-    };
+    }
 
     if names.iter().all(|alias| &*alias.name != "annotations") {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(FutureAnnotationsInStub, *range);
+    let mut diagnostic = checker.report_diagnostic(FutureAnnotationsInStub, *range);
 
-    if checker.settings.preview.is_enabled() {
-        let stmt = checker.semantic().current_statement();
+    let stmt = checker.semantic().current_statement();
 
-        diagnostic.try_set_fix(|| {
-            let edit = fix::edits::remove_unused_imports(
-                std::iter::once("annotations"),
-                stmt,
-                None,
-                checker.locator(),
-                checker.stylist(),
-                checker.indexer(),
-            )?;
+    diagnostic.try_set_fix(|| {
+        let edit = fix::edits::remove_unused_imports(
+            std::iter::once("annotations"),
+            stmt,
+            None,
+            checker.locator(),
+            checker.stylist(),
+            checker.indexer(),
+        )?;
 
-            Ok(Fix::safe_edit(edit))
-        });
-    }
-
-    checker.diagnostics.push(diagnostic);
+        Ok(Fix::safe_edit(edit))
+    });
 }

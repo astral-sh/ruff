@@ -1,0 +1,53 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: attribute_assignment.md - Attribute assignment - Possibly-unbound attributes
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/attribute_assignment.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | def _(flag: bool) -> None:
+2 |     class C:
+3 |         if flag:
+4 |             attr: int = 0
+5 | 
+6 |     C.attr = 1  # error: [possibly-unbound-attribute]
+7 | 
+8 |     instance = C()
+9 |     instance.attr = 1  # error: [possibly-unbound-attribute]
+```
+
+# Diagnostics
+
+```
+warning[possibly-unbound-attribute]: Attribute `attr` on type `<class 'C'>` is possibly unbound
+ --> src/mdtest_snippet.py:6:5
+  |
+4 |             attr: int = 0
+5 |
+6 |     C.attr = 1  # error: [possibly-unbound-attribute]
+  |     ^^^^^^
+7 |
+8 |     instance = C()
+  |
+info: rule `possibly-unbound-attribute` is enabled by default
+
+```
+
+```
+warning[possibly-unbound-attribute]: Attribute `attr` on type `C` is possibly unbound
+ --> src/mdtest_snippet.py:9:5
+  |
+8 |     instance = C()
+9 |     instance.attr = 1  # error: [possibly-unbound-attribute]
+  |     ^^^^^^^^^^^^^
+  |
+info: rule `possibly-unbound-attribute` is enabled by default
+
+```

@@ -1,11 +1,10 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
-use ruff_python_ast::{self as ast, Stmt};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
+use ruff_python_ast::{self as ast, PythonVersion, Stmt};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::settings::types::PythonVersion;
 
 /// ## What it does
 /// Checks for uses of except handling via `try`-`except` within `for` and
@@ -88,8 +87,8 @@ impl Violation for TryExceptInLoop {
 }
 
 /// PERF203
-pub(crate) fn try_except_in_loop(checker: &mut Checker, body: &[Stmt]) {
-    if checker.settings.target_version >= PythonVersion::Py311 {
+pub(crate) fn try_except_in_loop(checker: &Checker, body: &[Stmt]) {
+    if checker.target_version() >= PythonVersion::PY311 {
         return;
     }
 
@@ -107,9 +106,7 @@ pub(crate) fn try_except_in_loop(checker: &mut Checker, body: &[Stmt]) {
         return;
     }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(TryExceptInLoop, handler.range()));
+    checker.report_diagnostic(TryExceptInLoop, handler.range());
 }
 
 /// Returns `true` if a `break` or `continue` statement is present in `body`.

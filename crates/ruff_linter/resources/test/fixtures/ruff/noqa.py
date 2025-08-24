@@ -19,5 +19,6 @@ def f():
 
 
 def f():
-    # Only `E741` should be ignored by the `noqa`.
+    # Neither of these are ignored and warning is
+    # logged to user
     I = 1  # noqa: E741.F841

@@ -1,0 +1,20 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+---
+S704 Unsafe use of `markupsafe.Markup` detected
+ --> S704_extend_markup_names.py:5:1
+  |
+4 | content = "<script>alert('Hello, world!')</script>"
+5 | Markup(f"unsafe {content}")  # S704
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+6 | literal(f"unsafe {content}")  # S704
+  |
+
+S704 Unsafe use of `webhelpers.html.literal` detected
+ --> S704_extend_markup_names.py:6:1
+  |
+4 | content = "<script>alert('Hello, world!')</script>"
+5 | Markup(f"unsafe {content}")  # S704
+6 | literal(f"unsafe {content}")  # S704
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |

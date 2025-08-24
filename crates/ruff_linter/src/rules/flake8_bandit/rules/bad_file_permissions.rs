@@ -1,12 +1,12 @@
 use anyhow::Result;
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr, Operator};
 use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -61,7 +61,7 @@ enum Reason {
 }
 
 /// S103
-pub(crate) fn bad_file_permissions(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn bad_file_permissions(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::OS) {
         return;
     }
@@ -78,22 +78,22 @@ pub(crate) fn bad_file_permissions(checker: &mut Checker, call: &ast::ExprCall) 
                 // The mask is a valid integer value -- check for overly permissive permissions.
                 Ok(Some(mask)) => {
                     if (mask & WRITE_WORLD > 0) || (mask & EXECUTE_GROUP > 0) {
-                        checker.diagnostics.push(Diagnostic::new(
+                        checker.report_diagnostic(
                             BadFilePermissions {
                                 reason: Reason::Permissive(mask),
                             },
                             mode_arg.range(),
-                        ));
+                        );
                     }
                 }
                 // The mask is an invalid integer value (i.e., it's out of range).
                 Err(_) => {
-                    checker.diagnostics.push(Diagnostic::new(
+                    checker.report_diagnostic(
                         BadFilePermissions {
                             reason: Reason::Invalid,
                         },
                         mode_arg.range(),
-                    ));
+                    );
                 }
             }
         }
@@ -166,6 +166,7 @@ fn parse_mask(expr: &Expr, semantic: &SemanticModel) -> Result<Option<u16>> {
             op,
             right,
             range: _,
+            node_index: _,
         }) => {
             let Some(left_value) = parse_mask(left, semantic)? else {
                 return Ok(None);

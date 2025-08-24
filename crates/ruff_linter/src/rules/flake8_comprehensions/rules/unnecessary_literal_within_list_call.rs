@@ -1,11 +1,11 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
-use super::helpers;
+use crate::rules::flake8_comprehensions::helpers;
 
 /// ## What it does
 /// Checks for `list()` calls that take unnecessary list or tuple literals as
@@ -19,7 +19,7 @@ use super::helpers;
 /// removed. Otherwise, if a tuple literal is passed in, then it should be
 /// rewritten as a list literal.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// list([1, 2])
 /// list((1, 2))
@@ -63,8 +63,11 @@ impl AlwaysFixableViolation for UnnecessaryLiteralWithinListCall {
 }
 
 /// C410
-pub(crate) fn unnecessary_literal_within_list_call(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn unnecessary_literal_within_list_call(checker: &Checker, call: &ast::ExprCall) {
     if !call.arguments.keywords.is_empty() {
+        return;
+    }
+    if call.arguments.args.len() > 1 {
         return;
     }
     let Some(argument) =
@@ -79,7 +82,7 @@ pub(crate) fn unnecessary_literal_within_list_call(checker: &mut Checker, call: 
         return;
     }
 
-    let diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UnnecessaryLiteralWithinListCall {
             kind: argument_kind,
         },
@@ -116,7 +119,7 @@ pub(crate) fn unnecessary_literal_within_list_call(checker: &mut Checker, call: 
         }
     };
 
-    checker.diagnostics.push(diagnostic.with_fix(fix));
+    diagnostic.set_fix(fix);
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

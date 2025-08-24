@@ -1,13 +1,13 @@
 use std::hash::Hash;
 
-use ruff_python_semantic::{analyze::class::any_super_class, SemanticModel};
+use ruff_python_semantic::analyze::class::iter_super_class;
 use rustc_hash::FxHashSet;
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -39,19 +39,20 @@ use crate::checkers::ast::Checker;
 /// ```
 #[derive(ViolationMetadata)]
 pub(crate) struct RedefinedSlotsInSubclass {
-    name: String,
+    base: String,
+    slot_name: String,
 }
 
 impl Violation for RedefinedSlotsInSubclass {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let RedefinedSlotsInSubclass { name } = self;
-        format!("Redefined slot '{name}' in subclass")
+        let RedefinedSlotsInSubclass { base, slot_name } = self;
+        format!("Slot `{slot_name}` redefined from base class `{base}`")
     }
 }
 
 // PLW0244
-pub(crate) fn redefined_slots_in_subclass(checker: &mut Checker, class_def: &ast::StmtClassDef) {
+pub(crate) fn redefined_slots_in_subclass(checker: &Checker, class_def: &ast::StmtClassDef) {
     // Early return if this is not a subclass
     if class_def.bases().is_empty() {
         return;
@@ -65,20 +66,9 @@ pub(crate) fn redefined_slots_in_subclass(checker: &mut Checker, class_def: &ast
         return;
     }
 
-    let semantic = checker.semantic();
-    let mut diagnostics: Vec<_> = class_slots
-        .iter()
-        .filter(|&slot| contained_in_super_slots(class_def, semantic, slot))
-        .map(|slot| {
-            Diagnostic::new(
-                RedefinedSlotsInSubclass {
-                    name: slot.name.to_string(),
-                },
-                slot.range(),
-            )
-        })
-        .collect();
-    checker.diagnostics.append(&mut diagnostics);
+    for slot in class_slots {
+        check_super_slots(checker, class_def, &slot);
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -111,22 +101,21 @@ impl Ranged for Slot<'_> {
     }
 }
 
-fn contained_in_super_slots(
-    class_def: &ast::StmtClassDef,
-    semantic: &SemanticModel,
-    slot: &Slot,
-) -> bool {
-    any_super_class(class_def, semantic, &|super_class| {
-        // This function checks every super class
-        // but we want every _strict_ super class, hence:
-        if class_def.name == super_class.name {
-            return false;
+fn check_super_slots(checker: &Checker, class_def: &ast::StmtClassDef, slot: &Slot) {
+    for super_class in iter_super_class(class_def, checker.semantic()).skip(1) {
+        if slots_members(&super_class.body).contains(slot) {
+            checker.report_diagnostic(
+                RedefinedSlotsInSubclass {
+                    base: super_class.name.to_string(),
+                    slot_name: slot.name.to_string(),
+                },
+                slot.range(),
+            );
         }
-        slots_members(&super_class.body).contains(slot)
-    })
+    }
 }
 
-fn slots_members(body: &[Stmt]) -> FxHashSet<Slot> {
+fn slots_members(body: &[Stmt]) -> FxHashSet<Slot<'_>> {
     let mut members = FxHashSet::default();
     for stmt in body {
         match stmt {
@@ -172,13 +161,17 @@ fn slots_members(body: &[Stmt]) -> FxHashSet<Slot> {
     members
 }
 
-fn slots_attributes(expr: &Expr) -> impl Iterator<Item = Slot> {
+fn slots_attributes(expr: &Expr) -> impl Iterator<Item = Slot<'_>> {
     // Ex) `__slots__ = ("name",)`
     let elts_iter = match expr {
         Expr::Tuple(ast::ExprTuple { elts, .. })
         | Expr::List(ast::ExprList { elts, .. })
         | Expr::Set(ast::ExprSet { elts, .. }) => Some(elts.iter().filter_map(|elt| match elt {
-            Expr::StringLiteral(ast::ExprStringLiteral { value, range }) => Some(Slot {
+            Expr::StringLiteral(ast::ExprStringLiteral {
+                value,
+                range,
+                node_index: _,
+            }) => Some(Slot {
                 name: value.to_str(),
                 range: *range,
             }),
@@ -194,12 +187,14 @@ fn slots_attributes(expr: &Expr) -> impl Iterator<Item = Slot> {
                 .unwrap()
                 .iter_keys()
                 .filter_map(|key| match key {
-                    Some(Expr::StringLiteral(ast::ExprStringLiteral { value, range })) => {
-                        Some(Slot {
-                            name: value.to_str(),
-                            range: *range,
-                        })
-                    }
+                    Some(Expr::StringLiteral(ast::ExprStringLiteral {
+                        value,
+                        range,
+                        node_index: _,
+                    })) => Some(Slot {
+                        name: value.to_str(),
+                        range: *range,
+                    }),
                     _ => None,
                 }),
         ),

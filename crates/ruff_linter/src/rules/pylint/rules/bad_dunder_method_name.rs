@@ -1,9 +1,9 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::pylint::helpers::is_known_dunder_method;
 
@@ -56,7 +56,7 @@ impl Violation for BadDunderMethodName {
 }
 
 /// PLW3201
-pub(crate) fn bad_dunder_method_name(checker: &mut Checker, method: &ast::StmtFunctionDef) {
+pub(crate) fn bad_dunder_method_name(checker: &Checker, method: &ast::StmtFunctionDef) {
     // https://github.com/astral-sh/ruff/issues/14535
     if checker.source_type.is_stub() {
         return;
@@ -69,7 +69,7 @@ pub(crate) fn bad_dunder_method_name(checker: &mut Checker, method: &ast::StmtFu
     // If the name is explicitly allowed, skip it.
     if is_known_dunder_method(&method.name)
         || checker
-            .settings
+            .settings()
             .pylint
             .allow_dunder_method_names
             .contains(method.name.as_str())
@@ -82,10 +82,10 @@ pub(crate) fn bad_dunder_method_name(checker: &mut Checker, method: &ast::StmtFu
         return;
     }
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(
         BadDunderMethodName {
             name: method.name.to_string(),
         },
         method.identifier(),
-    ));
+    );
 }

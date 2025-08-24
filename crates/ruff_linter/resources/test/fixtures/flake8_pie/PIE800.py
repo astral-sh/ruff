@@ -70,6 +70,32 @@ foo({**foo, **{"bar": True}})  # PIE800
     ,
 })
 
+{
+    "data": [],
+    ** # Foo
+    (  # Comment
+        { "a": b,
+          # Comment
+          }
+    ) ,
+    c: 9,
+}
+
+
+# https://github.com/astral-sh/ruff/issues/15997
+{"a": [], **{},}
+{"a": [], **({}),}
+
+{"a": [], **{}, 6: 3}
+{"a": [], **({}), 6: 3}
+
+{"a": [], **{
+    # Comment
+}, 6: 3}
+{"a": [], **({
+    # Comment
+}), 6: 3}
+
 
 {**foo,    "bar": True  }  # OK
 

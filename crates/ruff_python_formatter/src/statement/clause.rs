@@ -1,4 +1,4 @@
-use ruff_formatter::{write, Argument, Arguments, FormatError};
+use ruff_formatter::{Argument, Arguments, FormatError, write};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{
     ElifElseClause, ExceptHandlerExceptHandler, MatchCase, StmtClassDef, StmtFor, StmtFunctionDef,
@@ -7,8 +7,8 @@ use ruff_python_ast::{
 use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::comments::{leading_alternate_branch_comments, trailing_comments, SourceComment};
-use crate::statement::suite::{contains_only_an_ellipsis, SuiteKind};
+use crate::comments::{SourceComment, leading_alternate_branch_comments, trailing_comments};
+use crate::statement::suite::{SuiteKind, contains_only_an_ellipsis};
 use crate::verbatim::write_suppressed_clause_header;
 use crate::{has_skip_comment, prelude::*};
 
@@ -87,6 +87,7 @@ impl ClauseHeader<'_> {
                 type_params,
                 arguments,
                 range: _,
+                node_index: _,
                 decorator_list: _,
                 name: _,
                 body: _,
@@ -103,6 +104,7 @@ impl ClauseHeader<'_> {
                 type_params,
                 parameters,
                 range: _,
+                node_index: _,
                 is_async: _,
                 decorator_list: _,
                 name: _,
@@ -121,6 +123,7 @@ impl ClauseHeader<'_> {
             ClauseHeader::If(StmtIf {
                 test,
                 range: _,
+                node_index: _,
                 body: _,
                 elif_else_clauses: _,
             }) => {
@@ -129,6 +132,7 @@ impl ClauseHeader<'_> {
             ClauseHeader::ElifElse(ElifElseClause {
                 test,
                 range: _,
+                node_index: _,
                 body: _,
             }) => {
                 if let Some(test) = test.as_ref() {
@@ -139,6 +143,7 @@ impl ClauseHeader<'_> {
             ClauseHeader::ExceptHandler(ExceptHandlerExceptHandler {
                 type_: type_expr,
                 range: _,
+                node_index: _,
                 name: _,
                 body: _,
             }) => {
@@ -149,6 +154,7 @@ impl ClauseHeader<'_> {
             ClauseHeader::Match(StmtMatch {
                 subject,
                 range: _,
+                node_index: _,
                 cases: _,
             }) => {
                 visit(subject.as_ref(), visitor);
@@ -157,6 +163,7 @@ impl ClauseHeader<'_> {
                 guard,
                 pattern,
                 range: _,
+                node_index: _,
                 body: _,
             }) => {
                 visit(pattern, visitor);
@@ -169,6 +176,7 @@ impl ClauseHeader<'_> {
                 target,
                 iter,
                 range: _,
+                node_index: _,
                 is_async: _,
                 body: _,
                 orelse: _,
@@ -179,6 +187,7 @@ impl ClauseHeader<'_> {
             ClauseHeader::While(StmtWhile {
                 test,
                 range: _,
+                node_index: _,
                 body: _,
                 orelse: _,
             }) => {
@@ -187,6 +196,7 @@ impl ClauseHeader<'_> {
             ClauseHeader::With(StmtWith {
                 items,
                 range: _,
+                node_index: _,
                 is_async: _,
                 body: _,
             }) => {
@@ -473,12 +483,22 @@ fn colon_range(after_keyword_or_condition: TextSize, source: &str) -> FormatResu
             range,
         }) => Ok(range),
         Some(token) => {
-            debug_assert!(false, "Expected the colon marking the end of the case header but found {token:?} instead.");
-            Err(FormatError::syntax_error("Expected colon marking the end of the case header but found another token instead."))
+            debug_assert!(
+                false,
+                "Expected the colon marking the end of the case header but found {token:?} instead."
+            );
+            Err(FormatError::syntax_error(
+                "Expected colon marking the end of the case header but found another token instead.",
+            ))
         }
         None => {
-            debug_assert!(false, "Expected the colon marking the end of the case header but found the end of the range.");
-            Err(FormatError::syntax_error("Expected the colon marking the end of the case header but found the end of the range."))
+            debug_assert!(
+                false,
+                "Expected the colon marking the end of the case header but found the end of the range."
+            );
+            Err(FormatError::syntax_error(
+                "Expected the colon marking the end of the case header but found the end of the range.",
+            ))
         }
     }
 }

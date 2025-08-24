@@ -1,0 +1,104 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+PLC0415 `import` should be at the top-level of a file
+  --> import_outside_top_level_with_banned.py:9:5
+   |
+ 8 | def import_in_function():
+ 9 |     import symtable  # [import-outside-toplevel]
+   |     ^^^^^^^^^^^^^^^
+10 |     import os, sys  # [import-outside-toplevel]
+11 |     import time as thyme  # [import-outside-toplevel]
+   |
+
+PLC0415 `import` should be at the top-level of a file
+  --> import_outside_top_level_with_banned.py:10:5
+   |
+ 8 | def import_in_function():
+ 9 |     import symtable  # [import-outside-toplevel]
+10 |     import os, sys  # [import-outside-toplevel]
+   |     ^^^^^^^^^^^^^^
+11 |     import time as thyme  # [import-outside-toplevel]
+12 |     import random as rand, socket as sock  # [import-outside-toplevel]
+   |
+
+PLC0415 `import` should be at the top-level of a file
+  --> import_outside_top_level_with_banned.py:11:5
+   |
+ 9 |     import symtable  # [import-outside-toplevel]
+10 |     import os, sys  # [import-outside-toplevel]
+11 |     import time as thyme  # [import-outside-toplevel]
+   |     ^^^^^^^^^^^^^^^^^^^^
+12 |     import random as rand, socket as sock  # [import-outside-toplevel]
+13 |     from collections import defaultdict # [import-outside-toplevel]
+   |
+
+PLC0415 `import` should be at the top-level of a file
+  --> import_outside_top_level_with_banned.py:12:5
+   |
+10 |     import os, sys  # [import-outside-toplevel]
+11 |     import time as thyme  # [import-outside-toplevel]
+12 |     import random as rand, socket as sock  # [import-outside-toplevel]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+13 |     from collections import defaultdict # [import-outside-toplevel]
+14 |     from math import sin as sign, cos as cosplay  # [import-outside-toplevel]
+   |
+
+PLC0415 `import` should be at the top-level of a file
+  --> import_outside_top_level_with_banned.py:13:5
+   |
+11 |     import time as thyme  # [import-outside-toplevel]
+12 |     import random as rand, socket as sock  # [import-outside-toplevel]
+13 |     from collections import defaultdict # [import-outside-toplevel]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+14 |     from math import sin as sign, cos as cosplay  # [import-outside-toplevel]
+   |
+
+PLC0415 `import` should be at the top-level of a file
+  --> import_outside_top_level_with_banned.py:14:5
+   |
+12 |     import random as rand, socket as sock  # [import-outside-toplevel]
+13 |     from collections import defaultdict # [import-outside-toplevel]
+14 |     from math import sin as sign, cos as cosplay  # [import-outside-toplevel]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+15 |
+16 |     # these should be allowed due to TID253 top-level ban
+   |
+
+PLC0415 `import` should be at the top-level of a file
+  --> import_outside_top_level_with_banned.py:24:5
+   |
+23 |     # this should still trigger an error due to multiple imports
+24 |     from pkg import foo_allowed, bar_banned # [import-outside-toplevel]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+25 |
+26 | class ClassWithImports:
+   |
+
+PLC0415 `import` should be at the top-level of a file
+  --> import_outside_top_level_with_banned.py:27:5
+   |
+26 | class ClassWithImports:
+27 |     import tokenize  # [import-outside-toplevel]
+   |     ^^^^^^^^^^^^^^^
+28 |
+29 |     def __init__(self):
+   |
+
+PLC0415 `import` should be at the top-level of a file
+  --> import_outside_top_level_with_banned.py:30:9
+   |
+29 |     def __init__(self):
+30 |         import trace  # [import-outside-toplevel]
+   |         ^^^^^^^^^^^^
+31 |
+32 |         # these should be allowed due to TID253 top-level ban
+   |
+
+PLC0415 `import` should be at the top-level of a file
+  --> import_outside_top_level_with_banned.py:40:9
+   |
+39 |         # this should still trigger an error due to multiple imports
+40 |         from pkg import foo_allowed, bar_banned # [import-outside-toplevel]
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |

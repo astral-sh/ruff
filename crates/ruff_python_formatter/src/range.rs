@@ -2,13 +2,13 @@ use tracing::Level;
 
 use ruff_formatter::printer::SourceMapGeneration;
 use ruff_formatter::{
-    format, FormatContext, FormatError, FormatOptions, IndentStyle, PrintedRange, SourceCode,
+    FormatContext, FormatError, FormatOptions, IndentStyle, PrintedRange, SourceCode, format,
 };
-use ruff_python_ast::visitor::source_order::{walk_body, SourceOrderVisitor, TraversalSignal};
+use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal, walk_body};
 use ruff_python_ast::{AnyNodeRef, Stmt, StmtMatch, StmtTry};
-use ruff_python_parser::{parse, AsMode};
+use ruff_python_parser::{ParseOptions, parse};
 use ruff_python_trivia::{
-    indentation_at_offset, BackwardsTokenizer, CommentRanges, SimpleToken, SimpleTokenKind,
+    BackwardsTokenizer, CommentRanges, SimpleToken, SimpleTokenKind, indentation_at_offset,
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -17,7 +17,7 @@ use crate::context::{IndentLevel, NodeLevel};
 use crate::prelude::*;
 use crate::statement::suite::DocstringStmt;
 use crate::verbatim::{ends_suppression, starts_suppression};
-use crate::{format_module_source, FormatModuleError, PyFormatOptions};
+use crate::{FormatModuleError, PyFormatOptions, format_module_source};
 
 /// Formats the given `range` in source rather than the entire file.
 ///
@@ -73,7 +73,7 @@ pub fn format_range(
 
     assert_valid_char_boundaries(range, source);
 
-    let parsed = parse(source, options.source_type().as_mode())?;
+    let parsed = parse(source, ParseOptions::from(options.source_type()))?;
     let source_code = SourceCode::new(source);
     let comment_ranges = CommentRanges::from(parsed.tokens());
     let comments = Comments::from_ast(parsed.syntax(), source_code, &comment_ranges);
@@ -154,7 +154,7 @@ fn find_enclosing_node<'ast>(
     let mut visitor = FindEnclosingNode::new(range, context);
 
     if visitor.enter_node(root).is_traverse() {
-        root.visit_preorder(&mut visitor);
+        root.visit_source_order(&mut visitor);
     }
     visitor.leave_node(root);
 
@@ -314,7 +314,7 @@ fn narrow_range(
     };
 
     if visitor.enter_node(enclosing_node).is_traverse() {
-        enclosing_node.visit_preorder(&mut visitor);
+        enclosing_node.visit_source_order(&mut visitor);
     }
 
     visitor.leave_node(enclosing_node);
@@ -369,6 +369,7 @@ impl SourceOrderVisitor<'_> for NarrowRange<'_> {
                 subject: _,
                 cases,
                 range: _,
+                node_index: _,
             }) => {
                 if let Some(saved_state) = self.enter_level(cases.first().map(AnyNodeRef::from)) {
                     for match_case in cases {
@@ -387,6 +388,7 @@ impl SourceOrderVisitor<'_> for NarrowRange<'_> {
                 finalbody,
                 is_star: _,
                 range: _,
+                node_index: _,
             }) => {
                 self.visit_body(body);
                 if let Some(except_handler_saved) =
@@ -546,7 +548,7 @@ impl NarrowRange<'_> {
         Some(SavedLevel { level: saved_level })
     }
 
-    #[allow(clippy::needless_pass_by_value)]
+    #[expect(clippy::needless_pass_by_value)]
     fn leave_level(&mut self, saved_state: SavedLevel) {
         self.level = saved_state.level;
     }
@@ -659,10 +661,11 @@ impl Format<PyFormatContext<'_>> for FormatEnclosingNode<'_> {
             | AnyNodeRef::ExprYieldFrom(_)
             | AnyNodeRef::ExprCompare(_)
             | AnyNodeRef::ExprCall(_)
-            | AnyNodeRef::FStringExpressionElement(_)
-            | AnyNodeRef::FStringLiteralElement(_)
-            | AnyNodeRef::FStringFormatSpec(_)
+            | AnyNodeRef::InterpolatedElement(_)
+            | AnyNodeRef::InterpolatedStringLiteralElement(_)
+            | AnyNodeRef::InterpolatedStringFormatSpec(_)
             | AnyNodeRef::ExprFString(_)
+            | AnyNodeRef::ExprTString(_)
             | AnyNodeRef::ExprStringLiteral(_)
             | AnyNodeRef::ExprBytesLiteral(_)
             | AnyNodeRef::ExprNumberLiteral(_)
@@ -679,6 +682,7 @@ impl Format<PyFormatContext<'_>> for FormatEnclosingNode<'_> {
             | AnyNodeRef::ExprIpyEscapeCommand(_)
             | AnyNodeRef::FString(_)
             | AnyNodeRef::StringLiteral(_)
+            | AnyNodeRef::TString(_)
             | AnyNodeRef::PatternMatchValue(_)
             | AnyNodeRef::PatternMatchSingleton(_)
             | AnyNodeRef::PatternMatchSequence(_)

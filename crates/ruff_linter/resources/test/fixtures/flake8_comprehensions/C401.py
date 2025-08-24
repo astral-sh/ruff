@@ -26,9 +26,29 @@ set((2 * x for x in range(3)))
 set(((2 * x for x in range(3))))
 set((((2 * x for x in range(3)))))
 
+# Account for trailing comma in fix
+# See https://github.com/astral-sh/ruff/issues/15852
+set((0 for _ in []),)
+set(
+    (0 for _ in [])
+    # some comments
+    ,
+    # some more
+)
+
+# t-strings
+print(t"Hello {set(f(a) for a in 'abc')} World")
+print(t"Hello { set(f(a) for a in 'abc') } World")
+small_nums = t"{set(a if a < 6 else 0 for a in range(3))}"
+print(t"Hello {set(a for a in range(3))} World")
+print(t"{set(a for a in 'abc') - set(a for a in 'ab')}")
+print(t"{ set(a for a in 'abc') - set(a for a in 'ab') }")
+
+
 # Not built-in set.
 def set(*args, **kwargs):
     return None
 
 set(2 * x for x in range(3))
 set(x for x in range(3))
+

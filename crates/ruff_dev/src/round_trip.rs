@@ -1,5 +1,4 @@
 //! Run round-trip source code generation on a given Python or Jupyter notebook file.
-#![allow(clippy::print_stdout, clippy::print_stderr)]
 
 use std::fs;
 use std::path::PathBuf;

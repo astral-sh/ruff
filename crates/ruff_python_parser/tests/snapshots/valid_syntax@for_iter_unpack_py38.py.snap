@@ -1,0 +1,212 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/for_iter_unpack_py38.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..112,
+        body: [
+            For(
+                StmtFor {
+                    node_index: NodeIndex(None),
+                    range: 43..65,
+                    is_async: false,
+                    target: Name(
+                        ExprName {
+                            node_index: NodeIndex(None),
+                            range: 47..48,
+                            id: Name("x"),
+                            ctx: Store,
+                        },
+                    ),
+                    iter: Tuple(
+                        ExprTuple {
+                            node_index: NodeIndex(None),
+                            range: 52..60,
+                            elts: [
+                                Starred(
+                                    ExprStarred {
+                                        node_index: NodeIndex(None),
+                                        range: 53..55,
+                                        value: Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 54..55,
+                                                id: Name("a"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ctx: Load,
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 58..59,
+                                        id: Name("b"),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: true,
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 62..65,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 62..65,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                },
+            ),
+            For(
+                StmtFor {
+                    node_index: NodeIndex(None),
+                    range: 66..88,
+                    is_async: false,
+                    target: Name(
+                        ExprName {
+                            node_index: NodeIndex(None),
+                            range: 70..71,
+                            id: Name("x"),
+                            ctx: Store,
+                        },
+                    ),
+                    iter: Tuple(
+                        ExprTuple {
+                            node_index: NodeIndex(None),
+                            range: 75..83,
+                            elts: [
+                                Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 77..78,
+                                        id: Name("a"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                Starred(
+                                    ExprStarred {
+                                        node_index: NodeIndex(None),
+                                        range: 80..82,
+                                        value: Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 81..82,
+                                                id: Name("b"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: true,
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 85..88,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 85..88,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                },
+            ),
+            For(
+                StmtFor {
+                    node_index: NodeIndex(None),
+                    range: 89..111,
+                    is_async: false,
+                    target: Name(
+                        ExprName {
+                            node_index: NodeIndex(None),
+                            range: 93..94,
+                            id: Name("x"),
+                            ctx: Store,
+                        },
+                    ),
+                    iter: Tuple(
+                        ExprTuple {
+                            node_index: NodeIndex(None),
+                            range: 98..106,
+                            elts: [
+                                Starred(
+                                    ExprStarred {
+                                        node_index: NodeIndex(None),
+                                        range: 99..101,
+                                        value: Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 100..101,
+                                                id: Name("a"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ctx: Load,
+                                    },
+                                ),
+                                Starred(
+                                    ExprStarred {
+                                        node_index: NodeIndex(None),
+                                        range: 103..105,
+                                        value: Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 104..105,
+                                                id: Name("b"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: true,
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 108..111,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 108..111,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                },
+            ),
+        ],
+    },
+)
+```

@@ -1,3 +1,5 @@
+pub(crate) mod completions;
+
 pub(crate) mod add_noqa;
 pub(crate) mod analyze_graph;
 pub(crate) mod check;

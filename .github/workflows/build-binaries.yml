@@ -23,10 +23,12 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions: {}
+
 env:
   PACKAGE_NAME: ruff
   MODULE_NAME: ruff
-  PYTHON_VERSION: "3.11"
+  PYTHON_VERSION: "3.13"
   CARGO_INCREMENTAL: 0
   CARGO_NET_RETRY: 10
   CARGO_TERM_COLOR: always
@@ -37,17 +39,17 @@ jobs:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           submodules: recursive
           persist-credentials: false
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: "Prep README.md"
         run: python scripts/transform_readme.py --target pypi
       - name: "Build sdist"
-        uses: PyO3/maturin-action@v1
+        uses: PyO3/maturin-action@86b9d133d34bc1b40018696f782949dac11bd380 # v1.49.4
         with:
           command: sdist
           args: --out dist
@@ -57,7 +59,7 @@ jobs:
           "${MODULE_NAME}" --help
           python -m "${MODULE_NAME}" --help
       - name: "Upload sdist"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: wheels-sdist
           path: dist
@@ -66,23 +68,23 @@ jobs:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
     runs-on: macos-14
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           submodules: recursive
           persist-credentials: false
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
       - name: "Prep README.md"
         run: python scripts/transform_readme.py --target pypi
       - name: "Build wheels - x86_64"
-        uses: PyO3/maturin-action@v1
+        uses: PyO3/maturin-action@86b9d133d34bc1b40018696f782949dac11bd380 # v1.49.4
         with:
           target: x86_64
           args: --release --locked --out dist
       - name: "Upload wheels"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: wheels-macos-x86_64
           path: dist
@@ -97,7 +99,7 @@ jobs:
           tar czvf $ARCHIVE_FILE $ARCHIVE_NAME
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: artifacts-macos-x86_64
           path: |
@@ -108,18 +110,18 @@ jobs:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
     runs-on: macos-14
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           submodules: recursive
           persist-credentials: false
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: arm64
       - name: "Prep README.md"
         run: python scripts/transform_readme.py --target pypi
       - name: "Build wheels - aarch64"
-        uses: PyO3/maturin-action@v1
+        uses: PyO3/maturin-action@86b9d133d34bc1b40018696f782949dac11bd380 # v1.49.4
         with:
           target: aarch64
           args: --release --locked --out dist
@@ -129,7 +131,7 @@ jobs:
           ruff --help
           python -m ruff --help
       - name: "Upload wheels"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: wheels-aarch64-apple-darwin
           path: dist
@@ -144,7 +146,7 @@ jobs:
           tar czvf $ARCHIVE_FILE $ARCHIVE_NAME
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: artifacts-aarch64-apple-darwin
           path: |
@@ -164,18 +166,18 @@ jobs:
           - target: aarch64-pc-windows-msvc
             arch: x64
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           submodules: recursive
           persist-credentials: false
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: ${{ matrix.platform.arch }}
       - name: "Prep README.md"
         run: python scripts/transform_readme.py --target pypi
       - name: "Build wheels"
-        uses: PyO3/maturin-action@v1
+        uses: PyO3/maturin-action@86b9d133d34bc1b40018696f782949dac11bd380 # v1.49.4
         with:
           target: ${{ matrix.platform.target }}
           args: --release --locked --out dist
@@ -190,7 +192,7 @@ jobs:
           "${MODULE_NAME}" --help
           python -m "${MODULE_NAME}" --help
       - name: "Upload wheels"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: wheels-${{ matrix.platform.target }}
           path: dist
@@ -201,7 +203,7 @@ jobs:
           7z a $ARCHIVE_FILE ./target/${{ matrix.platform.target }}/release/ruff.exe
           sha256sum $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: artifacts-${{ matrix.platform.target }}
           path: |
@@ -217,18 +219,18 @@ jobs:
           - x86_64-unknown-linux-gnu
           - i686-unknown-linux-gnu
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           submodules: recursive
           persist-credentials: false
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
       - name: "Prep README.md"
         run: python scripts/transform_readme.py --target pypi
       - name: "Build wheels"
-        uses: PyO3/maturin-action@v1
+        uses: PyO3/maturin-action@86b9d133d34bc1b40018696f782949dac11bd380 # v1.49.4
         with:
           target: ${{ matrix.target }}
           manylinux: auto
@@ -240,7 +242,7 @@ jobs:
           "${MODULE_NAME}" --help
           python -m "${MODULE_NAME}" --help
       - name: "Upload wheels"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: wheels-${{ matrix.target }}
           path: dist
@@ -258,7 +260,7 @@ jobs:
           tar czvf $ARCHIVE_FILE $ARCHIVE_NAME
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: artifacts-${{ matrix.target }}
           path: |
@@ -290,26 +292,28 @@ jobs:
             maturin_docker_options: -e JEMALLOC_SYS_WITH_LG_PAGE=16
           - target: arm-unknown-linux-musleabihf
             arch: arm
+          - target: riscv64gc-unknown-linux-gnu
+            arch: riscv64
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           submodules: recursive
           persist-credentials: false
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: "Prep README.md"
         run: python scripts/transform_readme.py --target pypi
       - name: "Build wheels"
-        uses: PyO3/maturin-action@v1
+        uses: PyO3/maturin-action@86b9d133d34bc1b40018696f782949dac11bd380 # v1.49.4
         with:
           target: ${{ matrix.platform.target }}
           manylinux: auto
           docker-options: ${{ matrix.platform.maturin_docker_options }}
           args: --release --locked --out dist
-      - uses: uraimo/run-on-arch-action@v2
-        if: matrix.platform.arch != 'ppc64'
+      - uses: uraimo/run-on-arch-action@d94c13912ea685de38fccc1109385b83fd79427d # v3.0.1
+        if: ${{ matrix.platform.arch != 'ppc64' && matrix.platform.arch != 'ppc64le'}}
         name: Test wheel
         with:
           arch: ${{ matrix.platform.arch == 'arm' && 'armv6' || matrix.platform.arch }}
@@ -317,13 +321,13 @@ jobs:
           githubToken: ${{ github.token }}
           install: |
             apt-get update
-            apt-get install -y --no-install-recommends python3 python3-pip
+            apt-get install -y --no-install-recommends python3 python3-pip libatomic1
             pip3 install -U pip
           run: |
             pip3 install ${{ env.PACKAGE_NAME }} --no-index --find-links dist/ --force-reinstall
             ruff --help
       - name: "Upload wheels"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: wheels-${{ matrix.platform.target }}
           path: dist
@@ -341,7 +345,7 @@ jobs:
           tar czvf $ARCHIVE_FILE $ARCHIVE_NAME
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: artifacts-${{ matrix.platform.target }}
           path: |
@@ -357,25 +361,25 @@ jobs:
           - x86_64-unknown-linux-musl
           - i686-unknown-linux-musl
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           submodules: recursive
           persist-credentials: false
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
       - name: "Prep README.md"
         run: python scripts/transform_readme.py --target pypi
       - name: "Build wheels"
-        uses: PyO3/maturin-action@v1
+        uses: PyO3/maturin-action@86b9d133d34bc1b40018696f782949dac11bd380 # v1.49.4
         with:
           target: ${{ matrix.target }}
           manylinux: musllinux_1_2
           args: --release --locked --out dist
       - name: "Test wheel"
         if: matrix.target == 'x86_64-unknown-linux-musl'
-        uses: addnab/docker-run-action@v3
+        uses: addnab/docker-run-action@4f65fabd2431ebc8d299f8e5a018d79a769ae185 # v3
         with:
           image: alpine:latest
           options: -v ${{ github.workspace }}:/io -w /io
@@ -385,7 +389,7 @@ jobs:
             .venv/bin/pip3 install ${{ env.PACKAGE_NAME }} --no-index --find-links dist/ --force-reinstall
             .venv/bin/${{ env.MODULE_NAME }} --help
       - name: "Upload wheels"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: wheels-${{ matrix.target }}
           path: dist
@@ -403,7 +407,7 @@ jobs:
           tar czvf $ARCHIVE_FILE $ARCHIVE_NAME
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: artifacts-${{ matrix.target }}
           path: |
@@ -423,23 +427,23 @@ jobs:
             arch: armv7
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           submodules: recursive
           persist-credentials: false
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: "Prep README.md"
         run: python scripts/transform_readme.py --target pypi
       - name: "Build wheels"
-        uses: PyO3/maturin-action@v1
+        uses: PyO3/maturin-action@86b9d133d34bc1b40018696f782949dac11bd380 # v1.49.4
         with:
           target: ${{ matrix.platform.target }}
           manylinux: musllinux_1_2
           args: --release --locked --out dist
           docker-options: ${{ matrix.platform.maturin_docker_options }}
-      - uses: uraimo/run-on-arch-action@v2
+      - uses: uraimo/run-on-arch-action@d94c13912ea685de38fccc1109385b83fd79427d # v3.0.1
         name: Test wheel
         with:
           arch: ${{ matrix.platform.arch }}
@@ -452,7 +456,7 @@ jobs:
             .venv/bin/pip3 install ${{ env.PACKAGE_NAME }} --no-index --find-links dist/ --force-reinstall
             .venv/bin/${{ env.MODULE_NAME }} --help
       - name: "Upload wheels"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: wheels-${{ matrix.platform.target }}
           path: dist
@@ -470,7 +474,7 @@ jobs:
           tar czvf $ARCHIVE_FILE $ARCHIVE_NAME
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: artifacts-${{ matrix.platform.target }}
           path: |

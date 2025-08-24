@@ -1,10 +1,10 @@
 use ruff_python_ast::Alias;
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_stdlib::future::is_feature_name;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -30,15 +30,16 @@ impl Violation for FutureFeatureNotDefined {
     }
 }
 
-pub(crate) fn future_feature_not_defined(checker: &mut Checker, alias: &Alias) {
+/// F407
+pub(crate) fn future_feature_not_defined(checker: &Checker, alias: &Alias) {
     if is_feature_name(&alias.name) {
         return;
     }
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(
         FutureFeatureNotDefined {
             name: alias.name.to_string(),
         },
         alias.range(),
-    ));
+    );
 }

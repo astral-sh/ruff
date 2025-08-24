@@ -1,10 +1,10 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_source_file::{UniversalNewlineIterator, UniversalNewlines};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for docstring summary lines that are not separated from the docstring
@@ -66,10 +66,10 @@ impl Violation for MissingBlankLineAfterSummary {
 }
 
 /// D205
-pub(crate) fn blank_after_summary(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn blank_after_summary(checker: &Checker, docstring: &Docstring) {
     let body = docstring.body();
 
-    if !docstring.triple_quoted() {
+    if !docstring.is_triple_quoted() {
         return;
     }
 
@@ -84,7 +84,7 @@ pub(crate) fn blank_after_summary(checker: &mut Checker, docstring: &Docstring) 
         }
     }
     if lines_count > 1 && blanks_count != 1 {
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             MissingBlankLineAfterSummary {
                 num_lines: blanks_count,
             },
@@ -118,6 +118,5 @@ pub(crate) fn blank_after_summary(checker: &mut Checker, docstring: &Docstring) 
                 blank_end,
             )));
         }
-        checker.diagnostics.push(diagnostic);
     }
 }

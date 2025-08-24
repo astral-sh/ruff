@@ -1,9 +1,9 @@
 use ruff_python_ast::{self as ast, Expr, UnaryOp};
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -51,7 +51,7 @@ impl Violation for UnaryPrefixIncrementDecrement {
 
 /// B002
 pub(crate) fn unary_prefix_increment_decrement(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     op: UnaryOp,
     operand: &Expr,
@@ -61,20 +61,20 @@ pub(crate) fn unary_prefix_increment_decrement(
     };
     match (op, nested_op) {
         (UnaryOp::UAdd, UnaryOp::UAdd) => {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(
                 UnaryPrefixIncrementDecrement {
                     operator: UnaryPrefixOperatorType::Increment,
                 },
                 expr.range(),
-            ));
+            );
         }
         (UnaryOp::USub, UnaryOp::USub) => {
-            checker.diagnostics.push(Diagnostic::new(
+            checker.report_diagnostic(
                 UnaryPrefixIncrementDecrement {
                     operator: UnaryPrefixOperatorType::Decrement,
                 },
                 expr.range(),
-            ));
+            );
         }
         _ => {}
     }

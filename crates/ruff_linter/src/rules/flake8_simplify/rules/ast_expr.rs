@@ -1,15 +1,13 @@
-use ruff_python_ast::{
-    self as ast, str_prefix::StringLiteralPrefix, Arguments, Expr, StringLiteralFlags,
-};
-use ruff_text_size::Ranged;
+use ruff_python_ast::{self as ast, Arguments, Expr, str_prefix::StringLiteralPrefix};
+use ruff_text_size::{Ranged, TextRange};
 
-use crate::fix::snippet::SourceCodeSnippet;
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_semantic::analyze::typing::is_dict;
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Modules;
+use ruff_python_semantic::analyze::typing::is_dict;
 
 use crate::checkers::ast::Checker;
+use crate::fix::snippet::SourceCodeSnippet;
+use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Check for environment variables that are not capitalized.
@@ -33,6 +31,12 @@ use crate::checkers::ast::Checker;
 ///
 /// os.environ["FOO"]
 /// ```
+///
+/// ## Fix safety
+///
+/// This fix is always marked as unsafe because automatically capitalizing environment variable names
+/// can change program behavior in environments where the variable names are case-sensitive, such as most
+/// Unix-like systems.
 ///
 /// ## References
 /// - [Python documentation: `os.environ`](https://docs.python.org/3/library/os.html#os.environ)
@@ -123,7 +127,7 @@ fn is_lowercase_allowed(env_var: &str) -> bool {
 }
 
 /// SIM112
-pub(crate) fn use_capital_environment_variables(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn use_capital_environment_variables(checker: &Checker, expr: &Expr) {
     if !checker.semantic().seen_module(Modules::OS) {
         return;
     }
@@ -171,16 +175,16 @@ pub(crate) fn use_capital_environment_variables(checker: &mut Checker, expr: &Ex
         return;
     }
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(
         UncapitalizedEnvironmentVariables {
             expected: SourceCodeSnippet::new(capital_env_var),
             actual: SourceCodeSnippet::new(env_var.to_string()),
         },
         arg.range(),
-    ));
+    );
 }
 
-fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
+fn check_os_environ_subscript(checker: &Checker, expr: &Expr) {
     let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr else {
         return;
     };
@@ -211,7 +215,7 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UncapitalizedEnvironmentVariables {
             expected: SourceCodeSnippet::new(capital_env_var.clone()),
             actual: SourceCodeSnippet::new(env_var.to_string()),
@@ -220,29 +224,30 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
     );
     let node = ast::StringLiteral {
         value: capital_env_var.into_boxed_str(),
-        flags: StringLiteralFlags::default().with_prefix({
+        flags: checker.default_string_flags().with_prefix({
             if env_var.is_unicode() {
                 StringLiteralPrefix::Unicode
             } else {
                 StringLiteralPrefix::Empty
             }
         }),
-        ..ast::StringLiteral::default()
+        range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     let new_env_var = node.into();
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
         checker.generator().expr(&new_env_var),
         slice.range(),
     )));
-    checker.diagnostics.push(diagnostic);
 }
 
 /// SIM910
-pub(crate) fn dict_get_with_none_default(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn dict_get_with_none_default(checker: &Checker, expr: &Expr) {
     let Expr::Call(ast::ExprCall {
         func,
         arguments: Arguments { args, keywords, .. },
         range: _,
+        node_index: _,
     }) = expr
     else {
         return;
@@ -275,7 +280,7 @@ pub(crate) fn dict_get_with_none_default(checker: &mut Checker, expr: &Expr) {
         Expr::Name(name) => {
             let Some(binding) = checker
                 .semantic()
-                .only_binding(name)
+                .resolve_name(name)
                 .map(|id| checker.semantic().binding(id))
             else {
                 return;
@@ -294,7 +299,7 @@ pub(crate) fn dict_get_with_none_default(checker: &mut Checker, expr: &Expr) {
     );
     let actual = checker.locator().slice(expr);
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         DictGetWithNoneDefault {
             expected: SourceCodeSnippet::new(expected.clone()),
             actual: SourceCodeSnippet::from_str(actual),
@@ -305,5 +310,4 @@ pub(crate) fn dict_get_with_none_default(checker: &mut Checker, expr: &Expr) {
         expected,
         expr.range(),
     )));
-    checker.diagnostics.push(diagnostic);
 }

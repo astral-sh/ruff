@@ -1,0 +1,27 @@
+---
+source: crates/ruff/tests/lint.rs
+info:
+  program: ruff
+  args:
+    - check
+    - "--no-cache"
+    - "--output-format"
+    - concise
+    - "--config"
+    - "lint.isort.required-imports = [\"import pandas as pd\"]"
+    - "--select"
+    - "I002,ICN001,F401"
+    - "--stdin-filename"
+    - test.py
+    - "--unsafe-fixes"
+    - "--fix"
+    - "-"
+  stdin: "1"
+---
+success: true
+exit_code: 0
+----- stdout -----
+import pandas as pd
+1
+----- stderr -----
+Found 1 error (1 fixed, 0 remaining).

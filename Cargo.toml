@@ -3,8 +3,9 @@ members = ["crates/*"]
 resolver = "2"
 
 [workspace.package]
-edition = "2021"
-rust-version = "1.80"
+# Please update rustfmt.toml when bumping the Rust edition
+edition = "2024"
+rust-version = "1.87"
 homepage = "https://docs.astral.sh/ruff"
 documentation = "https://docs.astral.sh/ruff"
 repository = "https://github.com/astral-sh/ruff"
@@ -22,7 +23,9 @@ ruff_graph = { path = "crates/ruff_graph" }
 ruff_index = { path = "crates/ruff_index" }
 ruff_linter = { path = "crates/ruff_linter" }
 ruff_macros = { path = "crates/ruff_macros" }
+ruff_memory_usage = { path = "crates/ruff_memory_usage" }
 ruff_notebook = { path = "crates/ruff_notebook" }
+ruff_options_metadata = { path = "crates/ruff_options_metadata" }
 ruff_python_ast = { path = "crates/ruff_python_ast" }
 ruff_python_codegen = { path = "crates/ruff_python_codegen" }
 ruff_python_formatter = { path = "crates/ruff_python_formatter" }
@@ -35,65 +38,82 @@ ruff_python_trivia = { path = "crates/ruff_python_trivia" }
 ruff_server = { path = "crates/ruff_server" }
 ruff_source_file = { path = "crates/ruff_source_file" }
 ruff_text_size = { path = "crates/ruff_text_size" }
-red_knot_vendored = { path = "crates/red_knot_vendored" }
 ruff_workspace = { path = "crates/ruff_workspace" }
 
-red_knot_python_semantic = { path = "crates/red_knot_python_semantic" }
-red_knot_server = { path = "crates/red_knot_server" }
-red_knot_test = { path = "crates/red_knot_test" }
-red_knot_workspace = { path = "crates/red_knot_workspace", default-features = false }
+ty = { path = "crates/ty" }
+ty_combine = { path = "crates/ty_combine" }
+ty_ide = { path = "crates/ty_ide" }
+ty_project = { path = "crates/ty_project", default-features = false }
+ty_python_semantic = { path = "crates/ty_python_semantic" }
+ty_server = { path = "crates/ty_server" }
+ty_static = { path = "crates/ty_static" }
+ty_test = { path = "crates/ty_test" }
+ty_vendored = { path = "crates/ty_vendored" }
 
 aho-corasick = { version = "1.1.3" }
 anstream = { version = "0.6.18" }
 anstyle = { version = "1.0.10" }
 anyhow = { version = "1.0.80" }
+arc-swap = { version = "1.7.1" }
 assert_fs = { version = "1.1.0" }
 argfile = { version = "0.2.0" }
-bincode = { version = "1.3.3" }
+bincode = { version = "2.0.0" }
 bitflags = { version = "2.5.0" }
+bitvec = { version = "1.0.1", default-features = false, features = [
+    "alloc",
+] }
 bstr = { version = "1.9.1" }
 cachedir = { version = "0.3.1" }
 camino = { version = "1.1.7" }
-chrono = { version = "0.4.35", default-features = false, features = ["clock"] }
 clap = { version = "4.5.3", features = ["derive"] }
 clap_complete_command = { version = "0.6.0" }
 clearscreen = { version = "4.0.0" }
-codspeed-criterion-compat = { version = "2.6.0", default-features = false }
+divan = { package = "codspeed-divan-compat", version = "3.0.2" }
+codspeed-criterion-compat = { version = "3.0.2", default-features = false }
 colored = { version = "3.0.0" }
 console_error_panic_hook = { version = "0.1.7" }
 console_log = { version = "1.0.0" }
 countme = { version = "3.0.1" }
-compact_str = "0.8.0"
-criterion = { version = "0.5.1", default-features = false }
+compact_str = "0.9.0"
+criterion = { version = "0.7.0", default-features = false }
 crossbeam = { version = "0.8.4" }
 dashmap = { version = "6.0.1" }
 dir-test = { version = "0.4.0" }
 dunce = { version = "1.0.5" }
 drop_bomb = { version = "0.1.5" }
-env_logger = { version = "0.11.0" }
-etcetera = { version = "0.8.0" }
+etcetera = { version = "0.10.0" }
 fern = { version = "0.7.0" }
 filetime = { version = "0.2.23" }
+getrandom = { version = "0.3.1" }
+get-size2 = { version = "0.6.2", features = [
+    "derive",
+    "smallvec",
+    "hashbrown",
+    "compact-str",
+] }
 glob = { version = "0.3.1" }
 globset = { version = "0.4.14" }
 globwalk = { version = "0.9.1" }
 hashbrown = { version = "0.15.0", default-features = false, features = [
     "raw-entry",
+    "equivalent",
     "inline-more",
 ] }
+heck = "0.5.0"
 ignore = { version = "0.4.22" }
 imara-diff = { version = "0.1.5" }
 imperative = { version = "1.0.4" }
 indexmap = { version = "2.6.0" }
-indicatif = { version = "0.17.8" }
+indicatif = { version = "0.18.0" }
 indoc = { version = "2.0.4" }
 insta = { version = "1.35.1" }
 insta-cmd = { version = "0.6.0" }
 is-macro = { version = "0.3.5" }
 is-wsl = { version = "0.4.0" }
 itertools = { version = "0.14.0" }
+jiff = { version = "0.2.0" }
 js-sys = { version = "0.3.69" }
-jod-thread = { version = "0.1.2" }
+jod-thread = { version = "1.0.0" }
 libc = { version = "0.2.153" }
 libcst = { version = "1.1.0", default-features = false }
 log = { version = "0.4.17" }
@@ -105,7 +125,7 @@ matchit = { version = "0.8.1" }
 memchr = { version = "2.7.1" }
 mimalloc = { version = "0.1.39" }
 natord = { version = "1.0.9" }
-notify = { version = "7.0.0" }
+notify = { version = "8.0.0" }
 ordermap = { version = "0.5.0" }
 path-absolutize = { version = "3.1.1" }
 path-slash = { version = "0.2.1" }
@@ -116,12 +136,19 @@ proc-macro2 = { version = "1.0.79" }
 pyproject-toml = { version = "0.13.4" }
 quick-junit = { version = "0.5.0" }
 quote = { version = "1.0.23" }
-rand = { version = "0.8.5" }
+rand = { version = "0.9.0" }
 rayon = { version = "1.10.0" }
 regex = { version = "1.10.2" }
+regex-automata = { version = "0.4.9" }
 rustc-hash = { version = "2.0.0" }
+rustc-stable-hash = { version = "0.1.2" }
 # When updating salsa, make sure to also update the revision in `fuzz/Cargo.toml`
-salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "88a1d7774d78f048fbd77d40abca9ebd729fd1f0" }
+salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "a3ffa22cb26756473d56f867aedec3fd907c4dd9", default-features = false, features = [
+    "compact_str",
+    "macros",
+    "salsa_unstable",
+    "inventory",
+] }
 schemars = { version = "0.8.16" }
 seahash = { version = "4.1.0" }
 serde = { version = "1.0.197", features = ["derive"] }
@@ -133,25 +160,32 @@ serde_with = { version = "3.6.0", default-features = false, features = [
 ] }
 shellexpand = { version = "3.0.0" }
 similar = { version = "2.4.0", features = ["inline"] }
-smallvec = { version = "1.13.2" }
-snapbox = { version = "0.6.0", features = ["diff", "term-svg", "cmd", "examples"] }
+smallvec = { version = "1.13.2", features = ["union", "const_generics", "const_new"] }
+snapbox = { version = "0.6.0", features = [
+    "diff",
+    "term-svg",
+    "cmd",
+    "examples",
+] }
 static_assertions = "1.1.0"
-strum = { version = "0.26.0", features = ["strum_macros"] }
-strum_macros = { version = "0.26.0" }
+strum = { version = "0.27.0", features = ["strum_macros"] }
+strum_macros = { version = "0.27.0" }
 syn = { version = "2.0.55" }
 tempfile = { version = "3.9.0" }
 test-case = { version = "3.3.1" }
 thiserror = { version = "2.0.0" }
 tikv-jemallocator = { version = "0.6.0" }
-toml = { version = "0.8.11" }
+toml = { version = "0.9.0" }
 tracing = { version = "0.1.40" }
 tracing-flame = { version = "0.2.0" }
-tracing-indicatif = { version = "0.3.6" }
+tracing-indicatif = { version = "0.3.11" }
+tracing-log = { version = "0.2.0" }
 tracing-subscriber = { version = "0.3.18", default-features = false, features = [
     "env-filter",
     "fmt",
+    "ansi",
+    "smallvec",
 ] }
-tracing-tree = { version = "0.4.0" }
 tryfn = { version = "0.2.1" }
 typed-arena = { version = "2.0.2" }
 unic-ucd-category = { version = "0.9" }
@@ -159,19 +193,17 @@ unicode-ident = { version = "1.0.12" }
 unicode-width = { version = "0.2.0" }
 unicode_names2 = { version = "1.2.2" }
 unicode-normalization = { version = "0.1.23" }
-ureq = { version = "2.9.6" }
 url = { version = "2.5.0" }
-uuid = { version = "1.6.1", features = [
-    "v4",
-    "fast-rng",
-    "macro-diagnostics",
-    "js",
-] }
+uuid = { version = "1.6.1", features = ["v4", "fast-rng", "macro-diagnostics"] }
 walkdir = { version = "2.3.2" }
 wasm-bindgen = { version = "0.2.92" }
 wasm-bindgen-test = { version = "0.3.42" }
 wild = { version = "2" }
 zip = { version = "0.6.6", default-features = false }
+
+[workspace.metadata.cargo-shear]
+ignored = ["getrandom", "ruff_options_metadata", "uuid"]
+
 
 [workspace.lints.rust]
 unsafe_code = "warn"
@@ -183,6 +215,8 @@ unexpected_cfgs = { level = "warn", check-cfg = [
 
 [workspace.lints.clippy]
 pedantic = { level = "warn", priority = -2 }
+# Enabled at the crate level
+disallowed_methods = "allow"
 # Allowed pedantic lints
 char_lit_as_u8 = "allow"
 collapsible_else_if = "allow"
@@ -197,9 +231,12 @@ must_use_candidate = "allow"
 similar_names = "allow"
 single_match_else = "allow"
 too_many_lines = "allow"
+needless_continue = "allow" # An explicit continue can be more readable, especially if the alternative is an empty block.
+unnecessary_debug_formatting = "allow" # too many instances, the display also doesn't quote the path which is often desired in logs where we use them the most often.
 # Without the hashes we run into a `rustfmt` bug in some snapshot tests, see #13250
 needless_raw_string_hashes = "allow"
 # Disallowed restriction lints
+ignore_without_reason = "allow" # Too many exsisting instances, and there's no auto fix.
 print_stdout = "warn"
 print_stderr = "warn"
 dbg_macro = "warn"
@@ -217,6 +254,7 @@ unused_peekable = "warn"
 
 # Diagnostics are not actionable: Enable once https://github.com/rust-lang/rust-clippy/issues/13774 is resolved.
 large_stack_arrays = "allow"
+
 
 [profile.release]
 # Note that we set these explicitly, and these values
@@ -241,6 +279,9 @@ opt-level = 3
 [profile.dev.package.similar]
 opt-level = 3
 
+[profile.dev.package.salsa]
+opt-level = 3
+
 # Reduce complexity of a parser function that would trigger a locals limit in a wasm tool.
 # https://github.com/bytecodealliance/wasm-tools/blob/b5c3d98e40590512a3b12470ef358d5c7b983b15/crates/wasmparser/src/limits.rs#L29
 [profile.dev.package.ruff_python_parser]
@@ -255,60 +296,3 @@ debug = 1
 # The profile that 'cargo dist' will build with.
 [profile.dist]
 inherits = "release"
-
-# Config for 'dist'
-[workspace.metadata.dist]
-# The preferred dist version to use in CI (Cargo.toml SemVer syntax)
-cargo-dist-version = "0.25.2-prerelease.3"
-# CI backends to support
-ci = "github"
-# The installers to generate for each app
-installers = ["shell", "powershell"]
-# The archive format to use for windows builds (defaults .zip)
-windows-archive = ".zip"
-# The archive format to use for non-windows builds (defaults .tar.xz)
-unix-archive = ".tar.gz"
-# Target platforms to build apps for (Rust target-triple syntax)
-targets = [
-    "aarch64-apple-darwin",
-    "aarch64-pc-windows-msvc",
-    "aarch64-unknown-linux-gnu",
-    "aarch64-unknown-linux-musl",
-    "arm-unknown-linux-musleabihf",
-    "armv7-unknown-linux-gnueabihf",
-    "armv7-unknown-linux-musleabihf",
-    "i686-pc-windows-msvc",
-    "i686-unknown-linux-gnu",
-    "i686-unknown-linux-musl",
-    "powerpc64-unknown-linux-gnu",
-    "powerpc64le-unknown-linux-gnu",
-    "s390x-unknown-linux-gnu",
-    "x86_64-apple-darwin",
-    "x86_64-pc-windows-msvc",
-    "x86_64-unknown-linux-gnu",
-    "x86_64-unknown-linux-musl",
-]
-# Whether to auto-include files like READMEs, LICENSEs, and CHANGELOGs (default true)
-auto-includes = false
-# Whether dist should create a Github Release or use an existing draft
-create-release = true
-# Which actions to run on pull requests
-pr-run-mode = "skip"
-# Whether CI should trigger releases with dispatches instead of tag pushes
-dispatch-releases = true
-# Which phase dist should use to create the GitHub release
-github-release = "announce"
-# Whether CI should include auto-generated code to build local artifacts
-build-local-artifacts = false
-# Local artifacts jobs to run in CI
-local-artifacts-jobs = ["./build-binaries", "./build-docker"]
-# Publish jobs to run in CI
-publish-jobs = ["./publish-pypi", "./publish-wasm"]
-# Post-announce jobs to run in CI
-post-announce-jobs = ["./notify-dependents", "./publish-docs", "./publish-playground"]
-# Custom permissions for GitHub Jobs
-github-custom-job-permissions = { "build-docker" = { packages = "write", contents = "read" }, "publish-wasm" = { contents = "read", id-token = "write", packages = "write" } }
-# Whether to install an updater program
-install-updater = false
-# Path that installers should place binaries in
-install-path = ["$XDG_BIN_HOME/", "$XDG_DATA_HOME/../bin", "~/.local/bin"]

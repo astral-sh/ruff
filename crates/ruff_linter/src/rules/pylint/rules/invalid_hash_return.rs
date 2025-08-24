@@ -1,5 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::visitor::Visitor;
@@ -9,6 +8,7 @@ use ruff_python_semantic::analyze::terminal::Terminal;
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -48,8 +48,8 @@ impl Violation for InvalidHashReturnType {
     }
 }
 
-/// E0309
-pub(crate) fn invalid_hash_return(checker: &mut Checker, function_def: &ast::StmtFunctionDef) {
+/// PLE0309
+pub(crate) fn invalid_hash_return(checker: &Checker, function_def: &ast::StmtFunctionDef) {
     if function_def.name.as_str() != "__hash__" {
         return;
     }
@@ -72,10 +72,7 @@ pub(crate) fn invalid_hash_return(checker: &mut Checker, function_def: &ast::Stm
 
     // If there are no return statements, add a diagnostic.
     if terminal == Terminal::Implicit {
-        checker.diagnostics.push(Diagnostic::new(
-            InvalidHashReturnType,
-            function_def.identifier(),
-        ));
+        checker.report_diagnostic(InvalidHashReturnType, function_def.identifier());
         return;
     }
 
@@ -92,15 +89,11 @@ pub(crate) fn invalid_hash_return(checker: &mut Checker, function_def: &ast::Stm
                 ResolvedPythonType::Unknown
                     | ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer))
             ) {
-                checker
-                    .diagnostics
-                    .push(Diagnostic::new(InvalidHashReturnType, value.range()));
+                checker.report_diagnostic(InvalidHashReturnType, value.range());
             }
         } else {
             // Disallow implicit `None`.
-            checker
-                .diagnostics
-                .push(Diagnostic::new(InvalidHashReturnType, stmt.range()));
+            checker.report_diagnostic(InvalidHashReturnType, stmt.range());
         }
     }
 }

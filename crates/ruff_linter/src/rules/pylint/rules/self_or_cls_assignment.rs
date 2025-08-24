@@ -1,14 +1,17 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{self as ast, Expr, ParameterWithDefault};
-use ruff_python_semantic::analyze::function_type::{self as function_type, FunctionType};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::ScopeKind;
+use ruff_python_semantic::analyze::function_type::{self as function_type, FunctionType};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for assignment of `self` and `cls` in instance and class methods respectively.
+///
+/// This check also applies to `__new__` even though this is technically
+/// a static method.
 ///
 /// ## Why is this bad?
 /// The identifiers `self` and `cls` are conventional in Python for the first parameter of instance
@@ -63,8 +66,8 @@ impl Violation for SelfOrClsAssignment {
     }
 }
 
-/// PLW0127
-pub(crate) fn self_or_cls_assignment(checker: &mut Checker, target: &Expr) {
+/// PLW0642
+pub(crate) fn self_or_cls_assignment(checker: &Checker, target: &Expr) {
     let ScopeKind::Function(ast::StmtFunctionDef {
         name,
         decorator_list,
@@ -82,10 +85,7 @@ pub(crate) fn self_or_cls_assignment(checker: &mut Checker, target: &Expr) {
         return;
     };
 
-    let Some(ParameterWithDefault {
-        parameter: self_or_cls,
-        ..
-    }) = parameters
+    let Some(self_or_cls) = parameters
         .posonlyargs
         .first()
         .or_else(|| parameters.args.first())
@@ -98,28 +98,26 @@ pub(crate) fn self_or_cls_assignment(checker: &mut Checker, target: &Expr) {
         decorator_list,
         parent,
         checker.semantic(),
-        &checker.settings.pep8_naming.classmethod_decorators,
-        &checker.settings.pep8_naming.staticmethod_decorators,
+        &checker.settings().pep8_naming.classmethod_decorators,
+        &checker.settings().pep8_naming.staticmethod_decorators,
     );
 
-    let method_type = match (function_type, self_or_cls.name.as_str()) {
-        (FunctionType::Method { .. }, "self") => MethodType::Instance,
-        (FunctionType::ClassMethod { .. }, "cls") => MethodType::Class,
+    let method_type = match (function_type, self_or_cls.name().as_str()) {
+        (FunctionType::Method, "self") => MethodType::Instance,
+        (FunctionType::ClassMethod, "cls") => MethodType::Class,
+        (FunctionType::NewMethod, "cls") => MethodType::New,
         _ => return,
     };
 
     check_expr(checker, target, method_type);
 }
 
-fn check_expr(checker: &mut Checker, target: &Expr, method_type: MethodType) {
+fn check_expr(checker: &Checker, target: &Expr, method_type: MethodType) {
     match target {
         Expr::Name(_) => {
             if let Expr::Name(ast::ExprName { id, .. }) = target {
                 if id.as_str() == method_type.arg_name() {
-                    checker.diagnostics.push(Diagnostic::new(
-                        SelfOrClsAssignment { method_type },
-                        target.range(),
-                    ));
+                    checker.report_diagnostic(SelfOrClsAssignment { method_type }, target.range());
                 }
             }
         }
@@ -137,6 +135,7 @@ fn check_expr(checker: &mut Checker, target: &Expr, method_type: MethodType) {
 enum MethodType {
     Instance,
     Class,
+    New,
 }
 
 impl MethodType {
@@ -144,6 +143,7 @@ impl MethodType {
         match self {
             MethodType::Instance => "self",
             MethodType::Class => "cls",
+            MethodType::New => "cls",
         }
     }
 }
@@ -153,6 +153,7 @@ impl std::fmt::Display for MethodType {
         match self {
             MethodType::Instance => f.write_str("instance"),
             MethodType::Class => f.write_str("class"),
+            MethodType::New => f.write_str("`__new__`"),
         }
     }
 }

@@ -53,6 +53,18 @@ import builtins
 if x == builtins.float("nan"):
     pass
 
+# https://github.com/astral-sh/ruff/issues/16374
+match number:
+    # Errors
+    case np.nan: ...
+    case math.nan: ...
+
+    # No errors
+    case np.nan(): ...
+    case math.nan(): ...
+    case float('nan'): ...
+    case npy_nan: ...
+
 # OK
 if math.isnan(x):
     pass
@@ -80,3 +92,8 @@ if y == np.inf:
 # OK
 if x == "nan":
     pass
+
+# PLW0117
+# https://github.com/astral-sh/ruff/issues/18596
+assert x == float("-NaN ")
+assert x == float(" \n+nan   \t")

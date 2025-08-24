@@ -1,9 +1,9 @@
 use ruff_python_ast::{self as ast, Stmt};
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -41,17 +41,20 @@ impl Violation for FStringDocstring {
 }
 
 /// B021
-pub(crate) fn f_string_docstring(checker: &mut Checker, body: &[Stmt]) {
+pub(crate) fn f_string_docstring(checker: &Checker, body: &[Stmt]) {
     let Some(stmt) = body.first() else {
         return;
     };
-    let Stmt::Expr(ast::StmtExpr { value, range: _ }) = stmt else {
+    let Stmt::Expr(ast::StmtExpr {
+        value,
+        range: _,
+        node_index: _,
+    }) = stmt
+    else {
         return;
     };
     if !value.is_f_string_expr() {
         return;
     }
-    checker
-        .diagnostics
-        .push(Diagnostic::new(FStringDocstring, stmt.identifier()));
+    checker.report_diagnostic(FStringDocstring, stmt.identifier());
 }

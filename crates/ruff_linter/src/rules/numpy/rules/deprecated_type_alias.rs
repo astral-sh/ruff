@@ -1,10 +1,10 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Expr;
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for deprecated NumPy type aliases.
@@ -19,7 +19,7 @@ use crate::checkers::ast::Checker;
 /// Note, however, that `np.bool` and `np.long` were reintroduced in 2.0 with
 /// different semantics, and are thus omitted from this rule.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// import numpy as np
 ///
@@ -51,7 +51,7 @@ impl Violation for NumpyDeprecatedTypeAlias {
 }
 
 /// NPY001
-pub(crate) fn deprecated_type_alias(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn deprecated_type_alias(checker: &Checker, expr: &Expr) {
     if !checker.semantic().seen_module(Modules::NUMPY) {
         return;
     }
@@ -74,7 +74,7 @@ pub(crate) fn deprecated_type_alias(checker: &mut Checker, expr: &Expr) {
                 }
             })
     {
-        let mut diagnostic = Diagnostic::new(
+        let mut diagnostic = checker.report_diagnostic(
             NumpyDeprecatedTypeAlias {
                 type_name: type_name.to_string(),
             },
@@ -93,6 +93,5 @@ pub(crate) fn deprecated_type_alias(checker: &mut Checker, expr: &Expr) {
             let binding_edit = Edit::range_replacement(binding, expr.range());
             Ok(Fix::safe_edits(binding_edit, import_edit))
         });
-        checker.diagnostics.push(diagnostic);
     }
 }

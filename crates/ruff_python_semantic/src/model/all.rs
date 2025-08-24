@@ -2,7 +2,7 @@
 
 use bitflags::bitflags;
 
-use ruff_python_ast::{self as ast, helpers::map_subscript, Expr, Stmt};
+use ruff_python_ast::{self as ast, Expr, Stmt, helpers::map_subscript};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::SemanticModel;
@@ -82,7 +82,12 @@ impl SemanticModel<'_> {
             flags: &mut DunderAllFlags,
         ) {
             for elt in elts {
-                if let Expr::StringLiteral(ast::ExprStringLiteral { value, range }) = elt {
+                if let Expr::StringLiteral(ast::ExprStringLiteral {
+                    value,
+                    range,
+                    node_index: _,
+                }) = elt
+                {
                     names.push(DunderAllName {
                         name: value.to_str(),
                         range: *range,

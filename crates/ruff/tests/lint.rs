@@ -3,9 +3,9 @@
 #![cfg(not(target_family = "wasm"))]
 
 use regex::escape;
-use std::fs;
 use std::process::Command;
 use std::str;
+use std::{fs, path::Path};
 
 use anyhow::Result;
 use assert_fs::fixture::{ChildPath, FileTouch, PathChild};
@@ -15,8 +15,8 @@ use tempfile::TempDir;
 const BIN_NAME: &str = "ruff";
 const STDIN_BASE_OPTIONS: &[&str] = &["check", "--no-cache", "--output-format", "concise"];
 
-fn tempdir_filter(tempdir: &TempDir) -> String {
-    format!(r"{}\\?/?", escape(tempdir.path().to_str().unwrap()))
+fn tempdir_filter(path: impl AsRef<Path>) -> String {
+    format!(r"{}\\?/?", escape(path.as_ref().to_str().unwrap()))
 }
 
 #[test]
@@ -534,7 +534,7 @@ fn nonexistent_config_file() {
 fn config_override_rejected_if_invalid_toml() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
-        .args(["--config", "foo = bar", "."]), @r#"
+        .args(["--config", "foo = bar", "."]), @r"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -551,12 +551,11 @@ fn config_override_rejected_if_invalid_toml() {
     TOML parse error at line 1, column 7
       |
     1 | foo = bar
-      |       ^
-    invalid string
-    expected `"`, `'`
+      |       ^^^
+    string values must be quoted, expected literal string
 
     For more information, try '--help'.
-    "#);
+    ");
 }
 
 #[test]
@@ -607,6 +606,138 @@ fn extend_passed_via_config_argument() {
 
     For more information, try '--help'.
     ");
+}
+
+#[test]
+fn nonexistent_extend_file() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let project_dir = dunce::canonicalize(tempdir.path())?;
+    fs::write(
+        project_dir.join("ruff.toml"),
+        r#"
+extend = "ruff2.toml"
+"#,
+    )?;
+
+    fs::write(
+        project_dir.join("ruff2.toml"),
+        r#"
+extend = "ruff3.toml"
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![
+            (tempdir_filter(&project_dir).as_str(), "[TMP]/"),
+            ("The system cannot find the file specified.", "No such file or directory")
+        ]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["check"]).current_dir(project_dir), @r"
+        success: false
+        exit_code: 2
+        ----- stdout -----
+
+        ----- stderr -----
+        ruff failed
+          Cause: Failed to load extended configuration `[TMP]/ruff3.toml` (`[TMP]/ruff.toml` extends `[TMP]/ruff2.toml` extends `[TMP]/ruff3.toml`)
+          Cause: Failed to read [TMP]/ruff3.toml
+          Cause: No such file or directory (os error 2)
+        ");
+    });
+
+    Ok(())
+}
+
+#[test]
+fn circular_extend() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let project_path = dunce::canonicalize(tempdir.path())?;
+
+    fs::write(
+        project_path.join("ruff.toml"),
+        r#"
+extend = "ruff2.toml"
+"#,
+    )?;
+    fs::write(
+        project_path.join("ruff2.toml"),
+        r#"
+extend = "ruff3.toml"
+"#,
+    )?;
+    fs::write(
+        project_path.join("ruff3.toml"),
+        r#"
+extend = "ruff.toml"
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&project_path).as_str(), "[TMP]/")]
+    }, {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args(["check"])
+            .current_dir(project_path),
+        @r"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Circular configuration detected: `[TMP]/ruff.toml` extends `[TMP]/ruff2.toml` extends `[TMP]/ruff3.toml` extends `[TMP]/ruff.toml`
+    ");
+    });
+
+    Ok(())
+}
+
+#[test]
+fn parse_error_extends() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let project_path = dunce::canonicalize(tempdir.path())?;
+
+    fs::write(
+        project_path.join("ruff.toml"),
+        r#"
+extend = "ruff2.toml"
+"#,
+    )?;
+    fs::write(
+        project_path.join("ruff2.toml"),
+        r#"
+[lint]
+select = [E501]
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&project_path).as_str(), "[TMP]/")]
+    }, {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args(["check"])
+            .current_dir(project_path),
+        @r"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Failed to load extended configuration `[TMP]/ruff2.toml` (`[TMP]/ruff.toml` extends `[TMP]/ruff2.toml`)
+      Cause: Failed to parse [TMP]/ruff2.toml
+      Cause: TOML parse error at line 3, column 11
+      |
+    3 | select = [E501]
+      |           ^^^^
+    string values must be quoted, expected literal string
+    ");
+    });
+
+    Ok(())
 }
 
 #[test]
@@ -743,7 +874,7 @@ fn each_toml_option_requires_a_new_flag_1() {
       |
     1 | extend-select=['F841'], line-length=90
       |                       ^
-    expected newline, `#`
+    unexpected key or value, expected newline, `#`
 
     For more information, try '--help'.
     ");
@@ -774,7 +905,7 @@ fn each_toml_option_requires_a_new_flag_2() {
       |
     1 | extend-select=['F841'] line-length=90
       |                        ^
-    expected newline, `#`
+    unexpected key or value, expected newline, `#`
 
     For more information, try '--help'.
     ");
@@ -861,6 +992,8 @@ fn value_given_to_table_key_is_not_inline_table_2() {
     - `lint.extend-per-file-ignores`
     - `lint.exclude`
     - `lint.preview`
+    - `lint.typing-extensions`
+    - `lint.future-annotations`
 
     For more information, try '--help'.
     ");
@@ -1019,6 +1152,24 @@ include = ["*.ipy"]
     });
 
     Ok(())
+}
+
+#[test]
+fn warn_invalid_noqa_with_no_diagnostics() {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .args(["--isolated"])
+            .arg("--select")
+            .arg("F401")
+            .arg("-")
+            .pass_stdin(
+                r#"
+# ruff: noqa: AAA101
+print("Hello world!")
+"#
+            )
+    );
 }
 
 #[test]
@@ -1750,6 +1901,40 @@ def first_square():
     Ok(())
 }
 
+/// Regression test for <https://github.com/astral-sh/ruff/issues/2253>
+#[test]
+fn add_noqa_parent() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let test_path = tempdir.path().join("noqa.py");
+    fs::write(
+        &test_path,
+        r#"
+from foo import (  # noqa: F401
+		bar
+)
+		"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+                .args(STDIN_BASE_OPTIONS)
+                .arg("--add-noqa")
+                .arg("--select=F401")
+                .arg("noqa.py")
+                .current_dir(&tempdir), @r"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+
+        ----- stderr -----
+        ");
+    });
+
+    Ok(())
+}
+
 /// Infer `3.11` from `requires-python` in `pyproject.toml`.
 #[test]
 fn requires_python() -> Result<()> {
@@ -1936,6 +2121,2653 @@ select = ["UP006"]
     Ok(())
 }
 
+/// ```
+/// tmp
+/// ├── pyproject.toml #<--- no `[tool.ruff]`
+/// └── test.py
+/// ```
+#[test]
+fn requires_python_no_tool() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let project_dir = dunce::canonicalize(tempdir.path())?;
+    let ruff_toml = tempdir.path().join("pyproject.toml");
+    fs::write(
+        &ruff_toml,
+        r#"[project]
+requires-python = ">= 3.11"
+"#,
+    )?;
+
+    let testpy = tempdir.path().join("test.py");
+    fs::write(
+        &testpy,
+        r#"from typing import Union;foo: Union[int, str] = 1"#,
+    )?;
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&project_dir).as_str(), "[TMP]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--show-settings")
+            .args(["--select","UP007"])
+            .arg("test.py")
+            .arg("-")
+            .current_dir(project_dir)
+            , @r#"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        Resolved settings for: "[TMP]/test.py"
+
+        # General Settings
+        cache_dir = "[TMP]/.ruff_cache"
+        fix = false
+        fix_only = false
+        output_format = concise
+        show_fixes = false
+        unsafe_fixes = hint
+
+        # File Resolver Settings
+        file_resolver.exclude = [
+        	".bzr",
+        	".direnv",
+        	".eggs",
+        	".git",
+        	".git-rewrite",
+        	".hg",
+        	".ipynb_checkpoints",
+        	".mypy_cache",
+        	".nox",
+        	".pants.d",
+        	".pyenv",
+        	".pytest_cache",
+        	".pytype",
+        	".ruff_cache",
+        	".svn",
+        	".tox",
+        	".venv",
+        	".vscode",
+        	"__pypackages__",
+        	"_build",
+        	"buck-out",
+        	"dist",
+        	"node_modules",
+        	"site-packages",
+        	"venv",
+        ]
+        file_resolver.extend_exclude = []
+        file_resolver.force_exclude = false
+        file_resolver.include = [
+        	"*.py",
+        	"*.pyi",
+        	"*.ipynb",
+        	"**/pyproject.toml",
+        ]
+        file_resolver.extend_include = []
+        file_resolver.respect_gitignore = true
+        file_resolver.project_root = "[TMP]/"
+
+        # Linter Settings
+        linter.exclude = []
+        linter.project_root = "[TMP]/"
+        linter.rules.enabled = [
+        	non-pep604-annotation-union (UP007),
+        ]
+        linter.rules.should_fix = [
+        	non-pep604-annotation-union (UP007),
+        ]
+        linter.per_file_ignores = {}
+        linter.safety_table.forced_safe = []
+        linter.safety_table.forced_unsafe = []
+        linter.unresolved_target_version = 3.11
+        linter.per_file_target_version = {}
+        linter.preview = disabled
+        linter.explicit_preview_rules = false
+        linter.extension = ExtensionMapping({})
+        linter.allowed_confusables = []
+        linter.builtins = []
+        linter.dummy_variable_rgx = ^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$
+        linter.external = []
+        linter.ignore_init_module_imports = true
+        linter.logger_objects = []
+        linter.namespace_packages = []
+        linter.src = [
+        	"[TMP]/",
+        	"[TMP]/src",
+        ]
+        linter.tab_size = 4
+        linter.line_length = 88
+        linter.task_tags = [
+        	TODO,
+        	FIXME,
+        	XXX,
+        ]
+        linter.typing_modules = []
+        linter.typing_extensions = true
+
+        # Linter Plugins
+        linter.flake8_annotations.mypy_init_return = false
+        linter.flake8_annotations.suppress_dummy_args = false
+        linter.flake8_annotations.suppress_none_returning = false
+        linter.flake8_annotations.allow_star_arg_any = false
+        linter.flake8_annotations.ignore_fully_untyped = false
+        linter.flake8_bandit.hardcoded_tmp_directory = [
+        	/tmp,
+        	/var/tmp,
+        	/dev/shm,
+        ]
+        linter.flake8_bandit.check_typed_exception = false
+        linter.flake8_bandit.extend_markup_names = []
+        linter.flake8_bandit.allowed_markup_calls = []
+        linter.flake8_bugbear.extend_immutable_calls = []
+        linter.flake8_builtins.allowed_modules = []
+        linter.flake8_builtins.ignorelist = []
+        linter.flake8_builtins.strict_checking = false
+        linter.flake8_comprehensions.allow_dict_calls_with_keyword_arguments = false
+        linter.flake8_copyright.notice_rgx = (?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}((-|,\s)\d{4})*
+        linter.flake8_copyright.author = none
+        linter.flake8_copyright.min_file_size = 0
+        linter.flake8_errmsg.max_string_length = 0
+        linter.flake8_gettext.functions_names = [
+        	_,
+        	gettext,
+        	ngettext,
+        ]
+        linter.flake8_implicit_str_concat.allow_multiline = true
+        linter.flake8_import_conventions.aliases = {
+        	altair = alt,
+        	holoviews = hv,
+        	matplotlib = mpl,
+        	matplotlib.pyplot = plt,
+        	networkx = nx,
+        	numpy = np,
+        	numpy.typing = npt,
+        	pandas = pd,
+        	panel = pn,
+        	plotly.express = px,
+        	polars = pl,
+        	pyarrow = pa,
+        	seaborn = sns,
+        	tensorflow = tf,
+        	tkinter = tk,
+        	xml.etree.ElementTree = ET,
+        }
+        linter.flake8_import_conventions.banned_aliases = {}
+        linter.flake8_import_conventions.banned_from = []
+        linter.flake8_pytest_style.fixture_parentheses = false
+        linter.flake8_pytest_style.parametrize_names_type = tuple
+        linter.flake8_pytest_style.parametrize_values_type = list
+        linter.flake8_pytest_style.parametrize_values_row_type = tuple
+        linter.flake8_pytest_style.raises_require_match_for = [
+        	BaseException,
+        	Exception,
+        	ValueError,
+        	OSError,
+        	IOError,
+        	EnvironmentError,
+        	socket.error,
+        ]
+        linter.flake8_pytest_style.raises_extend_require_match_for = []
+        linter.flake8_pytest_style.mark_parentheses = false
+        linter.flake8_quotes.inline_quotes = double
+        linter.flake8_quotes.multiline_quotes = double
+        linter.flake8_quotes.docstring_quotes = double
+        linter.flake8_quotes.avoid_escape = true
+        linter.flake8_self.ignore_names = [
+        	_make,
+        	_asdict,
+        	_replace,
+        	_fields,
+        	_field_defaults,
+        	_name_,
+        	_value_,
+        ]
+        linter.flake8_tidy_imports.ban_relative_imports = "parents"
+        linter.flake8_tidy_imports.banned_api = {}
+        linter.flake8_tidy_imports.banned_module_level_imports = []
+        linter.flake8_type_checking.strict = false
+        linter.flake8_type_checking.exempt_modules = [
+        	typing,
+        	typing_extensions,
+        ]
+        linter.flake8_type_checking.runtime_required_base_classes = []
+        linter.flake8_type_checking.runtime_required_decorators = []
+        linter.flake8_type_checking.quote_annotations = false
+        linter.flake8_unused_arguments.ignore_variadic_names = false
+        linter.isort.required_imports = []
+        linter.isort.combine_as_imports = false
+        linter.isort.force_single_line = false
+        linter.isort.force_sort_within_sections = false
+        linter.isort.detect_same_package = true
+        linter.isort.case_sensitive = false
+        linter.isort.force_wrap_aliases = false
+        linter.isort.force_to_top = []
+        linter.isort.known_modules = {}
+        linter.isort.order_by_type = true
+        linter.isort.relative_imports_order = furthest_to_closest
+        linter.isort.single_line_exclusions = []
+        linter.isort.split_on_trailing_comma = true
+        linter.isort.classes = []
+        linter.isort.constants = []
+        linter.isort.variables = []
+        linter.isort.no_lines_before = []
+        linter.isort.lines_after_imports = -1
+        linter.isort.lines_between_types = 0
+        linter.isort.forced_separate = []
+        linter.isort.section_order = [
+        	known { type = future },
+        	known { type = standard_library },
+        	known { type = third_party },
+        	known { type = first_party },
+        	known { type = local_folder },
+        ]
+        linter.isort.default_section = known { type = third_party }
+        linter.isort.no_sections = false
+        linter.isort.from_first = false
+        linter.isort.length_sort = false
+        linter.isort.length_sort_straight = false
+        linter.mccabe.max_complexity = 10
+        linter.pep8_naming.ignore_names = [
+        	setUp,
+        	tearDown,
+        	setUpClass,
+        	tearDownClass,
+        	setUpModule,
+        	tearDownModule,
+        	asyncSetUp,
+        	asyncTearDown,
+        	setUpTestData,
+        	failureException,
+        	longMessage,
+        	maxDiff,
+        ]
+        linter.pep8_naming.classmethod_decorators = []
+        linter.pep8_naming.staticmethod_decorators = []
+        linter.pycodestyle.max_line_length = 88
+        linter.pycodestyle.max_doc_length = none
+        linter.pycodestyle.ignore_overlong_task_comments = false
+        linter.pyflakes.extend_generics = []
+        linter.pyflakes.allowed_unused_imports = []
+        linter.pylint.allow_magic_value_types = [
+        	str,
+        	bytes,
+        ]
+        linter.pylint.allow_dunder_method_names = []
+        linter.pylint.max_args = 5
+        linter.pylint.max_positional_args = 5
+        linter.pylint.max_returns = 6
+        linter.pylint.max_bool_expr = 5
+        linter.pylint.max_branches = 12
+        linter.pylint.max_statements = 50
+        linter.pylint.max_public_methods = 20
+        linter.pylint.max_locals = 15
+        linter.pyupgrade.keep_runtime_typing = false
+        linter.ruff.parenthesize_tuple_in_subscript = false
+
+        # Formatter Settings
+        formatter.exclude = []
+        formatter.unresolved_target_version = 3.11
+        formatter.per_file_target_version = {}
+        formatter.preview = disabled
+        formatter.line_width = 88
+        formatter.line_ending = auto
+        formatter.indent_style = space
+        formatter.indent_width = 4
+        formatter.quote_style = double
+        formatter.magic_trailing_comma = respect
+        formatter.docstring_code_format = disabled
+        formatter.docstring_code_line_width = dynamic
+
+        # Analyze Settings
+        analyze.exclude = []
+        analyze.preview = disabled
+        analyze.target_version = 3.11
+        analyze.string_imports = disabled
+        analyze.extension = ExtensionMapping({})
+        analyze.include_dependencies = {}
+
+        ----- stderr -----
+        "#);
+    });
+    Ok(())
+}
+
+/// ```
+/// tmp
+/// ├── pyproject.toml #<--- no `[tool.ruff]`
+/// └── test.py
+/// ```
+#[test]
+fn requires_python_no_tool_target_version_override() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let project_dir = dunce::canonicalize(tempdir.path())?;
+    let ruff_toml = tempdir.path().join("pyproject.toml");
+    fs::write(
+        &ruff_toml,
+        r#"[project]
+requires-python = ">= 3.11"
+"#,
+    )?;
+
+    let testpy = tempdir.path().join("test.py");
+    fs::write(
+        &testpy,
+        r#"from typing import Union;foo: Union[int, str] = 1"#,
+    )?;
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&project_dir).as_str(), "[TMP]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--show-settings")
+            .args(["--select","UP007"])
+            .args(["--target-version","py310"])
+            .arg("test.py")
+            .arg("-")
+            .current_dir(project_dir)
+            , @r#"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        Resolved settings for: "[TMP]/test.py"
+
+        # General Settings
+        cache_dir = "[TMP]/.ruff_cache"
+        fix = false
+        fix_only = false
+        output_format = concise
+        show_fixes = false
+        unsafe_fixes = hint
+
+        # File Resolver Settings
+        file_resolver.exclude = [
+        	".bzr",
+        	".direnv",
+        	".eggs",
+        	".git",
+        	".git-rewrite",
+        	".hg",
+        	".ipynb_checkpoints",
+        	".mypy_cache",
+        	".nox",
+        	".pants.d",
+        	".pyenv",
+        	".pytest_cache",
+        	".pytype",
+        	".ruff_cache",
+        	".svn",
+        	".tox",
+        	".venv",
+        	".vscode",
+        	"__pypackages__",
+        	"_build",
+        	"buck-out",
+        	"dist",
+        	"node_modules",
+        	"site-packages",
+        	"venv",
+        ]
+        file_resolver.extend_exclude = []
+        file_resolver.force_exclude = false
+        file_resolver.include = [
+        	"*.py",
+        	"*.pyi",
+        	"*.ipynb",
+        	"**/pyproject.toml",
+        ]
+        file_resolver.extend_include = []
+        file_resolver.respect_gitignore = true
+        file_resolver.project_root = "[TMP]/"
+
+        # Linter Settings
+        linter.exclude = []
+        linter.project_root = "[TMP]/"
+        linter.rules.enabled = [
+        	non-pep604-annotation-union (UP007),
+        ]
+        linter.rules.should_fix = [
+        	non-pep604-annotation-union (UP007),
+        ]
+        linter.per_file_ignores = {}
+        linter.safety_table.forced_safe = []
+        linter.safety_table.forced_unsafe = []
+        linter.unresolved_target_version = 3.10
+        linter.per_file_target_version = {}
+        linter.preview = disabled
+        linter.explicit_preview_rules = false
+        linter.extension = ExtensionMapping({})
+        linter.allowed_confusables = []
+        linter.builtins = []
+        linter.dummy_variable_rgx = ^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$
+        linter.external = []
+        linter.ignore_init_module_imports = true
+        linter.logger_objects = []
+        linter.namespace_packages = []
+        linter.src = [
+        	"[TMP]/",
+        	"[TMP]/src",
+        ]
+        linter.tab_size = 4
+        linter.line_length = 88
+        linter.task_tags = [
+        	TODO,
+        	FIXME,
+        	XXX,
+        ]
+        linter.typing_modules = []
+        linter.typing_extensions = true
+
+        # Linter Plugins
+        linter.flake8_annotations.mypy_init_return = false
+        linter.flake8_annotations.suppress_dummy_args = false
+        linter.flake8_annotations.suppress_none_returning = false
+        linter.flake8_annotations.allow_star_arg_any = false
+        linter.flake8_annotations.ignore_fully_untyped = false
+        linter.flake8_bandit.hardcoded_tmp_directory = [
+        	/tmp,
+        	/var/tmp,
+        	/dev/shm,
+        ]
+        linter.flake8_bandit.check_typed_exception = false
+        linter.flake8_bandit.extend_markup_names = []
+        linter.flake8_bandit.allowed_markup_calls = []
+        linter.flake8_bugbear.extend_immutable_calls = []
+        linter.flake8_builtins.allowed_modules = []
+        linter.flake8_builtins.ignorelist = []
+        linter.flake8_builtins.strict_checking = false
+        linter.flake8_comprehensions.allow_dict_calls_with_keyword_arguments = false
+        linter.flake8_copyright.notice_rgx = (?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}((-|,\s)\d{4})*
+        linter.flake8_copyright.author = none
+        linter.flake8_copyright.min_file_size = 0
+        linter.flake8_errmsg.max_string_length = 0
+        linter.flake8_gettext.functions_names = [
+        	_,
+        	gettext,
+        	ngettext,
+        ]
+        linter.flake8_implicit_str_concat.allow_multiline = true
+        linter.flake8_import_conventions.aliases = {
+        	altair = alt,
+        	holoviews = hv,
+        	matplotlib = mpl,
+        	matplotlib.pyplot = plt,
+        	networkx = nx,
+        	numpy = np,
+        	numpy.typing = npt,
+        	pandas = pd,
+        	panel = pn,
+        	plotly.express = px,
+        	polars = pl,
+        	pyarrow = pa,
+        	seaborn = sns,
+        	tensorflow = tf,
+        	tkinter = tk,
+        	xml.etree.ElementTree = ET,
+        }
+        linter.flake8_import_conventions.banned_aliases = {}
+        linter.flake8_import_conventions.banned_from = []
+        linter.flake8_pytest_style.fixture_parentheses = false
+        linter.flake8_pytest_style.parametrize_names_type = tuple
+        linter.flake8_pytest_style.parametrize_values_type = list
+        linter.flake8_pytest_style.parametrize_values_row_type = tuple
+        linter.flake8_pytest_style.raises_require_match_for = [
+        	BaseException,
+        	Exception,
+        	ValueError,
+        	OSError,
+        	IOError,
+        	EnvironmentError,
+        	socket.error,
+        ]
+        linter.flake8_pytest_style.raises_extend_require_match_for = []
+        linter.flake8_pytest_style.mark_parentheses = false
+        linter.flake8_quotes.inline_quotes = double
+        linter.flake8_quotes.multiline_quotes = double
+        linter.flake8_quotes.docstring_quotes = double
+        linter.flake8_quotes.avoid_escape = true
+        linter.flake8_self.ignore_names = [
+        	_make,
+        	_asdict,
+        	_replace,
+        	_fields,
+        	_field_defaults,
+        	_name_,
+        	_value_,
+        ]
+        linter.flake8_tidy_imports.ban_relative_imports = "parents"
+        linter.flake8_tidy_imports.banned_api = {}
+        linter.flake8_tidy_imports.banned_module_level_imports = []
+        linter.flake8_type_checking.strict = false
+        linter.flake8_type_checking.exempt_modules = [
+        	typing,
+        	typing_extensions,
+        ]
+        linter.flake8_type_checking.runtime_required_base_classes = []
+        linter.flake8_type_checking.runtime_required_decorators = []
+        linter.flake8_type_checking.quote_annotations = false
+        linter.flake8_unused_arguments.ignore_variadic_names = false
+        linter.isort.required_imports = []
+        linter.isort.combine_as_imports = false
+        linter.isort.force_single_line = false
+        linter.isort.force_sort_within_sections = false
+        linter.isort.detect_same_package = true
+        linter.isort.case_sensitive = false
+        linter.isort.force_wrap_aliases = false
+        linter.isort.force_to_top = []
+        linter.isort.known_modules = {}
+        linter.isort.order_by_type = true
+        linter.isort.relative_imports_order = furthest_to_closest
+        linter.isort.single_line_exclusions = []
+        linter.isort.split_on_trailing_comma = true
+        linter.isort.classes = []
+        linter.isort.constants = []
+        linter.isort.variables = []
+        linter.isort.no_lines_before = []
+        linter.isort.lines_after_imports = -1
+        linter.isort.lines_between_types = 0
+        linter.isort.forced_separate = []
+        linter.isort.section_order = [
+        	known { type = future },
+        	known { type = standard_library },
+        	known { type = third_party },
+        	known { type = first_party },
+        	known { type = local_folder },
+        ]
+        linter.isort.default_section = known { type = third_party }
+        linter.isort.no_sections = false
+        linter.isort.from_first = false
+        linter.isort.length_sort = false
+        linter.isort.length_sort_straight = false
+        linter.mccabe.max_complexity = 10
+        linter.pep8_naming.ignore_names = [
+        	setUp,
+        	tearDown,
+        	setUpClass,
+        	tearDownClass,
+        	setUpModule,
+        	tearDownModule,
+        	asyncSetUp,
+        	asyncTearDown,
+        	setUpTestData,
+        	failureException,
+        	longMessage,
+        	maxDiff,
+        ]
+        linter.pep8_naming.classmethod_decorators = []
+        linter.pep8_naming.staticmethod_decorators = []
+        linter.pycodestyle.max_line_length = 88
+        linter.pycodestyle.max_doc_length = none
+        linter.pycodestyle.ignore_overlong_task_comments = false
+        linter.pyflakes.extend_generics = []
+        linter.pyflakes.allowed_unused_imports = []
+        linter.pylint.allow_magic_value_types = [
+        	str,
+        	bytes,
+        ]
+        linter.pylint.allow_dunder_method_names = []
+        linter.pylint.max_args = 5
+        linter.pylint.max_positional_args = 5
+        linter.pylint.max_returns = 6
+        linter.pylint.max_bool_expr = 5
+        linter.pylint.max_branches = 12
+        linter.pylint.max_statements = 50
+        linter.pylint.max_public_methods = 20
+        linter.pylint.max_locals = 15
+        linter.pyupgrade.keep_runtime_typing = false
+        linter.ruff.parenthesize_tuple_in_subscript = false
+
+        # Formatter Settings
+        formatter.exclude = []
+        formatter.unresolved_target_version = 3.10
+        formatter.per_file_target_version = {}
+        formatter.preview = disabled
+        formatter.line_width = 88
+        formatter.line_ending = auto
+        formatter.indent_style = space
+        formatter.indent_width = 4
+        formatter.quote_style = double
+        formatter.magic_trailing_comma = respect
+        formatter.docstring_code_format = disabled
+        formatter.docstring_code_line_width = dynamic
+
+        # Analyze Settings
+        analyze.exclude = []
+        analyze.preview = disabled
+        analyze.target_version = 3.10
+        analyze.string_imports = disabled
+        analyze.extension = ExtensionMapping({})
+        analyze.include_dependencies = {}
+
+        ----- stderr -----
+        "#);
+    });
+    Ok(())
+}
+/// ```
+/// tmp
+/// ├── pyproject.toml #<--- no `[tool.ruff]`
+/// └── test.py
+/// ```
+#[test]
+fn requires_python_no_tool_with_check() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let project_dir = dunce::canonicalize(tempdir.path())?;
+    let ruff_toml = tempdir.path().join("pyproject.toml");
+    fs::write(
+        &ruff_toml,
+        r#"[project]
+requires-python = ">= 3.11"
+"#,
+    )?;
+
+    let testpy = tempdir.path().join("test.py");
+    fs::write(
+        &testpy,
+        r#"from typing import Union;foo: Union[int, str] = 1"#,
+    )?;
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&project_dir).as_str(), "[TMP]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .args(["--select","UP007"])
+            .arg(".")
+            .current_dir(project_dir)
+            , @r###"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        test.py:1:31: UP007 [*] Use `X | Y` for type annotations
+        Found 1 error.
+        [*] 1 fixable with the `--fix` option.
+
+        ----- stderr -----
+        "###);
+    });
+    Ok(())
+}
+
+/// ```
+/// tmp
+/// ├── pyproject.toml #<-- no [tool.ruff]
+/// ├── ruff.toml #<-- no `target-version`
+/// └── test.py
+/// ```
+#[test]
+fn requires_python_ruff_toml_no_target_fallback() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let project_dir = dunce::canonicalize(tempdir.path())?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"[lint]
+select = ["UP007"]
+"#,
+    )?;
+
+    let pyproject_toml = tempdir.path().join("pyproject.toml");
+    fs::write(
+        &pyproject_toml,
+        r#"[project]
+requires-python = ">= 3.11"
+"#,
+    )?;
+
+    let testpy = tempdir.path().join("test.py");
+    fs::write(
+        &testpy,
+        r#"
+from typing import Union;foo: Union[int, str] = 1
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&project_dir).as_str(), "[TMP]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("test.py")
+            .arg("--show-settings")
+            .current_dir(project_dir), @r#"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        Resolved settings for: "[TMP]/test.py"
+        Settings path: "[TMP]/ruff.toml"
+
+        # General Settings
+        cache_dir = "[TMP]/.ruff_cache"
+        fix = false
+        fix_only = false
+        output_format = concise
+        show_fixes = false
+        unsafe_fixes = hint
+
+        # File Resolver Settings
+        file_resolver.exclude = [
+        	".bzr",
+        	".direnv",
+        	".eggs",
+        	".git",
+        	".git-rewrite",
+        	".hg",
+        	".ipynb_checkpoints",
+        	".mypy_cache",
+        	".nox",
+        	".pants.d",
+        	".pyenv",
+        	".pytest_cache",
+        	".pytype",
+        	".ruff_cache",
+        	".svn",
+        	".tox",
+        	".venv",
+        	".vscode",
+        	"__pypackages__",
+        	"_build",
+        	"buck-out",
+        	"dist",
+        	"node_modules",
+        	"site-packages",
+        	"venv",
+        ]
+        file_resolver.extend_exclude = []
+        file_resolver.force_exclude = false
+        file_resolver.include = [
+        	"*.py",
+        	"*.pyi",
+        	"*.ipynb",
+        	"**/pyproject.toml",
+        ]
+        file_resolver.extend_include = []
+        file_resolver.respect_gitignore = true
+        file_resolver.project_root = "[TMP]/"
+
+        # Linter Settings
+        linter.exclude = []
+        linter.project_root = "[TMP]/"
+        linter.rules.enabled = [
+        	non-pep604-annotation-union (UP007),
+        ]
+        linter.rules.should_fix = [
+        	non-pep604-annotation-union (UP007),
+        ]
+        linter.per_file_ignores = {}
+        linter.safety_table.forced_safe = []
+        linter.safety_table.forced_unsafe = []
+        linter.unresolved_target_version = 3.11
+        linter.per_file_target_version = {}
+        linter.preview = disabled
+        linter.explicit_preview_rules = false
+        linter.extension = ExtensionMapping({})
+        linter.allowed_confusables = []
+        linter.builtins = []
+        linter.dummy_variable_rgx = ^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$
+        linter.external = []
+        linter.ignore_init_module_imports = true
+        linter.logger_objects = []
+        linter.namespace_packages = []
+        linter.src = [
+        	"[TMP]/",
+        	"[TMP]/src",
+        ]
+        linter.tab_size = 4
+        linter.line_length = 88
+        linter.task_tags = [
+        	TODO,
+        	FIXME,
+        	XXX,
+        ]
+        linter.typing_modules = []
+        linter.typing_extensions = true
+
+        # Linter Plugins
+        linter.flake8_annotations.mypy_init_return = false
+        linter.flake8_annotations.suppress_dummy_args = false
+        linter.flake8_annotations.suppress_none_returning = false
+        linter.flake8_annotations.allow_star_arg_any = false
+        linter.flake8_annotations.ignore_fully_untyped = false
+        linter.flake8_bandit.hardcoded_tmp_directory = [
+        	/tmp,
+        	/var/tmp,
+        	/dev/shm,
+        ]
+        linter.flake8_bandit.check_typed_exception = false
+        linter.flake8_bandit.extend_markup_names = []
+        linter.flake8_bandit.allowed_markup_calls = []
+        linter.flake8_bugbear.extend_immutable_calls = []
+        linter.flake8_builtins.allowed_modules = []
+        linter.flake8_builtins.ignorelist = []
+        linter.flake8_builtins.strict_checking = false
+        linter.flake8_comprehensions.allow_dict_calls_with_keyword_arguments = false
+        linter.flake8_copyright.notice_rgx = (?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}((-|,\s)\d{4})*
+        linter.flake8_copyright.author = none
+        linter.flake8_copyright.min_file_size = 0
+        linter.flake8_errmsg.max_string_length = 0
+        linter.flake8_gettext.functions_names = [
+        	_,
+        	gettext,
+        	ngettext,
+        ]
+        linter.flake8_implicit_str_concat.allow_multiline = true
+        linter.flake8_import_conventions.aliases = {
+        	altair = alt,
+        	holoviews = hv,
+        	matplotlib = mpl,
+        	matplotlib.pyplot = plt,
+        	networkx = nx,
+        	numpy = np,
+        	numpy.typing = npt,
+        	pandas = pd,
+        	panel = pn,
+        	plotly.express = px,
+        	polars = pl,
+        	pyarrow = pa,
+        	seaborn = sns,
+        	tensorflow = tf,
+        	tkinter = tk,
+        	xml.etree.ElementTree = ET,
+        }
+        linter.flake8_import_conventions.banned_aliases = {}
+        linter.flake8_import_conventions.banned_from = []
+        linter.flake8_pytest_style.fixture_parentheses = false
+        linter.flake8_pytest_style.parametrize_names_type = tuple
+        linter.flake8_pytest_style.parametrize_values_type = list
+        linter.flake8_pytest_style.parametrize_values_row_type = tuple
+        linter.flake8_pytest_style.raises_require_match_for = [
+        	BaseException,
+        	Exception,
+        	ValueError,
+        	OSError,
+        	IOError,
+        	EnvironmentError,
+        	socket.error,
+        ]
+        linter.flake8_pytest_style.raises_extend_require_match_for = []
+        linter.flake8_pytest_style.mark_parentheses = false
+        linter.flake8_quotes.inline_quotes = double
+        linter.flake8_quotes.multiline_quotes = double
+        linter.flake8_quotes.docstring_quotes = double
+        linter.flake8_quotes.avoid_escape = true
+        linter.flake8_self.ignore_names = [
+        	_make,
+        	_asdict,
+        	_replace,
+        	_fields,
+        	_field_defaults,
+        	_name_,
+        	_value_,
+        ]
+        linter.flake8_tidy_imports.ban_relative_imports = "parents"
+        linter.flake8_tidy_imports.banned_api = {}
+        linter.flake8_tidy_imports.banned_module_level_imports = []
+        linter.flake8_type_checking.strict = false
+        linter.flake8_type_checking.exempt_modules = [
+        	typing,
+        	typing_extensions,
+        ]
+        linter.flake8_type_checking.runtime_required_base_classes = []
+        linter.flake8_type_checking.runtime_required_decorators = []
+        linter.flake8_type_checking.quote_annotations = false
+        linter.flake8_unused_arguments.ignore_variadic_names = false
+        linter.isort.required_imports = []
+        linter.isort.combine_as_imports = false
+        linter.isort.force_single_line = false
+        linter.isort.force_sort_within_sections = false
+        linter.isort.detect_same_package = true
+        linter.isort.case_sensitive = false
+        linter.isort.force_wrap_aliases = false
+        linter.isort.force_to_top = []
+        linter.isort.known_modules = {}
+        linter.isort.order_by_type = true
+        linter.isort.relative_imports_order = furthest_to_closest
+        linter.isort.single_line_exclusions = []
+        linter.isort.split_on_trailing_comma = true
+        linter.isort.classes = []
+        linter.isort.constants = []
+        linter.isort.variables = []
+        linter.isort.no_lines_before = []
+        linter.isort.lines_after_imports = -1
+        linter.isort.lines_between_types = 0
+        linter.isort.forced_separate = []
+        linter.isort.section_order = [
+        	known { type = future },
+        	known { type = standard_library },
+        	known { type = third_party },
+        	known { type = first_party },
+        	known { type = local_folder },
+        ]
+        linter.isort.default_section = known { type = third_party }
+        linter.isort.no_sections = false
+        linter.isort.from_first = false
+        linter.isort.length_sort = false
+        linter.isort.length_sort_straight = false
+        linter.mccabe.max_complexity = 10
+        linter.pep8_naming.ignore_names = [
+        	setUp,
+        	tearDown,
+        	setUpClass,
+        	tearDownClass,
+        	setUpModule,
+        	tearDownModule,
+        	asyncSetUp,
+        	asyncTearDown,
+        	setUpTestData,
+        	failureException,
+        	longMessage,
+        	maxDiff,
+        ]
+        linter.pep8_naming.classmethod_decorators = []
+        linter.pep8_naming.staticmethod_decorators = []
+        linter.pycodestyle.max_line_length = 88
+        linter.pycodestyle.max_doc_length = none
+        linter.pycodestyle.ignore_overlong_task_comments = false
+        linter.pyflakes.extend_generics = []
+        linter.pyflakes.allowed_unused_imports = []
+        linter.pylint.allow_magic_value_types = [
+        	str,
+        	bytes,
+        ]
+        linter.pylint.allow_dunder_method_names = []
+        linter.pylint.max_args = 5
+        linter.pylint.max_positional_args = 5
+        linter.pylint.max_returns = 6
+        linter.pylint.max_bool_expr = 5
+        linter.pylint.max_branches = 12
+        linter.pylint.max_statements = 50
+        linter.pylint.max_public_methods = 20
+        linter.pylint.max_locals = 15
+        linter.pyupgrade.keep_runtime_typing = false
+        linter.ruff.parenthesize_tuple_in_subscript = false
+
+        # Formatter Settings
+        formatter.exclude = []
+        formatter.unresolved_target_version = 3.11
+        formatter.per_file_target_version = {}
+        formatter.preview = disabled
+        formatter.line_width = 88
+        formatter.line_ending = auto
+        formatter.indent_style = space
+        formatter.indent_width = 4
+        formatter.quote_style = double
+        formatter.magic_trailing_comma = respect
+        formatter.docstring_code_format = disabled
+        formatter.docstring_code_line_width = dynamic
+
+        # Analyze Settings
+        analyze.exclude = []
+        analyze.preview = disabled
+        analyze.target_version = 3.11
+        analyze.string_imports = disabled
+        analyze.extension = ExtensionMapping({})
+        analyze.include_dependencies = {}
+
+        ----- stderr -----
+        "#);
+    });
+    Ok(())
+}
+
+/// ```
+/// tmp
+/// ├── pyproject.toml #<-- no [tool.ruff]
+/// ├── ruff.toml #<-- no `target-version`
+/// └── test.py
+/// ```
+#[test]
+fn requires_python_ruff_toml_no_target_fallback_check() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let project_dir = dunce::canonicalize(tempdir.path())?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"[lint]
+select = ["UP007"]
+"#,
+    )?;
+
+    let pyproject_toml = tempdir.path().join("pyproject.toml");
+    fs::write(
+        &pyproject_toml,
+        r#"[project]
+requires-python = ">= 3.11"
+"#,
+    )?;
+
+    let testpy = tempdir.path().join("test.py");
+    fs::write(
+        &testpy,
+        r#"
+from typing import Union;foo: Union[int, str] = 1
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&project_dir).as_str(), "[TMP]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg(".")
+            .current_dir(project_dir), @r###"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        test.py:2:31: UP007 [*] Use `X | Y` for type annotations
+        Found 1 error.
+        [*] 1 fixable with the `--fix` option.
+
+        ----- stderr -----
+        "###);
+    });
+    Ok(())
+}
+
+/// ```
+/// tmp
+/// ├── foo
+/// │  ├── pyproject.toml #<-- no [tool.ruff], no `requires-python`
+/// │  └── test.py
+/// └── pyproject.toml #<-- no [tool.ruff], has `requires-python`
+/// ```
+#[test]
+fn requires_python_pyproject_toml_above() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let project_dir = dunce::canonicalize(tempdir.path())?;
+    let outer_pyproject = tempdir.path().join("pyproject.toml");
+    fs::write(
+        &outer_pyproject,
+        r#"[project]
+requires-python = ">= 3.11"
+"#,
+    )?;
+
+    let foodir = tempdir.path().join("foo");
+    fs::create_dir(foodir)?;
+
+    let inner_pyproject = tempdir.path().join("foo/pyproject.toml");
+    fs::write(
+        &inner_pyproject,
+        r#"[project]
+"#,
+    )?;
+
+    let testpy = tempdir.path().join("foo/test.py");
+    fs::write(
+        &testpy,
+        r#"
+from typing import Union;foo: Union[int, str] = 1
+"#,
+    )?;
+
+    let testpy_canon = dunce::canonicalize(testpy)?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&testpy_canon).as_str(), "[TMP]/foo/test.py"),(tempdir_filter(&project_dir).as_str(), "[TMP]/"),(r"(?m)^foo\\test","foo/test")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--show-settings")
+            .args(["--select","UP007"])
+            .arg("foo/test.py")
+            .current_dir(&project_dir), @r#"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        Resolved settings for: "[TMP]/foo/test.py"
+
+        # General Settings
+        cache_dir = "[TMP]/.ruff_cache"
+        fix = false
+        fix_only = false
+        output_format = concise
+        show_fixes = false
+        unsafe_fixes = hint
+
+        # File Resolver Settings
+        file_resolver.exclude = [
+        	".bzr",
+        	".direnv",
+        	".eggs",
+        	".git",
+        	".git-rewrite",
+        	".hg",
+        	".ipynb_checkpoints",
+        	".mypy_cache",
+        	".nox",
+        	".pants.d",
+        	".pyenv",
+        	".pytest_cache",
+        	".pytype",
+        	".ruff_cache",
+        	".svn",
+        	".tox",
+        	".venv",
+        	".vscode",
+        	"__pypackages__",
+        	"_build",
+        	"buck-out",
+        	"dist",
+        	"node_modules",
+        	"site-packages",
+        	"venv",
+        ]
+        file_resolver.extend_exclude = []
+        file_resolver.force_exclude = false
+        file_resolver.include = [
+        	"*.py",
+        	"*.pyi",
+        	"*.ipynb",
+        	"**/pyproject.toml",
+        ]
+        file_resolver.extend_include = []
+        file_resolver.respect_gitignore = true
+        file_resolver.project_root = "[TMP]/"
+
+        # Linter Settings
+        linter.exclude = []
+        linter.project_root = "[TMP]/"
+        linter.rules.enabled = [
+        	non-pep604-annotation-union (UP007),
+        ]
+        linter.rules.should_fix = [
+        	non-pep604-annotation-union (UP007),
+        ]
+        linter.per_file_ignores = {}
+        linter.safety_table.forced_safe = []
+        linter.safety_table.forced_unsafe = []
+        linter.unresolved_target_version = 3.11
+        linter.per_file_target_version = {}
+        linter.preview = disabled
+        linter.explicit_preview_rules = false
+        linter.extension = ExtensionMapping({})
+        linter.allowed_confusables = []
+        linter.builtins = []
+        linter.dummy_variable_rgx = ^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$
+        linter.external = []
+        linter.ignore_init_module_imports = true
+        linter.logger_objects = []
+        linter.namespace_packages = []
+        linter.src = [
+        	"[TMP]/",
+        	"[TMP]/src",
+        ]
+        linter.tab_size = 4
+        linter.line_length = 88
+        linter.task_tags = [
+        	TODO,
+        	FIXME,
+        	XXX,
+        ]
+        linter.typing_modules = []
+        linter.typing_extensions = true
+
+        # Linter Plugins
+        linter.flake8_annotations.mypy_init_return = false
+        linter.flake8_annotations.suppress_dummy_args = false
+        linter.flake8_annotations.suppress_none_returning = false
+        linter.flake8_annotations.allow_star_arg_any = false
+        linter.flake8_annotations.ignore_fully_untyped = false
+        linter.flake8_bandit.hardcoded_tmp_directory = [
+        	/tmp,
+        	/var/tmp,
+        	/dev/shm,
+        ]
+        linter.flake8_bandit.check_typed_exception = false
+        linter.flake8_bandit.extend_markup_names = []
+        linter.flake8_bandit.allowed_markup_calls = []
+        linter.flake8_bugbear.extend_immutable_calls = []
+        linter.flake8_builtins.allowed_modules = []
+        linter.flake8_builtins.ignorelist = []
+        linter.flake8_builtins.strict_checking = false
+        linter.flake8_comprehensions.allow_dict_calls_with_keyword_arguments = false
+        linter.flake8_copyright.notice_rgx = (?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}((-|,\s)\d{4})*
+        linter.flake8_copyright.author = none
+        linter.flake8_copyright.min_file_size = 0
+        linter.flake8_errmsg.max_string_length = 0
+        linter.flake8_gettext.functions_names = [
+        	_,
+        	gettext,
+        	ngettext,
+        ]
+        linter.flake8_implicit_str_concat.allow_multiline = true
+        linter.flake8_import_conventions.aliases = {
+        	altair = alt,
+        	holoviews = hv,
+        	matplotlib = mpl,
+        	matplotlib.pyplot = plt,
+        	networkx = nx,
+        	numpy = np,
+        	numpy.typing = npt,
+        	pandas = pd,
+        	panel = pn,
+        	plotly.express = px,
+        	polars = pl,
+        	pyarrow = pa,
+        	seaborn = sns,
+        	tensorflow = tf,
+        	tkinter = tk,
+        	xml.etree.ElementTree = ET,
+        }
+        linter.flake8_import_conventions.banned_aliases = {}
+        linter.flake8_import_conventions.banned_from = []
+        linter.flake8_pytest_style.fixture_parentheses = false
+        linter.flake8_pytest_style.parametrize_names_type = tuple
+        linter.flake8_pytest_style.parametrize_values_type = list
+        linter.flake8_pytest_style.parametrize_values_row_type = tuple
+        linter.flake8_pytest_style.raises_require_match_for = [
+        	BaseException,
+        	Exception,
+        	ValueError,
+        	OSError,
+        	IOError,
+        	EnvironmentError,
+        	socket.error,
+        ]
+        linter.flake8_pytest_style.raises_extend_require_match_for = []
+        linter.flake8_pytest_style.mark_parentheses = false
+        linter.flake8_quotes.inline_quotes = double
+        linter.flake8_quotes.multiline_quotes = double
+        linter.flake8_quotes.docstring_quotes = double
+        linter.flake8_quotes.avoid_escape = true
+        linter.flake8_self.ignore_names = [
+        	_make,
+        	_asdict,
+        	_replace,
+        	_fields,
+        	_field_defaults,
+        	_name_,
+        	_value_,
+        ]
+        linter.flake8_tidy_imports.ban_relative_imports = "parents"
+        linter.flake8_tidy_imports.banned_api = {}
+        linter.flake8_tidy_imports.banned_module_level_imports = []
+        linter.flake8_type_checking.strict = false
+        linter.flake8_type_checking.exempt_modules = [
+        	typing,
+        	typing_extensions,
+        ]
+        linter.flake8_type_checking.runtime_required_base_classes = []
+        linter.flake8_type_checking.runtime_required_decorators = []
+        linter.flake8_type_checking.quote_annotations = false
+        linter.flake8_unused_arguments.ignore_variadic_names = false
+        linter.isort.required_imports = []
+        linter.isort.combine_as_imports = false
+        linter.isort.force_single_line = false
+        linter.isort.force_sort_within_sections = false
+        linter.isort.detect_same_package = true
+        linter.isort.case_sensitive = false
+        linter.isort.force_wrap_aliases = false
+        linter.isort.force_to_top = []
+        linter.isort.known_modules = {}
+        linter.isort.order_by_type = true
+        linter.isort.relative_imports_order = furthest_to_closest
+        linter.isort.single_line_exclusions = []
+        linter.isort.split_on_trailing_comma = true
+        linter.isort.classes = []
+        linter.isort.constants = []
+        linter.isort.variables = []
+        linter.isort.no_lines_before = []
+        linter.isort.lines_after_imports = -1
+        linter.isort.lines_between_types = 0
+        linter.isort.forced_separate = []
+        linter.isort.section_order = [
+        	known { type = future },
+        	known { type = standard_library },
+        	known { type = third_party },
+        	known { type = first_party },
+        	known { type = local_folder },
+        ]
+        linter.isort.default_section = known { type = third_party }
+        linter.isort.no_sections = false
+        linter.isort.from_first = false
+        linter.isort.length_sort = false
+        linter.isort.length_sort_straight = false
+        linter.mccabe.max_complexity = 10
+        linter.pep8_naming.ignore_names = [
+        	setUp,
+        	tearDown,
+        	setUpClass,
+        	tearDownClass,
+        	setUpModule,
+        	tearDownModule,
+        	asyncSetUp,
+        	asyncTearDown,
+        	setUpTestData,
+        	failureException,
+        	longMessage,
+        	maxDiff,
+        ]
+        linter.pep8_naming.classmethod_decorators = []
+        linter.pep8_naming.staticmethod_decorators = []
+        linter.pycodestyle.max_line_length = 88
+        linter.pycodestyle.max_doc_length = none
+        linter.pycodestyle.ignore_overlong_task_comments = false
+        linter.pyflakes.extend_generics = []
+        linter.pyflakes.allowed_unused_imports = []
+        linter.pylint.allow_magic_value_types = [
+        	str,
+        	bytes,
+        ]
+        linter.pylint.allow_dunder_method_names = []
+        linter.pylint.max_args = 5
+        linter.pylint.max_positional_args = 5
+        linter.pylint.max_returns = 6
+        linter.pylint.max_bool_expr = 5
+        linter.pylint.max_branches = 12
+        linter.pylint.max_statements = 50
+        linter.pylint.max_public_methods = 20
+        linter.pylint.max_locals = 15
+        linter.pyupgrade.keep_runtime_typing = false
+        linter.ruff.parenthesize_tuple_in_subscript = false
+
+        # Formatter Settings
+        formatter.exclude = []
+        formatter.unresolved_target_version = 3.11
+        formatter.per_file_target_version = {}
+        formatter.preview = disabled
+        formatter.line_width = 88
+        formatter.line_ending = auto
+        formatter.indent_style = space
+        formatter.indent_width = 4
+        formatter.quote_style = double
+        formatter.magic_trailing_comma = respect
+        formatter.docstring_code_format = disabled
+        formatter.docstring_code_line_width = dynamic
+
+        # Analyze Settings
+        analyze.exclude = []
+        analyze.preview = disabled
+        analyze.target_version = 3.11
+        analyze.string_imports = disabled
+        analyze.extension = ExtensionMapping({})
+        analyze.include_dependencies = {}
+
+        ----- stderr -----
+        "#);
+    });
+    Ok(())
+}
+
+/// ```
+/// tmp
+/// ├── foo
+/// │  ├── pyproject.toml #<-- has [tool.ruff], no `requires-python`
+/// │  └── test.py
+/// └── pyproject.toml #<-- no [tool.ruff], has `requires-python`
+/// ```
+#[test]
+fn requires_python_pyproject_toml_above_with_tool() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let project_dir = dunce::canonicalize(tempdir.path())?;
+    let outer_pyproject = tempdir.path().join("pyproject.toml");
+    fs::write(
+        &outer_pyproject,
+        r#"[project]
+requires-python = ">= 3.11"
+"#,
+    )?;
+
+    let foodir = tempdir.path().join("foo");
+    fs::create_dir(foodir)?;
+
+    let inner_pyproject = tempdir.path().join("foo/pyproject.toml");
+    fs::write(
+        &inner_pyproject,
+        r#"
+[tool.ruff]
+target-version = "py310"
+"#,
+    )?;
+
+    let testpy = tempdir.path().join("foo/test.py");
+    fs::write(
+        &testpy,
+        r#"
+from typing import Union;foo: Union[int, str] = 1
+"#,
+    )?;
+
+    let testpy_canon = dunce::canonicalize(testpy)?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&testpy_canon).as_str(), "[TMP]/foo/test.py"),(tempdir_filter(&project_dir).as_str(), "[TMP]/"),(r"foo\\","foo/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--show-settings")
+            .args(["--select","UP007"])
+            .arg("foo/test.py")
+            .current_dir(&project_dir), @r#"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        Resolved settings for: "[TMP]/foo/test.py"
+
+        # General Settings
+        cache_dir = "[TMP]/foo/.ruff_cache"
+        fix = false
+        fix_only = false
+        output_format = concise
+        show_fixes = false
+        unsafe_fixes = hint
+
+        # File Resolver Settings
+        file_resolver.exclude = [
+        	".bzr",
+        	".direnv",
+        	".eggs",
+        	".git",
+        	".git-rewrite",
+        	".hg",
+        	".ipynb_checkpoints",
+        	".mypy_cache",
+        	".nox",
+        	".pants.d",
+        	".pyenv",
+        	".pytest_cache",
+        	".pytype",
+        	".ruff_cache",
+        	".svn",
+        	".tox",
+        	".venv",
+        	".vscode",
+        	"__pypackages__",
+        	"_build",
+        	"buck-out",
+        	"dist",
+        	"node_modules",
+        	"site-packages",
+        	"venv",
+        ]
+        file_resolver.extend_exclude = []
+        file_resolver.force_exclude = false
+        file_resolver.include = [
+        	"*.py",
+        	"*.pyi",
+        	"*.ipynb",
+        	"**/pyproject.toml",
+        ]
+        file_resolver.extend_include = []
+        file_resolver.respect_gitignore = true
+        file_resolver.project_root = "[TMP]/foo"
+
+        # Linter Settings
+        linter.exclude = []
+        linter.project_root = "[TMP]/foo"
+        linter.rules.enabled = [
+        	non-pep604-annotation-union (UP007),
+        ]
+        linter.rules.should_fix = [
+        	non-pep604-annotation-union (UP007),
+        ]
+        linter.per_file_ignores = {}
+        linter.safety_table.forced_safe = []
+        linter.safety_table.forced_unsafe = []
+        linter.unresolved_target_version = 3.10
+        linter.per_file_target_version = {}
+        linter.preview = disabled
+        linter.explicit_preview_rules = false
+        linter.extension = ExtensionMapping({})
+        linter.allowed_confusables = []
+        linter.builtins = []
+        linter.dummy_variable_rgx = ^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$
+        linter.external = []
+        linter.ignore_init_module_imports = true
+        linter.logger_objects = []
+        linter.namespace_packages = []
+        linter.src = [
+        	"[TMP]/foo",
+        	"[TMP]/foo/src",
+        ]
+        linter.tab_size = 4
+        linter.line_length = 88
+        linter.task_tags = [
+        	TODO,
+        	FIXME,
+        	XXX,
+        ]
+        linter.typing_modules = []
+        linter.typing_extensions = true
+
+        # Linter Plugins
+        linter.flake8_annotations.mypy_init_return = false
+        linter.flake8_annotations.suppress_dummy_args = false
+        linter.flake8_annotations.suppress_none_returning = false
+        linter.flake8_annotations.allow_star_arg_any = false
+        linter.flake8_annotations.ignore_fully_untyped = false
+        linter.flake8_bandit.hardcoded_tmp_directory = [
+        	/tmp,
+        	/var/tmp,
+        	/dev/shm,
+        ]
+        linter.flake8_bandit.check_typed_exception = false
+        linter.flake8_bandit.extend_markup_names = []
+        linter.flake8_bandit.allowed_markup_calls = []
+        linter.flake8_bugbear.extend_immutable_calls = []
+        linter.flake8_builtins.allowed_modules = []
+        linter.flake8_builtins.ignorelist = []
+        linter.flake8_builtins.strict_checking = false
+        linter.flake8_comprehensions.allow_dict_calls_with_keyword_arguments = false
+        linter.flake8_copyright.notice_rgx = (?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}((-|,\s)\d{4})*
+        linter.flake8_copyright.author = none
+        linter.flake8_copyright.min_file_size = 0
+        linter.flake8_errmsg.max_string_length = 0
+        linter.flake8_gettext.functions_names = [
+        	_,
+        	gettext,
+        	ngettext,
+        ]
+        linter.flake8_implicit_str_concat.allow_multiline = true
+        linter.flake8_import_conventions.aliases = {
+        	altair = alt,
+        	holoviews = hv,
+        	matplotlib = mpl,
+        	matplotlib.pyplot = plt,
+        	networkx = nx,
+        	numpy = np,
+        	numpy.typing = npt,
+        	pandas = pd,
+        	panel = pn,
+        	plotly.express = px,
+        	polars = pl,
+        	pyarrow = pa,
+        	seaborn = sns,
+        	tensorflow = tf,
+        	tkinter = tk,
+        	xml.etree.ElementTree = ET,
+        }
+        linter.flake8_import_conventions.banned_aliases = {}
+        linter.flake8_import_conventions.banned_from = []
+        linter.flake8_pytest_style.fixture_parentheses = false
+        linter.flake8_pytest_style.parametrize_names_type = tuple
+        linter.flake8_pytest_style.parametrize_values_type = list
+        linter.flake8_pytest_style.parametrize_values_row_type = tuple
+        linter.flake8_pytest_style.raises_require_match_for = [
+        	BaseException,
+        	Exception,
+        	ValueError,
+        	OSError,
+        	IOError,
+        	EnvironmentError,
+        	socket.error,
+        ]
+        linter.flake8_pytest_style.raises_extend_require_match_for = []
+        linter.flake8_pytest_style.mark_parentheses = false
+        linter.flake8_quotes.inline_quotes = double
+        linter.flake8_quotes.multiline_quotes = double
+        linter.flake8_quotes.docstring_quotes = double
+        linter.flake8_quotes.avoid_escape = true
+        linter.flake8_self.ignore_names = [
+        	_make,
+        	_asdict,
+        	_replace,
+        	_fields,
+        	_field_defaults,
+        	_name_,
+        	_value_,
+        ]
+        linter.flake8_tidy_imports.ban_relative_imports = "parents"
+        linter.flake8_tidy_imports.banned_api = {}
+        linter.flake8_tidy_imports.banned_module_level_imports = []
+        linter.flake8_type_checking.strict = false
+        linter.flake8_type_checking.exempt_modules = [
+        	typing,
+        	typing_extensions,
+        ]
+        linter.flake8_type_checking.runtime_required_base_classes = []
+        linter.flake8_type_checking.runtime_required_decorators = []
+        linter.flake8_type_checking.quote_annotations = false
+        linter.flake8_unused_arguments.ignore_variadic_names = false
+        linter.isort.required_imports = []
+        linter.isort.combine_as_imports = false
+        linter.isort.force_single_line = false
+        linter.isort.force_sort_within_sections = false
+        linter.isort.detect_same_package = true
+        linter.isort.case_sensitive = false
+        linter.isort.force_wrap_aliases = false
+        linter.isort.force_to_top = []
+        linter.isort.known_modules = {}
+        linter.isort.order_by_type = true
+        linter.isort.relative_imports_order = furthest_to_closest
+        linter.isort.single_line_exclusions = []
+        linter.isort.split_on_trailing_comma = true
+        linter.isort.classes = []
+        linter.isort.constants = []
+        linter.isort.variables = []
+        linter.isort.no_lines_before = []
+        linter.isort.lines_after_imports = -1
+        linter.isort.lines_between_types = 0
+        linter.isort.forced_separate = []
+        linter.isort.section_order = [
+        	known { type = future },
+        	known { type = standard_library },
+        	known { type = third_party },
+        	known { type = first_party },
+        	known { type = local_folder },
+        ]
+        linter.isort.default_section = known { type = third_party }
+        linter.isort.no_sections = false
+        linter.isort.from_first = false
+        linter.isort.length_sort = false
+        linter.isort.length_sort_straight = false
+        linter.mccabe.max_complexity = 10
+        linter.pep8_naming.ignore_names = [
+        	setUp,
+        	tearDown,
+        	setUpClass,
+        	tearDownClass,
+        	setUpModule,
+        	tearDownModule,
+        	asyncSetUp,
+        	asyncTearDown,
+        	setUpTestData,
+        	failureException,
+        	longMessage,
+        	maxDiff,
+        ]
+        linter.pep8_naming.classmethod_decorators = []
+        linter.pep8_naming.staticmethod_decorators = []
+        linter.pycodestyle.max_line_length = 88
+        linter.pycodestyle.max_doc_length = none
+        linter.pycodestyle.ignore_overlong_task_comments = false
+        linter.pyflakes.extend_generics = []
+        linter.pyflakes.allowed_unused_imports = []
+        linter.pylint.allow_magic_value_types = [
+        	str,
+        	bytes,
+        ]
+        linter.pylint.allow_dunder_method_names = []
+        linter.pylint.max_args = 5
+        linter.pylint.max_positional_args = 5
+        linter.pylint.max_returns = 6
+        linter.pylint.max_bool_expr = 5
+        linter.pylint.max_branches = 12
+        linter.pylint.max_statements = 50
+        linter.pylint.max_public_methods = 20
+        linter.pylint.max_locals = 15
+        linter.pyupgrade.keep_runtime_typing = false
+        linter.ruff.parenthesize_tuple_in_subscript = false
+
+        # Formatter Settings
+        formatter.exclude = []
+        formatter.unresolved_target_version = 3.10
+        formatter.per_file_target_version = {}
+        formatter.preview = disabled
+        formatter.line_width = 88
+        formatter.line_ending = auto
+        formatter.indent_style = space
+        formatter.indent_width = 4
+        formatter.quote_style = double
+        formatter.magic_trailing_comma = respect
+        formatter.docstring_code_format = disabled
+        formatter.docstring_code_line_width = dynamic
+
+        # Analyze Settings
+        analyze.exclude = []
+        analyze.preview = disabled
+        analyze.target_version = 3.10
+        analyze.string_imports = disabled
+        analyze.extension = ExtensionMapping({})
+        analyze.include_dependencies = {}
+
+        ----- stderr -----
+        "#);
+    });
+    Ok(())
+}
+
+/// ```
+/// tmp
+/// ├── foo
+/// │  ├── pyproject.toml #<-- no [tool.ruff]
+/// │  └── test.py
+/// └── ruff.toml #<-- no `target-version`
+/// ```
+#[test]
+fn requires_python_ruff_toml_above() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let project_dir = dunce::canonicalize(tempdir.path())?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+[lint]
+select = ["UP007"]
+"#,
+    )?;
+
+    let foodir = tempdir.path().join("foo");
+    fs::create_dir(foodir)?;
+
+    let pyproject_toml = tempdir.path().join("foo/pyproject.toml");
+    fs::write(
+        &pyproject_toml,
+        r#"[project]
+requires-python = ">= 3.11"
+"#,
+    )?;
+
+    let testpy = tempdir.path().join("foo/test.py");
+    fs::write(
+        &testpy,
+        r#"
+from typing import Union;foo: Union[int, str] = 1
+"#,
+    )?;
+
+    let testpy_canon = dunce::canonicalize(testpy)?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&testpy_canon).as_str(), "[TMP]/foo/test.py"),(tempdir_filter(&project_dir).as_str(), "[TMP]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--show-settings")
+            .arg("foo/test.py")
+            .current_dir(&project_dir), @r#"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        Resolved settings for: "[TMP]/foo/test.py"
+        Settings path: "[TMP]/ruff.toml"
+
+        # General Settings
+        cache_dir = "[TMP]/.ruff_cache"
+        fix = false
+        fix_only = false
+        output_format = concise
+        show_fixes = false
+        unsafe_fixes = hint
+
+        # File Resolver Settings
+        file_resolver.exclude = [
+        	".bzr",
+        	".direnv",
+        	".eggs",
+        	".git",
+        	".git-rewrite",
+        	".hg",
+        	".ipynb_checkpoints",
+        	".mypy_cache",
+        	".nox",
+        	".pants.d",
+        	".pyenv",
+        	".pytest_cache",
+        	".pytype",
+        	".ruff_cache",
+        	".svn",
+        	".tox",
+        	".venv",
+        	".vscode",
+        	"__pypackages__",
+        	"_build",
+        	"buck-out",
+        	"dist",
+        	"node_modules",
+        	"site-packages",
+        	"venv",
+        ]
+        file_resolver.extend_exclude = []
+        file_resolver.force_exclude = false
+        file_resolver.include = [
+        	"*.py",
+        	"*.pyi",
+        	"*.ipynb",
+        	"**/pyproject.toml",
+        ]
+        file_resolver.extend_include = []
+        file_resolver.respect_gitignore = true
+        file_resolver.project_root = "[TMP]/"
+
+        # Linter Settings
+        linter.exclude = []
+        linter.project_root = "[TMP]/"
+        linter.rules.enabled = [
+        	non-pep604-annotation-union (UP007),
+        ]
+        linter.rules.should_fix = [
+        	non-pep604-annotation-union (UP007),
+        ]
+        linter.per_file_ignores = {}
+        linter.safety_table.forced_safe = []
+        linter.safety_table.forced_unsafe = []
+        linter.unresolved_target_version = none
+        linter.per_file_target_version = {}
+        linter.preview = disabled
+        linter.explicit_preview_rules = false
+        linter.extension = ExtensionMapping({})
+        linter.allowed_confusables = []
+        linter.builtins = []
+        linter.dummy_variable_rgx = ^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$
+        linter.external = []
+        linter.ignore_init_module_imports = true
+        linter.logger_objects = []
+        linter.namespace_packages = []
+        linter.src = [
+        	"[TMP]/",
+        	"[TMP]/src",
+        ]
+        linter.tab_size = 4
+        linter.line_length = 88
+        linter.task_tags = [
+        	TODO,
+        	FIXME,
+        	XXX,
+        ]
+        linter.typing_modules = []
+        linter.typing_extensions = true
+
+        # Linter Plugins
+        linter.flake8_annotations.mypy_init_return = false
+        linter.flake8_annotations.suppress_dummy_args = false
+        linter.flake8_annotations.suppress_none_returning = false
+        linter.flake8_annotations.allow_star_arg_any = false
+        linter.flake8_annotations.ignore_fully_untyped = false
+        linter.flake8_bandit.hardcoded_tmp_directory = [
+        	/tmp,
+        	/var/tmp,
+        	/dev/shm,
+        ]
+        linter.flake8_bandit.check_typed_exception = false
+        linter.flake8_bandit.extend_markup_names = []
+        linter.flake8_bandit.allowed_markup_calls = []
+        linter.flake8_bugbear.extend_immutable_calls = []
+        linter.flake8_builtins.allowed_modules = []
+        linter.flake8_builtins.ignorelist = []
+        linter.flake8_builtins.strict_checking = false
+        linter.flake8_comprehensions.allow_dict_calls_with_keyword_arguments = false
+        linter.flake8_copyright.notice_rgx = (?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}((-|,\s)\d{4})*
+        linter.flake8_copyright.author = none
+        linter.flake8_copyright.min_file_size = 0
+        linter.flake8_errmsg.max_string_length = 0
+        linter.flake8_gettext.functions_names = [
+        	_,
+        	gettext,
+        	ngettext,
+        ]
+        linter.flake8_implicit_str_concat.allow_multiline = true
+        linter.flake8_import_conventions.aliases = {
+        	altair = alt,
+        	holoviews = hv,
+        	matplotlib = mpl,
+        	matplotlib.pyplot = plt,
+        	networkx = nx,
+        	numpy = np,
+        	numpy.typing = npt,
+        	pandas = pd,
+        	panel = pn,
+        	plotly.express = px,
+        	polars = pl,
+        	pyarrow = pa,
+        	seaborn = sns,
+        	tensorflow = tf,
+        	tkinter = tk,
+        	xml.etree.ElementTree = ET,
+        }
+        linter.flake8_import_conventions.banned_aliases = {}
+        linter.flake8_import_conventions.banned_from = []
+        linter.flake8_pytest_style.fixture_parentheses = false
+        linter.flake8_pytest_style.parametrize_names_type = tuple
+        linter.flake8_pytest_style.parametrize_values_type = list
+        linter.flake8_pytest_style.parametrize_values_row_type = tuple
+        linter.flake8_pytest_style.raises_require_match_for = [
+        	BaseException,
+        	Exception,
+        	ValueError,
+        	OSError,
+        	IOError,
+        	EnvironmentError,
+        	socket.error,
+        ]
+        linter.flake8_pytest_style.raises_extend_require_match_for = []
+        linter.flake8_pytest_style.mark_parentheses = false
+        linter.flake8_quotes.inline_quotes = double
+        linter.flake8_quotes.multiline_quotes = double
+        linter.flake8_quotes.docstring_quotes = double
+        linter.flake8_quotes.avoid_escape = true
+        linter.flake8_self.ignore_names = [
+        	_make,
+        	_asdict,
+        	_replace,
+        	_fields,
+        	_field_defaults,
+        	_name_,
+        	_value_,
+        ]
+        linter.flake8_tidy_imports.ban_relative_imports = "parents"
+        linter.flake8_tidy_imports.banned_api = {}
+        linter.flake8_tidy_imports.banned_module_level_imports = []
+        linter.flake8_type_checking.strict = false
+        linter.flake8_type_checking.exempt_modules = [
+        	typing,
+        	typing_extensions,
+        ]
+        linter.flake8_type_checking.runtime_required_base_classes = []
+        linter.flake8_type_checking.runtime_required_decorators = []
+        linter.flake8_type_checking.quote_annotations = false
+        linter.flake8_unused_arguments.ignore_variadic_names = false
+        linter.isort.required_imports = []
+        linter.isort.combine_as_imports = false
+        linter.isort.force_single_line = false
+        linter.isort.force_sort_within_sections = false
+        linter.isort.detect_same_package = true
+        linter.isort.case_sensitive = false
+        linter.isort.force_wrap_aliases = false
+        linter.isort.force_to_top = []
+        linter.isort.known_modules = {}
+        linter.isort.order_by_type = true
+        linter.isort.relative_imports_order = furthest_to_closest
+        linter.isort.single_line_exclusions = []
+        linter.isort.split_on_trailing_comma = true
+        linter.isort.classes = []
+        linter.isort.constants = []
+        linter.isort.variables = []
+        linter.isort.no_lines_before = []
+        linter.isort.lines_after_imports = -1
+        linter.isort.lines_between_types = 0
+        linter.isort.forced_separate = []
+        linter.isort.section_order = [
+        	known { type = future },
+        	known { type = standard_library },
+        	known { type = third_party },
+        	known { type = first_party },
+        	known { type = local_folder },
+        ]
+        linter.isort.default_section = known { type = third_party }
+        linter.isort.no_sections = false
+        linter.isort.from_first = false
+        linter.isort.length_sort = false
+        linter.isort.length_sort_straight = false
+        linter.mccabe.max_complexity = 10
+        linter.pep8_naming.ignore_names = [
+        	setUp,
+        	tearDown,
+        	setUpClass,
+        	tearDownClass,
+        	setUpModule,
+        	tearDownModule,
+        	asyncSetUp,
+        	asyncTearDown,
+        	setUpTestData,
+        	failureException,
+        	longMessage,
+        	maxDiff,
+        ]
+        linter.pep8_naming.classmethod_decorators = []
+        linter.pep8_naming.staticmethod_decorators = []
+        linter.pycodestyle.max_line_length = 88
+        linter.pycodestyle.max_doc_length = none
+        linter.pycodestyle.ignore_overlong_task_comments = false
+        linter.pyflakes.extend_generics = []
+        linter.pyflakes.allowed_unused_imports = []
+        linter.pylint.allow_magic_value_types = [
+        	str,
+        	bytes,
+        ]
+        linter.pylint.allow_dunder_method_names = []
+        linter.pylint.max_args = 5
+        linter.pylint.max_positional_args = 5
+        linter.pylint.max_returns = 6
+        linter.pylint.max_bool_expr = 5
+        linter.pylint.max_branches = 12
+        linter.pylint.max_statements = 50
+        linter.pylint.max_public_methods = 20
+        linter.pylint.max_locals = 15
+        linter.pyupgrade.keep_runtime_typing = false
+        linter.ruff.parenthesize_tuple_in_subscript = false
+
+        # Formatter Settings
+        formatter.exclude = []
+        formatter.unresolved_target_version = 3.9
+        formatter.per_file_target_version = {}
+        formatter.preview = disabled
+        formatter.line_width = 88
+        formatter.line_ending = auto
+        formatter.indent_style = space
+        formatter.indent_width = 4
+        formatter.quote_style = double
+        formatter.magic_trailing_comma = respect
+        formatter.docstring_code_format = disabled
+        formatter.docstring_code_line_width = dynamic
+
+        # Analyze Settings
+        analyze.exclude = []
+        analyze.preview = disabled
+        analyze.target_version = 3.9
+        analyze.string_imports = disabled
+        analyze.extension = ExtensionMapping({})
+        analyze.include_dependencies = {}
+
+        ----- stderr -----
+        "#);
+    });
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&testpy_canon).as_str(), "[TMP]/foo/test.py"),(tempdir_filter(&project_dir).as_str(), "[TMP]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--show-settings")
+            .arg("test.py")
+            .current_dir(project_dir.join("foo")), @r#"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        Resolved settings for: "[TMP]/foo/test.py"
+        Settings path: "[TMP]/ruff.toml"
+
+        # General Settings
+        cache_dir = "[TMP]/.ruff_cache"
+        fix = false
+        fix_only = false
+        output_format = concise
+        show_fixes = false
+        unsafe_fixes = hint
+
+        # File Resolver Settings
+        file_resolver.exclude = [
+        	".bzr",
+        	".direnv",
+        	".eggs",
+        	".git",
+        	".git-rewrite",
+        	".hg",
+        	".ipynb_checkpoints",
+        	".mypy_cache",
+        	".nox",
+        	".pants.d",
+        	".pyenv",
+        	".pytest_cache",
+        	".pytype",
+        	".ruff_cache",
+        	".svn",
+        	".tox",
+        	".venv",
+        	".vscode",
+        	"__pypackages__",
+        	"_build",
+        	"buck-out",
+        	"dist",
+        	"node_modules",
+        	"site-packages",
+        	"venv",
+        ]
+        file_resolver.extend_exclude = []
+        file_resolver.force_exclude = false
+        file_resolver.include = [
+        	"*.py",
+        	"*.pyi",
+        	"*.ipynb",
+        	"**/pyproject.toml",
+        ]
+        file_resolver.extend_include = []
+        file_resolver.respect_gitignore = true
+        file_resolver.project_root = "[TMP]/"
+
+        # Linter Settings
+        linter.exclude = []
+        linter.project_root = "[TMP]/"
+        linter.rules.enabled = [
+        	non-pep604-annotation-union (UP007),
+        ]
+        linter.rules.should_fix = [
+        	non-pep604-annotation-union (UP007),
+        ]
+        linter.per_file_ignores = {}
+        linter.safety_table.forced_safe = []
+        linter.safety_table.forced_unsafe = []
+        linter.unresolved_target_version = none
+        linter.per_file_target_version = {}
+        linter.preview = disabled
+        linter.explicit_preview_rules = false
+        linter.extension = ExtensionMapping({})
+        linter.allowed_confusables = []
+        linter.builtins = []
+        linter.dummy_variable_rgx = ^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$
+        linter.external = []
+        linter.ignore_init_module_imports = true
+        linter.logger_objects = []
+        linter.namespace_packages = []
+        linter.src = [
+        	"[TMP]/",
+        	"[TMP]/src",
+        ]
+        linter.tab_size = 4
+        linter.line_length = 88
+        linter.task_tags = [
+        	TODO,
+        	FIXME,
+        	XXX,
+        ]
+        linter.typing_modules = []
+        linter.typing_extensions = true
+
+        # Linter Plugins
+        linter.flake8_annotations.mypy_init_return = false
+        linter.flake8_annotations.suppress_dummy_args = false
+        linter.flake8_annotations.suppress_none_returning = false
+        linter.flake8_annotations.allow_star_arg_any = false
+        linter.flake8_annotations.ignore_fully_untyped = false
+        linter.flake8_bandit.hardcoded_tmp_directory = [
+        	/tmp,
+        	/var/tmp,
+        	/dev/shm,
+        ]
+        linter.flake8_bandit.check_typed_exception = false
+        linter.flake8_bandit.extend_markup_names = []
+        linter.flake8_bandit.allowed_markup_calls = []
+        linter.flake8_bugbear.extend_immutable_calls = []
+        linter.flake8_builtins.allowed_modules = []
+        linter.flake8_builtins.ignorelist = []
+        linter.flake8_builtins.strict_checking = false
+        linter.flake8_comprehensions.allow_dict_calls_with_keyword_arguments = false
+        linter.flake8_copyright.notice_rgx = (?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}((-|,\s)\d{4})*
+        linter.flake8_copyright.author = none
+        linter.flake8_copyright.min_file_size = 0
+        linter.flake8_errmsg.max_string_length = 0
+        linter.flake8_gettext.functions_names = [
+        	_,
+        	gettext,
+        	ngettext,
+        ]
+        linter.flake8_implicit_str_concat.allow_multiline = true
+        linter.flake8_import_conventions.aliases = {
+        	altair = alt,
+        	holoviews = hv,
+        	matplotlib = mpl,
+        	matplotlib.pyplot = plt,
+        	networkx = nx,
+        	numpy = np,
+        	numpy.typing = npt,
+        	pandas = pd,
+        	panel = pn,
+        	plotly.express = px,
+        	polars = pl,
+        	pyarrow = pa,
+        	seaborn = sns,
+        	tensorflow = tf,
+        	tkinter = tk,
+        	xml.etree.ElementTree = ET,
+        }
+        linter.flake8_import_conventions.banned_aliases = {}
+        linter.flake8_import_conventions.banned_from = []
+        linter.flake8_pytest_style.fixture_parentheses = false
+        linter.flake8_pytest_style.parametrize_names_type = tuple
+        linter.flake8_pytest_style.parametrize_values_type = list
+        linter.flake8_pytest_style.parametrize_values_row_type = tuple
+        linter.flake8_pytest_style.raises_require_match_for = [
+        	BaseException,
+        	Exception,
+        	ValueError,
+        	OSError,
+        	IOError,
+        	EnvironmentError,
+        	socket.error,
+        ]
+        linter.flake8_pytest_style.raises_extend_require_match_for = []
+        linter.flake8_pytest_style.mark_parentheses = false
+        linter.flake8_quotes.inline_quotes = double
+        linter.flake8_quotes.multiline_quotes = double
+        linter.flake8_quotes.docstring_quotes = double
+        linter.flake8_quotes.avoid_escape = true
+        linter.flake8_self.ignore_names = [
+        	_make,
+        	_asdict,
+        	_replace,
+        	_fields,
+        	_field_defaults,
+        	_name_,
+        	_value_,
+        ]
+        linter.flake8_tidy_imports.ban_relative_imports = "parents"
+        linter.flake8_tidy_imports.banned_api = {}
+        linter.flake8_tidy_imports.banned_module_level_imports = []
+        linter.flake8_type_checking.strict = false
+        linter.flake8_type_checking.exempt_modules = [
+        	typing,
+        	typing_extensions,
+        ]
+        linter.flake8_type_checking.runtime_required_base_classes = []
+        linter.flake8_type_checking.runtime_required_decorators = []
+        linter.flake8_type_checking.quote_annotations = false
+        linter.flake8_unused_arguments.ignore_variadic_names = false
+        linter.isort.required_imports = []
+        linter.isort.combine_as_imports = false
+        linter.isort.force_single_line = false
+        linter.isort.force_sort_within_sections = false
+        linter.isort.detect_same_package = true
+        linter.isort.case_sensitive = false
+        linter.isort.force_wrap_aliases = false
+        linter.isort.force_to_top = []
+        linter.isort.known_modules = {}
+        linter.isort.order_by_type = true
+        linter.isort.relative_imports_order = furthest_to_closest
+        linter.isort.single_line_exclusions = []
+        linter.isort.split_on_trailing_comma = true
+        linter.isort.classes = []
+        linter.isort.constants = []
+        linter.isort.variables = []
+        linter.isort.no_lines_before = []
+        linter.isort.lines_after_imports = -1
+        linter.isort.lines_between_types = 0
+        linter.isort.forced_separate = []
+        linter.isort.section_order = [
+        	known { type = future },
+        	known { type = standard_library },
+        	known { type = third_party },
+        	known { type = first_party },
+        	known { type = local_folder },
+        ]
+        linter.isort.default_section = known { type = third_party }
+        linter.isort.no_sections = false
+        linter.isort.from_first = false
+        linter.isort.length_sort = false
+        linter.isort.length_sort_straight = false
+        linter.mccabe.max_complexity = 10
+        linter.pep8_naming.ignore_names = [
+        	setUp,
+        	tearDown,
+        	setUpClass,
+        	tearDownClass,
+        	setUpModule,
+        	tearDownModule,
+        	asyncSetUp,
+        	asyncTearDown,
+        	setUpTestData,
+        	failureException,
+        	longMessage,
+        	maxDiff,
+        ]
+        linter.pep8_naming.classmethod_decorators = []
+        linter.pep8_naming.staticmethod_decorators = []
+        linter.pycodestyle.max_line_length = 88
+        linter.pycodestyle.max_doc_length = none
+        linter.pycodestyle.ignore_overlong_task_comments = false
+        linter.pyflakes.extend_generics = []
+        linter.pyflakes.allowed_unused_imports = []
+        linter.pylint.allow_magic_value_types = [
+        	str,
+        	bytes,
+        ]
+        linter.pylint.allow_dunder_method_names = []
+        linter.pylint.max_args = 5
+        linter.pylint.max_positional_args = 5
+        linter.pylint.max_returns = 6
+        linter.pylint.max_bool_expr = 5
+        linter.pylint.max_branches = 12
+        linter.pylint.max_statements = 50
+        linter.pylint.max_public_methods = 20
+        linter.pylint.max_locals = 15
+        linter.pyupgrade.keep_runtime_typing = false
+        linter.ruff.parenthesize_tuple_in_subscript = false
+
+        # Formatter Settings
+        formatter.exclude = []
+        formatter.unresolved_target_version = 3.9
+        formatter.per_file_target_version = {}
+        formatter.preview = disabled
+        formatter.line_width = 88
+        formatter.line_ending = auto
+        formatter.indent_style = space
+        formatter.indent_width = 4
+        formatter.quote_style = double
+        formatter.magic_trailing_comma = respect
+        formatter.docstring_code_format = disabled
+        formatter.docstring_code_line_width = dynamic
+
+        # Analyze Settings
+        analyze.exclude = []
+        analyze.preview = disabled
+        analyze.target_version = 3.9
+        analyze.string_imports = disabled
+        analyze.extension = ExtensionMapping({})
+        analyze.include_dependencies = {}
+
+        ----- stderr -----
+        "#);
+    });
+    Ok(())
+}
+
+/// ```
+/// tmp
+/// ├── pyproject.toml <-- requires >=3.10
+/// ├── ruff.toml <--- extends base
+/// ├── shared
+/// │   └── base_config.toml <-- targets 3.11
+/// └── test.py
+/// ```
+#[test]
+fn requires_python_extend_from_shared_config() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let project_dir = dunce::canonicalize(tempdir.path())?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+extend = "./shared/base_config.toml"
+[lint]
+select = ["UP007"]
+"#,
+    )?;
+
+    let shared_dir = tempdir.path().join("shared");
+    fs::create_dir(shared_dir)?;
+
+    let pyproject_toml = tempdir.path().join("pyproject.toml");
+    fs::write(
+        &pyproject_toml,
+        r#"[project]
+requires-python = ">= 3.10"
+"#,
+    )?;
+
+    let shared_toml = tempdir.path().join("shared/base_config.toml");
+    fs::write(
+        &shared_toml,
+        r#"
+target-version = "py311"
+"#,
+    )?;
+
+    let testpy = tempdir.path().join("test.py");
+    fs::write(
+        &testpy,
+        r#"
+from typing import Union;foo: Union[int, str] = 1
+"#,
+    )?;
+
+    let testpy_canon = dunce::canonicalize(testpy)?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&testpy_canon).as_str(), "[TMP]/test.py"),(tempdir_filter(&project_dir).as_str(), "[TMP]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--show-settings")
+            .arg("test.py")
+            .current_dir(&project_dir), @r#"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        Resolved settings for: "[TMP]/test.py"
+        Settings path: "[TMP]/ruff.toml"
+
+        # General Settings
+        cache_dir = "[TMP]/.ruff_cache"
+        fix = false
+        fix_only = false
+        output_format = concise
+        show_fixes = false
+        unsafe_fixes = hint
+
+        # File Resolver Settings
+        file_resolver.exclude = [
+        	".bzr",
+        	".direnv",
+        	".eggs",
+        	".git",
+        	".git-rewrite",
+        	".hg",
+        	".ipynb_checkpoints",
+        	".mypy_cache",
+        	".nox",
+        	".pants.d",
+        	".pyenv",
+        	".pytest_cache",
+        	".pytype",
+        	".ruff_cache",
+        	".svn",
+        	".tox",
+        	".venv",
+        	".vscode",
+        	"__pypackages__",
+        	"_build",
+        	"buck-out",
+        	"dist",
+        	"node_modules",
+        	"site-packages",
+        	"venv",
+        ]
+        file_resolver.extend_exclude = []
+        file_resolver.force_exclude = false
+        file_resolver.include = [
+        	"*.py",
+        	"*.pyi",
+        	"*.ipynb",
+        	"**/pyproject.toml",
+        ]
+        file_resolver.extend_include = []
+        file_resolver.respect_gitignore = true
+        file_resolver.project_root = "[TMP]/"
+
+        # Linter Settings
+        linter.exclude = []
+        linter.project_root = "[TMP]/"
+        linter.rules.enabled = [
+        	non-pep604-annotation-union (UP007),
+        ]
+        linter.rules.should_fix = [
+        	non-pep604-annotation-union (UP007),
+        ]
+        linter.per_file_ignores = {}
+        linter.safety_table.forced_safe = []
+        linter.safety_table.forced_unsafe = []
+        linter.unresolved_target_version = 3.10
+        linter.per_file_target_version = {}
+        linter.preview = disabled
+        linter.explicit_preview_rules = false
+        linter.extension = ExtensionMapping({})
+        linter.allowed_confusables = []
+        linter.builtins = []
+        linter.dummy_variable_rgx = ^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$
+        linter.external = []
+        linter.ignore_init_module_imports = true
+        linter.logger_objects = []
+        linter.namespace_packages = []
+        linter.src = [
+        	"[TMP]/",
+        	"[TMP]/src",
+        ]
+        linter.tab_size = 4
+        linter.line_length = 88
+        linter.task_tags = [
+        	TODO,
+        	FIXME,
+        	XXX,
+        ]
+        linter.typing_modules = []
+        linter.typing_extensions = true
+
+        # Linter Plugins
+        linter.flake8_annotations.mypy_init_return = false
+        linter.flake8_annotations.suppress_dummy_args = false
+        linter.flake8_annotations.suppress_none_returning = false
+        linter.flake8_annotations.allow_star_arg_any = false
+        linter.flake8_annotations.ignore_fully_untyped = false
+        linter.flake8_bandit.hardcoded_tmp_directory = [
+        	/tmp,
+        	/var/tmp,
+        	/dev/shm,
+        ]
+        linter.flake8_bandit.check_typed_exception = false
+        linter.flake8_bandit.extend_markup_names = []
+        linter.flake8_bandit.allowed_markup_calls = []
+        linter.flake8_bugbear.extend_immutable_calls = []
+        linter.flake8_builtins.allowed_modules = []
+        linter.flake8_builtins.ignorelist = []
+        linter.flake8_builtins.strict_checking = false
+        linter.flake8_comprehensions.allow_dict_calls_with_keyword_arguments = false
+        linter.flake8_copyright.notice_rgx = (?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}((-|,\s)\d{4})*
+        linter.flake8_copyright.author = none
+        linter.flake8_copyright.min_file_size = 0
+        linter.flake8_errmsg.max_string_length = 0
+        linter.flake8_gettext.functions_names = [
+        	_,
+        	gettext,
+        	ngettext,
+        ]
+        linter.flake8_implicit_str_concat.allow_multiline = true
+        linter.flake8_import_conventions.aliases = {
+        	altair = alt,
+        	holoviews = hv,
+        	matplotlib = mpl,
+        	matplotlib.pyplot = plt,
+        	networkx = nx,
+        	numpy = np,
+        	numpy.typing = npt,
+        	pandas = pd,
+        	panel = pn,
+        	plotly.express = px,
+        	polars = pl,
+        	pyarrow = pa,
+        	seaborn = sns,
+        	tensorflow = tf,
+        	tkinter = tk,
+        	xml.etree.ElementTree = ET,
+        }
+        linter.flake8_import_conventions.banned_aliases = {}
+        linter.flake8_import_conventions.banned_from = []
+        linter.flake8_pytest_style.fixture_parentheses = false
+        linter.flake8_pytest_style.parametrize_names_type = tuple
+        linter.flake8_pytest_style.parametrize_values_type = list
+        linter.flake8_pytest_style.parametrize_values_row_type = tuple
+        linter.flake8_pytest_style.raises_require_match_for = [
+        	BaseException,
+        	Exception,
+        	ValueError,
+        	OSError,
+        	IOError,
+        	EnvironmentError,
+        	socket.error,
+        ]
+        linter.flake8_pytest_style.raises_extend_require_match_for = []
+        linter.flake8_pytest_style.mark_parentheses = false
+        linter.flake8_quotes.inline_quotes = double
+        linter.flake8_quotes.multiline_quotes = double
+        linter.flake8_quotes.docstring_quotes = double
+        linter.flake8_quotes.avoid_escape = true
+        linter.flake8_self.ignore_names = [
+        	_make,
+        	_asdict,
+        	_replace,
+        	_fields,
+        	_field_defaults,
+        	_name_,
+        	_value_,
+        ]
+        linter.flake8_tidy_imports.ban_relative_imports = "parents"
+        linter.flake8_tidy_imports.banned_api = {}
+        linter.flake8_tidy_imports.banned_module_level_imports = []
+        linter.flake8_type_checking.strict = false
+        linter.flake8_type_checking.exempt_modules = [
+        	typing,
+        	typing_extensions,
+        ]
+        linter.flake8_type_checking.runtime_required_base_classes = []
+        linter.flake8_type_checking.runtime_required_decorators = []
+        linter.flake8_type_checking.quote_annotations = false
+        linter.flake8_unused_arguments.ignore_variadic_names = false
+        linter.isort.required_imports = []
+        linter.isort.combine_as_imports = false
+        linter.isort.force_single_line = false
+        linter.isort.force_sort_within_sections = false
+        linter.isort.detect_same_package = true
+        linter.isort.case_sensitive = false
+        linter.isort.force_wrap_aliases = false
+        linter.isort.force_to_top = []
+        linter.isort.known_modules = {}
+        linter.isort.order_by_type = true
+        linter.isort.relative_imports_order = furthest_to_closest
+        linter.isort.single_line_exclusions = []
+        linter.isort.split_on_trailing_comma = true
+        linter.isort.classes = []
+        linter.isort.constants = []
+        linter.isort.variables = []
+        linter.isort.no_lines_before = []
+        linter.isort.lines_after_imports = -1
+        linter.isort.lines_between_types = 0
+        linter.isort.forced_separate = []
+        linter.isort.section_order = [
+        	known { type = future },
+        	known { type = standard_library },
+        	known { type = third_party },
+        	known { type = first_party },
+        	known { type = local_folder },
+        ]
+        linter.isort.default_section = known { type = third_party }
+        linter.isort.no_sections = false
+        linter.isort.from_first = false
+        linter.isort.length_sort = false
+        linter.isort.length_sort_straight = false
+        linter.mccabe.max_complexity = 10
+        linter.pep8_naming.ignore_names = [
+        	setUp,
+        	tearDown,
+        	setUpClass,
+        	tearDownClass,
+        	setUpModule,
+        	tearDownModule,
+        	asyncSetUp,
+        	asyncTearDown,
+        	setUpTestData,
+        	failureException,
+        	longMessage,
+        	maxDiff,
+        ]
+        linter.pep8_naming.classmethod_decorators = []
+        linter.pep8_naming.staticmethod_decorators = []
+        linter.pycodestyle.max_line_length = 88
+        linter.pycodestyle.max_doc_length = none
+        linter.pycodestyle.ignore_overlong_task_comments = false
+        linter.pyflakes.extend_generics = []
+        linter.pyflakes.allowed_unused_imports = []
+        linter.pylint.allow_magic_value_types = [
+        	str,
+        	bytes,
+        ]
+        linter.pylint.allow_dunder_method_names = []
+        linter.pylint.max_args = 5
+        linter.pylint.max_positional_args = 5
+        linter.pylint.max_returns = 6
+        linter.pylint.max_bool_expr = 5
+        linter.pylint.max_branches = 12
+        linter.pylint.max_statements = 50
+        linter.pylint.max_public_methods = 20
+        linter.pylint.max_locals = 15
+        linter.pyupgrade.keep_runtime_typing = false
+        linter.ruff.parenthesize_tuple_in_subscript = false
+
+        # Formatter Settings
+        formatter.exclude = []
+        formatter.unresolved_target_version = 3.10
+        formatter.per_file_target_version = {}
+        formatter.preview = disabled
+        formatter.line_width = 88
+        formatter.line_ending = auto
+        formatter.indent_style = space
+        formatter.indent_width = 4
+        formatter.quote_style = double
+        formatter.magic_trailing_comma = respect
+        formatter.docstring_code_format = disabled
+        formatter.docstring_code_line_width = dynamic
+
+        # Analyze Settings
+        analyze.exclude = []
+        analyze.preview = disabled
+        analyze.target_version = 3.10
+        analyze.string_imports = disabled
+        analyze.extension = ExtensionMapping({})
+        analyze.include_dependencies = {}
+
+        ----- stderr -----
+        "#);
+    });
+
+    Ok(())
+}
+
 #[test]
 fn checks_notebooks_in_stable() -> anyhow::Result<()> {
     let tempdir = TempDir::new()?;
@@ -2079,6 +4911,7 @@ fn flake8_import_convention_invalid_aliases_config_alias_name() -> Result<()> {
 
         ----- stderr -----
         ruff failed
+          Cause: Failed to load configuration `[TMP]/ruff.toml`
           Cause: Failed to parse [TMP]/ruff.toml
           Cause: TOML parse error at line 3, column 17
           |
@@ -2115,6 +4948,7 @@ fn flake8_import_convention_invalid_aliases_config_extend_alias_name() -> Result
 
         ----- stderr -----
         ruff failed
+          Cause: Failed to load configuration `[TMP]/ruff.toml`
           Cause: Failed to parse [TMP]/ruff.toml
           Cause: TOML parse error at line 3, column 17
           |
@@ -2151,6 +4985,7 @@ fn flake8_import_convention_invalid_aliases_config_module_name() -> Result<()> {
 
         ----- stderr -----
         ruff failed
+          Cause: Failed to load configuration `[TMP]/ruff.toml`
           Cause: Failed to parse [TMP]/ruff.toml
           Cause: TOML parse error at line 3, column 1
           |
@@ -2162,15 +4997,836 @@ fn flake8_import_convention_invalid_aliases_config_module_name() -> Result<()> {
 }
 
 #[test]
+fn flake8_import_convention_nfkc_normalization() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+[lint.flake8-import-conventions.aliases]
+"test.module" = "_﹏𝘥𝘦𝘣𝘶𝘨﹏﹏"
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--config")
+            .arg(&ruff_toml)
+    , @r"
+        success: false
+        exit_code: 2
+        ----- stdout -----
+
+        ----- stderr -----
+        ruff failed
+          Cause: Invalid alias for module 'test.module': alias normalizes to '__debug__', which is not allowed.
+        ");});
+    Ok(())
+}
+
+#[test]
 fn flake8_import_convention_unused_aliased_import() {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--config")
+            .arg(r#"lint.isort.required-imports = ["import pandas"]"#)
+            .args(["--select", "I002,ICN001,F401"])
+            .args(["--stdin-filename", "test.py"])
+            .arg("--unsafe-fixes")
+            .arg("--fix")
+            .arg("-")
+            .pass_stdin("1")
+    );
+}
+
+#[test]
+fn flake8_import_convention_unused_aliased_import_no_conflict() {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--config")
+            .arg(r#"lint.isort.required-imports = ["import pandas as pd"]"#)
+            .args(["--select", "I002,ICN001,F401"])
+            .args(["--stdin-filename", "test.py"])
+            .arg("--unsafe-fixes")
+            .arg("--fix")
+            .arg("-")
+            .pass_stdin("1")
+    );
+}
+
+// See: https://github.com/astral-sh/ruff/issues/16177
+#[test]
+fn flake8_pyi_redundant_none_literal() {
+    let snippet = r#"
+from typing import Literal
+
+# For each of these expressions, Ruff provides a fix for one of the `Literal[None]` elements
+# but not both, as if both were autofixed it would result in `None | None`,
+# which leads to a `TypeError` at runtime.
+a: Literal[None,] | Literal[None,]
+b: Literal[None] | Literal[None]
+c: Literal[None] | Literal[None,]
+d: Literal[None,] | Literal[None]
+"#;
+
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
-        .arg("--config")
-        .arg(r#"lint.isort.required-imports = ["import pandas"]"#)
-        .args(["--select", "I002,ICN001,F401"])
+        .args(["--select", "PYI061"])
+        .args(["--stdin-filename", "test.py"])
+        .arg("--preview")
+        .arg("--diff")
+        .arg("-")
+        .pass_stdin(snippet), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    --- test.py
+    +++ test.py
+    @@ -4,7 +4,7 @@
+     # For each of these expressions, Ruff provides a fix for one of the `Literal[None]` elements
+     # but not both, as if both were autofixed it would result in `None | None`,
+     # which leads to a `TypeError` at runtime.
+    -a: Literal[None,] | Literal[None,]
+    -b: Literal[None] | Literal[None]
+    -c: Literal[None] | Literal[None,]
+    -d: Literal[None,] | Literal[None]
+    +a: None | Literal[None,]
+    +b: None | Literal[None]
+    +c: None | Literal[None,]
+    +d: None | Literal[None]
+
+
+    ----- stderr -----
+    Would fix 4 errors.
+    ");
+}
+
+/// Test that private, old-style `TypeVar` generics
+/// 1. Get replaced with PEP 695 type parameters (UP046, UP047)
+/// 2. Get renamed to remove leading underscores (UP049)
+/// 3. Emit a warning that the standalone type variable is now unused (PYI018)
+/// 4. Remove the now-unused `Generic` import
+#[test]
+fn pep695_generic_rename() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--select", "F401,PYI018,UP046,UP047,UP049"])
         .args(["--stdin-filename", "test.py"])
         .arg("--unsafe-fixes")
         .arg("--fix")
+        .arg("--preview")
+        .arg("--target-version=py312")
         .arg("-")
-        .pass_stdin("1"));
+        .pass_stdin(
+            r#"
+from typing import Generic, TypeVar
+_T = TypeVar("_T")
+
+class OldStyle(Generic[_T]):
+    var: _T
+
+def func(t: _T) -> _T:
+    x: _T
+    return x
+"#
+        ),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+
+    class OldStyle[T]:
+        var: T
+
+    def func[T](t: T) -> T:
+        x: T
+        return x
+
+    ----- stderr -----
+    Found 7 errors (7 fixed, 0 remaining).
+    "
+    );
+}
+
+/// Test that we do not rename two different type parameters to the same name
+/// in one execution of Ruff (autofixing this to `class Foo[T, T]: ...` would
+/// introduce invalid syntax)
+#[test]
+fn type_parameter_rename_isolation() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--select", "UP049"])
+        .args(["--stdin-filename", "test.py"])
+        .arg("--unsafe-fixes")
+        .arg("--fix")
+        .arg("--preview")
+        .arg("--target-version=py312")
+        .arg("-")
+        .pass_stdin(
+            r#"
+class Foo[_T, __T]:
+    pass
+"#
+        ),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+
+    class Foo[T, __T]:
+        pass
+
+    ----- stderr -----
+    test.py:2:14: UP049 Generic class uses private type parameters
+    Found 2 errors (1 fixed, 1 remaining).
+    "
+    );
+}
+
+/// construct a directory tree with this structure:
+/// .
+/// ├── abc
+/// │  └── __init__.py
+/// ├── collections
+/// │  ├── __init__.py
+/// │  ├── abc
+/// │  │  └── __init__.py
+/// │  └── foobar
+/// │      └── __init__.py
+/// ├── foobar
+/// │  ├── __init__.py
+/// │  ├── abc
+/// │  │  └── __init__.py
+/// │  └── collections
+/// │      ├── __init__.py
+/// │      ├── abc
+/// │      │  └── __init__.py
+/// │      └── foobar
+/// │          └── __init__.py
+/// ├── ruff.toml
+/// └── urlparse
+///     └── __init__.py
+fn create_a005_module_structure(tempdir: &TempDir) -> Result<()> {
+    fn create_module(path: &Path) -> Result<()> {
+        fs::create_dir(path)?;
+        fs::File::create(path.join("__init__.py"))?;
+        Ok(())
+    }
+
+    let foobar = tempdir.path().join("foobar");
+    create_module(&foobar)?;
+    for base in [&tempdir.path().into(), &foobar] {
+        for dir in ["abc", "collections"] {
+            create_module(&base.join(dir))?;
+        }
+        create_module(&base.join("collections").join("abc"))?;
+        create_module(&base.join("collections").join("foobar"))?;
+    }
+    create_module(&tempdir.path().join("urlparse"))?;
+    // also create a ruff.toml to mark the project root
+    fs::File::create(tempdir.path().join("ruff.toml"))?;
+
+    Ok(())
+}
+
+/// Test A005 with `strict-checking = true`
+#[test]
+fn a005_module_shadowing_strict() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    create_a005_module_structure(&tempdir)?;
+
+    insta::with_settings!({
+        filters => vec![(r"\\", "/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--config")
+            .arg(r#"lint.flake8-builtins.strict-checking = true"#)
+            .args(["--select", "A005"])
+            .current_dir(tempdir.path()),
+            @r"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        abc/__init__.py:1:1: A005 Module `abc` shadows a Python standard-library module
+        collections/__init__.py:1:1: A005 Module `collections` shadows a Python standard-library module
+        collections/abc/__init__.py:1:1: A005 Module `abc` shadows a Python standard-library module
+        foobar/abc/__init__.py:1:1: A005 Module `abc` shadows a Python standard-library module
+        foobar/collections/__init__.py:1:1: A005 Module `collections` shadows a Python standard-library module
+        foobar/collections/abc/__init__.py:1:1: A005 Module `abc` shadows a Python standard-library module
+        Found 6 errors.
+
+        ----- stderr -----
+        ");
+    });
+
+    Ok(())
+}
+
+/// Test A005 with `strict-checking = false`
+#[test]
+fn a005_module_shadowing_non_strict() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    create_a005_module_structure(&tempdir)?;
+
+    insta::with_settings!({
+        filters => vec![(r"\\", "/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--config")
+            .arg(r#"lint.flake8-builtins.strict-checking = false"#)
+            .args(["--select", "A005"])
+            .current_dir(tempdir.path()),
+            @r"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        abc/__init__.py:1:1: A005 Module `abc` shadows a Python standard-library module
+        collections/__init__.py:1:1: A005 Module `collections` shadows a Python standard-library module
+        Found 2 errors.
+
+        ----- stderr -----
+        ");
+
+    });
+
+    Ok(())
+}
+
+/// Test A005 with `strict-checking` unset
+///
+/// This should match the non-strict version directly above
+#[test]
+fn a005_module_shadowing_strict_default() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    create_a005_module_structure(&tempdir)?;
+
+    insta::with_settings!({
+        filters => vec![(r"\\", "/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .args(["--select", "A005"])
+            .current_dir(tempdir.path()),
+            @r"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        abc/__init__.py:1:1: A005 Module `abc` shadows a Python standard-library module
+        collections/__init__.py:1:1: A005 Module `collections` shadows a Python standard-library module
+        Found 2 errors.
+
+        ----- stderr -----
+        ");
+    });
+    Ok(())
+}
+
+/// Test that the linter respects per-file-target-version.
+#[test]
+fn per_file_target_version_linter() {
+    // without per-file-target-version, there should be one UP046 error
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--target-version", "py312"])
+        .args(["--select", "UP046"]) // only triggers on 3.12+
+        .args(["--stdin-filename", "test.py"])
+        .arg("--preview")
+        .arg("-")
+        .pass_stdin(r#"
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class A(Generic[T]):
+    var: T
+"#),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:6:9: UP046 Generic class `A` uses `Generic` subclass instead of type parameters
+    Found 1 error.
+    No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
+
+    ----- stderr -----
+    "
+    );
+
+    // with per-file-target-version, there should be no errors because the new generic syntax is
+    // unavailable
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--target-version", "py312"])
+        .args(["--config", r#"per-file-target-version = {"test.py" = "py311"}"#])
+        .args(["--select", "UP046"]) // only triggers on 3.12+
+        .args(["--stdin-filename", "test.py"])
+        .arg("--preview")
+        .arg("-")
+        .pass_stdin(r#"
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class A(Generic[T]):
+    var: T
+"#),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+}
+
+#[test]
+fn walrus_before_py38() {
+    // ok
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--stdin-filename", "test.py"])
+        .arg("--target-version=py38")
+        .arg("-")
+        .pass_stdin(r#"(x := 1)"#),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+
+    // not ok on 3.7 with preview
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--stdin-filename", "test.py"])
+        .arg("--target-version=py37")
+        .arg("--preview")
+        .arg("-")
+        .pass_stdin(r#"(x := 1)"#),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:2: invalid-syntax: Cannot use named assignment expression (`:=`) on Python 3.7 (syntax was added in Python 3.8)
+    Found 1 error.
+
+    ----- stderr -----
+    "
+    );
+}
+
+#[test]
+fn match_before_py310() {
+    // ok on 3.10
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--stdin-filename", "test.py"])
+        .arg("--target-version=py310")
+        .arg("-")
+        .pass_stdin(
+            r#"
+match 2:
+    case 1:
+        print("it's one")
+"#
+        ),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+
+    // ok on 3.9 without preview
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--stdin-filename", "test.py"])
+        .arg("--target-version=py39")
+        .arg("-")
+        .pass_stdin(
+            r#"
+match 2:
+    case 1:
+        print("it's one")
+"#
+        ),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:2:1: invalid-syntax: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
+    Found 1 error.
+
+    ----- stderr -----
+    "
+    );
+
+    // syntax error on 3.9 with preview
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--stdin-filename", "test.py"])
+        .arg("--target-version=py39")
+        .arg("--preview")
+        .arg("-")
+        .pass_stdin(
+            r#"
+match 2:
+    case 1:
+        print("it's one")
+"#
+        ),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:2:1: invalid-syntax: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
+    Found 1 error.
+
+    ----- stderr -----
+    "
+    );
+}
+
+/// Regression test for <https://github.com/astral-sh/ruff/issues/16417>
+#[test]
+fn cache_syntax_errors() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    fs::write(tempdir.path().join("main.py"), "match 2:\n    case 1: ...")?;
+
+    let mut cmd = Command::new(get_cargo_bin(BIN_NAME));
+    // inline STDIN_BASE_OPTIONS to remove --no-cache
+    cmd.args(["check", "--output-format", "concise"])
+        .arg("--target-version=py39")
+        .arg("--preview")
+        .arg("--quiet") // suppress `debug build without --no-cache` warnings
+        .current_dir(&tempdir);
+
+    assert_cmd_snapshot!(
+        cmd,
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    main.py:1:1: invalid-syntax: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
+
+    ----- stderr -----
+    "
+    );
+
+    // this should *not* be cached, like normal parse errors
+    assert_cmd_snapshot!(
+        cmd,
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    main.py:1:1: invalid-syntax: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
+/// Regression test for <https://github.com/astral-sh/ruff/issues/9381> with very helpful
+/// reproduction repo here: <https://github.com/lucasfijen/example_ruff_glob_bug>
+#[test]
+fn cookiecutter_globbing() -> Result<()> {
+    // This is a simplified directory structure from the repo linked above. The essence of the
+    // problem is this `{{cookiecutter.repo_name}}` directory containing a config file with a glob.
+    // The absolute path of the glob contains the glob metacharacters `{{` and `}}` even though the
+    // user's glob does not.
+    let tempdir = TempDir::new()?;
+    let cookiecutter = tempdir.path().join("{{cookiecutter.repo_name}}");
+    let cookiecutter_toml = cookiecutter.join("pyproject.toml");
+    let tests = cookiecutter.join("tests");
+    fs::create_dir_all(&tests)?;
+    fs::write(
+        &cookiecutter_toml,
+        r#"tool.ruff.lint.per-file-ignores = { "tests/*" = ["F811"] }"#,
+    )?;
+    // F811 example from the docs to ensure the glob still works
+    let maintest = tests.join("maintest.py");
+    fs::write(maintest, "import foo\nimport bar\nimport foo")?;
+
+    insta::with_settings!({filters => vec![(r"\\", "/")]}, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+                .args(STDIN_BASE_OPTIONS)
+                .arg("--select=F811")
+                .current_dir(tempdir.path()), @r"
+			success: true
+			exit_code: 0
+			----- stdout -----
+			All checks passed!
+
+			----- stderr -----
+			");
+    });
+
+    // after removing the config file with the ignore, F811 applies, so the glob worked above
+    fs::remove_file(cookiecutter_toml)?;
+
+    insta::with_settings!({filters => vec![(r"\\", "/")]}, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+                .args(STDIN_BASE_OPTIONS)
+                .arg("--select=F811")
+                .current_dir(tempdir.path()), @r"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        {{cookiecutter.repo_name}}/tests/maintest.py:3:8: F811 [*] Redefinition of unused `foo` from line 1: `foo` redefined here
+        Found 1 error.
+        [*] 1 fixable with the `--fix` option.
+
+        ----- stderr -----
+        ");
+    });
+
+    Ok(())
+}
+
+/// Like the test above but exercises the non-absolute path case in `PerFile::new`
+#[test]
+fn cookiecutter_globbing_no_project_root() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let tempdir = tempdir.path().join("{{cookiecutter.repo_name}}");
+    fs::create_dir(&tempdir)?;
+
+    insta::with_settings!({filters => vec![(r"\\", "/")]}, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .current_dir(&tempdir)
+            .args(STDIN_BASE_OPTIONS)
+            .args(["--extend-per-file-ignores", "generated.py:Q"]), @r"
+		success: true
+		exit_code: 0
+		----- stdout -----
+		All checks passed!
+
+		----- stderr -----
+		warning: No Python files found under the given path(s)
+		");
+    });
+
+    Ok(())
+}
+
+/// Test that semantic syntax errors (1) are emitted, (2) are not cached, (3) don't affect the
+/// reporting of normal diagnostics, and (4) are not suppressed by `select = []` (or otherwise
+/// disabling all AST-based rules).
+#[test]
+fn semantic_syntax_errors() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let contents = "[(x := 1) for x in foo]";
+    fs::write(tempdir.path().join("main.py"), contents)?;
+
+    let mut cmd = Command::new(get_cargo_bin(BIN_NAME));
+    // inline STDIN_BASE_OPTIONS to remove --no-cache
+    cmd.args(["check", "--output-format", "concise"])
+        .arg("--preview")
+        .arg("--quiet") // suppress `debug build without --no-cache` warnings
+        .current_dir(&tempdir);
+
+    assert_cmd_snapshot!(
+        cmd,
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    main.py:1:3: invalid-syntax: assignment expression cannot rebind comprehension variable
+    main.py:1:20: F821 Undefined name `foo`
+
+    ----- stderr -----
+    "
+    );
+
+    // this should *not* be cached, like normal parse errors
+    assert_cmd_snapshot!(
+        cmd,
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    main.py:1:3: invalid-syntax: assignment expression cannot rebind comprehension variable
+    main.py:1:20: F821 Undefined name `foo`
+
+    ----- stderr -----
+    "
+    );
+
+    // ensure semantic errors are caught even without AST-based rules selected
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .args(["--config", "lint.select = []"])
+            .arg("--preview")
+            .arg("-")
+            .pass_stdin(contents),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:3: invalid-syntax: assignment expression cannot rebind comprehension variable
+    Found 1 error.
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
+/// Regression test for <https://github.com/astral-sh/ruff/issues/17821>.
+///
+/// `lint.typing-extensions = false` with Python 3.9 should disable the PYI019 lint because it would
+/// try to import `Self` from `typing_extensions`
+#[test]
+fn combine_typing_extensions_config() {
+    let contents = "
+from typing import TypeVar
+T = TypeVar('T')
+class Foo:
+    def f(self: T) -> T: ...
+";
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .args(["--config", "lint.typing-extensions = false"])
+            .arg("--select=PYI019")
+            .arg("--target-version=py39")
+            .arg("-")
+            .pass_stdin(contents),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+}
+
+#[test_case::test_case("concise")]
+#[test_case::test_case("full")]
+#[test_case::test_case("json")]
+#[test_case::test_case("json-lines")]
+#[test_case::test_case("junit")]
+#[test_case::test_case("grouped")]
+#[test_case::test_case("github")]
+#[test_case::test_case("gitlab")]
+#[test_case::test_case("pylint")]
+#[test_case::test_case("rdjson")]
+#[test_case::test_case("azure")]
+#[test_case::test_case("sarif")]
+fn output_format(output_format: &str) -> Result<()> {
+    const CONTENT: &str = "\
+import os  # F401
+x = y      # F821
+match 42:  # invalid-syntax
+    case _: ...
+";
+
+    let tempdir = TempDir::new()?;
+    let input = tempdir.path().join("input.py");
+    fs::write(&input, CONTENT)?;
+
+    let snapshot = format!("output_format_{output_format}");
+
+    let project_dir = dunce::canonicalize(tempdir.path())?;
+
+    insta::with_settings!({
+        filters => vec![
+            (tempdir_filter(&project_dir).as_str(), "[TMP]/"),
+            (tempdir_filter(&tempdir).as_str(), "[TMP]/"),
+            (r#""[^"]+\\?/?input.py"#, r#""[TMP]/input.py"#),
+            (ruff_linter::VERSION, "[VERSION]"),
+        ]
+    }, {
+        assert_cmd_snapshot!(
+            snapshot,
+            Command::new(get_cargo_bin(BIN_NAME))
+                .args([
+                    "check",
+                    "--no-cache",
+                    "--output-format",
+                    output_format,
+                    "--select",
+                    "F401,F821",
+                    "--target-version",
+                    "py39",
+                    "input.py",
+                ])
+                .current_dir(&tempdir),
+        );
+    });
+
+    Ok(())
+}
+
+#[test]
+fn future_annotations_preview_warning() {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .args(["--config", "lint.future-annotations = true"])
+            .args(["--select", "F"])
+            .arg("--no-preview")
+            .arg("-")
+            .pass_stdin("1"),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    warning: The `lint.future-annotations` setting will have no effect because `preview` is disabled
+    ",
+    );
+}
+
+#[test]
+fn up045_nested_optional_flatten_all() {
+    let contents = "\
+from typing import Optional
+nested_optional: Optional[Optional[Optional[str]]] = None
+";
+
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .args(["--select", "UP045", "--diff", "--target-version", "py312"])
+            .arg("-")
+            .pass_stdin(contents),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    @@ -1,2 +1,2 @@
+     from typing import Optional
+    -nested_optional: Optional[Optional[Optional[str]]] = None
+    +nested_optional: str | None = None
+
+
+    ----- stderr -----
+    Would fix 1 error.
+    ",
+    );
 }

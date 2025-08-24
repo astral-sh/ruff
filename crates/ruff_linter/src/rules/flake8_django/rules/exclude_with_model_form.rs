@@ -1,11 +1,11 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::rules::flake8_django::rules::helpers::is_model_form;
+use crate::rules::flake8_django::helpers::is_model_form;
 
 /// ## What it does
 /// Checks for the use of `exclude` in Django `ModelForm` classes.
@@ -46,7 +46,7 @@ impl Violation for DjangoExcludeWithModelForm {
 }
 
 /// DJ006
-pub(crate) fn exclude_with_model_form(checker: &mut Checker, class_def: &ast::StmtClassDef) {
+pub(crate) fn exclude_with_model_form(checker: &Checker, class_def: &ast::StmtClassDef) {
     if !checker.semantic().seen_module(Modules::DJANGO) {
         return;
     }
@@ -71,9 +71,7 @@ pub(crate) fn exclude_with_model_form(checker: &mut Checker, class_def: &ast::St
                     continue;
                 };
                 if id == "exclude" {
-                    checker
-                        .diagnostics
-                        .push(Diagnostic::new(DjangoExcludeWithModelForm, target.range()));
+                    checker.report_diagnostic(DjangoExcludeWithModelForm, target.range());
                     return;
                 }
             }

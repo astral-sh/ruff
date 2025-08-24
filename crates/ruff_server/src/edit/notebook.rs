@@ -118,7 +118,7 @@ impl NotebookDocument {
                 // This is required because of the way the `NotebookCell` is modelled. We include
                 // the `TextDocument` within the `NotebookCell` so when it's deleted, the
                 // corresponding `TextDocument` is removed as well. But, when cells are
-                // re-oredered, the change request doesn't provide the actual contents of the cell.
+                // re-ordered, the change request doesn't provide the actual contents of the cell.
                 // Instead, it only provides that (a) these cell URIs were removed, and (b) these
                 // cell URIs were added.
                 // https://github.com/astral-sh/ruff/issues/12573
@@ -247,7 +247,7 @@ mod tests {
     use super::NotebookDocument;
 
     enum TestCellContent {
-        #[allow(dead_code)]
+        #[expect(dead_code)]
         Markup(String),
         Code(String),
     }

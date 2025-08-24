@@ -241,7 +241,7 @@ where
     Ok((format_type, c))
 }
 
-#[allow(clippy::cast_possible_wrap)]
+#[expect(clippy::cast_possible_wrap)]
 fn parse_quantity<T, I>(iter: &mut ParseIter<I>) -> Result<Option<CFormatQuantity>, ParsingError>
 where
     T: Into<char> + Copy,

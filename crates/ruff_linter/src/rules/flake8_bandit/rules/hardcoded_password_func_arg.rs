@@ -1,12 +1,12 @@
 use ruff_python_ast::Keyword;
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
-use super::super::helpers::{matches_password_name, string_literal};
+use crate::rules::flake8_bandit::helpers::{matches_password_name, string_literal};
 
 /// ## What it does
 /// Checks for potential uses of hardcoded passwords in function calls.
@@ -51,20 +51,22 @@ impl Violation for HardcodedPasswordFuncArg {
 }
 
 /// S106
-pub(crate) fn hardcoded_password_func_arg(checker: &mut Checker, keywords: &[Keyword]) {
-    checker
-        .diagnostics
-        .extend(keywords.iter().filter_map(|keyword| {
-            string_literal(&keyword.value).filter(|string| !string.is_empty())?;
-            let arg = keyword.arg.as_ref()?;
-            if !matches_password_name(arg) {
-                return None;
-            }
-            Some(Diagnostic::new(
-                HardcodedPasswordFuncArg {
-                    name: arg.to_string(),
-                },
-                keyword.range(),
-            ))
-        }));
+pub(crate) fn hardcoded_password_func_arg(checker: &Checker, keywords: &[Keyword]) {
+    for keyword in keywords {
+        if string_literal(&keyword.value).is_none_or(str::is_empty) {
+            continue;
+        }
+        let Some(arg) = &keyword.arg else {
+            continue;
+        };
+        if !matches_password_name(arg) {
+            continue;
+        }
+        checker.report_diagnostic(
+            HardcodedPasswordFuncArg {
+                name: arg.to_string(),
+            },
+            keyword.range(),
+        );
+    }
 }

@@ -1,9 +1,9 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{Expr, ExprSubscript};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::{Expr, ExprSubscript, PythonVersion};
 use ruff_text_size::Ranged;
 
-use crate::{checkers::ast::Checker, settings::types::PythonVersion};
+use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for consistent style regarding whether nonempty tuples in subscripts
@@ -62,14 +62,20 @@ impl AlwaysFixableViolation for IncorrectlyParenthesizedTupleInSubscript {
 }
 
 /// RUF031
-pub(crate) fn subscript_with_parenthesized_tuple(checker: &mut Checker, subscript: &ExprSubscript) {
-    let prefer_parentheses = checker.settings.ruff.parenthesize_tuple_in_subscript;
+pub(crate) fn subscript_with_parenthesized_tuple(checker: &Checker, subscript: &ExprSubscript) {
+    let prefer_parentheses = checker.settings().ruff.parenthesize_tuple_in_subscript;
 
     let Expr::Tuple(tuple_subscript) = &*subscript.slice else {
         return;
     };
 
     if tuple_subscript.parenthesized == prefer_parentheses || tuple_subscript.is_empty() {
+        return;
+    }
+
+    // We should not handle single starred expressions
+    // (regardless of `prefer_parentheses`)
+    if matches!(&tuple_subscript.elts[..], &[Expr::Starred(_)]) {
         return;
     }
 
@@ -82,7 +88,7 @@ pub(crate) fn subscript_with_parenthesized_tuple(checker: &mut Checker, subscrip
     // to a syntax error in Python 3.10.
     // This is no longer a syntax error starting in Python 3.11
     // see https://peps.python.org/pep-0646/#change-1-star-expressions-in-indexes
-    if checker.settings.target_version <= PythonVersion::Py310
+    if checker.target_version() <= PythonVersion::PY310
         && !prefer_parentheses
         && tuple_subscript.iter().any(Expr::is_starred_expr)
     {
@@ -105,11 +111,10 @@ pub(crate) fn subscript_with_parenthesized_tuple(checker: &mut Checker, subscrip
     };
     let edit = Edit::range_replacement(new_source, source_range);
 
-    checker.diagnostics.push(
-        Diagnostic::new(
+    checker
+        .report_diagnostic(
             IncorrectlyParenthesizedTupleInSubscript { prefer_parentheses },
             source_range,
         )
-        .with_fix(Fix::safe_edit(edit)),
-    );
+        .set_fix(Fix::safe_edit(edit));
 }

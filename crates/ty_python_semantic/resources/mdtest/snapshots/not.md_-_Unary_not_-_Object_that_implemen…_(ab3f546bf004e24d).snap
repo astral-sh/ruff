@@ -1,0 +1,35 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: not.md - Unary not - Object that implements `__bool__` incorrectly
+mdtest path: crates/ty_python_semantic/resources/mdtest/unary/not.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | class NotBoolable:
+2 |     __bool__: int = 3
+3 | 
+4 | # error: [unsupported-bool-conversion]
+5 | not NotBoolable()
+```
+
+# Diagnostics
+
+```
+error[unsupported-bool-conversion]: Boolean conversion is unsupported for type `NotBoolable`
+ --> src/mdtest_snippet.py:5:1
+  |
+4 | # error: [unsupported-bool-conversion]
+5 | not NotBoolable()
+  | ^^^^^^^^^^^^^^^^^
+  |
+info: `__bool__` on `NotBoolable` must be callable
+info: rule `unsupported-bool-conversion` is enabled by default
+
+```

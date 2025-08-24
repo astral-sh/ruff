@@ -1,0 +1,288 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/iter_unpack_yield_py37.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..128,
+        body: [
+            Assign(
+                StmtAssign {
+                    node_index: NodeIndex(None),
+                    range: 43..59,
+                    targets: [
+                        Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 43..47,
+                                id: Name("rest"),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: Tuple(
+                        ExprTuple {
+                            node_index: NodeIndex(None),
+                            range: 50..59,
+                            elts: [
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 51..52,
+                                        value: Int(
+                                            4,
+                                        ),
+                                    },
+                                ),
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 54..55,
+                                        value: Int(
+                                            5,
+                                        ),
+                                    },
+                                ),
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 57..58,
+                                        value: Int(
+                                            6,
+                                        ),
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: true,
+                        },
+                    ),
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    node_index: NodeIndex(None),
+                    range: 60..89,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("g"),
+                        range: 64..65,
+                        node_index: NodeIndex(None),
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 65..67,
+                        node_index: NodeIndex(None),
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 69..89,
+                                value: Yield(
+                                    ExprYield {
+                                        node_index: NodeIndex(None),
+                                        range: 69..89,
+                                        value: Some(
+                                            Tuple(
+                                                ExprTuple {
+                                                    node_index: NodeIndex(None),
+                                                    range: 75..89,
+                                                    elts: [
+                                                        NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                node_index: NodeIndex(None),
+                                                                range: 75..76,
+                                                                value: Int(
+                                                                    1,
+                                                                ),
+                                                            },
+                                                        ),
+                                                        NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                node_index: NodeIndex(None),
+                                                                range: 78..79,
+                                                                value: Int(
+                                                                    2,
+                                                                ),
+                                                            },
+                                                        ),
+                                                        NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                node_index: NodeIndex(None),
+                                                                range: 81..82,
+                                                                value: Int(
+                                                                    3,
+                                                                ),
+                                                            },
+                                                        ),
+                                                        Starred(
+                                                            ExprStarred {
+                                                                node_index: NodeIndex(None),
+                                                                range: 84..89,
+                                                                value: Name(
+                                                                    ExprName {
+                                                                        node_index: NodeIndex(None),
+                                                                        range: 85..89,
+                                                                        id: Name("rest"),
+                                                                        ctx: Load,
+                                                                    },
+                                                                ),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                    ],
+                                                    ctx: Load,
+                                                    parenthesized: false,
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    node_index: NodeIndex(None),
+                    range: 90..127,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("h"),
+                        range: 94..95,
+                        node_index: NodeIndex(None),
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 95..97,
+                        node_index: NodeIndex(None),
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 99..127,
+                                value: Yield(
+                                    ExprYield {
+                                        node_index: NodeIndex(None),
+                                        range: 99..127,
+                                        value: Some(
+                                            Tuple(
+                                                ExprTuple {
+                                                    node_index: NodeIndex(None),
+                                                    range: 105..127,
+                                                    elts: [
+                                                        NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                node_index: NodeIndex(None),
+                                                                range: 105..106,
+                                                                value: Int(
+                                                                    1,
+                                                                ),
+                                                            },
+                                                        ),
+                                                        Yield(
+                                                            ExprYield {
+                                                                node_index: NodeIndex(None),
+                                                                range: 109..123,
+                                                                value: Some(
+                                                                    Tuple(
+                                                                        ExprTuple {
+                                                                            node_index: NodeIndex(None),
+                                                                            range: 115..123,
+                                                                            elts: [
+                                                                                NumberLiteral(
+                                                                                    ExprNumberLiteral {
+                                                                                        node_index: NodeIndex(None),
+                                                                                        range: 115..116,
+                                                                                        value: Int(
+                                                                                            2,
+                                                                                        ),
+                                                                                    },
+                                                                                ),
+                                                                                Starred(
+                                                                                    ExprStarred {
+                                                                                        node_index: NodeIndex(None),
+                                                                                        range: 118..123,
+                                                                                        value: Name(
+                                                                                            ExprName {
+                                                                                                node_index: NodeIndex(None),
+                                                                                                range: 119..123,
+                                                                                                id: Name("rest"),
+                                                                                                ctx: Load,
+                                                                                            },
+                                                                                        ),
+                                                                                        ctx: Load,
+                                                                                    },
+                                                                                ),
+                                                                            ],
+                                                                            ctx: Load,
+                                                                            parenthesized: false,
+                                                                        },
+                                                                    ),
+                                                                ),
+                                                            },
+                                                        ),
+                                                        NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                node_index: NodeIndex(None),
+                                                                range: 126..127,
+                                                                value: Int(
+                                                                    3,
+                                                                ),
+                                                            },
+                                                        ),
+                                                    ],
+                                                    ctx: Load,
+                                                    parenthesized: false,
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Unsupported Syntax Errors
+
+  |
+1 | # parse_options: {"target-version": "3.7"}
+2 | rest = (4, 5, 6)
+3 | def g(): yield 1, 2, 3, *rest
+  |                         ^^^^^ Syntax Error: Cannot use iterable unpacking in yield expressions on Python 3.7 (syntax was added in Python 3.8)
+4 | def h(): yield 1, (yield 2, *rest), 3
+  |
+
+
+  |
+2 | rest = (4, 5, 6)
+3 | def g(): yield 1, 2, 3, *rest
+4 | def h(): yield 1, (yield 2, *rest), 3
+  |                             ^^^^^ Syntax Error: Cannot use iterable unpacking in yield expressions on Python 3.7 (syntax was added in Python 3.8)
+  |

@@ -4,13 +4,6 @@ if TYPE_CHECKING:
     pass  # TC005
 
 
-if False:
-    pass  # TC005
-
-if 0:
-    pass  # TC005
-
-
 def example():
     if TYPE_CHECKING:
         pass  # TC005
@@ -29,13 +22,6 @@ if TYPE_CHECKING:
 
 
 if TYPE_CHECKING:
-    x: List
-
-
-if False:
-    x: List
-
-if 0:
     x: List
 
 

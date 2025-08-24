@@ -1,11 +1,11 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::add_argument;
+use crate::{AlwaysFixableViolation, Applicability, Fix};
 
 /// ## What it does
 /// Checks for uses of `subprocess.run` without an explicit `check` argument.
@@ -60,7 +60,7 @@ impl AlwaysFixableViolation for SubprocessRunWithoutCheck {
 }
 
 /// PLW1510
-pub(crate) fn subprocess_run_without_check(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn subprocess_run_without_check(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::SUBPROCESS) {
         return;
     }
@@ -71,7 +71,8 @@ pub(crate) fn subprocess_run_without_check(checker: &mut Checker, call: &ast::Ex
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["subprocess", "run"]))
     {
         if call.arguments.find_keyword("check").is_none() {
-            let mut diagnostic = Diagnostic::new(SubprocessRunWithoutCheck, call.func.range());
+            let mut diagnostic =
+                checker.report_diagnostic(SubprocessRunWithoutCheck, call.func.range());
             diagnostic.set_fix(Fix::applicable_edit(
                 add_argument(
                     "check=False",
@@ -91,7 +92,6 @@ pub(crate) fn subprocess_run_without_check(checker: &mut Checker, call: &ast::Ex
                     Applicability::Safe
                 },
             ));
-            checker.diagnostics.push(diagnostic);
         }
     }
 }

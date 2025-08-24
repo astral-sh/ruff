@@ -1,10 +1,10 @@
 use rustc_hash::FxHashSet;
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -60,7 +60,7 @@ impl Violation for NonSlotAssignment {
 }
 
 /// PLE0237
-pub(crate) fn non_slot_assignment(checker: &mut Checker, class_def: &ast::StmtClassDef) {
+pub(crate) fn non_slot_assignment(checker: &Checker, class_def: &ast::StmtClassDef) {
     let semantic = checker.semantic();
 
     // If the class inherits from another class (aside from `object`), then it's possible that
@@ -74,12 +74,12 @@ pub(crate) fn non_slot_assignment(checker: &mut Checker, class_def: &ast::StmtCl
     }
 
     for attribute in is_attributes_not_in_slots(&class_def.body) {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(
             NonSlotAssignment {
                 name: attribute.name.to_string(),
             },
             attribute.range(),
-        ));
+        );
     }
 }
 
@@ -100,7 +100,7 @@ impl Ranged for AttributeAssignment<'_> {
 /// Return a list of attributes that are assigned to but not included in `__slots__`.
 ///
 /// If the `__slots__` attribute cannot be statically determined, returns an empty vector.
-fn is_attributes_not_in_slots(body: &[Stmt]) -> Vec<AttributeAssignment> {
+fn is_attributes_not_in_slots(body: &[Stmt]) -> Vec<AttributeAssignment<'_>> {
     // First, collect all the attributes that are assigned to `__slots__`.
     let mut slots = FxHashSet::default();
     for statement in body {

@@ -1,11 +1,11 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast as ast;
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::Locator;
-use crate::{checkers::ast::Checker, settings::types::PythonVersion};
+use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for code that could be written more idiomatically using
@@ -68,8 +68,8 @@ impl AlwaysFixableViolation for SliceToRemovePrefixOrSuffix {
 }
 
 /// FURB188
-pub(crate) fn slice_to_remove_affix_expr(checker: &mut Checker, if_expr: &ast::ExprIf) {
-    if checker.settings.target_version < PythonVersion::Py39 {
+pub(crate) fn slice_to_remove_affix_expr(checker: &Checker, if_expr: &ast::ExprIf) {
+    if checker.target_version() < PythonVersion::PY39 {
         return;
     }
 
@@ -78,7 +78,7 @@ pub(crate) fn slice_to_remove_affix_expr(checker: &mut Checker, if_expr: &ast::E
             let kind = removal_data.affix_query.kind;
             let text = removal_data.text;
 
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 SliceToRemovePrefixOrSuffix {
                     affix_kind: kind,
                     stmt_or_expression: StmtOrExpr::Expression,
@@ -93,14 +93,13 @@ pub(crate) fn slice_to_remove_affix_expr(checker: &mut Checker, if_expr: &ast::E
                 if_expr.start(),
                 if_expr.end(),
             )));
-            checker.diagnostics.push(diagnostic);
         }
     }
 }
 
 /// FURB188
-pub(crate) fn slice_to_remove_affix_stmt(checker: &mut Checker, if_stmt: &ast::StmtIf) {
-    if checker.settings.target_version < PythonVersion::Py39 {
+pub(crate) fn slice_to_remove_affix_stmt(checker: &Checker, if_stmt: &ast::StmtIf) {
+    if checker.target_version() < PythonVersion::PY39 {
         return;
     }
     if let Some(removal_data) = affix_removal_data_stmt(if_stmt) {
@@ -108,7 +107,7 @@ pub(crate) fn slice_to_remove_affix_stmt(checker: &mut Checker, if_stmt: &ast::S
             let kind = removal_data.affix_query.kind;
             let text = removal_data.text;
 
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 SliceToRemovePrefixOrSuffix {
                     affix_kind: kind,
                     stmt_or_expression: StmtOrExpr::Statement,
@@ -127,7 +126,6 @@ pub(crate) fn slice_to_remove_affix_stmt(checker: &mut Checker, if_stmt: &ast::S
                 if_stmt.start(),
                 if_stmt.end(),
             )));
-            checker.diagnostics.push(diagnostic);
         }
     }
 }
@@ -141,12 +139,13 @@ pub(crate) fn slice_to_remove_affix_stmt(checker: &mut Checker, if_stmt: &ast::S
 /// where `func` is either `startswith` or `endswith`,
 /// this function collects `text`,`func`, `affix`, and the non-null
 /// bound of the slice. Otherwise, returns `None`.
-fn affix_removal_data_expr(if_expr: &ast::ExprIf) -> Option<RemoveAffixData> {
+fn affix_removal_data_expr(if_expr: &ast::ExprIf) -> Option<RemoveAffixData<'_>> {
     let ast::ExprIf {
         test,
         body,
         orelse,
         range: _,
+        node_index: _,
     } = if_expr;
 
     let ast::ExprSubscript { value, slice, .. } = body.as_subscript_expr()?;
@@ -167,12 +166,13 @@ fn affix_removal_data_expr(if_expr: &ast::ExprIf) -> Option<RemoveAffixData> {
 /// where `func` is either `startswith` or `endswith`,
 /// this function collects `text`,`func`, `affix`, and the non-null
 /// bound of the slice. Otherwise, returns `None`.
-fn affix_removal_data_stmt(if_stmt: &ast::StmtIf) -> Option<RemoveAffixData> {
+fn affix_removal_data_stmt(if_stmt: &ast::StmtIf) -> Option<RemoveAffixData<'_>> {
     let ast::StmtIf {
         test,
         body,
         elif_else_clauses,
         range: _,
+        node_index: _,
     } = if_stmt;
 
     // Cannot safely transform, e.g.,
@@ -184,7 +184,7 @@ fn affix_removal_data_stmt(if_stmt: &ast::StmtIf) -> Option<RemoveAffixData> {
     // ```
     if !elif_else_clauses.is_empty() {
         return None;
-    };
+    }
 
     // Cannot safely transform, e.g.,
     // ```python
@@ -205,6 +205,7 @@ fn affix_removal_data_stmt(if_stmt: &ast::StmtIf) -> Option<RemoveAffixData> {
         value,
         targets,
         range: _,
+        node_index: _,
     } = statement.as_assign_stmt()?;
     let [target] = targets.as_slice() else {
         return None;
@@ -265,7 +266,7 @@ fn affix_removal_data<'a>(
         })
     {
         return None;
-    };
+    }
 
     let compr_test_expr = ast::comparable::ComparableExpr::from(
         &test.as_call_expr()?.func.as_attribute_expr()?.value,
@@ -327,9 +328,11 @@ fn affix_matches_slice_bound(data: &RemoveAffixData, semantic: &SemanticModel) -
             ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
                 value: num,
                 range: _,
+                node_index: _,
             }),
             ast::Expr::StringLiteral(ast::ExprStringLiteral {
                 range: _,
+                node_index: _,
                 value: string_val,
             }),
         ) => num
@@ -341,6 +344,7 @@ fn affix_matches_slice_bound(data: &RemoveAffixData, semantic: &SemanticModel) -
             AffixKind::StartsWith,
             ast::Expr::Call(ast::ExprCall {
                 range: _,
+                node_index: _,
                 func,
                 arguments,
             }),
@@ -360,12 +364,14 @@ fn affix_matches_slice_bound(data: &RemoveAffixData, semantic: &SemanticModel) -
                 op: ast::UnaryOp::USub,
                 operand,
                 range: _,
+                node_index: _,
             }),
             ast::Expr::StringLiteral(ast::ExprStringLiteral {
                 range: _,
+                node_index: _,
                 value: string_val,
             }),
-        ) => operand.as_number_literal_expr().is_some_and(
+        ) if operand.is_number_literal_expr() => operand.as_number_literal_expr().is_some_and(
             |ast::ExprNumberLiteral { value, .. }| {
                 // Only support prefix removal for size at most `u32::MAX`
                 value
@@ -380,11 +386,13 @@ fn affix_matches_slice_bound(data: &RemoveAffixData, semantic: &SemanticModel) -
                 op: ast::UnaryOp::USub,
                 operand,
                 range: _,
+                node_index: _,
             }),
             _,
         ) => operand.as_call_expr().is_some_and(
             |ast::ExprCall {
                  range: _,
+                 node_index: _,
                  func,
                  arguments,
              }| {

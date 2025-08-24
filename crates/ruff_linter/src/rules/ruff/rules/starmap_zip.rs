@@ -1,9 +1,11 @@
-use crate::checkers::ast::Checker;
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{parenthesize::parenthesized_range, Expr, ExprCall};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::PythonVersion;
+use ruff_python_ast::{Expr, ExprCall, parenthesize::parenthesized_range};
 use ruff_python_parser::TokenKind;
 use ruff_text_size::{Ranged, TextRange};
+
+use crate::checkers::ast::Checker;
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `itertools.starmap` calls where the second argument is a `zip` call.
@@ -28,22 +30,34 @@ use ruff_text_size::{Ranged, TextRange};
 /// map(func, a, b)
 /// map(func, a, b, strict=True)  # 3.14+
 /// ```
+///
+/// ## Fix safety
+///
+/// This rule's fix is marked as unsafe if the `starmap` or `zip` expressions contain comments that
+/// would be deleted by applying the fix. Otherwise, the fix can be applied safely.
+///
+/// ## Fix availability
+///
+/// This rule will emit a diagnostic but not suggest a fix if `map` has been shadowed from its
+/// builtin binding.
 #[derive(ViolationMetadata)]
 pub(crate) struct StarmapZip;
 
-impl AlwaysFixableViolation for StarmapZip {
+impl Violation for StarmapZip {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         "`itertools.starmap` called on `zip` iterable".to_string()
     }
 
-    fn fix_title(&self) -> String {
-        "Use `map` instead".to_string()
+    fn fix_title(&self) -> Option<String> {
+        Some("Use `map` instead".to_string())
     }
 }
 
 /// RUF058
-pub(crate) fn starmap_zip(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn starmap_zip(checker: &Checker, call: &ExprCall) {
     let semantic = checker.semantic();
 
     if !call.arguments.keywords.is_empty() {
@@ -54,8 +68,30 @@ pub(crate) fn starmap_zip(checker: &mut Checker, call: &ExprCall) {
         return;
     };
 
-    if !iterable_call.arguments.keywords.is_empty() {
-        // TODO: Pass `strict=` to `map` too when 3.14 is supported.
+    let keywords = &iterable_call.arguments.keywords;
+
+    match checker.target_version().cmp(&PythonVersion::PY314) {
+        // Keyword arguments not supported for `map` before Python 3.14
+        std::cmp::Ordering::Less => {
+            if !keywords.is_empty() {
+                return;
+            }
+        }
+        // Only supported keyword argument is `strict` starting in 3.14
+        std::cmp::Ordering::Equal | std::cmp::Ordering::Greater => {
+            if keywords.len() > 1 {
+                return;
+            }
+            if keywords.len() == 1 && iterable_call.arguments.find_keyword("strict").is_none() {
+                return;
+            }
+        }
+    }
+
+    let positionals = &iterable_call.arguments.args;
+
+    // `zip(*a)` where `a` is empty is valid, but `map(_, *a)` isn't.
+    if !positionals.is_empty() && positionals.iter().all(Expr::is_starred_expr) {
         return;
     }
 
@@ -70,13 +106,19 @@ pub(crate) fn starmap_zip(checker: &mut Checker, call: &ExprCall) {
         return;
     }
 
-    let fix = replace_with_map(call, iterable_call, checker);
-    let diagnostic = Diagnostic::new(StarmapZip, call.range);
+    let mut diagnostic = checker.report_diagnostic(StarmapZip, call.range);
 
-    checker.diagnostics.push(diagnostic.with_fix(fix));
+    if let Some(fix) = replace_with_map(call, iterable_call, checker) {
+        diagnostic.set_fix(fix);
+    }
 }
 
-fn replace_with_map(starmap: &ExprCall, zip: &ExprCall, checker: &Checker) -> Fix {
+/// Replace the `starmap` call with a call to the `map` builtin, if `map` has not been shadowed.
+fn replace_with_map(starmap: &ExprCall, zip: &ExprCall, checker: &Checker) -> Option<Fix> {
+    if !checker.semantic().has_builtin_binding("map") {
+        return None;
+    }
+
     let change_func_to_map = Edit::range_replacement("map".to_string(), starmap.func.range());
 
     let mut remove_zip = vec![];
@@ -142,5 +184,9 @@ fn replace_with_map(starmap: &ExprCall, zip: &ExprCall, checker: &Checker) -> Fi
         Applicability::Safe
     };
 
-    Fix::applicable_edits(change_func_to_map, remove_zip, applicability)
+    Some(Fix::applicable_edits(
+        change_func_to_map,
+        remove_zip,
+        applicability,
+    ))
 }

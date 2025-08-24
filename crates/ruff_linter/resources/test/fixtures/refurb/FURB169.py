@@ -26,6 +26,23 @@ type(None) != type(foo)
 
 type(None) != type(None)
 
+type(a.b) is type(None)
+
+type(
+    a(
+        # Comment
+    )
+) != type(None)
+
+type(
+    a := 1
+) == type(None)
+
+type(
+    a for a in range(0)
+) is not type(None)
+
+
 # Ok.
 
 foo is None

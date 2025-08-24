@@ -1,9 +1,8 @@
 use itertools::Itertools;
 use rustc_hash::FxHashSet;
 
-use ruff_diagnostics::Edit;
 use ruff_python_ast::helpers::{
-    pep_604_union, typing_optional, typing_union, ReturnStatementVisitor,
+    ReturnStatementVisitor, pep_604_union, typing_optional, typing_union,
 };
 use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::Visitor;
@@ -14,8 +13,9 @@ use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::{Definition, SemanticModel};
 use ruff_text_size::{TextRange, TextSize};
 
-use crate::importer::{ImportRequest, Importer};
-use crate::settings::types::PythonVersion;
+use crate::Edit;
+use crate::checkers::ast::Checker;
+use ruff_python_ast::PythonVersion;
 
 /// Return the name of the function, if it's overloaded.
 pub(crate) fn overloaded_name<'a>(
@@ -119,30 +119,25 @@ impl AutoPythonType {
     /// additional edits.
     pub(crate) fn into_expression(
         self,
-        importer: &Importer,
+        checker: &Checker,
         at: TextSize,
-        semantic: &SemanticModel,
-        target_version: PythonVersion,
     ) -> Option<(Expr, Vec<Edit>)> {
+        let target_version = checker.target_version();
         match self {
             AutoPythonType::Never => {
-                let (no_return_edit, binding) = importer
-                    .get_or_import_symbol(
-                        &ImportRequest::import_from(
-                            "typing",
-                            if target_version >= PythonVersion::Py311 {
-                                "Never"
-                            } else {
-                                "NoReturn"
-                            },
-                        ),
-                        at,
-                        semantic,
-                    )
+                let member = if target_version >= PythonVersion::PY311 {
+                    "Never"
+                } else {
+                    "NoReturn"
+                };
+                let (no_return_edit, binding) = checker
+                    .typing_importer(member, PythonVersion::lowest())?
+                    .import(at)
                     .ok()?;
                 let expr = Expr::Name(ast::ExprName {
                     id: Name::from(binding),
                     range: TextRange::default(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                     ctx: ExprContext::Load,
                 });
                 Some((expr, vec![no_return_edit]))
@@ -152,7 +147,7 @@ impl AutoPythonType {
                 Some((expr, vec![]))
             }
             AutoPythonType::Union(python_types) => {
-                if target_version >= PythonVersion::Py310 {
+                if target_version >= PythonVersion::PY310 {
                     // Aggregate all the individual types (e.g., `int`, `float`).
                     let names = python_types
                         .iter()
@@ -175,12 +170,9 @@ impl AutoPythonType {
                             let element = type_expr(*python_type)?;
 
                             // Ex) `Optional[int]`
-                            let (optional_edit, binding) = importer
-                                .get_or_import_symbol(
-                                    &ImportRequest::import_from("typing", "Optional"),
-                                    at,
-                                    semantic,
-                                )
+                            let (optional_edit, binding) = checker
+                                .typing_importer("Optional", PythonVersion::lowest())?
+                                .import(at)
                                 .ok()?;
                             let expr = typing_optional(element, Name::from(binding));
                             Some((expr, vec![optional_edit]))
@@ -192,12 +184,9 @@ impl AutoPythonType {
                                 .collect::<Option<Vec<_>>>()?;
 
                             // Ex) `Union[int, str]`
-                            let (union_edit, binding) = importer
-                                .get_or_import_symbol(
-                                    &ImportRequest::import_from("typing", "Union"),
-                                    at,
-                                    semantic,
-                                )
+                            let (union_edit, binding) = checker
+                                .typing_importer("Union", PythonVersion::lowest())?
+                                .import(at)
                                 .ok()?;
                             let expr = typing_union(&elements, Name::from(binding));
                             Some((expr, vec![union_edit]))
@@ -215,6 +204,7 @@ fn type_expr(python_type: PythonType) -> Option<Expr> {
         Expr::Name(ast::ExprName {
             id: name.into(),
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             ctx: ExprContext::Load,
         })
     }

@@ -197,7 +197,7 @@ pub const LINE_TERMINATORS: [char; 3] = ['\r', LINE_SEPARATOR, PARAGRAPH_SEPARAT
 
 /// Replace the line terminators matching the provided list with "\n"
 /// since its the only line break type supported by the printer
-pub fn normalize_newlines<const N: usize>(text: &str, terminators: [char; N]) -> Cow<str> {
+pub fn normalize_newlines<const N: usize>(text: &str, terminators: [char; N]) -> Cow<'_, str> {
     let mut result = String::new();
     let mut last_end = 0;
 
@@ -519,7 +519,7 @@ impl TextWidth {
             let char_width = match c {
                 '\t' => indent_width.value(),
                 '\n' => return TextWidth::Multiline,
-                #[allow(clippy::cast_possible_truncation)]
+                #[expect(clippy::cast_possible_truncation)]
                 c => c.width().unwrap_or(0) as u32,
             };
             width += char_width;
@@ -543,7 +543,7 @@ impl TextWidth {
 #[cfg(test)]
 mod tests {
 
-    use crate::format_element::{normalize_newlines, LINE_TERMINATORS};
+    use crate::format_element::{LINE_TERMINATORS, normalize_newlines};
 
     #[test]
     fn test_normalize_newlines() {

@@ -1,0 +1,151 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/parenthesized_named_expr_py38.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..92,
+        body: [
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 43..59,
+                    value: Set(
+                        ExprSet {
+                            node_index: NodeIndex(None),
+                            range: 43..59,
+                            elts: [
+                                Named(
+                                    ExprNamed {
+                                        node_index: NodeIndex(None),
+                                        range: 45..51,
+                                        target: Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 45..46,
+                                                id: Name("x"),
+                                                ctx: Store,
+                                            },
+                                        ),
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 50..51,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ),
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 54..55,
+                                        value: Int(
+                                            2,
+                                        ),
+                                    },
+                                ),
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 57..58,
+                                        value: Int(
+                                            3,
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 60..91,
+                    value: SetComp(
+                        ExprSetComp {
+                            node_index: NodeIndex(None),
+                            range: 60..91,
+                            elt: Named(
+                                ExprNamed {
+                                    node_index: NodeIndex(None),
+                                    range: 62..71,
+                                    target: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 62..66,
+                                            id: Name("last"),
+                                            ctx: Store,
+                                        },
+                                    ),
+                                    value: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 70..71,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                            generators: [
+                                Comprehension {
+                                    range: 73..90,
+                                    node_index: NodeIndex(None),
+                                    target: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 77..78,
+                                            id: Name("x"),
+                                            ctx: Store,
+                                        },
+                                    ),
+                                    iter: Call(
+                                        ExprCall {
+                                            node_index: NodeIndex(None),
+                                            range: 82..90,
+                                            func: Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 82..87,
+                                                    id: Name("range"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            arguments: Arguments {
+                                                range: 87..90,
+                                                node_index: NodeIndex(None),
+                                                args: [
+                                                    NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            node_index: NodeIndex(None),
+                                                            range: 88..89,
+                                                            value: Int(
+                                                                3,
+                                                            ),
+                                                        },
+                                                    ),
+                                                ],
+                                                keywords: [],
+                                            },
+                                        },
+                                    ),
+                                    ifs: [],
+                                    is_async: false,
+                                },
+                            ],
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```

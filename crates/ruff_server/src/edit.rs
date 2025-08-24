@@ -31,6 +31,16 @@ pub enum PositionEncoding {
     UTF8,
 }
 
+impl From<PositionEncoding> for ruff_source_file::PositionEncoding {
+    fn from(value: PositionEncoding) -> Self {
+        match value {
+            PositionEncoding::UTF8 => Self::Utf8,
+            PositionEncoding::UTF16 => Self::Utf16,
+            PositionEncoding::UTF32 => Self::Utf32,
+        }
+    }
+}
+
 /// A unique document ID, derived from a URL passed as part of an LSP request.
 /// This document ID can point to either be a standalone Python file, a full notebook, or a cell within a notebook.
 #[derive(Clone, Debug)]

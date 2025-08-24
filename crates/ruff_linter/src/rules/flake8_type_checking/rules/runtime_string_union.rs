@@ -1,9 +1,9 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::{Expr, Operator};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -23,17 +23,28 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Example
 /// ```python
-/// var: str | "int"
+/// var: "Foo" | None
+///
+///
+/// class Foo: ...
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// var: str | int
+/// from __future__ import annotations
+///
+/// var: Foo | None
+///
+///
+/// class Foo: ...
 /// ```
 ///
 /// Or, extend the quotes to include the entire union:
 /// ```python
-/// var: "str | int"
+/// var: "Foo | None"
+///
+///
+/// class Foo: ...
 /// ```
 ///
 /// ## References
@@ -52,7 +63,7 @@ impl Violation for RuntimeStringUnion {
 }
 
 /// TC010
-pub(crate) fn runtime_string_union(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn runtime_string_union(checker: &Checker, expr: &Expr) {
     if !checker.semantic().in_type_definition() {
         return;
     }
@@ -66,9 +77,7 @@ pub(crate) fn runtime_string_union(checker: &mut Checker, expr: &Expr) {
     traverse_op(expr, &mut strings);
 
     for string in strings {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(RuntimeStringUnion, string.range()));
+        checker.report_diagnostic(RuntimeStringUnion, string.range());
     }
 }
 

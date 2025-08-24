@@ -1,9 +1,9 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::{function_type, visibility};
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -58,7 +58,7 @@ impl Violation for TooManyArguments {
 }
 
 /// PLR0913
-pub(crate) fn too_many_arguments(checker: &mut Checker, function_def: &ast::StmtFunctionDef) {
+pub(crate) fn too_many_arguments(checker: &Checker, function_def: &ast::StmtFunctionDef) {
     // https://github.com/astral-sh/ruff/issues/14535
     if checker.source_type.is_stub() {
         return;
@@ -68,15 +68,10 @@ pub(crate) fn too_many_arguments(checker: &mut Checker, function_def: &ast::Stmt
     let num_arguments = function_def
         .parameters
         .iter_non_variadic_params()
-        .filter(|arg| {
-            !checker
-                .settings
-                .dummy_variable_rgx
-                .is_match(&arg.parameter.name)
-        })
+        .filter(|param| !checker.settings().dummy_variable_rgx.is_match(param.name()))
         .count();
 
-    if num_arguments <= checker.settings.pylint.max_args {
+    if num_arguments <= checker.settings().pylint.max_args {
         return;
     }
 
@@ -95,10 +90,12 @@ pub(crate) fn too_many_arguments(checker: &mut Checker, function_def: &ast::Stmt
             &function_def.decorator_list,
             semantic.current_scope(),
             semantic,
-            &checker.settings.pep8_naming.classmethod_decorators,
-            &checker.settings.pep8_naming.staticmethod_decorators,
+            &checker.settings().pep8_naming.classmethod_decorators,
+            &checker.settings().pep8_naming.staticmethod_decorators,
         ),
-        function_type::FunctionType::Method | function_type::FunctionType::ClassMethod
+        function_type::FunctionType::Method
+            | function_type::FunctionType::ClassMethod
+            | function_type::FunctionType::NewMethod
     ) {
         // If so, we need to subtract one from the number of positional arguments, since the first
         // argument is always `self` or `cls`.
@@ -107,15 +104,15 @@ pub(crate) fn too_many_arguments(checker: &mut Checker, function_def: &ast::Stmt
         num_arguments
     };
 
-    if num_arguments <= checker.settings.pylint.max_args {
+    if num_arguments <= checker.settings().pylint.max_args {
         return;
     }
 
-    checker.diagnostics.push(Diagnostic::new(
+    checker.report_diagnostic(
         TooManyArguments {
             c_args: num_arguments,
-            max_args: checker.settings.pylint.max_args,
+            max_args: checker.settings().pylint.max_args,
         },
         function_def.identifier(),
-    ));
+    );
 }

@@ -1,13 +1,12 @@
-use ruff_diagnostics::Diagnostic;
-use ruff_diagnostics::Edit;
-use ruff_diagnostics::Fix;
-use ruff_diagnostics::FixAvailability;
-use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Number;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
+use crate::Edit;
+use crate::Fix;
+use crate::FixAvailability;
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -79,7 +78,7 @@ impl Violation for SortedMinMax {
 }
 
 /// FURB192
-pub(crate) fn sorted_min_max(checker: &mut Checker, subscript: &ast::ExprSubscript) {
+pub(crate) fn sorted_min_max(checker: &Checker, subscript: &ast::ExprSubscript) {
     if subscript.ctx.is_store() || subscript.ctx.is_del() {
         return;
     }
@@ -178,7 +177,7 @@ pub(crate) fn sorted_min_max(checker: &mut Checker, subscript: &ast::ExprSubscri
         (Index::Last, true) => MinMax::Min,
     };
 
-    let mut diagnostic = Diagnostic::new(SortedMinMax { min_max }, subscript.range());
+    let mut diagnostic = checker.report_diagnostic(SortedMinMax { min_max }, subscript.range());
 
     if checker.semantic().has_builtin_binding(min_max.as_str()) {
         diagnostic.set_fix({
@@ -200,8 +199,6 @@ pub(crate) fn sorted_min_max(checker: &mut Checker, subscript: &ast::ExprSubscri
             }
         });
     }
-
-    checker.diagnostics.push(diagnostic);
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

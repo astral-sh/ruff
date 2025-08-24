@@ -10,18 +10,19 @@ use itertools::Itertools;
 use regex::Regex;
 
 use ruff_formatter::printer::SourceMapGeneration;
-use ruff_python_ast::{str::Quote, AnyStringFlags, StringFlags};
+use ruff_python_ast::{AnyStringFlags, StringFlags, str::Quote};
+use ruff_python_parser::ParseOptions;
 use ruff_python_trivia::CommentRanges;
 use {
-    ruff_formatter::{write, FormatOptions, IndentStyle, LineWidth, Printed},
-    ruff_python_trivia::{is_python_whitespace, PythonWhitespace},
+    ruff_formatter::{FormatOptions, IndentStyle, LineWidth, Printed, write},
+    ruff_python_trivia::{PythonWhitespace, is_python_whitespace},
     ruff_text_size::{Ranged, TextLen, TextRange, TextSize},
 };
 
-use crate::string::StringQuotes;
-use crate::{prelude::*, DocstringCodeLineWidth, FormatModuleError};
-
 use super::NormalizedString;
+use crate::preview::is_no_chaperone_for_escaped_quote_in_triple_quoted_docstring_enabled;
+use crate::string::StringQuotes;
+use crate::{DocstringCodeLineWidth, FormatModuleError, prelude::*};
 
 /// Format a docstring by trimming whitespace and adjusting the indentation.
 ///
@@ -167,7 +168,7 @@ pub(crate) fn format(normalized: &NormalizedString, f: &mut PyFormatter) -> Form
     if docstring[first.len()..].trim().is_empty() {
         // For `"""\n"""` or other whitespace between the quotes, black keeps a single whitespace,
         // but `""""""` doesn't get one inserted.
-        if needs_chaperone_space(normalized.flags(), trim_end)
+        if needs_chaperone_space(normalized.flags(), trim_end, f.context())
             || (trim_end.is_empty() && !docstring.is_empty())
         {
             space().fmt(f)?;
@@ -207,7 +208,7 @@ pub(crate) fn format(normalized: &NormalizedString, f: &mut PyFormatter) -> Form
     let trim_end = docstring
         .as_ref()
         .trim_end_matches(|c: char| c.is_whitespace() && c != '\n');
-    if needs_chaperone_space(normalized.flags(), trim_end) {
+    if needs_chaperone_space(normalized.flags(), trim_end, f.context()) {
         space().fmt(f)?;
     }
 
@@ -458,7 +459,7 @@ impl<'src> DocstringLinePrinter<'_, '_, '_, 'src> {
                 Indentation::from_str(trim_end).columns() - self.stripped_indentation.columns();
             let in_docstring_indent = " ".repeat(indent_len) + trim_end.trim_start();
             text(&in_docstring_indent).fmt(self.f)?;
-        };
+        }
 
         // We handled the case that the closing quotes are on their own line
         // above (the last line is empty except for whitespace). If they are on
@@ -492,8 +493,6 @@ impl<'src> DocstringLinePrinter<'_, '_, '_, 'src> {
         &mut self,
         kind: &mut CodeExampleKind<'_>,
     ) -> FormatResult<Option<Vec<OutputDocstringLine<'static>>>> {
-        use ruff_python_parser::AsMode;
-
         let line_width = match self.f.options().docstring_code_line_width() {
             DocstringCodeLineWidth::Fixed(width) => width,
             DocstringCodeLineWidth::Dynamic => {
@@ -570,7 +569,8 @@ impl<'src> DocstringLinePrinter<'_, '_, '_, 'src> {
                 std::format!(r#""""{}""""#, printed.as_code())
             }
         };
-        let result = ruff_python_parser::parse(&wrapped, self.f.options().source_type().as_mode());
+        let result =
+            ruff_python_parser::parse(&wrapped, ParseOptions::from(self.f.options().source_type()));
         // If the resulting code is not valid, then reset and pass through
         // the docstring lines as-is.
         if result.is_err() {
@@ -1580,10 +1580,8 @@ fn docstring_format_source(
     docstring_quote_style: Quote,
     source: &str,
 ) -> Result<Printed, FormatModuleError> {
-    use ruff_python_parser::AsMode;
-
     let source_type = options.source_type();
-    let parsed = ruff_python_parser::parse(source, source_type.as_mode())?;
+    let parsed = ruff_python_parser::parse(source, ParseOptions::from(source_type))?;
     let comment_ranges = CommentRanges::from(parsed.tokens());
     let source_code = ruff_formatter::SourceCode::new(source);
     let comments = crate::Comments::from_ast(parsed.syntax(), source_code, &comment_ranges);
@@ -1598,15 +1596,43 @@ fn docstring_format_source(
     Ok(formatted.print()?)
 }
 
-/// If the last line of the docstring is `content" """` or `content\ """`, we need a chaperone space
-/// that avoids `content""""` and `content\"""`. This does only applies to un-escaped backslashes,
-/// so `content\\ """` doesn't need a space while `content\\\ """` does.
-pub(super) fn needs_chaperone_space(flags: AnyStringFlags, trim_end: &str) -> bool {
-    if trim_end.chars().rev().take_while(|c| *c == '\\').count() % 2 == 1 {
-        true
+/// If the last line of the docstring is `content""""` or `content\"""`, we need a chaperone space
+/// that avoids `content""""` and `content\"""`. This only applies to un-escaped backslashes,
+/// so `content\\"""` doesn't need a space while `content\\\"""` does.
+pub(super) fn needs_chaperone_space(
+    flags: AnyStringFlags,
+    trim_end: &str,
+    context: &PyFormatContext,
+) -> bool {
+    if count_consecutive_chars_from_end(trim_end, '\\') % 2 == 1 {
+        // Odd backslash count; chaperone avoids escaping closing quotes
+        // `"\ "` -> prevent that this becomes `"\"` which escapes the closing quote.
+        return true;
+    }
+
+    if is_no_chaperone_for_escaped_quote_in_triple_quoted_docstring_enabled(context) {
+        if flags.is_triple_quoted() {
+            if let Some(before_quote) = trim_end.strip_suffix(flags.quote_style().as_char()) {
+                if count_consecutive_chars_from_end(before_quote, '\\') % 2 == 0 {
+                    // Even backslash count preceding quote;
+                    // ```py
+                    // """a "  """
+                    // """a \\"  """
+                    // ```
+                    // The chaperon is needed or the triple quoted string "ends" with 4 instead of 3 quotes.
+                    return true;
+                }
+            }
+        }
+
+        false
     } else {
         flags.is_triple_quoted() && trim_end.ends_with(flags.quote_style().as_char())
     }
+}
+
+fn count_consecutive_chars_from_end(s: &str, target: char) -> usize {
+    s.chars().rev().take_while(|c| *c == target).count()
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -1770,7 +1796,7 @@ impl Indentation {
                     }),
 
                     _ => None,
-                }
+                };
             }
             Self::Mixed { .. } => return None,
         };

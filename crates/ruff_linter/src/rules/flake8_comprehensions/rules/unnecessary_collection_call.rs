@@ -1,5 +1,4 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextSize};
 
@@ -7,6 +6,7 @@ use crate::checkers::ast::Checker;
 use crate::rules::flake8_comprehensions::fixes;
 use crate::rules::flake8_comprehensions::fixes::{pad_end, pad_start};
 use crate::rules::flake8_comprehensions::settings::Settings;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for unnecessary `dict()`, `list()` or `tuple()` calls that can be
@@ -17,7 +17,7 @@ use crate::rules::flake8_comprehensions::settings::Settings;
 /// literal (`{}`). The former is slower because the name `dict` must be
 /// looked up in the global scope in case it has been rebound.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// dict()
 /// dict(a=1, b=2)
@@ -58,7 +58,7 @@ impl AlwaysFixableViolation for UnnecessaryCollectionCall {
 
 /// C408
 pub(crate) fn unnecessary_collection_call(
-    checker: &mut Checker,
+    checker: &Checker,
     call: &ast::ExprCall,
     settings: &Settings,
 ) {
@@ -89,7 +89,7 @@ pub(crate) fn unnecessary_collection_call(
     };
 
     let mut diagnostic =
-        Diagnostic::new(UnnecessaryCollectionCall { kind: collection }, call.range());
+        checker.report_diagnostic(UnnecessaryCollectionCall { kind: collection }, call.range());
 
     // Convert `dict()` to `{}`.
     if call.arguments.keywords.is_empty() {
@@ -128,8 +128,6 @@ pub(crate) fn unnecessary_collection_call(
             fixes::fix_unnecessary_collection_call(call, checker).map(Fix::unsafe_edit)
         });
     }
-
-    checker.diagnostics.push(diagnostic);
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

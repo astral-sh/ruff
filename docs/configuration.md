@@ -51,7 +51,7 @@ If left unspecified, Ruff's default configuration is equivalent to:
     target-version = "py39"
 
     [tool.ruff.lint]
-    # Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`)  codes by default.
+    # Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`) codes by default.
     # Unlike Flake8, Ruff doesn't enable pycodestyle warnings (`W`) or
     # McCabe complexity (`C901`) by default.
     select = ["E4", "E7", "E9", "F"]
@@ -133,7 +133,7 @@ If left unspecified, Ruff's default configuration is equivalent to:
     target-version = "py39"
 
     [lint]
-    # Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`)  codes by default.
+    # Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`) codes by default.
     # Unlike Flake8, Ruff doesn't enable pycodestyle warnings (`W`) or
     # McCabe complexity (`C901`) by default.
     select = ["E4", "E7", "E9", "F"]
@@ -270,7 +270,7 @@ There are a few exceptions to these rules:
 1. If no config file is found in the filesystem hierarchy, Ruff will fall back to using
     a default configuration. If a user-specific configuration file exists
     at `${config_dir}/ruff/pyproject.toml`, that file will be used instead of the default
-    configuration, with `${config_dir}` being determined via [`etcetera`'s native strategy](https://docs.rs/etcetera/latest/etcetera/#native-strategy),
+    configuration, with `${config_dir}` being determined via [`etcetera`'s base strategy](https://docs.rs/etcetera/latest/etcetera/#native-strategy),
     and all relative paths being again resolved relative to the _current working directory_.
 1. Any config-file-supported settings that are provided on the command-line (e.g., via
     `--select`) will override the settings in _every_ resolved configuration file.
@@ -306,6 +306,17 @@ All of the above rules apply equivalently to `pyproject.toml`, `ruff.toml`, and 
 If Ruff detects multiple configuration files in the same directory, the `.ruff.toml` file will take
 precedence over the `ruff.toml` file, and the `ruff.toml` file will take precedence over
 the `pyproject.toml` file.
+
+### Inferring the Python version
+When no discovered configuration specifies a [`target-version`](settings.md#target-version), Ruff will attempt to fall back to the minimum version compatible with the `requires-python` field in a nearby `pyproject.toml`.
+The rules for this behavior are as follows:
+
+1. If a configuration file is passed directly, Ruff does not attempt to infer a missing `target-version`.
+1. If a configuration file is found in the filesystem hierarchy, Ruff will infer a missing `target-version` from the `requires-python` field in a `pyproject.toml` file in the same directory as the found configuration.
+1. If we are using a user-level configuration from `${config_dir}/ruff/pyproject.toml`, the `requires-python` field in the first `pyproject.toml` file found in an ancestor of the current working directory takes precedence over the `target-version` in the user-level configuration.
+1. If no configuration files are found, Ruff will infer the `target-version` from the `requires-python` field in the first `pyproject.toml` file found in an ancestor of the current working directory.
+
+Note that in these last two cases, the behavior of Ruff may differ depending on the working directory from which it is invoked.
 
 ## Python file discovery
 
@@ -597,7 +608,7 @@ Options:
           RUFF_OUTPUT_FILE=]
       --target-version <TARGET_VERSION>
           The minimum Python version that should be supported [possible values:
-          py37, py38, py39, py310, py311, py312, py313]
+          py37, py38, py39, py310, py311, py312, py313, py314]
       --preview
           Enable preview mode; checks will include unstable rules and fixes.
           Use `--no-preview` to disable
@@ -712,7 +723,7 @@ Options:
           notebooks, use `--extension ipy:ipynb`
       --target-version <TARGET_VERSION>
           The minimum Python version that should be supported [possible values:
-          py37, py38, py39, py310, py311, py312, py313]
+          py37, py38, py39, py310, py311, py312, py313, py314]
       --preview
           Enable preview mode; enables unstable formatting. Use `--no-preview`
           to disable
@@ -726,6 +737,9 @@ Miscellaneous:
           Path to the cache directory [env: RUFF_CACHE_DIR=]
       --stdin-filename <STDIN_FILENAME>
           The name of the file when passing it through stdin
+      --exit-non-zero-on-format
+          Exit with a non-zero status code if any files were modified via
+          format, even if all files were formatted successfully
 
 File selection:
       --respect-gitignore

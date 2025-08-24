@@ -11,6 +11,9 @@ pub enum FunctionType {
     Method,
     ClassMethod,
     StaticMethod,
+    /// `__new__` is an implicit static method but
+    /// is treated similarly to class methods for several lint rules
+    NewMethod,
 }
 
 /// Classify a function based on its scope, name, and decorators.
@@ -24,23 +27,28 @@ pub fn classify(
 ) -> FunctionType {
     if !parent_scope.kind.is_class() {
         return FunctionType::Function;
-    };
+    }
     if decorator_list
         .iter()
         .any(|decorator| is_static_method(decorator, semantic, staticmethod_decorators))
     {
         FunctionType::StaticMethod
-    } else if matches!(name, "__new__" | "__init_subclass__" | "__class_getitem__")  // Special-case class method, like `__new__`.
-        || decorator_list.iter().any(|decorator| is_class_method(decorator, semantic, classmethod_decorators))
+    } else if decorator_list
+        .iter()
+        .any(|decorator| is_class_method(decorator, semantic, classmethod_decorators))
     {
         FunctionType::ClassMethod
     } else {
-        // It's an instance method.
-        FunctionType::Method
+        match name {
+            "__new__" => FunctionType::NewMethod, // Implicit static method.
+            "__init_subclass__" | "__class_getitem__" => FunctionType::ClassMethod, // Implicit class methods.
+            _ => FunctionType::Method, // Default to instance method.
+        }
     }
 }
 
 /// Return `true` if a [`Decorator`] is indicative of a static method.
+/// Note: Implicit static methods like `__new__` are not considered.
 fn is_static_method(
     decorator: &Decorator,
     semantic: &SemanticModel,
@@ -81,6 +89,7 @@ fn is_static_method(
 }
 
 /// Return `true` if a [`Decorator`] is indicative of a class method.
+/// Note: Implicit class methods like `__init_subclass__` and `__class_getitem__` are not considered.
 fn is_class_method(
     decorator: &Decorator,
     semantic: &SemanticModel,
@@ -127,7 +136,11 @@ fn is_class_method(
 pub fn is_stub(function_def: &StmtFunctionDef, semantic: &SemanticModel) -> bool {
     function_def.body.iter().all(|stmt| match stmt {
         Stmt::Pass(_) => true,
-        Stmt::Expr(StmtExpr { value, range: _ }) => {
+        Stmt::Expr(StmtExpr {
+            value,
+            range: _,
+            node_index: _,
+        }) => {
             matches!(
                 value.as_ref(),
                 Expr::StringLiteral(_) | Expr::EllipsisLiteral(_)
@@ -135,6 +148,7 @@ pub fn is_stub(function_def: &StmtFunctionDef, semantic: &SemanticModel) -> bool
         }
         Stmt::Raise(StmtRaise {
             range: _,
+            node_index: _,
             exc: exception,
             cause: _,
         }) => exception.as_ref().is_some_and(|exc| {

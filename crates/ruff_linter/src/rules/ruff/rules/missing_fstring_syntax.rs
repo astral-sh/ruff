@@ -1,8 +1,7 @@
 use memchr::memchr2_iter;
 use rustc_hash::FxHashSet;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_literal::format::FormatSpec;
 use ruff_python_parser::parse_expression;
@@ -10,9 +9,10 @@ use ruff_python_semantic::analyze::logging::is_logger_candidate;
 use ruff_python_semantic::{Modules, SemanticModel, TypingOnlyBindingsStatus};
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::rules::fastapi::rules::is_fastapi_route_call;
-use crate::Locator;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Searches for strings that look like they were meant to be f-strings, but are missing an `f` prefix.
@@ -35,7 +35,8 @@ use crate::Locator;
 /// 5. The string references variables that are not in scope, or it doesn't capture variables at all.
 /// 6. Any format specifiers in the potential f-string are invalid.
 /// 7. The string is part of a function call that is known to expect a template string rather than an
-///    evaluated f-string: for example, a [`logging`] call, a [`gettext`] call, or a [fastAPI path].
+///    evaluated f-string: for example, a [`logging`][logging] call, a [`gettext`][gettext] call,
+///    or a [FastAPI path].
 ///
 /// ## Example
 ///
@@ -52,9 +53,14 @@ use crate::Locator;
 /// print(f"Hello {name}! It is {day_of_week} today!")
 /// ```
 ///
+/// ## Fix safety
+///
+/// This fix will always change the behavior of the program and, despite the precautions detailed
+/// above, this may be undesired. As such the fix is always marked as unsafe.
+///
 /// [logging]: https://docs.python.org/3/howto/logging-cookbook.html#using-particular-formatting-styles-throughout-your-application
 /// [gettext]: https://docs.python.org/3/library/gettext.html
-/// [fastAPI path]: https://fastapi.tiangolo.com/tutorial/path-params/
+/// [FastAPI path]: https://fastapi.tiangolo.com/tutorial/path-params/
 #[derive(ViolationMetadata)]
 pub(crate) struct MissingFStringSyntax;
 
@@ -70,8 +76,13 @@ impl AlwaysFixableViolation for MissingFStringSyntax {
 }
 
 /// RUF027
-pub(crate) fn missing_fstring_syntax(checker: &mut Checker, literal: &ast::StringLiteral) {
+pub(crate) fn missing_fstring_syntax(checker: &Checker, literal: &ast::StringLiteral) {
     let semantic = checker.semantic();
+
+    // fstrings are never correct as type definitions
+    if semantic.in_type_definition() {
+        return;
+    }
 
     // we want to avoid statement expressions that are just a string literal.
     // there's no reason to have standalone f-strings and this lets us avoid docstrings too
@@ -82,7 +93,7 @@ pub(crate) fn missing_fstring_syntax(checker: &mut Checker, literal: &ast::Strin
         }
     }
 
-    let logger_objects = &checker.settings.logger_objects;
+    let logger_objects = &checker.settings().logger_objects;
     let fastapi_seen = semantic.seen_module(Modules::FASTAPI);
 
     // We also want to avoid:
@@ -105,9 +116,9 @@ pub(crate) fn missing_fstring_syntax(checker: &mut Checker, literal: &ast::Strin
     }
 
     if should_be_fstring(literal, checker.locator(), semantic) {
-        let diagnostic = Diagnostic::new(MissingFStringSyntax, literal.range())
-            .with_fix(fix_fstring_syntax(literal.range()));
-        checker.diagnostics.push(diagnostic);
+        checker
+            .report_diagnostic(MissingFStringSyntax, literal.range())
+            .set_fix(fix_fstring_syntax(literal.range()));
     }
 }
 
@@ -203,7 +214,7 @@ fn should_be_fstring(
 
     for f_string in value.f_strings() {
         let mut has_name = false;
-        for element in f_string.elements.expressions() {
+        for element in f_string.elements.interpolations() {
             if let ast::Expr::Name(ast::ExprName { id, .. }) = element.expression.as_ref() {
                 if arg_names.contains(id) {
                     return false;
@@ -218,7 +229,7 @@ fn should_be_fstring(
                         semantic.scope_id,
                         TypingOnlyBindingsStatus::Disallowed,
                     )
-                    .map_or(true, |id| semantic.binding(id).kind.is_builtin())
+                    .is_none_or(|id| semantic.binding(id).kind.is_builtin())
                 {
                     return false;
                 }

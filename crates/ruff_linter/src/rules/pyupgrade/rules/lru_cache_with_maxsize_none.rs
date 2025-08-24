@@ -1,11 +1,11 @@
 use ruff_python_ast::{self as ast, Arguments, Decorator, Expr, Keyword};
 use ruff_text_size::{Ranged, TextRange};
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for uses of `functools.lru_cache` that set `maxsize=None`.
@@ -55,7 +55,7 @@ impl AlwaysFixableViolation for LRUCacheWithMaxsizeNone {
 }
 
 /// UP033
-pub(crate) fn lru_cache_with_maxsize_none(checker: &mut Checker, decorator_list: &[Decorator]) {
+pub(crate) fn lru_cache_with_maxsize_none(checker: &Checker, decorator_list: &[Decorator]) {
     for decorator in decorator_list {
         let Expr::Call(ast::ExprCall {
             func,
@@ -64,8 +64,10 @@ pub(crate) fn lru_cache_with_maxsize_none(checker: &mut Checker, decorator_list:
                     args,
                     keywords,
                     range: _,
+                    node_index: _,
                 },
             range: _,
+            node_index: _,
         }) = &decorator.expression
         else {
             continue;
@@ -85,9 +87,10 @@ pub(crate) fn lru_cache_with_maxsize_none(checker: &mut Checker, decorator_list:
                 arg,
                 value,
                 range: _,
+                node_index: _,
             } = &keywords[0];
             if arg.as_ref().is_some_and(|arg| arg == "maxsize") && value.is_none_literal_expr() {
-                let mut diagnostic = Diagnostic::new(
+                let mut diagnostic = checker.report_diagnostic(
                     LRUCacheWithMaxsizeNone,
                     TextRange::new(func.end(), decorator.end()),
                 );
@@ -101,7 +104,6 @@ pub(crate) fn lru_cache_with_maxsize_none(checker: &mut Checker, decorator_list:
                         Edit::range_replacement(binding, decorator.expression.range());
                     Ok(Fix::safe_edits(import_edit, [reference_edit]))
                 });
-                checker.diagnostics.push(diagnostic);
             }
         }
     }

@@ -1,12 +1,12 @@
-use ruff_python_ast::{Expr, Parameter, ParameterWithDefault, Parameters};
+use ruff_python_ast::{Expr, Parameter, Parameters};
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
-use super::super::helpers::{matches_password_name, string_literal};
+use crate::rules::flake8_bandit::helpers::{matches_password_name, string_literal};
 
 /// ## What it does
 /// Checks for potential uses of hardcoded passwords in function argument
@@ -54,33 +54,28 @@ impl Violation for HardcodedPasswordDefault {
     }
 }
 
-fn check_password_kwarg(parameter: &Parameter, default: &Expr) -> Option<Diagnostic> {
-    string_literal(default).filter(|string| !string.is_empty())?;
+fn check_password_kwarg(checker: &Checker, parameter: &Parameter, default: &Expr) {
+    if string_literal(default).is_none_or(str::is_empty) {
+        return;
+    }
     let kwarg_name = &parameter.name;
     if !matches_password_name(kwarg_name) {
-        return None;
+        return;
     }
-    Some(Diagnostic::new(
+    checker.report_diagnostic(
         HardcodedPasswordDefault {
             name: kwarg_name.to_string(),
         },
         default.range(),
-    ))
+    );
 }
 
 /// S107
-pub(crate) fn hardcoded_password_default(checker: &mut Checker, parameters: &Parameters) {
-    for ParameterWithDefault {
-        parameter,
-        default,
-        range: _,
-    } in parameters.iter_non_variadic_params()
-    {
-        let Some(default) = default else {
+pub(crate) fn hardcoded_password_default(checker: &Checker, parameters: &Parameters) {
+    for parameter in parameters.iter_non_variadic_params() {
+        let Some(default) = parameter.default() else {
             continue;
         };
-        if let Some(diagnostic) = check_password_kwarg(parameter, default) {
-            checker.diagnostics.push(diagnostic);
-        }
+        check_password_kwarg(checker, &parameter.parameter, default);
     }
 }

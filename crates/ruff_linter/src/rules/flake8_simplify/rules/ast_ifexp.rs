@@ -1,13 +1,13 @@
 use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, UnaryOp};
 use ruff_text_size::{Ranged, TextRange};
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::{is_const_false, is_const_true};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::parenthesize::parenthesized_range;
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `if` expressions that can be replaced with `bool()` calls.
@@ -26,6 +26,13 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// bool(a)
 /// ```
+///
+/// ## Fix safety
+///
+/// This fix is marked as unsafe because it may change the program’s behavior if the condition does not
+/// return a proper Boolean. While the fix will try to wrap non-boolean values in a call to bool,
+/// custom implementations of comparison functions like `__eq__` can avoid the bool call and still
+/// lead to altered behavior. Moreover, the fix may remove comments.
 ///
 /// ## References
 /// - [Python documentation: Truth Value Testing](https://docs.python.org/3/library/stdtypes.html#truth-value-testing)
@@ -140,7 +147,7 @@ impl AlwaysFixableViolation for IfExprWithTwistedArms {
 
 /// SIM210
 pub(crate) fn if_expr_with_true_false(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     test: &Expr,
     body: &Expr,
@@ -150,7 +157,7 @@ pub(crate) fn if_expr_with_true_false(
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         IfExprWithTrueFalse {
             is_compare: test.is_compare_expr(),
         },
@@ -181,6 +188,7 @@ pub(crate) fn if_expr_with_true_false(
                             id: Name::new_static("bool"),
                             ctx: ExprContext::Load,
                             range: TextRange::default(),
+                            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                         }
                         .into(),
                     ),
@@ -188,20 +196,21 @@ pub(crate) fn if_expr_with_true_false(
                         args: Box::from([test.clone()]),
                         keywords: Box::from([]),
                         range: TextRange::default(),
+                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                     },
                     range: TextRange::default(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 }
                 .into(),
             ),
             expr.range(),
         )));
-    };
-    checker.diagnostics.push(diagnostic);
+    }
 }
 
 /// SIM211
 pub(crate) fn if_expr_with_false_true(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     test: &Expr,
     body: &Expr,
@@ -211,24 +220,24 @@ pub(crate) fn if_expr_with_false_true(
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(IfExprWithFalseTrue, expr.range());
+    let mut diagnostic = checker.report_diagnostic(IfExprWithFalseTrue, expr.range());
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
         checker.generator().expr(
             &ast::ExprUnaryOp {
                 op: UnaryOp::Not,
                 operand: Box::new(test.clone()),
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             }
             .into(),
         ),
         expr.range(),
     )));
-    checker.diagnostics.push(diagnostic);
 }
 
 /// SIM212
 pub(crate) fn twisted_arms_in_ifexpr(
-    checker: &mut Checker,
+    checker: &Checker,
     expr: &Expr,
     test: &Expr,
     body: &Expr,
@@ -238,6 +247,7 @@ pub(crate) fn twisted_arms_in_ifexpr(
         op,
         operand,
         range: _,
+        node_index: _,
     }) = &test
     else {
         return;
@@ -257,7 +267,7 @@ pub(crate) fn twisted_arms_in_ifexpr(
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         IfExprWithTwistedArms {
             expr_body: checker.generator().expr(body),
             expr_else: checker.generator().expr(orelse),
@@ -272,10 +282,10 @@ pub(crate) fn twisted_arms_in_ifexpr(
         body: Box::new(node1),
         orelse: Box::new(node),
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
         checker.generator().expr(&node3.into()),
         expr.range(),
     )));
-    checker.diagnostics.push(diagnostic);
 }

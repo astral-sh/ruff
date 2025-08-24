@@ -1,13 +1,13 @@
 use ruff_python_ast as ast;
 use ruff_python_ast::Stmt;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility::is_abstract;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::delete_stmt;
+use crate::{AlwaysFixableViolation, Fix};
 
 /// ## What it does
 /// Checks for redundant definitions of `__str__` or `__repr__` in stubs.
@@ -42,7 +42,7 @@ impl AlwaysFixableViolation for StrOrReprDefinedInStub {
 }
 
 /// PYI029
-pub(crate) fn str_or_repr_defined_in_stub(checker: &mut Checker, stmt: &Stmt) {
+pub(crate) fn str_or_repr_defined_in_stub(checker: &Checker, stmt: &Stmt) {
     let Stmt::FunctionDef(ast::StmtFunctionDef {
         name,
         decorator_list,
@@ -82,7 +82,7 @@ pub(crate) fn str_or_repr_defined_in_stub(checker: &mut Checker, stmt: &Stmt) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         StrOrReprDefinedInStub {
             name: name.to_string(),
         },
@@ -94,5 +94,4 @@ pub(crate) fn str_or_repr_defined_in_stub(checker: &mut Checker, stmt: &Stmt) {
     diagnostic.set_fix(Fix::safe_edit(edit).isolate(Checker::isolation(
         checker.semantic().current_statement_parent_id(),
     )));
-    checker.diagnostics.push(diagnostic);
 }

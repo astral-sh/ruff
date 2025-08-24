@@ -1,9 +1,9 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_semantic::analyze::visibility::{self, Visibility::Public};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -99,9 +99,9 @@ impl Violation for TooManyPublicMethods {
     }
 }
 
-/// R0904
+/// PLR0904
 pub(crate) fn too_many_public_methods(
-    checker: &mut Checker,
+    checker: &Checker,
     class_def: &ast::StmtClassDef,
     max_methods: usize,
 ) {
@@ -121,12 +121,12 @@ pub(crate) fn too_many_public_methods(
         .count();
 
     if methods > max_methods {
-        checker.diagnostics.push(Diagnostic::new(
+        checker.report_diagnostic(
             TooManyPublicMethods {
                 methods,
                 max_methods,
             },
             class_def.range(),
-        ));
+        );
     }
 }

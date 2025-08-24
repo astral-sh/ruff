@@ -144,14 +144,14 @@ def f():
 
 def f():
     # make sure that `tmp` is not deleted
-    tmp = 1; result = []  # commment should be protected
+    tmp = 1; result = []  # comment should be protected
     for i in range(10):
         result.append(i + 1)  # PERF401
 
 
 def f():
     # make sure that `tmp` is not deleted
-    result = []; tmp = 1  # commment should be protected
+    result = []; tmp = 1  # comment should be protected
     for i in range(10):
         result.append(i + 1)  # PERF401
 
@@ -260,3 +260,48 @@ def f():
     for i in range(5):
         if j := i:
             items.append(j)
+
+def f():
+    values = [1, 2, 3]
+    result = list()  # this should be replaced with a comprehension
+    for i in values:
+        result.append(i + 1)  # PERF401
+
+def f():
+    src = [1]
+    dst = []
+
+    for i in src:
+        if True if True else False:
+            dst.append(i)
+
+    for i in src:
+        if lambda: 0:
+            dst.append(i)
+
+def f():
+    i = "xyz"
+    result = []
+    for i in range(3):
+        result.append(x for x in [i])
+
+def f():
+    i = "xyz"
+    result = []
+    for i in range(3):
+        result.append((x for x in [i]))
+
+G_INDEX = None
+def f():
+    global G_INDEX
+    result = []
+    for G_INDEX in range(3):
+        result.append(G_INDEX)
+
+def f():
+    NL_INDEX = None
+    def x():
+        nonlocal NL_INDEX
+        result = []
+        for NL_INDEX in range(3):
+            result.append(NL_INDEX)

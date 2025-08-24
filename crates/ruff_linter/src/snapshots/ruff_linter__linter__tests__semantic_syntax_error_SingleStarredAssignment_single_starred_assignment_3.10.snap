@@ -1,0 +1,9 @@
+---
+source: crates/ruff_linter/src/linter.rs
+---
+invalid-syntax: starred assignment target must be in a list or tuple
+ --> <filename>:1:1
+  |
+1 | *a = [1, 2, 3, 4]
+  | ^^
+  |

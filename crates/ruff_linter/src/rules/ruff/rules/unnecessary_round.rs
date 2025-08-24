@@ -1,12 +1,14 @@
-use crate::checkers::ast::Checker;
-use crate::Locator;
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Arguments, Expr, ExprCall, ExprNumberLiteral, Number};
+use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 use ruff_python_semantic::analyze::typing;
-use ruff_python_semantic::SemanticModel;
+use ruff_source_file::find_newline;
 use ruff_text_size::Ranged;
+
+use crate::Locator;
+use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
 /// ## What it does
 /// Checks for `round()` calls that have no effect on the input.
@@ -26,6 +28,11 @@ use ruff_text_size::Ranged;
 /// ```python
 /// a = 1
 /// ```
+///
+/// ## Fix safety
+///
+/// The fix is marked unsafe if it is not possible to guarantee that the first argument of
+/// `round()` is of type `int`, or if the fix deletes comments.
 #[derive(ViolationMetadata)]
 pub(crate) struct UnnecessaryRound;
 
@@ -41,7 +48,7 @@ impl AlwaysFixableViolation for UnnecessaryRound {
 }
 
 /// RUF057
-pub(crate) fn unnecessary_round(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn unnecessary_round(checker: &Checker, call: &ExprCall) {
     if !checker.semantic().match_builtin_expr(&call.func, "round") {
         return;
     }
@@ -59,7 +66,7 @@ pub(crate) fn unnecessary_round(checker: &mut Checker, call: &ExprCall) {
         return;
     }
 
-    let applicability = match rounded_value {
+    let mut applicability = match rounded_value {
         // ```python
         // some_int: int
         //
@@ -86,12 +93,16 @@ pub(crate) fn unnecessary_round(checker: &mut Checker, call: &ExprCall) {
         _ => return,
     };
 
+    if checker.comment_ranges().intersects(call.range()) {
+        applicability = Applicability::Unsafe;
+    }
+
     let edit = unwrap_round_call(call, rounded, checker.semantic(), checker.locator());
     let fix = Fix::applicable_edit(edit, applicability);
 
-    let diagnostic = Diagnostic::new(UnnecessaryRound, call.range());
-
-    checker.diagnostics.push(diagnostic.with_fix(fix));
+    checker
+        .report_diagnostic(UnnecessaryRound, call.range())
+        .set_fix(fix);
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -196,13 +207,13 @@ fn unwrap_round_call(
     locator: &Locator,
 ) -> Edit {
     let rounded_expr = locator.slice(rounded.range());
-
     let has_parent_expr = semantic.current_expression_parent().is_some();
-    let new_content = if has_parent_expr || rounded.is_named_expr() {
-        format!("({rounded_expr})")
-    } else {
-        rounded_expr.to_string()
-    };
+    let new_content =
+        if has_parent_expr || rounded.is_named_expr() || find_newline(rounded_expr).is_some() {
+            format!("({rounded_expr})")
+        } else {
+            rounded_expr.to_string()
+        };
 
     Edit::range_replacement(new_content, call.range)
 }

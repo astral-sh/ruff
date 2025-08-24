@@ -1,8 +1,8 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, ExprCall};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -48,7 +48,7 @@ impl Violation for SslInsecureVersion {
 }
 
 /// S502
-pub(crate) fn ssl_insecure_version(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn ssl_insecure_version(checker: &Checker, call: &ExprCall) {
     let Some(keyword) = checker
         .semantic()
         .resolve_qualified_name(call.func.as_ref())
@@ -68,22 +68,22 @@ pub(crate) fn ssl_insecure_version(checker: &mut Checker, call: &ExprCall) {
     match &keyword.value {
         Expr::Name(ast::ExprName { id, .. }) => {
             if is_insecure_protocol(id) {
-                checker.diagnostics.push(Diagnostic::new(
+                checker.report_diagnostic(
                     SslInsecureVersion {
                         protocol: id.to_string(),
                     },
                     keyword.range(),
-                ));
+                );
             }
         }
         Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
             if is_insecure_protocol(attr) {
-                checker.diagnostics.push(Diagnostic::new(
+                checker.report_diagnostic(
                     SslInsecureVersion {
                         protocol: attr.to_string(),
                     },
                     keyword.range(),
-                ));
+                );
             }
         }
         _ => {}

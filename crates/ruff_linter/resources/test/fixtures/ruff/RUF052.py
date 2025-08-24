@@ -176,3 +176,22 @@ class Node:
         _seen.add(self)
         for other in self.connected:
             other.recurse(_seen=_seen)
+
+
+def foo():
+    _dummy_var = 42
+
+    def bar():
+        dummy_var = 43
+        print(_dummy_var)
+
+
+def foo():
+    # Unfixable because both possible candidates for the new name are shadowed
+    # in the scope of one of the references to the variable
+    _dummy_var = 42
+
+    def bar():
+        dummy_var = 43
+        dummy_var_ = 44
+        print(_dummy_var)

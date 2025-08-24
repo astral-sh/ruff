@@ -1,10 +1,10 @@
 use ruff_python_ast::{self as ast, Expr, Stmt};
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::{ScopeKind, SemanticModel};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -49,7 +49,12 @@ fn match_async_exit_stack(semantic: &SemanticModel) -> bool {
     let Some(expr) = semantic.current_expression_grandparent() else {
         return false;
     };
-    let Expr::Await(ast::ExprAwait { value, range: _ }) = expr else {
+    let Expr::Await(ast::ExprAwait {
+        value,
+        range: _,
+        node_index: _,
+    }) = expr
+    else {
         return false;
     };
     let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() else {
@@ -112,6 +117,28 @@ fn match_exit_stack(semantic: &SemanticModel) -> bool {
         }
     }
     false
+}
+
+/// Return `true` if the current expression is nested in a call to one of the
+/// unittest context manager methods: `cls.enterClassContext()`,
+/// `self.enterContext()`, or `self.enterAsyncContext()`.
+fn match_unittest_context_methods(semantic: &SemanticModel) -> bool {
+    let Some(expr) = semantic.current_expression_parent() else {
+        return false;
+    };
+    let Expr::Call(ast::ExprCall { func, .. }) = expr else {
+        return false;
+    };
+    let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func.as_ref() else {
+        return false;
+    };
+    let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() else {
+        return false;
+    };
+    matches!(
+        (id.as_str(), attr.as_str()),
+        ("cls", "enterClassContext") | ("self", "enterContext" | "enterAsyncContext")
+    )
 }
 
 /// Return `true` if the expression is a call to `open()`,
@@ -197,7 +224,7 @@ fn is_immediately_closed(semantic: &SemanticModel) -> bool {
 }
 
 /// SIM115
-pub(crate) fn open_file_with_context_handler(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn open_file_with_context_handler(checker: &Checker, call: &ast::ExprCall) {
     let semantic = checker.semantic();
 
     if !is_open_call(semantic, call) {
@@ -229,6 +256,11 @@ pub(crate) fn open_file_with_context_handler(checker: &mut Checker, call: &ast::
         return;
     }
 
+    // Ex) `self.enterContext(open("foo.txt"))`
+    if match_unittest_context_methods(semantic) {
+        return;
+    }
+
     // Ex) `def __enter__(self): ...`
     if let ScopeKind::Function(ast::StmtFunctionDef { name, .. }) =
         &checker.semantic().current_scope().kind
@@ -238,8 +270,5 @@ pub(crate) fn open_file_with_context_handler(checker: &mut Checker, call: &ast::
         }
     }
 
-    checker.diagnostics.push(Diagnostic::new(
-        OpenFileWithContextHandler,
-        call.func.range(),
-    ));
+    checker.report_diagnostic(OpenFileWithContextHandler, call.func.range());
 }

@@ -1,9 +1,8 @@
-use crate::checkers::ast::Checker;
-use crate::importer::ImportRequest;
-use crate::settings::types::PythonVersion;
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use crate::checkers::ast::{Checker, TypingImporter};
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
+use ruff_python_ast::PythonVersion;
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze;
@@ -76,6 +75,16 @@ use ruff_text_size::Ranged;
 /// ## Fix safety
 /// This rule's fix is marked as unsafe as it changes the meaning of your type annotations.
 ///
+/// ## Availability
+///
+/// Because this rule relies on the third-party `typing_extensions` module for Python versions
+/// before 3.11, its diagnostic will not be emitted, and no fix will be offered, if
+/// `typing_extensions` imports have been disabled by the [`lint.typing-extensions`] linter option.
+///
+/// ## Options
+///
+/// - `lint.typing-extensions`
+///
 /// ## References
 /// - [Python documentation: `typing.Self`](https://docs.python.org/3/library/typing.html#typing.Self)
 #[derive(ViolationMetadata)]
@@ -97,7 +106,9 @@ impl Violation for NonSelfReturnType {
         if matches!(class_name.as_str(), "__new__") {
             "`__new__` methods usually return `self` at runtime".to_string()
         } else {
-            format!("`{method_name}` methods in classes like `{class_name}` usually return `self` at runtime")
+            format!(
+                "`{method_name}` methods in classes like `{class_name}` usually return `self` at runtime"
+            )
         }
     }
 
@@ -108,7 +119,7 @@ impl Violation for NonSelfReturnType {
 
 /// PYI034
 pub(crate) fn non_self_return_type(
-    checker: &mut Checker,
+    checker: &Checker,
     stmt: &ast::Stmt,
     is_async: bool,
     name: &str,
@@ -187,13 +198,17 @@ pub(crate) fn non_self_return_type(
 
 /// Add a diagnostic for the given method.
 fn add_diagnostic(
-    checker: &mut Checker,
+    checker: &Checker,
     stmt: &ast::Stmt,
     returns: &ast::Expr,
     class_def: &ast::StmtClassDef,
     method_name: &str,
 ) {
-    let mut diagnostic = Diagnostic::new(
+    let Some(importer) = checker.typing_importer("Self", PythonVersion::PY311) else {
+        return;
+    };
+
+    let mut diagnostic = checker.report_diagnostic(
         NonSelfReturnType {
             class_name: class_def.name.to_string(),
             method_name: method_name.to_string(),
@@ -201,30 +216,19 @@ fn add_diagnostic(
         stmt.identifier(),
     );
 
-    diagnostic.try_set_fix(|| replace_with_self_fix(checker, stmt, returns, class_def));
-
-    checker.diagnostics.push(diagnostic);
+    diagnostic.try_set_fix(|| {
+        replace_with_self_fix(checker.semantic(), &importer, stmt, returns, class_def)
+    });
 }
 
 fn replace_with_self_fix(
-    checker: &mut Checker,
+    semantic: &SemanticModel,
+    importer: &TypingImporter,
     stmt: &ast::Stmt,
     returns: &ast::Expr,
     class_def: &ast::StmtClassDef,
 ) -> anyhow::Result<Fix> {
-    let semantic = checker.semantic();
-
-    let (self_import, self_binding) = {
-        let source_module = if checker.settings.target_version >= PythonVersion::Py311 {
-            "typing"
-        } else {
-            "typing_extensions"
-        };
-
-        let (importer, semantic) = (checker.importer(), checker.semantic());
-        let request = ImportRequest::import_from(source_module, "Self");
-        importer.get_or_import_symbol(&request, returns.start(), semantic)?
-    };
+    let (self_import, self_binding) = importer.import(returns.start())?;
 
     let mut others = Vec::with_capacity(2);
 
@@ -240,7 +244,7 @@ fn replace_with_self_fix(
     others.extend(remove_first_argument_type_hint());
     others.push(Edit::range_replacement(self_binding, returns.range()));
 
-    let applicability = if might_be_generic(class_def, checker.semantic()) {
+    let applicability = if might_be_generic(class_def, semantic) {
         Applicability::DisplayOnly
     } else {
         Applicability::Unsafe

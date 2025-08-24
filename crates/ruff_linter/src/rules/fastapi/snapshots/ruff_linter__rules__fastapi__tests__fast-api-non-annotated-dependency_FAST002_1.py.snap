@@ -1,15 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/fastapi/mod.rs
-snapshot_kind: text
 ---
-FAST002_1.py:10:13: FAST002 [*] FastAPI dependency without `Annotated`
+FAST002 [*] FastAPI dependency without `Annotated`
+  --> FAST002_1.py:10:13
    |
  9 | @app.get("/test")
 10 | def handler(echo: str = Query("")):
-   |             ^^^^^^^^^^^^^^^^^^^^^ FAST002
+   |             ^^^^^^^^^^^^^^^^^^^^^
 11 |     return echo
    |
-   = help: Replace with `typing.Annotated`
+help: Replace with `typing.Annotated`
 
 ℹ Unsafe fix
 2  2  | values. See #15043 for more details."""
@@ -27,14 +27,15 @@ FAST002_1.py:10:13: FAST002 [*] FastAPI dependency without `Annotated`
 12 13 | 
 13 14 | 
 
-FAST002_1.py:15:14: FAST002 [*] FastAPI dependency without `Annotated`
+FAST002 [*] FastAPI dependency without `Annotated`
+  --> FAST002_1.py:15:14
    |
 14 | @app.get("/test")
 15 | def handler2(echo: str = Query(default="")):
-   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FAST002
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 16 |     return echo
    |
-   = help: Replace with `typing.Annotated`
+help: Replace with `typing.Annotated`
 
 ℹ Unsafe fix
 2  2  | values. See #15043 for more details."""
@@ -54,14 +55,15 @@ FAST002_1.py:15:14: FAST002 [*] FastAPI dependency without `Annotated`
 17 18 | 
 18 19 | 
 
-FAST002_1.py:20:14: FAST002 [*] FastAPI dependency without `Annotated`
+FAST002 [*] FastAPI dependency without `Annotated`
+  --> FAST002_1.py:20:14
    |
 19 | @app.get("/test")
 20 | def handler3(echo: str = Query("123", min_length=3, max_length=50)):
-   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FAST002
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 21 |     return echo
    |
-   = help: Replace with `typing.Annotated`
+help: Replace with `typing.Annotated`
 
 ℹ Unsafe fix
 2  2  | values. See #15043 for more details."""

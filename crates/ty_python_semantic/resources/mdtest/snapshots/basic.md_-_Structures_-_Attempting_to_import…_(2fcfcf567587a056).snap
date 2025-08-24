@@ -1,0 +1,65 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: basic.md - Structures - Attempting to import a stdlib module that's not yet been added
+mdtest path: crates/ty_python_semantic/resources/mdtest/import/basic.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | import tomllib  # error: [unresolved-import]
+2 | from string.templatelib import Template  # error: [unresolved-import]
+3 | from importlib.resources import abc  # error: [unresolved-import]
+```
+
+# Diagnostics
+
+```
+error[unresolved-import]: Cannot resolve imported module `tomllib`
+ --> src/mdtest_snippet.py:1:8
+  |
+1 | import tomllib  # error: [unresolved-import]
+  |        ^^^^^^^
+2 | from string.templatelib import Template  # error: [unresolved-import]
+3 | from importlib.resources import abc  # error: [unresolved-import]
+  |
+info: The stdlib module `tomllib` is only available on Python 3.11+
+info: Python 3.10 was assumed when resolving modules because it was specified on the command line
+info: rule `unresolved-import` is enabled by default
+
+```
+
+```
+error[unresolved-import]: Cannot resolve imported module `string.templatelib`
+ --> src/mdtest_snippet.py:2:6
+  |
+1 | import tomllib  # error: [unresolved-import]
+2 | from string.templatelib import Template  # error: [unresolved-import]
+  |      ^^^^^^^^^^^^^^^^^^
+3 | from importlib.resources import abc  # error: [unresolved-import]
+  |
+info: The stdlib module `string.templatelib` is only available on Python 3.14+
+info: Python 3.10 was assumed when resolving modules because it was specified on the command line
+info: rule `unresolved-import` is enabled by default
+
+```
+
+```
+error[unresolved-import]: Module `importlib.resources` has no member `abc`
+ --> src/mdtest_snippet.py:3:33
+  |
+1 | import tomllib  # error: [unresolved-import]
+2 | from string.templatelib import Template  # error: [unresolved-import]
+3 | from importlib.resources import abc  # error: [unresolved-import]
+  |                                 ^^^
+  |
+info: The stdlib module `importlib.resources` only has a `abc` submodule on Python 3.11+
+info: Python 3.10 was assumed when resolving modules because it was specified on the command line
+info: rule `unresolved-import` is enabled by default
+
+```

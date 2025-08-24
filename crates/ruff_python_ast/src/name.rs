@@ -3,11 +3,14 @@ use std::fmt::{Debug, Display, Formatter, Write};
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 
-use crate::{nodes, Expr};
+use crate::Expr;
+use crate::generated::ExprName;
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "cache", derive(ruff_macros::CacheKey))]
+#[cfg_attr(feature = "salsa", derive(salsa::Update))]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct Name(compact_str::CompactString);
 
 impl Name {
@@ -26,14 +29,29 @@ impl Name {
         Self(compact_str::CompactString::const_new(name))
     }
 
+    pub fn shrink_to_fit(&mut self) {
+        self.0.shrink_to_fit();
+    }
+
     pub fn as_str(&self) -> &str {
         self.0.as_str()
+    }
+
+    pub fn push_str(&mut self, s: &str) {
+        self.0.push_str(s);
     }
 }
 
 impl Debug for Name {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "Name({:?})", self.as_str())
+    }
+}
+
+impl std::fmt::Write for Name {
+    fn write_str(&mut self, s: &str) -> std::fmt::Result {
+        self.0.push_str(s);
+        Ok(())
     }
 }
 
@@ -106,6 +124,13 @@ impl From<Name> for compact_str::CompactString {
     #[inline]
     fn from(name: Name) -> Self {
         name.0
+    }
+}
+
+impl From<Name> for String {
+    #[inline]
+    fn from(name: Name) -> Self {
+        name.as_str().into()
     }
 }
 
@@ -190,14 +215,14 @@ impl schemars::JsonSchema for Name {
         String::schema_id()
     }
 
-    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
-        String::json_schema(gen)
+    fn json_schema(generator: &mut schemars::r#gen::SchemaGenerator) -> schemars::schema::Schema {
+        String::json_schema(generator)
     }
 
     fn _schemars_private_non_optional_json_schema(
-        gen: &mut schemars::gen::SchemaGenerator,
+        generator: &mut schemars::r#gen::SchemaGenerator,
     ) -> schemars::schema::Schema {
-        String::_schemars_private_non_optional_json_schema(gen)
+        String::_schemars_private_non_optional_json_schema(generator)
     }
 
     fn _schemars_private_is_option() -> bool {
@@ -386,17 +411,15 @@ impl<'a> UnqualifiedName<'a> {
         let attr1 = match expr {
             Expr::Attribute(attr1) => attr1,
             // Ex) `foo`
-            Expr::Name(nodes::ExprName { id, .. }) => {
-                return Some(Self::from_slice(&[id.as_str()]))
-            }
+            Expr::Name(ExprName { id, .. }) => return Some(Self::from_slice(&[id.as_str()])),
             _ => return None,
         };
 
         let attr2 = match attr1.value.as_ref() {
             Expr::Attribute(attr2) => attr2,
             // Ex) `foo.bar`
-            Expr::Name(nodes::ExprName { id, .. }) => {
-                return Some(Self::from_slice(&[id.as_str(), attr1.attr.as_str()]))
+            Expr::Name(ExprName { id, .. }) => {
+                return Some(Self::from_slice(&[id.as_str(), attr1.attr.as_str()]));
             }
             _ => return None,
         };
@@ -404,7 +427,7 @@ impl<'a> UnqualifiedName<'a> {
         let attr3 = match attr2.value.as_ref() {
             Expr::Attribute(attr3) => attr3,
             // Ex) `foo.bar.baz`
-            Expr::Name(nodes::ExprName { id, .. }) => {
+            Expr::Name(ExprName { id, .. }) => {
                 return Some(Self::from_slice(&[
                     id.as_str(),
                     attr2.attr.as_str(),
@@ -417,7 +440,7 @@ impl<'a> UnqualifiedName<'a> {
         let attr4 = match attr3.value.as_ref() {
             Expr::Attribute(attr4) => attr4,
             // Ex) `foo.bar.baz.bop`
-            Expr::Name(nodes::ExprName { id, .. }) => {
+            Expr::Name(ExprName { id, .. }) => {
                 return Some(Self::from_slice(&[
                     id.as_str(),
                     attr3.attr.as_str(),
@@ -431,7 +454,7 @@ impl<'a> UnqualifiedName<'a> {
         let attr5 = match attr4.value.as_ref() {
             Expr::Attribute(attr5) => attr5,
             // Ex) `foo.bar.baz.bop.bap`
-            Expr::Name(nodes::ExprName { id, .. }) => {
+            Expr::Name(ExprName { id, .. }) => {
                 return Some(Self::from_slice(&[
                     id.as_str(),
                     attr4.attr.as_str(),
@@ -446,7 +469,7 @@ impl<'a> UnqualifiedName<'a> {
         let attr6 = match attr5.value.as_ref() {
             Expr::Attribute(attr6) => attr6,
             // Ex) `foo.bar.baz.bop.bap.bab`
-            Expr::Name(nodes::ExprName { id, .. }) => {
+            Expr::Name(ExprName { id, .. }) => {
                 return Some(Self::from_slice(&[
                     id.as_str(),
                     attr5.attr.as_str(),
@@ -462,7 +485,7 @@ impl<'a> UnqualifiedName<'a> {
         let attr7 = match attr6.value.as_ref() {
             Expr::Attribute(attr7) => attr7,
             // Ex) `foo.bar.baz.bop.bap.bab.bob`
-            Expr::Name(nodes::ExprName { id, .. }) => {
+            Expr::Name(ExprName { id, .. }) => {
                 return Some(Self::from_slice(&[
                     id.as_str(),
                     attr6.attr.as_str(),
@@ -479,7 +502,7 @@ impl<'a> UnqualifiedName<'a> {
         let attr8 = match attr7.value.as_ref() {
             Expr::Attribute(attr8) => attr8,
             // Ex) `foo.bar.baz.bop.bap.bab.bob.bib`
-            Expr::Name(nodes::ExprName { id, .. }) => {
+            Expr::Name(ExprName { id, .. }) => {
                 return Some(Self(SegmentsVec::from([
                     id.as_str(),
                     attr7.attr.as_str(),
@@ -504,7 +527,7 @@ impl<'a> UnqualifiedName<'a> {
                     segments.push(attr.attr.as_str());
                     &*attr.value
                 }
-                Expr::Name(nodes::ExprName { id, .. }) => {
+                Expr::Name(ExprName { id, .. }) => {
                     segments.push(id.as_str());
                     break;
                 }

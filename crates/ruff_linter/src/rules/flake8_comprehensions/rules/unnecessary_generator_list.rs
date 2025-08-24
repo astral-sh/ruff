@@ -1,14 +1,15 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
+use ruff_python_ast::ExprGenerator;
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::parenthesize::parenthesized_range;
-use ruff_python_ast::ExprGenerator;
-use ruff_text_size::{Ranged, TextSize};
+use ruff_python_parser::TokenKind;
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
-use super::helpers;
+use crate::rules::flake8_comprehensions::helpers;
 
 /// ## What it does
 /// Checks for unnecessary generators that can be rewritten as list
@@ -23,7 +24,7 @@ use super::helpers;
 /// `list(x for x in foo)`, it's better to use `list(foo)` directly, since it's
 /// even more direct.
 ///
-/// ## Examples
+/// ## Example
 /// ```python
 /// list(f(x) for x in foo)
 /// list(x for x in foo)
@@ -65,7 +66,7 @@ impl AlwaysFixableViolation for UnnecessaryGeneratorList {
 }
 
 /// C400 (`list(generator)`)
-pub(crate) fn unnecessary_generator_list(checker: &mut Checker, call: &ast::ExprCall) {
+pub(crate) fn unnecessary_generator_list(checker: &Checker, call: &ast::ExprCall) {
     let Some(argument) = helpers::exactly_one_argument_with_matching_function(
         "list",
         &call.func,
@@ -93,22 +94,23 @@ pub(crate) fn unnecessary_generator_list(checker: &mut Checker, call: &ast::Expr
     if let [generator] = generators.as_slice() {
         if generator.ifs.is_empty() && !generator.is_async {
             if ComparableExpr::from(elt) == ComparableExpr::from(&generator.target) {
-                let diagnostic = Diagnostic::new(
-                    UnnecessaryGeneratorList {
-                        short_circuit: true,
-                    },
-                    call.range(),
-                );
                 let iterator = format!("list({})", checker.locator().slice(generator.iter.range()));
                 let fix = Fix::unsafe_edit(Edit::range_replacement(iterator, call.range()));
-                checker.diagnostics.push(diagnostic.with_fix(fix));
+                checker
+                    .report_diagnostic(
+                        UnnecessaryGeneratorList {
+                            short_circuit: true,
+                        },
+                        call.range(),
+                    )
+                    .set_fix(fix);
                 return;
             }
         }
     }
 
     // Convert `list(f(x) for x in y)` to `[f(x) for x in y]`.
-    let diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UnnecessaryGeneratorList {
             short_circuit: false,
         },
@@ -123,11 +125,16 @@ pub(crate) fn unnecessary_generator_list(checker: &mut Checker, call: &ast::Expr
         );
 
         // Replace `)` with `]`.
-        let call_end = Edit::replacement(
-            "]".to_string(),
-            call.arguments.end() - TextSize::from(1),
-            call.end(),
-        );
+        // Place `]` at argument's end or at trailing comma if present
+        let after_arg_tokens = checker
+            .tokens()
+            .in_range(TextRange::new(argument.end(), call.end()));
+        let right_bracket_loc = after_arg_tokens
+            .iter()
+            .find(|token| token.kind() == TokenKind::Comma)
+            .map_or(call.arguments.end(), Ranged::end)
+            - TextSize::from(1);
+        let call_end = Edit::replacement("]".to_string(), right_bracket_loc, call.end());
 
         // Remove the inner parentheses, if the expression is a generator. The easiest way to do
         // this reliably is to use the printer.
@@ -152,5 +159,5 @@ pub(crate) fn unnecessary_generator_list(checker: &mut Checker, call: &ast::Expr
             Fix::unsafe_edits(call_start, [call_end])
         }
     };
-    checker.diagnostics.push(diagnostic.with_fix(fix));
+    diagnostic.set_fix(fix);
 }

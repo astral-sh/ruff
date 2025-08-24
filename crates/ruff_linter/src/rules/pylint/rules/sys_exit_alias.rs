@@ -1,10 +1,10 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::Expr;
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::ExprCall;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for uses of the `exit()` and `quit()`.
@@ -18,6 +18,20 @@ use crate::importer::ImportRequest;
 ///
 /// Prefer `sys.exit()`, as the `sys` module is guaranteed to exist in all
 /// contexts.
+///
+/// ## Fix safety
+/// This fix is always unsafe. When replacing `exit` or `quit` with `sys.exit`,
+/// the behavior can change in the following ways:
+///
+/// 1. If the code runs in an environment where the `site` module is not imported
+///    (e.g., with `python -S`), the original code would raise a `NameError`, while
+///    the fixed code would execute normally.
+///
+/// 2. `site.exit` and `sys.exit` handle tuple arguments differently. `site.exit`
+///    treats tuples as regular objects and always returns exit code 1, while `sys.exit`
+///    interprets tuple contents to determine the exit code: an empty tuple () results in
+///    exit code 0, and a single-element tuple like (2,) uses that element's value (2) as
+///    the exit code.
 ///
 /// ## Example
 /// ```python
@@ -56,27 +70,44 @@ impl Violation for SysExitAlias {
 }
 
 /// PLR1722
-pub(crate) fn sys_exit_alias(checker: &mut Checker, func: &Expr) {
-    let Some(builtin) = checker.semantic().resolve_builtin_symbol(func) else {
+pub(crate) fn sys_exit_alias(checker: &Checker, call: &ExprCall) {
+    let Some(builtin) = checker.semantic().resolve_builtin_symbol(&call.func) else {
         return;
     };
     if !matches!(builtin, "exit" | "quit") {
         return;
     }
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         SysExitAlias {
             name: builtin.to_string(),
         },
-        func.range(),
+        call.func.range(),
     );
+
+    let has_star_kwargs = call
+        .arguments
+        .keywords
+        .iter()
+        .any(|kwarg| kwarg.arg.is_none());
+    // only one optional argument allowed, and we can't convert **kwargs
+    if call.arguments.len() > 1 || has_star_kwargs {
+        return;
+    }
+
     diagnostic.try_set_fix(|| {
         let (import_edit, binding) = checker.importer().get_or_import_symbol(
             &ImportRequest::import("sys", "exit"),
-            func.start(),
+            call.func.start(),
             checker.semantic(),
         )?;
-        let reference_edit = Edit::range_replacement(binding, func.range());
-        Ok(Fix::unsafe_edits(import_edit, [reference_edit]))
+        let reference_edit = Edit::range_replacement(binding, call.func.range());
+        let mut edits = vec![reference_edit];
+        if let Some(kwarg) = call.arguments.find_keyword("code") {
+            edits.push(Edit::range_replacement(
+                checker.source()[kwarg.value.range()].to_string(),
+                kwarg.range,
+            ));
+        }
+        Ok(Fix::unsafe_edits(import_edit, edits))
     });
-    checker.diagnostics.push(diagnostic);
 }

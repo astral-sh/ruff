@@ -2,7 +2,7 @@ use lsp_types::ClientCapabilities;
 use ruff_linter::display_settings;
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-#[allow(clippy::struct_excessive_bools)]
+#[expect(clippy::struct_excessive_bools)]
 pub(crate) struct ResolvedClientCapabilities {
     pub(crate) code_action_deferred_edit_resolution: bool,
     pub(crate) apply_edit: bool,

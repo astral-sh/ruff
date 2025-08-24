@@ -4,12 +4,12 @@ use anyhow::Result;
 
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use ruff_python_ast::helpers::to_module_path;
-use ruff_python_parser::{parse, Mode};
+use ruff_python_parser::{Mode, ParseOptions, parse};
 
 use crate::collector::Collector;
 pub use crate::db::ModuleDb;
 use crate::resolver::Resolver;
-pub use crate::settings::{AnalyzeSettings, Direction};
+pub use crate::settings::{AnalyzeSettings, Direction, StringImports};
 
 mod collector;
 mod db;
@@ -26,11 +26,11 @@ impl ModuleImports {
         db: &ModuleDb,
         path: &SystemPath,
         package: Option<&SystemPath>,
-        string_imports: bool,
+        string_imports: StringImports,
     ) -> Result<Self> {
         // Read and parse the source code.
         let source = std::fs::read_to_string(path)?;
-        let parsed = parse(&source, Mode::Module)?;
+        let parsed = parse(&source, ParseOptions::from(Mode::Module))?;
 
         let module_path =
             package.and_then(|package| to_module_path(package.as_std_path(), path.as_std_path()));
@@ -42,13 +42,11 @@ impl ModuleImports {
         // Resolve the imports.
         let mut resolved_imports = ModuleImports::default();
         for import in imports {
-            let Some(resolved) = Resolver::new(db).resolve(import) else {
-                continue;
-            };
-            let Some(path) = resolved.as_system_path() else {
-                continue;
-            };
-            resolved_imports.insert(path.to_path_buf());
+            for resolved in Resolver::new(db).resolve(import) {
+                if let Some(path) = resolved.as_system_path() {
+                    resolved_imports.insert(path.to_path_buf());
+                }
+            }
         }
 
         Ok(resolved_imports)

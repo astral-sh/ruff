@@ -10,8 +10,8 @@ use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 
 use crate::display_settings;
-use crate::rules::isort::categorize::KnownModules;
 use crate::rules::isort::ImportType;
+use crate::rules::isort::categorize::KnownModules;
 use ruff_macros::CacheKey;
 use ruff_python_semantic::{Alias, MemberNameImport, ModuleNameImport, NameImport};
 
@@ -45,7 +45,7 @@ impl Display for RelativeImportsOrder {
 }
 
 #[derive(Debug, Clone, CacheKey)]
-#[allow(clippy::struct_excessive_bools)]
+#[expect(clippy::struct_excessive_bools)]
 pub struct Settings {
     pub required_imports: BTreeSet<NameImport>,
     pub combine_as_imports: bool,

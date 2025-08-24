@@ -1,20 +1,26 @@
 pub use glob::PatternError;
 pub use memory_fs::MemoryFileSystem;
+
+#[cfg(all(feature = "testing", feature = "os"))]
+pub use os::testing::UserConfigDirectoryOverrideGuard;
+
 #[cfg(feature = "os")]
 pub use os::OsSystem;
+
+use filetime::FileTime;
 use ruff_notebook::{Notebook, NotebookError};
 use std::error::Error;
-use std::fmt::Debug;
+use std::fmt::{Debug, Formatter};
 use std::path::{Path, PathBuf};
 use std::{fmt, io};
-pub use test::{DbWithTestSystem, TestSystem};
+pub use test::{DbWithTestSystem, DbWithWritableSystem, InMemorySystem, TestSystem};
 use walk_directory::WalkDirectoryBuilder;
 
 use crate::file_revision::FileRevision;
 
 pub use self::path::{
-    deduplicate_nested_paths, DeduplicatedNestedPathsIter, SystemPath, SystemPathBuf,
-    SystemVirtualPath, SystemVirtualPathBuf,
+    DeduplicatedNestedPathsIter, SystemPath, SystemPathBuf, SystemVirtualPath,
+    SystemVirtualPathBuf, deduplicate_nested_paths,
 };
 
 mod memory_fs;
@@ -40,7 +46,7 @@ pub type Result<T> = std::io::Result<T>;
 ///    * File watching isn't supported.
 ///
 /// Abstracting the system also enables tests to use a more efficient in-memory file system.
-pub trait System: Debug {
+pub trait System: Debug + Sync + Send {
     /// Reads the metadata of the file or directory at `path`.
     ///
     /// This function will traverse symbolic links to query information about the destination file.
@@ -84,6 +90,20 @@ pub trait System: Debug {
         self.path_metadata(path).is_ok()
     }
 
+    /// Returns `true` if `path` exists on disk using the exact casing as specified in `path` for the parts after `prefix`.
+    ///
+    /// This is the same as [`Self::path_exists`] on case-sensitive systems.
+    ///
+    /// ## The use of prefix
+    ///
+    /// Prefix is only intended as an optimization for systems that can't efficiently check
+    /// if an entire path exists with the exact casing as specified in `path`. However,
+    /// implementations are allowed to check the casing of the entire path if they can do so efficiently.
+    fn path_exists_case_sensitive(&self, path: &SystemPath, prefix: &SystemPath) -> bool;
+
+    /// Returns the [`CaseSensitivity`] of the system's file system.
+    fn case_sensitivity(&self) -> CaseSensitivity;
+
     /// Returns `true` if `path` exists and is a directory.
     fn is_directory(&self, path: &SystemPath) -> bool {
         self.path_metadata(path)
@@ -98,6 +118,16 @@ pub trait System: Debug {
 
     /// Returns the current working directory
     fn current_directory(&self) -> &SystemPath;
+
+    /// Returns the directory path where user configurations are stored.
+    ///
+    /// Returns `None` if no such convention exists for the system.
+    fn user_config_directory(&self) -> Option<SystemPathBuf>;
+
+    /// Returns the directory path where cached files are stored.
+    ///
+    /// Returns `None` if no such convention exists for the system.
+    fn cache_dir(&self) -> Option<SystemPathBuf>;
 
     /// Iterate over the contents of the directory at `path`.
     ///
@@ -142,13 +172,116 @@ pub trait System: Debug {
         &self,
         pattern: &str,
     ) -> std::result::Result<
-        Box<dyn Iterator<Item = std::result::Result<SystemPathBuf, GlobError>>>,
+        Box<dyn Iterator<Item = std::result::Result<SystemPathBuf, GlobError>> + '_>,
         PatternError,
     >;
+
+    /// Fetches the environment variable `key` from the current process.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`std::env::VarError::NotPresent`] if:
+    /// - The variable is not set.
+    /// - The variable's name contains an equal sign or NUL (`'='` or `'\0'`).
+    ///
+    /// Returns [`std::env::VarError::NotUnicode`] if the variable's value is not valid
+    /// Unicode.
+    fn env_var(&self, name: &str) -> std::result::Result<String, std::env::VarError> {
+        let _ = name;
+        Err(std::env::VarError::NotPresent)
+    }
+
+    /// Returns a handle to a [`WritableSystem`] if this system is writeable.
+    fn as_writable(&self) -> Option<&dyn WritableSystem>;
 
     fn as_any(&self) -> &dyn std::any::Any;
 
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any;
+
+    fn dyn_clone(&self) -> Box<dyn System>;
+}
+
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
+pub enum CaseSensitivity {
+    /// The case sensitivity of the file system is unknown.
+    ///
+    /// The file system is either case-sensitive or case-insensitive. A caller
+    /// should not assume either case.
+    #[default]
+    Unknown,
+
+    /// The file system is case-sensitive.
+    CaseSensitive,
+
+    /// The file system is case-insensitive.
+    CaseInsensitive,
+}
+
+impl CaseSensitivity {
+    /// Returns `true` if the file system is known to be case-sensitive.
+    pub const fn is_case_sensitive(self) -> bool {
+        matches!(self, Self::CaseSensitive)
+    }
+}
+
+impl fmt::Display for CaseSensitivity {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            CaseSensitivity::Unknown => f.write_str("unknown"),
+            CaseSensitivity::CaseSensitive => f.write_str("case-sensitive"),
+            CaseSensitivity::CaseInsensitive => f.write_str("case-insensitive"),
+        }
+    }
+}
+
+/// System trait for non-readonly systems.
+pub trait WritableSystem: System {
+    /// Creates a file at the given path.
+    ///
+    /// Returns an error if the file already exists.
+    fn create_new_file(&self, path: &SystemPath) -> Result<()>;
+
+    /// Writes the given content to the file at the given path.
+    fn write_file(&self, path: &SystemPath, content: &str) -> Result<()>;
+
+    /// Creates a directory at `path` as well as any intermediate directories.
+    fn create_directory_all(&self, path: &SystemPath) -> Result<()>;
+
+    /// Reads the provided file from the system cache, or creates the file if necessary.
+    ///
+    /// Returns `Ok(None)` if the system does not expose a suitable cache directory.
+    fn get_or_cache(
+        &self,
+        path: &SystemPath,
+        read_contents: &dyn Fn() -> Result<String>,
+    ) -> Result<Option<SystemPathBuf>> {
+        let Some(cache_dir) = self.cache_dir() else {
+            return Ok(None);
+        };
+
+        let cache_path = cache_dir.join(path);
+
+        // The file has already been cached.
+        if self.is_file(&cache_path) {
+            return Ok(Some(cache_path));
+        }
+
+        // Read the file contents.
+        let contents = read_contents()?;
+
+        // Create the parent directory.
+        self.create_directory_all(cache_path.parent().unwrap())?;
+
+        // Create and write to the file on the system.
+        //
+        // Note that `create_new_file` will fail if the file has already been created. This
+        // ensures that only one thread/process ever attempts to write to it to avoid corrupting
+        // the cache.
+        self.create_new_file(&cache_path)?;
+        self.write_file(&cache_path, &contents)?;
+
+        Ok(Some(cache_path))
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -279,4 +412,28 @@ impl From<glob::GlobError> for GlobError {
 pub enum GlobErrorKind {
     IOError(io::Error),
     NonUtf8Path,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub fn file_time_now() -> FileTime {
+    FileTime::now()
+}
+
+#[cfg(target_arch = "wasm32")]
+pub fn file_time_now() -> FileTime {
+    // Copied from FileTime::from_system_time()
+    let time = web_time::SystemTime::now();
+
+    time.duration_since(web_time::UNIX_EPOCH)
+        .map(|d| FileTime::from_unix_time(d.as_secs() as i64, d.subsec_nanos()))
+        .unwrap_or_else(|e| {
+            let until_epoch = e.duration();
+            let (sec_offset, nanos) = if until_epoch.subsec_nanos() == 0 {
+                (0, 0)
+            } else {
+                (-1, 1_000_000_000 - until_epoch.subsec_nanos())
+            };
+
+            FileTime::from_unix_time(-(until_epoch.as_secs() as i64) + sec_offset, nanos)
+        })
 }

@@ -5,10 +5,10 @@ use ruff_python_literal::cformat::{CFormatPart, CFormatSpec, CFormatStrOrBytes, 
 use ruff_text_size::Ranged;
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -211,7 +211,7 @@ fn is_valid_dict(formats: &[CFormatStrOrBytes<String>], items: &[ast::DictItem])
 
 /// PLE1307
 pub(crate) fn bad_string_format_type(
-    checker: &mut Checker,
+    checker: &Checker,
     bin_op: &ast::ExprBinOp,
     format_string: &ast::ExprStringLiteral,
 ) {
@@ -219,6 +219,7 @@ pub(crate) fn bad_string_format_type(
     let mut format_strings = vec![];
     for StringLiteral {
         value: _,
+        node_index: _,
         range,
         flags,
     } in &format_string.value
@@ -230,18 +231,20 @@ pub(crate) fn bad_string_format_type(
         // Parse the format string (e.g. `"%s"`) into a list of `PercentFormat`.
         if let Ok(format_string) = CFormatString::from_str(string) {
             format_strings.push(format_string);
-        };
+        }
     }
 
     // Parse the parameters.
     let is_valid = match &*bin_op.right {
         Expr::Tuple(ast::ExprTuple { elts, .. }) => is_valid_tuple(&format_strings, elts),
-        Expr::Dict(ast::ExprDict { items, range: _ }) => is_valid_dict(&format_strings, items),
+        Expr::Dict(ast::ExprDict {
+            items,
+            range: _,
+            node_index: _,
+        }) => is_valid_dict(&format_strings, items),
         _ => is_valid_constant(&format_strings, &bin_op.right),
     };
     if !is_valid {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(BadStringFormatType, bin_op.range()));
+        checker.report_diagnostic(BadStringFormatType, bin_op.range());
     }
 }

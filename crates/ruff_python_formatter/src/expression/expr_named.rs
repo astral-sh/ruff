@@ -4,7 +4,7 @@ use ruff_python_ast::ExprNamed;
 
 use crate::comments::dangling_comments;
 use crate::expression::parentheses::{
-    in_parentheses_only_soft_line_break_or_space, NeedsParentheses, OptionalParentheses,
+    NeedsParentheses, OptionalParentheses, in_parentheses_only_soft_line_break_or_space,
 };
 use crate::prelude::*;
 
@@ -17,6 +17,7 @@ impl FormatNodeRule<ExprNamed> for FormatExprNamed {
             target,
             value,
             range: _,
+            node_index: _,
         } = item;
 
         // This context, a dangling comment is a comment between the `:=` and the value.

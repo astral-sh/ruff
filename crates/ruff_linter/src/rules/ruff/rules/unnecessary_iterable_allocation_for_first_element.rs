@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Arguments, Comprehension, Expr, Int};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_stdlib::builtins::is_iterator;
@@ -9,6 +8,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks the following constructs, all of which can be replaced by
@@ -72,10 +72,7 @@ impl AlwaysFixableViolation for UnnecessaryIterableAllocationForFirstElement {
 }
 
 /// RUF015
-pub(crate) fn unnecessary_iterable_allocation_for_first_element(
-    checker: &mut Checker,
-    expr: &Expr,
-) {
+pub(crate) fn unnecessary_iterable_allocation_for_first_element(checker: &Checker, expr: &Expr) {
     let value = match expr {
         // Ex) `list(x)[0]`
         Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
@@ -118,7 +115,7 @@ pub(crate) fn unnecessary_iterable_allocation_for_first_element(
         Cow::Owned(format!("iter({iterable})"))
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UnnecessaryIterableAllocationForFirstElement {
             iterable: SourceCodeSnippet::new(iterable.to_string()),
         },
@@ -129,8 +126,6 @@ pub(crate) fn unnecessary_iterable_allocation_for_first_element(
         format!("next({iterable})"),
         expr.range(),
     )));
-
-    checker.diagnostics.push(diagnostic);
 }
 
 /// Check that the slice [`Expr`] is a slice of the first element (e.g., `x[0]`).
@@ -266,9 +261,11 @@ fn match_iteration_target(expr: &Expr, semantic: &SemanticModel) -> Option<Itera
 /// Returns the [`Expr`] target for a comprehension, if the comprehension is "simple"
 /// (e.g., `x` for `[i for i in x]`).
 fn match_simple_comprehension(elt: &Expr, generators: &[Comprehension]) -> Option<TextRange> {
-    let [generator @ Comprehension {
-        is_async: false, ..
-    }] = generators
+    let [
+        generator @ Comprehension {
+            is_async: false, ..
+        },
+    ] = generators
     else {
         return None;
     };

@@ -1,14 +1,14 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_async::helpers::AsyncModule;
-use crate::settings::types::PythonVersion;
+use ruff_python_ast::PythonVersion;
 
-#[allow(clippy::doc_link_with_quotes)]
+#[expect(clippy::doc_link_with_quotes)]
 /// ## What it does
 /// Checks for `async` function definitions with `timeout` parameters.
 ///
@@ -87,10 +87,7 @@ impl Violation for AsyncFunctionWithTimeout {
 }
 
 /// ASYNC109
-pub(crate) fn async_function_with_timeout(
-    checker: &mut Checker,
-    function_def: &ast::StmtFunctionDef,
-) {
+pub(crate) fn async_function_with_timeout(checker: &Checker, function_def: &ast::StmtFunctionDef) {
     // Detect `async` calls with a `timeout` argument.
     if !function_def.is_async {
         return;
@@ -111,12 +108,9 @@ pub(crate) fn async_function_with_timeout(
     };
 
     // asyncio.timeout feature was first introduced in Python 3.11
-    if module == AsyncModule::AsyncIo && checker.settings.target_version < PythonVersion::Py311 {
+    if module == AsyncModule::AsyncIo && checker.target_version() < PythonVersion::PY311 {
         return;
     }
 
-    checker.diagnostics.push(Diagnostic::new(
-        AsyncFunctionWithTimeout { module },
-        timeout.range(),
-    ));
+    checker.report_diagnostic(AsyncFunctionWithTimeout { module }, timeout.range());
 }

@@ -1,14 +1,14 @@
-use ruff_formatter::{write, FormatRuleWithOptions};
+use ruff_formatter::{FormatRuleWithOptions, write};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{Expr, ExprAttribute, ExprNumberLiteral, Number};
-use ruff_python_trivia::{find_only_token_in_range, SimpleTokenKind};
+use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer, find_only_token_in_range};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::dangling_comments;
-use crate::expression::parentheses::{
-    is_expression_parenthesized, NeedsParentheses, OptionalParentheses, Parentheses,
-};
 use crate::expression::CallChainLayout;
+use crate::expression::parentheses::{
+    NeedsParentheses, OptionalParentheses, Parentheses, is_expression_parenthesized,
+};
 use crate::prelude::*;
 
 #[derive(Default)]
@@ -30,6 +30,7 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
         let ExprAttribute {
             value,
             range: _,
+            node_index: _,
             attr,
             ctx: _,
         } = item;
@@ -50,9 +51,6 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
                 if parenthesize_value {
                     // Don't propagate the call chain layout.
                     value.format().with_options(Parentheses::Always).fmt(f)?;
-
-                    // Format the dot on its own line.
-                    soft_line_break().fmt(f)?;
                 } else {
                     match value.as_ref() {
                         Expr::Attribute(expr) => {
@@ -60,11 +58,9 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
                         }
                         Expr::Call(expr) => {
                             expr.format().with_options(call_chain_layout).fmt(f)?;
-                            soft_line_break().fmt(f)?;
                         }
                         Expr::Subscript(expr) => {
                             expr.format().with_options(call_chain_layout).fmt(f)?;
-                            soft_line_break().fmt(f)?;
                         }
                         _ => {
                             value.format().with_options(Parentheses::Never).fmt(f)?;
@@ -77,19 +73,56 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
                 value.format().with_options(Parentheses::Never).fmt(f)?;
             }
 
+            let comments = f.context().comments().clone();
+
+            // Always add a line break if the value is parenthesized and there's an
+            // end of line comment on the same line as the closing parenthesis.
+            // ```python
+            // (
+            //      (
+            //          a
+            //      )  # `end_of_line_comment`
+            //      .
+            //      b
+            // )
+            // ```
+            let has_trailing_end_of_line_comment =
+                SimpleTokenizer::starts_at(value.end(), f.context().source())
+                    .skip_trivia()
+                    .take_while(|token| token.kind == SimpleTokenKind::RParen)
+                    .last()
+                    .is_some_and(|right_paren| {
+                        let trailing_value_comments = comments.trailing(&**value);
+                        trailing_value_comments.iter().any(|comment| {
+                            comment.line_position().is_end_of_line()
+                                && comment.start() > right_paren.end()
+                        })
+                    });
+
+            if has_trailing_end_of_line_comment {
+                hard_line_break().fmt(f)?;
+            }
+            // Allow the `.` on its own line if this is a fluent call chain
+            // and the value either requires parenthesizing or is a call or subscript expression
+            // (it's a fluent chain but not the first element).
+            else if call_chain_layout == CallChainLayout::Fluent {
+                if parenthesize_value || value.is_call_expr() || value.is_subscript_expr() {
+                    soft_line_break().fmt(f)?;
+                }
+            }
+
             // Identify dangling comments before and after the dot:
             // ```python
             // (
             //      (
             //          a
-            //      )  # `before_dot`
+            //      )
             //      # `before_dot`
             //      .  # `after_dot`
             //      # `after_dot`
             //      b
             // )
             // ```
-            let comments = f.context().comments().clone();
             let dangling = comments.dangling(item);
             let (before_dot, after_dot) = if dangling.is_empty() {
                 (dangling, dangling)
@@ -156,7 +189,12 @@ impl NeedsParentheses for ExprAttribute {
 // Non Hex, octal or binary number literals need parentheses to disambiguate the attribute `.` from
 // a decimal point. Floating point numbers don't strictly need parentheses but it reads better (rather than 0.0.test()).
 fn is_base_ten_number_literal(expr: &Expr, source: &str) -> bool {
-    if let Some(ExprNumberLiteral { value, range }) = expr.as_number_literal_expr() {
+    if let Some(ExprNumberLiteral {
+        value,
+        range,
+        node_index: _,
+    }) = expr.as_number_literal_expr()
+    {
         match value {
             Number::Float(_) => true,
             Number::Int(_) => {

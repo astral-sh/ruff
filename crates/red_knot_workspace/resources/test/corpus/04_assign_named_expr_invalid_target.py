@@ -1,1 +1,0 @@
-../../../../ruff_python_parser/resources/invalid/expressions/named/invalid_target.py

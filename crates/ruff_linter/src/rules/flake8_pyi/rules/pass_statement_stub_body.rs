@@ -1,9 +1,9 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Stmt;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for `pass` statements in empty stub bodies.
@@ -23,7 +23,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## References
-/// - [Typing documentation - Writing and Maintaining Stub Files](https://typing.readthedocs.io/en/latest/guides/writing_stubs.html)
+/// - [Typing documentation - Writing and Maintaining Stub Files](https://typing.python.org/en/latest/guides/writing_stubs.html)
 #[derive(ViolationMetadata)]
 pub(crate) struct PassStatementStubBody;
 
@@ -39,15 +39,14 @@ impl AlwaysFixableViolation for PassStatementStubBody {
 }
 
 /// PYI009
-pub(crate) fn pass_statement_stub_body(checker: &mut Checker, body: &[Stmt]) {
+pub(crate) fn pass_statement_stub_body(checker: &Checker, body: &[Stmt]) {
     let [Stmt::Pass(pass)] = body else {
         return;
     };
 
-    let mut diagnostic = Diagnostic::new(PassStatementStubBody, pass.range());
+    let mut diagnostic = checker.report_diagnostic(PassStatementStubBody, pass.range());
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         "...".to_string(),
         pass.range(),
     )));
-    checker.diagnostics.push(diagnostic);
 }

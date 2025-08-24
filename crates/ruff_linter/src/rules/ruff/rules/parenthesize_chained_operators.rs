@@ -1,10 +1,10 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for chained operators where adding parentheses could improve the
@@ -48,10 +48,7 @@ impl AlwaysFixableViolation for ParenthesizeChainedOperators {
 }
 
 /// RUF021
-pub(crate) fn parenthesize_chained_logical_operators(
-    checker: &mut Checker,
-    expr: &ast::ExprBoolOp,
-) {
+pub(crate) fn parenthesize_chained_logical_operators(checker: &Checker, expr: &ast::ExprBoolOp) {
     // We're only interested in `and` expressions inside `or` expressions:
     // - `a or b or c` => `BoolOp(values=[Name("a"), Name("b"), Name("c")], op=Or)`
     // - `a and b and c` => `BoolOp(values=[Name("a"), Name("b"), Name("c")], op=And)`
@@ -89,13 +86,12 @@ pub(crate) fn parenthesize_chained_logical_operators(
                 {
                     let new_source = format!("({})", locator.slice(source_range));
                     let edit = Edit::range_replacement(new_source, source_range);
-                    checker.diagnostics.push(
-                        Diagnostic::new(ParenthesizeChainedOperators, source_range)
-                            .with_fix(Fix::safe_edit(edit)),
-                    );
+                    checker
+                        .report_diagnostic(ParenthesizeChainedOperators, source_range)
+                        .set_fix(Fix::safe_edit(edit));
                 }
             }
             _ => continue,
-        };
+        }
     }
 }

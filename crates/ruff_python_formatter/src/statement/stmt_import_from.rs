@@ -1,9 +1,8 @@
 use ruff_formatter::write;
-use ruff_python_ast::AstNode;
 use ruff_python_ast::StmtImportFrom;
 use ruff_text_size::Ranged;
 
-use crate::builders::{parenthesize_if_expands, PyFormatterExtensions, TrailingComma};
+use crate::builders::{PyFormatterExtensions, TrailingComma, parenthesize_if_expands};
 use crate::comments::SourceComment;
 use crate::expression::parentheses::parenthesized;
 use crate::has_skip_comment;
@@ -20,6 +19,7 @@ impl FormatNodeRule<StmtImportFrom> for FormatStmtImportFrom {
             names,
             level,
             range: _,
+            node_index: _,
         } = item;
 
         write!(
@@ -62,7 +62,7 @@ impl FormatNodeRule<StmtImportFrom> for FormatStmtImportFrom {
         // )
         // ```
         let comments = f.context().comments().clone();
-        let parenthesized_comments = comments.dangling(item.as_any_node_ref());
+        let parenthesized_comments = comments.dangling(item);
 
         if parenthesized_comments.is_empty() {
             parenthesize_if_expands(&names).fmt(f)

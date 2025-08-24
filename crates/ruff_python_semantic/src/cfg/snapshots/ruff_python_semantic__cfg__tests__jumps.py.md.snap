@@ -1,0 +1,81 @@
+---
+source: crates/ruff_python_semantic/src/cfg/mod.rs
+description: "This is a Mermaid graph. You can use https://mermaid.live to visualize it as a diagram."
+---
+## Function 0
+### Source
+```python
+def only_return():
+    return
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+	node0["return"]
+	node1((("EXIT")))
+	node0==>node1
+```
+
+## Function 1
+### Source
+```python
+def after_return():
+    return 1
+    print("unreachable")
+    print("and this")
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+	node0["return 1"]
+	node1((("EXIT")))
+	node2["print(#quot;unreachable#quot;)
+print(#quot;and this#quot;)"]
+	node0==>node1
+	node2==>node1
+```
+
+## Function 2
+### Source
+```python
+def after_raise():
+    raise ValueError
+    print("unreachable")
+    print("and this")
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+	node0["raise ValueError"]
+	node1((("EXIT")))
+	node2["print(#quot;unreachable#quot;)
+print(#quot;and this#quot;)"]
+	node0==>node1
+	node2==>node1
+```
+
+## Function 3
+### Source
+```python
+def multiple_returns():
+    return 1
+    print("unreachable")
+    return 2
+    print("and this")
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+	node0["return 1"]
+	node1((("EXIT")))
+	node2["print(#quot;unreachable#quot;)
+return 2"]
+	node3["print(#quot;and this#quot;)"]
+	node0==>node1
+	node2==>node1
+	node3==>node1
+```

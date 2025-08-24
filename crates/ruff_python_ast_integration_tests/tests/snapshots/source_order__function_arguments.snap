@@ -1,26 +1,34 @@
 ---
 source: crates/ruff_python_ast_integration_tests/tests/source_order.rs
 expression: trace
-snapshot_kind: text
 ---
 - ModModule
   - StmtFunctionDef
+    - Identifier
     - Parameters
       - ParameterWithDefault
         - Parameter
+          - Identifier
       - ParameterWithDefault
         - Parameter
+          - Identifier
       - ParameterWithDefault
         - Parameter
+          - Identifier
       - ParameterWithDefault
         - Parameter
+          - Identifier
         - ExprNumberLiteral
       - Parameter
+        - Identifier
       - ParameterWithDefault
         - Parameter
+          - Identifier
         - ExprNumberLiteral
       - ParameterWithDefault
         - Parameter
+          - Identifier
         - ExprNumberLiteral
       - Parameter
+        - Identifier
     - StmtPass

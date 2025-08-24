@@ -1,10 +1,10 @@
 use ruff_python_ast::{self as ast, Alias, Identifier, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::checkers::ast::Checker;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for submodule imports that are aliased to the submodule name.
@@ -47,12 +47,7 @@ impl Violation for ManualFromImport {
 }
 
 /// PLR0402
-pub(crate) fn manual_from_import(
-    checker: &mut Checker,
-    stmt: &Stmt,
-    alias: &Alias,
-    names: &[Alias],
-) {
+pub(crate) fn manual_from_import(checker: &Checker, stmt: &Stmt, alias: &Alias, names: &[Alias]) {
     let Some(asname) = &alias.asname else {
         return;
     };
@@ -63,7 +58,7 @@ pub(crate) fn manual_from_import(
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         ManualFromImport {
             module: module.to_string(),
             name: name.to_string(),
@@ -77,14 +72,15 @@ pub(crate) fn manual_from_import(
                 name: asname.clone(),
                 asname: None,
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             }],
             level: 0,
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         };
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             checker.generator().stmt(&node.into()),
             stmt.range(),
         )));
     }
-    checker.diagnostics.push(diagnostic);
 }

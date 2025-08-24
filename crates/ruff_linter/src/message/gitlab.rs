@@ -1,5 +1,5 @@
-use std::collections::hash_map::DefaultHasher;
 use std::collections::HashSet;
+use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::io::Write;
 
@@ -7,8 +7,10 @@ use serde::ser::SerializeSeq;
 use serde::{Serialize, Serializer};
 use serde_json::json;
 
+use ruff_db::diagnostic::Diagnostic;
+
 use crate::fs::{relativize_path, relativize_path_to};
-use crate::message::{Emitter, EmitterContext, Message};
+use crate::message::{Emitter, EmitterContext};
 
 /// Generate JSON with violations in GitLab CI format
 //  https://docs.gitlab.com/ee/ci/testing/code_quality.html#implement-a-custom-tool
@@ -28,13 +30,13 @@ impl Emitter for GitlabEmitter {
     fn emit(
         &mut self,
         writer: &mut dyn Write,
-        messages: &[Message],
+        diagnostics: &[Diagnostic],
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
         serde_json::to_writer_pretty(
             writer,
             &SerializedMessages {
-                messages,
+                diagnostics,
                 context,
                 project_dir: self.project_dir.as_deref(),
             },
@@ -45,7 +47,7 @@ impl Emitter for GitlabEmitter {
 }
 
 struct SerializedMessages<'a> {
-    messages: &'a [Message],
+    diagnostics: &'a [Diagnostic],
     context: &'a EmitterContext<'a>,
     project_dir: Option<&'a str>,
 }
@@ -55,55 +57,54 @@ impl Serialize for SerializedMessages<'_> {
     where
         S: Serializer,
     {
-        let mut s = serializer.serialize_seq(Some(self.messages.len()))?;
-        let mut fingerprints = HashSet::<u64>::with_capacity(self.messages.len());
+        let mut s = serializer.serialize_seq(Some(self.diagnostics.len()))?;
+        let mut fingerprints = HashSet::<u64>::with_capacity(self.diagnostics.len());
 
-        for message in self.messages {
-            let start_location = message.compute_start_location();
-            let end_location = message.compute_end_location();
+        for diagnostic in self.diagnostics {
+            let filename = diagnostic.expect_ruff_filename();
 
-            let lines = if self.context.is_notebook(message.filename()) {
+            let (start_location, end_location) = if self.context.is_notebook(&filename) {
                 // We can't give a reasonable location for the structured formats,
                 // so we show one that's clearly a fallback
-                json!({
-                    "begin": 1,
-                    "end": 1
-                })
+                Default::default()
             } else {
-                json!({
-                    "begin": start_location.row,
-                    "end": end_location.row
-                })
+                (
+                    diagnostic.expect_ruff_start_location(),
+                    diagnostic.expect_ruff_end_location(),
+                )
             };
 
             let path = self.project_dir.as_ref().map_or_else(
-                || relativize_path(message.filename()),
-                |project_dir| relativize_path_to(message.filename(), project_dir),
+                || relativize_path(&filename),
+                |project_dir| relativize_path_to(&filename, project_dir),
             );
 
-            let mut message_fingerprint = fingerprint(message, &path, 0);
+            let mut message_fingerprint = fingerprint(diagnostic, &path, 0);
 
             // Make sure that we do not get a fingerprint that is already in use
             // by adding in the previously generated one.
             while fingerprints.contains(&message_fingerprint) {
-                message_fingerprint = fingerprint(message, &path, message_fingerprint);
+                message_fingerprint = fingerprint(diagnostic, &path, message_fingerprint);
             }
             fingerprints.insert(message_fingerprint);
 
-            let description = if let Some(rule) = message.rule() {
-                format!("({}) {}", rule.noqa_code(), message.body())
-            } else {
-                message.body().to_string()
-            };
+            let description = diagnostic.body();
+            let check_name = diagnostic.secondary_code_or_id();
 
             let value = json!({
-                "description": description,
+                "check_name": check_name,
+                // GitLab doesn't display the separate `check_name` field in a Code Quality report,
+                // so prepend it to the description too.
+                "description": format!("{check_name}: {description}"),
                 "severity": "major",
                 "fingerprint": format!("{:x}", message_fingerprint),
                 "location": {
                     "path": path,
-                    "lines": lines
-                }
+                    "positions": {
+                        "begin": start_location,
+                        "end": end_location,
+                    },
+                },
             });
 
             s.serialize_element(&value)?;
@@ -114,7 +115,7 @@ impl Serialize for SerializedMessages<'_> {
 }
 
 /// Generate a unique fingerprint to identify a violation.
-fn fingerprint(message: &Message, project_path: &str, salt: u64) -> u64 {
+fn fingerprint(message: &Diagnostic, project_path: &str, salt: u64) -> u64 {
     let mut hasher = DefaultHasher::new();
 
     salt.hash(&mut hasher);
@@ -128,15 +129,15 @@ fn fingerprint(message: &Message, project_path: &str, salt: u64) -> u64 {
 mod tests {
     use insta::assert_snapshot;
 
-    use crate::message::tests::{
-        capture_emitter_output, create_messages, create_syntax_error_messages,
-    };
     use crate::message::GitlabEmitter;
+    use crate::message::tests::{
+        capture_emitter_output, create_diagnostics, create_syntax_error_diagnostics,
+    };
 
     #[test]
     fn output() {
         let mut emitter = GitlabEmitter::default();
-        let content = capture_emitter_output(&mut emitter, &create_messages());
+        let content = capture_emitter_output(&mut emitter, &create_diagnostics());
 
         assert_snapshot!(redact_fingerprint(&content));
     }
@@ -144,7 +145,7 @@ mod tests {
     #[test]
     fn syntax_errors() {
         let mut emitter = GitlabEmitter::default();
-        let content = capture_emitter_output(&mut emitter, &create_syntax_error_messages());
+        let content = capture_emitter_output(&mut emitter, &create_syntax_error_diagnostics());
 
         assert_snapshot!(redact_fingerprint(&content));
     }

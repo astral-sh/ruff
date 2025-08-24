@@ -5,12 +5,12 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::env::VarError;
-use std::num::{NonZeroU16, NonZeroU8};
+use std::num::{NonZeroU8, NonZeroU16};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
-use anyhow::{anyhow, Result};
-use glob::{glob, GlobError, Paths, PatternError};
+use anyhow::{Context, Result, anyhow};
+use glob::{GlobError, Paths, PatternError, glob};
 use itertools::Itertools;
 use regex::Regex;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -20,23 +20,26 @@ use strum::IntoEnumIterator;
 
 use ruff_cache::cache_dir;
 use ruff_formatter::IndentStyle;
-use ruff_graph::{AnalyzeSettings, Direction};
+use ruff_graph::{AnalyzeSettings, Direction, StringImports};
 use ruff_linter::line_width::{IndentWidth, LineLength};
-use ruff_linter::registry::RuleNamespace;
-use ruff_linter::registry::{Rule, RuleSet, INCOMPATIBLE_CODES};
+use ruff_linter::registry::{INCOMPATIBLE_CODES, Rule, RuleNamespace, RuleSet};
 use ruff_linter::rule_selector::{PreviewOptions, Specificity};
 use ruff_linter::rules::{flake8_import_conventions, isort, pycodestyle};
 use ruff_linter::settings::fix_safety_table::FixSafetyTable;
 use ruff_linter::settings::rule_table::RuleTable;
 use ruff_linter::settings::types::{
-    CompiledPerFileIgnoreList, ExtensionMapping, FilePattern, FilePatternSet, OutputFormat,
-    PerFileIgnore, PreviewMode, PythonVersion, RequiredVersion, UnsafeFixes,
+    CompiledPerFileIgnoreList, CompiledPerFileTargetVersionList, ExtensionMapping, FilePattern,
+    FilePatternSet, GlobPath, OutputFormat, PerFileIgnore, PerFileTargetVersion, PreviewMode,
+    RequiredVersion, UnsafeFixes,
 };
-use ruff_linter::settings::{LinterSettings, DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX, TASK_TAGS};
+use ruff_linter::settings::{
+    DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX, LinterSettings, TASK_TAGS, TargetVersion,
+};
 use ruff_linter::{
-    fs, warn_user_once, warn_user_once_by_id, warn_user_once_by_message, RuleSelector,
-    RUFF_PKG_VERSION,
+    RUFF_PKG_VERSION, RuleSelector, fs, warn_user_once, warn_user_once_by_id,
+    warn_user_once_by_message,
 };
+use ruff_python_ast as ast;
 use ruff_python_formatter::{
     DocstringCode, DocstringCodeLineWidth, MagicTrailingComma, QuoteStyle,
 };
@@ -52,7 +55,7 @@ use crate::options::{
     PydoclintOptions, PydocstyleOptions, PyflakesOptions, PylintOptions, RuffOptions,
 };
 use crate::settings::{
-    FileResolverSettings, FormatterSettings, LineEnding, Settings, EXCLUDE, INCLUDE,
+    EXCLUDE, FileResolverSettings, FormatterSettings, INCLUDE, LineEnding, Settings,
 };
 
 #[derive(Clone, Debug, Default)]
@@ -136,7 +139,8 @@ pub struct Configuration {
     pub builtins: Option<Vec<String>>,
     pub namespace_packages: Option<Vec<PathBuf>>,
     pub src: Option<Vec<PathBuf>>,
-    pub target_version: Option<PythonVersion>,
+    pub target_version: Option<ast::PythonVersion>,
+    pub per_file_target_version: Option<Vec<PerFileTargetVersion>>,
 
     // Global formatting options
     pub line_length: Option<LineLength>,
@@ -161,6 +165,7 @@ impl Configuration {
             }
         }
 
+        let linter_target_version = TargetVersion(self.target_version);
         let target_version = self.target_version.unwrap_or_default();
         let global_preview = self.preview.unwrap_or_default();
 
@@ -173,19 +178,17 @@ impl Configuration {
             PreviewMode::Enabled => ruff_python_formatter::PreviewMode::Enabled,
         };
 
+        let per_file_target_version = CompiledPerFileTargetVersionList::resolve(
+            self.per_file_target_version.unwrap_or_default(),
+        )
+        .context("failed to resolve `per-file-target-version` table")?;
+
         let formatter = FormatterSettings {
             exclude: FilePatternSet::try_from_iter(format.exclude.unwrap_or_default())?,
             extension: self.extension.clone().unwrap_or_default(),
             preview: format_preview,
-            target_version: match target_version {
-                PythonVersion::Py37 => ruff_python_formatter::PythonVersion::Py37,
-                PythonVersion::Py38 => ruff_python_formatter::PythonVersion::Py38,
-                PythonVersion::Py39 => ruff_python_formatter::PythonVersion::Py39,
-                PythonVersion::Py310 => ruff_python_formatter::PythonVersion::Py310,
-                PythonVersion::Py311 => ruff_python_formatter::PythonVersion::Py311,
-                PythonVersion::Py312 => ruff_python_formatter::PythonVersion::Py312,
-                PythonVersion::Py313 => ruff_python_formatter::PythonVersion::Py313,
-            },
+            unresolved_target_version: target_version,
+            per_file_target_version: per_file_target_version.clone(),
             line_width: self
                 .line_length
                 .map_or(format_defaults.line_width, |length| {
@@ -219,9 +222,14 @@ impl Configuration {
             preview: analyze_preview,
             target_version,
             extension: self.extension.clone().unwrap_or_default(),
-            detect_string_imports: analyze
-                .detect_string_imports
-                .unwrap_or(analyze_defaults.detect_string_imports),
+            string_imports: StringImports {
+                enabled: analyze
+                    .detect_string_imports
+                    .unwrap_or(analyze_defaults.string_imports.enabled),
+                min_dots: analyze
+                    .string_imports_min_dots
+                    .unwrap_or(analyze_defaults.string_imports.min_dots),
+            },
             include_dependencies: analyze
                 .include_dependencies
                 .unwrap_or(analyze_defaults.include_dependencies),
@@ -242,10 +250,19 @@ impl Configuration {
             .unwrap_or_default();
         let flake8_import_conventions = lint
             .flake8_import_conventions
-            .map(Flake8ImportConventionsOptions::into_settings)
+            .map(Flake8ImportConventionsOptions::try_into_settings)
+            .transpose()?
             .unwrap_or_default();
 
         conflicting_import_settings(&isort, &flake8_import_conventions)?;
+
+        let future_annotations = lint.future_annotations.unwrap_or_default();
+        if lint_preview.is_disabled() && future_annotations {
+            warn_user_once!(
+                "The `lint.future-annotations` setting will have no effect \
+                    because `preview` is disabled"
+            );
+        }
 
         Ok(Settings {
             cache_dir: self
@@ -272,13 +289,13 @@ impl Configuration {
                 project_root: project_root.to_path_buf(),
             },
 
-            #[allow(deprecated)]
             linter: LinterSettings {
                 rules,
                 exclude: FilePatternSet::try_from_iter(lint.exclude.unwrap_or_default())?,
                 extension: self.extension.unwrap_or_default(),
                 preview: lint_preview,
-                target_version,
+                unresolved_target_version: linter_target_version,
+                per_file_target_version,
                 project_root: project_root.to_path_buf(),
                 allowed_confusables: lint
                     .allowed_confusables
@@ -325,7 +342,7 @@ impl Configuration {
                     .unwrap_or_default(),
                 flake8_bandit: lint
                     .flake8_bandit
-                    .map(Flake8BanditOptions::into_settings)
+                    .map(|flake8_bandit| flake8_bandit.into_settings(lint.ruff.as_ref()))
                     .unwrap_or_default(),
                 flake8_boolean_trap: lint
                     .flake8_boolean_trap
@@ -428,6 +445,8 @@ impl Configuration {
                     .ruff
                     .map(RuffOptions::into_settings)
                     .unwrap_or_default(),
+                typing_extensions: lint.typing_extensions.unwrap_or(true),
+                future_annotations,
             },
 
             formatter,
@@ -470,7 +489,7 @@ impl Configuration {
                 paths
                     .into_iter()
                     .map(|pattern| {
-                        let absolute = fs::normalize_path_to(&pattern, project_root);
+                        let absolute = GlobPath::normalize(&pattern, project_root);
                         FilePattern::User(pattern, absolute)
                     })
                     .collect()
@@ -489,7 +508,7 @@ impl Configuration {
                     paths
                         .into_iter()
                         .map(|pattern| {
-                            let absolute = fs::normalize_path_to(&pattern, project_root);
+                            let absolute = GlobPath::normalize(&pattern, project_root);
                             FilePattern::User(pattern, absolute)
                         })
                         .collect()
@@ -501,7 +520,7 @@ impl Configuration {
                     paths
                         .into_iter()
                         .map(|pattern| {
-                            let absolute = fs::normalize_path_to(&pattern, project_root);
+                            let absolute = GlobPath::normalize(&pattern, project_root);
                             FilePattern::User(pattern, absolute)
                         })
                         .collect()
@@ -511,7 +530,7 @@ impl Configuration {
                 paths
                     .into_iter()
                     .map(|pattern| {
-                        let absolute = fs::normalize_path_to(&pattern, project_root);
+                        let absolute = GlobPath::normalize(&pattern, project_root);
                         FilePattern::User(pattern, absolute)
                     })
                     .collect()
@@ -535,7 +554,19 @@ impl Configuration {
                 .src
                 .map(|src| resolve_src(&src, project_root))
                 .transpose()?,
-            target_version: options.target_version,
+            target_version: options.target_version.map(ast::PythonVersion::from),
+            per_file_target_version: options.per_file_target_version.map(|versions| {
+                versions
+                    .into_iter()
+                    .map(|(pattern, version)| {
+                        PerFileTargetVersion::new(
+                            pattern,
+                            ast::PythonVersion::from(version),
+                            Some(project_root),
+                        )
+                    })
+                    .collect()
+            }),
             // `--extension` is a hidden command-line argument that isn't supported in configuration
             // files at present.
             extension: None,
@@ -583,6 +614,9 @@ impl Configuration {
             show_fixes: self.show_fixes.or(config.show_fixes),
             src: self.src.or(config.src),
             target_version: self.target_version.or(config.target_version),
+            per_file_target_version: self
+                .per_file_target_version
+                .or(config.per_file_target_version),
             preview: self.preview.or(config.preview),
             extension: self.extension.or(config.extension),
 
@@ -616,6 +650,8 @@ pub struct LintConfiguration {
     pub logger_objects: Option<Vec<String>>,
     pub task_tags: Option<Vec<String>>,
     pub typing_modules: Option<Vec<String>>,
+    pub typing_extensions: Option<bool>,
+    pub future_annotations: Option<bool>,
 
     // Plugins
     pub flake8_annotations: Option<Flake8AnnotationsOptions>,
@@ -649,7 +685,7 @@ pub struct LintConfiguration {
 
 impl LintConfiguration {
     fn from_options(options: LintOptions, project_root: &Path) -> Result<Self> {
-        #[allow(deprecated)]
+        #[expect(deprecated)]
         let ignore = options
             .common
             .ignore
@@ -657,7 +693,7 @@ impl LintConfiguration {
             .flatten()
             .chain(options.common.extend_ignore.into_iter().flatten())
             .collect();
-        #[allow(deprecated)]
+        #[expect(deprecated)]
         let unfixable = options
             .common
             .unfixable
@@ -666,10 +702,12 @@ impl LintConfiguration {
             .chain(options.common.extend_unfixable.into_iter().flatten())
             .collect();
 
-        #[allow(deprecated)]
+        #[expect(deprecated)]
         let ignore_init_module_imports = {
             if options.common.ignore_init_module_imports.is_some() {
-                warn_user_once!("The `ignore-init-module-imports` option is deprecated and will be removed in a future release. Ruff's handling of imports in `__init__.py` files has been improved (in preview) and unused imports will always be flagged.");
+                warn_user_once!(
+                    "The `ignore-init-module-imports` option is deprecated and will be removed in a future release. Ruff's handling of imports in `__init__.py` files has been improved (in preview) and unused imports will always be flagged."
+                );
             }
             options.common.ignore_init_module_imports
         };
@@ -679,7 +717,7 @@ impl LintConfiguration {
                 paths
                     .into_iter()
                     .map(|pattern| {
-                        let absolute = fs::normalize_path_to(&pattern, project_root);
+                        let absolute = GlobPath::normalize(&pattern, project_root);
                         FilePattern::User(pattern, absolute)
                     })
                     .collect()
@@ -729,6 +767,8 @@ impl LintConfiguration {
             task_tags: options.common.task_tags,
             logger_objects: options.common.logger_objects,
             typing_modules: options.common.typing_modules,
+            typing_extensions: options.typing_extensions,
+            future_annotations: options.future_annotations,
 
             // Plugins
             flake8_annotations: options.common.flake8_annotations,
@@ -1024,7 +1064,9 @@ impl LintConfiguration {
                 [] => (),
                 [selection] => {
                     let (prefix, code) = selection.prefix_and_code();
-                    return Err(anyhow!("Selection of deprecated rule `{prefix}{code}` is not allowed when preview is enabled."));
+                    return Err(anyhow!(
+                        "Selection of deprecated rule `{prefix}{code}` is not allowed when preview is enabled."
+                    ));
                 }
                 [..] => {
                     let mut message = "Selection of deprecated rules is not allowed when preview is enabled. Remove selection of:".to_string();
@@ -1072,7 +1114,7 @@ impl LintConfiguration {
         // approach to give each pair it's own `warn_user_once`.
         for (preferred, expendable, message) in INCOMPATIBLE_CODES {
             if rules.enabled(*preferred) && rules.enabled(*expendable) {
-                warn_user_once_by_id!(expendable.as_ref(), "{}", message);
+                warn_user_once_by_id!(expendable.name().as_str(), "{}", message);
                 rules.disable(*expendable);
             }
         }
@@ -1153,6 +1195,8 @@ impl LintConfiguration {
             pylint: self.pylint.combine(config.pylint),
             pyupgrade: self.pyupgrade.combine(config.pyupgrade),
             ruff: self.ruff.combine(config.ruff),
+            typing_extensions: self.typing_extensions.or(config.typing_extensions),
+            future_annotations: self.future_annotations.or(config.future_annotations),
         }
     }
 }
@@ -1172,7 +1216,6 @@ pub struct FormatConfiguration {
 }
 
 impl FormatConfiguration {
-    #[allow(clippy::needless_pass_by_value)]
     pub fn from_options(options: FormatOptions, project_root: &Path) -> Result<Self> {
         Ok(Self {
             // `--extension` is a hidden command-line argument that isn't supported in configuration
@@ -1182,7 +1225,7 @@ impl FormatConfiguration {
                 paths
                     .into_iter()
                     .map(|pattern| {
-                        let absolute = fs::normalize_path_to(&pattern, project_root);
+                        let absolute = GlobPath::normalize(&pattern, project_root);
                         FilePattern::User(pattern, absolute)
                     })
                     .collect()
@@ -1210,7 +1253,6 @@ impl FormatConfiguration {
     }
 
     #[must_use]
-    #[allow(clippy::needless_pass_by_value)]
     pub fn combine(self, config: Self) -> Self {
         Self {
             exclude: self.exclude.or(config.exclude),
@@ -1235,18 +1277,18 @@ pub struct AnalyzeConfiguration {
 
     pub direction: Option<Direction>,
     pub detect_string_imports: Option<bool>,
+    pub string_imports_min_dots: Option<usize>,
     pub include_dependencies: Option<BTreeMap<PathBuf, (PathBuf, Vec<String>)>>,
 }
 
 impl AnalyzeConfiguration {
-    #[allow(clippy::needless_pass_by_value)]
     pub fn from_options(options: AnalyzeOptions, project_root: &Path) -> Result<Self> {
         Ok(Self {
             exclude: options.exclude.map(|paths| {
                 paths
                     .into_iter()
                     .map(|pattern| {
-                        let absolute = fs::normalize_path_to(&pattern, project_root);
+                        let absolute = GlobPath::normalize(&pattern, project_root);
                         FilePattern::User(pattern, absolute)
                     })
                     .collect()
@@ -1254,6 +1296,7 @@ impl AnalyzeConfiguration {
             preview: options.preview.map(PreviewMode::from),
             direction: options.direction,
             detect_string_imports: options.detect_string_imports,
+            string_imports_min_dots: options.string_imports_min_dots,
             include_dependencies: options.include_dependencies.map(|dependencies| {
                 dependencies
                     .into_iter()
@@ -1266,13 +1309,15 @@ impl AnalyzeConfiguration {
     }
 
     #[must_use]
-    #[allow(clippy::needless_pass_by_value)]
     pub fn combine(self, config: Self) -> Self {
         Self {
             exclude: self.exclude.or(config.exclude),
             preview: self.preview.or(config.preview),
             direction: self.direction.or(config.direction),
             detect_string_imports: self.detect_string_imports.or(config.detect_string_imports),
+            string_imports_min_dots: self
+                .string_imports_min_dots
+                .or(config.string_imports_min_dots),
             include_dependencies: self.include_dependencies.or(config.include_dependencies),
         }
     }
@@ -1318,7 +1363,7 @@ fn warn_about_deprecated_top_level_lint_options(
     top_level_options: &LintCommonOptions,
     path: Option<&Path>,
 ) {
-    #[allow(deprecated)]
+    #[expect(deprecated)]
     let LintCommonOptions {
         allowed_confusables,
         dummy_variable_rgx,
@@ -1576,9 +1621,20 @@ fn conflicting_import_settings(
     use std::fmt::Write;
     let mut err_body = String::new();
     for required_import in &isort.required_imports {
-        let name = required_import.qualified_name().to_string();
-        if let Some(alias) = flake8_import_conventions.aliases.get(&name) {
-            writeln!(err_body, "    - `{name}` -> `{alias}`").unwrap();
+        // Ex: `from foo import bar as baz` OR `import foo.bar as baz`
+        // - qualified name: `foo.bar`
+        // - bound name: `baz`
+        // - conflicts with: `{"foo.bar":"buzz"}`
+        // - does not conflict with either of
+        //   - `{"bar":"buzz"}`
+        //   - `{"foo.bar":"baz"}`
+        let qualified_name = required_import.qualified_name().to_string();
+        let bound_name = required_import.bound_name();
+        let Some(alias) = flake8_import_conventions.aliases.get(&qualified_name) else {
+            continue;
+        };
+        if alias != bound_name {
+            writeln!(err_body, "    - `{qualified_name}` -> `{alias}`").unwrap();
         }
     }
 
@@ -1602,11 +1658,11 @@ mod tests {
 
     use anyhow::Result;
 
+    use ruff_linter::RuleSelector;
     use ruff_linter::codes::{Flake8Copyright, Pycodestyle, Refurb};
     use ruff_linter::registry::{Linter, Rule, RuleSet};
     use ruff_linter::rule_selector::PreviewOptions;
     use ruff_linter::settings::types::PreviewMode;
-    use ruff_linter::RuleSelector;
 
     use crate::configuration::{LintConfiguration, RuleSelection};
     use crate::options::PydocstyleOptions;
@@ -1627,7 +1683,6 @@ mod tests {
         Rule::BlankLinesBeforeNestedDefinition,
     ];
 
-    #[allow(clippy::needless_pass_by_value)]
     fn resolve_rules(
         selections: impl IntoIterator<Item = RuleSelection>,
         preview: Option<PreviewOptions>,

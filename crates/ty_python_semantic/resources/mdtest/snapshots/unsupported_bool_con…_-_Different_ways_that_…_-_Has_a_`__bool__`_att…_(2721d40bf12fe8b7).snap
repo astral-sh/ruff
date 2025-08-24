@@ -1,0 +1,37 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: unsupported_bool_conversion.md - Different ways that `unsupported-bool-conversion` can occur - Has a `__bool__` attribute, but it's not callable
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/unsupported_bool_conversion.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | class NotBoolable:
+2 |     __bool__: int = 3
+3 | 
+4 | a = NotBoolable()
+5 | 
+6 | # error: [unsupported-bool-conversion]
+7 | 10 and a and True
+```
+
+# Diagnostics
+
+```
+error[unsupported-bool-conversion]: Boolean conversion is unsupported for type `NotBoolable`
+ --> src/mdtest_snippet.py:7:8
+  |
+6 | # error: [unsupported-bool-conversion]
+7 | 10 and a and True
+  |        ^
+  |
+info: `__bool__` on `NotBoolable` must be callable
+info: rule `unsupported-bool-conversion` is enabled by default
+
+```

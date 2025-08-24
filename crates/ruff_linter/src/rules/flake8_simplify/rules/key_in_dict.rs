@@ -1,14 +1,14 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
-use ruff_diagnostics::{Applicability, Edit};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::AnyNodeRef;
+use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Arguments, CmpOp, Comprehension, Expr};
 use ruff_python_semantic::analyze::typing;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Fix};
+use crate::{Applicability, Edit};
 
 /// ## What it does
 /// Checks for key-existence checks against `dict.keys()` calls.
@@ -55,17 +55,12 @@ impl AlwaysFixableViolation for InDictKeys {
 }
 
 /// SIM118
-fn key_in_dict(
-    checker: &mut Checker,
-    left: &Expr,
-    right: &Expr,
-    operator: CmpOp,
-    parent: AnyNodeRef,
-) {
+fn key_in_dict(checker: &Checker, left: &Expr, right: &Expr, operator: CmpOp, parent: AnyNodeRef) {
     let Expr::Call(ast::ExprCall {
         func,
         arguments: Arguments { args, keywords, .. },
         range: _,
+        node_index: _,
     }) = &right
     else {
         return;
@@ -109,7 +104,7 @@ fn key_in_dict(
     )
     .unwrap_or(right.range());
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         InDictKeys {
             operator: operator.as_str().to_string(),
         },
@@ -164,11 +159,10 @@ fn key_in_dict(
             ));
         }
     }
-    checker.diagnostics.push(diagnostic);
 }
 
 /// SIM118 in a `for` loop.
-pub(crate) fn key_in_dict_for(checker: &mut Checker, for_stmt: &ast::StmtFor) {
+pub(crate) fn key_in_dict_for(checker: &Checker, for_stmt: &ast::StmtFor) {
     key_in_dict(
         checker,
         &for_stmt.target,
@@ -179,7 +173,7 @@ pub(crate) fn key_in_dict_for(checker: &mut Checker, for_stmt: &ast::StmtFor) {
 }
 
 /// SIM118 in a comprehension.
-pub(crate) fn key_in_dict_comprehension(checker: &mut Checker, comprehension: &Comprehension) {
+pub(crate) fn key_in_dict_comprehension(checker: &Checker, comprehension: &Comprehension) {
     key_in_dict(
         checker,
         &comprehension.target,
@@ -190,7 +184,7 @@ pub(crate) fn key_in_dict_comprehension(checker: &mut Checker, comprehension: &C
 }
 
 /// SIM118 in a comparison.
-pub(crate) fn key_in_dict_compare(checker: &mut Checker, compare: &ast::ExprCompare) {
+pub(crate) fn key_in_dict_compare(checker: &Checker, compare: &ast::ExprCompare) {
     let [op] = &*compare.ops else {
         return;
     };

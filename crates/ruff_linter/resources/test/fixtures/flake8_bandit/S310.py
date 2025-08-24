@@ -40,3 +40,8 @@ urllib.request.urlopen(urllib.request.Request('http://www.google.com'))
 urllib.request.urlopen(urllib.request.Request(f'http://www.google.com'))
 urllib.request.urlopen(urllib.request.Request('file:///foo/bar/baz'))
 urllib.request.urlopen(urllib.request.Request(url))
+
+
+# https://github.com/astral-sh/ruff/issues/15522
+map(urllib.request.urlopen, [])
+foo = urllib.request.urlopen

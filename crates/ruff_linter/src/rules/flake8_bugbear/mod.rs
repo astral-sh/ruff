@@ -10,17 +10,20 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
-    use crate::assert_messages;
+    use crate::assert_diagnostics;
     use crate::registry::Rule;
 
     use crate::settings::LinterSettings;
     use crate::test::test_path;
 
-    use crate::settings::types::PythonVersion;
+    use crate::settings::types::PreviewMode;
+
+    use ruff_python_ast::PythonVersion;
 
     #[test_case(Rule::AbstractBaseClassWithoutAbstractMethod, Path::new("B024.py"))]
     #[test_case(Rule::AssertFalse, Path::new("B011.py"))]
-    #[test_case(Rule::AssertRaisesException, Path::new("B017.py"))]
+    #[test_case(Rule::AssertRaisesException, Path::new("B017_0.py"))]
+    #[test_case(Rule::AssertRaisesException, Path::new("B017_1.py"))]
     #[test_case(Rule::AssignmentToOsEnviron, Path::new("B003.py"))]
     #[test_case(Rule::CachedInstanceMethod, Path::new("B019.py"))]
     #[test_case(Rule::ClassAsDataStructure, Path::new("class_as_data_structure.py"))]
@@ -76,14 +79,14 @@ mod tests {
             Path::new("flake8_bugbear").join(path).as_path(),
             &LinterSettings::for_rule(rule_code),
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
     #[test_case(
         Rule::ClassAsDataStructure,
         Path::new("class_as_data_structure.py"),
-        PythonVersion::Py39
+        PythonVersion::PY39
     )]
     fn rules_with_target_version(
         rule_code: Rule,
@@ -93,18 +96,18 @@ mod tests {
         let snapshot = format!(
             "{}_py{}{}_{}",
             rule_code.noqa_code(),
-            target_version.major(),
-            target_version.minor(),
+            target_version.major,
+            target_version.minor,
             path.to_string_lossy(),
         );
         let diagnostics = test_path(
             Path::new("flake8_bugbear").join(path).as_path(),
             &LinterSettings {
-                target_version,
+                unresolved_target_version: target_version.into(),
                 ..LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -115,7 +118,7 @@ mod tests {
             Path::new("flake8_bugbear").join(snapshot).as_path(),
             &LinterSettings::for_rule(Rule::ZipWithoutExplicitStrict),
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -134,7 +137,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::MutableArgumentDefault)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -155,7 +158,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::FunctionCallInDefaultArgument)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -171,7 +174,26 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::MutableContextvarDefault)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::AssertRaisesException, Path::new("B017_0.py"))]
+    #[test_case(Rule::AssertRaisesException, Path::new("B017_1.py"))]
+    fn rules_preview(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "preview__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("flake8_bugbear").join(path).as_path(),
+            &LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 }
