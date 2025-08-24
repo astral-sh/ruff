@@ -235,34 +235,30 @@ def h(x: Intersection[A, B]):
     reveal_type(x)  # revealed: tuple[B] | None
 ```
 
-### Real-world example
-
-Adapted from <https://github.com/pypa/packaging/blob/main/src/packaging/_parser.py>:
+### Union inside generic
 
 #### With old-style union
 
 ```py
 from typing import Union
 
-type MarkerAtom = Union[int, list["MarkerAtom"]]
-type MarkerList = list[Union["MarkerList", MarkerAtom, str]]
+type A = list[Union["A", str]]
 
-def f(marker_list: MarkerList):
-    reveal_type(marker_list)  # revealed: list[MarkerList | MarkerAtom | str]
-    for item in marker_list:
-        reveal_type(item)  # revealed: list[MarkerList | MarkerAtom | str] | int | list[MarkerAtom] | str
+def f(x: A):
+    reveal_type(x)  # revealed: list[A | str]
+    for item in x:
+        reveal_type(item)  # revealed: list[A | str] | str
 ```
 
 #### With new-style union
 
 ```py
-type MarkerAtom = int | list["MarkerAtom"]
-type MarkerList = list["MarkerList" | MarkerAtom | str]
+type A = list["A" | str]
 
-def f(marker_list: MarkerList):
-    reveal_type(marker_list)  # revealed: list[MarkerList | MarkerAtom | str]
-    for item in marker_list:
-        reveal_type(item)  # revealed: list[MarkerList | MarkerAtom | str] | int | list[MarkerAtom] | str
+def f(x: A):
+    reveal_type(x)  # revealed: list[A | str]
+    for item in x:
+        reveal_type(item)  # revealed: list[A | str] | str
 ```
 
 #### With Optional
@@ -270,11 +266,10 @@ def f(marker_list: MarkerList):
 ```py
 from typing import Optional, Union
 
-type MarkerAtom = Optional[list["MarkerAtom"]]
-type MarkerList = list[Optional[Union["MarkerList", MarkerAtom, str]]]
+type A = list[Optional[Union["A", str]]]
 
-def f(marker_list: MarkerList):
-    reveal_type(marker_list)  # revealed: list[MarkerList | MarkerAtom | str | None]
-    for item in marker_list:
-        reveal_type(item)  # revealed: list[MarkerList | MarkerAtom | str | None] | list[MarkerAtom] | None | str
+def f(x: A):
+    reveal_type(x)  # revealed: list[A | str | None]
+    for item in x:
+        reveal_type(item)  # revealed: list[A | str | None] | None | str
 ```
