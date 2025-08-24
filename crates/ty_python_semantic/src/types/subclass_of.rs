@@ -1,17 +1,15 @@
-use ruff_python_ast::name::Name;
-
 use crate::place::PlaceAndQualifiers;
 use crate::semantic_index::definition::Definition;
 use crate::types::constraints::Constraints;
 use crate::types::variance::VarianceInferable;
 use crate::types::{
-    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, ClassType, DynamicType,
-    HasRelationToVisitor, IsDisjointVisitor, KnownClass, MaterializationType, MemberLookupPolicy,
-    NormalizedVisitor, Type, TypeMapping, TypeRelation, TypeVarInstance,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, DynamicType, HasRelationToVisitor,
+    IsDisjointVisitor, KnownClass, MaterializationType, MemberLookupPolicy, NormalizedVisitor,
+    Type, TypeMapping, TypeRelation,
 };
 use crate::{Db, FxOrderSet};
 
-use super::{TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance};
+use super::TypeVarVariance;
 
 /// A type that represents `type[C]`, i.e. the class object `C` and class objects that are subclasses of `C`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]

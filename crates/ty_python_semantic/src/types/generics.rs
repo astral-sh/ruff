@@ -449,41 +449,33 @@ fn is_subtype_with_materialization<'db, C: Constraints<'db>>(
         // is a subset of the range covered by base.
         // This is also true for subtyping between None and Top.
         // And assignability between Top and None.
-        (MaterializationType::Top, MaterializationType::Top) => {
-            (C::from_bool(
-                db,
-                base_bottom.is_subtype_of(db, derived_bottom)
-                    && derived_top.is_subtype_of(db, base_top),
-            ))
-        }
+        (MaterializationType::Top, MaterializationType::Top) => C::from_bool(
+            db,
+            base_bottom.is_subtype_of(db, derived_bottom)
+                && derived_top.is_subtype_of(db, base_top),
+        ),
         // One bottom is a subtype of another if it covers a strictly larger set of materializations.
-        (MaterializationType::Bottom, MaterializationType::Bottom) => {
-            (C::from_bool(
-                db,
-                derived_bottom.is_subtype_of(db, base_bottom)
-                    && base_top.is_subtype_of(db, base_bottom),
-            ))
-        }
+        (MaterializationType::Bottom, MaterializationType::Bottom) => C::from_bool(
+            db,
+            derived_bottom.is_subtype_of(db, base_bottom)
+                && base_top.is_subtype_of(db, base_bottom),
+        ),
         // A bottom materialization is a subtype of top if it's a subtype of some part of the range of materializations
         // covered by top, i.e. either the top or bottom of derived is between the top and derived of base.
-        (MaterializationType::Bottom, MaterializationType::Top) => {
-            (C::from_bool(
-                db,
-                (base_bottom.is_subtype_of(db, derived_bottom)
-                    && derived_bottom.is_subtype_of(db, base_top))
-                    || (base_bottom.is_subtype_of(db, derived_top)
-                        && derived_top.is_subtype_of(db, base_top)),
-            ))
-        }
+        (MaterializationType::Bottom, MaterializationType::Top) => C::from_bool(
+            db,
+            (base_bottom.is_subtype_of(db, derived_bottom)
+                && derived_bottom.is_subtype_of(db, base_top))
+                || (base_bottom.is_subtype_of(db, derived_top)
+                    && derived_top.is_subtype_of(db, base_top)),
+        ),
         // A top materialization is a subtype of a bottom materialization only if both are the
         // same fully static type.
-        (MaterializationType::Top, MaterializationType::Bottom) => {
-            (C::from_bool(
-                db,
-                derived_top.is_subtype_of(db, base_bottom)
-                    && base_top.is_subtype_of(db, derived_bottom),
-            ))
-        }
+        (MaterializationType::Top, MaterializationType::Bottom) => C::from_bool(
+            db,
+            derived_top.is_subtype_of(db, base_bottom)
+                && base_top.is_subtype_of(db, derived_bottom),
+        ),
     }
 }
 
@@ -514,24 +506,20 @@ fn has_relation_with_materialization<'db, C: Constraints<'db>>(
                 && base_type.is_assignable_to(db, *derived_type),
         ),
         // For gradual types, A <: B (subtyping) is defined as Top[A] <: Bottom[B]
-        (None, Some(base_mat), TypeRelation::Subtyping) => {
-            (is_subtype_with_materialization(
-                db,
-                derived_type,
-                MaterializationType::Top,
-                base_type,
-                base_mat,
-            ))
-        }
-        (Some(derived_mat), None, TypeRelation::Subtyping) => {
-            (is_subtype_with_materialization(
-                db,
-                derived_type,
-                derived_mat,
-                base_type,
-                MaterializationType::Bottom,
-            ))
-        }
+        (None, Some(base_mat), TypeRelation::Subtyping) => is_subtype_with_materialization(
+            db,
+            derived_type,
+            MaterializationType::Top,
+            base_type,
+            base_mat,
+        ),
+        (Some(derived_mat), None, TypeRelation::Subtyping) => is_subtype_with_materialization(
+            db,
+            derived_type,
+            derived_mat,
+            base_type,
+            MaterializationType::Bottom,
+        ),
         // And A <~ B (assignability) is Bottom[A] <: Top[B]
         (None, Some(base_mat), TypeRelation::Assignability) => is_subtype_with_materialization(
             db,
@@ -706,7 +694,7 @@ impl<'db> Specialization<'db> {
                     }
                     TypeVarVariance::Invariant => {
                         let top_materialization = vartype.materialize(db, MaterializationType::Top);
-                        if (!vartype.is_equivalent_to(db, top_materialization)) {
+                        if !vartype.is_equivalent_to(db, top_materialization) {
                             has_dynamic_invariant_typevar = true;
                         }
                         *vartype

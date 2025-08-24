@@ -213,6 +213,7 @@ pub enum MaterializationType {
 
 impl MaterializationType {
     /// Flip the materialization type: `Top` becomes `Bottom` and vice versa.
+    #[must_use]
     pub const fn flip(self) -> Self {
         match self {
             Self::Top => Self::Bottom,

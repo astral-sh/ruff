@@ -28,7 +28,7 @@ use crate::types::constraints::{Constraints, IteratorConstraintsExtension};
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, HasRelationToVisitor, IsDisjointVisitor,
     IsEquivalentVisitor, MaterializationType, NormalizedVisitor, Type, TypeMapping, TypeRelation,
-    TypeVarVariance, UnionBuilder, UnionType,
+    UnionBuilder, UnionType,
 };
 use crate::util::subscript::{Nth, OutOfBoundsError, PyIndex, PySlice, StepSizeZeroError};
 use crate::{Db, FxOrderSet, Program};
