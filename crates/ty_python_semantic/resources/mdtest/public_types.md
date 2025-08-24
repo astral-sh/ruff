@@ -85,8 +85,7 @@ def outer(flag: bool) -> None:
     inner()
 ```
 
-If all symbol assignments are done before the lazy nested scope, exact boundness analysis is
-performed.
+If a symbol is only conditionally bound, we do not raise any errors:
 
 ```py
 def outer(flag: bool) -> None:
@@ -104,24 +103,8 @@ def outer(flag: bool) -> None:
         x = A()
 
     def inner() -> None:
-        # error: [possibly-unresolved-reference]
-        reveal_type(x)  # revealed: A
-    inner()
-```
-
-If a symbol is (conditionally) bound after the lazy nested scope, we treat the symbol is always
-bound and do not raise any boundness errors in the nested scope:
-
-```py
-def outer(flag: bool) -> None:
-    if flag:
-        x = A()
-
-    def inner() -> None:
         # TODO: Ideally, we would emit a possibly-unresolved-reference error here.
         reveal_type(x)  # revealed: A
-    if flag:
-        x = A()
     inner()
 ```
 

@@ -4,7 +4,7 @@ use crate::dunder_all::dunder_all_names;
 use crate::module_resolver::{KnownModule, file_to_module};
 use crate::semantic_index::definition::{Definition, DefinitionState};
 use crate::semantic_index::place::{PlaceExprRef, ScopedPlaceId};
-use crate::semantic_index::scope::ScopeId;
+use crate::semantic_index::scope::{ScopeId, ScopeLaziness};
 use crate::semantic_index::{
     BindingWithConstraints, BindingWithConstraintsIterator, BoundnessAnalysis,
     ConsideredDefinitions, DeclarationsIterator, EnclosingSnapshotResult, place_table,
@@ -712,7 +712,7 @@ fn place_by_id<'db>(
         ConsideredDefinitions::AllReachable(None) => use_def.all_reachable_bindings(place_id),
         ConsideredDefinitions::AllReachable(Some(snapshot)) => {
             if let EnclosingSnapshotResult::FoundBindings(bindings, _) =
-                use_def.enclosing_snapshot(snapshot)
+                use_def.enclosing_snapshot(snapshot, ScopeLaziness::Lazy)
             {
                 bindings
             } else {
