@@ -1,130 +1,142 @@
 ---
 source: crates/ruff_linter/src/rules/pydoclint/mod.rs
 ---
-DOC102_google.py:6:5: DOC102 Documented parameter `a` is not in the function's signature
+DOC102 Documented parameter `a` is not in the function's signature
+ --> DOC102_google.py:6:5
   |
 4 |     Adds two numbers and returns the result.
 5 |
 6 |     Args:
-  |     ^^^^ DOC102
+  |     ^^^^
 7 |         a (int): The first number to add.
 8 |         b (int): The second number to add.
   |
-  = help: Remove the extraneous parameter from the docstring
+help: Remove the extraneous parameter from the docstring
 
-DOC102_google.py:21:5: DOC102 Documented parameter `multiplier` is not in the function's signature
+DOC102 Documented parameter `multiplier` is not in the function's signature
+  --> DOC102_google.py:21:5
    |
 19 |     Multiplies each element in a list by a given multiplier.
 20 |
 21 |     Args:
-   |     ^^^^ DOC102
+   |     ^^^^
 22 |         lst (list of int): A list of integers.
 23 |         multiplier (int): The multiplier for each element in the list.
    |
-   = help: Remove the extraneous parameter from the docstring
+help: Remove the extraneous parameter from the docstring
 
-DOC102_google.py:36:5: DOC102 Documented parameter `numbers` is not in the function's signature
+DOC102 Documented parameter `numbers` is not in the function's signature
+  --> DOC102_google.py:36:5
    |
 34 |     Finds the maximum value in a list of numbers.
 35 |
 36 |     Args:
-   |     ^^^^ DOC102
+   |     ^^^^
 37 |         numbers (list of int): A list of integers to search through.
    |
-   = help: Remove the extraneous parameter from the docstring
+help: Remove the extraneous parameter from the docstring
 
-DOC102_google.py:50:5: DOC102 These documented parameters are not in the function's signature: `name`, `age`, `email`
+DOC102 These documented parameters are not in the function's signature: `name`, `age`, `email`
+  --> DOC102_google.py:50:5
    |
 48 |     Creates a user profile with basic information.
 49 |
 50 |     Args:
-   |     ^^^^ DOC102
+   |     ^^^^
 51 |         name (str): The name of the user.
 52 |         age (int): The age of the user.
    |
-   = help: Remove the extraneous parameters from the docstring
+help: Remove the extraneous parameters from the docstring
 
-DOC102_google.py:72:5: DOC102 Documented parameter `tax_rate` is not in the function's signature
+DOC102 Documented parameter `tax_rate` is not in the function's signature
+  --> DOC102_google.py:72:5
    |
 70 |     Calculates the total price after applying tax and a discount.
 71 |
 72 |     Args:
-   |     ^^^^ DOC102
+   |     ^^^^
 73 |         item_prices (list of float): A list of prices for each item.
 74 |         tax_rate (float): The tax rate to apply.
    |
-   = help: Remove the extraneous parameter from the docstring
+help: Remove the extraneous parameter from the docstring
 
-DOC102_google.py:91:5: DOC102 These documented parameters are not in the function's signature: `to_address`, `cc_address`
+DOC102 These documented parameters are not in the function's signature: `to_address`, `cc_address`
+  --> DOC102_google.py:91:5
    |
 89 |     Sends an email to the specified recipients.
 90 |
 91 |     Args:
-   |     ^^^^ DOC102
+   |     ^^^^
 92 |         subject (str): The subject of the email.
 93 |         body (str): The content of the email.
    |
-   = help: Remove the extraneous parameters from the docstring
+help: Remove the extraneous parameters from the docstring
 
-DOC102_google.py:109:5: DOC102 Documented parameter `separator` is not in the function's signature
+DOC102 Documented parameter `separator` is not in the function's signature
+   --> DOC102_google.py:109:5
     |
 107 |     Concatenates multiple strings with a specified separator.
 108 |
 109 |     Args:
-    |     ^^^^ DOC102
+    |     ^^^^
 110 |         separator (str): The separator to use between strings.
 111 |         *args (str): Variable length argument list of strings to concatenate.
     |
-    = help: Remove the extraneous parameter from the docstring
+help: Remove the extraneous parameter from the docstring
 
-DOC102_google.py:124:5: DOC102 These documented parameters are not in the function's signature: `items`, `details`
+DOC102 These documented parameters are not in the function's signature: `items`, `details`
+   --> DOC102_google.py:124:5
     |
 122 |     Processes an order with a list of items and optional order details.
 123 |
 124 |     Args:
-    |     ^^^^ DOC102
+    |     ^^^^
 125 |         order_id (int): The unique identifier for the order.
 126 |         *items (str): Variable length argument list of items in the order.
     |
-    = help: Remove the extraneous parameters from the docstring
+help: Remove the extraneous parameters from the docstring
 
-DOC102_google.py:149:9: DOC102 Documented parameter `value` is not in the function's signature
+DOC102 Documented parameter `value` is not in the function's signature
+   --> DOC102_google.py:149:9
     |
 147 |         Initializes the calculator with an initial value.
 148 |
 149 |         Args:
-    |         ^^^^ DOC102
+    |         ^^^^
 150 |             value (int, optional): The initial value of the calculator. Defaults to 0.
 151 |         """
     |
-    = help: Remove the extraneous parameter from the docstring
+help: Remove the extraneous parameter from the docstring
 
-DOC102_google.py:159:9: DOC102 Documented parameter `number` is not in the function's signature
+DOC102 Documented parameter `number` is not in the function's signature
+   --> DOC102_google.py:159:9
     |
 157 |         Adds a number to the current value.
 158 |
 159 |         Args:
-    |         ^^^^ DOC102
+    |         ^^^^
 160 |             number (int or float): The number to add to the current value.
     |
-    = help: Remove the extraneous parameter from the docstring
+help: Remove the extraneous parameter from the docstring
 
-DOC102_google.py:174:9: DOC102 Documented parameter `value_str` is not in the function's signature
+DOC102 Documented parameter `value_str` is not in the function's signature
+   --> DOC102_google.py:174:9
     |
 172 |         Creates a Calculator instance from a string representation of a number.
 173 |
 174 |         Args:
-    |         ^^^^ DOC102
+    |         ^^^^
 175 |             value_str (str): The string representing the initial value.
     |
-    = help: Remove the extraneous parameter from the docstring
+help: Remove the extraneous parameter from the docstring
 
-DOC102_google.py:189:9: DOC102 Documented parameter `number` is not in the function's signature
+DOC102 Documented parameter `number` is not in the function's signature
+   --> DOC102_google.py:189:9
     |
 187 |         Checks if a given number is valid (int or float).
 188 |
 189 |         Args:
-    |         ^^^^ DOC102
+    |         ^^^^
 190 |             number (any): The value to check.
     |
-    = help: Remove the extraneous parameter from the docstring
+help: Remove the extraneous parameter from the docstring
