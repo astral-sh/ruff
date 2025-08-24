@@ -243,17 +243,13 @@
 use ruff_index::{IndexVec, newtype_index};
 use rustc_hash::FxHashMap;
 
-use self::place_state::{
-    Bindings, Declarations, EnclosingSnapshot, LiveBindingsIterator, LiveDeclaration,
-    LiveDeclarationsIterator, PlaceState, ScopedDefinitionId,
-};
 use crate::node_key::NodeKey;
-use crate::place::BoundnessAnalysis;
 use crate::semantic_index::ast_ids::ScopedUseId;
 use crate::semantic_index::definition::{Definition, DefinitionState};
 use crate::semantic_index::member::ScopedMemberId;
 use crate::semantic_index::narrowing_constraints::{
     ConstraintKey, NarrowingConstraints, NarrowingConstraintsBuilder, NarrowingConstraintsIterator,
+    ScopedNarrowingConstraint,
 };
 use crate::semantic_index::place::{PlaceExprRef, ScopedPlaceId};
 use crate::semantic_index::predicate::{
@@ -264,11 +260,74 @@ use crate::semantic_index::reachability_constraints::{
 };
 use crate::semantic_index::scope::{FileScopeId, ScopeKind, ScopeLaziness};
 use crate::semantic_index::symbol::ScopedSymbolId;
-use crate::semantic_index::use_def::place_state::PreviousDefinitions;
+use crate::semantic_index::use_def::place_state::{
+    Bindings, Declarations, EnclosingSnapshot, LiveBindingResult, LiveBindingsIterator,
+    LiveDeclaration, LiveDeclarationsIterator, PlaceState, PreviousDefinitions, ScopedDefinitionId,
+};
 use crate::semantic_index::{EnclosingSnapshotResult, SemanticIndex};
 use crate::types::{IntersectionBuilder, Truthiness, Type, infer_narrowing_constraint};
 
 mod place_state;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, get_size2::GetSize)]
+pub(crate) enum SnapshotCompleteness {
+    /// The snapshot is complete and can be used alone to determine the type of place.
+    Complete,
+    /// The snapshot is incomplete and must take into account other reachable definitions within its scope.
+    Incomplete(ScopedSymbolId, ScopedEnclosingSnapshotId),
+}
+
+/// Specifies how the boundness of a place should be determined.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) enum BoundnessAnalysis<'b> {
+    /// The place is always considered bound.
+    /// If the `Bindings` are `Some`, use their narrowing and reachability constraints.
+    /// This is used in inference for nonlocal symbols, where the boundness is not fully known, but a recorded snapshot is usable for some bindings.
+    AssumeBound(Option<&'b Bindings>),
+    /// The boundness of the place is determined based on the visibility of the implicit
+    /// `unbound` binding. In the example below, when analyzing the visibility of the
+    /// `x = <unbound>` binding from the position of the end of the scope, it would be
+    /// `Truthiness::Ambiguous`, because it could either be visible or not, depending on the
+    /// `flag()` return value. This would result in a `Boundness::PossiblyUnbound` for `x`.
+    ///
+    /// ```py
+    /// x = <unbound>
+    ///
+    /// if flag():
+    ///     x = 1
+    /// ```
+    BasedOnUnboundVisibility,
+}
+
+impl BoundnessAnalysis<'_> {
+    pub(crate) fn is_assume_bound(&self) -> bool {
+        matches!(self, BoundnessAnalysis::AssumeBound(_))
+    }
+}
+
+/// Specifies which definitions should be considered when looking up a place.
+///
+/// In the example below, the `EndOfScope` variant would consider the `x = 2` and `x = 3` definitions,
+/// while the `AllReachable` variant would also consider the `x = 1` definition.
+/// ```py
+/// def _():
+///     x = 1
+///
+///     x = 2
+///
+///     if flag():
+///         x = 3
+/// ```
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
+pub(crate) enum ConsideredDefinitions {
+    /// Consider only the definitions that are "live" at the end of the scope, i.e. those
+    /// that have not been shadowed or deleted.
+    EndOfScope,
+    /// Consider all definitions that are reachable from the start of the scope.
+    /// If `ScopedEnclosingSnapshotId` is `Some`, consider all reachable definitions,
+    /// but use the narrowing and reachability constraints of the bindings recorded in the enclosing snapshot.
+    AllReachable(Option<ScopedEnclosingSnapshotId>),
+}
 
 /// Applicable definitions and constraints for every use of a name.
 #[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
@@ -379,7 +438,7 @@ impl<'db> UseDefMap<'db> {
                 })
             }
             ConstraintKey::NestedScope(nested_scope) => {
-                let EnclosingSnapshotResult::FoundBindings(bindings) =
+                let EnclosingSnapshotResult::FoundBindings(bindings, _) =
                     index.enclosing_snapshot(enclosing_scope, expr, nested_scope)
                 else {
                     unreachable!(
@@ -468,7 +527,7 @@ impl<'db> UseDefMap<'db> {
         symbol: ScopedSymbolId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
         let bindings = &self.reachable_definitions_by_symbol[symbol].bindings;
-        self.bindings_iterator(bindings, BoundnessAnalysis::AssumeBound)
+        self.bindings_iterator(bindings, BoundnessAnalysis::AssumeBound(None))
     }
 
     pub(crate) fn all_reachable_member_bindings(
@@ -476,7 +535,7 @@ impl<'db> UseDefMap<'db> {
         symbol: ScopedMemberId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
         let bindings = &self.reachable_definitions_by_member[symbol].bindings;
-        self.bindings_iterator(bindings, BoundnessAnalysis::AssumeBound)
+        self.bindings_iterator(bindings, BoundnessAnalysis::AssumeBound(None))
     }
 
     pub(crate) fn enclosing_snapshot(
@@ -484,19 +543,37 @@ impl<'db> UseDefMap<'db> {
         snapshot_id: ScopedEnclosingSnapshotId,
         nested_laziness: ScopeLaziness,
     ) -> EnclosingSnapshotResult<'_, 'db> {
-        let boundness_analysis = if nested_laziness.is_eager() {
-            BoundnessAnalysis::BasedOnUnboundVisibility
-        } else {
-            // TODO: We haven't implemented proper boundness analysis for nonlocal symbols, so we assume the boundness is bound for now.
-            BoundnessAnalysis::AssumeBound
-        };
         match self.enclosing_snapshots.get(snapshot_id) {
             Some(EnclosingSnapshot::Constraint(constraint)) => {
                 EnclosingSnapshotResult::FoundConstraint(*constraint)
             }
-            Some(EnclosingSnapshot::Bindings(bindings)) => EnclosingSnapshotResult::FoundBindings(
-                self.bindings_iterator(bindings, boundness_analysis),
-            ),
+            Some(EnclosingSnapshot::Bindings(
+                bindings,
+                completeness @ SnapshotCompleteness::Complete,
+            )) => {
+                let boundness_analysis = if nested_laziness.is_eager() {
+                    BoundnessAnalysis::BasedOnUnboundVisibility
+                } else {
+                    BoundnessAnalysis::AssumeBound(None)
+                };
+                EnclosingSnapshotResult::FoundBindings(
+                    self.bindings_iterator(bindings, boundness_analysis),
+                    *completeness,
+                )
+            }
+            Some(EnclosingSnapshot::Bindings(
+                bindings,
+                completeness @ SnapshotCompleteness::Incomplete(enclosing_symbol, _),
+            )) => {
+                let boundness_analysis = BoundnessAnalysis::AssumeBound(Some(bindings));
+                EnclosingSnapshotResult::FoundBindings(
+                    self.bindings_iterator(
+                        &self.reachable_definitions_by_symbol[*enclosing_symbol].bindings,
+                        boundness_analysis,
+                    ),
+                    *completeness,
+                )
+            }
             None => EnclosingSnapshotResult::NotFound,
         }
     }
@@ -552,7 +629,7 @@ impl<'db> UseDefMap<'db> {
         symbol: ScopedSymbolId,
     ) -> DeclarationsIterator<'_, 'db> {
         let declarations = &self.reachable_definitions_by_symbol[symbol].declarations;
-        self.declarations_iterator(declarations, BoundnessAnalysis::AssumeBound)
+        self.declarations_iterator(declarations, BoundnessAnalysis::AssumeBound(None))
     }
 
     pub(crate) fn all_reachable_member_declarations(
@@ -560,7 +637,7 @@ impl<'db> UseDefMap<'db> {
         member: ScopedMemberId,
     ) -> DeclarationsIterator<'_, 'db> {
         let declarations = &self.reachable_definitions_by_member[member].declarations;
-        self.declarations_iterator(declarations, BoundnessAnalysis::AssumeBound)
+        self.declarations_iterator(declarations, BoundnessAnalysis::AssumeBound(None))
     }
 
     pub(crate) fn all_reachable_declarations(
@@ -625,7 +702,7 @@ impl<'db> UseDefMap<'db> {
     fn bindings_iterator<'map>(
         &'map self,
         bindings: &'map Bindings,
-        boundness_analysis: BoundnessAnalysis,
+        boundness_analysis: BoundnessAnalysis<'map>,
     ) -> BindingWithConstraintsIterator<'map, 'db> {
         BindingWithConstraintsIterator {
             all_definitions: &self.all_definitions,
@@ -640,7 +717,7 @@ impl<'db> UseDefMap<'db> {
     fn declarations_iterator<'map>(
         &'map self,
         declarations: &'map Declarations,
-        boundness_analysis: BoundnessAnalysis,
+        boundness_analysis: BoundnessAnalysis<'map>,
     ) -> DeclarationsIterator<'map, 'db> {
         DeclarationsIterator {
             all_definitions: &self.all_definitions,
@@ -690,7 +767,7 @@ pub(crate) struct BindingWithConstraintsIterator<'map, 'db> {
     pub(crate) predicates: &'map Predicates<'db>,
     pub(crate) narrowing_constraints: &'map NarrowingConstraints,
     pub(crate) reachability_constraints: &'map ReachabilityConstraints,
-    pub(crate) boundness_analysis: BoundnessAnalysis,
+    pub(crate) boundness_analysis: BoundnessAnalysis<'map>,
     inner: LiveBindingsIterator<'map>,
 }
 
@@ -701,17 +778,38 @@ impl<'map, 'db> Iterator for BindingWithConstraintsIterator<'map, 'db> {
         let predicates = self.predicates;
         let narrowing_constraints = self.narrowing_constraints;
 
-        self.inner
-            .next()
-            .map(|live_binding| BindingWithConstraints {
+        self.inner.next().map(|live_binding| {
+            let (narrowing_constraint, reachability_constraint) =
+                if let BoundnessAnalysis::AssumeBound(Some(bindings)) = self.boundness_analysis {
+                    match bindings.live_binding(live_binding.binding) {
+                        LiveBindingResult::Found(binding) => (
+                            binding.narrowing_constraint,
+                            binding.reachability_constraint,
+                        ),
+                        LiveBindingResult::NotFound => (
+                            live_binding.narrowing_constraint,
+                            live_binding.reachability_constraint,
+                        ),
+                        LiveBindingResult::Shadowed => (
+                            ScopedNarrowingConstraint::empty(),
+                            ScopedReachabilityConstraintId::ALWAYS_FALSE,
+                        ),
+                    }
+                } else {
+                    (
+                        live_binding.narrowing_constraint,
+                        live_binding.reachability_constraint,
+                    )
+                };
+            BindingWithConstraints {
                 binding: self.all_definitions[live_binding.binding],
                 narrowing_constraint: ConstraintsIterator {
                     predicates,
-                    constraint_ids: narrowing_constraints
-                        .iter_predicates(live_binding.narrowing_constraint),
+                    constraint_ids: narrowing_constraints.iter_predicates(narrowing_constraint),
                 },
-                reachability_constraint: live_binding.reachability_constraint,
-            })
+                reachability_constraint,
+            }
+        })
     }
 }
 
@@ -771,7 +869,7 @@ pub(crate) struct DeclarationsIterator<'map, 'db> {
     all_definitions: &'map IndexVec<ScopedDefinitionId, DefinitionState<'db>>,
     pub(crate) predicates: &'map Predicates<'db>,
     pub(crate) reachability_constraints: &'map ReachabilityConstraints,
-    pub(crate) boundness_analysis: BoundnessAnalysis,
+    pub(crate) boundness_analysis: BoundnessAnalysis<'map>,
     inner: LiveDeclarationsIterator<'map>,
 }
 
@@ -1215,8 +1313,10 @@ impl<'db> UseDefMapBuilder<'db> {
                 bindings.unbound_narrowing_constraint(),
             ))
         } else {
-            self.enclosing_snapshots
-                .push(EnclosingSnapshot::Bindings(bindings.clone()))
+            self.enclosing_snapshots.push(EnclosingSnapshot::Bindings(
+                bindings.clone(),
+                SnapshotCompleteness::Complete,
+            ))
         }
     }
 
@@ -1236,6 +1336,22 @@ impl<'db> UseDefMapBuilder<'db> {
                         .zip(terminal_bindings.iter())
                         .all(|(a, b)| a.binding == b.binding)
             })
+    }
+
+    pub(super) fn mark_snapshot_incomplete(
+        &mut self,
+        snapshot_id: ScopedEnclosingSnapshotId,
+        enclosing_symbol: ScopedSymbolId,
+    ) {
+        match self.enclosing_snapshots.get_mut(snapshot_id) {
+            Some(EnclosingSnapshot::Bindings(_, completeness)) => {
+                *completeness = SnapshotCompleteness::Incomplete(enclosing_symbol, snapshot_id);
+            }
+            Some(EnclosingSnapshot::Constraint(constraint)) => {
+                *constraint = ScopedNarrowingConstraint::empty();
+            }
+            None => {}
+        }
     }
 
     /// Take a snapshot of the current visible-places state.

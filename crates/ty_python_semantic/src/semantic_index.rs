@@ -26,6 +26,9 @@ use crate::semantic_index::scope::{
     NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopeKind, ScopeLaziness,
 };
 use crate::semantic_index::symbol::ScopedSymbolId;
+pub(crate) use crate::semantic_index::use_def::{
+    BoundnessAnalysis, ConsideredDefinitions, SnapshotCompleteness,
+};
 use crate::semantic_index::use_def::{EnclosingSnapshotKey, ScopedEnclosingSnapshotId, UseDefMap};
 use crate::semantic_model::HasTrackedScope;
 
@@ -190,7 +193,10 @@ pub(crate) fn global_scope(db: &dyn Db, file: File) -> ScopeId<'_> {
 
 pub(crate) enum EnclosingSnapshotResult<'map, 'db> {
     FoundConstraint(ScopedNarrowingConstraint),
-    FoundBindings(BindingWithConstraintsIterator<'map, 'db>),
+    FoundBindings(
+        BindingWithConstraintsIterator<'map, 'db>,
+        SnapshotCompleteness,
+    ),
     NotFound,
     NoLongerInEagerContext,
 }

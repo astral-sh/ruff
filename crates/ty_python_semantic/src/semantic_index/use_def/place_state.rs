@@ -52,6 +52,7 @@ use crate::semantic_index::narrowing_constraints::{
 use crate::semantic_index::reachability_constraints::{
     ReachabilityConstraintsBuilder, ScopedReachabilityConstraintId,
 };
+use crate::semantic_index::use_def::SnapshotCompleteness;
 
 /// A newtype-index for a definition in a particular scope.
 #[newtype_index]
@@ -189,14 +190,14 @@ impl Declarations {
 #[derive(Clone, Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(super) enum EnclosingSnapshot {
     Constraint(ScopedNarrowingConstraint),
-    Bindings(Bindings),
+    Bindings(Bindings, SnapshotCompleteness),
 }
 
 impl EnclosingSnapshot {
     pub(super) fn finish(&mut self, reachability_constraints: &mut ReachabilityConstraintsBuilder) {
         match self {
             Self::Constraint(_) => {}
-            Self::Bindings(bindings) => {
+            Self::Bindings(bindings, _) => {
                 bindings.finish(reachability_constraints);
             }
         }
@@ -205,7 +206,7 @@ impl EnclosingSnapshot {
     pub(crate) fn bindings(&self) -> Option<&Bindings> {
         match self {
             Self::Constraint(_) => None,
-            Self::Bindings(bindings) => Some(bindings),
+            Self::Bindings(bindings, _) => Some(bindings),
         }
     }
 }
@@ -213,7 +214,7 @@ impl EnclosingSnapshot {
 /// Live bindings for a single place at some point in control flow. Each live binding comes
 /// with a set of narrowing constraints and a reachability constraint.
 #[derive(Clone, Debug, Default, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
-pub(super) struct Bindings {
+pub(crate) struct Bindings {
     /// The narrowing constraint applicable to the "unbound" binding, if we need access to it even
     /// when it's not visible. This happens in class scopes, where local name bindings are not visible
     /// to nested scopes, but we still need to know what narrowing constraints were applied to the
@@ -221,6 +222,12 @@ pub(super) struct Bindings {
     unbound_narrowing_constraint: Option<ScopedNarrowingConstraint>,
     /// A list of live bindings for this place, sorted by their `ScopedDefinitionId`
     live_bindings: SmallVec<[LiveBinding; 2]>,
+}
+
+pub(crate) enum LiveBindingResult<'b> {
+    Found(&'b LiveBinding),
+    NotFound,
+    Shadowed,
 }
 
 impl Bindings {
@@ -238,6 +245,22 @@ impl Bindings {
 
     pub(super) fn len(&self) -> usize {
         self.live_bindings.len()
+    }
+
+    pub(super) fn live_binding(&self, id: ScopedDefinitionId) -> LiveBindingResult<'_> {
+        self.live_bindings
+            .iter()
+            .find(|live_binding| live_binding.binding == id)
+            .map_or_else(
+                || {
+                    if self.live_bindings.last().is_some_and(|b| b.binding > id) {
+                        LiveBindingResult::Shadowed
+                    } else {
+                        LiveBindingResult::NotFound
+                    }
+                },
+                LiveBindingResult::Found,
+            )
     }
 }
 

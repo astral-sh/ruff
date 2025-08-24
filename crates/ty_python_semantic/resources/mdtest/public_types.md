@@ -214,8 +214,7 @@ def outer() -> None:
     x = 1
 
     def inner() -> None:
-        # TODO: ideally, this should be `Literal[1, 2]`
-        reveal_type(x)  # revealed: None | Literal[1, 2]
+        reveal_type(x)  # revealed: Literal[1, 2]
     inner()
 
     x = 2

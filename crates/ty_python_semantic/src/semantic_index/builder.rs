@@ -400,8 +400,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
-    /// Any lazy snapshots of the place that have been reassigned are no longer valid, so delete them.
-    /// If there is no reassignment, the state of the symbol just before the closure definition is recorded as a lazy snapshot.
+    /// Any lazy snapshots of the place that have been reassigned are no longer valid on their own, so mark as incomplete.
+    /// If there is no reassignment, the state of the symbol just before the closure definition is recorded as a complete lazy snapshot.
     /// We have not yet tracked where the closure is actually referenced, but we can assume that the closure becomes referenceable after the closure is defined.
     /// ```py
     /// def outer() -> None:
@@ -416,44 +416,44 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     ///         reveal_type(x)  # revealed: None | Literal[1]
     ///
     ///     # Reassignment of `x` after the definition of `inner2`.
-    ///     # Sweep lazy snapshots of `x` for `inner2`.
+    ///     # lazy snapshots of `x` for `inner2` is incomplete.
     ///     x = 1
     ///
     ///     def inner() -> None:
     ///         # In this scope, `x = None` appears as being shadowed by `x = 1`.
     ///         reveal_type(x)  # revealed: Literal[1]
     ///
-    ///     # No reassignment of `x` after the definition of `inner`, so we can safely record a lazy snapshot for `inner`.
+    ///     # No reassignment of `x` after the definition of `inner`, so we can safely use a complete lazy snapshot for `inner`.
     ///     inner()
     ///     inner2()
     /// ```
-    fn sweep_lazy_snapshots(&mut self, popped_scope_id: FileScopeId) {
-        // Retain only snapshots that are either eager
-        //     || (enclosing_scope != popped_scope && popped_scope is not a visible ancestor of enclosing_scope)
-        //     || enclosing_place is not a symbol or not reassigned
-        // <=> remove those that are lazy
-        //     && (enclosing_scope == popped_scope || popped_scope is a visible ancestor of enclosing_scope)
-        //     && enclosing_place is a symbol and reassigned
-        self.enclosing_snapshots.retain(|key, snapshot_id| {
-            let popped_place_table = &self.place_tables[popped_scope_id];
-            key.nested_laziness.is_eager()
-                || (key.enclosing_scope != popped_scope_id
-                    && VisibleAncestorsIter::new(&self.scopes, key.enclosing_scope)
-                        .all(|(ancestor, _)| ancestor != popped_scope_id))
-                || !key.enclosing_place.as_symbol().is_some_and(|symbol_id| {
+    fn check_lazy_snapshots(&mut self, popped_scope_id: FileScopeId) {
+        for (key, snapshot_id) in &self.enclosing_snapshots {
+            if let Some(enclosing_symbol) = key.enclosing_place.as_symbol() {
+                if key.nested_laziness.is_lazy()
+                    && (key.enclosing_scope == popped_scope_id
+                        || VisibleAncestorsIter::new(&self.scopes, key.enclosing_scope)
+                            .any(|(ancestor, _)| ancestor == popped_scope_id))
+                {
                     let name = &self.place_tables[key.enclosing_scope]
-                        .symbol(symbol_id)
+                        .symbol(enclosing_symbol)
                         .name();
-                    popped_place_table.symbol_id(name).is_some_and(|symbol_id| {
-                        popped_place_table.symbol(symbol_id).is_reassigned()
+                    let popped_place_table = &self.place_tables[popped_scope_id];
+                    if let Some(symbol_id) = popped_place_table.symbol_id(name) {
+                        if popped_place_table.symbol(symbol_id).is_reassigned()
                             && !self.use_def_maps[popped_scope_id].bindings_are_unchanged(
                                 &self.use_def_maps[key.enclosing_scope],
                                 *snapshot_id,
                                 symbol_id,
                             )
-                    })
-                })
-        });
+                        {
+                            self.use_def_maps[key.enclosing_scope]
+                                .mark_snapshot_incomplete(*snapshot_id, enclosing_symbol);
+                        }
+                    }
+                }
+            }
+        }
     }
 
     fn sweep_nonlocal_lazy_snapshots(&mut self) {
@@ -495,7 +495,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .pop()
             .expect("Root scope should be present");
 
-        self.sweep_lazy_snapshots(popped_scope_id);
+        self.check_lazy_snapshots(popped_scope_id);
 
         let children_end = self.scopes.next_index();
 
@@ -781,7 +781,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// Records that all remaining statements in the current block are unreachable.
     fn mark_unreachable(&mut self) {
         self.current_use_def_map_mut().mark_unreachable();
-        self.sweep_lazy_snapshots(self.current_scope());
+        self.check_lazy_snapshots(self.current_scope());
     }
 
     /// Records a reachability constraint that always evaluates to "ambiguous".
