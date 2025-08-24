@@ -22,7 +22,9 @@ use crate::types::{
 };
 use crate::types::{SpecialFormType, Type, protocol_class::ProtocolClassLiteral};
 use crate::util::diagnostics::format_enumeration;
-use crate::{Db, FxIndexMap, FxOrderMap, Module, ModuleName, Program, declare_lint};
+use crate::{
+    Db, DisplaySettings, FxIndexMap, FxOrderMap, Module, ModuleName, Program, declare_lint,
+};
 use itertools::Itertools;
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::name::Name;
@@ -1915,42 +1917,29 @@ pub(super) fn report_invalid_assignment(
     target_ty: Type,
     source_ty: Type,
 ) {
+    let mut settings = DisplaySettings::default();
     // Handles the situation where the report naming is confusing, such as class with the same Name,
     // but from different scopes.
-    let use_qualified = if let Some(target_class) = type_to_class_literal(target_ty, context.db()) {
+    if let Some(target_class) = type_to_class_literal(target_ty, context.db()) {
         if let Some(source_class) = type_to_class_literal(source_ty, context.db()) {
-            target_class != source_class
+            if target_class != source_class
                 && target_class.name(context.db()) == source_class.name(context.db())
-        } else {
-            false
+            {
+                settings = settings.qualified();
+            }
         }
-    } else {
-        false
-    };
-
-    if use_qualified {
-        report_invalid_assignment_with_message(
-            context,
-            node,
-            target_ty,
-            format_args!(
-                "Object of type `{}` is not assignable to `{}`",
-                source_ty.qualified_display(context.db()),
-                target_ty.qualified_display(context.db()),
-            ),
-        );
-    } else {
-        report_invalid_assignment_with_message(
-            context,
-            node,
-            target_ty,
-            format_args!(
-                "Object of type `{}` is not assignable to `{}`",
-                source_ty.display(context.db()),
-                target_ty.display(context.db())
-            ),
-        );
     }
+
+    report_invalid_assignment_with_message(
+        context,
+        node,
+        target_ty,
+        format_args!(
+            "Object of type `{}` is not assignable to `{}`",
+            source_ty.display_with(context.db(), settings),
+            target_ty.display_with(context.db(), settings)
+        ),
+    );
 }
 
 fn type_to_class_literal<'db>(ty: Type<'db>, db: &'db dyn crate::Db) -> Option<ClassLiteral<'db>> {
@@ -1969,7 +1958,7 @@ fn type_to_class_literal<'db>(ty: Type<'db>, db: &'db dyn crate::Db) -> Option<C
             ClassType::NonGeneric(class) => Some(class),
             ClassType::Generic(alias) => Some(alias.origin(db)),
         },
-        Type::TypedDict(typed_dict) => match typed_dict.defining_class(db) {
+        Type::TypedDict(typed_dict) => match typed_dict.defining_class {
             ClassType::NonGeneric(class) => Some(class),
             ClassType::Generic(alias) => Some(alias.origin(db)),
         },

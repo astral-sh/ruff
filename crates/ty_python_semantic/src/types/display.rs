@@ -26,17 +26,33 @@ use ruff_db::parsed::parsed_module;
 pub struct DisplaySettings {
     /// Whether rendering can be multiline
     pub multiline: bool,
+    /// Whether rendering will show qualified display (e.g., module.class)
+    pub qualified: bool,
 }
 
 impl DisplaySettings {
     #[must_use]
     pub fn multiline(self) -> Self {
-        Self { multiline: true }
+        Self {
+            multiline: true,
+            ..self
+        }
     }
 
     #[must_use]
     pub fn singleline(self) -> Self {
-        Self { multiline: false }
+        Self {
+            multiline: false,
+            ..self
+        }
+    }
+
+    #[must_use]
+    pub fn qualified(self) -> Self {
+        Self {
+            qualified: true,
+            ..self
+        }
     }
 }
 
@@ -48,10 +64,6 @@ impl<'db> Type<'db> {
             db,
         }
     }
-    pub fn qualified_display(&self, db: &'db dyn Db) -> QualifiedDisplayType<'_> {
-        QualifiedDisplayType { ty: self, db }
-    }
-
     pub fn display_with(&self, db: &'db dyn Db, settings: DisplaySettings) -> DisplayType<'_> {
         DisplayType {
             ty: self,
@@ -104,80 +116,26 @@ impl fmt::Debug for DisplayType<'_> {
     }
 }
 
-#[derive(Copy, Clone)]
-pub struct QualifiedDisplayType<'db> {
-    ty: &'db Type<'db>,
+/// Writes the string representation of a type, which is the value displayed either as
+/// `Literal[<repr>]` or `Literal[<repr1>, <repr2>]` for literal types or as `<repr>` for
+/// non literals
+struct DisplayRepresentation<'db> {
+    ty: Type<'db>,
     db: &'db dyn Db,
+    settings: DisplaySettings,
 }
 
-impl Display for QualifiedDisplayType<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self.ty {
-            Type::ClassLiteral(literal) => f.write_str(&self.qualified_representation(*literal)),
-            Type::NominalInstance(instance) => match instance.class(self.db) {
-                ClassType::NonGeneric(class) => f.write_str(&self.qualified_representation(class)),
-                ClassType::Generic(alias) => {
-                    f.write_str(&self.qualified_representation(alias.origin(self.db)))
-                }
-            },
-            Type::EnumLiteral(enum_literal) => {
-                write!(
-                    f,
-                    "Literal[{}]",
-                    self.qualified_representation(enum_literal.enum_class(self.db))
-                )
-            }
-            Type::GenericAlias(alias) => {
-                write!(
-                    f,
-                    "<class '{}'>",
-                    &self.qualified_representation(alias.origin(self.db))
-                )
-            }
-            Type::ProtocolInstance(protocol) => match protocol.inner {
-                Protocol::FromClass(ClassType::NonGeneric(class)) => {
-                    f.write_str(&self.qualified_representation(class))
-                }
-                Protocol::FromClass(ClassType::Generic(alias)) => {
-                    f.write_str(&self.qualified_representation(alias.origin(self.db)))
-                }
-                Protocol::Synthesized(_) => self.ty.display(self.db).fmt(f),
-            },
-            Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
-                SubclassOfInner::Class(ClassType::NonGeneric(class)) => {
-                    write!(f, "type[{}]", self.qualified_representation(class))
-                }
-                SubclassOfInner::Class(ClassType::Generic(alias)) => {
-                    write!(
-                        f,
-                        "type[{}]",
-                        self.qualified_representation(alias.origin(self.db))
-                    )
-                }
-                SubclassOfInner::Dynamic(_) => self.ty.display(self.db).fmt(f),
-            },
-            Type::TypedDict(typed_dict) => match typed_dict.defining_class(self.db) {
-                ClassType::NonGeneric(class) => f.write_str(&self.qualified_representation(class)),
-                ClassType::Generic(alias) => {
-                    f.write_str(&self.qualified_representation(alias.origin(self.db)))
-                }
-            },
-            _ => self.ty.display(self.db).fmt(f),
-        }
-    }
-}
-
-impl QualifiedDisplayType<'_> {
-    fn qualified_representation(self, class: ClassLiteral) -> String {
+impl DisplayRepresentation<'_> {
+    fn class_parents(&self, class: ClassLiteral) -> Vec<String> {
         let body_scope = class.body_scope(self.db);
         let file = body_scope.file(self.db);
         let module_ast = parsed_module(self.db, file).load(self.db);
         let index = semantic_index(self.db, file);
         let file_scope_id = body_scope.file_scope_id(self.db);
 
-        let mut name_parts = vec![self.ty.representation(self.db).to_string()];
+        let mut name_parts = vec![];
 
-        // Skip itself
+        // Skips itself
         for (ancestor_file_scope_id, ancestor_scope) in index.ancestor_scopes(file_scope_id).skip(1)
         {
             let ancestor_scope_id = ancestor_file_scope_id.to_scope_id(self.db, file);
@@ -207,23 +165,8 @@ impl QualifiedDisplayType<'_> {
         }
 
         name_parts.reverse();
-        name_parts.join(".")
+        name_parts
     }
-}
-
-impl fmt::Debug for QualifiedDisplayType<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        Display::fmt(self, f)
-    }
-}
-
-/// Writes the string representation of a type, which is the value displayed either as
-/// `Literal[<repr>]` or `Literal[<repr1>, <repr2>]` for literal types or as `<repr>` for
-/// non literals
-struct DisplayRepresentation<'db> {
-    ty: Type<'db>,
-    db: &'db dyn Db,
-    settings: DisplaySettings,
 }
 
 impl Display for DisplayRepresentation<'_> {
@@ -243,13 +186,27 @@ impl Display for DisplayRepresentation<'_> {
                         .expect("Specialization::tuple() should always return `Some()` for `KnownClass::Tuple`")
                         .display_with(self.db, self.settings)
                         .fmt(f),
-                    (ClassType::NonGeneric(class), _) => f.write_str(class.name(self.db)),
+                    (ClassType::NonGeneric(class), _) => {
+                        if self.settings.qualified {
+                            f.write_fmt(format_args!("{}.{}", self.class_parents(class).join("."), class.name(self.db)))
+                        } else {
+                            f.write_str(class.name(self.db))
+                        }
+                    },
                     (ClassType::Generic(alias), _) => alias.display_with(self.db, self.settings).fmt(f),
                 }
             }
             Type::ProtocolInstance(protocol) => match protocol.inner {
                 Protocol::FromClass(ClassType::NonGeneric(class)) => {
-                    f.write_str(class.name(self.db))
+                    if self.settings.qualified {
+                        f.write_fmt(format_args!(
+                            "{}.{}",
+                            self.class_parents(class).join("."),
+                            class.name(self.db)
+                        ))
+                    } else {
+                        f.write_str(class.name(self.db))
+                    }
                 }
                 Protocol::FromClass(ClassType::Generic(alias)) => {
                     alias.display_with(self.db, self.settings).fmt(f)
@@ -274,7 +231,15 @@ impl Display for DisplayRepresentation<'_> {
                 write!(f, "<module '{}'>", module.module(self.db).name(self.db))
             }
             Type::ClassLiteral(class) => {
-                write!(f, "<class '{}'>", class.name(self.db))
+                if self.settings.qualified {
+                    f.write_fmt(format_args!(
+                        "<class '{}.{}'>",
+                        self.class_parents(class).join("."),
+                        class.name(self.db)
+                    ))
+                } else {
+                    write!(f, "<class '{}'>", class.name(self.db))
+                }
             }
             Type::GenericAlias(generic) => write!(
                 f,
@@ -283,7 +248,15 @@ impl Display for DisplayRepresentation<'_> {
             ),
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 SubclassOfInner::Class(ClassType::NonGeneric(class)) => {
-                    write!(f, "type[{}]", class.name(self.db))
+                    if self.settings.qualified {
+                        f.write_fmt(format_args!(
+                            "type[{}.{}]",
+                            self.class_parents(class).join("."),
+                            class.name(self.db)
+                        ))
+                    } else {
+                        write!(f, "type[{}]", class.name(self.db))
+                    }
                 }
                 SubclassOfInner::Class(ClassType::Generic(alias)) => {
                     write!(
@@ -394,12 +367,23 @@ impl Display for DisplayRepresentation<'_> {
                 escape.bytes_repr(TripleQuotes::No).write(f)
             }
             Type::EnumLiteral(enum_literal) => {
-                write!(
-                    f,
-                    "{enum_class}.{name}",
-                    enum_class = enum_literal.enum_class(self.db).name(self.db),
-                    name = enum_literal.name(self.db),
-                )
+                if self.settings.qualified {
+                    let enum_class = enum_literal.enum_class(self.db);
+                    write!(
+                        f,
+                        "{parents}.{enum_class}.{name}",
+                        parents = self.class_parents(enum_class).join("."),
+                        enum_class = enum_class.name(self.db),
+                        name = enum_literal.name(self.db),
+                    )
+                } else {
+                    write!(
+                        f,
+                        "{enum_class}.{name}",
+                        enum_class = enum_literal.enum_class(self.db).name(self.db),
+                        name = enum_literal.name(self.db),
+                    )
+                }
             }
             Type::NonInferableTypeVar(bound_typevar) | Type::TypeVar(bound_typevar) => {
                 f.write_str(bound_typevar.typevar(self.db).name(self.db))?;
@@ -435,7 +419,21 @@ impl Display for DisplayRepresentation<'_> {
                 }
                 f.write_str("]")
             }
-            Type::TypedDict(typed_dict) => f.write_str(typed_dict.defining_class.name(self.db)),
+            Type::TypedDict(typed_dict) => {
+                if self.settings.qualified {
+                    let class = match typed_dict.defining_class {
+                        ClassType::NonGeneric(literal) => literal,
+                        ClassType::Generic(alias) => alias.origin(self.db),
+                    };
+                    f.write_fmt(format_args!(
+                        "{}.{}",
+                        self.class_parents(class).join("."),
+                        class.name(self.db)
+                    ))
+                } else {
+                    f.write_str(typed_dict.defining_class.name(self.db))
+                }
+            }
             Type::TypeAlias(alias) => f.write_str(alias.name(self.db)),
         }
     }
