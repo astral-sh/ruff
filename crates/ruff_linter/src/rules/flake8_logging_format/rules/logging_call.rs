@@ -89,17 +89,13 @@ fn logging_f_string(
         })
         .collect();
 
-    // Combine collected interpolation names with existing trailing positional names in
-    // that order so that placeholders map to arguments correctly. Do not deduplicate;
-    // duplicates are valid when the same name appears multiple times.
-    let mut result_args = args.clone();
-    result_args.extend(existing_names);
+    args.extend(existing_names);
 
     let replacement = format!(
         "{q}{format_string}{q}, {args}",
         q = quote_str,
         format_string = format_string,
-        args = result_args.join(", ")
+        args = args.join(", ")
     );
 
     let fix = Fix::safe_edit(Edit::range_replacement(replacement, msg.range()));
