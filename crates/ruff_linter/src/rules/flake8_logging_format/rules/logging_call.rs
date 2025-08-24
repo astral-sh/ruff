@@ -29,7 +29,7 @@ fn logging_f_string(
     }
 
     let mut format_string = String::new();
-    let mut args = Vec::new();
+    let mut args: Vec<&str> = Vec::new();
 
     // Try to reuse the first part's quote style when building the replacement.
     // Default to double quotes if we can't determine it.
@@ -64,7 +64,7 @@ fn logging_f_string(
                     match interpolated.expression.as_ref() {
                         Expr::Name(name) => {
                             format_string.push_str("%s");
-                            args.push(name.id.to_string());
+                            args.push(name.id.as_str());
                         }
                         _ => return,
                     }
@@ -78,12 +78,12 @@ fn logging_f_string(
     }
 
     // Determine names of existing trailing positional args (after the `msg` argument).
-    let existing_names: Vec<String> = arguments
+    let existing_names: Vec<&str> = arguments
         .args
         .iter()
         .skip(msg_pos + 1)
         .filter_map(|arg| match arg {
-            Expr::Name(name) => Some(name.id.to_string()),
+            Expr::Name(name) => Some(name.id.as_str()),
             _ => None,
         })
         .collect();
