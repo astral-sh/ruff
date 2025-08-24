@@ -28,6 +28,12 @@ fn logging_f_string(
         return;
     }
 
+    // If there are existing positional arguments after the message, bail out.
+    // This could indicate a mistake or complex usage we shouldn't try to fix.
+    if arguments.args.len() > msg_pos + 1 {
+        return;
+    }
+
     let mut format_string = String::new();
     let mut args: Vec<&str> = Vec::new();
 
@@ -76,19 +82,6 @@ fn logging_f_string(
     if args.is_empty() {
         return;
     }
-
-    // Determine names of existing trailing positional args (after the `msg` argument).
-    let existing_names: Vec<&str> = arguments
-        .args
-        .iter()
-        .skip(msg_pos + 1)
-        .filter_map(|arg| match arg {
-            Expr::Name(name) => Some(name.id.as_str()),
-            _ => None,
-        })
-        .collect();
-
-    args.extend(existing_names);
 
     let replacement = format!(
         "{q}{format_string}{q}, {args}",

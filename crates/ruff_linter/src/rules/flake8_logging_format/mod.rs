@@ -22,6 +22,7 @@ mod tests {
     #[test_case(Path::new("G002.py"))]
     #[test_case(Path::new("G003.py"))]
     #[test_case(Path::new("G004.py"))]
+    #[test_case(Path::new("G004_arg_order.py"))]
     #[test_case(Path::new("G010.py"))]
     #[test_case(Path::new("G101_1.py"))]
     #[test_case(Path::new("G101_2.py"))]
@@ -49,42 +50,23 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn g004_fix_gated_by_preview_flag() -> Result<()> {
-        use crate::settings::LinterSettings;
-
+    #[test_case(Rule::LoggingFString, Path::new("G004.py"))]
+    #[test_case(Rule::LoggingFString, Path::new("G004_arg_order.py"))]
+    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "preview__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
         let diagnostics = test_path(
-            Path::new("flake8_logging_format")
-                .join(Path::new("G004_arg_order.py"))
-                .as_path(),
-            &LinterSettings {
-                preview: crate::settings::types::PreviewMode::Disabled,
-                ..LinterSettings::for_rules(vec![Rule::LoggingFString])
+            Path::new("flake8_logging_format").join(path).as_path(),
+            &settings::LinterSettings {
+                logger_objects: vec!["logging_setup.logger".to_string()],
+                preview: settings::types::PreviewMode::Enabled,
+                ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
-
-        // When preview is disabled, diagnostics should be emitted but no fix should be attached.
-        assert!(diagnostics.iter().all(|d| d.fix().is_none()));
-        Ok(())
-    }
-
-    #[test]
-    fn g004_preserves_argument_order_in_fix() -> Result<()> {
-        use crate::settings::LinterSettings;
-
-        // Use the fixture that contains a two-argument example to ensure ordering is preserved.
-        let diagnostics = test_path(
-            Path::new("flake8_logging_format")
-                .join(Path::new("G004_arg_order.py"))
-                .as_path(),
-            &LinterSettings {
-                preview: crate::settings::types::PreviewMode::Enabled,
-                ..LinterSettings::for_rules(vec![Rule::LoggingFString])
-            },
-        )?;
-
-        // Assert by snapshot (disabled/enabled snapshots stored in snapshots/).
-        assert_diagnostics!("G004_arg_order.py".to_string(), diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 }
