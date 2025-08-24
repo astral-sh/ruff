@@ -435,7 +435,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         || VisibleAncestorsIter::new(&self.scopes, key.enclosing_scope)
                             .any(|(ancestor, _)| ancestor == popped_scope_id))
                 {
-                    let name = &self.place_tables[key.enclosing_scope]
+                    let name = self.place_tables[key.enclosing_scope]
                         .symbol(enclosing_symbol)
                         .name();
                     let popped_place_table = &self.place_tables[popped_scope_id];

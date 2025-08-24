@@ -541,7 +541,6 @@ impl<'db> UseDefMap<'db> {
     pub(crate) fn enclosing_snapshot(
         &self,
         snapshot_id: ScopedEnclosingSnapshotId,
-        nested_laziness: ScopeLaziness,
     ) -> EnclosingSnapshotResult<'_, 'db> {
         match self.enclosing_snapshots.get(snapshot_id) {
             Some(EnclosingSnapshot::Constraint(constraint)) => {
@@ -551,11 +550,8 @@ impl<'db> UseDefMap<'db> {
                 bindings,
                 completeness @ SnapshotCompleteness::Complete,
             )) => {
-                let boundness_analysis = if nested_laziness.is_eager() {
-                    BoundnessAnalysis::BasedOnUnboundVisibility
-                } else {
-                    BoundnessAnalysis::AssumeBound(None)
-                };
+                // The snapshot is complete, perform exact boundness analysis.
+                let boundness_analysis = BoundnessAnalysis::BasedOnUnboundVisibility;
                 EnclosingSnapshotResult::FoundBindings(
                     self.bindings_iterator(bindings, boundness_analysis),
                     *completeness,
@@ -565,6 +561,7 @@ impl<'db> UseDefMap<'db> {
                 bindings,
                 completeness @ SnapshotCompleteness::Incomplete(enclosing_symbol, _),
             )) => {
+                // The snapshot is incomplete, we assume the boundness is bound.
                 let boundness_analysis = BoundnessAnalysis::AssumeBound(Some(bindings));
                 EnclosingSnapshotResult::FoundBindings(
                     self.bindings_iterator(

@@ -512,8 +512,7 @@ impl<'db> SemanticIndex<'db> {
                             nested_laziness: ScopeLaziness::Lazy,
                         };
                         if let Some(id) = self.enclosing_snapshots.get(&key) {
-                            return self.use_def_maps[enclosing_scope]
-                                .enclosing_snapshot(*id, key.nested_laziness);
+                            return self.use_def_maps[enclosing_scope].enclosing_snapshot(*id);
                         }
                     }
                 }
@@ -532,7 +531,7 @@ impl<'db> SemanticIndex<'db> {
         let Some(id) = self.enclosing_snapshots.get(&key) else {
             return EnclosingSnapshotResult::NotFound;
         };
-        self.use_def_maps[enclosing_scope].enclosing_snapshot(*id, key.nested_laziness)
+        self.use_def_maps[enclosing_scope].enclosing_snapshot(*id)
     }
 
     pub(crate) fn semantic_syntax_errors(&self) -> &[SemanticSyntaxError] {
