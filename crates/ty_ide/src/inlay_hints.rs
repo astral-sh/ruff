@@ -6,7 +6,6 @@ use ruff_db::parsed::parsed_module;
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor, TraversalSignal};
 use ruff_python_ast::{AnyNodeRef, Expr, Stmt};
 use ruff_text_size::{Ranged, TextRange, TextSize};
-use smallvec::{SmallVec, smallvec};
 use ty_python_semantic::types::{Type, inlay_hint_function_argument_details};
 use ty_python_semantic::{HasType, SemanticModel};
 
@@ -55,13 +54,13 @@ pub enum InlayHintKind {
 
 #[derive(Debug, Clone)]
 pub struct InlayHintLabel {
-    pub parts: SmallVec<[InlayHintLabelPart; 2]>,
+    pub parts: Vec<InlayHintLabelPart>,
 }
 
 impl InlayHintLabel {
     pub fn simple(s: impl Into<String>, target: Option<crate::NavigationTarget>) -> InlayHintLabel {
         InlayHintLabel {
-            parts: smallvec![InlayHintLabelPart {
+            parts: vec![InlayHintLabelPart {
                 text: s.into(),
                 target,
             }],
@@ -95,7 +94,7 @@ impl InlayHintLabel {
 impl From<String> for InlayHintLabel {
     fn from(s: String) -> Self {
         Self {
-            parts: smallvec![InlayHintLabelPart {
+            parts: vec![InlayHintLabelPart {
                 text: s,
                 target: None,
             }],
