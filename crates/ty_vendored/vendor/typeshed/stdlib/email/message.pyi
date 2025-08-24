@@ -7,7 +7,7 @@ from email.charset import Charset
 from email.contentmanager import ContentManager
 from email.errors import MessageDefect
 from email.policy import Policy
-from typing import Any, Generic, Literal, Protocol, TypeVar, overload
+from typing import Any, Generic, Literal, Protocol, TypeVar, overload, type_check_only
 from typing_extensions import Self, TypeAlias
 
 __all__ = ["Message", "EmailMessage"]
@@ -26,9 +26,11 @@ _EncodedPayloadType: TypeAlias = Message | bytes
 _MultipartPayloadType: TypeAlias = list[_PayloadType]
 _CharsetType: TypeAlias = Charset | str | None
 
+@type_check_only
 class _SupportsEncodeToPayload(Protocol):
     def encode(self, encoding: str, /) -> _PayloadType | _MultipartPayloadType | _SupportsDecodeToPayload: ...
 
+@type_check_only
 class _SupportsDecodeToPayload(Protocol):
     def decode(self, encoding: str, errors: str, /) -> _PayloadType | _MultipartPayloadType: ...
 

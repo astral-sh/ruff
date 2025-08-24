@@ -21,7 +21,6 @@ pub use text::TextEmitter;
 use crate::Fix;
 use crate::registry::Rule;
 
-mod diff;
 mod github;
 mod gitlab;
 mod grouped;

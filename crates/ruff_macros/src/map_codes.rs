@@ -433,13 +433,7 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
             Copy,
             Clone,
             Hash,
-            PartialOrd,
-            Ord,
-            ::ruff_macros::CacheKey,
             ::strum_macros::IntoStaticStr,
-            ::strum_macros::EnumString,
-            ::serde::Serialize,
-            ::serde::Deserialize,
         )]
         #[repr(u16)]
         #[strum(serialize_all = "kebab-case")]

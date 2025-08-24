@@ -20,7 +20,7 @@ from typing import TypeVar
 
 T = TypeVar("T")
 reveal_type(type(T))  # revealed: <class 'TypeVar'>
-reveal_type(T)  # revealed: typing.TypeVar("T")
+reveal_type(T)  # revealed: typing.TypeVar
 reveal_type(T.__name__)  # revealed: Literal["T"]
 ```
 
@@ -80,7 +80,7 @@ from typing import TypeVar
 
 T = TypeVar("T", default=int)
 reveal_type(type(T))  # revealed: <class 'TypeVar'>
-reveal_type(T)  # revealed: typing.TypeVar("T", default=int)
+reveal_type(T)  # revealed: typing.TypeVar
 reveal_type(T.__default__)  # revealed: int
 reveal_type(T.__bound__)  # revealed: None
 reveal_type(T.__constraints__)  # revealed: tuple[()]
@@ -116,7 +116,7 @@ from typing import TypeVar
 
 T = TypeVar("T", bound=int)
 reveal_type(type(T))  # revealed: <class 'TypeVar'>
-reveal_type(T)  # revealed: typing.TypeVar("T", bound=int)
+reveal_type(T)  # revealed: typing.TypeVar
 reveal_type(T.__bound__)  # revealed: int
 reveal_type(T.__constraints__)  # revealed: tuple[()]
 
@@ -131,7 +131,7 @@ from typing import TypeVar
 
 T = TypeVar("T", int, str)
 reveal_type(type(T))  # revealed: <class 'TypeVar'>
-reveal_type(T)  # revealed: typing.TypeVar("T", int, str)
+reveal_type(T)  # revealed: typing.TypeVar
 reveal_type(T.__constraints__)  # revealed: tuple[int, str]
 
 S = TypeVar("S")

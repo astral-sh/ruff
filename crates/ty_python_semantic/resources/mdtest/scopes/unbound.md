@@ -40,6 +40,22 @@ class C:
 reveal_type(C.y)  # revealed: Unknown | Literal[1, "abc"]
 ```
 
+## Possibly unbound in class scope with multiple declarations
+
+```py
+def coinflip() -> bool:
+    return True
+
+class C:
+    if coinflip():
+        x: int = 1
+    elif coinflip():
+        x: str = "abc"
+
+# error: [possibly-unbound-attribute]
+reveal_type(C.x)  # revealed: int | str
+```
+
 ## Unbound function local
 
 An unbound function local that has definitions in the scope does not fall back to globals.

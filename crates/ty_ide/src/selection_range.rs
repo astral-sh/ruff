@@ -14,7 +14,8 @@ pub fn selection_range(db: &dyn Db, file: File, offset: TextSize) -> Vec<TextRan
     let covering = covering_node(parsed.syntax().into(), range);
 
     let mut ranges = Vec::new();
-    for node in covering.ancestors() {
+    // Start with the largest range (the root), so iterate ancestors backwards
+    for node in covering.ancestors().rev() {
         if should_include_in_selection(node) {
             let range = node.range();
             // Eliminate duplicates when parent and child nodes have the same range

@@ -254,6 +254,11 @@ impl Diagnostic {
             .find(|ann| ann.is_primary)
     }
 
+    /// Returns a mutable borrow of all annotations of this diagnostic.
+    pub fn annotations_mut(&mut self) -> impl Iterator<Item = &mut Annotation> {
+        Arc::make_mut(&mut self.inner).annotations.iter_mut()
+    }
+
     /// Returns the "primary" span of this diagnostic if one exists.
     ///
     /// When there are multiple primary spans, then the first one that was
@@ -308,6 +313,11 @@ impl Diagnostic {
 
     pub fn sub_diagnostics(&self) -> &[SubDiagnostic] {
         &self.inner.subs
+    }
+
+    /// Returns a mutable borrow of the sub-diagnostics of this diagnostic.
+    pub fn sub_diagnostics_mut(&mut self) -> impl Iterator<Item = &mut SubDiagnostic> {
+        Arc::make_mut(&mut self.inner).subs.iter_mut()
     }
 
     /// Returns the fix for this diagnostic if it exists.
@@ -619,6 +629,11 @@ impl SubDiagnostic {
 
     pub fn annotations(&self) -> &[Annotation] {
         &self.inner.annotations
+    }
+
+    /// Returns a mutable borrow of the annotations of this sub-diagnostic.
+    pub fn annotations_mut(&mut self) -> impl Iterator<Item = &mut Annotation> {
+        self.inner.annotations.iter_mut()
     }
 
     /// Returns a shared borrow of the "primary" annotation of this diagnostic
@@ -1279,6 +1294,10 @@ pub struct DisplayDiagnosticConfig {
     hide_severity: bool,
     /// Whether to show the availability of a fix in a diagnostic.
     show_fix_status: bool,
+    /// Whether to show the diff for an available fix after the main diagnostic.
+    ///
+    /// This currently only applies to `DiagnosticFormat::Full`.
+    show_fix_diff: bool,
     /// The lowest applicability that should be shown when reporting diagnostics.
     fix_applicability: Applicability,
 }
@@ -1326,6 +1345,14 @@ impl DisplayDiagnosticConfig {
         }
     }
 
+    /// Whether to show a diff for an available fix after the main diagnostic.
+    pub fn show_fix_diff(self, yes: bool) -> DisplayDiagnosticConfig {
+        DisplayDiagnosticConfig {
+            show_fix_diff: yes,
+            ..self
+        }
+    }
+
     /// Set the lowest fix applicability that should be shown.
     ///
     /// In other words, an applicability of `Safe` (the default) would suppress showing fixes or fix
@@ -1349,6 +1376,7 @@ impl Default for DisplayDiagnosticConfig {
             preview: false,
             hide_severity: false,
             show_fix_status: false,
+            show_fix_diff: false,
             fix_applicability: Applicability::Safe,
         }
     }

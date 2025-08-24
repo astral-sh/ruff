@@ -4,7 +4,7 @@ import types
 from _typeshed import SupportsKeysAndGetItem, Unused
 from builtins import property as _builtins_property
 from collections.abc import Callable, Iterable, Iterator, Mapping
-from typing import Any, Generic, Literal, TypeVar, overload
+from typing import Any, Final, Generic, Literal, TypeVar, overload
 from typing_extensions import Self, TypeAlias
 
 __all__ = ["EnumMeta", "Enum", "IntEnum", "Flag", "IntFlag", "auto", "unique"]
@@ -551,9 +551,9 @@ if sys.version_info >= (3, 11):
         NAMED_FLAGS = "multi-flag aliases may not contain unnamed flags"
         UNIQUE = "one name per value"
 
-    CONTINUOUS = EnumCheck.CONTINUOUS
-    NAMED_FLAGS = EnumCheck.NAMED_FLAGS
-    UNIQUE = EnumCheck.UNIQUE
+    CONTINUOUS: Final = EnumCheck.CONTINUOUS
+    NAMED_FLAGS: Final = EnumCheck.NAMED_FLAGS
+    UNIQUE: Final = EnumCheck.UNIQUE
 
     class verify:
         """
@@ -577,10 +577,10 @@ if sys.version_info >= (3, 11):
         EJECT = "eject"
         KEEP = "keep"
 
-    STRICT = FlagBoundary.STRICT
-    CONFORM = FlagBoundary.CONFORM
-    EJECT = FlagBoundary.EJECT
-    KEEP = FlagBoundary.KEEP
+    STRICT: Final = FlagBoundary.STRICT
+    CONFORM: Final = FlagBoundary.CONFORM
+    EJECT: Final = FlagBoundary.EJECT
+    KEEP: Final = FlagBoundary.KEEP
 
     def global_str(self: Enum) -> str:
         """

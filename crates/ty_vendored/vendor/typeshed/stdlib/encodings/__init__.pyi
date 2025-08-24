@@ -28,6 +28,7 @@ Written by Marc-Andre Lemburg (mal@lemburg.com).
 
 """
 
+import sys
 from codecs import CodecInfo
 
 class CodecRegistryError(LookupError, SystemError): ...
@@ -45,6 +46,9 @@ def normalize_encoding(encoding: str | bytes) -> str:
     """
 
 def search_function(encoding: str) -> CodecInfo | None: ...
+
+if sys.version_info >= (3, 14) and sys.platform == "win32":
+    def win32_code_page_search_function(encoding: str) -> CodecInfo | None: ...
 
 # Needed for submodules
 def __getattr__(name: str): ...  # incomplete module

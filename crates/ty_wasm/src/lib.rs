@@ -421,7 +421,11 @@ impl Workspace {
             .into_iter()
             .map(|completion| Completion {
                 kind: completion.kind(&self.db).map(CompletionKind::from),
-                name: completion.name.into(),
+                name: completion.inner.name.into(),
+                documentation: completion
+                    .documentation
+                    .map(|documentation| documentation.render_plaintext()),
+                detail: completion.inner.ty.display(&self.db).to_string().into(),
             })
             .collect())
     }
@@ -438,6 +442,7 @@ impl Workspace {
             // TODO: Provide a way to configure this
             &InlayHintSettings {
                 variable_types: true,
+                call_argument_names: true,
             },
         );
 
@@ -451,6 +456,7 @@ impl Workspace {
                     &source,
                     self.position_encoding,
                 ),
+                kind: hint.content.into(),
             })
             .collect())
     }
@@ -531,7 +537,9 @@ impl Workspace {
 
                 SignatureInformation {
                     label: sig.label,
-                    documentation: sig.documentation,
+                    documentation: sig
+                        .documentation
+                        .map(|docstring| docstring.render_plaintext()),
                     parameters,
                     active_parameter: sig.active_parameter.and_then(|p| u32::try_from(p).ok()),
                 }
@@ -905,6 +913,10 @@ pub struct Completion {
     #[wasm_bindgen(getter_with_clone)]
     pub name: String,
     pub kind: Option<CompletionKind>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub documentation: Option<String>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub detail: Option<String>,
 }
 
 #[wasm_bindgen]
@@ -970,12 +982,30 @@ impl From<ty_python_semantic::CompletionKind> for CompletionKind {
 }
 
 #[wasm_bindgen]
+#[derive(Debug, Clone, PartialEq, Eq, Copy)]
+pub enum InlayHintKind {
+    Type,
+    Parameter,
+}
+
+impl From<ty_ide::InlayHintContent<'_>> for InlayHintKind {
+    fn from(kind: ty_ide::InlayHintContent) -> Self {
+        match kind {
+            ty_ide::InlayHintContent::Type(_) => Self::Type,
+            ty_ide::InlayHintContent::CallArgumentName(_) => Self::Parameter,
+        }
+    }
+}
+
+#[wasm_bindgen]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InlayHint {
     #[wasm_bindgen(getter_with_clone)]
     pub markdown: String,
 
     pub position: Position,
+
+    pub kind: InlayHintKind,
 }
 
 #[wasm_bindgen]
@@ -1200,6 +1230,10 @@ impl System for WasmSystem {
 
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
+    }
+
+    fn dyn_clone(&self) -> Box<dyn System> {
+        Box::new(self.clone())
     }
 }
 

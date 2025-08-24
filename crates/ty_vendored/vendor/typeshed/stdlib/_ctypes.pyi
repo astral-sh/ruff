@@ -7,24 +7,24 @@ from abc import abstractmethod
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from ctypes import CDLL, ArgumentError as ArgumentError, c_void_p
 from types import GenericAlias
-from typing import Any, ClassVar, Generic, TypeVar, final, overload, type_check_only
+from typing import Any, ClassVar, Final, Generic, TypeVar, final, overload, type_check_only
 from typing_extensions import Self, TypeAlias
 
 _T = TypeVar("_T")
 _CT = TypeVar("_CT", bound=_CData)
 
-FUNCFLAG_CDECL: int
-FUNCFLAG_PYTHONAPI: int
-FUNCFLAG_USE_ERRNO: int
-FUNCFLAG_USE_LASTERROR: int
-RTLD_GLOBAL: int
-RTLD_LOCAL: int
+FUNCFLAG_CDECL: Final = 0x1
+FUNCFLAG_PYTHONAPI: Final = 0x4
+FUNCFLAG_USE_ERRNO: Final = 0x8
+FUNCFLAG_USE_LASTERROR: Final = 0x10
+RTLD_GLOBAL: Final[int]
+RTLD_LOCAL: Final[int]
 
 if sys.version_info >= (3, 11):
-    CTYPES_MAX_ARGCOUNT: int
+    CTYPES_MAX_ARGCOUNT: Final[int]
 
 if sys.version_info >= (3, 12):
-    SIZEOF_TIME_T: int
+    SIZEOF_TIME_T: Final[int]
 
 if sys.platform == "win32":
     # Description, Source, HelpFile, HelpContext, scode
@@ -41,8 +41,8 @@ if sys.platform == "win32":
 
     def CopyComPointer(src: _PointerLike, dst: _PointerLike | _CArgObject) -> int:
         """CopyComPointer(src, dst) -> HRESULT value"""
-    FUNCFLAG_HRESULT: int
-    FUNCFLAG_STDCALL: int
+    FUNCFLAG_HRESULT: Final = 0x2
+    FUNCFLAG_STDCALL: Final = 0x0
 
     def FormatError(code: int = ...) -> str:
         """FormatError([integer]) -> string
@@ -131,7 +131,10 @@ class _SimpleCData(_CData, Generic[_T], metaclass=_PyCSimpleType):
     def __init__(self, value: _T = ...) -> None: ...  # pyright: ignore[reportInvalidTypeVarUse]
     def __ctypes_from_outparam__(self, /) -> _T: ...  # type: ignore[override]
 
+@type_check_only
 class _CanCastTo(_CData): ...
+
+@type_check_only
 class _PointerLike(_CanCastTo): ...
 
 # This type is not exposed. It calls itself _ctypes.PyCPointerType.

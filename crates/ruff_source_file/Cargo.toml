@@ -22,7 +22,7 @@ serde = { workspace = true, optional = true }
 [dev-dependencies]
 
 [features]
-get-size = ["dep:get-size2"]
+get-size = ["dep:get-size2", "ruff_text_size/get-size"]
 serde = ["dep:serde", "ruff_text_size/serde"]
 
 [lints]

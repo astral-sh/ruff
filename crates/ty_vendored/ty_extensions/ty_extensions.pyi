@@ -1,5 +1,15 @@
+import sys
+from collections.abc import Iterable
 from enum import Enum
-from typing import Any, LiteralString, _SpecialForm
+from typing import (
+    Any,
+    ClassVar,
+    LiteralString,
+    Protocol,
+    _SpecialForm,
+)
+
+from typing_extensions import Self  # noqa: UP035
 
 # Special operations
 def static_assert(condition: object, msg: LiteralString | None = None) -> None: ...
@@ -14,6 +24,12 @@ Not: _SpecialForm
 Intersection: _SpecialForm
 TypeOf: _SpecialForm
 CallableTypeOf: _SpecialForm
+# Top[T] evaluates to the top materialization of T, a type that is a supertype
+# of every materialization of T.
+Top: _SpecialForm
+# Bottom[T] evaluates to the bottom materialization of T, a type that is a subtype
+# of every materialization of T.
+Bottom: _SpecialForm
 
 # ty treats annotations of `float` to mean `float | int`, and annotations of `complex`
 # to mean `complex | float | int`. This is to support a typing-system special case [1].
@@ -46,12 +62,6 @@ def dunder_all_names(module: Any) -> Any: ...
 # List all members of an enum.
 def enum_members[E: type[Enum]](enum: E) -> tuple[str, ...]: ...
 
-# Returns the type that's an upper bound of materializing the given (gradual) type.
-def top_materialization(type: Any) -> Any: ...
-
-# Returns the type that's a lower bound of materializing the given (gradual) type.
-def bottom_materialization(type: Any) -> Any: ...
-
 # Returns a tuple of all members of the given object, similar to `dir(obj)` and
 # `inspect.getmembers(obj)`, with at least the following differences:
 #
@@ -69,3 +79,16 @@ def has_member(obj: Any, name: str) -> bool: ...
 # diagnostic describing the protocol's interface. Passing a non-protocol type
 # will cause ty to emit an error diagnostic.
 def reveal_protocol_interface(protocol: type) -> None: ...
+
+# A protocol describing an interface that should be satisfied by all named tuples
+# created using `typing.NamedTuple` or `collections.namedtuple`.
+class NamedTupleLike(Protocol):
+    # from typing.NamedTuple stub
+    _field_defaults: ClassVar[dict[str, Any]]
+    _fields: ClassVar[tuple[str, ...]]
+    @classmethod
+    def _make(self: Self, iterable: Iterable[Any]) -> Self: ...
+    def _asdict(self, /) -> dict[str, Any]: ...
+    def _replace(self: Self, /, **kwargs) -> Self: ...
+    if sys.version_info >= (3, 13):
+        def __replace__(self: Self, **kwargs) -> Self: ...

@@ -10,107 +10,107 @@ from typing import Any, Final, Literal, overload
 from typing_extensions import Buffer
 
 if sys.platform != "win32":
-    FASYNC: int
-    FD_CLOEXEC: int
-    F_DUPFD: int
-    F_DUPFD_CLOEXEC: int
-    F_GETFD: int
-    F_GETFL: int
-    F_GETLK: int
-    F_GETOWN: int
-    F_RDLCK: int
-    F_SETFD: int
-    F_SETFL: int
-    F_SETLK: int
-    F_SETLKW: int
-    F_SETOWN: int
-    F_UNLCK: int
-    F_WRLCK: int
+    FASYNC: Final[int]
+    FD_CLOEXEC: Final[int]
+    F_DUPFD: Final[int]
+    F_DUPFD_CLOEXEC: Final[int]
+    F_GETFD: Final[int]
+    F_GETFL: Final[int]
+    F_GETLK: Final[int]
+    F_GETOWN: Final[int]
+    F_RDLCK: Final[int]
+    F_SETFD: Final[int]
+    F_SETFL: Final[int]
+    F_SETLK: Final[int]
+    F_SETLKW: Final[int]
+    F_SETOWN: Final[int]
+    F_UNLCK: Final[int]
+    F_WRLCK: Final[int]
 
-    F_GETLEASE: int
-    F_SETLEASE: int
+    F_GETLEASE: Final[int]
+    F_SETLEASE: Final[int]
     if sys.platform == "darwin":
-        F_FULLFSYNC: int
-        F_NOCACHE: int
-        F_GETPATH: int
+        F_FULLFSYNC: Final[int]
+        F_NOCACHE: Final[int]
+        F_GETPATH: Final[int]
     if sys.platform == "linux":
-        F_SETLKW64: int
-        F_SETSIG: int
-        F_SHLCK: int
-        F_SETLK64: int
-        F_GETSIG: int
-        F_NOTIFY: int
-        F_EXLCK: int
-        F_GETLK64: int
-        F_ADD_SEALS: int
-        F_GET_SEALS: int
-        F_SEAL_GROW: int
-        F_SEAL_SEAL: int
-        F_SEAL_SHRINK: int
-        F_SEAL_WRITE: int
+        F_SETLKW64: Final[int]
+        F_SETSIG: Final[int]
+        F_SHLCK: Final[int]
+        F_SETLK64: Final[int]
+        F_GETSIG: Final[int]
+        F_NOTIFY: Final[int]
+        F_EXLCK: Final[int]
+        F_GETLK64: Final[int]
+        F_ADD_SEALS: Final[int]
+        F_GET_SEALS: Final[int]
+        F_SEAL_GROW: Final[int]
+        F_SEAL_SEAL: Final[int]
+        F_SEAL_SHRINK: Final[int]
+        F_SEAL_WRITE: Final[int]
         F_OFD_GETLK: Final[int]
         F_OFD_SETLK: Final[int]
         F_OFD_SETLKW: Final[int]
 
         if sys.version_info >= (3, 10):
-            F_GETPIPE_SZ: int
-            F_SETPIPE_SZ: int
+            F_GETPIPE_SZ: Final[int]
+            F_SETPIPE_SZ: Final[int]
 
-        DN_ACCESS: int
-        DN_ATTRIB: int
-        DN_CREATE: int
-        DN_DELETE: int
-        DN_MODIFY: int
-        DN_MULTISHOT: int
-        DN_RENAME: int
+        DN_ACCESS: Final[int]
+        DN_ATTRIB: Final[int]
+        DN_CREATE: Final[int]
+        DN_DELETE: Final[int]
+        DN_MODIFY: Final[int]
+        DN_MULTISHOT: Final[int]
+        DN_RENAME: Final[int]
 
-    LOCK_EX: int
-    LOCK_NB: int
-    LOCK_SH: int
-    LOCK_UN: int
+    LOCK_EX: Final[int]
+    LOCK_NB: Final[int]
+    LOCK_SH: Final[int]
+    LOCK_UN: Final[int]
     if sys.platform == "linux":
-        LOCK_MAND: int
-        LOCK_READ: int
-        LOCK_RW: int
-        LOCK_WRITE: int
+        LOCK_MAND: Final[int]
+        LOCK_READ: Final[int]
+        LOCK_RW: Final[int]
+        LOCK_WRITE: Final[int]
 
     if sys.platform == "linux":
         # Constants for the POSIX STREAMS interface. Present in glibc until 2.29 (released February 2019).
         # Never implemented on BSD, and considered "obsolescent" starting in POSIX 2008.
         # Probably still used on Solaris.
-        I_ATMARK: int
-        I_CANPUT: int
-        I_CKBAND: int
-        I_FDINSERT: int
-        I_FIND: int
-        I_FLUSH: int
-        I_FLUSHBAND: int
-        I_GETBAND: int
-        I_GETCLTIME: int
-        I_GETSIG: int
-        I_GRDOPT: int
-        I_GWROPT: int
-        I_LINK: int
-        I_LIST: int
-        I_LOOK: int
-        I_NREAD: int
-        I_PEEK: int
-        I_PLINK: int
-        I_POP: int
-        I_PUNLINK: int
-        I_PUSH: int
-        I_RECVFD: int
-        I_SENDFD: int
-        I_SETCLTIME: int
-        I_SETSIG: int
-        I_SRDOPT: int
-        I_STR: int
-        I_SWROPT: int
-        I_UNLINK: int
+        I_ATMARK: Final[int]
+        I_CANPUT: Final[int]
+        I_CKBAND: Final[int]
+        I_FDINSERT: Final[int]
+        I_FIND: Final[int]
+        I_FLUSH: Final[int]
+        I_FLUSHBAND: Final[int]
+        I_GETBAND: Final[int]
+        I_GETCLTIME: Final[int]
+        I_GETSIG: Final[int]
+        I_GRDOPT: Final[int]
+        I_GWROPT: Final[int]
+        I_LINK: Final[int]
+        I_LIST: Final[int]
+        I_LOOK: Final[int]
+        I_NREAD: Final[int]
+        I_PEEK: Final[int]
+        I_PLINK: Final[int]
+        I_POP: Final[int]
+        I_PUNLINK: Final[int]
+        I_PUSH: Final[int]
+        I_RECVFD: Final[int]
+        I_SENDFD: Final[int]
+        I_SETCLTIME: Final[int]
+        I_SETSIG: Final[int]
+        I_SRDOPT: Final[int]
+        I_STR: Final[int]
+        I_SWROPT: Final[int]
+        I_UNLINK: Final[int]
 
     if sys.version_info >= (3, 12) and sys.platform == "linux":
-        FICLONE: int
-        FICLONERANGE: int
+        FICLONE: Final[int]
+        FICLONERANGE: Final[int]
 
     if sys.version_info >= (3, 13) and sys.platform == "linux":
         F_OWNER_TID: Final = 0

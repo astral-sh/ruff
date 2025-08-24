@@ -120,6 +120,7 @@ __all__ = [
     "clear_overloads",
     "dataclass_transform",
     "deprecated",
+    "disjoint_base",
     "Doc",
     "evaluate_forward_ref",
     "get_overloads",
@@ -150,6 +151,7 @@ __all__ = [
     "TypeGuard",
     "TypeIs",
     "TYPE_CHECKING",
+    "type_repr",
     "Never",
     "NoReturn",
     "ReadOnly",
@@ -262,6 +264,8 @@ def final(f: _F) -> _F:
     attempts to set the ``__final__`` attribute to ``True`` on the decorated
     object to allow runtime introspection.
     """
+
+def disjoint_base(cls: _TC) -> _TC: ...
 
 Literal: _SpecialForm
 
@@ -837,6 +841,7 @@ else:
         This protocol only supports blocking I/O.
         """
 
+        __slots__ = ()
         @abc.abstractmethod
         def read(self, size: int = ..., /) -> _T_co:
             """Read data from the input stream and return it.
@@ -852,6 +857,7 @@ else:
         This protocol only supports blocking I/O.
         """
 
+        __slots__ = ()
         @abc.abstractmethod
         def write(self, data: _T_contra, /) -> int:
             """Write *data* to the output stream and return the number of items written."""
@@ -901,6 +907,7 @@ else:
         """
 
     @final
+    @type_check_only
     class _NoDefaultType: ...
 
     NoDefault: _NoDefaultType
@@ -1122,8 +1129,8 @@ else:
         def __getitem__(self, parameters: Incomplete | tuple[Incomplete, ...]) -> AnnotationForm: ...
         def __init_subclass__(cls, *args: Unused, **kwargs: Unused) -> NoReturn: ...
         if sys.version_info >= (3, 10):
-            def __or__(self, right: Any) -> _SpecialForm: ...
-            def __ror__(self, left: Any) -> _SpecialForm: ...
+            def __or__(self, right: Any, /) -> _SpecialForm: ...
+            def __ror__(self, left: Any, /) -> _SpecialForm: ...
 
 # PEP 727
 class Doc:
@@ -1150,6 +1157,7 @@ class Doc:
     def __eq__(self, other: object) -> bool: ...
 
 # PEP 728
+@type_check_only
 class _NoExtraItemsType: ...
 
 NoExtraItems: _NoExtraItemsType
@@ -1161,7 +1169,7 @@ TypeForm: _SpecialForm
 if sys.version_info >= (3, 14):
     from typing import evaluate_forward_ref as evaluate_forward_ref
 
-    from annotationlib import Format as Format, get_annotations as get_annotations
+    from annotationlib import Format as Format, get_annotations as get_annotations, type_repr as type_repr
 else:
     class Format(enum.IntEnum):
         """An enumeration."""
@@ -1290,6 +1298,7 @@ else:
         format: Format | None = None,
         _recursive_guard: Container[str] = ...,
     ) -> AnnotationForm: ...
+    def type_repr(value: object) -> str: ...
 
 # PEP 661
 class Sentinel:

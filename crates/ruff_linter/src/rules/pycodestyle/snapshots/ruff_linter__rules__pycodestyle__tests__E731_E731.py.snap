@@ -105,7 +105,7 @@ help: Rewrite `f` as a `def`
 26 27 | 
 27 28 | def scope():
 
-E731 Do not assign a `lambda` expression, use a `def`
+E731 [*] Do not assign a `lambda` expression, use a `def`
   --> E731.py:57:5
    |
 55 | class Scope:
@@ -115,7 +115,7 @@ E731 Do not assign a `lambda` expression, use a `def`
    |
 help: Rewrite `f` as a `def`
 
-ℹ Display-only fix
+ℹ Unsafe fix
 54 54 | 
 55 55 | class Scope:
 56 56 |     # E731
@@ -318,7 +318,7 @@ help: Rewrite `f` as a `def`
 137 138 | 
 138 139 | class TemperatureScales(Enum):
 
-E731 Do not assign a `lambda` expression, use a `def`
+E731 [*] Do not assign a `lambda` expression, use a `def`
    --> E731.py:139:5
     |
 138 | class TemperatureScales(Enum):
@@ -328,7 +328,7 @@ E731 Do not assign a `lambda` expression, use a `def`
     |
 help: Rewrite `CELSIUS` as a `def`
 
-ℹ Display-only fix
+ℹ Unsafe fix
 136 136 | 
 137 137 | 
 138 138 | class TemperatureScales(Enum):
@@ -339,7 +339,7 @@ help: Rewrite `CELSIUS` as a `def`
 141 142 | 
 142 143 | 
 
-E731 Do not assign a `lambda` expression, use a `def`
+E731 [*] Do not assign a `lambda` expression, use a `def`
    --> E731.py:140:5
     |
 138 | class TemperatureScales(Enum):
@@ -349,7 +349,7 @@ E731 Do not assign a `lambda` expression, use a `def`
     |
 help: Rewrite `FAHRENHEIT` as a `def`
 
-ℹ Display-only fix
+ℹ Unsafe fix
 137 137 | 
 138 138 | class TemperatureScales(Enum):
 139 139 |     CELSIUS = (lambda deg_c: deg_c)

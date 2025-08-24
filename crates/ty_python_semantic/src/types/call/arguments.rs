@@ -5,7 +5,7 @@ use ruff_python_ast as ast;
 
 use crate::Db;
 use crate::types::KnownClass;
-use crate::types::enums::enum_member_literals;
+use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::tuple::{Tuple, TupleLength, TupleType};
 
 use super::Type;
@@ -208,10 +208,32 @@ impl<'a, 'db> FromIterator<(Argument<'a>, Option<Type<'db>>)> for CallArguments<
     }
 }
 
+/// Returns `true` if the type can be expanded into its subtypes.
+///
+/// In other words, it returns `true` if [`expand_type`] returns [`Some`] for the given type.
+pub(crate) fn is_expandable_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    match ty {
+        Type::NominalInstance(instance) => {
+            let class = instance.class(db);
+            class.is_known(db, KnownClass::Bool)
+                || instance.tuple_spec(db).is_some_and(|spec| match &*spec {
+                    Tuple::Fixed(fixed_length_tuple) => fixed_length_tuple
+                        .all_elements()
+                        .any(|element| is_expandable_type(db, *element)),
+                    Tuple::Variable(_) => false,
+                })
+                || enum_metadata(db, class.class_literal(db).0).is_some()
+        }
+        Type::Union(_) => true,
+        _ => false,
+    }
+}
+
 /// Expands a type into its possible subtypes, if applicable.
 ///
 /// Returns [`None`] if the type cannot be expanded.
 fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
+    // NOTE: Update `is_expandable_type` if this logic changes accordingly.
     match ty {
         Type::NominalInstance(instance) => {
             let class = instance.class(db);
@@ -237,7 +259,7 @@ fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
                                 }
                             })
                             .multi_cartesian_product()
-                            .map(|types| Type::tuple(TupleType::from_elements(db, types)))
+                            .map(|types| Type::tuple(TupleType::heterogeneous(db, types)))
                             .collect::<Vec<_>>();
 
                         if expanded.len() == 1 {
@@ -257,7 +279,7 @@ fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
 
             None
         }
-        Type::Union(union) => Some(union.iter(db).copied().collect()),
+        Type::Union(union) => Some(union.elements(db).to_vec()),
         // We don't handle `type[A | B]` here because it's already stored in the expanded form
         // i.e., `type[A] | type[B]` which is handled by the `Type::Union` case.
         _ => None,

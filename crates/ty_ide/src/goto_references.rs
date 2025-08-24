@@ -405,9 +405,7 @@ except ValueError as err:
 ",
         );
 
-        // Note: Currently only finds the declaration, not the usages
-        // This is because semantic analysis for except handler variables isn't fully implemented
-        assert_snapshot!(test.references(), @r###"
+        assert_snapshot!(test.references(), @r"
         info[references]: Reference 1
          --> main.py:4:29
           |
@@ -418,7 +416,37 @@ except ValueError as err:
         5 |     print(f'Error: {err}')
         6 |     return err
           |
-        "###);
+
+        info[references]: Reference 2
+         --> main.py:5:21
+          |
+        3 |     x = 1 / 0
+        4 | except ZeroDivisionError as err:
+        5 |     print(f'Error: {err}')
+          |                     ^^^
+        6 |     return err
+          |
+
+        info[references]: Reference 3
+         --> main.py:6:12
+          |
+        4 | except ZeroDivisionError as err:
+        5 |     print(f'Error: {err}')
+        6 |     return err
+          |            ^^^
+        7 |
+        8 | try:
+          |
+
+        info[references]: Reference 4
+          --> main.py:11:31
+           |
+         9 |     y = 2 / 0
+        10 | except ValueError as err:
+        11 |     print(f'Different error: {err}')
+           |                               ^^^
+           |
+        ");
     }
 
     #[test]
@@ -758,7 +786,7 @@ class DataProcessor:
         5 |     def __init__(self):
         6 |         self.multiplier = func
           |                           ^^^^
-        7 |     
+        7 |
         8 |     def process(self, value):
           |
 
@@ -806,7 +834,7 @@ def process_model():
         2 | class MyModel:
         3 |     attr = 42
           |     ^^^^
-        4 |         
+        4 |
         5 |     def get_attribute(self):
           |
 

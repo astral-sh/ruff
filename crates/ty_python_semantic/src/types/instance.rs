@@ -7,14 +7,15 @@ use super::protocol_class::ProtocolInterface;
 use super::{BoundTypeVarInstance, ClassType, KnownClass, SubclassOfType, Type, TypeVarVariance};
 use crate::place::PlaceAndQualifiers;
 use crate::semantic_index::definition::Definition;
-use crate::types::cyclic::PairVisitor;
+use crate::types::constraints::{Constraints, IteratorConstraintsExtension};
 use crate::types::enums::is_single_member_enum;
 use crate::types::protocol_class::walk_protocol_interface;
 use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
-    ClassBase, DynamicType, TypeMapping, TypeRelation, TypeTransformer, TypedDictType, UnionType,
+    ApplyTypeMappingVisitor, ClassBase, DynamicType, HasRelationToVisitor, IsDisjointVisitor,
+    IsEquivalentVisitor, NormalizedVisitor, TypeMapping, TypeRelation, VarianceInferable,
 };
-use crate::{Db, FxOrderSet, Program};
+use crate::{Db, FxOrderSet};
 
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
 
@@ -34,7 +35,7 @@ impl<'db> Type<'db> {
             _ if class_literal.is_protocol(db) => {
                 Self::ProtocolInstance(ProtocolInstanceType::from_class(class))
             }
-            _ if class_literal.is_typed_dict(db) => TypedDictType::from(db, class),
+            _ if class_literal.is_typed_dict(db) => Type::typed_dict(class),
             _ => Type::non_tuple_instance(class),
         }
     }
@@ -43,6 +44,30 @@ impl<'db> Type<'db> {
         let Some(tuple) = tuple else {
             return Type::Never;
         };
+        Type::tuple_instance(tuple)
+    }
+
+    pub(crate) fn homogeneous_tuple(db: &'db dyn Db, element: Type<'db>) -> Self {
+        Type::tuple_instance(TupleType::homogeneous(db, element))
+    }
+
+    pub(crate) fn heterogeneous_tuple<I, T>(db: &'db dyn Db, elements: I) -> Self
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<Type<'db>>,
+    {
+        Type::tuple(TupleType::heterogeneous(
+            db,
+            elements.into_iter().map(Into::into),
+        ))
+    }
+
+    pub(crate) fn empty_tuple(db: &'db dyn Db) -> Self {
+        Type::tuple_instance(TupleType::empty(db))
+    }
+
+    /// **Private** helper function to create a `Type::NominalInstance` from a tuple.
+    fn tuple_instance(tuple: TupleType<'db>) -> Self {
         Type::NominalInstance(NominalInstanceType(NominalInstanceInner::ExactTuple(tuple)))
     }
 
@@ -68,23 +93,26 @@ impl<'db> Type<'db> {
             SynthesizedProtocolType::new(
                 db,
                 ProtocolInterface::with_property_members(db, members),
-                &TypeTransformer::default(),
+                &NormalizedVisitor::default(),
             ),
         ))
     }
 
     /// Return `true` if `self` conforms to the interface described by `protocol`.
-    pub(super) fn satisfies_protocol(
+    pub(super) fn satisfies_protocol<C: Constraints<'db>>(
         self,
         db: &'db dyn Db,
         protocol: ProtocolInstanceType<'db>,
         relation: TypeRelation,
-    ) -> bool {
+        visitor: &HasRelationToVisitor<'db, C>,
+    ) -> C {
         protocol
             .inner
             .interface(db)
             .members(db)
-            .all(|member| member.is_satisfied_by(db, self, relation))
+            .when_all(db, |member| {
+                member.is_satisfied_by(db, self, relation, visitor)
+            })
     }
 }
 
@@ -117,47 +145,6 @@ impl<'db> NominalInstanceType<'db> {
     /// I.e., for the type `tuple[int, str]`, this will return the tuple spec `[int, str]`.
     /// For a subclass of `tuple[int, str]`, it will return the same tuple spec.
     pub(super) fn tuple_spec(&self, db: &'db dyn Db) -> Option<Cow<'db, TupleSpec<'db>>> {
-        fn own_tuple_spec_of_class<'db>(
-            db: &'db dyn Db,
-            class: ClassType<'db>,
-        ) -> Option<Cow<'db, TupleSpec<'db>>> {
-            let (class_literal, specialization) = class.class_literal(db);
-            match class_literal.known(db)? {
-                KnownClass::Tuple => Some(
-                    specialization
-                        .and_then(|spec| Some(Cow::Borrowed(spec.tuple(db)?)))
-                        .unwrap_or_else(|| Cow::Owned(TupleSpec::homogeneous(Type::unknown()))),
-                ),
-                KnownClass::VersionInfo => {
-                    let python_version = Program::get(db).python_version(db);
-                    let int_instance_ty = KnownClass::Int.to_instance(db);
-
-                    // TODO: just grab this type from typeshed (it's a `sys._ReleaseLevel` type alias there)
-                    let release_level_ty = {
-                        let elements: Box<[Type<'db>]> = ["alpha", "beta", "candidate", "final"]
-                            .iter()
-                            .map(|level| Type::string_literal(db, level))
-                            .collect();
-
-                        // For most unions, it's better to go via `UnionType::from_elements` or use `UnionBuilder`;
-                        // those techniques ensure that union elements are deduplicated and unions are eagerly simplified
-                        // into other types where necessary. Here, however, we know that there are no duplicates
-                        // in this union, so it's probably more efficient to use `UnionType::new()` directly.
-                        Type::Union(UnionType::new(db, elements))
-                    };
-
-                    Some(Cow::Owned(TupleSpec::from_elements([
-                        Type::IntLiteral(python_version.major.into()),
-                        Type::IntLiteral(python_version.minor.into()),
-                        int_instance_ty,
-                        release_level_ty,
-                        int_instance_ty,
-                    ])))
-                }
-                _ => None,
-            }
-        }
-
         match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => Some(Cow::Borrowed(tuple.tuple(db))),
             NominalInstanceInner::NonTuple(class) => {
@@ -171,7 +158,26 @@ impl<'db> NominalInstanceType<'db> {
                 class
                     .iter_mro(db)
                     .filter_map(ClassBase::into_class)
-                    .find_map(|class| own_tuple_spec_of_class(db, class))
+                    .find_map(|class| match class.known(db)? {
+                        // N.B. this is a pure optimisation: iterating through the MRO would give us
+                        // the correct tuple spec for `sys._version_info`, since we special-case the class
+                        // in `ClassLiteral::explicit_bases()` so that it is inferred as inheriting from
+                        // a tuple type with the correct spec for the user's configured Python version and platform.
+                        KnownClass::VersionInfo => {
+                            Some(Cow::Owned(TupleSpec::version_info_spec(db)))
+                        }
+                        KnownClass::Tuple => Some(
+                            class
+                                .into_generic_alias()
+                                .and_then(|alias| {
+                                    Some(Cow::Borrowed(alias.specialization(db).tuple(db)?))
+                                })
+                                .unwrap_or_else(|| {
+                                    Cow::Owned(TupleSpec::homogeneous(Type::unknown()))
+                                }),
+                        ),
+                        _ => None,
+                    })
             }
         }
     }
@@ -241,7 +247,7 @@ impl<'db> NominalInstanceType<'db> {
     pub(super) fn normalized_impl(
         self,
         db: &'db dyn Db,
-        visitor: &TypeTransformer<'db>,
+        visitor: &NormalizedVisitor<'db>,
     ) -> Type<'db> {
         match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => {
@@ -262,54 +268,63 @@ impl<'db> NominalInstanceType<'db> {
         }
     }
 
-    pub(super) fn has_relation_to(
+    pub(super) fn has_relation_to_impl<C: Constraints<'db>>(
         self,
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
-    ) -> bool {
+        visitor: &HasRelationToVisitor<'db, C>,
+    ) -> C {
         match (self.0, other.0) {
             (
                 NominalInstanceInner::ExactTuple(tuple1),
                 NominalInstanceInner::ExactTuple(tuple2),
-            ) => tuple1.has_relation_to(db, tuple2, relation),
+            ) => tuple1.has_relation_to_impl(db, tuple2, relation, visitor),
             _ => self
                 .class(db)
-                .has_relation_to(db, other.class(db), relation),
+                .has_relation_to_impl(db, other.class(db), relation, visitor),
         }
     }
 
-    pub(super) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
-        match (self.0, other.0) {
-            (
-                NominalInstanceInner::ExactTuple(tuple1),
-                NominalInstanceInner::ExactTuple(tuple2),
-            ) => tuple1.is_equivalent_to(db, tuple2),
-            (NominalInstanceInner::NonTuple(class1), NominalInstanceInner::NonTuple(class2)) => {
-                class1.is_equivalent_to(db, class2)
-            }
-            _ => false,
-        }
-    }
-
-    pub(super) fn is_disjoint_from_impl(
+    pub(super) fn is_equivalent_to_impl<C: Constraints<'db>>(
         self,
         db: &'db dyn Db,
         other: Self,
-        visitor: &PairVisitor<'db>,
-    ) -> bool {
-        let self_spec = self.tuple_spec(db);
-        if let Some(self_spec) = self_spec.as_deref() {
-            let other_spec = other.tuple_spec(db);
-            if let Some(other_spec) = other_spec.as_deref() {
-                if self_spec.is_disjoint_from_impl(db, other_spec, visitor) {
-                    return true;
+        visitor: &IsEquivalentVisitor<'db, C>,
+    ) -> C {
+        match (self.0, other.0) {
+            (
+                NominalInstanceInner::ExactTuple(tuple1),
+                NominalInstanceInner::ExactTuple(tuple2),
+            ) => tuple1.is_equivalent_to_impl(db, tuple2, visitor),
+            (NominalInstanceInner::NonTuple(class1), NominalInstanceInner::NonTuple(class2)) => {
+                class1.is_equivalent_to_impl(db, class2, visitor)
+            }
+            _ => C::unsatisfiable(db),
+        }
+    }
+
+    pub(super) fn is_disjoint_from_impl<C: Constraints<'db>>(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        visitor: &IsDisjointVisitor<'db, C>,
+    ) -> C {
+        let mut result = C::unsatisfiable(db);
+        if let Some(self_spec) = self.tuple_spec(db) {
+            if let Some(other_spec) = other.tuple_spec(db) {
+                let compatible = self_spec.is_disjoint_from_impl(db, &other_spec, visitor);
+                if result.union(db, compatible).is_always_satisfied(db) {
+                    return result;
                 }
             }
         }
-        !self
-            .class(db)
-            .could_coexist_in_mro_with(db, other.class(db))
+        result.or(db, || {
+            C::from_bool(
+                db,
+                !(self.class(db)).could_coexist_in_mro_with(db, other.class(db)),
+            )
+        })
     }
 
     pub(super) fn is_singleton(self, db: &'db dyn Db) -> bool {
@@ -342,17 +357,18 @@ impl<'db> NominalInstanceType<'db> {
         SubclassOfType::from(db, self.class(db))
     }
 
-    pub(super) fn apply_type_mapping<'a>(
+    pub(super) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Type<'db> {
         match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => {
-                Type::tuple(tuple.apply_type_mapping(db, type_mapping))
+                Type::tuple(tuple.apply_type_mapping_impl(db, type_mapping, visitor))
             }
             NominalInstanceInner::NonTuple(class) => {
-                Type::non_tuple_instance(class.apply_type_mapping(db, type_mapping))
+                Type::non_tuple_instance(class.apply_type_mapping_impl(db, type_mapping, visitor))
             }
         }
     }
@@ -402,6 +418,12 @@ pub(crate) struct SliceLiteral {
     pub(crate) start: Option<i32>,
     pub(crate) stop: Option<i32>,
     pub(crate) step: Option<i32>,
+}
+
+impl<'db> VarianceInferable<'db> for NominalInstanceType<'db> {
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+        self.class(db).variance_of(db, typevar)
+    }
 }
 
 /// A `ProtocolInstanceType` represents the set of all possible runtime objects
@@ -471,7 +493,7 @@ impl<'db> ProtocolInstanceType<'db> {
     ///
     /// See [`Type::normalized`] for more details.
     pub(super) fn normalized(self, db: &'db dyn Db) -> Type<'db> {
-        self.normalized_impl(db, &TypeTransformer::default())
+        self.normalized_impl(db, &NormalizedVisitor::default())
     }
 
     /// Return a "normalized" version of this `Protocol` type.
@@ -480,10 +502,15 @@ impl<'db> ProtocolInstanceType<'db> {
     pub(super) fn normalized_impl(
         self,
         db: &'db dyn Db,
-        visitor: &TypeTransformer<'db>,
+        visitor: &NormalizedVisitor<'db>,
     ) -> Type<'db> {
         let object = Type::object(db);
-        if object.satisfies_protocol(db, self, TypeRelation::Subtyping) {
+        if object.satisfies_protocol(
+            db,
+            self,
+            TypeRelation::Subtyping,
+            &HasRelationToVisitor::new(true),
+        ) {
             return object;
         }
         match self.inner {
@@ -497,30 +524,36 @@ impl<'db> ProtocolInstanceType<'db> {
     /// Return `true` if this protocol type has the given type relation to the protocol `other`.
     ///
     /// TODO: consider the types of the members as well as their existence
-    pub(super) fn has_relation_to(
+    pub(super) fn has_relation_to_impl<C: Constraints<'db>>(
         self,
         db: &'db dyn Db,
         other: Self,
         _relation: TypeRelation,
-    ) -> bool {
+        visitor: &HasRelationToVisitor<'db, C>,
+    ) -> C {
         other
             .inner
             .interface(db)
-            .is_sub_interface_of(db, self.inner.interface(db))
+            .is_sub_interface_of(db, self.inner.interface(db), visitor)
     }
 
     /// Return `true` if this protocol type is equivalent to the protocol `other`.
     ///
     /// TODO: consider the types of the members as well as their existence
-    pub(super) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+    pub(super) fn is_equivalent_to_impl<C: Constraints<'db>>(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        _visitor: &IsEquivalentVisitor<'db, C>,
+    ) -> C {
         if self == other {
-            return true;
+            return C::always_satisfiable(db);
         }
         let self_normalized = self.normalized(db);
         if self_normalized == Type::ProtocolInstance(other) {
-            return true;
+            return C::always_satisfiable(db);
         }
-        self_normalized == other.normalized(db)
+        C::from_bool(db, self_normalized == other.normalized(db))
     }
 
     /// Return `true` if this protocol type is disjoint from the protocol `other`.
@@ -528,13 +561,13 @@ impl<'db> ProtocolInstanceType<'db> {
     /// TODO: a protocol `X` is disjoint from a protocol `Y` if `X` and `Y`
     /// have a member with the same name but disjoint types
     #[expect(clippy::unused_self)]
-    pub(super) fn is_disjoint_from_impl(
+    pub(super) fn is_disjoint_from_impl<C: Constraints<'db>>(
         self,
-        _db: &'db dyn Db,
+        db: &'db dyn Db,
         _other: Self,
-        _visitor: &PairVisitor<'db>,
-    ) -> bool {
-        false
+        _visitor: &IsDisjointVisitor<'db, C>,
+    ) -> C {
+        C::unsatisfiable(db)
     }
 
     pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
@@ -554,17 +587,18 @@ impl<'db> ProtocolInstanceType<'db> {
         }
     }
 
-    pub(super) fn apply_type_mapping<'a>(
+    pub(super) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         match self.inner {
             Protocol::FromClass(class) => {
-                Self::from_class(class.apply_type_mapping(db, type_mapping))
+                Self::from_class(class.apply_type_mapping_impl(db, type_mapping, visitor))
             }
             Protocol::Synthesized(synthesized) => {
-                Self::synthesized(synthesized.apply_type_mapping(db, type_mapping))
+                Self::synthesized(synthesized.apply_type_mapping_impl(db, type_mapping, visitor))
             }
         }
     }
@@ -587,6 +621,12 @@ impl<'db> ProtocolInstanceType<'db> {
 
     pub(super) fn interface(self, db: &'db dyn Db) -> ProtocolInterface<'db> {
         self.inner.interface(db)
+    }
+}
+
+impl<'db> VarianceInferable<'db> for ProtocolInstanceType<'db> {
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+        self.inner.variance_of(db, typevar)
     }
 }
 
@@ -615,10 +655,24 @@ impl<'db> Protocol<'db> {
     }
 }
 
+impl<'db> VarianceInferable<'db> for Protocol<'db> {
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+        match self {
+            Protocol::FromClass(class_type) => class_type.variance_of(db, typevar),
+            Protocol::Synthesized(synthesized_protocol_type) => {
+                synthesized_protocol_type.variance_of(db, typevar)
+            }
+        }
+    }
+}
+
 mod synthesized_protocol {
     use crate::semantic_index::definition::Definition;
     use crate::types::protocol_class::ProtocolInterface;
-    use crate::types::{BoundTypeVarInstance, TypeMapping, TypeTransformer, TypeVarVariance};
+    use crate::types::{
+        ApplyTypeMappingVisitor, BoundTypeVarInstance, NormalizedVisitor, TypeMapping,
+        TypeVarVariance, VarianceInferable,
+    };
     use crate::{Db, FxOrderSet};
 
     /// A "synthesized" protocol type that is dissociated from a class definition in source code.
@@ -639,7 +693,7 @@ mod synthesized_protocol {
         pub(super) fn new(
             db: &'db dyn Db,
             interface: ProtocolInterface<'db>,
-            visitor: &TypeTransformer<'db>,
+            visitor: &NormalizedVisitor<'db>,
         ) -> Self {
             Self(interface.normalized_impl(db, visitor))
         }
@@ -648,10 +702,11 @@ mod synthesized_protocol {
             Self(self.0.materialize(db, variance))
         }
 
-        pub(super) fn apply_type_mapping<'a>(
+        pub(super) fn apply_type_mapping_impl<'a>(
             self,
             db: &'db dyn Db,
             type_mapping: &TypeMapping<'a, 'db>,
+            _visitor: &ApplyTypeMappingVisitor<'db>,
         ) -> Self {
             Self(self.0.specialized_and_normalized(db, type_mapping))
         }
@@ -667,6 +722,16 @@ mod synthesized_protocol {
 
         pub(in crate::types) fn interface(self) -> ProtocolInterface<'db> {
             self.0
+        }
+    }
+
+    impl<'db> VarianceInferable<'db> for SynthesizedProtocolType<'db> {
+        fn variance_of(
+            self,
+            db: &'db dyn Db,
+            typevar: BoundTypeVarInstance<'db>,
+        ) -> TypeVarVariance {
+            self.0.variance_of(db, typevar)
         }
     }
 }

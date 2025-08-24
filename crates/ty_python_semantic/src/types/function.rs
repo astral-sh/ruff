@@ -65,6 +65,7 @@ use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::semantic_index;
 use crate::types::call::{Binding, CallArguments};
+use crate::types::constraints::Constraints;
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{
     REDUNDANT_CAST, STATIC_ASSERT_ERROR, TYPE_ASSERTION_FAILURE,
@@ -77,8 +78,9 @@ use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::any_over_type;
 use crate::types::{
     BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, ClassType,
-    DeprecatedInstance, DynamicType, KnownClass, Truthiness, Type, TypeMapping, TypeRelation,
-    TypeTransformer, UnionBuilder, all_members, walk_type_mapping,
+    DeprecatedInstance, DynamicType, HasRelationToVisitor, IsEquivalentVisitor, KnownClass,
+    NormalizedVisitor, Truthiness, Type, TypeMapping, TypeRelation, UnionBuilder, all_members,
+    walk_type_mapping,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -94,7 +96,6 @@ pub(crate) struct FunctionSpans {
     pub(crate) name: Span,
     /// The span of the parameter list, including the opening and
     /// closing parentheses.
-    #[expect(dead_code)]
     pub(crate) parameters: Span,
     /// The span of the annotated return type, if present.
     pub(crate) return_type: Option<Span>,
@@ -119,6 +120,8 @@ bitflags! {
         const OVERRIDE = 1 << 6;
     }
 }
+
+impl get_size2::GetSize for FunctionDecorators {}
 
 impl FunctionDecorators {
     pub(super) fn from_decorator_type(db: &dyn Db, decorator_type: Type) -> Self {
@@ -163,6 +166,7 @@ bitflags! {
         const ORDER_DEFAULT = 1 << 1;
         const KW_ONLY_DEFAULT = 1 << 2;
         const FROZEN_DEFAULT = 1 << 3;
+        const FIELD_SPECIFIERS= 1 << 4;
     }
 }
 
@@ -184,7 +188,7 @@ impl Default for DataclassTransformerParams {
 /// Ordering is based on the function's id assigned by salsa and not on the function literal's
 /// values. The id may change between runs, or when the function literal was garbage collected and
 /// recreated.
-#[salsa::interned(debug)]
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct OverloadLiteral<'db> {
     /// Name of the function at definition.
@@ -406,7 +410,7 @@ impl<'db> OverloadLiteral<'db> {
 /// Ordering is based on the function's id assigned by salsa and not on the function literal's
 /// values. The id may change between runs, or when the function literal was garbage collected and
 /// recreated.
-#[salsa::interned(debug)]
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct FunctionLiteral<'db> {
     pub(crate) last_definition: OverloadLiteral<'db>,
@@ -432,6 +436,9 @@ pub struct FunctionLiteral<'db> {
     /// [updated]: crate::types::class::ClassLiteral::own_class_member
     inherited_generic_context: Option<GenericContext<'db>>,
 }
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for FunctionLiteral<'_> {}
 
 fn walk_function_literal<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
@@ -599,7 +606,7 @@ impl<'db> FunctionLiteral<'db> {
         )
     }
 
-    fn normalized_impl(self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
+    fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         let context = self
             .inherited_generic_context(db)
             .map(|ctx| ctx.normalized_impl(db, visitor));
@@ -609,7 +616,7 @@ impl<'db> FunctionLiteral<'db> {
 
 /// Represents a function type, which might be a non-generic function, or a specialization of a
 /// generic function.
-#[salsa::interned(debug)]
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct FunctionType<'db> {
     pub(crate) literal: FunctionLiteral<'db>,
@@ -853,15 +860,16 @@ impl<'db> FunctionType<'db> {
         BoundMethodType::new(db, self, self_instance)
     }
 
-    pub(crate) fn has_relation_to(
+    pub(crate) fn has_relation_to_impl<C: Constraints<'db>>(
         self,
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
-    ) -> bool {
+        _visitor: &HasRelationToVisitor<'db, C>,
+    ) -> C {
         match relation {
-            TypeRelation::Subtyping => self.is_subtype_of(db, other),
-            TypeRelation::Assignability => self.is_assignable_to(db, other),
+            TypeRelation::Subtyping => C::from_bool(db, self.is_subtype_of(db, other)),
+            TypeRelation::Assignability => C::from_bool(db, self.is_assignable_to(db, other)),
         }
     }
 
@@ -890,16 +898,21 @@ impl<'db> FunctionType<'db> {
             && self.signature(db).is_assignable_to(db, other.signature(db))
     }
 
-    pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+    pub(crate) fn is_equivalent_to_impl<C: Constraints<'db>>(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        visitor: &IsEquivalentVisitor<'db, C>,
+    ) -> C {
         if self.normalized(db) == other.normalized(db) {
-            return true;
+            return C::always_satisfiable(db);
         }
         if self.literal(db) != other.literal(db) {
-            return false;
+            return C::unsatisfiable(db);
         }
         let self_signature = self.signature(db);
         let other_signature = other.signature(db);
-        self_signature.is_equivalent_to(db, other_signature)
+        self_signature.is_equivalent_to_impl(db, other_signature, visitor)
     }
 
     pub(crate) fn find_legacy_typevars(
@@ -915,10 +928,10 @@ impl<'db> FunctionType<'db> {
     }
 
     pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
-        self.normalized_impl(db, &TypeTransformer::default())
+        self.normalized_impl(db, &NormalizedVisitor::default())
     }
 
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         let mappings: Box<_> = self
             .type_mappings(db)
             .iter()
@@ -995,6 +1008,8 @@ fn is_instance_truthiness<'db>(
 
         Type::ClassLiteral(..) => always_true_if(is_instance(&KnownClass::Type.to_instance(db))),
 
+        Type::TypeAlias(alias) => is_instance_truthiness(db, alias.value_type(db), class),
+
         Type::BoundMethod(..)
         | Type::MethodWrapper(..)
         | Type::WrapperDescriptor(..)
@@ -1008,6 +1023,7 @@ fn is_instance_truthiness<'db>(
         | Type::PropertyInstance(..)
         | Type::AlwaysTruthy
         | Type::AlwaysFalsy
+        | Type::NonInferableTypeVar(..)
         | Type::TypeVar(..)
         | Type::BoundSuper(..)
         | Type::TypeIs(..)
@@ -1057,7 +1073,15 @@ fn last_definition_signature_cycle_initial<'db>(
 /// Non-exhaustive enumeration of known functions (e.g. `builtins.reveal_type`, ...) that might
 /// have special behavior.
 #[derive(
-    Debug, Copy, Clone, PartialEq, Eq, Hash, strum_macros::EnumString, strum_macros::IntoStaticStr,
+    Debug,
+    Copy,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    strum_macros::EnumString,
+    strum_macros::IntoStaticStr,
+    get_size2::GetSize,
 )]
 #[strum(serialize_all = "snake_case")]
 #[cfg_attr(test, derive(strum_macros::EnumIter))]
@@ -1144,10 +1168,6 @@ pub enum KnownFunction {
     AllMembers,
     /// `ty_extensions.has_member`
     HasMember,
-    /// `ty_extensions.top_materialization`
-    TopMaterialization,
-    /// `ty_extensions.bottom_materialization`
-    BottomMaterialization,
     /// `ty_extensions.reveal_protocol_interface`
     RevealProtocolInterface,
 }
@@ -1208,8 +1228,6 @@ impl KnownFunction {
             | Self::IsSingleValued
             | Self::IsSingleton
             | Self::IsSubtypeOf
-            | Self::TopMaterialization
-            | Self::BottomMaterialization
             | Self::GenericContext
             | Self::DunderAllNames
             | Self::EnumMembers
@@ -1545,8 +1563,6 @@ pub(crate) mod tests {
                 | KnownFunction::IsSingleValued
                 | KnownFunction::IsAssignableTo
                 | KnownFunction::IsEquivalentTo
-                | KnownFunction::TopMaterialization
-                | KnownFunction::BottomMaterialization
                 | KnownFunction::HasMember
                 | KnownFunction::RevealProtocolInterface
                 | KnownFunction::AllMembers => KnownModule::TyExtensions,

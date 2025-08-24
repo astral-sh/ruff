@@ -1439,6 +1439,7 @@ help: Replace with list literal
     166 |+print(["S", "P", "L", "I", "T"])
 167 167 | print("\x1c\x1d\x1e\x1f>".split(maxsplit=0))
 168 168 | print("<\x1c\x1d\x1e\x1f".rsplit(maxsplit=0))
+169 169 | 
 
 SIM905 [*] Consider using a list literal instead of `str.split`
    --> SIM905.py:167:7
@@ -1458,6 +1459,8 @@ help: Replace with list literal
 167     |-print("\x1c\x1d\x1e\x1f>".split(maxsplit=0))
     167 |+print([">"])
 168 168 | print("<\x1c\x1d\x1e\x1f".rsplit(maxsplit=0))
+169 169 | 
+170 170 | # leading/trailing whitespace should not count towards maxsplit
 
 SIM905 [*] Consider using a list literal instead of `str.split`
    --> SIM905.py:168:7
@@ -1466,6 +1469,8 @@ SIM905 [*] Consider using a list literal instead of `str.split`
 167 | print("\x1c\x1d\x1e\x1f>".split(maxsplit=0))
 168 | print("<\x1c\x1d\x1e\x1f".rsplit(maxsplit=0))
     |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+169 |
+170 | # leading/trailing whitespace should not count towards maxsplit
     |
 help: Replace with list literal
 
@@ -1475,3 +1480,26 @@ help: Replace with list literal
 167 167 | print("\x1c\x1d\x1e\x1f>".split(maxsplit=0))
 168     |-print("<\x1c\x1d\x1e\x1f".rsplit(maxsplit=0))
     168 |+print(["<"])
+169 169 | 
+170 170 | # leading/trailing whitespace should not count towards maxsplit
+171 171 | " a b c d ".split(maxsplit=2)  # ["a", "b", "c d "]
+
+SIM905 Consider using a list literal instead of `str.split`
+   --> SIM905.py:171:1
+    |
+170 | # leading/trailing whitespace should not count towards maxsplit
+171 | " a b c d ".split(maxsplit=2)  # ["a", "b", "c d "]
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+172 | " a b c d ".rsplit(maxsplit=2)  # [" a b", "c", "d"]
+    |
+help: Replace with list literal
+
+SIM905 Consider using a list literal instead of `str.split`
+   --> SIM905.py:172:1
+    |
+170 | # leading/trailing whitespace should not count towards maxsplit
+171 | " a b c d ".split(maxsplit=2)  # ["a", "b", "c d "]
+172 | " a b c d ".rsplit(maxsplit=2)  # [" a b", "c", "d"]
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: Replace with list literal

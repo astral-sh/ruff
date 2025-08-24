@@ -191,23 +191,24 @@ pub(crate) fn enum_metadata<'db>(
             }
 
             let declarations = use_def_map.end_of_scope_symbol_declarations(symbol_id);
-            let declared = place_from_declarations(db, declarations);
+            let declared =
+                place_from_declarations(db, declarations).ignore_conflicting_declarations();
 
             match declared {
-                Ok(PlaceAndQualifiers {
+                PlaceAndQualifiers {
                     place: Place::Type(Type::Dynamic(DynamicType::Unknown), _),
                     qualifiers,
-                }) if qualifiers.contains(TypeQualifiers::FINAL) => {}
-                Ok(PlaceAndQualifiers {
+                } if qualifiers.contains(TypeQualifiers::FINAL) => {}
+                PlaceAndQualifiers {
                     place: Place::Unbound,
                     ..
-                }) => {
+                } => {
                     // Undeclared attributes are considered members
                 }
-                Ok(PlaceAndQualifiers {
+                PlaceAndQualifiers {
                     place: Place::Type(Type::NominalInstance(instance), _),
                     ..
-                }) if instance.class(db).is_known(db, KnownClass::Member) => {
+                } if instance.class(db).is_known(db, KnownClass::Member) => {
                     // If the attribute is specifically declared with `enum.member`, it is considered a member
                 }
                 _ => {

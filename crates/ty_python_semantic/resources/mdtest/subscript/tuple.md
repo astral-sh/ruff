@@ -142,6 +142,15 @@ reveal_type(os.stat_result.__mro__)
 reveal_type(os.stat_result.__getitem__)
 ```
 
+But perhaps the most commonly used tuple subclass instance is the singleton `sys.version_info`:
+
+```py
+import sys
+
+# revealed: Overload[(self, index: Literal[-5, 0], /) -> Literal[3], (self, index: Literal[-4, 1], /) -> Literal[11], (self, index: Literal[-3, -1, 2, 4], /) -> int, (self, index: Literal[-2, 3], /) -> Literal["alpha", "beta", "candidate", "final"], (self, index: SupportsIndex, /) -> int | Literal["alpha", "beta", "candidate", "final"], (self, index: slice[Any, Any, Any], /) -> tuple[int | Literal["alpha", "beta", "candidate", "final"], ...]]
+reveal_type(type(sys.version_info).__getitem__)
+```
+
 Because of the synthesized `__getitem__` overloads we synthesize for tuples and tuple subclasses,
 tuples are naturally understood as being subtypes of protocols that have precise return types from
 `__getitem__` method members:

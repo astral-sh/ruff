@@ -1,3 +1,7 @@
+#![warn(
+    clippy::disallowed_methods,
+    reason = "Prefer System trait methods over std methods in ty crates"
+)]
 use crate::glob::{GlobFilterCheckMode, IncludeResult};
 use crate::metadata::options::{OptionDiagnostic, ToSettingsError};
 use crate::walk::{ProjectFilesFilter, ProjectFilesWalker};
@@ -24,9 +28,9 @@ use std::panic::{AssertUnwindSafe, UnwindSafe};
 use std::sync::Arc;
 use thiserror::Error;
 use tracing::error;
-use ty_python_semantic::lint::{LintRegistry, LintRegistryBuilder, RuleSelection};
+use ty_python_semantic::add_inferred_python_version_hint_to_diagnostic;
+use ty_python_semantic::lint::RuleSelection;
 use ty_python_semantic::types::check_types;
-use ty_python_semantic::{add_inferred_python_version_hint_to_diagnostic, register_lints};
 
 mod db;
 mod files;
@@ -34,15 +38,6 @@ mod glob;
 pub mod metadata;
 mod walk;
 pub mod watch;
-
-pub static DEFAULT_LINT_REGISTRY: std::sync::LazyLock<LintRegistry> =
-    std::sync::LazyLock::new(default_lints_registry);
-
-pub fn default_lints_registry() -> LintRegistry {
-    let mut builder = LintRegistryBuilder::default();
-    register_lints(&mut builder);
-    builder.build()
-}
 
 /// The project as a Salsa ingredient.
 ///
@@ -55,7 +50,7 @@ pub fn default_lints_registry() -> LintRegistry {
 /// 2. Running `ruff check` with different target versions results in different programs (settings) but
 ///    it remains the same project. That's why program is a narrowed view of the project only
 ///    holding on to the most fundamental settings required for checking.
-#[salsa::input]
+#[salsa::input(heap_size=ruff_memory_usage::heap_size)]
 #[derive(Debug)]
 pub struct Project {
     /// The files that are open in the project, [`None`] if there are no open files.
@@ -636,7 +631,7 @@ impl Iterator for ProjectFilesIter<'_> {
 
 impl FusedIterator for ProjectFilesIter<'_> {}
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, get_size2::GetSize)]
 pub struct IOErrorDiagnostic {
     file: Option<File>,
     error: IOErrorKind,
@@ -652,7 +647,7 @@ impl IOErrorDiagnostic {
     }
 }
 
-#[derive(Error, Debug, Clone)]
+#[derive(Error, Debug, Clone, get_size2::GetSize)]
 enum IOErrorKind {
     #[error(transparent)]
     Walk(#[from] walk::WalkError),

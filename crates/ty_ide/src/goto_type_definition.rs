@@ -50,20 +50,20 @@ mod tests {
 
         assert_snapshot!(test.goto_type_definition(), @r"
         info[goto-type-definition]: Type definition
-         --> main.py:2:19
+         --> main.py:2:7
           |
-        2 |             class Test: ...
-          |                   ^^^^
+        2 | class Test: ...
+          |       ^^^^
         3 |
-        4 |             ab = Test()
+        4 | ab = Test()
           |
         info: Source
-         --> main.py:4:13
+         --> main.py:4:1
           |
-        2 |             class Test: ...
+        2 | class Test: ...
         3 |
-        4 |             ab = Test()
-          |             ^^
+        4 | ab = Test()
+          | ^^
           |
         ");
     }
@@ -82,20 +82,20 @@ mod tests {
 
         assert_snapshot!(test.goto_type_definition(), @r"
         info[goto-type-definition]: Type definition
-         --> main.py:2:17
+         --> main.py:2:5
           |
-        2 |             def foo(a, b): ...
-          |                 ^^^
+        2 | def foo(a, b): ...
+          |     ^^^
         3 |
-        4 |             ab = foo
+        4 | ab = foo
           |
         info: Source
-         --> main.py:6:13
+         --> main.py:6:1
           |
-        4 |             ab = foo
+        4 | ab = foo
         5 |
-        6 |             ab
-          |             ^^
+        6 | ab
+          | ^^
           |
         ");
     }
@@ -120,39 +120,39 @@ mod tests {
 
         assert_snapshot!(test.goto_type_definition(), @r"
         info[goto-type-definition]: Type definition
-         --> main.py:3:17
+         --> main.py:3:5
           |
-        3 |             def foo(a, b): ...
-          |                 ^^^
+        3 | def foo(a, b): ...
+          |     ^^^
         4 |
-        5 |             def bar(a, b): ...
+        5 | def bar(a, b): ...
           |
         info: Source
-          --> main.py:12:13
+          --> main.py:12:1
            |
-        10 |                 a = bar
+        10 |     a = bar
         11 |
-        12 |             a
-           |             ^
+        12 | a
+           | ^
            |
 
         info[goto-type-definition]: Type definition
-         --> main.py:5:17
+         --> main.py:5:5
           |
-        3 |             def foo(a, b): ...
+        3 | def foo(a, b): ...
         4 |
-        5 |             def bar(a, b): ...
-          |                 ^^^
+        5 | def bar(a, b): ...
+          |     ^^^
         6 |
-        7 |             if random.choice():
+        7 | if random.choice():
           |
         info: Source
-          --> main.py:12:13
+          --> main.py:12:1
            |
-        10 |                 a = bar
+        10 |     a = bar
         11 |
-        12 |             a
-           |             ^
+        12 | a
+           | ^
            |
         ");
     }
@@ -177,12 +177,12 @@ mod tests {
           | ^^^^^^
           |
         info: Source
-         --> main.py:4:13
+         --> main.py:4:1
           |
-        2 |             import lib
+        2 | import lib
         3 |
-        4 |             lib
-          |             ^^^
+        4 | lib
+          | ^^^
           |
         ");
     }
@@ -199,22 +199,22 @@ mod tests {
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type-definition]: Type definition
-           --> stdlib/builtins.pyi:892:7
+           --> stdlib/builtins.pyi:901:7
             |
-        890 |     def __getitem__(self, key: int, /) -> str | int | None: ...
-        891 |
-        892 | class str(Sequence[str]):
+        899 |     def __getitem__(self, key: int, /) -> str | int | None: ...
+        900 |
+        901 | class str(Sequence[str]):
             |       ^^^
-        893 |     """str(object='') -> str
-        894 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
+        902 |     """str(object='') -> str
+        903 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
             |
         info: Source
-         --> main.py:4:13
+         --> main.py:4:1
           |
-        2 |             a: str = "test"
+        2 | a: str = "test"
         3 |
-        4 |             a
-          |             ^
+        4 | a
+          | ^
           |
         "#);
     }
@@ -228,20 +228,20 @@ mod tests {
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type-definition]: Type definition
-           --> stdlib/builtins.pyi:892:7
+           --> stdlib/builtins.pyi:901:7
             |
-        890 |     def __getitem__(self, key: int, /) -> str | int | None: ...
-        891 |
-        892 | class str(Sequence[str]):
+        899 |     def __getitem__(self, key: int, /) -> str | int | None: ...
+        900 |
+        901 | class str(Sequence[str]):
             |       ^^^
-        893 |     """str(object='') -> str
-        894 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
+        902 |     """str(object='') -> str
+        903 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
             |
         info: Source
-         --> main.py:2:22
+         --> main.py:2:10
           |
-        2 |             a: str = "test"
-          |                      ^^^^^^
+        2 | a: str = "test"
+          |          ^^^^^^
           |
         "#);
     }
@@ -256,16 +256,16 @@ mod tests {
 
         assert_snapshot!(test.goto_type_definition(), @r"
         info[goto-type-definition]: Type definition
-         --> main.py:2:24
+         --> main.py:2:12
           |
-        2 |             type Alias[T: int = bool] = list[T]
-          |                        ^
+        2 | type Alias[T: int = bool] = list[T]
+          |            ^
           |
         info: Source
-         --> main.py:2:46
+         --> main.py:2:34
           |
-        2 |             type Alias[T: int = bool] = list[T]
-          |                                              ^
+        2 | type Alias[T: int = bool] = list[T]
+          |                                  ^
           |
         ");
     }
@@ -312,22 +312,22 @@ mod tests {
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type-definition]: Type definition
-         --> main.py:4:13
+         --> main.py:4:1
           |
-        2 |             from typing_extensions import TypeAliasType
+        2 | from typing_extensions import TypeAliasType
         3 |
-        4 |             Alias = TypeAliasType("Alias", tuple[int, int])
-          |             ^^^^^
+        4 | Alias = TypeAliasType("Alias", tuple[int, int])
+          | ^^^^^
         5 |
-        6 |             Alias
+        6 | Alias
           |
         info: Source
-         --> main.py:6:13
+         --> main.py:6:1
           |
-        4 |             Alias = TypeAliasType("Alias", tuple[int, int])
+        4 | Alias = TypeAliasType("Alias", tuple[int, int])
         5 |
-        6 |             Alias
-          |             ^^^^^
+        6 | Alias
+          | ^^^^^
           |
         "#);
     }
@@ -344,22 +344,22 @@ mod tests {
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type-definition]: Type definition
-           --> stdlib/builtins.pyi:892:7
+           --> stdlib/builtins.pyi:901:7
             |
-        890 |     def __getitem__(self, key: int, /) -> str | int | None: ...
-        891 |
-        892 | class str(Sequence[str]):
+        899 |     def __getitem__(self, key: int, /) -> str | int | None: ...
+        900 |
+        901 | class str(Sequence[str]):
             |       ^^^
-        893 |     """str(object='') -> str
-        894 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
+        902 |     """str(object='') -> str
+        903 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
             |
         info: Source
-         --> main.py:4:18
+         --> main.py:4:6
           |
-        2 |             def test(a: str): ...
+        2 | def test(a: str): ...
         3 |
-        4 |             test(a= "123")
-          |                  ^
+        4 | test(a= "123")
+          |      ^
           |
         "#);
     }
@@ -389,12 +389,12 @@ mod tests {
         339 |     int(x, base=10) -> integer
             |
         info: Source
-         --> main.py:4:18
+         --> main.py:4:6
           |
-        2 |             def test(a: str): ...
+        2 | def test(a: str): ...
         3 |
-        4 |             test(a= 123)
-          |                  ^
+        4 | test(a= 123)
+          |      ^
           |
         "#);
     }
@@ -411,16 +411,16 @@ f(**kwargs<CURSOR>)
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @r#"
+        assert_snapshot!(test.goto_type_definition(), @r###"
         info[goto-type-definition]: Type definition
-            --> stdlib/builtins.pyi:2890:7
+            --> stdlib/builtins.pyi:2901:7
              |
-        2888 |         """See PEP 585"""
-        2889 |
-        2890 | class dict(MutableMapping[_KT, _VT]):
+        2899 |         """See PEP 585"""
+        2900 |
+        2901 | class dict(MutableMapping[_KT, _VT]):
              |       ^^^^
-        2891 |     """dict() -> new empty dictionary
-        2892 |     dict(mapping) -> new dictionary initialized from a mapping object's
+        2902 |     """dict() -> new empty dictionary
+        2903 |     dict(mapping) -> new dictionary initialized from a mapping object's
              |
         info: Source
          --> main.py:6:5
@@ -430,7 +430,7 @@ f(**kwargs<CURSOR>)
         6 | f(**kwargs)
           |     ^^^^^^
           |
-        "#);
+        "###);
     }
 
     #[test]
@@ -444,21 +444,21 @@ f(**kwargs<CURSOR>)
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type-definition]: Type definition
-           --> stdlib/builtins.pyi:892:7
+           --> stdlib/builtins.pyi:901:7
             |
-        890 |     def __getitem__(self, key: int, /) -> str | int | None: ...
-        891 |
-        892 | class str(Sequence[str]):
+        899 |     def __getitem__(self, key: int, /) -> str | int | None: ...
+        900 |
+        901 | class str(Sequence[str]):
             |       ^^^
-        893 |     """str(object='') -> str
-        894 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
+        902 |     """str(object='') -> str
+        903 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
             |
         info: Source
-         --> main.py:3:17
+         --> main.py:3:5
           |
-        2 |             def foo(a: str):
-        3 |                 a
-          |                 ^
+        2 | def foo(a: str):
+        3 |     a
+          |     ^
           |
         "#);
     }
@@ -478,19 +478,19 @@ f(**kwargs<CURSOR>)
 
         assert_snapshot!(test.goto_type_definition(), @r"
         info[goto-type-definition]: Type definition
-         --> main.py:2:19
+         --> main.py:2:7
           |
-        2 |             class X:
-          |                   ^
-        3 |                 def foo(a, b): ...
+        2 | class X:
+          |       ^
+        3 |     def foo(a, b): ...
           |
         info: Source
-         --> main.py:7:13
+         --> main.py:7:1
           |
-        5 |             x = X()
+        5 | x = X()
         6 |
-        7 |             x.foo()
-          |             ^
+        7 | x.foo()
+          | ^
           |
         ");
     }
@@ -507,20 +507,20 @@ f(**kwargs<CURSOR>)
 
         assert_snapshot!(test.goto_type_definition(), @r"
         info[goto-type-definition]: Type definition
-         --> main.py:2:17
+         --> main.py:2:5
           |
-        2 |             def foo(a, b): ...
-          |                 ^^^
+        2 | def foo(a, b): ...
+          |     ^^^
         3 |
-        4 |             foo()
+        4 | foo()
           |
         info: Source
-         --> main.py:4:13
+         --> main.py:4:1
           |
-        2 |             def foo(a, b): ...
+        2 | def foo(a, b): ...
         3 |
-        4 |             foo()
-          |             ^^^
+        4 | foo()
+          | ^^^
           |
         ");
     }
@@ -537,22 +537,22 @@ f(**kwargs<CURSOR>)
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type-definition]: Type definition
-           --> stdlib/builtins.pyi:892:7
+           --> stdlib/builtins.pyi:901:7
             |
-        890 |     def __getitem__(self, key: int, /) -> str | int | None: ...
-        891 |
-        892 | class str(Sequence[str]):
+        899 |     def __getitem__(self, key: int, /) -> str | int | None: ...
+        900 |
+        901 | class str(Sequence[str]):
             |       ^^^
-        893 |     """str(object='') -> str
-        894 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
+        902 |     """str(object='') -> str
+        903 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
             |
         info: Source
-         --> main.py:4:27
+         --> main.py:4:15
           |
-        2 |             def foo(a: str | None, b):
-        3 |                 if a is not None:
-        4 |                     print(a)
-          |                           ^
+        2 | def foo(a: str | None, b):
+        3 |     if a is not None:
+        4 |         print(a)
+          |               ^
           |
         "#);
     }
@@ -577,29 +577,29 @@ f(**kwargs<CURSOR>)
         923 |         """The type of the None singleton."""
             |
         info: Source
-         --> main.py:3:17
+         --> main.py:3:5
           |
-        2 |             def foo(a: str | None, b):
-        3 |                 a
-          |                 ^
+        2 | def foo(a: str | None, b):
+        3 |     a
+          |     ^
           |
 
         info[goto-type-definition]: Type definition
-           --> stdlib/builtins.pyi:892:7
+           --> stdlib/builtins.pyi:901:7
             |
-        890 |     def __getitem__(self, key: int, /) -> str | int | None: ...
-        891 |
-        892 | class str(Sequence[str]):
+        899 |     def __getitem__(self, key: int, /) -> str | int | None: ...
+        900 |
+        901 | class str(Sequence[str]):
             |       ^^^
-        893 |     """str(object='') -> str
-        894 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
+        902 |     """str(object='') -> str
+        903 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
             |
         info: Source
-         --> main.py:3:17
+         --> main.py:3:5
           |
-        2 |             def foo(a: str | None, b):
-        3 |                 a
-          |                 ^
+        2 | def foo(a: str | None, b):
+        3 |     a
+          |     ^
           |
         "#);
     }

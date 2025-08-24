@@ -13,7 +13,7 @@ use ruff_text_size::TextRange;
 use salsa::Durability;
 use salsa::Setter;
 
-#[salsa::input(singleton)]
+#[salsa::input(singleton, heap_size=ruff_memory_usage::heap_size)]
 pub struct Program {
     #[returns(ref)]
     pub python_version_with_source: PythonVersionWithSource,
@@ -93,7 +93,7 @@ pub struct ProgramSettings {
     pub search_paths: SearchPaths,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Default)]
+#[derive(Clone, Debug, Eq, PartialEq, Default, get_size2::GetSize)]
 pub enum PythonVersionSource {
     /// Value loaded from a project's configuration file.
     ConfigFile(PythonVersionFileSource),
@@ -123,7 +123,7 @@ pub enum PythonVersionSource {
 
 /// Information regarding the file and [`TextRange`] of the configuration
 /// from which we inferred the Python version.
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, get_size2::GetSize)]
 pub struct PythonVersionFileSource {
     path: Arc<SystemPathBuf>,
     range: Option<TextRange>,
@@ -145,7 +145,7 @@ impl PythonVersionFileSource {
     }
 }
 
-#[derive(Eq, PartialEq, Debug, Clone)]
+#[derive(Eq, PartialEq, Debug, Clone, get_size2::GetSize)]
 pub struct PythonVersionWithSource {
     pub version: PythonVersion,
     pub source: PythonVersionSource,

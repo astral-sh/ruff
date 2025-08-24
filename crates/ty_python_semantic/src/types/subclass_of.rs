@@ -2,9 +2,12 @@ use ruff_python_ast::name::Name;
 
 use crate::place::PlaceAndQualifiers;
 use crate::semantic_index::definition::Definition;
+use crate::types::constraints::Constraints;
+use crate::types::variance::VarianceInferable;
 use crate::types::{
-    BindingContext, BoundTypeVarInstance, ClassType, DynamicType, KnownClass, MemberLookupPolicy,
-    Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarInstance,
+    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, ClassType, DynamicType,
+    HasRelationToVisitor, IsDisjointVisitor, KnownClass, MemberLookupPolicy, NormalizedVisitor,
+    Type, TypeMapping, TypeRelation, TypeVarInstance,
 };
 use crate::{Db, FxOrderSet};
 
@@ -90,16 +93,19 @@ impl<'db> SubclassOfType<'db> {
                 TypeVarVariance::Invariant => {
                     // We need to materialize this to `type[T]` but that isn't representable so
                     // we instead use a type variable with an upper bound of `type`.
-                    Type::TypeVar(BoundTypeVarInstance::new(
+                    Type::NonInferableTypeVar(BoundTypeVarInstance::new(
                         db,
                         TypeVarInstance::new(
                             db,
                             Name::new_static("T_all"),
                             None,
-                            Some(TypeVarBoundOrConstraints::UpperBound(
-                                KnownClass::Type.to_instance(db),
-                            )),
-                            variance,
+                            Some(
+                                TypeVarBoundOrConstraints::UpperBound(
+                                    KnownClass::Type.to_instance(db),
+                                )
+                                .into(),
+                            ),
+                            Some(variance),
                             None,
                             TypeVarKind::Pep695,
                         ),
@@ -112,14 +118,19 @@ impl<'db> SubclassOfType<'db> {
         }
     }
 
-    pub(super) fn apply_type_mapping<'a>(
+    pub(super) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         match self.subclass_of {
             SubclassOfInner::Class(class) => Self {
-                subclass_of: SubclassOfInner::Class(class.apply_type_mapping(db, type_mapping)),
+                subclass_of: SubclassOfInner::Class(class.apply_type_mapping_impl(
+                    db,
+                    type_mapping,
+                    visitor,
+                )),
             },
             SubclassOfInner::Dynamic(_) => self,
         }
@@ -149,26 +160,29 @@ impl<'db> SubclassOfType<'db> {
     }
 
     /// Return `true` if `self` has a certain relation to `other`.
-    pub(crate) fn has_relation_to(
+    pub(crate) fn has_relation_to_impl<C: Constraints<'db>>(
         self,
         db: &'db dyn Db,
         other: SubclassOfType<'db>,
         relation: TypeRelation,
-    ) -> bool {
+        visitor: &HasRelationToVisitor<'db, C>,
+    ) -> C {
         match (self.subclass_of, other.subclass_of) {
             (SubclassOfInner::Dynamic(_), SubclassOfInner::Dynamic(_)) => {
-                relation.is_assignability()
+                C::from_bool(db, relation.is_assignability())
             }
             (SubclassOfInner::Dynamic(_), SubclassOfInner::Class(other_class)) => {
-                other_class.is_object(db) || relation.is_assignability()
+                C::from_bool(db, other_class.is_object(db) || relation.is_assignability())
             }
-            (SubclassOfInner::Class(_), SubclassOfInner::Dynamic(_)) => relation.is_assignability(),
+            (SubclassOfInner::Class(_), SubclassOfInner::Dynamic(_)) => {
+                C::from_bool(db, relation.is_assignability())
+            }
 
             // For example, `type[bool]` describes all possible runtime subclasses of the class `bool`,
             // and `type[int]` describes all possible runtime subclasses of the class `int`.
             // The first set is a subset of the second set, because `bool` is itself a subclass of `int`.
             (SubclassOfInner::Class(self_class), SubclassOfInner::Class(other_class)) => {
-                self_class.has_relation_to(db, other_class, relation)
+                self_class.has_relation_to_impl(db, other_class, relation, visitor)
             }
         }
     }
@@ -176,16 +190,23 @@ impl<'db> SubclassOfType<'db> {
     /// Return` true` if `self` is a disjoint type from `other`.
     ///
     /// See [`Type::is_disjoint_from`] for more details.
-    pub(crate) fn is_disjoint_from_impl(self, db: &'db dyn Db, other: Self) -> bool {
+    pub(crate) fn is_disjoint_from_impl<C: Constraints<'db>>(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        _visitor: &IsDisjointVisitor<'db, C>,
+    ) -> C {
         match (self.subclass_of, other.subclass_of) {
-            (SubclassOfInner::Dynamic(_), _) | (_, SubclassOfInner::Dynamic(_)) => false,
+            (SubclassOfInner::Dynamic(_), _) | (_, SubclassOfInner::Dynamic(_)) => {
+                C::unsatisfiable(db)
+            }
             (SubclassOfInner::Class(self_class), SubclassOfInner::Class(other_class)) => {
-                !self_class.could_coexist_in_mro_with(db, other_class)
+                C::from_bool(db, !self_class.could_coexist_in_mro_with(db, other_class))
             }
         }
     }
 
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         Self {
             subclass_of: self.subclass_of.normalized_impl(db, visitor),
         }
@@ -202,6 +223,15 @@ impl<'db> SubclassOfType<'db> {
         self.subclass_of
             .into_class()
             .is_some_and(|class| class.class_literal(db).0.is_typed_dict(db))
+    }
+}
+
+impl<'db> VarianceInferable<'db> for SubclassOfType<'db> {
+    fn variance_of(self, db: &dyn Db, typevar: BoundTypeVarInstance<'_>) -> TypeVarVariance {
+        match self.subclass_of {
+            SubclassOfInner::Dynamic(_) => TypeVarVariance::Bivariant,
+            SubclassOfInner::Class(class) => class.variance_of(db, typevar),
+        }
     }
 }
 
@@ -248,7 +278,7 @@ impl<'db> SubclassOfInner<'db> {
         }
     }
 
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         match self {
             Self::Class(class) => Self::Class(class.normalized_impl(db, visitor)),
             Self::Dynamic(dynamic) => Self::Dynamic(dynamic.normalized()),
@@ -272,6 +302,12 @@ impl<'db> SubclassOfInner<'db> {
 impl<'db> From<ClassType<'db>> for SubclassOfInner<'db> {
     fn from(value: ClassType<'db>) -> Self {
         SubclassOfInner::Class(value)
+    }
+}
+
+impl From<DynamicType> for SubclassOfInner<'_> {
+    fn from(value: DynamicType) -> Self {
+        SubclassOfInner::Dynamic(value)
     }
 }
 
