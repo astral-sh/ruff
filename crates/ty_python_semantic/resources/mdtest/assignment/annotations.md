@@ -188,6 +188,9 @@ import a
 import b
 
 df: a.DataFrame = b.DataFrame()  # error: [invalid-assignment] "Object of type `b.DataFrame` is not assignable to `a.DataFrame`"
+
+# TODO: this should be error: [invalid-assignment] "Object of type `list[b.DataFrame]` is not assignable to `list[a.DataFrame]`
+dataframes: list[a.DataFrame] = [b.DataFrame()]
 ```
 
 `a.py`:
