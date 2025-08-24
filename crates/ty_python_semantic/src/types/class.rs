@@ -30,10 +30,10 @@ use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
     ApplyTypeMappingVisitor, Binding, BoundSuperError, BoundSuperType, CallableType,
     DataclassParams, DeprecatedInstance, HasRelationToVisitor, IsEquivalentVisitor,
-    KnownInstanceType, ManualPEP695TypeAliasType, NormalizedVisitor, PropertyInstanceType,
-    StringLiteralType, TypeAliasType, TypeMapping, TypeRelation, TypeVarBoundOrConstraints,
-    TypeVarInstance, TypeVarKind, VarianceInferable, declaration_type, infer_definition_types,
-    todo_type,
+    KnownInstanceType, ManualPEP695TypeAliasType, MaterializationType, NormalizedVisitor,
+    PropertyInstanceType, StringLiteralType, TypeAliasType, TypeMapping, TypeRelation,
+    TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, VarianceInferable, declaration_type,
+    infer_definition_types, todo_type,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet, Program,
@@ -271,11 +271,16 @@ impl<'db> GenericAlias<'db> {
         )
     }
 
-    pub(super) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+    pub(super) fn materialize(
+        self,
+        db: &'db dyn Db,
+        materialization_type: MaterializationType,
+    ) -> Self {
         Self::new(
             db,
             self.origin(db),
-            self.specialization(db).materialize(db, variance),
+            self.specialization(db)
+                .materialize(db, materialization_type),
         )
     }
 
@@ -403,10 +408,14 @@ impl<'db> ClassType<'db> {
         }
     }
 
-    pub(super) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+    pub(super) fn materialize(
+        self,
+        db: &'db dyn Db,
+        materialization_type: MaterializationType,
+    ) -> Self {
         match self {
             Self::NonGeneric(_) => self,
-            Self::Generic(generic) => Self::Generic(generic.materialize(db, variance)),
+            Self::Generic(generic) => Self::Generic(generic.materialize(db, materialization_type)),
         }
     }
 

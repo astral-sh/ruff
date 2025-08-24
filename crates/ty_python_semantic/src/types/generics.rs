@@ -16,9 +16,9 @@ use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, HasRelationToVisitor, IsEquivalentVisitor,
-    KnownClass, KnownInstanceType, NormalizedVisitor, Type, TypeMapping, TypeRelation,
-    TypeVarBoundOrConstraints, TypeVarInstance, TypeVarVariance, UnionType, binding_type,
-    declaration_type,
+    KnownClass, KnownInstanceType, MaterializationType, NormalizedVisitor, Type, TypeMapping,
+    TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarVariance, UnionType,
+    binding_type, declaration_type,
 };
 use crate::{Db, FxOrderSet};
 
@@ -244,6 +244,7 @@ impl<'db> GenericContext<'db> {
                 db,
                 self,
                 partial.types(db),
+                None,
                 Some(TupleType::homogeneous(db, Type::unknown())),
             )
         } else {
@@ -304,7 +305,7 @@ impl<'db> GenericContext<'db> {
         types: Box<[Type<'db>]>,
     ) -> Specialization<'db> {
         assert!(self.variables(db).len() == types.len());
-        Specialization::new(db, self, types, None)
+        Specialization::new(db, self, types, None, None)
     }
 
     /// Creates a specialization of this generic context for the `tuple` class.
@@ -314,7 +315,7 @@ impl<'db> GenericContext<'db> {
         element_type: Type<'db>,
         tuple: TupleType<'db>,
     ) -> Specialization<'db> {
-        Specialization::new(db, self, Box::from([element_type]), Some(tuple))
+        Specialization::new(db, self, Box::from([element_type]), None, Some(tuple))
     }
 
     /// Creates a specialization of this generic context. Panics if the length of `types` does not
@@ -360,7 +361,7 @@ impl<'db> GenericContext<'db> {
             expanded[idx] = default;
         }
 
-        Specialization::new(db, self, expanded.into_boxed_slice(), None)
+        Specialization::new(db, self, expanded.into_boxed_slice(), None, None)
     }
 
     pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
@@ -407,6 +408,7 @@ pub struct Specialization<'db> {
     pub(crate) generic_context: GenericContext<'db>,
     #[returns(deref)]
     pub(crate) types: Box<[Type<'db>]>,
+    pub(crate) specialization_type: Option<MaterializationType>,
 
     /// For specializations of `tuple`, we also store more detailed information about the tuple's
     /// elements, above what the class's (single) typevar can represent.
@@ -427,6 +429,136 @@ pub(super) fn walk_specialization<'db, V: super::visitor::TypeVisitor<'db> + ?Si
     }
     if let Some(tuple) = specialization.tuple_inner(db) {
         walk_tuple_type(db, tuple, visitor);
+    }
+}
+
+fn is_subtype_with_materialization<'db, C: Constraints<'db>>(
+    db: &'db dyn Db,
+    derived_type: &Type<'db>,
+    derived_materialization: MaterializationType,
+    base_type: &Type<'db>,
+    base_materialization: MaterializationType,
+) -> C {
+    let derived_top = derived_type.top_materialization(db);
+    let derived_bottom = derived_type.bottom_materialization(db);
+    let base_top = base_type.top_materialization(db);
+    let base_bottom = base_type.bottom_materialization(db);
+    match (derived_materialization, base_materialization) {
+        // Top and bottom materializations are fully static, so subtyping and assignability are the same.
+        // One top is a subtype of another if the range of materializations covered by derived
+        // is a subset of the range covered by base.
+        // This is also true for subtyping between None and Top.
+        // And assignability between Top and None.
+        (MaterializationType::Top, MaterializationType::Top) => {
+            (C::from_bool(
+                db,
+                base_bottom.is_subtype_of(db, derived_bottom)
+                    && derived_top.is_subtype_of(db, base_top),
+            ))
+        }
+        // One bottom is a subtype of another if it covers a strictly larger set of materializations.
+        (MaterializationType::Bottom, MaterializationType::Bottom) => {
+            (C::from_bool(
+                db,
+                derived_bottom.is_subtype_of(db, base_bottom)
+                    && base_top.is_subtype_of(db, base_bottom),
+            ))
+        }
+        // A bottom materialization is a subtype of top if it's a subtype of some part of the range of materializations
+        // covered by top, i.e. either the top or bottom of derived is between the top and derived of base.
+        (MaterializationType::Bottom, MaterializationType::Top) => {
+            (C::from_bool(
+                db,
+                (base_bottom.is_subtype_of(db, derived_bottom)
+                    && derived_bottom.is_subtype_of(db, base_top))
+                    || (base_bottom.is_subtype_of(db, derived_top)
+                        && derived_top.is_subtype_of(db, base_top)),
+            ))
+        }
+        // A top materialization is a subtype of a bottom materialization only if both are the
+        // same fully static type.
+        (MaterializationType::Top, MaterializationType::Bottom) => {
+            (C::from_bool(
+                db,
+                derived_top.is_subtype_of(db, base_bottom)
+                    && derived_bottom.is_subtype_of(db, base_top),
+            ))
+        }
+    }
+}
+
+/// Whether two types have a relation (subtyping or assignability), taking into account
+/// that `base_type` may come from a top or bottom materialization.
+fn has_relation_with_materialization<'db, C: Constraints<'db>>(
+    db: &'db dyn Db,
+    derived_type: &Type<'db>,
+    derived_materialization: Option<MaterializationType>,
+    base_type: &Type<'db>,
+    base_materialization: Option<MaterializationType>,
+    relation: TypeRelation,
+) -> C {
+    match (derived_materialization, base_materialization, relation) {
+        // Top and bottom materializations are fully static types, so subtyping
+        // is the same as assignability.
+        (Some(derived_mat), Some(base_mat), _) => {
+            is_subtype_with_materialization(db, derived_type, derived_mat, base_type, base_mat)
+        }
+        // For gradual types, A <: B (subtyping) is defined as Top[A] <: Bottom[B]
+        (None, None, TypeRelation::Subtyping) => {
+            (is_subtype_with_materialization(
+                db,
+                derived_type,
+                MaterializationType::Top,
+                base_type,
+                MaterializationType::Bottom,
+            ))
+        }
+        (None, Some(base_mat), TypeRelation::Subtyping) => {
+            (is_subtype_with_materialization(
+                db,
+                derived_type,
+                MaterializationType::Top,
+                base_type,
+                base_mat,
+            ))
+        }
+        (Some(derived_mat), None, TypeRelation::Subtyping) => {
+            (is_subtype_with_materialization(
+                db,
+                derived_type,
+                derived_mat,
+                base_type,
+                MaterializationType::Bottom,
+            ))
+        }
+        // And A <~ B (assignability) is Bottom[A] <: Top[B]
+        (None, None, TypeRelation::Assignability) => {
+            (is_subtype_with_materialization(
+                db,
+                derived_type,
+                MaterializationType::Bottom,
+                base_type,
+                MaterializationType::Top,
+            ))
+        }
+        (None, Some(base_mat), TypeRelation::Assignability) => {
+            (is_subtype_with_materialization(
+                db,
+                derived_type,
+                MaterializationType::Bottom,
+                base_type,
+                base_mat,
+            ))
+        }
+        (Some(derived_mat), None, TypeRelation::Assignability) => {
+            (is_subtype_with_materialization(
+                db,
+                derived_type,
+                derived_mat,
+                base_type,
+                MaterializationType::Top,
+            ))
+        }
     }
 }
 
@@ -489,7 +621,13 @@ impl<'db> Specialization<'db> {
         let tuple_inner = self
             .tuple_inner(db)
             .and_then(|tuple| tuple.apply_type_mapping_impl(db, type_mapping, visitor));
-        Specialization::new(db, self.generic_context(db), types, tuple_inner)
+        Specialization::new(
+            db,
+            self.generic_context(db),
+            types,
+            self.specialization_type(db),
+            tuple_inner,
+        )
     }
 
     /// Applies an optional specialization to this specialization.
@@ -527,7 +665,8 @@ impl<'db> Specialization<'db> {
             })
             .collect();
         // TODO: Combine the tuple specs too
-        Specialization::new(db, self.generic_context(db), types, None)
+        // TODO(jelle): specialization type?
+        Specialization::new(db, self.generic_context(db), types, None, None)
     }
 
     pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
@@ -540,25 +679,69 @@ impl<'db> Specialization<'db> {
             .tuple_inner(db)
             .and_then(|tuple| tuple.normalized_impl(db, visitor));
         let context = self.generic_context(db).normalized_impl(db, visitor);
-        Self::new(db, context, types, tuple_inner)
+        Self::new(
+            db,
+            context,
+            types,
+            self.specialization_type(db),
+            tuple_inner,
+        )
     }
 
-    pub(super) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+    pub(super) fn materialize(
+        self,
+        db: &'db dyn Db,
+        materialization_type: MaterializationType,
+    ) -> Self {
+        // The top and bottom materializations are fully static types already, so materializing them
+        // further does nothing.
+        if self.specialization_type(db).is_some() {
+            return self;
+        }
+        let mut has_dynamic_invariant_typevar = false;
         let types: Box<[_]> = self
             .generic_context(db)
             .variables(db)
             .into_iter()
             .zip(self.types(db))
             .map(|(bound_typevar, vartype)| {
-                let variance = bound_typevar.variance_with_polarity(db, variance);
-                vartype.materialize(db, variance)
+                // TODO(jelle): polarity?
+                match bound_typevar.variance(db) {
+                    TypeVarVariance::Bivariant => {
+                        // With bivariance, all specializations are subtypes of each other,
+                        // so any materialization is acceptable.
+                        vartype.materialize(db, MaterializationType::Top)
+                    }
+                    TypeVarVariance::Covariant => vartype.materialize(db, materialization_type),
+                    TypeVarVariance::Contravariant => {
+                        vartype.materialize(db, materialization_type.flip())
+                    }
+                    TypeVarVariance::Invariant => {
+                        let top_materialization = vartype.materialize(db, MaterializationType::Top);
+                        if (!vartype.is_equivalent_to(db, top_materialization)) {
+                            has_dynamic_invariant_typevar = true;
+                        }
+                        *vartype
+                    }
+                }
             })
             .collect();
         let tuple_inner = self.tuple_inner(db).and_then(|tuple| {
             // Tuples are immutable, so tuple element types are always in covariant position.
-            tuple.materialize(db, variance)
+            tuple.materialize(db, materialization_type)
         });
-        Specialization::new(db, self.generic_context(db), types, tuple_inner)
+        let new_specialization_type = if has_dynamic_invariant_typevar {
+            Some(materialization_type)
+        } else {
+            None
+        };
+        Specialization::new(
+            db,
+            self.generic_context(db),
+            types,
+            new_specialization_type,
+            tuple_inner,
+        )
     }
 
     pub(crate) fn has_relation_to_impl<C: Constraints<'db>>(
@@ -578,12 +761,20 @@ impl<'db> Specialization<'db> {
             return self_tuple.has_relation_to_impl(db, other_tuple, relation, visitor);
         }
 
+        let self_materialization_type = self.specialization_type(db);
+        let other_materialization_type = other.specialization_type(db);
+
         let mut result = C::always_satisfiable(db);
         for ((bound_typevar, self_type), other_type) in (generic_context.variables(db).into_iter())
             .zip(self.types(db))
             .zip(other.types(db))
         {
-            if self_type.is_dynamic() || other_type.is_dynamic() {
+            // As an optimization, we can return early if either type is dynamic, unless
+            // we're dealing with a top or bottom materialization.
+            if other_materialization_type.is_none()
+                && self_materialization_type.is_none()
+                && (self_type.is_dynamic() || other_type.is_dynamic())
+            {
                 match relation {
                     TypeRelation::Assignability => continue,
                     TypeRelation::Subtyping => return C::unsatisfiable(db),
@@ -597,14 +788,14 @@ impl<'db> Specialization<'db> {
             //   - invariant: verify that self_type <: other_type AND other_type <: self_type
             //   - bivariant: skip, can't make subtyping/assignability false
             let compatible = match bound_typevar.variance(db) {
-                TypeVarVariance::Invariant => match relation {
-                    TypeRelation::Subtyping => self_type.when_equivalent_to(db, *other_type),
-                    TypeRelation::Assignability => C::from_bool(
-                        db,
-                        self_type.is_assignable_to(db, *other_type)
-                            && other_type.is_assignable_to(db, *self_type),
-                    ),
-                },
+                TypeVarVariance::Invariant => has_relation_with_materialization(
+                    db,
+                    self_type,
+                    self_materialization_type,
+                    other_type,
+                    other_materialization_type,
+                    relation,
+                ),
                 TypeVarVariance::Covariant => {
                     self_type.has_relation_to_impl(db, *other_type, relation, visitor)
                 }
@@ -627,6 +818,9 @@ impl<'db> Specialization<'db> {
         other: Specialization<'db>,
         visitor: &IsEquivalentVisitor<'db, C>,
     ) -> C {
+        if self.specialization_type(db) != other.specialization_type(db) {
+            return C::unsatisfiable(db);
+        }
         let generic_context = self.generic_context(db);
         if generic_context != other.generic_context(db) {
             return C::unsatisfiable(db);

@@ -27,8 +27,8 @@ use crate::types::class::{ClassType, KnownClass};
 use crate::types::constraints::{Constraints, IteratorConstraintsExtension};
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, HasRelationToVisitor, IsDisjointVisitor,
-    IsEquivalentVisitor, NormalizedVisitor, Type, TypeMapping, TypeRelation, TypeVarVariance,
-    UnionBuilder, UnionType,
+    IsEquivalentVisitor, MaterializationType, NormalizedVisitor, Type, TypeMapping, TypeRelation,
+    TypeVarVariance, UnionBuilder, UnionType,
 };
 use crate::util::subscript::{Nth, OutOfBoundsError, PyIndex, PySlice, StepSizeZeroError};
 use crate::{Db, FxOrderSet, Program};
@@ -228,8 +228,12 @@ impl<'db> TupleType<'db> {
         TupleType::new(db, &self.tuple(db).normalized_impl(db, visitor))
     }
 
-    pub(crate) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Option<Self> {
-        TupleType::new(db, &self.tuple(db).materialize(db, variance))
+    pub(crate) fn materialize(
+        self,
+        db: &'db dyn Db,
+        materialization_type: MaterializationType,
+    ) -> Option<Self> {
+        TupleType::new(db, &self.tuple(db).materialize(db, materialization_type))
     }
 
     pub(crate) fn apply_type_mapping_impl<'a>(
@@ -389,8 +393,12 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         Self::from_elements(self.0.iter().map(|ty| ty.normalized_impl(db, visitor)))
     }
 
-    fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
-        Self::from_elements(self.0.iter().map(|ty| ty.materialize(db, variance)))
+    fn materialize(&self, db: &'db dyn Db, materialization_type: MaterializationType) -> Self {
+        Self::from_elements(
+            self.0
+                .iter()
+                .map(|ty| ty.materialize(db, materialization_type)),
+        )
     }
 
     fn apply_type_mapping_impl<'a>(
@@ -703,11 +711,19 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         })
     }
 
-    fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> TupleSpec<'db> {
+    fn materialize(
+        &self,
+        db: &'db dyn Db,
+        materialization_type: MaterializationType,
+    ) -> TupleSpec<'db> {
         Self::mixed(
-            self.prefix.iter().map(|ty| ty.materialize(db, variance)),
-            self.variable.materialize(db, variance),
-            self.suffix.iter().map(|ty| ty.materialize(db, variance)),
+            self.prefix
+                .iter()
+                .map(|ty| ty.materialize(db, materialization_type)),
+            self.variable.materialize(db, materialization_type),
+            self.suffix
+                .iter()
+                .map(|ty| ty.materialize(db, materialization_type)),
         )
     }
 
@@ -1058,10 +1074,14 @@ impl<'db> Tuple<Type<'db>> {
         }
     }
 
-    pub(crate) fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+    pub(crate) fn materialize(
+        &self,
+        db: &'db dyn Db,
+        materialization_type: MaterializationType,
+    ) -> Self {
         match self {
-            Tuple::Fixed(tuple) => Tuple::Fixed(tuple.materialize(db, variance)),
-            Tuple::Variable(tuple) => tuple.materialize(db, variance),
+            Tuple::Fixed(tuple) => Tuple::Fixed(tuple.materialize(db, materialization_type)),
+            Tuple::Variable(tuple) => tuple.materialize(db, materialization_type),
         }
     }
 

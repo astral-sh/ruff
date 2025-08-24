@@ -14,8 +14,8 @@ use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::tuple::TupleSpec;
 use crate::types::{
-    CallableType, IntersectionType, KnownClass, MethodWrapperKind, Protocol, StringLiteralType,
-    SubclassOfInner, Type, UnionType, WrapperDescriptorKind,
+    CallableType, IntersectionType, KnownClass, MaterializationType, MethodWrapperKind, Protocol,
+    StringLiteralType, SubclassOfInner, Type, UnionType, WrapperDescriptorKind,
 };
 
 /// Settings for displaying types and signatures
@@ -515,6 +515,7 @@ impl<'db> GenericAlias<'db> {
         DisplayGenericAlias {
             origin: self.origin(db),
             specialization: self.specialization(db),
+            specialization_type: self.specialization(db).specialization_type(db),
             db,
             settings,
         }
@@ -524,6 +525,7 @@ impl<'db> GenericAlias<'db> {
 pub(crate) struct DisplayGenericAlias<'db> {
     origin: ClassLiteral<'db>,
     specialization: Specialization<'db>,
+    specialization_type: Option<MaterializationType>,
     db: &'db dyn Db,
     settings: DisplaySettings,
 }
@@ -533,14 +535,25 @@ impl Display for DisplayGenericAlias<'_> {
         if let Some(tuple) = self.specialization.tuple(self.db) {
             tuple.display_with(self.db, self.settings).fmt(f)
         } else {
+            let prefix = match self.specialization_type {
+                None => "",
+                Some(MaterializationType::Top) => "Top[",
+                Some(MaterializationType::Bottom) => "Bottom[",
+            };
+            let suffix = match self.specialization_type {
+                None => "",
+                Some(_) => "]",
+            };
             write!(
                 f,
-                "{origin}{specialization}",
+                "{prefix}{origin}{specialization}{suffix}",
+                prefix = prefix,
                 origin = self.origin.name(self.db),
                 specialization = self.specialization.display_short(
                     self.db,
                     TupleSpecialization::from_class(self.db, self.origin)
                 ),
+                suffix = suffix,
             )
         }
     }

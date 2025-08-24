@@ -47,7 +47,7 @@ The invariant position is replaced with an unresolved type variable.
 
 ```py
 def _(top_list: Top[list[Any]]):
-    reveal_type(top_list)  # revealed: list[T_all]
+    reveal_type(top_list)  # revealed: Top[list[Any]]
 ```
 
 ### Bottom materialization
@@ -75,7 +75,7 @@ type variable.
 
 ```py
 def _(bottom_list: Bottom[list[Any]]):
-    reveal_type(bottom_list)  # revealed: list[T_all]
+    reveal_type(bottom_list)  # revealed: Bottom[list[Any]]
 ```
 
 ## Fully static types
@@ -230,14 +230,14 @@ def _(
     top_aiu: Top[LTAnyIntUnknown],
     bottom_aiu: Bottom[LTAnyIntUnknown],
 ):
-    reveal_type(top_ai)  # revealed: list[tuple[T_all, int]]
-    reveal_type(bottom_ai)  # revealed: list[tuple[T_all, int]]
+    reveal_type(top_ai)  # revealed: Top[list[tuple[Any, int]]]
+    reveal_type(bottom_ai)  # revealed: Bottom[list[tuple[Any, int]]]
 
-    reveal_type(top_su)  # revealed: list[tuple[str, T_all]]
-    reveal_type(bottom_su)  # revealed: list[tuple[str, T_all]]
+    reveal_type(top_su)  # revealed: Top[list[tuple[str, Unknown]]]
+    reveal_type(bottom_su)  # revealed: Bottom[list[tuple[str, Unknown]]]
 
-    reveal_type(top_aiu)  # revealed: list[tuple[T_all, int, T_all]]
-    reveal_type(bottom_aiu)  # revealed: list[tuple[T_all, int, T_all]]
+    reveal_type(top_aiu)  # revealed: Top[list[tuple[Any, int, Unknown]]]
+    reveal_type(bottom_aiu)  # revealed: Bottom[list[tuple[Any, int, Unknown]]]
 ```
 
 ## Union
@@ -286,14 +286,14 @@ def _(
     top_aiu: Top[list[Any | int | Unknown]],
     bottom_aiu: Bottom[list[Any | int | Unknown]],
 ):
-    reveal_type(top_ai)  # revealed: list[T_all | int]
-    reveal_type(bottom_ai)  # revealed: list[T_all | int]
+    reveal_type(top_ai)  # revealed: Top[list[Any | int]]
+    reveal_type(bottom_ai)  # revealed: Bottom[list[Any | int]]
 
-    reveal_type(top_su)  # revealed: list[str | T_all]
-    reveal_type(bottom_su)  # revealed: list[str | T_all]
+    reveal_type(top_su)  # revealed: Top[list[str | Unknown]]
+    reveal_type(bottom_su)  # revealed: Bottom[list[str | Unknown]]
 
-    reveal_type(top_aiu)  # revealed: list[T_all | int]
-    reveal_type(bottom_aiu)  # revealed: list[T_all | int]
+    reveal_type(top_aiu)  # revealed: Top[list[Any | int]]
+    reveal_type(bottom_aiu)  # revealed: Bottom[list[Any | int]]
 ```
 
 ## Intersection
@@ -320,8 +320,10 @@ def _(
     top: Top[Intersection[list[Any], list[int]]],
     bottom: Bottom[Intersection[list[Any], list[int]]],
 ):
-    reveal_type(top)  # revealed: list[T_all] & list[int]
-    reveal_type(bottom)  # revealed: list[T_all] & list[int]
+    # Top[list[Any] & list[int]] = Top[list[Any]] & list[int] = list[int]
+    reveal_type(top)  # revealed: list[int]
+    # Bottom[list[Any] & list[int]] = Bottom[list[Any]] & list[int] = Bottom[list[Any]]
+    reveal_type(bottom)  # revealed: Bottom[list[Any]]
 ```
 
 ## Negation (via `Not`)
@@ -366,8 +368,8 @@ static_assert(is_equivalent_to(Bottom[type[int | Any]], type[int]))
 
 # Here, `T` has an upper bound of `type`
 def _(top: Top[list[type[Any]]], bottom: Bottom[list[type[Any]]]):
-    reveal_type(top)  # revealed: list[T_all]
-    reveal_type(bottom)  # revealed: list[T_all]
+    reveal_type(top)  # revealed: Top[list[type[Any]]]
+    reveal_type(bottom)  # revealed: Bottom[list[type[Any]]]
 ```
 
 ## Type variables
@@ -427,8 +429,8 @@ class GenericContravariant(Generic[T_contra]):
     pass
 
 def _(top: Top[GenericInvariant[Any]], bottom: Bottom[GenericInvariant[Any]]):
-    reveal_type(top)  # revealed: GenericInvariant[T_all]
-    reveal_type(bottom)  # revealed: GenericInvariant[T_all]
+    reveal_type(top)  # revealed: Top[GenericInvariant[Any]]
+    reveal_type(bottom)  # revealed: Bottom[GenericInvariant[Any]]
 
 static_assert(is_equivalent_to(Top[GenericCovariant[Any]], GenericCovariant[object]))
 static_assert(is_equivalent_to(Bottom[GenericCovariant[Any]], GenericCovariant[Never]))
@@ -448,8 +450,8 @@ type CovariantCallable = Callable[[GenericCovariant[Any]], None]
 type ContravariantCallable = Callable[[GenericContravariant[Any]], None]
 
 def invariant(top: Top[InvariantCallable], bottom: Bottom[InvariantCallable]) -> None:
-    reveal_type(top)  # revealed: (GenericInvariant[T_all], /) -> None
-    reveal_type(bottom)  # revealed: (GenericInvariant[T_all], /) -> None
+    reveal_type(top)  # revealed: (Bottom[GenericInvariant[Any]], /) -> None
+    reveal_type(bottom)  # revealed: (Top[GenericInvariant[Any]], /) -> None
 
 def covariant(top: Top[CovariantCallable], bottom: Bottom[CovariantCallable]) -> None:
     reveal_type(top)  # revealed: (GenericCovariant[Never], /) -> None
@@ -491,4 +493,32 @@ def _(
     top_1: Top[1],  # error: [invalid-type-form]
     bottom_1: Bottom[1],  # error: [invalid-type-form]
 ): ...
+```
+
+## Nested use
+
+`Top[T]` and `Bottom[T]` are always fully static types. Therefore, they have only one
+materialization (themselves) and applying `Top` or `Bottom` again does nothing.
+
+```py
+from typing import Any
+from ty_extensions import Top, Bottom, static_assert, is_equivalent_to
+
+static_assert(is_equivalent_to(Top[Top[list[Any]]], Top[list[Any]]))
+static_assert(is_equivalent_to(Bottom[Top[list[Any]]], Top[list[Any]]))
+
+static_assert(is_equivalent_to(Bottom[Bottom[list[Any]]], Bottom[list[Any]]))
+static_assert(is_equivalent_to(Top[Bottom[list[Any]]], Bottom[list[Any]]))
+```
+
+## Subtyping
+
+Any `list[T]` is a subtype of `top[list[Any]]`.
+
+```py
+from typing import Any
+from ty_extensions import is_subtype_of, static_assert, Top
+
+static_assert(is_subtype_of(list[int], Top[list[Any]]))
+static_assert(not is_subtype_of(Top[list[Any]], list[int]))
 ```

@@ -6,8 +6,8 @@ use crate::types::constraints::Constraints;
 use crate::types::variance::VarianceInferable;
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, ClassType, DynamicType,
-    HasRelationToVisitor, IsDisjointVisitor, KnownClass, MemberLookupPolicy, NormalizedVisitor,
-    Type, TypeMapping, TypeRelation, TypeVarInstance,
+    HasRelationToVisitor, IsDisjointVisitor, KnownClass, MaterializationType, MemberLookupPolicy,
+    NormalizedVisitor, Type, TypeMapping, TypeRelation, TypeVarInstance,
 };
 use crate::{Db, FxOrderSet};
 
@@ -85,34 +85,15 @@ impl<'db> SubclassOfType<'db> {
         subclass_of.is_dynamic()
     }
 
-    pub(super) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Type<'db> {
+    pub(super) fn materialize(
+        self,
+        db: &'db dyn Db,
+        materialization_type: MaterializationType,
+    ) -> Type<'db> {
         match self.subclass_of {
-            SubclassOfInner::Dynamic(_) => match variance {
-                TypeVarVariance::Covariant => KnownClass::Type.to_instance(db),
-                TypeVarVariance::Contravariant => Type::Never,
-                TypeVarVariance::Invariant => {
-                    // We need to materialize this to `type[T]` but that isn't representable so
-                    // we instead use a type variable with an upper bound of `type`.
-                    Type::NonInferableTypeVar(BoundTypeVarInstance::new(
-                        db,
-                        TypeVarInstance::new(
-                            db,
-                            Name::new_static("T_all"),
-                            None,
-                            Some(
-                                TypeVarBoundOrConstraints::UpperBound(
-                                    KnownClass::Type.to_instance(db),
-                                )
-                                .into(),
-                            ),
-                            Some(variance),
-                            None,
-                            TypeVarKind::Pep695,
-                        ),
-                        BindingContext::Synthetic,
-                    ))
-                }
-                TypeVarVariance::Bivariant => unreachable!(),
+            SubclassOfInner::Dynamic(_) => match materialization_type {
+                MaterializationType::Top => KnownClass::Type.to_instance(db),
+                MaterializationType::Bottom => Type::Never,
             },
             SubclassOfInner::Class(_) => Type::SubclassOf(self),
         }
