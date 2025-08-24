@@ -48,4 +48,43 @@ mod tests {
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
+
+    #[test]
+    fn g004_fix_gated_by_preview_flag() -> Result<()> {
+        use crate::settings::LinterSettings;
+
+        let diagnostics = test_path(
+            Path::new("flake8_logging_format")
+                .join(Path::new("G004_arg_order.py"))
+                .as_path(),
+            &LinterSettings {
+                preview: crate::settings::types::PreviewMode::Disabled,
+                ..LinterSettings::for_rules(vec![Rule::LoggingFString])
+            },
+        )?;
+
+        // When preview is disabled, diagnostics should be emitted but no fix should be attached.
+        assert!(diagnostics.iter().all(|d| d.fix().is_none()));
+        Ok(())
+    }
+
+    #[test]
+    fn g004_preserves_argument_order_in_fix() -> Result<()> {
+        use crate::settings::LinterSettings;
+
+        // Use the fixture that contains a two-argument example to ensure ordering is preserved.
+        let diagnostics = test_path(
+            Path::new("flake8_logging_format")
+                .join(Path::new("G004_arg_order.py"))
+                .as_path(),
+            &LinterSettings {
+                preview: crate::settings::types::PreviewMode::Enabled,
+                ..LinterSettings::for_rules(vec![Rule::LoggingFString])
+            },
+        )?;
+
+        // Assert by snapshot (disabled/enabled snapshots stored in snapshots/).
+        assert_diagnostics!("G004_arg_order.py".to_string(), diagnostics);
+        Ok(())
+    }
 }

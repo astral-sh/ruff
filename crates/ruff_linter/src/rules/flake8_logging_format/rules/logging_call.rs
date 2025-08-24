@@ -1,15 +1,109 @@
-use ruff_python_ast::{self as ast, Arguments, Expr, Keyword, Operator};
+use ruff_python_ast::InterpolatedStringElement;
+use ruff_python_ast::{self as ast, Arguments, Expr, Keyword, Operator, StringFlags};
 use ruff_python_semantic::analyze::logging;
 use ruff_python_stdlib::logging::LoggingLevel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::preview::is_fix_f_string_logging_enabled;
 use crate::registry::Rule;
 use crate::rules::flake8_logging_format::violations::{
     LoggingExcInfo, LoggingExtraAttrClash, LoggingFString, LoggingPercentFormat,
     LoggingRedundantExcInfo, LoggingStringConcat, LoggingStringFormat, LoggingWarn,
 };
 use crate::{Edit, Fix};
+fn logging_f_string(
+    checker: &Checker,
+    msg: &Expr,
+    f_string: &ast::ExprFString,
+    arguments: &Arguments,
+    msg_pos: usize,
+) {
+    // Report the diagnostic up-front so we can attach a fix later only when preview is enabled.
+    let mut diagnostic = checker.report_diagnostic(LoggingFString, msg.range());
+
+    // Preview gate for the automatic fix.
+    if !is_fix_f_string_logging_enabled(checker.settings()) {
+        return;
+    }
+
+    let mut format_string = String::new();
+    let mut args = Vec::new();
+
+    // Try to reuse the first part's quote style when building the replacement.
+    // Default to double quotes if we can't determine it.
+    let quote_str = f_string
+        .value
+        .f_strings()
+        .next()
+        .map(|f| f.flags.quote_str())
+        .unwrap_or("\"")
+        .to_string();
+
+    for f in f_string.value.f_strings() {
+        for element in &f.elements {
+            match element {
+                InterpolatedStringElement::Literal(lit) => {
+                    // If the literal text contains a '%' placeholder, bail out: mixing
+                    // f-string interpolation with '%' placeholders is ambiguous for our
+                    // automatic conversion, so don't offer a fix for this case.
+                    if lit.value.as_ref().contains('%') {
+                        return;
+                    }
+                    format_string.push_str(lit.value.as_ref());
+                }
+                InterpolatedStringElement::Interpolation(interpolated) => {
+                    if interpolated.format_spec.is_some()
+                        || !matches!(
+                            interpolated.conversion,
+                            ruff_python_ast::ConversionFlag::None
+                        )
+                    {
+                        return;
+                    }
+                    match interpolated.expression.as_ref() {
+                        Expr::Name(name) => {
+                            format_string.push_str("%s");
+                            args.push(name.id.to_string());
+                        }
+                        _ => return,
+                    }
+                }
+            }
+        }
+    }
+
+    if args.is_empty() {
+        return;
+    }
+
+    // Determine names of existing trailing positional args (after the `msg` argument).
+    let existing_names: Vec<String> = arguments
+        .args
+        .iter()
+        .skip(msg_pos + 1)
+        .filter_map(|arg| match arg {
+            Expr::Name(name) => Some(name.id.to_string()),
+            _ => None,
+        })
+        .collect();
+
+    // Combine collected interpolation names with existing trailing positional names in
+    // that order so that placeholders map to arguments correctly. Do not deduplicate;
+    // duplicates are valid when the same name appears multiple times.
+    let mut result_args = args.clone();
+    result_args.extend(existing_names);
+
+    let replacement = format!(
+        "{q}{format_string}{q}, {args}",
+        q = quote_str,
+        format_string = format_string,
+        args = result_args.join(", ")
+    );
+
+    let fix = Fix::safe_edit(Edit::range_replacement(replacement, msg.range()));
+    diagnostic.set_fix(fix);
+}
 
 /// Returns `true` if the attribute is a reserved attribute on the `logging` module's `LogRecord`
 /// class.
@@ -42,7 +136,7 @@ fn is_reserved_attr(attr: &str) -> bool {
 }
 
 /// Check logging messages for violations.
-fn check_msg(checker: &Checker, msg: &Expr) {
+fn check_msg(checker: &Checker, msg: &Expr, arguments: &Arguments, msg_pos: usize) {
     match msg {
         // Check for string concatenation and percent format.
         Expr::BinOp(ast::ExprBinOp { op, .. }) => match op {
@@ -55,8 +149,10 @@ fn check_msg(checker: &Checker, msg: &Expr) {
             _ => {}
         },
         // Check for f-strings.
-        Expr::FString(_) => {
-            checker.report_diagnostic_if_enabled(LoggingFString, msg.range());
+        Expr::FString(f_string) => {
+            if checker.is_rule_enabled(Rule::LoggingFString) {
+                logging_f_string(checker, msg, f_string, arguments, msg_pos);
+            }
         }
         // Check for .format() calls.
         Expr::Call(ast::ExprCall { func, .. }) => {
@@ -168,7 +264,7 @@ pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCall) {
     // G001, G002, G003, G004
     let msg_pos = usize::from(matches!(logging_call_type, LoggingCallType::LogCall));
     if let Some(format_arg) = call.arguments.find_argument_value("msg", msg_pos) {
-        check_msg(checker, format_arg);
+        check_msg(checker, format_arg, &call.arguments, msg_pos);
     }
 
     // G010
