@@ -12,6 +12,7 @@ use crate::rules::flake8_logging_format::violations::{
     LoggingRedundantExcInfo, LoggingStringConcat, LoggingStringFormat, LoggingWarn,
 };
 use crate::{Edit, Fix};
+
 fn logging_f_string(
     checker: &Checker,
     msg: &Expr,
