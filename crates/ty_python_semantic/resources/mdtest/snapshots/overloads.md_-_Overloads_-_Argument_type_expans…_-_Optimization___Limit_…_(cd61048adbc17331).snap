@@ -34,7 +34,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/call/overloads.md
  1 | from overloaded import A, B, f
  2 | from typing_extensions import reveal_type
  3 | 
- 4 | def _(ab: A | B, a=None):
+ 4 | def _(a: int | None):
  5 |     reveal_type(
  6 |         # error: [no-matching-overload]
  7 |         # revealed: Unknown

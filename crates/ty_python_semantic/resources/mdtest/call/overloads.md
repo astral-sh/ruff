@@ -660,9 +660,9 @@ class Foo:
 
 ```py
 from overloaded import A, B, C, Foo, f
-from typing_extensions import reveal_type
+from typing_extensions import Any, reveal_type
 
-def _(ab: A | B, a=1):
+def _(ab: A | B, a: int | Any):
     reveal_type(f(a1=a, a2=a, a3=a))  # revealed: C
     reveal_type(f(A(), a1=a, a2=a, a3=a))  # revealed: A
     reveal_type(f(B(), a1=a, a2=a, a3=a))  # revealed: B
@@ -750,7 +750,7 @@ def _(ab: A | B, a=1):
         )
     )
 
-def _(foo: Foo, ab: A | B, a=1):
+def _(foo: Foo, ab: A | B, a: int | Any):
     reveal_type(foo.f(a1=a, a2=a, a3=a))  # revealed: C
     reveal_type(foo.f(A(), a1=a, a2=a, a3=a))  # revealed: A
     reveal_type(foo.f(B(), a1=a, a2=a, a3=a))  # revealed: B
@@ -861,7 +861,7 @@ def f(x: B, /, **kwargs: int) -> B: ...
 from overloaded import A, B, f
 from typing_extensions import reveal_type
 
-def _(ab: A | B, a=None):
+def _(a: int | None):
     reveal_type(
         # error: [no-matching-overload]
         # revealed: Unknown
