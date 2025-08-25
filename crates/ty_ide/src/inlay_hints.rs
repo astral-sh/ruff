@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{fmt, vec};
 
 use crate::Db;
 use ruff_db::files::File;
@@ -18,11 +18,10 @@ pub struct InlayHint {
 
 impl InlayHint {
     fn type_hint(position: TextSize, ty: Type, db: &dyn Db) -> Self {
-        let mut label_parts = Vec::new();
-
-        label_parts.push(": ".into());
-
-        label_parts.push(InlayHintLabelPart::new(ty.display(db).to_string()));
+        let label_parts = vec![
+            InlayHintLabelPart::new(": ".into()),
+            InlayHintLabelPart::new(ty.display(db).to_string()),
+        ];
 
         Self {
             position,
@@ -32,11 +31,10 @@ impl InlayHint {
     }
 
     fn call_argument_name(position: TextSize, name: &str) -> Self {
-        let mut label_parts = Vec::new();
-
-        label_parts.push(InlayHintLabelPart::new(name.into()));
-
-        label_parts.push("=".into());
+        let label_parts = vec![
+            InlayHintLabelPart::new(name.into()),
+            InlayHintLabelPart::new("=".into()),
+        ];
 
         Self {
             position,
