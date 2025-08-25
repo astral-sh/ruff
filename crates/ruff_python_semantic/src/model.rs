@@ -434,8 +434,10 @@ impl<'a> SemanticModel<'a> {
             //
             // Also allow an additional level beyond that to cover the implicit
             // `__class__` closure created around methods and enclosing the type scope.
-            class_variables_visible =
-                matches!((scope.kind, index), (ScopeKind::Type, 0) | (ScopeKind::ClassCell, 1));
+            class_variables_visible = matches!(
+                (scope.kind, index),
+                (ScopeKind::Type, 0) | (ScopeKind::ClassCell, 1)
+            );
 
             if let Some(binding_id) = scope.get(name.id.as_str()) {
                 // Mark the binding as used.
