@@ -153,28 +153,25 @@ def f():
         pass
 
 
-# OK -- `__class__` in this case is not the special `__class__` cell,
-# so we don't emit a diagnostic. (It has its own special semantics --
-# see https://github.com/astral-sh/ruff/pull/20048#discussion_r2298338048 --
-# but those aren't relevant here.)
+# OK, `__class__` in this case is not the special `__class__` cell, so we don't
+# emit a diagnostic. (It has its own special semantics -- see
+# https://github.com/astral-sh/ruff/pull/20048#discussion_r2298338048 -- but
+# those aren't relevant here.)
 class A:
     __class__ = 1
 
 
-# The following three cases should technically be allowed because `__class__`
-# is a nonlocal variable in the method scope. However, `__class__` isn't easily
-# accessible in other methods, so setting it like this is still likely to be an
-# error, and we still emit a diagnostic. See
-# https://github.com/astral-sh/ruff/pull/20048#discussion_r2296252395
+# The following three cases are flagged because they declare local `__class__`
+# variables that don't refer to the special `__class__` cell.
 class A:
     def set_class(self, cls):
-        __class__ = cls
+        __class__ = cls  # F841
 
 
 class A:
     class B:
         def set_class(self, cls):
-            __class__ = cls
+            __class__ = cls  # F841
 
 
 class A:
@@ -182,4 +179,11 @@ class A:
         class B:
             print(__class__)
             def set_class(self, cls):
-                __class__ = cls
+                __class__ = cls  # F841
+
+
+# OK, the `__class__` cell is nonlocal and declared as such.
+class NonlocalDunderClass:
+    def foo():
+        nonlocal __class__
+        __class__ = 1

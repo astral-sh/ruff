@@ -293,58 +293,61 @@ help: Remove assignment to unused variable `_`
 155 155 | 
 
 F841 [*] Local variable `__class__` is assigned to but never used
-   --> F841_0.py:171:9
+   --> F841_0.py:168:9
     |
-169 | class A:
-170 |     def set_class(self, cls):
-171 |         __class__ = cls
+166 | class A:
+167 |     def set_class(self, cls):
+168 |         __class__ = cls  # F841
     |         ^^^^^^^^^
     |
 help: Remove assignment to unused variable `__class__`
 
 ℹ Unsafe fix
-168 168 | # https://github.com/astral-sh/ruff/pull/20048#discussion_r2296252395
-169 169 | class A:
-170 170 |     def set_class(self, cls):
-171     |-        __class__ = cls
-    171 |+        pass
-172 172 | 
-173 173 | 
-174 174 | class A:
+165 165 | # variables that don't refer to the special `__class__` cell.
+166 166 | class A:
+167 167 |     def set_class(self, cls):
+168     |-        __class__ = cls  # F841
+    168 |+        pass  # F841
+169 169 | 
+170 170 | 
+171 171 | class A:
 
 F841 [*] Local variable `__class__` is assigned to but never used
-   --> F841_0.py:177:13
+   --> F841_0.py:174:13
     |
-175 |     class B:
-176 |         def set_class(self, cls):
-177 |             __class__ = cls
+172 |     class B:
+173 |         def set_class(self, cls):
+174 |             __class__ = cls  # F841
     |             ^^^^^^^^^
     |
 help: Remove assignment to unused variable `__class__`
 
 ℹ Unsafe fix
-174 174 | class A:
-175 175 |     class B:
-176 176 |         def set_class(self, cls):
-177     |-            __class__ = cls
-    177 |+            pass
-178 178 | 
-179 179 | 
-180 180 | class A:
+171 171 | class A:
+172 172 |     class B:
+173 173 |         def set_class(self, cls):
+174     |-            __class__ = cls  # F841
+    174 |+            pass  # F841
+175 175 | 
+176 176 | 
+177 177 | class A:
 
 F841 [*] Local variable `__class__` is assigned to but never used
-   --> F841_0.py:185:17
+   --> F841_0.py:182:17
     |
-183 |             print(__class__)
-184 |             def set_class(self, cls):
-185 |                 __class__ = cls
+180 |             print(__class__)
+181 |             def set_class(self, cls):
+182 |                 __class__ = cls  # F841
     |                 ^^^^^^^^^
     |
 help: Remove assignment to unused variable `__class__`
 
 ℹ Unsafe fix
-182 182 |         class B:
-183 183 |             print(__class__)
-184 184 |             def set_class(self, cls):
-185     |-                __class__ = cls
-    185 |+                pass
+179 179 |         class B:
+180 180 |             print(__class__)
+181 181 |             def set_class(self, cls):
+182     |-                __class__ = cls  # F841
+    182 |+                pass  # F841
+183 183 | 
+184 184 | 
+185 185 | # OK, the `__class__` cell is nonlocal and declared as such.
