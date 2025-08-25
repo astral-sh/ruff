@@ -23,6 +23,7 @@ mod tests {
     #[test_case(Rule::AsyncZeroSleep, Path::new("ASYNC115.py"))]
     #[test_case(Rule::LongSleepNotForever, Path::new("ASYNC116.py"))]
     #[test_case(Rule::BlockingHttpCallInAsyncFunction, Path::new("ASYNC210.py"))]
+    #[test_case(Rule::BlockingHttpCallHttpxInAsyncFunction, Path::new("ASYNC212.py"))]
     #[test_case(Rule::CreateSubprocessInAsyncFunction, Path::new("ASYNC22x.py"))]
     #[test_case(Rule::RunProcessInAsyncFunction, Path::new("ASYNC22x.py"))]
     #[test_case(Rule::WaitForProcessInAsyncFunction, Path::new("ASYNC22x.py"))]

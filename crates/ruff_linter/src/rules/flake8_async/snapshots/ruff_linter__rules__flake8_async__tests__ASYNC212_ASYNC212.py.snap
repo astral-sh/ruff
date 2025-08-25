@@ -1,0 +1,12 @@
+---
+source: crates/ruff_linter/src/rules/flake8_async/mod.rs
+---
+ASYNC212 Async functions should not use blocking httpx clients
+  --> ASYNC212.py:24:14
+   |
+23 | async def foo():
+24 |     client = httpx.Client()
+   |              ^^^^^^^^^^^^
+25 |     client.close()  # ASYNC212
+26 |     client.delete()  # ASYNC212
+   |
