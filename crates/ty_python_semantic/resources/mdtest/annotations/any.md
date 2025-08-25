@@ -176,3 +176,16 @@ Any()  # error: [call-non-callable] "Object of type `typing.Any` is not callable
 ```py
 class F(metaclass=Any): ...  # error: [invalid-metaclass] "Metaclass type `typing.Any` is not callable"
 ```
+
+And `Any` cannot be used in `isinstance()` checks:
+
+```py
+# error: [invalid-argument-type] "`typing.Any` cannot be used with `isinstance()`: This call will raise `TypeError` at runtime"
+isinstance("", Any)
+```
+
+But `issubclass()` checks are fine:
+
+```py
+issubclass(object, Any)  # no error!
+```
