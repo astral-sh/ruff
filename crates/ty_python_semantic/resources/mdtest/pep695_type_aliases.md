@@ -208,3 +208,19 @@ from ty_extensions import Intersection
 def h(x: Intersection[A, B]):
     reveal_type(x)  # revealed: tuple[B] | None
 ```
+
+### Real-world example
+
+Adapted from <https://github.com/pypa/packaging/blob/main/src/packaging/_parser.py>:
+
+```py
+from typing import Union
+
+type MarkerAtom = Union[int, list["MarkerAtom"]]
+type MarkerList = list[Union["MarkerList", MarkerAtom, str]]
+
+def f(marker_list: MarkerList):
+    reveal_type(marker_list)  # revealed: list[MarkerList | MarkerAtom | str]
+    for item in marker_list:
+        reveal_type(item)  # revealed: list[MarkerList | MarkerAtom | str] | int | list[MarkerAtom] | str
+```
