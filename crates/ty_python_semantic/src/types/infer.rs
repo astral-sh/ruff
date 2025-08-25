@@ -10040,6 +10040,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             // =================================================================================
             // Branches where we probably should emit diagnostics in some context, but don't yet
             // =================================================================================
+            // TODO: When this case is implemented and the `todo!` usage
+            // is removed, consider adding `todo = "warn"` to the Clippy
+            // lint configuration in `Cargo.toml`. At time of writing,
+            // 2025-08-22, this was the only usage of `todo!` in ruff/ty.
+            // ---AG
             ast::Expr::IpyEscapeCommand(_) => todo!("Implement Ipy escape command support"),
 
             ast::Expr::EllipsisLiteral(_) => {

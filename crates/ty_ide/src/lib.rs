@@ -26,7 +26,7 @@ mod workspace_symbols;
 
 pub use completion::completion;
 pub use doc_highlights::document_highlights;
-pub use document_symbols::{document_symbols, document_symbols_with_options};
+pub use document_symbols::document_symbols;
 pub use goto::{goto_declaration, goto_definition, goto_type_definition};
 pub use goto_references::goto_references;
 pub use hover::hover;
@@ -39,7 +39,7 @@ pub use semantic_tokens::{
     SemanticToken, SemanticTokenModifier, SemanticTokenType, SemanticTokens, semantic_tokens,
 };
 pub use signature_help::{ParameterDetails, SignatureDetails, SignatureHelpInfo, signature_help};
-pub use symbols::{SymbolInfo, SymbolKind, SymbolsOptions};
+pub use symbols::{FlatSymbols, HierarchicalSymbols, SymbolId, SymbolInfo, SymbolKind};
 pub use workspace_symbols::{WorkspaceSymbolInfo, workspace_symbols};
 
 use ruff_db::files::{File, FileRange};
