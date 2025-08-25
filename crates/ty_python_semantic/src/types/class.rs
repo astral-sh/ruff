@@ -465,9 +465,9 @@ impl<'db> ClassType<'db> {
         class_literal.definition(db)
     }
 
-    /// Return `Some` if this class is known to be a [`SolidBase`], or `None` if it is not.
-    pub(super) fn as_solid_base(self, db: &'db dyn Db) -> Option<SolidBase<'db>> {
-        self.class_literal(db).0.as_solid_base(db)
+    /// Return `Some` if this class is known to be a [`DisjointBase`], or `None` if it is not.
+    pub(super) fn as_disjoint_base(self, db: &'db dyn Db) -> Option<DisjointBase<'db>> {
+        self.class_literal(db).0.as_disjoint_base(db)
     }
 
     /// Return `true` if this class represents `known_class`
@@ -633,13 +633,13 @@ impl<'db> ClassType<'db> {
             .apply_optional_specialization(db, specialization)
     }
 
-    /// Return the [`SolidBase`] that appears first in the MRO of this class.
+    /// Return the [`DisjointBase`] that appears first in the MRO of this class.
     ///
-    /// Returns `None` if this class does not have any solid bases in its MRO.
-    pub(super) fn nearest_solid_base(self, db: &'db dyn Db) -> Option<SolidBase<'db>> {
+    /// Returns `None` if this class does not have any disjoint bases in its MRO.
+    pub(super) fn nearest_disjoint_base(self, db: &'db dyn Db) -> Option<DisjointBase<'db>> {
         self.iter_mro(db)
             .filter_map(ClassBase::into_class)
-            .find_map(|base| base.as_solid_base(db))
+            .find_map(|base| base.as_disjoint_base(db))
     }
 
     /// Return `true` if this class could coexist in an MRO with `other`.
@@ -660,12 +660,17 @@ impl<'db> ClassType<'db> {
             return other.is_subclass_of(db, self);
         }
 
-        // Two solid bases can only coexist in an MRO if one is a subclass of the other.
-        if self.nearest_solid_base(db).is_some_and(|solid_base_1| {
-            other.nearest_solid_base(db).is_some_and(|solid_base_2| {
-                !solid_base_1.could_coexist_in_mro_with(db, &solid_base_2)
+        // Two disjoint bases can only coexist in an MRO if one is a subclass of the other.
+        if self
+            .nearest_disjoint_base(db)
+            .is_some_and(|disjoint_base_1| {
+                other
+                    .nearest_disjoint_base(db)
+                    .is_some_and(|disjoint_base_2| {
+                        !disjoint_base_1.could_coexist_in_mro_with(db, &disjoint_base_2)
+                    })
             })
-        }) {
+        {
             return false;
         }
 
@@ -1519,14 +1524,19 @@ impl<'db> ClassLiteral<'db> {
         }
     }
 
-    /// Return `Some()` if this class is known to be a [`SolidBase`], or `None` if it is not.
-    pub(super) fn as_solid_base(self, db: &'db dyn Db) -> Option<SolidBase<'db>> {
+    /// Return `Some()` if this class is known to be a [`DisjointBase`], or `None` if it is not.
+    pub(super) fn as_disjoint_base(self, db: &'db dyn Db) -> Option<DisjointBase<'db>> {
         if let Some(known_class) = self.known(db) {
             known_class
-                .is_solid_base()
-                .then_some(SolidBase::hard_coded(self))
+                .is_disjoint_base()
+                .then_some(DisjointBase::hard_coded(self))
+        } else if self
+            .known_function_decorators(db)
+            .contains(&KnownFunction::DisjointBase)
+        {
+            Some(DisjointBase::due_to_decorator(self))
         } else if SlotsKind::from(db, self) == SlotsKind::NotEmpty {
-            Some(SolidBase::due_to_dunder_slots(self))
+            Some(DisjointBase::due_to_dunder_slots(self))
         } else {
             None
         }
@@ -3375,39 +3385,60 @@ impl InheritanceCycle {
 
 /// CPython internally considers a class a "solid base" if it has an atypical instance memory layout,
 /// with additional memory "slots" for each instance, besides the default object metadata and an
-/// attribute dictionary. A "solid base" can be a class defined in a C extension which defines C-level
-/// instance slots, or a Python class that defines non-empty `__slots__`.
+/// attribute dictionary. Per [PEP 800], however, we use the term "disjoint base" for this concept.
 ///
-/// Two solid bases can only coexist in a class's MRO if one is a subclass of the other. Knowing if
-/// a class is "solid base" or not is therefore valuable for inferring whether two instance types or
+/// A "disjoint base" can be a class defined in a C extension which defines C-level instance slots,
+/// or a Python class that defines non-empty `__slots__`. C-level instance slots are not generally
+/// visible to Python code, but PEP 800 specifies that any class decorated with
+/// `@typing_extensions.disjoint_base` should be treated by type checkers as a disjoint base; it is
+/// assumed that classes with C-level instance slots will be decorated as such when they appear in
+/// stub files.
+///
+/// Two disjoint bases can only coexist in a class's MRO if one is a subclass of the other. Knowing if
+/// a class is "disjoint base" or not is therefore valuable for inferring whether two instance types or
 /// two subclass-of types are disjoint from each other. It also allows us to detect possible
 /// `TypeError`s resulting from class definitions.
+///
+/// [PEP 800]: https://peps.python.org/pep-0800/
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
-pub(super) struct SolidBase<'db> {
+pub(super) struct DisjointBase<'db> {
     pub(super) class: ClassLiteral<'db>,
-    pub(super) kind: SolidBaseKind,
+    pub(super) kind: DisjointBaseKind,
 }
 
-impl<'db> SolidBase<'db> {
-    /// Creates a [`SolidBase`] instance where we know the class is a solid base
+impl<'db> DisjointBase<'db> {
+    /// Creates a [`DisjointBase`] instance where we know the class is a disjoint base
     /// because it is special-cased by ty.
+    ///
+    /// Practically speaking, none of these classes expose `__slots__` at the Python level,
+    /// so we internally record the "kind" as being the same as if they were decorated with
+    /// `@disjoint_base`.
     fn hard_coded(class: ClassLiteral<'db>) -> Self {
         Self {
             class,
-            kind: SolidBaseKind::HardCoded,
+            kind: DisjointBaseKind::DisjointBaseDecorator,
         }
     }
 
-    /// Creates a [`SolidBase`] instance where we know the class is a solid base
+    /// Creates a [`DisjointBase`] instance where we know the class is a disjoint base
+    /// because it has the `@disjoint_base` decorator on its definition
+    fn due_to_decorator(class: ClassLiteral<'db>) -> Self {
+        Self {
+            class,
+            kind: DisjointBaseKind::DisjointBaseDecorator,
+        }
+    }
+
+    /// Creates a [`DisjointBase`] instance where we know the class is a disjoint base
     /// because of its `__slots__` definition.
     fn due_to_dunder_slots(class: ClassLiteral<'db>) -> Self {
         Self {
             class,
-            kind: SolidBaseKind::DefinesSlots,
+            kind: DisjointBaseKind::DefinesSlots,
         }
     }
 
-    /// Two solid bases can only coexist in a class's MRO if one is a subclass of the other
+    /// Two disjoint bases can only coexist in a class's MRO if one is a subclass of the other
     fn could_coexist_in_mro_with(&self, db: &'db dyn Db, other: &Self) -> bool {
         self == other
             || self
@@ -3420,10 +3451,11 @@ impl<'db> SolidBase<'db> {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub(super) enum SolidBaseKind {
-    /// We know the class is a solid base because of some hardcoded knowledge in ty.
-    HardCoded,
-    /// We know the class is a solid base because it has a non-empty `__slots__` definition.
+pub(super) enum DisjointBaseKind {
+    /// We know the class is a disjoint base because it's either hardcoded in ty
+    /// or has the `@disjoint_base` decorator.
+    DisjointBaseDecorator,
+    /// We know the class is a disjoint base because it has a non-empty `__slots__` definition.
     DefinesSlots,
 }
 
@@ -3624,13 +3656,12 @@ impl KnownClass {
         }
     }
 
-    /// Return `true` if this class is a [`SolidBase`]
-    const fn is_solid_base(self) -> bool {
+    /// Return `true` if this class is a [`DisjointBase`]
+    const fn is_disjoint_base(self) -> bool {
         match self {
-            Self::Object => false,
-
-            // Most non-`@final` builtins (other than `object`) are solid bases.
+            // Most non-`@final` builtins (other than `object`) are disjoint bases.
             Self::Set
+            | Self::Object
             | Self::FrozenSet
             | Self::BaseException
             | Self::Bytearray
@@ -3654,7 +3685,7 @@ impl KnownClass {
             | Self::Bytes => true,
 
             // It doesn't really make sense to ask the question for `@final` types,
-            // since these are "more than solid bases". But we'll anyway infer a `@final`
+            // since these are "more than disjoint bases". But we'll anyway infer a `@final`
             // class as being disjoint from a class that doesn't appear in its MRO,
             // and we'll anyway complain if we see a class definition that includes a
             // `@final` class in its bases. We therefore return `false` here to avoid
@@ -3684,8 +3715,7 @@ impl KnownClass {
             | Self::NoneType
             | Self::CoroutineType => false,
 
-            // Anything with a *runtime* MRO (N.B. sometimes different from the MRO that typeshed gives!)
-            // with length >2, or anything that is implemented in pure Python, is not a solid base.
+            // Anything that is implemented in pure Python without `__slots__` is not a disjoint base.
             Self::ABCMeta
             | Self::Awaitable
             | Self::Generator

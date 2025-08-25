@@ -1109,7 +1109,8 @@ pub enum KnownFunction {
 
     /// `typing(_extensions).final`
     Final,
-
+    /// `typing(_extensions).disjoint_base`
+    DisjointBase,
     /// [`typing(_extensions).no_type_check`](https://typing.python.org/en/latest/spec/directives.html#no-type-check)
     NoTypeCheck,
 
@@ -1212,6 +1213,7 @@ impl KnownFunction {
             | Self::GetProtocolMembers
             | Self::RuntimeCheckable
             | Self::DataclassTransform
+            | Self::DisjointBase
             | Self::NoTypeCheck => {
                 matches!(module, KnownModule::Typing | KnownModule::TypingExtensions)
             }
@@ -1574,6 +1576,7 @@ pub(crate) mod tests {
                 | KnownFunction::GetProtocolMembers
                 | KnownFunction::RuntimeCheckable
                 | KnownFunction::DataclassTransform
+                | KnownFunction::DisjointBase
                 | KnownFunction::NoTypeCheck => KnownModule::TypingExtensions,
 
                 KnownFunction::IsSingleton

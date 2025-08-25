@@ -1147,7 +1147,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             let is_protocol = class.is_protocol(self.db());
 
-            let mut solid_bases = IncompatibleBases::default();
+            let mut disjoint_bases = IncompatibleBases::default();
 
             // (3) Iterate through the class's explicit bases to check for various possible errors:
             //     - Check for inheritance from plain `Generic`,
@@ -1209,8 +1209,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     _ => continue,
                 };
 
-                if let Some(solid_base) = base_class.nearest_solid_base(self.db()) {
-                    solid_bases.insert(solid_base, i, base_class.class_literal(self.db()).0);
+                if let Some(disjoint_base) = base_class.nearest_disjoint_base(self.db()) {
+                    disjoint_bases.insert(disjoint_base, i, base_class.class_literal(self.db()).0);
                 }
 
                 if is_protocol
@@ -1301,14 +1301,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 },
                 Ok(_) => {
-                    solid_bases.remove_redundant_entries(self.db());
+                    disjoint_bases.remove_redundant_entries(self.db());
 
-                    if solid_bases.len() > 1 {
+                    if disjoint_bases.len() > 1 {
                         report_instance_layout_conflict(
                             &self.context,
                             class,
                             class_node,
-                            &solid_bases,
+                            &disjoint_bases,
                         );
                     }
                 }
