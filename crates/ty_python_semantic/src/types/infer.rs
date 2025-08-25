@@ -64,7 +64,9 @@ use super::string_annotation::{
 use super::subclass_of::SubclassOfInner;
 use super::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::module_name::{ModuleName, ModuleNameResolutionError};
-use crate::module_resolver::{KnownModule, file_to_module, resolve_module};
+use crate::module_resolver::{
+    KnownModule, ModuleResolveMode, file_to_module, resolve_module, search_paths,
+};
 use crate::node_key::NodeKey;
 use crate::place::{
     Boundness, ConsideredDefinitions, LookupError, Place, PlaceAndQualifiers,
@@ -72,6 +74,7 @@ use crate::place::{
     module_type_implicit_global_declaration, module_type_implicit_global_symbol, place,
     place_from_bindings, place_from_declarations, typing_extensions_symbol,
 };
+
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::{HasScopedUseId, ScopedUseId};
 use crate::semantic_index::definition::{
@@ -4954,11 +4957,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let Some(builder) = self.context.report_lint(&UNRESOLVED_IMPORT, range) else {
             return;
         };
+
         let mut diagnostic = builder.into_diagnostic(format_args!(
             "Cannot resolve imported module `{}{}`",
             ".".repeat(level as usize),
             module.unwrap_or_default()
         ));
+
         if level == 0 {
             if let Some(module_name) = module.and_then(ModuleName::new) {
                 let program = Program::get(self.db());
@@ -4981,6 +4986,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         return;
                     }
                 }
+            }
+
+            // Add search paths information to the diagnostic
+            // Use the same search paths function that is used in actual module resolution
+            let search_paths_list: Vec<String> =
+                search_paths(self.db(), ModuleResolveMode::StubsAllowed)
+                    .enumerate()
+                    .map(|(index, path)| {
+                        format!("  {}. {} ({})", index + 1, path, path.describe_kind())
+                    })
+                    .collect();
+
+            if !search_paths_list.is_empty() {
+                diagnostic.info(format_args!(
+                    "Searched in the following paths during module resolution:\n{}",
+                    search_paths_list.join("\n")
+                ));
             }
 
             diagnostic.info(
