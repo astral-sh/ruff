@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
+use ruff_python_semantic::ScopeKind;
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -50,6 +51,11 @@ impl Violation for NonlocalWithoutBinding {
 pub(crate) fn nonlocal_without_binding(checker: &Checker, nonlocal: &ast::StmtNonlocal) {
     if !checker.semantic().scope_id.is_global() {
         for name in &nonlocal.names {
+            // Skip __class__ in method definitions - it's implicitly available
+            if name == "__class__" && is_in_method_definition(checker) {
+                continue;
+            }
+
             if checker.semantic().nonlocal(name).is_none() {
                 checker.report_diagnostic(
                     NonlocalWithoutBinding {
@@ -60,4 +66,27 @@ pub(crate) fn nonlocal_without_binding(checker: &Checker, nonlocal: &ast::StmtNo
             }
         }
     }
+}
+
+/// Check if the current scope is within a method definition (function inside a class)
+fn is_in_method_definition(checker: &Checker) -> bool {
+    let semantic = checker.semantic();
+
+    // Check if we're currently in a function scope
+    if !matches!(semantic.current_scope().kind, ScopeKind::Function(_)) {
+        return false;
+    }
+
+    // Walk up the scope hierarchy to find a class scope, skipping Type scopes
+    let scopes: Vec<_> = semantic.current_scopes().collect();
+    for scope in scopes.iter().skip(1) {
+        // Skip current function scope
+        match scope.kind {
+            ScopeKind::Class(_) => return true,
+            ScopeKind::Type => continue, // Skip Type scopes and keep looking
+            _ => return false,
+        }
+    }
+
+    false
 }
