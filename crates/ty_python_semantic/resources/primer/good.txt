@@ -36,6 +36,7 @@ django-stubs
 downforeveryone
 dragonchain
 dulwich
+egglog-python
 flake8
 flake8-pyi
 freqtrade
