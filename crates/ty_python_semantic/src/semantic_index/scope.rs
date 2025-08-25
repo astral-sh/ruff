@@ -263,6 +263,10 @@ impl ScopeKind {
         matches!(self, ScopeKind::TypeParams | ScopeKind::TypeAlias)
     }
 
+    pub(crate) const fn is_type_alias(self) -> bool {
+        matches!(self, ScopeKind::TypeAlias)
+    }
+
     pub(crate) const fn is_non_lambda_function(self) -> bool {
         matches!(self, ScopeKind::Function)
     }

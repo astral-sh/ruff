@@ -6779,12 +6779,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             bindings,
                             SnapshotCompleteness::Complete,
                         ) => {
-                            if place_expr.is_symbol()
-                                && !enclosing_scope_id.is_function_like(db)
-                                && !is_immediately_enclosing_scope
-                            {
-                                continue;
-                            }
                             let place = place_from_bindings(db, bindings).map_type(|ty| {
                                 self.narrow_place_with_applicable_constraints(
                                     place_expr,
@@ -6802,12 +6796,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             _,
                             SnapshotCompleteness::Incomplete(_, snapshot),
                         ) => {
-                            if place_expr.is_symbol()
-                                && !enclosing_scope_id.is_function_like(db)
-                                && !is_immediately_enclosing_scope
-                            {
-                                continue;
-                            }
                             considered_definitions =
                                 ConsideredDefinitions::AllReachable(Some(snapshot));
                         }

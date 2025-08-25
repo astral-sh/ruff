@@ -504,7 +504,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         if popped_scope.is_eager() {
             self.record_eager_snapshots(popped_scope_id);
-        } else {
+        } else if !popped_scope.kind().is_type_alias() {
+            // Don't record lazy snapshots in a type alias scope, as it is a deferred evaluation context.
             self.record_lazy_snapshots(popped_scope_id);
         }
 
