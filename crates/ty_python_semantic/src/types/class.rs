@@ -5108,7 +5108,13 @@ mod tests {
 
     #[test]
     fn known_class_roundtrip_from_str() {
-        let db = setup_db();
+        let mut db = setup_db();
+        Program::get(&db)
+            .set_python_version_with_source(&mut db)
+            .to(PythonVersionWithSource {
+                version: PythonVersion::latest_preview(),
+                source: PythonVersionSource::default(),
+            });
         for class in KnownClass::iter() {
             let class_name = class.name(&db);
             let class_module = resolve_module(&db, &class.canonical_module(&db).name()).unwrap();
@@ -5137,6 +5143,14 @@ mod tests {
             });
 
         for class in KnownClass::iter() {
+            // Until the latest supported version is bumped to Python 3.14
+            // we need to skip template strings here.
+            // The assertion below should remind the developer to
+            // remove this exception once we _do_ bump `latest_ty`
+            assert_ne!(PythonVersion::latest_ty(), PythonVersion::PY314);
+            if matches!(class, KnownClass::Template) {
+                continue;
+            }
             assert_ne!(
                 class.to_instance(&db),
                 Type::unknown(),
@@ -5156,6 +5170,7 @@ mod tests {
         let mut classes: Vec<(KnownClass, PythonVersion)> = KnownClass::iter()
             .map(|class| {
                 let version_added = match class {
+                    KnownClass::Template => PythonVersion::PY314,
                     KnownClass::UnionType => PythonVersion::PY310,
                     KnownClass::BaseExceptionGroup | KnownClass::ExceptionGroup => {
                         PythonVersion::PY311
