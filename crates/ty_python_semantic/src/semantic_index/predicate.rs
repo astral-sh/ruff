@@ -28,7 +28,10 @@ impl ScopedPredicateId {
     /// A special ID that is used for an "always false" predicate.
     pub(crate) const ALWAYS_FALSE: ScopedPredicateId = ScopedPredicateId(0xffff_fffe);
 
-    const SMALLEST_TERMINAL: ScopedPredicateId = Self::ALWAYS_FALSE;
+    /// A special ID that is used for an "ambiguous" predicate.
+    pub(crate) const AMBIGUOUS: ScopedPredicateId = ScopedPredicateId(0xffff_fffd);
+
+    const SMALLEST_TERMINAL: ScopedPredicateId = Self::AMBIGUOUS;
 
     fn is_terminal(self) -> bool {
         self >= Self::SMALLEST_TERMINAL
@@ -86,6 +89,7 @@ pub(crate) struct Predicate<'db> {
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) enum PredicateOrLiteral<'db> {
     Literal(bool),
+    Ambiguous,
     Predicate(Predicate<'db>),
 }
 
@@ -93,6 +97,7 @@ impl PredicateOrLiteral<'_> {
     pub(crate) fn negated(self) -> Self {
         match self {
             PredicateOrLiteral::Literal(value) => PredicateOrLiteral::Literal(!value),
+            PredicateOrLiteral::Ambiguous => PredicateOrLiteral::Ambiguous,
             PredicateOrLiteral::Predicate(Predicate { node, is_positive }) => {
                 PredicateOrLiteral::Predicate(Predicate {
                     node,

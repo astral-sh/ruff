@@ -981,14 +981,16 @@ impl<'db> UseDefMapBuilder<'db> {
             PredicateOrLiteral::Predicate(predicate) => self.predicates.add_predicate(predicate),
             PredicateOrLiteral::Literal(true) => ScopedPredicateId::ALWAYS_TRUE,
             PredicateOrLiteral::Literal(false) => ScopedPredicateId::ALWAYS_FALSE,
+            PredicateOrLiteral::Ambiguous => ScopedPredicateId::AMBIGUOUS,
         }
     }
 
     pub(super) fn record_narrowing_constraint(&mut self, predicate: ScopedPredicateId) {
         if predicate == ScopedPredicateId::ALWAYS_TRUE
             || predicate == ScopedPredicateId::ALWAYS_FALSE
+            || predicate == ScopedPredicateId::AMBIGUOUS
         {
-            // No need to record a narrowing constraint for `True` or `False`.
+            // No need to record a narrowing constraint
             return;
         }
 
