@@ -721,9 +721,9 @@
             }
           ]
         },
-        "missing-typed-dict-required-field": {
-          "title": "detects missing required fields in `TypedDict` constructors",
-          "description": "## What it does\nDetects missing required fields in `TypedDict` constructor calls.\n\n## Why is this bad?\n`TypedDict` requires all non-optional fields to be provided during construction.\nMissing required fields can lead to `KeyError` at runtime when accessing the field.",
+        "missing-typed-dict-key": {
+          "title": "detects missing required keys in `TypedDict` constructors",
+          "description": "## What it does\nDetects missing required keys in `TypedDict` constructor calls.\n\n## Why is this bad?\n`TypedDict` requires all non-optional keys to be provided during construction.\nMissing items can lead to a `KeyError` at runtime.\n\n## Example\n```python\nfrom typing import TypedDict\n\nclass Person(TypedDict):\n    name: str\n    age: int\n\nalice: Person = {\"name\": \"Alice\"}  # missing required key 'age'\n\nalice[\"age\"]  # KeyError\n```",
           "default": "error",
           "oneOf": [
             {

@@ -96,7 +96,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_ATTRIBUTE_ACCESS);
     registry.register_lint(&REDUNDANT_CAST);
     registry.register_lint(&UNRESOLVED_GLOBAL);
-    registry.register_lint(&MISSING_TYPED_DICT_REQUIRED_FIELD);
+    registry.register_lint(&MISSING_TYPED_DICT_KEY);
 
     // String annotations
     registry.register_lint(&BYTE_STRING_TYPE_ANNOTATION);
@@ -1761,13 +1761,26 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Detects missing required fields in `TypedDict` constructor calls.
+    /// Detects missing required keys in `TypedDict` constructor calls.
     ///
     /// ## Why is this bad?
-    /// `TypedDict` requires all non-optional fields to be provided during construction.
-    /// Missing required fields can lead to `KeyError` at runtime when accessing the field.
-    pub(crate) static MISSING_TYPED_DICT_REQUIRED_FIELD = {
-        summary: "detects missing required fields in `TypedDict` constructors",
+    /// `TypedDict` requires all non-optional keys to be provided during construction.
+    /// Missing items can lead to a `KeyError` at runtime.
+    ///
+    /// ## Example
+    /// ```python
+    /// from typing import TypedDict
+    ///
+    /// class Person(TypedDict):
+    ///     name: str
+    ///     age: int
+    ///
+    /// alice: Person = {"name": "Alice"}  # missing required key 'age'
+    ///
+    /// alice["age"]  # KeyError
+    /// ```
+    pub(crate) static MISSING_TYPED_DICT_KEY = {
+        summary: "detects missing required keys in `TypedDict` constructors",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
@@ -2875,18 +2888,17 @@ pub(super) fn report_namedtuple_field_without_default_after_field_with_default<'
     }
 }
 
-pub(crate) fn report_missing_typed_dict_required_field<'db>(
+pub(crate) fn report_missing_typed_dict_key<'db>(
     context: &InferContext<'db, '_>,
     constructor_node: AnyNodeRef,
     typed_dict_ty: Type<'db>,
     missing_field: &str,
 ) {
     let db = context.db();
-    if let Some(builder) = context.report_lint(&MISSING_TYPED_DICT_REQUIRED_FIELD, constructor_node)
-    {
+    if let Some(builder) = context.report_lint(&MISSING_TYPED_DICT_KEY, constructor_node) {
         let typed_dict_name = typed_dict_ty.display(db);
         builder.into_diagnostic(format_args!(
-            "Missing required field '{missing_field}' in TypedDict `{typed_dict_name}` constructor",
+            "Missing required key '{missing_field}' in TypedDict `{typed_dict_name}` constructor",
         ));
     }
 }

@@ -6,7 +6,7 @@ use super::class::{ClassType, CodeGeneratorKind, Field};
 use super::context::InferContext;
 use super::diagnostic::{
     INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, report_invalid_key_on_typed_dict,
-    report_missing_typed_dict_required_field,
+    report_missing_typed_dict_key,
 };
 use super::{ApplyTypeMappingVisitor, Type, TypeMapping, visitor};
 use crate::{Db, FxOrderMap};
@@ -19,7 +19,7 @@ bitflags! {
     /// (see https://typing.python.org/en/latest/spec/typeddict.html)
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     pub struct TypedDictParams: u8 {
-        /// Whether fields are required by default (`total=True`)
+        /// Whether keys are required by default (`total=True`)
         const TOTAL = 1 << 0;
         // https://peps.python.org/pep-0728/
         // const EXTRA_ITEMS = 1 << 1;
@@ -191,28 +191,28 @@ pub(super) fn validate_typed_dict_key_assignment<'db, 'ast>(
     false
 }
 
-/// Validates that all required fields are provided in a `TypedDict` construction.
-/// Reports missing required field errors for any fields that are required but not provided.
-pub(super) fn validate_typed_dict_required_fields<'db, 'ast>(
+/// Validates that all required keys are provided in a `TypedDict` construction.
+/// Reports errors for any keys that are required but not provided.
+pub(super) fn validate_typed_dict_required_keys<'db, 'ast>(
     context: &InferContext<'db, 'ast>,
     typed_dict: TypedDictType<'db>,
-    provided_fields: &OrderSet<&str>,
+    provided_keys: &OrderSet<&str>,
     error_node: AnyNodeRef<'ast>,
 ) {
     let db = context.db();
     let items = typed_dict.items(db);
 
-    let required_fields: OrderSet<&str> = items
+    let required_keys: OrderSet<&str> = items
         .iter()
-        .filter_map(|(field_name, field)| field.is_required().then_some(field_name.as_str()))
+        .filter_map(|(key_name, field)| field.is_required().then_some(key_name.as_str()))
         .collect();
 
-    for missing_field in required_fields.difference(provided_fields) {
-        report_missing_typed_dict_required_field(
+    for missing_key in required_keys.difference(provided_keys) {
+        report_missing_typed_dict_key(
             context,
             error_node,
             Type::TypedDict(typed_dict),
-            missing_field,
+            missing_key,
         );
     }
 }
@@ -226,7 +226,7 @@ pub(super) fn validate_typed_dict_constructor<'db, 'ast>(
 ) {
     let has_positional_dict = arguments.args.len() == 1 && arguments.args[0].is_dict_expr();
 
-    let provided_fields = if has_positional_dict {
+    let provided_keys = if has_positional_dict {
         validate_from_dict_literal(
             context,
             typed_dict,
@@ -244,7 +244,7 @@ pub(super) fn validate_typed_dict_constructor<'db, 'ast>(
         )
     };
 
-    validate_typed_dict_required_fields(context, typed_dict, &provided_fields, error_node);
+    validate_typed_dict_required_keys(context, typed_dict, &provided_keys, error_node);
 }
 
 /// Validates a `TypedDict` constructor call with a single positional dictionary argument
@@ -256,7 +256,7 @@ fn validate_from_dict_literal<'db, 'ast>(
     error_node: AnyNodeRef<'ast>,
     expression_type_fn: &impl Fn(&ast::Expr) -> Type<'db>,
 ) -> OrderSet<&'ast str> {
-    let mut provided_fields = OrderSet::new();
+    let mut provided_keys = OrderSet::new();
 
     if let ast::Expr::Dict(dict_expr) = &arguments.args[0] {
         // Validate dict entries
@@ -267,7 +267,7 @@ fn validate_from_dict_literal<'db, 'ast>(
                 }) = key_expr
                 {
                     let key_str = key_value.to_str();
-                    provided_fields.insert(key_str);
+                    provided_keys.insert(key_str);
 
                     // Get the already-inferred argument type
                     let value_type = expression_type_fn(&dict_item.value);
@@ -286,7 +286,7 @@ fn validate_from_dict_literal<'db, 'ast>(
         }
     }
 
-    provided_fields
+    provided_keys
 }
 
 /// Validates a `TypedDict` constructor call with keywords
@@ -298,13 +298,13 @@ fn validate_from_keywords<'db, 'ast>(
     error_node: AnyNodeRef<'ast>,
     expression_type_fn: &impl Fn(&ast::Expr) -> Type<'db>,
 ) -> OrderSet<&'ast str> {
-    let provided_fields: OrderSet<&str> = arguments
+    let provided_keys: OrderSet<&str> = arguments
         .keywords
         .iter()
         .filter_map(|kw| kw.arg.as_ref().map(|arg| arg.id.as_str()))
         .collect();
 
-    // Validate that each field is assigned a type that is compatible with the field's type
+    // Validate that each key is assigned a type that is compatible with the keys's value type
     for keyword in &arguments.keywords {
         if let Some(arg_name) = &keyword.arg {
             // Get the already-inferred argument type
@@ -322,7 +322,7 @@ fn validate_from_keywords<'db, 'ast>(
         }
     }
 
-    provided_fields
+    provided_keys
 }
 
 /// Validates a `TypedDict` dictionary literal assignment
@@ -334,14 +334,14 @@ pub(super) fn validate_typed_dict_dict_literal<'db, 'ast>(
     error_node: AnyNodeRef<'ast>,
     expression_type_fn: impl Fn(&ast::Expr) -> Type<'db>,
 ) -> OrderSet<&'ast str> {
-    let mut provided_fields = OrderSet::new();
+    let mut provided_keys = OrderSet::new();
 
     // Validate each key-value pair in the dictionary literal
     for item in &dict_expr.items {
         if let Some(key_expr) = &item.key {
             if let ast::Expr::StringLiteral(key_literal) = key_expr {
                 let key_str = key_literal.value.to_str();
-                provided_fields.insert(key_str);
+                provided_keys.insert(key_str);
 
                 let value_type = expression_type_fn(&item.value);
                 validate_typed_dict_key_assignment(
@@ -358,8 +358,7 @@ pub(super) fn validate_typed_dict_dict_literal<'db, 'ast>(
         }
     }
 
-    // Validate that all required fields are provided
-    validate_typed_dict_required_fields(context, typed_dict, &provided_fields, error_node);
+    validate_typed_dict_required_keys(context, typed_dict, &provided_keys, error_node);
 
-    provided_fields
+    provided_keys
 }

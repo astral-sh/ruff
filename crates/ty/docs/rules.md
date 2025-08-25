@@ -1257,22 +1257,36 @@ def func(x: int): ...
 func()  # TypeError: func() missing 1 required positional argument: 'x'
 ```
 
-## `missing-typed-dict-required-field`
+## `missing-typed-dict-key`
 
 <small>
 Default level: [`error`](../rules.md#rule-levels "This lint has a default level of 'error'.") ·
-[Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20missing-typed-dict-required-field) ·
+[Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20missing-typed-dict-key) ·
 [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1762)
 </small>
 
 **What it does**
 
-Detects missing required fields in `TypedDict` constructor calls.
+Detects missing required keys in `TypedDict` constructor calls.
 
 **Why is this bad?**
 
-`TypedDict` requires all non-optional fields to be provided during construction.
-Missing required fields can lead to `KeyError` at runtime when accessing the field.
+`TypedDict` requires all non-optional keys to be provided during construction.
+Missing items can lead to a `KeyError` at runtime.
+
+**Example**
+
+```python
+from typing import TypedDict
+
+class Person(TypedDict):
+    name: str
+    age: int
+
+alice: Person = {"name": "Alice"}  # missing required key 'age'
+
+alice["age"]  # KeyError
+```
 
 ## `no-matching-overload`
 

@@ -55,9 +55,9 @@ eve1a: Person = {"name": b"Eve", "age": None}
 # error: [invalid-argument-type] "Invalid argument to key "name" with declared type `str` on TypedDict `Person`"
 eve1b = Person(name=b"Eve", age=None)
 
-# error: [missing-typed-dict-required-field] "Missing required field 'name' in TypedDict `Person` constructor"
+# error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
 eve2a: Person = {"age": 22}
-# error: [missing-typed-dict-required-field] "Missing required field 'name' in TypedDict `Person` constructor"
+# error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
 eve2b = Person(age=22)
 
 # error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "extra""
@@ -118,11 +118,11 @@ house.owner = {"name": "Alice", "age": 30}
 All of these are missing the required `age` field:
 
 ```py
-# error: [missing-typed-dict-required-field] "Missing required field 'age' in TypedDict `Person` constructor"
+# error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `Person` constructor"
 alice2: Person = {"name": "Alice"}
-# error: [missing-typed-dict-required-field] "Missing required field 'age' in TypedDict `Person` constructor"
+# error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `Person` constructor"
 Person(name="Alice")
-# error: [missing-typed-dict-required-field] "Missing required field 'age' in TypedDict `Person` constructor"
+# error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `Person` constructor"
 Person({"name": "Alice"})
 
 # TODO: this should be an error, similar to the above
@@ -194,7 +194,7 @@ class User(TypedDict):
 # Valid usage - all required fields provided
 user1 = User({"name": "Alice", "age": 30})
 
-# error: [missing-typed-dict-required-field] "Missing required field 'age' in TypedDict `User` constructor"
+# error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `User` constructor"
 user2 = User({"name": "Bob"})
 
 # error: [invalid-argument-type] "Invalid argument to key "name" with declared type `str` on TypedDict `User`: value of type `None`"
@@ -279,11 +279,11 @@ reveal_type(user1["bio"])  # revealed: str
 Constructor validation respects `Required`/`NotRequired` overrides:
 
 ```py
-# error: [missing-typed-dict-required-field] "Missing required field 'id' in TypedDict `Message` constructor"
+# error: [missing-typed-dict-key] "Missing required key 'id' in TypedDict `Message` constructor"
 invalid_msg = Message(content="Hello")  # Missing required id
 
-# error: [missing-typed-dict-required-field] "Missing required field 'name' in TypedDict `User` constructor"
-# error: [missing-typed-dict-required-field] "Missing required field 'email' in TypedDict `User` constructor"
+# error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `User` constructor"
+# error: [missing-typed-dict-key] "Missing required key 'email' in TypedDict `User` constructor"
 invalid_user = User(bio="No name provided")  # Missing required name and email
 ```
 
@@ -549,7 +549,7 @@ class Employee(Person):
 
 alice: Employee = {"name": "Alice", "employee_id": 1}
 
-# error: [missing-typed-dict-required-field] "Missing required field 'employee_id' in TypedDict `Employee` constructor"
+# error: [missing-typed-dict-key] "Missing required key 'employee_id' in TypedDict `Employee` constructor"
 eve: Employee = {"name": "Eve"}
 ```
 
@@ -574,10 +574,10 @@ person2 = PersonOptional(id=1, name="Alice", age=25)  # Valid - age optional
 person3 = PersonOptional(id=1, name="Alice", email="alice@test.com")  # Valid
 
 # These should be errors - missing required inherited fields
-# error: [missing-typed-dict-required-field] "Missing required field 'id' in TypedDict `PersonOptional` constructor"
+# error: [missing-typed-dict-key] "Missing required key 'id' in TypedDict `PersonOptional` constructor"
 person_invalid1 = PersonOptional(name="Bob")
 
-# error: [missing-typed-dict-required-field] "Missing required field 'name' in TypedDict `PersonOptional` constructor"
+# error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `PersonOptional` constructor"
 person_invalid2 = PersonOptional(id=2)
 
 # Case 2: total=False parent, total=True child
@@ -593,7 +593,7 @@ person4 = PersonRequired(age=30)  # Valid - only age required, id/name optional
 person5 = PersonRequired(id=1, name="Charlie", age=35)  # Valid - all provided
 
 # This should be an error - missing required new field
-# error: [missing-typed-dict-required-field] "Missing required field 'age' in TypedDict `PersonRequired` constructor"
+# error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `PersonRequired` constructor"
 person_invalid3 = PersonRequired(id=3, name="David")
 ```
 
@@ -614,11 +614,11 @@ class Employee(PersonMixed):  # total=True by default
 emp1 = Employee(id=1, department="Engineering")  # Valid
 emp2 = Employee(id=2, name="Eve", department="Sales")  # Valid
 
-# Errors for missing required fields
-# error: [missing-typed-dict-required-field] "Missing required field 'id' in TypedDict `Employee` constructor"
+# Errors for missing required keys
+# error: [missing-typed-dict-key] "Missing required key 'id' in TypedDict `Employee` constructor"
 emp_invalid1 = Employee(department="HR")
 
-# error: [missing-typed-dict-required-field] "Missing required field 'department' in TypedDict `Employee` constructor"
+# error: [missing-typed-dict-key] "Missing required key 'department' in TypedDict `Employee` constructor"
 emp_invalid2 = Employee(id=3)
 ```
 
@@ -768,7 +768,7 @@ class UserWithAlias(TD, total=False):
 user_empty = UserWithAlias(name="Alice")  # name is required
 user_partial = UserWithAlias(name="Alice", age=30)
 
-# error: [missing-typed-dict-required-field] "Missing required field 'name' in TypedDict `UserWithAlias` constructor"
+# error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `UserWithAlias` constructor"
 user_invalid = UserWithAlias(age=30)
 
 reveal_type(user_empty["name"])  # revealed: str
@@ -796,7 +796,7 @@ class ActualTypedDict(TD, total=True):
 not_td = NotActualTypedDict()
 reveal_type(not_td)  # revealed: NotActualTypedDict
 
-# error: [missing-typed-dict-required-field] "Missing required field 'name' in TypedDict `ActualTypedDict` constructor"
+# error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `ActualTypedDict` constructor"
 actual_td = ActualTypedDict()
 actual_td = ActualTypedDict(name="Alice")
 reveal_type(actual_td)  # revealed: ActualTypedDict
