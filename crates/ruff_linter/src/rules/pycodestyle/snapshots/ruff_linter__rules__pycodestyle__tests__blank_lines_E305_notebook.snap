@@ -11,12 +11,10 @@ E305 [*] Expected 2 blank lines after class or function definition, found (1)
 57 | # E306:3:5
    |
 help: Add missing blank line(s)
-
-ℹ Safe fix
-52 52 |     # comment
-53 53 | 
-54 54 |     # another comment
-   55 |+
-55 56 | fn()
-56 57 | # end
-57 58 | # E306:3:5
+52 |     # comment
+53 | 
+54 |     # another comment
+55 + 
+56 | fn()
+57 | # end
+58 | # E306:3:5

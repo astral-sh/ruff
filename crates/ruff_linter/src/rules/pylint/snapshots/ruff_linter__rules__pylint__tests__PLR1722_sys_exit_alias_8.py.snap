@@ -9,10 +9,9 @@ PLR1722 [*] Use `sys.exit()` instead of `exit`
   |     ^^^^
   |
 help: Replace `exit` with `sys.exit()`
-
-ℹ Unsafe fix
-1   |-from sys import argv
-  1 |+from sys import argv, exit
-2 2 | 
-3 3 | 
-4 4 | def main():
+  - from sys import argv
+1 + from sys import argv, exit
+2 | 
+3 | 
+4 | def main():
+note: This is an unsafe fix and may remove comments or change runtime behavior

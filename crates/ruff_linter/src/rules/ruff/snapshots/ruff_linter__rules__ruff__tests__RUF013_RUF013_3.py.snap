@@ -9,16 +9,15 @@ RUF013 [*] PEP 484 prohibits implicit `Optional`
 5 |     pass
   |
 help: Convert to `T | None`
-
-ℹ Unsafe fix
-1 1 | import typing
-2 2 | 
-3 3 | 
-4   |-def f(arg: typing.List[str] = None):  # RUF013
-  4 |+def f(arg: typing.List[str] | None = None):  # RUF013
-5 5 |     pass
-6 6 | 
-7 7 | 
+1 | import typing
+2 | 
+3 | 
+  - def f(arg: typing.List[str] = None):  # RUF013
+4 + def f(arg: typing.List[str] | None = None):  # RUF013
+5 |     pass
+6 | 
+7 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 RUF013 [*] PEP 484 prohibits implicit `Optional`
   --> RUF013_3.py:22:12
@@ -28,16 +27,15 @@ RUF013 [*] PEP 484 prohibits implicit `Optional`
 23 |     pass
    |
 help: Convert to `T | None`
-
-ℹ Unsafe fix
-19 19 |     pass
-20 20 | 
-21 21 | 
-22    |-def f(arg: typing.Union[int, str] = None):  # RUF013
-   22 |+def f(arg: typing.Union[int, str] | None = None):  # RUF013
-23 23 |     pass
-24 24 | 
-25 25 | 
+19 |     pass
+20 | 
+21 | 
+   - def f(arg: typing.Union[int, str] = None):  # RUF013
+22 + def f(arg: typing.Union[int, str] | None = None):  # RUF013
+23 |     pass
+24 | 
+25 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 RUF013 [*] PEP 484 prohibits implicit `Optional`
   --> RUF013_3.py:29:12
@@ -47,11 +45,10 @@ RUF013 [*] PEP 484 prohibits implicit `Optional`
 30 |     pass
    |
 help: Convert to `T | None`
-
-ℹ Unsafe fix
-26 26 | # Literal
-27 27 | 
-28 28 | 
-29    |-def f(arg: typing.Literal[1, "foo", True] = None):  # RUF013
-   29 |+def f(arg: typing.Literal[1, "foo", True] | None = None):  # RUF013
-30 30 |     pass
+26 | # Literal
+27 | 
+28 | 
+   - def f(arg: typing.Literal[1, "foo", True] = None):  # RUF013
+29 + def f(arg: typing.Literal[1, "foo", True] | None = None):  # RUF013
+30 |     pass
+note: This is an unsafe fix and may remove comments or change runtime behavior

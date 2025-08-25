@@ -10,13 +10,12 @@ C417 [*] Unnecessary `map()` usage (rewrite using a generator expression)
   |          ^^^^^^^^^^^^^^^^^^^^
   |
 help: Replace `map()` with a generator expression
-
-ℹ Unsafe fix
-4 4 | 
-5 5 | def overshadowed_list():
-6 6 |     list = ...
-7   |-    list(map(lambda x: x, []))
-  7 |+    list((x for x in []))
-8 8 | 
-9 9 | 
-10 10 | ### No errors
+4  | 
+5  | def overshadowed_list():
+6  |     list = ...
+   -     list(map(lambda x: x, []))
+7  +     list((x for x in []))
+8  | 
+9  | 
+10 | ### No errors
+note: This is an unsafe fix and may remove comments or change runtime behavior

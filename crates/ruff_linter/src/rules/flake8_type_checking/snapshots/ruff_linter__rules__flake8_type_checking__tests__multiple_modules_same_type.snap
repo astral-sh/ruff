@@ -12,18 +12,17 @@ TC003 [*] Move standard library import `os` into a type-checking block
 8 | def f(x: os, y: sys):
   |
 help: Move into type-checking block
-
-ℹ Unsafe fix
-3  3  | 
-4  4  | from typing import TYPE_CHECKING
-5  5  | 
-6     |-import os, sys
-7  6  | 
-   7  |+if TYPE_CHECKING:
-   8  |+    import os, sys
-   9  |+
-8  10 | def f(x: os, y: sys):
-9  11 |     pass
+3  | 
+4  | from typing import TYPE_CHECKING
+5  | 
+   - import os, sys
+6  | 
+7  + if TYPE_CHECKING:
+8  +     import os, sys
+9  + 
+10 | def f(x: os, y: sys):
+11 |     pass
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 TC003 [*] Move standard library import `sys` into a type-checking block
  --> <filename>:6:12
@@ -36,15 +35,14 @@ TC003 [*] Move standard library import `sys` into a type-checking block
 8 | def f(x: os, y: sys):
   |
 help: Move into type-checking block
-
-ℹ Unsafe fix
-3  3  | 
-4  4  | from typing import TYPE_CHECKING
-5  5  | 
-6     |-import os, sys
-7  6  | 
-   7  |+if TYPE_CHECKING:
-   8  |+    import os, sys
-   9  |+
-8  10 | def f(x: os, y: sys):
-9  11 |     pass
+3  | 
+4  | from typing import TYPE_CHECKING
+5  | 
+   - import os, sys
+6  | 
+7  + if TYPE_CHECKING:
+8  +     import os, sys
+9  + 
+10 | def f(x: os, y: sys):
+11 |     pass
+note: This is an unsafe fix and may remove comments or change runtime behavior

@@ -11,11 +11,10 @@ C411 [*] Unnecessary `list()` call (remove the outer call to `list()`)
 4 | # Skip when too many positional arguments
   |
 help: Remove outer `list()` call
-
-ℹ Unsafe fix
-1 1 | x = [1, 2, 3]
-2   |-list([i for i in x])
-  2 |+[i for i in x]
-3 3 | 
-4 4 | # Skip when too many positional arguments
-5 5 | # or keyword argument present.
+1 | x = [1, 2, 3]
+  - list([i for i in x])
+2 + [i for i in x]
+3 | 
+4 | # Skip when too many positional arguments
+5 | # or keyword argument present.
+note: This is an unsafe fix and may remove comments or change runtime behavior

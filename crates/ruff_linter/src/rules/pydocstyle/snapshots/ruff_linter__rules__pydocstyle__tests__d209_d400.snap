@@ -10,13 +10,11 @@ D209 [*] Multi-line docstring closing quotes should be on a separate line
   | |________________________________________________________________________^
   |
 help: Move closing quotes to new line
-
-ℹ Safe fix
-1 1 | def lorem():
-2 2 |     """lorem ipsum dolor sit amet consectetur adipiscing elit
-3   |-    sed do eiusmod tempor incididunt ut labore et dolore magna aliqua"""
-  3 |+    sed do eiusmod tempor incididunt ut labore et dolore magna aliqua
-  4 |+    """
+1 | def lorem():
+2 |     """lorem ipsum dolor sit amet consectetur adipiscing elit
+  -     sed do eiusmod tempor incididunt ut labore et dolore magna aliqua"""
+3 +     sed do eiusmod tempor incididunt ut labore et dolore magna aliqua
+4 +     """
 
 D400 [*] First line should end with a period
  --> D209_D400.py:2:5
@@ -27,9 +25,8 @@ D400 [*] First line should end with a period
   | |________________________________________________________________________^
   |
 help: Add period
-
-ℹ Unsafe fix
-1 1 | def lorem():
-2 2 |     """lorem ipsum dolor sit amet consectetur adipiscing elit
-3   |-    sed do eiusmod tempor incididunt ut labore et dolore magna aliqua"""
-  3 |+    sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."""
+1 | def lorem():
+2 |     """lorem ipsum dolor sit amet consectetur adipiscing elit
+  -     sed do eiusmod tempor incididunt ut labore et dolore magna aliqua"""
+3 +     sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."""
+note: This is an unsafe fix and may remove comments or change runtime behavior

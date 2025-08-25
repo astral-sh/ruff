@@ -10,13 +10,12 @@ C419 [*] Unnecessary list comprehension
 3 | max([x.val for x in bar])
   |
 help: Remove unnecessary comprehension
-
-ℹ Unsafe fix
-1   |-sum([x.val for x in bar])
-  1 |+sum(x.val for x in bar)
-2 2 | min([x.val for x in bar])
-3 3 | max([x.val for x in bar])
-4 4 | sum([x.val for x in bar], 0)
+  - sum([x.val for x in bar])
+1 + sum(x.val for x in bar)
+2 | min([x.val for x in bar])
+3 | max([x.val for x in bar])
+4 | sum([x.val for x in bar], 0)
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 C419 [*] Unnecessary list comprehension
  --> C419_1.py:2:5
@@ -28,14 +27,13 @@ C419 [*] Unnecessary list comprehension
 4 | sum([x.val for x in bar], 0)
   |
 help: Remove unnecessary comprehension
-
-ℹ Unsafe fix
-1 1 | sum([x.val for x in bar])
-2   |-min([x.val for x in bar])
-  2 |+min(x.val for x in bar)
-3 3 | max([x.val for x in bar])
-4 4 | sum([x.val for x in bar], 0)
-5 5 | 
+1 | sum([x.val for x in bar])
+  - min([x.val for x in bar])
+2 + min(x.val for x in bar)
+3 | max([x.val for x in bar])
+4 | sum([x.val for x in bar], 0)
+5 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 C419 [*] Unnecessary list comprehension
  --> C419_1.py:3:5
@@ -47,15 +45,14 @@ C419 [*] Unnecessary list comprehension
 4 | sum([x.val for x in bar], 0)
   |
 help: Remove unnecessary comprehension
-
-ℹ Unsafe fix
-1 1 | sum([x.val for x in bar])
-2 2 | min([x.val for x in bar])
-3   |-max([x.val for x in bar])
-  3 |+max(x.val for x in bar)
-4 4 | sum([x.val for x in bar], 0)
-5 5 | 
-6 6 | # OK
+1 | sum([x.val for x in bar])
+2 | min([x.val for x in bar])
+  - max([x.val for x in bar])
+3 + max(x.val for x in bar)
+4 | sum([x.val for x in bar], 0)
+5 | 
+6 | # OK
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 C419 [*] Unnecessary list comprehension
  --> C419_1.py:4:5
@@ -68,16 +65,15 @@ C419 [*] Unnecessary list comprehension
 6 | # OK
   |
 help: Remove unnecessary comprehension
-
-ℹ Unsafe fix
-1 1 | sum([x.val for x in bar])
-2 2 | min([x.val for x in bar])
-3 3 | max([x.val for x in bar])
-4   |-sum([x.val for x in bar], 0)
-  4 |+sum((x.val for x in bar), 0)
-5 5 | 
-6 6 | # OK
-7 7 | sum(x.val for x in bar)
+1 | sum([x.val for x in bar])
+2 | min([x.val for x in bar])
+3 | max([x.val for x in bar])
+  - sum([x.val for x in bar], 0)
+4 + sum((x.val for x in bar), 0)
+5 | 
+6 | # OK
+7 | sum(x.val for x in bar)
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 C419 [*] Unnecessary list comprehension
   --> C419_1.py:14:5
@@ -94,17 +90,16 @@ C419 [*] Unnecessary list comprehension
 20 |   )
    |
 help: Remove unnecessary comprehension
-
-ℹ Unsafe fix
-11 11 | 
-12 12 | # Multi-line
-13 13 | sum(
-14    |-    [
-   14 |+    (
-15 15 |         delta
-16 16 |         for delta in timedelta_list
-17 17 |         if delta
-18    |-    ],
-   18 |+    ),
-19 19 |     dt.timedelta(),
-20 20 | )
+11 | 
+12 | # Multi-line
+13 | sum(
+   -     [
+14 +     (
+15 |         delta
+16 |         for delta in timedelta_list
+17 |         if delta
+   -     ],
+18 +     ),
+19 |     dt.timedelta(),
+20 | )
+note: This is an unsafe fix and may remove comments or change runtime behavior

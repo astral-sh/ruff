@@ -10,21 +10,20 @@ TC003 [*] Move standard library import `collections.Counter` into a type-checkin
 3 | from elsewhere import third_party
   |
 help: Move into type-checking block
-
-ℹ Unsafe fix
-1     |-from collections import Counter
-   1  |+from __future__ import annotations
-2  2  | 
-3  3  | from elsewhere import third_party
-4  4  | 
-5  5  | from . import first_party
-   6  |+from typing import TYPE_CHECKING
-   7  |+
-   8  |+if TYPE_CHECKING:
-   9  |+    from collections import Counter
-6  10 | 
-7  11 | 
-8  12 | def f(x: first_party.foo): ...
+   - from collections import Counter
+1  + from __future__ import annotations
+2  | 
+3  | from elsewhere import third_party
+4  | 
+5  | from . import first_party
+6  + from typing import TYPE_CHECKING
+7  + 
+8  + if TYPE_CHECKING:
+9  +     from collections import Counter
+10 | 
+11 | 
+12 | def f(x: first_party.foo): ...
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 TC002 [*] Move third-party import `elsewhere.third_party` into a type-checking block
  --> TC001-3_future.py:3:23
@@ -37,21 +36,20 @@ TC002 [*] Move third-party import `elsewhere.third_party` into a type-checking b
 5 | from . import first_party
   |
 help: Move into type-checking block
-
-ℹ Unsafe fix
-   1  |+from __future__ import annotations
-1  2  | from collections import Counter
-2  3  | 
-3     |-from elsewhere import third_party
-4  4  | 
-5  5  | from . import first_party
-   6  |+from typing import TYPE_CHECKING
-   7  |+
-   8  |+if TYPE_CHECKING:
-   9  |+    from elsewhere import third_party
-6  10 | 
-7  11 | 
-8  12 | def f(x: first_party.foo): ...
+1  + from __future__ import annotations
+2  | from collections import Counter
+3  | 
+   - from elsewhere import third_party
+4  | 
+5  | from . import first_party
+6  + from typing import TYPE_CHECKING
+7  + 
+8  + if TYPE_CHECKING:
+9  +     from elsewhere import third_party
+10 | 
+11 | 
+12 | def f(x: first_party.foo): ...
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 TC001 [*] Move application import `.first_party` into a type-checking block
  --> TC001-3_future.py:5:15
@@ -62,18 +60,17 @@ TC001 [*] Move application import `.first_party` into a type-checking block
   |               ^^^^^^^^^^^
   |
 help: Move into type-checking block
-
-ℹ Unsafe fix
-   1  |+from __future__ import annotations
-1  2  | from collections import Counter
-2  3  | 
-3  4  | from elsewhere import third_party
-4  5  | 
-5     |-from . import first_party
-   6  |+from typing import TYPE_CHECKING
-   7  |+
-   8  |+if TYPE_CHECKING:
-   9  |+    from . import first_party
-6  10 | 
-7  11 | 
-8  12 | def f(x: first_party.foo): ...
+1  + from __future__ import annotations
+2  | from collections import Counter
+3  | 
+4  | from elsewhere import third_party
+5  | 
+   - from . import first_party
+6  + from typing import TYPE_CHECKING
+7  + 
+8  + if TYPE_CHECKING:
+9  +     from . import first_party
+10 | 
+11 | 
+12 | def f(x: first_party.foo): ...
+note: This is an unsafe fix and may remove comments or change runtime behavior

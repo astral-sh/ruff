@@ -10,13 +10,12 @@ PLR1722 [*] Use `sys.exit()` instead of `exit`
   | ^^^^
   |
 help: Replace `exit` with `sys.exit()`
-
-ℹ Unsafe fix
-  1 |+import sys
-1 2 | success = True
-2 3 | if success:
-3 4 |     code = 0
-4 5 | else:
-5 6 |     code = 1
-6   |-exit(code)
-  7 |+sys.exit(code)
+1 + import sys
+2 | success = True
+3 | if success:
+4 |     code = 0
+5 | else:
+6 |     code = 1
+  - exit(code)
+7 + sys.exit(code)
+note: This is an unsafe fix and may remove comments or change runtime behavior

@@ -11,16 +11,15 @@ LOG014 [*] `exc_info=` outside exception handlers
 13 | logger.info("", exc_info=True)
    |
 help: Remove `exc_info=`
-
-ℹ Unsafe fix
-9  9  | 
-10 10 | ### Errors
-11 11 | 
-12    |-logging.info("", exc_info=True)
-   12 |+logging.info("")
-13 13 | logger.info("", exc_info=True)
-14 14 | 
-15 15 | 
+9  | 
+10 | ### Errors
+11 | 
+   - logging.info("", exc_info=True)
+12 + logging.info("")
+13 | logger.info("", exc_info=True)
+14 | 
+15 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 LOG014 [*] `exc_info=` outside exception handlers
   --> LOG014_0.py:13:17
@@ -30,16 +29,15 @@ LOG014 [*] `exc_info=` outside exception handlers
    |                 ^^^^^^^^^^^^^
    |
 help: Remove `exc_info=`
-
-ℹ Unsafe fix
-10 10 | ### Errors
-11 11 | 
-12 12 | logging.info("", exc_info=True)
-13    |-logger.info("", exc_info=True)
-   13 |+logger.info("")
-14 14 | 
-15 15 | 
-16 16 | logging.info("", exc_info=1)
+10 | ### Errors
+11 | 
+12 | logging.info("", exc_info=True)
+   - logger.info("", exc_info=True)
+13 + logger.info("")
+14 | 
+15 | 
+16 | logging.info("", exc_info=1)
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 LOG014 [*] `exc_info=` outside exception handlers
   --> LOG014_0.py:16:18
@@ -49,16 +47,15 @@ LOG014 [*] `exc_info=` outside exception handlers
 17 | logger.info("", exc_info=1)
    |
 help: Remove `exc_info=`
-
-ℹ Unsafe fix
-13 13 | logger.info("", exc_info=True)
-14 14 | 
-15 15 | 
-16    |-logging.info("", exc_info=1)
-   16 |+logging.info("")
-17 17 | logger.info("", exc_info=1)
-18 18 | 
-19 19 | 
+13 | logger.info("", exc_info=True)
+14 | 
+15 | 
+   - logging.info("", exc_info=1)
+16 + logging.info("")
+17 | logger.info("", exc_info=1)
+18 | 
+19 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 LOG014 [*] `exc_info=` outside exception handlers
   --> LOG014_0.py:17:17
@@ -68,16 +65,15 @@ LOG014 [*] `exc_info=` outside exception handlers
    |                 ^^^^^^^^^^
    |
 help: Remove `exc_info=`
-
-ℹ Unsafe fix
-14 14 | 
-15 15 | 
-16 16 | logging.info("", exc_info=1)
-17    |-logger.info("", exc_info=1)
-   17 |+logger.info("")
-18 18 | 
-19 19 | 
-20 20 | def _():
+14 | 
+15 | 
+16 | logging.info("", exc_info=1)
+   - logger.info("", exc_info=1)
+17 + logger.info("")
+18 | 
+19 | 
+20 | def _():
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 LOG014 [*] `exc_info=` outside exception handlers
   --> LOG014_0.py:21:22
@@ -88,16 +84,15 @@ LOG014 [*] `exc_info=` outside exception handlers
 22 |     logger.info("", exc_info=True)
    |
 help: Remove `exc_info=`
-
-ℹ Unsafe fix
-18 18 | 
-19 19 | 
-20 20 | def _():
-21    |-    logging.info("", exc_info=True)
-   21 |+    logging.info("")
-22 22 |     logger.info("", exc_info=True)
-23 23 | 
-24 24 | 
+18 | 
+19 | 
+20 | def _():
+   -     logging.info("", exc_info=True)
+21 +     logging.info("")
+22 |     logger.info("", exc_info=True)
+23 | 
+24 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 LOG014 [*] `exc_info=` outside exception handlers
   --> LOG014_0.py:22:21
@@ -108,16 +103,15 @@ LOG014 [*] `exc_info=` outside exception handlers
    |                     ^^^^^^^^^^^^^
    |
 help: Remove `exc_info=`
-
-ℹ Unsafe fix
-19 19 | 
-20 20 | def _():
-21 21 |     logging.info("", exc_info=True)
-22    |-    logger.info("", exc_info=True)
-   22 |+    logger.info("")
-23 23 | 
-24 24 | 
-25 25 | try:
+19 | 
+20 | def _():
+21 |     logging.info("", exc_info=True)
+   -     logger.info("", exc_info=True)
+22 +     logger.info("")
+23 | 
+24 | 
+25 | try:
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 LOG014 [*] `exc_info=` outside exception handlers
   --> LOG014_0.py:29:26
@@ -129,16 +123,15 @@ LOG014 [*] `exc_info=` outside exception handlers
 30 |         logger.info("", exc_info=True)
    |
 help: Remove `exc_info=`
-
-ℹ Unsafe fix
-26 26 |     ...
-27 27 | except ...:
-28 28 |     def _():
-29    |-        logging.info("", exc_info=True)
-   29 |+        logging.info("")
-30 30 |         logger.info("", exc_info=True)
-31 31 | 
-32 32 | 
+26 |     ...
+27 | except ...:
+28 |     def _():
+   -         logging.info("", exc_info=True)
+29 +         logging.info("")
+30 |         logger.info("", exc_info=True)
+31 | 
+32 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 LOG014 [*] `exc_info=` outside exception handlers
   --> LOG014_0.py:30:25
@@ -149,13 +142,12 @@ LOG014 [*] `exc_info=` outside exception handlers
    |                         ^^^^^^^^^^^^^
    |
 help: Remove `exc_info=`
-
-ℹ Unsafe fix
-27 27 | except ...:
-28 28 |     def _():
-29 29 |         logging.info("", exc_info=True)
-30    |-        logger.info("", exc_info=True)
-   30 |+        logger.info("")
-31 31 | 
-32 32 | 
-33 33 | ### No errors
+27 | except ...:
+28 |     def _():
+29 |         logging.info("", exc_info=True)
+   -         logger.info("", exc_info=True)
+30 +         logger.info("")
+31 | 
+32 | 
+33 | ### No errors
+note: This is an unsafe fix and may remove comments or change runtime behavior

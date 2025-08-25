@@ -11,16 +11,14 @@ UP037 [*] Remove quotes from type annotation
 10 |     print(x)
    |
 help: Remove quotes
-
-ℹ Safe fix
-6  6  | 
-7  7  | def foo():
-8  8  |     # UP037
-9     |-    x: "Tuple[int, int]" = (0, 0)
-   9  |+    x: Tuple[int, int] = (0, 0)
-10 10 |     print(x)
-11 11 | 
-12 12 | 
+6  | 
+7  | def foo():
+8  |     # UP037
+   -     x: "Tuple[int, int]" = (0, 0)
+9  +     x: Tuple[int, int] = (0, 0)
+10 |     print(x)
+11 | 
+12 | 
 
 UP037 [*] Remove quotes from type annotation
   --> UP037_1.py:14:4
@@ -30,15 +28,14 @@ UP037 [*] Remove quotes from type annotation
    |    ^^^^^^^^^^^^^^^^^
    |
 help: Remove quotes
-
-ℹ Unsafe fix
-   1  |+from __future__ import annotations
-1  2  | from typing import TYPE_CHECKING
-2  3  | 
-3  4  | if TYPE_CHECKING:
+1  + from __future__ import annotations
+2  | from typing import TYPE_CHECKING
+3  | 
+4  | if TYPE_CHECKING:
 --------------------------------------------------------------------------------
-11 12 | 
-12 13 | 
-13 14 | # OK
-14    |-X: "Tuple[int, int]" = (0, 0)
-   15 |+X: Tuple[int, int] = (0, 0)
+12 | 
+13 | 
+14 | # OK
+   - X: "Tuple[int, int]" = (0, 0)
+15 + X: Tuple[int, int] = (0, 0)
+note: This is an unsafe fix and may remove comments or change runtime behavior

@@ -10,11 +10,10 @@ AIR302 [*] `airflow.executors.dask_executor.DaskExecutor` is moved into `daskexe
   | ^^^^^^^^^^^^
   |
 help: Install `apache-airflow-providers-daskexecutor>=1.0.0` and use `DaskExecutor` from `airflow.providers.daskexecutor.executors.dask_executor` instead.
-
-ℹ Unsafe fix
-1 1 | from __future__ import annotations
-2 2 | 
-3   |-from airflow.executors.dask_executor import DaskExecutor
-  3 |+from airflow.providers.daskexecutor.executors.dask_executor import DaskExecutor
-4 4 | 
-5 5 | DaskExecutor()
+1 | from __future__ import annotations
+2 | 
+  - from airflow.executors.dask_executor import DaskExecutor
+3 + from airflow.providers.daskexecutor.executors.dask_executor import DaskExecutor
+4 | 
+5 | DaskExecutor()
+note: This is an unsafe fix and may remove comments or change runtime behavior

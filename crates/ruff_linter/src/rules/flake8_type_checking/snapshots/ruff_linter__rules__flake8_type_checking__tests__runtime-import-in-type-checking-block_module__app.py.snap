@@ -10,18 +10,17 @@ TC004 [*] Move import `datetime` out of type-checking block. Import is used for 
 10 |     from array import array  # TC004
    |
 help: Move out of type-checking block
-
-ℹ Unsafe fix
-4  4  | 
-5  5  | import fastapi
-6  6  | from fastapi import FastAPI as Api
-   7  |+import datetime
-7  8  | 
-8  9  | if TYPE_CHECKING:
-9     |-    import datetime  # TC004
-10 10 |     from array import array  # TC004
-11 11 | 
-12 12 | app = fastapi.FastAPI("First application")
+4  | 
+5  | import fastapi
+6  | from fastapi import FastAPI as Api
+7  + import datetime
+8  | 
+9  | if TYPE_CHECKING:
+   -     import datetime  # TC004
+10 |     from array import array  # TC004
+11 | 
+12 | app = fastapi.FastAPI("First application")
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 TC004 [*] Move import `array.array` out of type-checking block. Import is used for more than type hinting.
   --> app.py:10:23
@@ -34,16 +33,15 @@ TC004 [*] Move import `array.array` out of type-checking block. Import is used f
 12 | app = fastapi.FastAPI("First application")
    |
 help: Move out of type-checking block
-
-ℹ Unsafe fix
-4  4  | 
-5  5  | import fastapi
-6  6  | from fastapi import FastAPI as Api
-   7  |+from array import array
-7  8  | 
-8  9  | if TYPE_CHECKING:
-9  10 |     import datetime  # TC004
-10    |-    from array import array  # TC004
-11 11 | 
-12 12 | app = fastapi.FastAPI("First application")
-13 13 |
+4  | 
+5  | import fastapi
+6  | from fastapi import FastAPI as Api
+7  + from array import array
+8  | 
+9  | if TYPE_CHECKING:
+10 |     import datetime  # TC004
+   -     from array import array  # TC004
+11 | 
+12 | app = fastapi.FastAPI("First application")
+13 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior

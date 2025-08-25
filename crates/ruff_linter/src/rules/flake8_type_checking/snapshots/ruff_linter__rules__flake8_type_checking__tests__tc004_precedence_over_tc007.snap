@@ -12,14 +12,13 @@ TC004 [*] Move import `foo.Foo` out of type-checking block. Import is used for m
 8 | a: TypeAlias = Foo | None  # OK
   |
 help: Move out of type-checking block
-
-ℹ Unsafe fix
-2 2 | from __future__ import annotations
-3 3 | 
-4 4 | from typing import TYPE_CHECKING, TypeAlias
-  5 |+from foo import Foo
-5 6 | if TYPE_CHECKING:
-6   |-    from foo import Foo  # TC004
-  7 |+    pass  # TC004
-7 8 | 
-8 9 | a: TypeAlias = Foo | None  # OK
+2 | from __future__ import annotations
+3 | 
+4 | from typing import TYPE_CHECKING, TypeAlias
+5 + from foo import Foo
+6 | if TYPE_CHECKING:
+  -     from foo import Foo  # TC004
+7 +     pass  # TC004
+8 | 
+9 | a: TypeAlias = Foo | None  # OK
+note: This is an unsafe fix and may remove comments or change runtime behavior

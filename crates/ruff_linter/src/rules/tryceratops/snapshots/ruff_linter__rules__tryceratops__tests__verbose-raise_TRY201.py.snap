@@ -10,16 +10,15 @@ TRY201 [*] Use `raise` without specifying exception name
    |               ^
    |
 help: Remove exception name
-
-ℹ Unsafe fix
-17 17 |         process()
-18 18 |     except MyException as e:
-19 19 |         logger.exception("process failed")
-20    |-        raise e
-   20 |+        raise
-21 21 | 
-22 22 | 
-23 23 | def good():
+17 |         process()
+18 |     except MyException as e:
+19 |         logger.exception("process failed")
+   -         raise e
+20 +         raise
+21 | 
+22 | 
+23 | def good():
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 TRY201 [*] Use `raise` without specifying exception name
   --> TRY201.py:63:19
@@ -30,16 +29,15 @@ TRY201 [*] Use `raise` without specifying exception name
    |                   ^
    |
 help: Remove exception name
-
-ℹ Unsafe fix
-60 60 |     except MyException as e:
-61 61 |         logger.exception("process failed")
-62 62 |         if True:
-63    |-            raise e
-   63 |+            raise
-64 64 | 
-65 65 | 
-66 66 | def bad_that_needs_recursion_2():
+60 |     except MyException as e:
+61 |         logger.exception("process failed")
+62 |         if True:
+   -             raise e
+63 +             raise
+64 | 
+65 | 
+66 | def bad_that_needs_recursion_2():
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 TRY201 [*] Use `raise` without specifying exception name
   --> TRY201.py:74:23
@@ -49,10 +47,9 @@ TRY201 [*] Use `raise` without specifying exception name
    |                       ^
    |
 help: Remove exception name
-
-ℹ Unsafe fix
-71 71 |         if True:
-72 72 | 
-73 73 |             def foo():
-74    |-                raise e
-   74 |+                raise
+71 |         if True:
+72 | 
+73 |             def foo():
+   -                 raise e
+74 +                 raise
+note: This is an unsafe fix and may remove comments or change runtime behavior

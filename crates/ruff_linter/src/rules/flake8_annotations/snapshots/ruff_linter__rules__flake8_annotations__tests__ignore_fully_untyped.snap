@@ -9,16 +9,15 @@ ANN201 [*] Missing return type annotation for public function `error_partially_t
 25 |     pass
    |
 help: Add return type annotation: `None`
-
-ℹ Unsafe fix
-21 21 |     pass
-22 22 | 
-23 23 | 
-24    |-def error_partially_typed_1(a: int, b):
-   24 |+def error_partially_typed_1(a: int, b) -> None:
-25 25 |     pass
-26 26 | 
-27 27 | 
+21 |     pass
+22 | 
+23 | 
+   - def error_partially_typed_1(a: int, b):
+24 + def error_partially_typed_1(a: int, b) -> None:
+25 |     pass
+26 | 
+27 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 ANN001 Missing type annotation for function argument `b`
   --> ignore_fully_untyped.py:24:37
@@ -44,16 +43,15 @@ ANN201 [*] Missing return type annotation for public function `error_partially_t
 33 |     pass
    |
 help: Add return type annotation: `None`
-
-ℹ Unsafe fix
-29 29 |     pass
-30 30 | 
-31 31 | 
-32    |-def error_partially_typed_3(a: int, b: int):
-   32 |+def error_partially_typed_3(a: int, b: int) -> None:
-33 33 |     pass
-34 34 | 
-35 35 | 
+29 |     pass
+30 | 
+31 | 
+   - def error_partially_typed_3(a: int, b: int):
+32 + def error_partially_typed_3(a: int, b: int) -> None:
+33 |     pass
+34 | 
+35 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 ANN201 [*] Missing return type annotation for public function `error_typed_self`
   --> ignore_fully_untyped.py:43:9
@@ -65,11 +63,10 @@ ANN201 [*] Missing return type annotation for public function `error_typed_self`
 44 |         pass
    |
 help: Add return type annotation: `None`
-
-ℹ Unsafe fix
-40 40 |     def ok_untyped_method(self):
-41 41 |         pass
-42 42 | 
-43    |-    def error_typed_self(self: X):
-   43 |+    def error_typed_self(self: X) -> None:
-44 44 |         pass
+40 |     def ok_untyped_method(self):
+41 |         pass
+42 | 
+   -     def error_typed_self(self: X):
+43 +     def error_typed_self(self: X) -> None:
+44 |         pass
+note: This is an unsafe fix and may remove comments or change runtime behavior

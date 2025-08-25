@@ -11,21 +11,20 @@ TC004 [*] Move import `pandas.DataFrame` out of type-checking block. Import is u
 59 |     def func(value: DataFrame):
    |
 help: Move out of type-checking block
-
-ℹ Unsafe fix
-   1  |+from pandas import DataFrame
-1  2  | def f():
-2  3  |     from pandas import DataFrame
-3  4  | 
+1  + from pandas import DataFrame
+2  | def f():
+3  |     from pandas import DataFrame
+4  | 
 --------------------------------------------------------------------------------
-54 55 |     from typing import TYPE_CHECKING
-55 56 | 
-56 57 |     if TYPE_CHECKING:
-57    |-        from pandas import DataFrame
-   58 |+        pass
-58 59 | 
-59 60 |     def func(value: DataFrame):
-60 61 |         ...
+55 |     from typing import TYPE_CHECKING
+56 | 
+57 |     if TYPE_CHECKING:
+   -         from pandas import DataFrame
+58 +         pass
+59 | 
+60 |     def func(value: DataFrame):
+61 |         ...
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 TC004 [*] Move import `pandas.DataFrame` out of type-checking block. Import is used for more than type hinting.
    --> quote.py:110:28
@@ -37,17 +36,16 @@ TC004 [*] Move import `pandas.DataFrame` out of type-checking block. Import is u
 112 |     x: TypeAlias = DataFrame | None
     |
 help: Move out of type-checking block
-
-ℹ Unsafe fix
-    1   |+from pandas import DataFrame
-1   2   | def f():
-2   3   |     from pandas import DataFrame
-3   4   | 
+1   + from pandas import DataFrame
+2   | def f():
+3   |     from pandas import DataFrame
+4   | 
 --------------------------------------------------------------------------------
-107 108 |     from typing import TypeAlias, TYPE_CHECKING
-108 109 | 
-109 110 |     if TYPE_CHECKING:
-110     |-        from pandas import DataFrame
-    111 |+        pass
-111 112 | 
-112 113 |     x: TypeAlias = DataFrame | None
+108 |     from typing import TypeAlias, TYPE_CHECKING
+109 | 
+110 |     if TYPE_CHECKING:
+    -         from pandas import DataFrame
+111 +         pass
+112 | 
+113 |     x: TypeAlias = DataFrame | None
+note: This is an unsafe fix and may remove comments or change runtime behavior

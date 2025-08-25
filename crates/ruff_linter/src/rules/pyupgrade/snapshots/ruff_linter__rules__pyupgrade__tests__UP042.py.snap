@@ -8,17 +8,16 @@ UP042 [*] Class A inherits from both `str` and `enum.Enum`
   |       ^
   |
 help: Inherit from `enum.StrEnum`
-
-ℹ Unsafe fix
-1   |-from enum import Enum
-  1 |+from enum import Enum, StrEnum
-2 2 | 
-3 3 | 
-4   |-class A(str, Enum): ...
-  4 |+class A(StrEnum): ...
-5 5 | 
-6 6 | 
-7 7 | class B(Enum, str): ...
+  - from enum import Enum
+1 + from enum import Enum, StrEnum
+2 | 
+3 | 
+  - class A(str, Enum): ...
+4 + class A(StrEnum): ...
+5 | 
+6 | 
+7 | class B(Enum, str): ...
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 UP042 [*] Class B inherits from both `str` and `enum.Enum`
  --> UP042.py:7:7
@@ -27,20 +26,19 @@ UP042 [*] Class B inherits from both `str` and `enum.Enum`
   |       ^
   |
 help: Inherit from `enum.StrEnum`
-
-ℹ Unsafe fix
-1   |-from enum import Enum
-  1 |+from enum import Enum, StrEnum
-2 2 | 
-3 3 | 
-4 4 | class A(str, Enum): ...
-5 5 | 
-6 6 | 
-7   |-class B(Enum, str): ...
-  7 |+class B(StrEnum): ...
-8 8 | 
-9 9 | 
-10 10 | class D(int, str, Enum): ...
+   - from enum import Enum
+1  + from enum import Enum, StrEnum
+2  | 
+3  | 
+4  | class A(str, Enum): ...
+5  | 
+6  | 
+   - class B(Enum, str): ...
+7  + class B(StrEnum): ...
+8  | 
+9  | 
+10 | class D(int, str, Enum): ...
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 UP042 Class D inherits from both `str` and `enum.Enum`
   --> UP042.py:10:7

@@ -10,15 +10,14 @@ TC001 [*] Move application import `.first_party` into a type-checking block
   |               ^^^^^^^^^^^
   |
 help: Move into type-checking block
-
-ℹ Unsafe fix
-1 1 | from __future__ import annotations
-2 2 | 
-3   |-from . import first_party
-  3 |+from typing import TYPE_CHECKING
-  4 |+
-  5 |+if TYPE_CHECKING:
-  6 |+    from . import first_party
-4 7 | 
-5 8 | 
-6 9 | def f(x: first_party.foo): ...
+1 | from __future__ import annotations
+2 | 
+  - from . import first_party
+3 + from typing import TYPE_CHECKING
+4 + 
+5 + if TYPE_CHECKING:
+6 +     from . import first_party
+7 | 
+8 | 
+9 | def f(x: first_party.foo): ...
+note: This is an unsafe fix and may remove comments or change runtime behavior

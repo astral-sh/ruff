@@ -10,14 +10,13 @@ PLE1520 [*] `@singledispatchmethod` decorator should not be used on non-method f
 6 |     pass
   |
 help: Replace with `@singledispatch`
-
-ℹ Unsafe fix
-1   |-from functools import singledispatchmethod
-  1 |+from functools import singledispatchmethod, singledispatch
-2 2 | 
-3 3 | 
-4   |-@singledispatchmethod  # [singledispatchmethod-function]
-  4 |+@singledispatch  # [singledispatchmethod-function]
-5 5 | def convert_position(position):
-6 6 |     pass
-7 7 |
+  - from functools import singledispatchmethod
+1 + from functools import singledispatchmethod, singledispatch
+2 | 
+3 | 
+  - @singledispatchmethod  # [singledispatchmethod-function]
+4 + @singledispatch  # [singledispatchmethod-function]
+5 | def convert_position(position):
+6 |     pass
+7 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior

@@ -9,9 +9,8 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 7 |     del y
   |
 help: Add `from __future__ import annotations`
-
-ℹ Unsafe fix
-  1 |+from __future__ import annotations
-1 2 | def main() -> None:
-2 3 |     a_list: list[str] = []
-3 4 |     a_list.append("hello")
+1 + from __future__ import annotations
+2 | def main() -> None:
+3 |     a_list: list[str] = []
+4 |     a_list.append("hello")
+note: This is an unsafe fix and may remove comments or change runtime behavior

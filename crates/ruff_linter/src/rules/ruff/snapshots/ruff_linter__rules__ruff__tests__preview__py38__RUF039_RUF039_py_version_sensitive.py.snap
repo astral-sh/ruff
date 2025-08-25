@@ -10,9 +10,8 @@ RUF039 [*] First argument to `re.compile()` is not raw string
   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
   |
 help: Replace with raw string
-
-ℹ Unsafe fix
-1 1 | import re
-2 2 | 
-3   |-re.compile("\N{Partial Differential}")  # with unsafe fix if python target is 3.8 or higher, else without fix
-  3 |+re.compile(r"\N{Partial Differential}")  # with unsafe fix if python target is 3.8 or higher, else without fix
+1 | import re
+2 | 
+  - re.compile("\N{Partial Differential}")  # with unsafe fix if python target is 3.8 or higher, else without fix
+3 + re.compile(r"\N{Partial Differential}")  # with unsafe fix if python target is 3.8 or higher, else without fix
+note: This is an unsafe fix and may remove comments or change runtime behavior

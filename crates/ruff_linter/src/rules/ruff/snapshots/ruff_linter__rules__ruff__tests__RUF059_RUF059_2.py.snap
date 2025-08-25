@@ -11,16 +11,15 @@ RUF059 [*] Unpacked variable `x2` is never used
 9 |         pass
   |
 help: Prefix it with an underscore or any other dummy variable pattern
-
-ℹ Unsafe fix
-5 5 |     with foo() as x1:
-6 6 |         pass
-7 7 | 
-8   |-    with foo() as (x2, y2):
-  8 |+    with foo() as (_x2, y2):
-9 9 |         pass
-10 10 | 
-11 11 |     with (foo() as x3, foo() as y3, foo() as z3):
+5  |     with foo() as x1:
+6  |         pass
+7  | 
+   -     with foo() as (x2, y2):
+8  +     with foo() as (_x2, y2):
+9  |         pass
+10 | 
+11 |     with (foo() as x3, foo() as y3, foo() as z3):
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 RUF059 [*] Unpacked variable `y2` is never used
  --> RUF059_2.py:8:24
@@ -32,16 +31,15 @@ RUF059 [*] Unpacked variable `y2` is never used
 9 |         pass
   |
 help: Prefix it with an underscore or any other dummy variable pattern
-
-ℹ Unsafe fix
-5 5 |     with foo() as x1:
-6 6 |         pass
-7 7 | 
-8   |-    with foo() as (x2, y2):
-  8 |+    with foo() as (x2, _y2):
-9 9 |         pass
-10 10 | 
-11 11 |     with (foo() as x3, foo() as y3, foo() as z3):
+5  |     with foo() as x1:
+6  |         pass
+7  | 
+   -     with foo() as (x2, y2):
+8  +     with foo() as (x2, _y2):
+9  |         pass
+10 | 
+11 |     with (foo() as x3, foo() as y3, foo() as z3):
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 RUF059 [*] Unpacked variable `x2` is never used
   --> RUF059_2.py:17:6
@@ -53,16 +51,15 @@ RUF059 [*] Unpacked variable `x2` is never used
 18 |     coords3 = (x3, y3) = (1, 2)
    |
 help: Prefix it with an underscore or any other dummy variable pattern
-
-ℹ Unsafe fix
-14 14 | 
-15 15 | def f():
-16 16 |     (x1, y1) = (1, 2)
-17    |-    (x2, y2) = coords2 = (1, 2)
-   17 |+    (_x2, y2) = coords2 = (1, 2)
-18 18 |     coords3 = (x3, y3) = (1, 2)
-19 19 | 
-20 20 | 
+14 | 
+15 | def f():
+16 |     (x1, y1) = (1, 2)
+   -     (x2, y2) = coords2 = (1, 2)
+17 +     (_x2, y2) = coords2 = (1, 2)
+18 |     coords3 = (x3, y3) = (1, 2)
+19 | 
+20 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 RUF059 [*] Unpacked variable `y2` is never used
   --> RUF059_2.py:17:10
@@ -74,16 +71,15 @@ RUF059 [*] Unpacked variable `y2` is never used
 18 |     coords3 = (x3, y3) = (1, 2)
    |
 help: Prefix it with an underscore or any other dummy variable pattern
-
-ℹ Unsafe fix
-14 14 | 
-15 15 | def f():
-16 16 |     (x1, y1) = (1, 2)
-17    |-    (x2, y2) = coords2 = (1, 2)
-   17 |+    (x2, _y2) = coords2 = (1, 2)
-18 18 |     coords3 = (x3, y3) = (1, 2)
-19 19 | 
-20 20 | 
+14 | 
+15 | def f():
+16 |     (x1, y1) = (1, 2)
+   -     (x2, y2) = coords2 = (1, 2)
+17 +     (x2, _y2) = coords2 = (1, 2)
+18 |     coords3 = (x3, y3) = (1, 2)
+19 | 
+20 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 RUF059 [*] Unpacked variable `x3` is never used
   --> RUF059_2.py:18:16
@@ -94,16 +90,15 @@ RUF059 [*] Unpacked variable `x3` is never used
    |                ^^
    |
 help: Prefix it with an underscore or any other dummy variable pattern
-
-ℹ Unsafe fix
-15 15 | def f():
-16 16 |     (x1, y1) = (1, 2)
-17 17 |     (x2, y2) = coords2 = (1, 2)
-18    |-    coords3 = (x3, y3) = (1, 2)
-   18 |+    coords3 = (_x3, y3) = (1, 2)
-19 19 | 
-20 20 | 
-21 21 | def f():
+15 | def f():
+16 |     (x1, y1) = (1, 2)
+17 |     (x2, y2) = coords2 = (1, 2)
+   -     coords3 = (x3, y3) = (1, 2)
+18 +     coords3 = (_x3, y3) = (1, 2)
+19 | 
+20 | 
+21 | def f():
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 RUF059 [*] Unpacked variable `y3` is never used
   --> RUF059_2.py:18:20
@@ -114,16 +109,15 @@ RUF059 [*] Unpacked variable `y3` is never used
    |                    ^^
    |
 help: Prefix it with an underscore or any other dummy variable pattern
-
-ℹ Unsafe fix
-15 15 | def f():
-16 16 |     (x1, y1) = (1, 2)
-17 17 |     (x2, y2) = coords2 = (1, 2)
-18    |-    coords3 = (x3, y3) = (1, 2)
-   18 |+    coords3 = (x3, _y3) = (1, 2)
-19 19 | 
-20 20 | 
-21 21 | def f():
+15 | def f():
+16 |     (x1, y1) = (1, 2)
+17 |     (x2, y2) = coords2 = (1, 2)
+   -     coords3 = (x3, y3) = (1, 2)
+18 +     coords3 = (x3, _y3) = (1, 2)
+19 | 
+20 | 
+21 | def f():
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 RUF059 [*] Unpacked variable `x` is never used
   --> RUF059_2.py:22:24
@@ -134,16 +128,15 @@ RUF059 [*] Unpacked variable `x` is never used
 23 |         pass
    |
 help: Prefix it with an underscore or any other dummy variable pattern
-
-ℹ Unsafe fix
-19 19 | 
-20 20 | 
-21 21 | def f():
-22    |-    with Nested(m) as (x, y):
-   22 |+    with Nested(m) as (_x, y):
-23 23 |         pass
-24 24 | 
-25 25 | 
+19 | 
+20 | 
+21 | def f():
+   -     with Nested(m) as (x, y):
+22 +     with Nested(m) as (_x, y):
+23 |         pass
+24 | 
+25 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 RUF059 [*] Unpacked variable `y` is never used
   --> RUF059_2.py:22:27
@@ -154,16 +147,15 @@ RUF059 [*] Unpacked variable `y` is never used
 23 |         pass
    |
 help: Prefix it with an underscore or any other dummy variable pattern
-
-ℹ Unsafe fix
-19 19 | 
-20 20 | 
-21 21 | def f():
-22    |-    with Nested(m) as (x, y):
-   22 |+    with Nested(m) as (x, _y):
-23 23 |         pass
-24 24 | 
-25 25 | 
+19 | 
+20 | 
+21 | def f():
+   -     with Nested(m) as (x, y):
+22 +     with Nested(m) as (x, _y):
+23 |         pass
+24 | 
+25 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 RUF059 [*] Unpacked variable `a` is never used
   --> RUF059_2.py:27:17
@@ -173,16 +165,15 @@ RUF059 [*] Unpacked variable `a` is never used
    |                 ^
    |
 help: Prefix it with an underscore or any other dummy variable pattern
-
-ℹ Unsafe fix
-24 24 | 
-25 25 | 
-26 26 | def f():
-27    |-    toplevel = (a, b) = lexer.get_token()
-   27 |+    toplevel = (_a, b) = lexer.get_token()
-28 28 | 
-29 29 | 
-30 30 | def f():
+24 | 
+25 | 
+26 | def f():
+   -     toplevel = (a, b) = lexer.get_token()
+27 +     toplevel = (_a, b) = lexer.get_token()
+28 | 
+29 | 
+30 | def f():
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 RUF059 [*] Unpacked variable `b` is never used
   --> RUF059_2.py:27:20
@@ -192,16 +183,15 @@ RUF059 [*] Unpacked variable `b` is never used
    |                    ^
    |
 help: Prefix it with an underscore or any other dummy variable pattern
-
-ℹ Unsafe fix
-24 24 | 
-25 25 | 
-26 26 | def f():
-27    |-    toplevel = (a, b) = lexer.get_token()
-   27 |+    toplevel = (a, _b) = lexer.get_token()
-28 28 | 
-29 29 | 
-30 30 | def f():
+24 | 
+25 | 
+26 | def f():
+   -     toplevel = (a, b) = lexer.get_token()
+27 +     toplevel = (a, _b) = lexer.get_token()
+28 | 
+29 | 
+30 | def f():
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 RUF059 [*] Unpacked variable `a` is never used
   --> RUF059_2.py:31:6
@@ -211,13 +201,12 @@ RUF059 [*] Unpacked variable `a` is never used
    |      ^
    |
 help: Prefix it with an underscore or any other dummy variable pattern
-
-ℹ Unsafe fix
-28 28 | 
-29 29 | 
-30 30 | def f():
-31    |-    (a, b) = toplevel = lexer.get_token()
-   31 |+    (_a, b) = toplevel = lexer.get_token()
+28 | 
+29 | 
+30 | def f():
+   -     (a, b) = toplevel = lexer.get_token()
+31 +     (_a, b) = toplevel = lexer.get_token()
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 RUF059 [*] Unpacked variable `b` is never used
   --> RUF059_2.py:31:9
@@ -227,10 +216,9 @@ RUF059 [*] Unpacked variable `b` is never used
    |         ^
    |
 help: Prefix it with an underscore or any other dummy variable pattern
-
-ℹ Unsafe fix
-28 28 | 
-29 29 | 
-30 30 | def f():
-31    |-    (a, b) = toplevel = lexer.get_token()
-   31 |+    (a, _b) = toplevel = lexer.get_token()
+28 | 
+29 | 
+30 | def f():
+   -     (a, b) = toplevel = lexer.get_token()
+31 +     (a, _b) = toplevel = lexer.get_token()
+note: This is an unsafe fix and may remove comments or change runtime behavior

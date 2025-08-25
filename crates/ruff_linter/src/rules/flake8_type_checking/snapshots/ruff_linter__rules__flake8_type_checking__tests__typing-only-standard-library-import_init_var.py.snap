@@ -9,16 +9,15 @@ TC003 [*] Move standard library import `pathlib.Path` into a type-checking block
   |                     ^^^^
   |
 help: Move into type-checking block
-
-ℹ Unsafe fix
-3  3  | from __future__ import annotations
-4  4  | 
-5  5  | from dataclasses import FrozenInstanceError, InitVar, dataclass
-6     |-from pathlib import Path
-   6  |+from typing import TYPE_CHECKING
-   7  |+
-   8  |+if TYPE_CHECKING:
-   9  |+    from pathlib import Path
-7  10 | 
-8  11 | 
-9  12 | @dataclass
+3  | from __future__ import annotations
+4  | 
+5  | from dataclasses import FrozenInstanceError, InitVar, dataclass
+   - from pathlib import Path
+6  + from typing import TYPE_CHECKING
+7  + 
+8  + if TYPE_CHECKING:
+9  +     from pathlib import Path
+10 | 
+11 | 
+12 | @dataclass
+note: This is an unsafe fix and may remove comments or change runtime behavior

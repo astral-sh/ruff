@@ -11,14 +11,13 @@ B006 [*] Do not use mutable data structures for argument defaults
 5 |     import os                    
   |
 help: Replace with `None`; initialize within function
-
-ℹ Unsafe fix
-1 1 | # Import followed by whitespace with no newline
-2 2 | # Same as B006_2.py, but import instead of docstring
-3 3 | 
-4   |-def foobar(foor, bar={}):    
-5   |-    import os                    
-  4 |+def foobar(foor, bar=None):    
-  5 |+    import os                    
-  6 |+    if bar is None:
-  7 |+        bar = {}
+1 | # Import followed by whitespace with no newline
+2 | # Same as B006_2.py, but import instead of docstring
+3 | 
+  - def foobar(foor, bar={}):    
+  -     import os                    
+4 + def foobar(foor, bar=None):    
+5 +     import os                    
+6 +     if bar is None:
+7 +         bar = {}
+note: This is an unsafe fix and may remove comments or change runtime behavior

@@ -12,12 +12,11 @@ B006 [*] Do not use mutable data structures for argument defaults
 6 |     """                    
   |
 help: Replace with `None`; initialize within function
-
-ℹ Unsafe fix
-1 1 | # Docstring followed by whitespace with no newline
-2 2 | # Regression test for https://github.com/astral-sh/ruff/issues/7155
-3 3 | 
-4   |-def foobar(foor, bar={}):    
-  4 |+def foobar(foor, bar=None):    
-5 5 |     """
-6 6 |     """
+1 | # Docstring followed by whitespace with no newline
+2 | # Regression test for https://github.com/astral-sh/ruff/issues/7155
+3 | 
+  - def foobar(foor, bar={}):    
+4 + def foobar(foor, bar=None):    
+5 |     """
+6 |     """                    
+note: This is an unsafe fix and may remove comments or change runtime behavior

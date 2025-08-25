@@ -123,23 +123,22 @@ AIR301 [*] `airflow.secrets.cache.SecretCache` is removed in Airflow 3.0
    | ^^^^^^^^^^^
    |
 help: Use `SecretCache` from `airflow.sdk` instead.
-
-ℹ Unsafe fix
-13 13 | from airflow.contrib.aws_athena_hook import AWSAthenaHook
-14 14 | from airflow.datasets import DatasetAliasEvent
-15 15 | from airflow.operators.subdag import SubDagOperator
-16    |-from airflow.secrets.cache import SecretCache
-17 16 | from airflow.secrets.local_filesystem import LocalFilesystemBackend
-18 17 | from airflow.triggers.external_task import TaskStateTrigger
-19 18 | from airflow.utils import dates
+13 | from airflow.contrib.aws_athena_hook import AWSAthenaHook
+14 | from airflow.datasets import DatasetAliasEvent
+15 | from airflow.operators.subdag import SubDagOperator
+   - from airflow.secrets.cache import SecretCache
+16 | from airflow.secrets.local_filesystem import LocalFilesystemBackend
+17 | from airflow.triggers.external_task import TaskStateTrigger
+18 | from airflow.utils import dates
 --------------------------------------------------------------------------------
-34 33 | from airflow.utils.trigger_rule import TriggerRule
-35 34 | from airflow.www.auth import has_access, has_access_dataset
-36 35 | from airflow.www.utils import get_sensitive_variables_fields, should_hide_value_for_key
-   36 |+from airflow.sdk import SecretCache
-37 37 | 
-38 38 | # airflow root
-39 39 | PY36, PY37, PY38, PY39, PY310, PY311, PY312
+33 | from airflow.utils.trigger_rule import TriggerRule
+34 | from airflow.www.auth import has_access, has_access_dataset
+35 | from airflow.www.utils import get_sensitive_variables_fields, should_hide_value_for_key
+36 + from airflow.sdk import SecretCache
+37 | 
+38 | # airflow root
+39 | PY36, PY37, PY38, PY39, PY310, PY311, PY312
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 AIR301 `airflow.triggers.external_task.TaskStateTrigger` is removed in Airflow 3.0
   --> AIR301_names.py:65:1

@@ -12,16 +12,15 @@ TC003 [*] Move standard library import `pathlib` into a type-checking block
 6 | TYPE_CHECKING = False
   |
 help: Move into type-checking block
-
-ℹ Unsafe fix
-1 1 | 
-2 2 | from __future__ import annotations
-3 3 | 
-4   |-import pathlib  # TC003
-5 4 | 
-6 5 | TYPE_CHECKING = False
-7 6 | if TYPE_CHECKING:
-  7 |+    import pathlib
-8 8 |     from types import TracebackType
-9 9 | 
-10 10 | def foo(tb: TracebackType) -> pathlib.Path: ...
+1  | 
+2  | from __future__ import annotations
+3  | 
+   - import pathlib  # TC003
+4  | 
+5  | TYPE_CHECKING = False
+6  | if TYPE_CHECKING:
+7  +     import pathlib
+8  |     from types import TracebackType
+9  | 
+10 | def foo(tb: TracebackType) -> pathlib.Path: ...
+note: This is an unsafe fix and may remove comments or change runtime behavior

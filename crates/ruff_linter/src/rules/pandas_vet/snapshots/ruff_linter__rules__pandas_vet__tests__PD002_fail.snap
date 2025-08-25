@@ -10,10 +10,9 @@ PD002 [*] `inplace=True` should be avoided; it has inconsistent behavior
   |                       ^^^^^^^^^^^^
   |
 help: Assign to variable; remove `inplace` arg
-
-ℹ Unsafe fix
-1 1 | 
-2 2 | import pandas as pd
-3 3 | x = pd.DataFrame()
-4   |-x.drop(["a"], axis=1, inplace=True)
-  4 |+x = x.drop(["a"], axis=1)
+1 | 
+2 | import pandas as pd
+3 | x = pd.DataFrame()
+  - x.drop(["a"], axis=1, inplace=True)
+4 + x = x.drop(["a"], axis=1)
+note: This is an unsafe fix and may remove comments or change runtime behavior

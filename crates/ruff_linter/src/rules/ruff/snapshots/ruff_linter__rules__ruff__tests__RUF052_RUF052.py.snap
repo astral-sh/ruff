@@ -11,18 +11,17 @@ RUF052 [*] Local dummy variable `_var` is accessed
 93 |         return _var
    |
 help: Remove leading underscores
-
-ℹ Unsafe fix
-89 89 | 
-90 90 | class Class_:
-91 91 |     def fun(self):
-92    |-        _var = "method variable" # [RUF052]
-93    |-        return _var
-   92 |+        var = "method variable" # [RUF052]
-   93 |+        return var
-94 94 | 
-95 95 | def fun(_var): # parameters are ignored
-96 96 |     return _var
+89 | 
+90 | class Class_:
+91 |     def fun(self):
+   -         _var = "method variable" # [RUF052]
+   -         return _var
+92 +         var = "method variable" # [RUF052]
+93 +         return var
+94 | 
+95 | def fun(_var): # parameters are ignored
+96 |     return _var
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 RUF052 [*] Local dummy variable `_list` is accessed
    --> RUF052.py:99:5
@@ -33,18 +32,17 @@ RUF052 [*] Local dummy variable `_list` is accessed
 100 |     return _list
     |
 help: Prefer using trailing underscores to avoid shadowing a built-in
-
-ℹ Unsafe fix
-96  96  |     return _var
-97  97  | 
-98  98  | def fun():
-99      |-    _list = "built-in" # [RUF052]
-100     |-    return _list
-    99  |+    list_ = "built-in" # [RUF052]
-    100 |+    return list_
-101 101 | 
-102 102 | x = "global"
-103 103 | 
+96  |     return _var
+97  | 
+98  | def fun():
+    -     _list = "built-in" # [RUF052]
+    -     return _list
+99  +     list_ = "built-in" # [RUF052]
+100 +     return list_
+101 | 
+102 | x = "global"
+103 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 RUF052 [*] Local dummy variable `_x` is accessed
    --> RUF052.py:106:5
@@ -56,18 +54,17 @@ RUF052 [*] Local dummy variable `_x` is accessed
 107 |     return _x
     |
 help: Prefer using trailing underscores to avoid shadowing a variable
-
-ℹ Unsafe fix
-103 103 | 
-104 104 | def fun():
-105 105 |     global x
-106     |-    _x = "shadows global" # [RUF052]
-107     |-    return _x
-    106 |+    x_ = "shadows global" # [RUF052]
-    107 |+    return x_
-108 108 | 
-109 109 | def foo():
-110 110 |   x = "outer"
+103 | 
+104 | def fun():
+105 |     global x
+    -     _x = "shadows global" # [RUF052]
+    -     return _x
+106 +     x_ = "shadows global" # [RUF052]
+107 +     return x_
+108 | 
+109 | def foo():
+110 |   x = "outer"
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 RUF052 [*] Local dummy variable `_x` is accessed
    --> RUF052.py:113:5
@@ -80,18 +77,17 @@ RUF052 [*] Local dummy variable `_x` is accessed
 115 |   bar()
     |
 help: Prefer using trailing underscores to avoid shadowing a variable
-
-ℹ Unsafe fix
-110 110 |   x = "outer"
-111 111 |   def bar():
-112 112 |     nonlocal x
-113     |-    _x = "shadows nonlocal" # [RUF052]
-114     |-    return _x
-    113 |+    x_ = "shadows nonlocal" # [RUF052]
-    114 |+    return x_
-115 115 |   bar()
-116 116 |   return x
-117 117 | 
+110 |   x = "outer"
+111 |   def bar():
+112 |     nonlocal x
+    -     _x = "shadows nonlocal" # [RUF052]
+    -     return _x
+113 +     x_ = "shadows nonlocal" # [RUF052]
+114 +     return x_
+115 |   bar()
+116 |   return x
+117 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 RUF052 [*] Local dummy variable `_x` is accessed
    --> RUF052.py:120:5
@@ -103,18 +99,17 @@ RUF052 [*] Local dummy variable `_x` is accessed
 121 |     return _x
     |
 help: Prefer using trailing underscores to avoid shadowing a variable
-
-ℹ Unsafe fix
-117 117 | 
-118 118 | def fun():
-119 119 |     x = "local"
-120     |-    _x = "shadows local" # [RUF052]
-121     |-    return _x
-    120 |+    x_ = "shadows local" # [RUF052]
-    121 |+    return x_
-122 122 | 
-123 123 | 
-124 124 | GLOBAL_1 = "global 1"
+117 | 
+118 | def fun():
+119 |     x = "local"
+    -     _x = "shadows local" # [RUF052]
+    -     return _x
+120 +     x_ = "shadows local" # [RUF052]
+121 +     return x_
+122 | 
+123 | 
+124 | GLOBAL_1 = "global 1"
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 RUF052 Local dummy variable `_GLOBAL_1` is accessed
    --> RUF052.py:128:5
@@ -169,25 +164,24 @@ RUF052 [*] Local dummy variable `_P` is accessed
 155 |     _NT = NamedTuple("_NT", [("foo", int)])
     |
 help: Remove leading underscores
-
-ℹ Unsafe fix
-150 150 |     from enum import Enum
-151 151 |     from collections import namedtuple
-152 152 | 
-153     |-    _P = ParamSpec("_P")
-    153 |+    P = ParamSpec("P")
-154 154 |     _T = TypeVar(name="_T", covariant=True, bound=int|str)
-155 155 |     _NT = NamedTuple("_NT", [("foo", int)])
-156 156 |     _E = Enum("_E", ["a", "b", "c"])
+150 |     from enum import Enum
+151 |     from collections import namedtuple
+152 | 
+    -     _P = ParamSpec("_P")
+153 +     P = ParamSpec("P")
+154 |     _T = TypeVar(name="_T", covariant=True, bound=int|str)
+155 |     _NT = NamedTuple("_NT", [("foo", int)])
+156 |     _E = Enum("_E", ["a", "b", "c"])
 --------------------------------------------------------------------------------
-159 159 |     _DynamicClass = type("_DynamicClass", (), {})
-160 160 |     _NotADynamicClass = type("_NotADynamicClass")
-161 161 | 
-162     |-    print(_T, _P, _NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
-    162 |+    print(_T, P, _NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
-163 163 | 
-164 164 | # Do not emit diagnostic if parameter is private
-165 165 | # even if it is later shadowed in the body of the function
+159 |     _DynamicClass = type("_DynamicClass", (), {})
+160 |     _NotADynamicClass = type("_NotADynamicClass")
+161 | 
+    -     print(_T, _P, _NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
+162 +     print(_T, P, _NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
+163 | 
+164 | # Do not emit diagnostic if parameter is private
+165 | # even if it is later shadowed in the body of the function
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 RUF052 [*] Local dummy variable `_T` is accessed
    --> RUF052.py:154:5
@@ -199,25 +193,24 @@ RUF052 [*] Local dummy variable `_T` is accessed
 156 |     _E = Enum("_E", ["a", "b", "c"])
     |
 help: Remove leading underscores
-
-ℹ Unsafe fix
-151 151 |     from collections import namedtuple
-152 152 | 
-153 153 |     _P = ParamSpec("_P")
-154     |-    _T = TypeVar(name="_T", covariant=True, bound=int|str)
-    154 |+    T = TypeVar(name="T", covariant=True, bound=int|str)
-155 155 |     _NT = NamedTuple("_NT", [("foo", int)])
-156 156 |     _E = Enum("_E", ["a", "b", "c"])
-157 157 |     _NT2 = namedtuple("_NT2", ['x', 'y', 'z'])
+151 |     from collections import namedtuple
+152 | 
+153 |     _P = ParamSpec("_P")
+    -     _T = TypeVar(name="_T", covariant=True, bound=int|str)
+154 +     T = TypeVar(name="T", covariant=True, bound=int|str)
+155 |     _NT = NamedTuple("_NT", [("foo", int)])
+156 |     _E = Enum("_E", ["a", "b", "c"])
+157 |     _NT2 = namedtuple("_NT2", ['x', 'y', 'z'])
 --------------------------------------------------------------------------------
-159 159 |     _DynamicClass = type("_DynamicClass", (), {})
-160 160 |     _NotADynamicClass = type("_NotADynamicClass")
-161 161 | 
-162     |-    print(_T, _P, _NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
-    162 |+    print(T, _P, _NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
-163 163 | 
-164 164 | # Do not emit diagnostic if parameter is private
-165 165 | # even if it is later shadowed in the body of the function
+159 |     _DynamicClass = type("_DynamicClass", (), {})
+160 |     _NotADynamicClass = type("_NotADynamicClass")
+161 | 
+    -     print(_T, _P, _NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
+162 +     print(T, _P, _NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
+163 | 
+164 | # Do not emit diagnostic if parameter is private
+165 | # even if it is later shadowed in the body of the function
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 RUF052 [*] Local dummy variable `_NT` is accessed
    --> RUF052.py:155:5
@@ -230,24 +223,23 @@ RUF052 [*] Local dummy variable `_NT` is accessed
 157 |     _NT2 = namedtuple("_NT2", ['x', 'y', 'z'])
     |
 help: Remove leading underscores
-
-ℹ Unsafe fix
-152 152 | 
-153 153 |     _P = ParamSpec("_P")
-154 154 |     _T = TypeVar(name="_T", covariant=True, bound=int|str)
-155     |-    _NT = NamedTuple("_NT", [("foo", int)])
-    155 |+    NT = NamedTuple("NT", [("foo", int)])
-156 156 |     _E = Enum("_E", ["a", "b", "c"])
-157 157 |     _NT2 = namedtuple("_NT2", ['x', 'y', 'z'])
-158 158 |     _NT3 = namedtuple(typename="_NT3", field_names=['x', 'y', 'z'])
-159 159 |     _DynamicClass = type("_DynamicClass", (), {})
-160 160 |     _NotADynamicClass = type("_NotADynamicClass")
-161 161 | 
-162     |-    print(_T, _P, _NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
-    162 |+    print(_T, _P, NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
-163 163 | 
-164 164 | # Do not emit diagnostic if parameter is private
-165 165 | # even if it is later shadowed in the body of the function
+152 | 
+153 |     _P = ParamSpec("_P")
+154 |     _T = TypeVar(name="_T", covariant=True, bound=int|str)
+    -     _NT = NamedTuple("_NT", [("foo", int)])
+155 +     NT = NamedTuple("NT", [("foo", int)])
+156 |     _E = Enum("_E", ["a", "b", "c"])
+157 |     _NT2 = namedtuple("_NT2", ['x', 'y', 'z'])
+158 |     _NT3 = namedtuple(typename="_NT3", field_names=['x', 'y', 'z'])
+159 |     _DynamicClass = type("_DynamicClass", (), {})
+160 |     _NotADynamicClass = type("_NotADynamicClass")
+161 | 
+    -     print(_T, _P, _NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
+162 +     print(_T, _P, NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
+163 | 
+164 | # Do not emit diagnostic if parameter is private
+165 | # even if it is later shadowed in the body of the function
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 RUF052 [*] Local dummy variable `_E` is accessed
    --> RUF052.py:156:5
@@ -260,23 +252,22 @@ RUF052 [*] Local dummy variable `_E` is accessed
 158 |     _NT3 = namedtuple(typename="_NT3", field_names=['x', 'y', 'z'])
     |
 help: Remove leading underscores
-
-ℹ Unsafe fix
-153 153 |     _P = ParamSpec("_P")
-154 154 |     _T = TypeVar(name="_T", covariant=True, bound=int|str)
-155 155 |     _NT = NamedTuple("_NT", [("foo", int)])
-156     |-    _E = Enum("_E", ["a", "b", "c"])
-    156 |+    E = Enum("E", ["a", "b", "c"])
-157 157 |     _NT2 = namedtuple("_NT2", ['x', 'y', 'z'])
-158 158 |     _NT3 = namedtuple(typename="_NT3", field_names=['x', 'y', 'z'])
-159 159 |     _DynamicClass = type("_DynamicClass", (), {})
-160 160 |     _NotADynamicClass = type("_NotADynamicClass")
-161 161 | 
-162     |-    print(_T, _P, _NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
-    162 |+    print(_T, _P, _NT, E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
-163 163 | 
-164 164 | # Do not emit diagnostic if parameter is private
-165 165 | # even if it is later shadowed in the body of the function
+153 |     _P = ParamSpec("_P")
+154 |     _T = TypeVar(name="_T", covariant=True, bound=int|str)
+155 |     _NT = NamedTuple("_NT", [("foo", int)])
+    -     _E = Enum("_E", ["a", "b", "c"])
+156 +     E = Enum("E", ["a", "b", "c"])
+157 |     _NT2 = namedtuple("_NT2", ['x', 'y', 'z'])
+158 |     _NT3 = namedtuple(typename="_NT3", field_names=['x', 'y', 'z'])
+159 |     _DynamicClass = type("_DynamicClass", (), {})
+160 |     _NotADynamicClass = type("_NotADynamicClass")
+161 | 
+    -     print(_T, _P, _NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
+162 +     print(_T, _P, _NT, E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
+163 | 
+164 | # Do not emit diagnostic if parameter is private
+165 | # even if it is later shadowed in the body of the function
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 RUF052 [*] Local dummy variable `_NT2` is accessed
    --> RUF052.py:157:5
@@ -289,22 +280,21 @@ RUF052 [*] Local dummy variable `_NT2` is accessed
 159 |     _DynamicClass = type("_DynamicClass", (), {})
     |
 help: Remove leading underscores
-
-ℹ Unsafe fix
-154 154 |     _T = TypeVar(name="_T", covariant=True, bound=int|str)
-155 155 |     _NT = NamedTuple("_NT", [("foo", int)])
-156 156 |     _E = Enum("_E", ["a", "b", "c"])
-157     |-    _NT2 = namedtuple("_NT2", ['x', 'y', 'z'])
-    157 |+    NT2 = namedtuple("NT2", ['x', 'y', 'z'])
-158 158 |     _NT3 = namedtuple(typename="_NT3", field_names=['x', 'y', 'z'])
-159 159 |     _DynamicClass = type("_DynamicClass", (), {})
-160 160 |     _NotADynamicClass = type("_NotADynamicClass")
-161 161 | 
-162     |-    print(_T, _P, _NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
-    162 |+    print(_T, _P, _NT, _E, NT2, _NT3, _DynamicClass, _NotADynamicClass)
-163 163 | 
-164 164 | # Do not emit diagnostic if parameter is private
-165 165 | # even if it is later shadowed in the body of the function
+154 |     _T = TypeVar(name="_T", covariant=True, bound=int|str)
+155 |     _NT = NamedTuple("_NT", [("foo", int)])
+156 |     _E = Enum("_E", ["a", "b", "c"])
+    -     _NT2 = namedtuple("_NT2", ['x', 'y', 'z'])
+157 +     NT2 = namedtuple("NT2", ['x', 'y', 'z'])
+158 |     _NT3 = namedtuple(typename="_NT3", field_names=['x', 'y', 'z'])
+159 |     _DynamicClass = type("_DynamicClass", (), {})
+160 |     _NotADynamicClass = type("_NotADynamicClass")
+161 | 
+    -     print(_T, _P, _NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
+162 +     print(_T, _P, _NT, _E, NT2, _NT3, _DynamicClass, _NotADynamicClass)
+163 | 
+164 | # Do not emit diagnostic if parameter is private
+165 | # even if it is later shadowed in the body of the function
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 RUF052 [*] Local dummy variable `_NT3` is accessed
    --> RUF052.py:158:5
@@ -317,21 +307,20 @@ RUF052 [*] Local dummy variable `_NT3` is accessed
 160 |     _NotADynamicClass = type("_NotADynamicClass")
     |
 help: Remove leading underscores
-
-ℹ Unsafe fix
-155 155 |     _NT = NamedTuple("_NT", [("foo", int)])
-156 156 |     _E = Enum("_E", ["a", "b", "c"])
-157 157 |     _NT2 = namedtuple("_NT2", ['x', 'y', 'z'])
-158     |-    _NT3 = namedtuple(typename="_NT3", field_names=['x', 'y', 'z'])
-    158 |+    NT3 = namedtuple(typename="NT3", field_names=['x', 'y', 'z'])
-159 159 |     _DynamicClass = type("_DynamicClass", (), {})
-160 160 |     _NotADynamicClass = type("_NotADynamicClass")
-161 161 | 
-162     |-    print(_T, _P, _NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
-    162 |+    print(_T, _P, _NT, _E, _NT2, NT3, _DynamicClass, _NotADynamicClass)
-163 163 | 
-164 164 | # Do not emit diagnostic if parameter is private
-165 165 | # even if it is later shadowed in the body of the function
+155 |     _NT = NamedTuple("_NT", [("foo", int)])
+156 |     _E = Enum("_E", ["a", "b", "c"])
+157 |     _NT2 = namedtuple("_NT2", ['x', 'y', 'z'])
+    -     _NT3 = namedtuple(typename="_NT3", field_names=['x', 'y', 'z'])
+158 +     NT3 = namedtuple(typename="NT3", field_names=['x', 'y', 'z'])
+159 |     _DynamicClass = type("_DynamicClass", (), {})
+160 |     _NotADynamicClass = type("_NotADynamicClass")
+161 | 
+    -     print(_T, _P, _NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
+162 +     print(_T, _P, _NT, _E, _NT2, NT3, _DynamicClass, _NotADynamicClass)
+163 | 
+164 | # Do not emit diagnostic if parameter is private
+165 | # even if it is later shadowed in the body of the function
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 RUF052 [*] Local dummy variable `_DynamicClass` is accessed
    --> RUF052.py:159:5
@@ -343,20 +332,19 @@ RUF052 [*] Local dummy variable `_DynamicClass` is accessed
 160 |     _NotADynamicClass = type("_NotADynamicClass")
     |
 help: Remove leading underscores
-
-ℹ Unsafe fix
-156 156 |     _E = Enum("_E", ["a", "b", "c"])
-157 157 |     _NT2 = namedtuple("_NT2", ['x', 'y', 'z'])
-158 158 |     _NT3 = namedtuple(typename="_NT3", field_names=['x', 'y', 'z'])
-159     |-    _DynamicClass = type("_DynamicClass", (), {})
-    159 |+    DynamicClass = type("DynamicClass", (), {})
-160 160 |     _NotADynamicClass = type("_NotADynamicClass")
-161 161 | 
-162     |-    print(_T, _P, _NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
-    162 |+    print(_T, _P, _NT, _E, _NT2, _NT3, DynamicClass, _NotADynamicClass)
-163 163 | 
-164 164 | # Do not emit diagnostic if parameter is private
-165 165 | # even if it is later shadowed in the body of the function
+156 |     _E = Enum("_E", ["a", "b", "c"])
+157 |     _NT2 = namedtuple("_NT2", ['x', 'y', 'z'])
+158 |     _NT3 = namedtuple(typename="_NT3", field_names=['x', 'y', 'z'])
+    -     _DynamicClass = type("_DynamicClass", (), {})
+159 +     DynamicClass = type("DynamicClass", (), {})
+160 |     _NotADynamicClass = type("_NotADynamicClass")
+161 | 
+    -     print(_T, _P, _NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
+162 +     print(_T, _P, _NT, _E, _NT2, _NT3, DynamicClass, _NotADynamicClass)
+163 | 
+164 | # Do not emit diagnostic if parameter is private
+165 | # even if it is later shadowed in the body of the function
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 RUF052 [*] Local dummy variable `_NotADynamicClass` is accessed
    --> RUF052.py:160:5
@@ -369,19 +357,18 @@ RUF052 [*] Local dummy variable `_NotADynamicClass` is accessed
 162 |     print(_T, _P, _NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
     |
 help: Remove leading underscores
-
-ℹ Unsafe fix
-157 157 |     _NT2 = namedtuple("_NT2", ['x', 'y', 'z'])
-158 158 |     _NT3 = namedtuple(typename="_NT3", field_names=['x', 'y', 'z'])
-159 159 |     _DynamicClass = type("_DynamicClass", (), {})
-160     |-    _NotADynamicClass = type("_NotADynamicClass")
-    160 |+    NotADynamicClass = type("_NotADynamicClass")
-161 161 | 
-162     |-    print(_T, _P, _NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
-    162 |+    print(_T, _P, _NT, _E, _NT2, _NT3, _DynamicClass, NotADynamicClass)
-163 163 | 
-164 164 | # Do not emit diagnostic if parameter is private
-165 165 | # even if it is later shadowed in the body of the function
+157 |     _NT2 = namedtuple("_NT2", ['x', 'y', 'z'])
+158 |     _NT3 = namedtuple(typename="_NT3", field_names=['x', 'y', 'z'])
+159 |     _DynamicClass = type("_DynamicClass", (), {})
+    -     _NotADynamicClass = type("_NotADynamicClass")
+160 +     NotADynamicClass = type("_NotADynamicClass")
+161 | 
+    -     print(_T, _P, _NT, _E, _NT2, _NT3, _DynamicClass, _NotADynamicClass)
+162 +     print(_T, _P, _NT, _E, _NT2, _NT3, _DynamicClass, NotADynamicClass)
+163 | 
+164 | # Do not emit diagnostic if parameter is private
+165 | # even if it is later shadowed in the body of the function
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 RUF052 [*] Local dummy variable `_dummy_var` is accessed
    --> RUF052.py:182:5
@@ -393,21 +380,20 @@ RUF052 [*] Local dummy variable `_dummy_var` is accessed
 184 |     def bar():
     |
 help: Prefer using trailing underscores to avoid shadowing a variable
-
-ℹ Unsafe fix
-179 179 | 
-180 180 | 
-181 181 | def foo():
-182     |-    _dummy_var = 42
-    182 |+    dummy_var_ = 42
-183 183 | 
-184 184 |     def bar():
-185 185 |         dummy_var = 43
-186     |-        print(_dummy_var)
-    186 |+        print(dummy_var_)
-187 187 | 
-188 188 | 
-189 189 | def foo():
+179 | 
+180 | 
+181 | def foo():
+    -     _dummy_var = 42
+182 +     dummy_var_ = 42
+183 | 
+184 |     def bar():
+185 |         dummy_var = 43
+    -         print(_dummy_var)
+186 +         print(dummy_var_)
+187 | 
+188 | 
+189 | def foo():
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 RUF052 Local dummy variable `_dummy_var` is accessed
    --> RUF052.py:192:5

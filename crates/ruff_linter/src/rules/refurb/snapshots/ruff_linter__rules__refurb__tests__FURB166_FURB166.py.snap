@@ -12,15 +12,14 @@ FURB166 [*] Use of `int` with explicit `base=2` after removing prefix
 5 | _ = int("0xFFFF"[2:], 16)
   |
 help: Replace with `base=0`
-
-ℹ Unsafe fix
-1 1 | # Errors
-2 2 | 
-3   |-_ = int("0b1010"[2:], 2)
-  3 |+_ = int("0b1010", 0)
-4 4 | _ = int("0o777"[2:], 8)
-5 5 | _ = int("0xFFFF"[2:], 16)
-6 6 | 
+1 | # Errors
+2 | 
+  - _ = int("0b1010"[2:], 2)
+3 + _ = int("0b1010", 0)
+4 | _ = int("0o777"[2:], 8)
+5 | _ = int("0xFFFF"[2:], 16)
+6 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 FURB166 [*] Use of `int` with explicit `base=8` after removing prefix
  --> FURB166.py:4:5
@@ -31,16 +30,15 @@ FURB166 [*] Use of `int` with explicit `base=8` after removing prefix
 5 | _ = int("0xFFFF"[2:], 16)
   |
 help: Replace with `base=0`
-
-ℹ Unsafe fix
-1 1 | # Errors
-2 2 | 
-3 3 | _ = int("0b1010"[2:], 2)
-4   |-_ = int("0o777"[2:], 8)
-  4 |+_ = int("0o777", 0)
-5 5 | _ = int("0xFFFF"[2:], 16)
-6 6 | 
-7 7 | b = "0b11"
+1 | # Errors
+2 | 
+3 | _ = int("0b1010"[2:], 2)
+  - _ = int("0o777"[2:], 8)
+4 + _ = int("0o777", 0)
+5 | _ = int("0xFFFF"[2:], 16)
+6 | 
+7 | b = "0b11"
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 FURB166 [*] Use of `int` with explicit `base=16` after removing prefix
  --> FURB166.py:5:5
@@ -53,16 +51,15 @@ FURB166 [*] Use of `int` with explicit `base=16` after removing prefix
 7 | b = "0b11"
   |
 help: Replace with `base=0`
-
-ℹ Unsafe fix
-2 2 | 
-3 3 | _ = int("0b1010"[2:], 2)
-4 4 | _ = int("0o777"[2:], 8)
-5   |-_ = int("0xFFFF"[2:], 16)
-  5 |+_ = int("0xFFFF", 0)
-6 6 | 
-7 7 | b = "0b11"
-8 8 | _ = int(b[2:], 2)
+2 | 
+3 | _ = int("0b1010"[2:], 2)
+4 | _ = int("0o777"[2:], 8)
+  - _ = int("0xFFFF"[2:], 16)
+5 + _ = int("0xFFFF", 0)
+6 | 
+7 | b = "0b11"
+8 | _ = int(b[2:], 2)
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 FURB166 [*] Use of `int` with explicit `base=2` after removing prefix
   --> FURB166.py:8:5
@@ -74,16 +71,15 @@ FURB166 [*] Use of `int` with explicit `base=2` after removing prefix
 10 | _ = int("0xFFFF"[2:], base=16)
    |
 help: Replace with `base=0`
-
-ℹ Unsafe fix
-5 5 | _ = int("0xFFFF"[2:], 16)
-6 6 | 
-7 7 | b = "0b11"
-8   |-_ = int(b[2:], 2)
-  8 |+_ = int(b, 0)
-9 9 | 
-10 10 | _ = int("0xFFFF"[2:], base=16)
-11 11 | 
+5  | _ = int("0xFFFF"[2:], 16)
+6  | 
+7  | b = "0b11"
+   - _ = int(b[2:], 2)
+8  + _ = int(b, 0)
+9  | 
+10 | _ = int("0xFFFF"[2:], base=16)
+11 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 FURB166 [*] Use of `int` with explicit `base=16` after removing prefix
   --> FURB166.py:10:5
@@ -96,16 +92,15 @@ FURB166 [*] Use of `int` with explicit `base=16` after removing prefix
 12 | _ = int(b"0xFFFF"[2:], 16)
    |
 help: Replace with `base=0`
-
-ℹ Unsafe fix
-7  7  | b = "0b11"
-8  8  | _ = int(b[2:], 2)
-9  9  | 
-10    |-_ = int("0xFFFF"[2:], base=16)
-   10 |+_ = int("0xFFFF", base=0)
-11 11 | 
-12 12 | _ = int(b"0xFFFF"[2:], 16)
-13 13 | 
+7  | b = "0b11"
+8  | _ = int(b[2:], 2)
+9  | 
+   - _ = int("0xFFFF"[2:], base=16)
+10 + _ = int("0xFFFF", base=0)
+11 | 
+12 | _ = int(b"0xFFFF"[2:], 16)
+13 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 FURB166 [*] Use of `int` with explicit `base=16` after removing prefix
   --> FURB166.py:12:5
@@ -116,16 +111,15 @@ FURB166 [*] Use of `int` with explicit `base=16` after removing prefix
    |     ^^^^^^^^^^^^^^^^^^^^^^
    |
 help: Replace with `base=0`
-
-ℹ Unsafe fix
-9  9  | 
-10 10 | _ = int("0xFFFF"[2:], base=16)
-11 11 | 
-12    |-_ = int(b"0xFFFF"[2:], 16)
-   12 |+_ = int(b"0xFFFF", 0)
-13 13 | 
-14 14 | 
-15 15 | def get_str():
+9  | 
+10 | _ = int("0xFFFF"[2:], base=16)
+11 | 
+   - _ = int(b"0xFFFF"[2:], 16)
+12 + _ = int(b"0xFFFF", 0)
+13 | 
+14 | 
+15 | def get_str():
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 FURB166 [*] Use of `int` with explicit `base=16` after removing prefix
   --> FURB166.py:19:5
@@ -136,13 +130,12 @@ FURB166 [*] Use of `int` with explicit `base=16` after removing prefix
 21 | # OK
    |
 help: Replace with `base=0`
-
-ℹ Unsafe fix
-16 16 |     return "0xFFF"
-17 17 | 
-18 18 | 
-19    |-_ = int(get_str()[2:], 16)
-   19 |+_ = int(get_str(), 0)
-20 20 | 
-21 21 | # OK
-22 22 |
+16 |     return "0xFFF"
+17 | 
+18 | 
+   - _ = int(get_str()[2:], 16)
+19 + _ = int(get_str(), 0)
+20 | 
+21 | # OK
+22 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior

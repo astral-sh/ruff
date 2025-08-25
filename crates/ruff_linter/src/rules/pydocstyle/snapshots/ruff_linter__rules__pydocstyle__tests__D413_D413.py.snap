@@ -12,15 +12,13 @@ D413 [*] Missing blank line after last section ("Returns")
 9 | """
   |
 help: Add blank line after "Returns"
-
-ℹ Safe fix
-6  6  | 
-7  7  | Returns:
-8  8  |     the value
-   9  |+
-9  10 | """
-10 11 | 
-11 12 | 
+6  | 
+7  | Returns:
+8  |     the value
+9  + 
+10 | """
+11 | 
+12 | 
 
 D413 [*] Missing blank line after last section ("Returns")
   --> D413.py:19:5
@@ -33,15 +31,13 @@ D413 [*] Missing blank line after last section ("Returns")
 21 |     """
    |
 help: Add blank line after "Returns"
-
-ℹ Safe fix
-18 18 | 
-19 19 |     Returns:
-20 20 |         the value
-   21 |+
-21 22 |     """
-22 23 | 
-23 24 | 
+18 | 
+19 |     Returns:
+20 |         the value
+21 + 
+22 |     """
+23 | 
+24 | 
 
 D413 [*] Missing blank line after last section ("Returns")
   --> D413.py:58:5
@@ -53,18 +49,16 @@ D413 [*] Missing blank line after last section ("Returns")
 59 |         the value"""
    |
 help: Add blank line after "Returns"
-
-ℹ Safe fix
-56 56 |             with a hanging indent
-57 57 | 
-58 58 |     Returns:
-59    |-        the value"""
-   59 |+        the value
-   60 |+
-   61 |+    """
-60 62 | 
-61 63 | 
-62 64 | def func():
+56 |             with a hanging indent
+57 | 
+58 |     Returns:
+   -         the value"""
+59 +         the value
+60 + 
+61 +     """
+62 | 
+63 | 
+64 | def func():
 
 D413 [*] Missing blank line after last section ("Returns")
   --> D413.py:69:5
@@ -77,18 +71,16 @@ D413 [*] Missing blank line after last section ("Returns")
 71 |         """
    |
 help: Add blank line after "Returns"
-
-ℹ Safe fix
-68 68 | 
-69 69 |     Returns:
-70 70 |         the value
-71    |-        """
-72 71 | 
-   72 |+    """
-   73 |+
-73 74 | 
-74 75 | def func():
-75 76 |     ("""Docstring.
+68 | 
+69 |     Returns:
+70 |         the value
+   -         """
+71 | 
+72 +     """
+73 + 
+74 | 
+75 | def func():
+76 |     ("""Docstring.
 
 D413 [*] Missing blank line after last section ("Raises")
   --> D413.py:77:5
@@ -101,10 +93,8 @@ D413 [*] Missing blank line after last section ("Raises")
 79 |     """)
    |
 help: Add blank line after "Raises"
-
-ℹ Safe fix
-76 76 | 
-77 77 |     Raises:
-78 78 |         ValueError: An error.
-   79 |+
-79 80 |     """)
+76 | 
+77 |     Raises:
+78 |         ValueError: An error.
+79 + 
+80 |     """)

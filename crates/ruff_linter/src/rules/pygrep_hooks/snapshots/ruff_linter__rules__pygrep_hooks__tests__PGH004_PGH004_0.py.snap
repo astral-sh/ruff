@@ -42,16 +42,15 @@ PGH004 [*] Use a colon when specifying `noqa` rule codes
 20 | # PGH004
    |
 help: Add missing colon
-
-ℹ Unsafe fix
-15 15 | x = 2  # noqa:X100
-16 16 | 
-17 17 | # PGH004
-18    |-x = 2  # noqa X100
-   18 |+x = 2  # noqa: X100
-19 19 | 
-20 20 | # PGH004
-21 21 | x = 2  # noqa X100, X200
+15 | x = 2  # noqa:X100
+16 | 
+17 | # PGH004
+   - x = 2  # noqa X100
+18 + x = 2  # noqa: X100
+19 | 
+20 | # PGH004
+21 | x = 2  # noqa X100, X200
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 PGH004 [*] Use a colon when specifying `noqa` rule codes
   --> PGH004_0.py:21:8
@@ -63,13 +62,12 @@ PGH004 [*] Use a colon when specifying `noqa` rule codes
 23 | # PGH004
    |
 help: Add missing colon
-
-ℹ Unsafe fix
-18 18 | x = 2  # noqa X100
-19 19 | 
-20 20 | # PGH004
-21    |-x = 2  # noqa X100, X200
-   21 |+x = 2  # noqa: X100, X200
-22 22 | 
-23 23 | # PGH004
-24 24 | x = 2  # noqa : X300
+18 | x = 2  # noqa X100
+19 | 
+20 | # PGH004
+   - x = 2  # noqa X100, X200
+21 + x = 2  # noqa: X100, X200
+22 | 
+23 | # PGH004
+24 | x = 2  # noqa : X300
+note: This is an unsafe fix and may remove comments or change runtime behavior

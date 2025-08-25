@@ -12,15 +12,14 @@ TC003 [*] Move standard library import `typing.Final` into a type-checking block
 7 | Const: Final[dict] = {}
   |
 help: Move into type-checking block
-
-ℹ Unsafe fix
-2 2 | 
-3 3 | from __future__ import annotations
-4 4 | 
-5   |-from typing import Final
-  5 |+from typing import TYPE_CHECKING
-  6 |+
-  7 |+if TYPE_CHECKING:
-  8 |+    from typing import Final
-6 9 | 
-7 10 | Const: Final[dict] = {}
+2  | 
+3  | from __future__ import annotations
+4  | 
+   - from typing import Final
+5  + from typing import TYPE_CHECKING
+6  + 
+7  + if TYPE_CHECKING:
+8  +     from typing import Final
+9  | 
+10 | Const: Final[dict] = {}
+note: This is an unsafe fix and may remove comments or change runtime behavior

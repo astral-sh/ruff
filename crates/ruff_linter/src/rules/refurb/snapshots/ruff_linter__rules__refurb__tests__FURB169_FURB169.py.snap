@@ -12,16 +12,14 @@ FURB169 [*] When checking against `None`, use `is` instead of comparison with `t
 7 | type(None) is type(foo)
   |
 help: Replace with `is None`
-
-ℹ Safe fix
-2 2 | 
-3 3 | # Error.
-4 4 | 
-5   |-type(foo) is type(None)
-  5 |+foo is None
-6 6 | 
-7 7 | type(None) is type(foo)
-8 8 | 
+2 | 
+3 | # Error.
+4 | 
+  - type(foo) is type(None)
+5 + foo is None
+6 | 
+7 | type(None) is type(foo)
+8 | 
 
 FURB169 [*] When checking against `None`, use `is` instead of comparison with `type(None)`
  --> FURB169.py:7:1
@@ -34,16 +32,14 @@ FURB169 [*] When checking against `None`, use `is` instead of comparison with `t
 9 | type(None) is type(None)
   |
 help: Replace with `is None`
-
-ℹ Safe fix
-4 4 | 
-5 5 | type(foo) is type(None)
-6 6 | 
-7   |-type(None) is type(foo)
-  7 |+foo is None
-8 8 | 
-9 9 | type(None) is type(None)
-10 10 | 
+4  | 
+5  | type(foo) is type(None)
+6  | 
+   - type(None) is type(foo)
+7  + foo is None
+8  | 
+9  | type(None) is type(None)
+10 | 
 
 FURB169 [*] When checking against `None`, use `is` instead of comparison with `type(None)`
   --> FURB169.py:9:1
@@ -56,16 +52,14 @@ FURB169 [*] When checking against `None`, use `is` instead of comparison with `t
 11 | type(foo) is not type(None)
    |
 help: Replace with `is None`
-
-ℹ Safe fix
-6  6  | 
-7  7  | type(None) is type(foo)
-8  8  | 
-9     |-type(None) is type(None)
-   9  |+None is None
-10 10 | 
-11 11 | type(foo) is not type(None)
-12 12 | 
+6  | 
+7  | type(None) is type(foo)
+8  | 
+   - type(None) is type(None)
+9  + None is None
+10 | 
+11 | type(foo) is not type(None)
+12 | 
 
 FURB169 [*] When checking against `None`, use `is not` instead of comparison with `type(None)`
   --> FURB169.py:11:1
@@ -78,16 +72,14 @@ FURB169 [*] When checking against `None`, use `is not` instead of comparison wit
 13 | type(None) is not type(foo)
    |
 help: Replace with `is not None`
-
-ℹ Safe fix
-8  8  | 
-9  9  | type(None) is type(None)
-10 10 | 
-11    |-type(foo) is not type(None)
-   11 |+foo is not None
-12 12 | 
-13 13 | type(None) is not type(foo)
-14 14 | 
+8  | 
+9  | type(None) is type(None)
+10 | 
+   - type(foo) is not type(None)
+11 + foo is not None
+12 | 
+13 | type(None) is not type(foo)
+14 | 
 
 FURB169 [*] When checking against `None`, use `is not` instead of comparison with `type(None)`
   --> FURB169.py:13:1
@@ -100,16 +92,14 @@ FURB169 [*] When checking against `None`, use `is not` instead of comparison wit
 15 | type(None) is not type(None)
    |
 help: Replace with `is not None`
-
-ℹ Safe fix
-10 10 | 
-11 11 | type(foo) is not type(None)
-12 12 | 
-13    |-type(None) is not type(foo)
-   13 |+foo is not None
-14 14 | 
-15 15 | type(None) is not type(None)
-16 16 | 
+10 | 
+11 | type(foo) is not type(None)
+12 | 
+   - type(None) is not type(foo)
+13 + foo is not None
+14 | 
+15 | type(None) is not type(None)
+16 | 
 
 FURB169 [*] When checking against `None`, use `is not` instead of comparison with `type(None)`
   --> FURB169.py:15:1
@@ -122,16 +112,14 @@ FURB169 [*] When checking against `None`, use `is not` instead of comparison wit
 17 | type(foo) == type(None)
    |
 help: Replace with `is not None`
-
-ℹ Safe fix
-12 12 | 
-13 13 | type(None) is not type(foo)
-14 14 | 
-15    |-type(None) is not type(None)
-   15 |+None is not None
-16 16 | 
-17 17 | type(foo) == type(None)
-18 18 | 
+12 | 
+13 | type(None) is not type(foo)
+14 | 
+   - type(None) is not type(None)
+15 + None is not None
+16 | 
+17 | type(foo) == type(None)
+18 | 
 
 FURB169 [*] When checking against `None`, use `is` instead of comparison with `type(None)`
   --> FURB169.py:17:1
@@ -144,16 +132,14 @@ FURB169 [*] When checking against `None`, use `is` instead of comparison with `t
 19 | type(None) == type(foo)
    |
 help: Replace with `is None`
-
-ℹ Safe fix
-14 14 | 
-15 15 | type(None) is not type(None)
-16 16 | 
-17    |-type(foo) == type(None)
-   17 |+foo is None
-18 18 | 
-19 19 | type(None) == type(foo)
-20 20 | 
+14 | 
+15 | type(None) is not type(None)
+16 | 
+   - type(foo) == type(None)
+17 + foo is None
+18 | 
+19 | type(None) == type(foo)
+20 | 
 
 FURB169 [*] When checking against `None`, use `is` instead of comparison with `type(None)`
   --> FURB169.py:19:1
@@ -166,16 +152,14 @@ FURB169 [*] When checking against `None`, use `is` instead of comparison with `t
 21 | type(None) == type(None)
    |
 help: Replace with `is None`
-
-ℹ Safe fix
-16 16 | 
-17 17 | type(foo) == type(None)
-18 18 | 
-19    |-type(None) == type(foo)
-   19 |+foo is None
-20 20 | 
-21 21 | type(None) == type(None)
-22 22 | 
+16 | 
+17 | type(foo) == type(None)
+18 | 
+   - type(None) == type(foo)
+19 + foo is None
+20 | 
+21 | type(None) == type(None)
+22 | 
 
 FURB169 [*] When checking against `None`, use `is` instead of comparison with `type(None)`
   --> FURB169.py:21:1
@@ -188,16 +172,14 @@ FURB169 [*] When checking against `None`, use `is` instead of comparison with `t
 23 | type(foo) != type(None)
    |
 help: Replace with `is None`
-
-ℹ Safe fix
-18 18 | 
-19 19 | type(None) == type(foo)
-20 20 | 
-21    |-type(None) == type(None)
-   21 |+None is None
-22 22 | 
-23 23 | type(foo) != type(None)
-24 24 | 
+18 | 
+19 | type(None) == type(foo)
+20 | 
+   - type(None) == type(None)
+21 + None is None
+22 | 
+23 | type(foo) != type(None)
+24 | 
 
 FURB169 [*] When checking against `None`, use `is not` instead of comparison with `type(None)`
   --> FURB169.py:23:1
@@ -210,16 +192,14 @@ FURB169 [*] When checking against `None`, use `is not` instead of comparison wit
 25 | type(None) != type(foo)
    |
 help: Replace with `is not None`
-
-ℹ Safe fix
-20 20 | 
-21 21 | type(None) == type(None)
-22 22 | 
-23    |-type(foo) != type(None)
-   23 |+foo is not None
-24 24 | 
-25 25 | type(None) != type(foo)
-26 26 | 
+20 | 
+21 | type(None) == type(None)
+22 | 
+   - type(foo) != type(None)
+23 + foo is not None
+24 | 
+25 | type(None) != type(foo)
+26 | 
 
 FURB169 [*] When checking against `None`, use `is not` instead of comparison with `type(None)`
   --> FURB169.py:25:1
@@ -232,16 +212,14 @@ FURB169 [*] When checking against `None`, use `is not` instead of comparison wit
 27 | type(None) != type(None)
    |
 help: Replace with `is not None`
-
-ℹ Safe fix
-22 22 | 
-23 23 | type(foo) != type(None)
-24 24 | 
-25    |-type(None) != type(foo)
-   25 |+foo is not None
-26 26 | 
-27 27 | type(None) != type(None)
-28 28 | 
+22 | 
+23 | type(foo) != type(None)
+24 | 
+   - type(None) != type(foo)
+25 + foo is not None
+26 | 
+27 | type(None) != type(None)
+28 | 
 
 FURB169 [*] When checking against `None`, use `is not` instead of comparison with `type(None)`
   --> FURB169.py:27:1
@@ -254,16 +232,14 @@ FURB169 [*] When checking against `None`, use `is not` instead of comparison wit
 29 | type(a.b) is type(None)
    |
 help: Replace with `is not None`
-
-ℹ Safe fix
-24 24 | 
-25 25 | type(None) != type(foo)
-26 26 | 
-27    |-type(None) != type(None)
-   27 |+None is not None
-28 28 | 
-29 29 | type(a.b) is type(None)
-30 30 | 
+24 | 
+25 | type(None) != type(foo)
+26 | 
+   - type(None) != type(None)
+27 + None is not None
+28 | 
+29 | type(a.b) is type(None)
+30 | 
 
 FURB169 [*] When checking against `None`, use `is` instead of comparison with `type(None)`
   --> FURB169.py:29:1
@@ -276,16 +252,14 @@ FURB169 [*] When checking against `None`, use `is` instead of comparison with `t
 31 | type(
    |
 help: Replace with `is None`
-
-ℹ Safe fix
-26 26 | 
-27 27 | type(None) != type(None)
-28 28 | 
-29    |-type(a.b) is type(None)
-   29 |+a.b is None
-30 30 | 
-31 31 | type(
-32 32 |     a(
+26 | 
+27 | type(None) != type(None)
+28 | 
+   - type(a.b) is type(None)
+29 + a.b is None
+30 | 
+31 | type(
+32 |     a(
 
 FURB169 [*] When checking against `None`, use `is not` instead of comparison with `type(None)`
   --> FURB169.py:31:1
@@ -302,20 +276,19 @@ FURB169 [*] When checking against `None`, use `is not` instead of comparison wit
 37 |   type(
    |
 help: Replace with `is not None`
-
-ℹ Unsafe fix
-28 28 | 
-29 29 | type(a.b) is type(None)
-30 30 | 
-31    |-type(
-32    |-    a(
-33    |-        # Comment
-34    |-    )
-35    |-) != type(None)
-   31 |+a() is not None
-36 32 | 
-37 33 | type(
-38 34 |     a := 1
+28 | 
+29 | type(a.b) is type(None)
+30 | 
+   - type(
+   -     a(
+   -         # Comment
+   -     )
+   - ) != type(None)
+31 + a() is not None
+32 | 
+33 | type(
+34 |     a := 1
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 FURB169 [*] When checking against `None`, use `is` instead of comparison with `type(None)`
   --> FURB169.py:37:1
@@ -330,18 +303,16 @@ FURB169 [*] When checking against `None`, use `is` instead of comparison with `t
 41 |   type(
    |
 help: Replace with `is None`
-
-ℹ Safe fix
-34 34 |     )
-35 35 | ) != type(None)
-36 36 | 
-37    |-type(
-38    |-    a := 1
-39    |-) == type(None)
-   37 |+(a := 1) is None
-40 38 | 
-41 39 | type(
-42 40 |     a for a in range(0)
+34 |     )
+35 | ) != type(None)
+36 | 
+   - type(
+   -     a := 1
+   - ) == type(None)
+37 + (a := 1) is None
+38 | 
+39 | type(
+40 |     a for a in range(0)
 
 FURB169 [*] When checking against `None`, use `is not` instead of comparison with `type(None)`
   --> FURB169.py:41:1
@@ -354,15 +325,13 @@ FURB169 [*] When checking against `None`, use `is not` instead of comparison wit
    | |___________________^
    |
 help: Replace with `is not None`
-
-ℹ Safe fix
-38 38 |     a := 1
-39 39 | ) == type(None)
-40 40 | 
-41    |-type(
-42    |-    a for a in range(0)
-43    |-) is not type(None)
-   41 |+(a for a in range(0)) is not None
-44 42 | 
-45 43 | 
-46 44 | # Ok.
+38 |     a := 1
+39 | ) == type(None)
+40 | 
+   - type(
+   -     a for a in range(0)
+   - ) is not type(None)
+41 + (a for a in range(0)) is not None
+42 | 
+43 | 
+44 | # Ok.

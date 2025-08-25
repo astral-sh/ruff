@@ -11,17 +11,16 @@ TC004 [*] Move import `typing.Tuple` out of type-checking block. Import is used 
 6 | x: Tuple
   |
 help: Move out of type-checking block
-
-ℹ Unsafe fix
-1 1 | from typing import TYPE_CHECKING
-  2 |+from typing import Tuple, List
-2 3 | 
-3 4 | if TYPE_CHECKING:
-4   |-    from typing import Tuple, List, Dict
-  5 |+    from typing import Dict
-5 6 | 
-6 7 | x: Tuple
-7 8 | 
+1 | from typing import TYPE_CHECKING
+2 + from typing import Tuple, List
+3 | 
+4 | if TYPE_CHECKING:
+  -     from typing import Tuple, List, Dict
+5 +     from typing import Dict
+6 | 
+7 | x: Tuple
+8 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 TC004 [*] Move import `typing.List` out of type-checking block. Import is used for more than type hinting.
  --> TC004_9.py:4:31
@@ -33,14 +32,13 @@ TC004 [*] Move import `typing.List` out of type-checking block. Import is used f
 6 | x: Tuple
   |
 help: Move out of type-checking block
-
-ℹ Unsafe fix
-1 1 | from typing import TYPE_CHECKING
-  2 |+from typing import Tuple, List
-2 3 | 
-3 4 | if TYPE_CHECKING:
-4   |-    from typing import Tuple, List, Dict
-  5 |+    from typing import Dict
-5 6 | 
-6 7 | x: Tuple
-7 8 |
+1 | from typing import TYPE_CHECKING
+2 + from typing import Tuple, List
+3 | 
+4 | if TYPE_CHECKING:
+  -     from typing import Tuple, List, Dict
+5 +     from typing import Dict
+6 | 
+7 | x: Tuple
+8 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior

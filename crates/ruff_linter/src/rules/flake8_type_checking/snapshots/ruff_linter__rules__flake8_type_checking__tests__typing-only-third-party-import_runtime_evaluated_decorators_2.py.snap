@@ -10,16 +10,15 @@ TC002 [*] Move third-party import `numpy` into a type-checking block
    |        ^^^^^
    |
 help: Move into type-checking block
-
-ℹ Unsafe fix
-7  7  | import pyproj
-8  8  | from attrs import frozen
-9  9  | 
-10    |-import numpy  # TC002
-   10 |+from typing import TYPE_CHECKING
-   11 |+
-   12 |+if TYPE_CHECKING:
-   13 |+    import numpy
-11 14 | 
-12 15 | 
-13 16 | @attrs.define(auto_attribs=True)
+7  | import pyproj
+8  | from attrs import frozen
+9  | 
+   - import numpy  # TC002
+10 + from typing import TYPE_CHECKING
+11 + 
+12 + if TYPE_CHECKING:
+13 +     import numpy
+14 | 
+15 | 
+16 | @attrs.define(auto_attribs=True)
+note: This is an unsafe fix and may remove comments or change runtime behavior

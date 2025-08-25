@@ -11,18 +11,17 @@ AIR302 [*] `airflow.hooks.jdbc_hook.JdbcHook` is moved into `jdbc` provider in A
 9 | jaydebeapi()
   |
 help: Install `apache-airflow-providers-jdbc>=1.0.0` and use `JdbcHook` from `airflow.providers.jdbc.hooks.jdbc` instead.
-
-ℹ Unsafe fix
-1 1 | from __future__ import annotations
-2 2 | 
-3 3 | from airflow.hooks.jdbc_hook import (
-4   |-    JdbcHook,
-5 4 |     jaydebeapi,
-6 5 | )
-  6 |+from airflow.providers.jdbc.hooks.jdbc import JdbcHook
-7 7 | 
-8 8 | JdbcHook()
-9 9 | jaydebeapi()
+1 | from __future__ import annotations
+2 | 
+3 | from airflow.hooks.jdbc_hook import (
+  -     JdbcHook,
+4 |     jaydebeapi,
+5 | )
+6 + from airflow.providers.jdbc.hooks.jdbc import JdbcHook
+7 | 
+8 | JdbcHook()
+9 | jaydebeapi()
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 AIR302 [*] `airflow.hooks.jdbc_hook.jaydebeapi` is moved into `jdbc` provider in Airflow 3.0;
  --> AIR302_jdbc.py:9:1
@@ -32,14 +31,13 @@ AIR302 [*] `airflow.hooks.jdbc_hook.jaydebeapi` is moved into `jdbc` provider in
   | ^^^^^^^^^^
   |
 help: Install `apache-airflow-providers-jdbc>=1.0.0` and use `jaydebeapi` from `airflow.providers.jdbc.hooks.jdbc` instead.
-
-ℹ Unsafe fix
-2 2 | 
-3 3 | from airflow.hooks.jdbc_hook import (
-4 4 |     JdbcHook,
-5   |-    jaydebeapi,
-6 5 | )
-  6 |+from airflow.providers.jdbc.hooks.jdbc import jaydebeapi
-7 7 | 
-8 8 | JdbcHook()
-9 9 | jaydebeapi()
+2 | 
+3 | from airflow.hooks.jdbc_hook import (
+4 |     JdbcHook,
+  -     jaydebeapi,
+5 | )
+6 + from airflow.providers.jdbc.hooks.jdbc import jaydebeapi
+7 | 
+8 | JdbcHook()
+9 | jaydebeapi()
+note: This is an unsafe fix and may remove comments or change runtime behavior

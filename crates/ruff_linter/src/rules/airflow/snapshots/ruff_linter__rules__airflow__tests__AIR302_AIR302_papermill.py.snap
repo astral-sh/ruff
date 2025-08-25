@@ -10,11 +10,10 @@ AIR302 [*] `airflow.operators.papermill_operator.PapermillOperator` is moved int
   | ^^^^^^^^^^^^^^^^^
   |
 help: Install `apache-airflow-providers-papermill>=1.0.0` and use `PapermillOperator` from `airflow.providers.papermill.operators.papermill` instead.
-
-ℹ Unsafe fix
-1 1 | from __future__ import annotations
-2 2 | 
-3   |-from airflow.operators.papermill_operator import PapermillOperator
-  3 |+from airflow.providers.papermill.operators.papermill import PapermillOperator
-4 4 | 
-5 5 | PapermillOperator()
+1 | from __future__ import annotations
+2 | 
+  - from airflow.operators.papermill_operator import PapermillOperator
+3 + from airflow.providers.papermill.operators.papermill import PapermillOperator
+4 | 
+5 | PapermillOperator()
+note: This is an unsafe fix and may remove comments or change runtime behavior

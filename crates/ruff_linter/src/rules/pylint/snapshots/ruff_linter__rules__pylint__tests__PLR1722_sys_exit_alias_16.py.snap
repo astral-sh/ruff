@@ -12,16 +12,15 @@ PLR1722 [*] Use `sys.exit()` instead of `exit`
 5 |     )  # 3
   |
 help: Replace `exit` with `sys.exit()`
-
-ℹ Unsafe fix
-  1 |+import sys
-1 2 | def test_case_1():
-2 3 |     # comments preserved with a positional argument
-3   |-    exit(  # comment
-  4 |+    sys.exit(  # comment
-4 5 |         1,  # 2
-5 6 |     )  # 3
-6 7 | 
+1 + import sys
+2 | def test_case_1():
+3 |     # comments preserved with a positional argument
+  -     exit(  # comment
+4 +     sys.exit(  # comment
+5 |         1,  # 2
+6 |     )  # 3
+7 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 PLR1722 [*] Use `sys.exit()` instead of `exit`
   --> sys_exit_alias_16.py:10:5
@@ -34,23 +33,22 @@ PLR1722 [*] Use `sys.exit()` instead of `exit`
 12 |     )  # 3
    |
 help: Replace `exit` with `sys.exit()`
-
-ℹ Unsafe fix
-   1  |+import sys
-1  2  | def test_case_1():
-2  3  |     # comments preserved with a positional argument
-3  4  |     exit(  # comment
+1  + import sys
+2  | def test_case_1():
+3  |     # comments preserved with a positional argument
+4  |     exit(  # comment
 --------------------------------------------------------------------------------
-7  8  | 
-8  9  | def test_case_2():
-9  10 |     # comments preserved with a single keyword argument
-10    |-    exit(  # comment
-11    |-        code=1,  # 2
-   11 |+    sys.exit(  # comment
-   12 |+        1,  # 2
-12 13 |     )  # 3
-13 14 | 
-14 15 | 
+8  | 
+9  | def test_case_2():
+10 |     # comments preserved with a single keyword argument
+   -     exit(  # comment
+   -         code=1,  # 2
+11 +     sys.exit(  # comment
+12 +         1,  # 2
+13 |     )  # 3
+14 | 
+15 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 PLR1722 Use `sys.exit()` instead of `exit`
   --> sys_exit_alias_16.py:17:5
@@ -71,15 +69,14 @@ PLR1722 [*] Use `sys.exit()` instead of `exit`
    |     ^^^^
    |
 help: Replace `exit` with `sys.exit()`
-
-ℹ Unsafe fix
-   1  |+import sys
-1  2  | def test_case_1():
-2  3  |     # comments preserved with a positional argument
-3  4  |     exit(  # comment
+1  + import sys
+2  | def test_case_1():
+3  |     # comments preserved with a positional argument
+4  |     exit(  # comment
 --------------------------------------------------------------------------------
-20 21 | def test_case_4():
-21 22 |     # this should now be fixable
-22 23 |     codes = [1]
-23    |-    exit(*codes)
-   24 |+    sys.exit(*codes)
+21 | def test_case_4():
+22 |     # this should now be fixable
+23 |     codes = [1]
+   -     exit(*codes)
+24 +     sys.exit(*codes)
+note: This is an unsafe fix and may remove comments or change runtime behavior

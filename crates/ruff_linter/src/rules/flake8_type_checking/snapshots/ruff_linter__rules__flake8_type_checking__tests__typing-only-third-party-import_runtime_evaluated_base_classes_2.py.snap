@@ -12,23 +12,22 @@ TC002 [*] Move third-party import `geopandas` into a type-checking block
 5 | import pyproj  # TC002
   |
 help: Move into type-checking block
-
-ℹ Unsafe fix
-1  1  | from __future__ import annotations
-2  2  | 
-3     |-import geopandas as gpd  # TC002
-4  3  | import pydantic
-5  4  | import pyproj  # TC002
-6  5  | from pydantic import BaseModel
-7  6  | 
-8  7  | import numpy
-   8  |+from typing import TYPE_CHECKING
-   9  |+
-   10 |+if TYPE_CHECKING:
-   11 |+    import geopandas as gpd
-9  12 | 
-10 13 | 
-11 14 | class A(BaseModel):
+1  | from __future__ import annotations
+2  | 
+   - import geopandas as gpd  # TC002
+3  | import pydantic
+4  | import pyproj  # TC002
+5  | from pydantic import BaseModel
+6  | 
+7  | import numpy
+8  + from typing import TYPE_CHECKING
+9  + 
+10 + if TYPE_CHECKING:
+11 +     import geopandas as gpd
+12 | 
+13 | 
+14 | class A(BaseModel):
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 TC002 [*] Move third-party import `pyproj` into a type-checking block
  --> runtime_evaluated_base_classes_2.py:5:8
@@ -40,19 +39,18 @@ TC002 [*] Move third-party import `pyproj` into a type-checking block
 6 | from pydantic import BaseModel
   |
 help: Move into type-checking block
-
-ℹ Unsafe fix
-2  2  | 
-3  3  | import geopandas as gpd  # TC002
-4  4  | import pydantic
-5     |-import pyproj  # TC002
-6  5  | from pydantic import BaseModel
-7  6  | 
-8  7  | import numpy
-   8  |+from typing import TYPE_CHECKING
-   9  |+
-   10 |+if TYPE_CHECKING:
-   11 |+    import pyproj
-9  12 | 
-10 13 | 
-11 14 | class A(BaseModel):
+2  | 
+3  | import geopandas as gpd  # TC002
+4  | import pydantic
+   - import pyproj  # TC002
+5  | from pydantic import BaseModel
+6  | 
+7  | import numpy
+8  + from typing import TYPE_CHECKING
+9  + 
+10 + if TYPE_CHECKING:
+11 +     import pyproj
+12 | 
+13 | 
+14 | class A(BaseModel):
+note: This is an unsafe fix and may remove comments or change runtime behavior

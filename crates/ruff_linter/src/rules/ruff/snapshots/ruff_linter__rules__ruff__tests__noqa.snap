@@ -19,10 +19,9 @@ F841 [*] Local variable `I` is assigned to but never used
    |     ^
    |
 help: Remove assignment to unused variable `I`
-
-ℹ Unsafe fix
-21 21 | def f():
-22 22 |     # Neither of these are ignored and warning is
-23 23 |     # logged to user
-24    |-    I = 1  # noqa: E741.F841
-   24 |+    pass  # noqa: E741.F841
+21 | def f():
+22 |     # Neither of these are ignored and warning is
+23 |     # logged to user
+   -     I = 1  # noqa: E741.F841
+24 +     pass  # noqa: E741.F841
+note: This is an unsafe fix and may remove comments or change runtime behavior

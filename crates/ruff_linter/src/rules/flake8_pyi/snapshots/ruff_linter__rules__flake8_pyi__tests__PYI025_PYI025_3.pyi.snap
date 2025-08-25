@@ -10,10 +10,9 @@ PYI025 [*] Use `from collections.abc import Set as AbstractSet` to avoid confusi
   |                                    ^^^
   |
 help: Alias `Set` to `AbstractSet`
-
-ℹ Unsafe fix
-3 3 | through usage of a "redundant" `import Set as Set` alias
-4 4 | """
-5 5 | 
-6   |-from collections.abc import Set as Set  # PYI025 triggered but fix is not marked as safe
-  6 |+from collections.abc import Set as AbstractSet  # PYI025 triggered but fix is not marked as safe
+3 | through usage of a "redundant" `import Set as Set` alias
+4 | """
+5 | 
+  - from collections.abc import Set as Set  # PYI025 triggered but fix is not marked as safe
+6 + from collections.abc import Set as AbstractSet  # PYI025 triggered but fix is not marked as safe
+note: This is an unsafe fix and may remove comments or change runtime behavior

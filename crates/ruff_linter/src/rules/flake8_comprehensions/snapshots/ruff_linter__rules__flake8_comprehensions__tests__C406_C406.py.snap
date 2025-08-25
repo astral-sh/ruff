@@ -10,13 +10,12 @@ C406 [*] Unnecessary list literal (rewrite as a dict literal)
 3 | d3 = dict([])
   |
 help: Rewrite as a dict literal
-
-ℹ Unsafe fix
-1   |-d1 = dict([(1, 2)])
-  1 |+d1 = {1: 2}
-2 2 | d2 = dict(((1, 2),))
-3 3 | d3 = dict([])
-4 4 | d4 = dict(())
+  - d1 = dict([(1, 2)])
+1 + d1 = {1: 2}
+2 | d2 = dict(((1, 2),))
+3 | d3 = dict([])
+4 | d4 = dict(())
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 C406 [*] Unnecessary tuple literal (rewrite as a dict literal)
  --> C406.py:2:6
@@ -28,14 +27,13 @@ C406 [*] Unnecessary tuple literal (rewrite as a dict literal)
 4 | d4 = dict(())
   |
 help: Rewrite as a dict literal
-
-ℹ Unsafe fix
-1 1 | d1 = dict([(1, 2)])
-2   |-d2 = dict(((1, 2),))
-  2 |+d2 = {1: 2,}
-3 3 | d3 = dict([])
-4 4 | d4 = dict(())
-5 5 | d5 = dict()
+1 | d1 = dict([(1, 2)])
+  - d2 = dict(((1, 2),))
+2 + d2 = {1: 2,}
+3 | d3 = dict([])
+4 | d4 = dict(())
+5 | d5 = dict()
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 C406 [*] Unnecessary list literal (rewrite as a dict literal)
  --> C406.py:3:6
@@ -48,14 +46,13 @@ C406 [*] Unnecessary list literal (rewrite as a dict literal)
 5 | d5 = dict()
   |
 help: Rewrite as a dict literal
-
-ℹ Unsafe fix
-1 1 | d1 = dict([(1, 2)])
-2 2 | d2 = dict(((1, 2),))
-3   |-d3 = dict([])
-  3 |+d3 = {}
-4 4 | d4 = dict(())
-5 5 | d5 = dict()
+1 | d1 = dict([(1, 2)])
+2 | d2 = dict(((1, 2),))
+  - d3 = dict([])
+3 + d3 = {}
+4 | d4 = dict(())
+5 | d5 = dict()
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 C406 [*] Unnecessary tuple literal (rewrite as a dict literal)
  --> C406.py:4:6
@@ -67,11 +64,10 @@ C406 [*] Unnecessary tuple literal (rewrite as a dict literal)
 5 | d5 = dict()
   |
 help: Rewrite as a dict literal
-
-ℹ Unsafe fix
-1 1 | d1 = dict([(1, 2)])
-2 2 | d2 = dict(((1, 2),))
-3 3 | d3 = dict([])
-4   |-d4 = dict(())
-  4 |+d4 = {}
-5 5 | d5 = dict()
+1 | d1 = dict([(1, 2)])
+2 | d2 = dict(((1, 2),))
+3 | d3 = dict([])
+  - d4 = dict(())
+4 + d4 = {}
+5 | d5 = dict()
+note: This is an unsafe fix and may remove comments or change runtime behavior

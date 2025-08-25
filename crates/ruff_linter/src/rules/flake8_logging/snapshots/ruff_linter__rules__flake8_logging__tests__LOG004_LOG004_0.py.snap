@@ -12,16 +12,15 @@ LOG004 [*] `.exception()` call outside exception handlers
 15 | exc("")
    |
 help: Replace with `.error()`
-
-ℹ Unsafe fix
-10 10 | 
-11 11 | ### Errors
-12 12 | 
-13    |-logging.exception("")
-   13 |+logging.error("")
-14 14 | logger.exception("")
-15 15 | exc("")
-16 16 | 
+10 | 
+11 | ### Errors
+12 | 
+   - logging.exception("")
+13 + logging.error("")
+14 | logger.exception("")
+15 | exc("")
+16 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 LOG004 [*] `.exception()` call outside exception handlers
   --> LOG004_0.py:14:1
@@ -32,16 +31,15 @@ LOG004 [*] `.exception()` call outside exception handlers
 15 | exc("")
    |
 help: Replace with `.error()`
-
-ℹ Unsafe fix
-11 11 | ### Errors
-12 12 | 
-13 13 | logging.exception("")
-14    |-logger.exception("")
-   14 |+logger.error("")
-15 15 | exc("")
-16 16 | 
-17 17 | 
+11 | ### Errors
+12 | 
+13 | logging.exception("")
+   - logger.exception("")
+14 + logger.error("")
+15 | exc("")
+16 | 
+17 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 LOG004 `.exception()` call outside exception handlers
   --> LOG004_0.py:15:1
@@ -63,16 +61,15 @@ LOG004 [*] `.exception()` call outside exception handlers
 21 |     exc("")
    |
 help: Replace with `.error()`
-
-ℹ Unsafe fix
-16 16 | 
-17 17 | 
-18 18 | def _():
-19    |-    logging.exception("")
-   19 |+    logging.error("")
-20 20 |     logger.exception("")
-21 21 |     exc("")
-22 22 | 
+16 | 
+17 | 
+18 | def _():
+   -     logging.exception("")
+19 +     logging.error("")
+20 |     logger.exception("")
+21 |     exc("")
+22 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 LOG004 [*] `.exception()` call outside exception handlers
   --> LOG004_0.py:20:5
@@ -84,16 +81,15 @@ LOG004 [*] `.exception()` call outside exception handlers
 21 |     exc("")
    |
 help: Replace with `.error()`
-
-ℹ Unsafe fix
-17 17 | 
-18 18 | def _():
-19 19 |     logging.exception("")
-20    |-    logger.exception("")
-   20 |+    logger.error("")
-21 21 |     exc("")
-22 22 | 
-23 23 | 
+17 | 
+18 | def _():
+19 |     logging.exception("")
+   -     logger.exception("")
+20 +     logger.error("")
+21 |     exc("")
+22 | 
+23 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 LOG004 `.exception()` call outside exception handlers
   --> LOG004_0.py:21:5
@@ -116,16 +112,15 @@ LOG004 [*] `.exception()` call outside exception handlers
 30 |         exc("")
    |
 help: Replace with `.error()`
-
-ℹ Unsafe fix
-25 25 |     ...
-26 26 | except ...:
-27 27 |     def _():
-28    |-        logging.exception("")
-   28 |+        logging.error("")
-29 29 |         logger.exception("")
-30 30 |         exc("")
-31 31 | 
+25 |     ...
+26 | except ...:
+27 |     def _():
+   -         logging.exception("")
+28 +         logging.error("")
+29 |         logger.exception("")
+30 |         exc("")
+31 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 LOG004 [*] `.exception()` call outside exception handlers
   --> LOG004_0.py:29:9
@@ -137,16 +132,15 @@ LOG004 [*] `.exception()` call outside exception handlers
 30 |         exc("")
    |
 help: Replace with `.error()`
-
-ℹ Unsafe fix
-26 26 | except ...:
-27 27 |     def _():
-28 28 |         logging.exception("")
-29    |-        logger.exception("")
-   29 |+        logger.error("")
-30 30 |         exc("")
-31 31 | 
-32 32 | 
+26 | except ...:
+27 |     def _():
+28 |         logging.exception("")
+   -         logger.exception("")
+29 +         logger.error("")
+30 |         exc("")
+31 | 
+32 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 LOG004 `.exception()` call outside exception handlers
   --> LOG004_0.py:30:9

@@ -11,15 +11,13 @@ F841 [*] Local variable `e` is assigned to but never used
 4 |     pass
   |
 help: Remove assignment to unused variable `e`
-
-ℹ Safe fix
-1 1 | try:
-2 2 |     1 / 0
-3   |-except ValueError as e:
-  3 |+except ValueError:
-4 4 |     pass
-5 5 | 
-6 6 | 
+1 | try:
+2 |     1 / 0
+  - except ValueError as e:
+3 + except ValueError:
+4 |     pass
+5 | 
+6 | 
 
 F841 [*] Local variable `foo` is assigned to but never used
   --> F841_0.py:20:5
@@ -30,15 +28,14 @@ F841 [*] Local variable `foo` is assigned to but never used
 21 |     (a, b) = (1, 2)
    |
 help: Remove assignment to unused variable `foo`
-
-ℹ Unsafe fix
-17 17 | 
-18 18 | 
-19 19 | def f():
-20    |-    foo = (1, 2)
-21 20 |     (a, b) = (1, 2)
-22 21 | 
-23 22 |     bar = (1, 2)
+17 | 
+18 | 
+19 | def f():
+   -     foo = (1, 2)
+20 |     (a, b) = (1, 2)
+21 | 
+22 |     bar = (1, 2)
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 F841 Local variable `a` is assigned to but never used
   --> F841_0.py:21:6
@@ -73,16 +70,15 @@ F841 [*] Local variable `baz` is assigned to but never used
    |              ^^^
    |
 help: Remove assignment to unused variable `baz`
-
-ℹ Unsafe fix
-23 23 |     bar = (1, 2)
-24 24 |     (c, d) = bar
-25 25 | 
-26    |-    (x, y) = baz = bar
-   26 |+    (x, y) = bar
-27 27 | 
-28 28 | 
-29 29 | def f():
+23 |     bar = (1, 2)
+24 |     (c, d) = bar
+25 | 
+   -     (x, y) = baz = bar
+26 +     (x, y) = bar
+27 | 
+28 | 
+29 | def f():
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 F841 [*] Local variable `_` is assigned to but never used
   --> F841_0.py:35:5
@@ -94,15 +90,14 @@ F841 [*] Local variable `_` is assigned to but never used
 37 |     _discarded = 1
    |
 help: Remove assignment to unused variable `_`
-
-ℹ Unsafe fix
-32 32 | 
-33 33 | 
-34 34 | def f():
-35    |-    _ = 1
-36 35 |     __ = 1
-37 36 |     _discarded = 1
-38 37 | 
+32 | 
+33 | 
+34 | def f():
+   -     _ = 1
+35 |     __ = 1
+36 |     _discarded = 1
+37 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 F841 [*] Local variable `__` is assigned to but never used
   --> F841_0.py:36:5
@@ -114,15 +109,14 @@ F841 [*] Local variable `__` is assigned to but never used
 37 |     _discarded = 1
    |
 help: Remove assignment to unused variable `__`
-
-ℹ Unsafe fix
-33 33 | 
-34 34 | def f():
-35 35 |     _ = 1
-36    |-    __ = 1
-37 36 |     _discarded = 1
-38 37 | 
-39 38 | 
+33 | 
+34 | def f():
+35 |     _ = 1
+   -     __ = 1
+36 |     _discarded = 1
+37 | 
+38 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 F841 [*] Local variable `_discarded` is assigned to but never used
   --> F841_0.py:37:5
@@ -133,15 +127,14 @@ F841 [*] Local variable `_discarded` is assigned to but never used
    |     ^^^^^^^^^^
    |
 help: Remove assignment to unused variable `_discarded`
-
-ℹ Unsafe fix
-34 34 | def f():
-35 35 |     _ = 1
-36 36 |     __ = 1
-37    |-    _discarded = 1
-38 37 | 
-39 38 | 
-40 39 | a = 1
+34 | def f():
+35 |     _ = 1
+36 |     __ = 1
+   -     _discarded = 1
+37 | 
+38 | 
+39 | a = 1
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 F841 [*] Local variable `b` is assigned to but never used
   --> F841_0.py:51:9
@@ -154,16 +147,15 @@ F841 [*] Local variable `b` is assigned to but never used
 53 |     def d():
    |
 help: Remove assignment to unused variable `b`
-
-ℹ Unsafe fix
-48 48 | 
-49 49 |     def c():
-50 50 |         # F841
-51    |-        b = 1
-   51 |+        pass
-52 52 | 
-53 53 |     def d():
-54 54 |         nonlocal b
+48 | 
+49 |     def c():
+50 |         # F841
+   -         b = 1
+51 +         pass
+52 | 
+53 |     def d():
+54 |         nonlocal b
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 F841 [*] Local variable `my_file` is assigned to but never used
   --> F841_0.py:79:26
@@ -174,16 +166,15 @@ F841 [*] Local variable `my_file` is assigned to but never used
 80 |         print("hello")
    |
 help: Remove assignment to unused variable `my_file`
-
-ℹ Unsafe fix
-76 76 | 
-77 77 | 
-78 78 | def f():
-79    |-    with open("file") as my_file, open("") as ((this, that)):
-   79 |+    with open("file"), open("") as ((this, that)):
-80 80 |         print("hello")
-81 81 | 
-82 82 | 
+76 | 
+77 | 
+78 | def f():
+   -     with open("file") as my_file, open("") as ((this, that)):
+79 +     with open("file"), open("") as ((this, that)):
+80 |         print("hello")
+81 | 
+82 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 F841 [*] Local variable `my_file` is assigned to but never used
   --> F841_0.py:85:25
@@ -196,16 +187,15 @@ F841 [*] Local variable `my_file` is assigned to but never used
 87 |     ):
    |
 help: Remove assignment to unused variable `my_file`
-
-ℹ Unsafe fix
-82 82 | 
-83 83 | def f():
-84 84 |     with (
-85    |-        open("file") as my_file,
-   85 |+        open("file"),
-86 86 |         open("") as ((this, that)),
-87 87 |     ):
-88 88 |         print("hello")
+82 | 
+83 | def f():
+84 |     with (
+   -         open("file") as my_file,
+85 +         open("file"),
+86 |         open("") as ((this, that)),
+87 |     ):
+88 |         print("hello")
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 F841 [*] Local variable `msg3` is assigned to but never used
    --> F841_0.py:102:5
@@ -218,15 +208,14 @@ F841 [*] Local variable `msg3` is assigned to but never used
 104 |         case 1:
     |
 help: Remove assignment to unused variable `msg3`
-
-ℹ Unsafe fix
-99  99  | def f(x: int):
-100 100 |     msg1 = "Hello, world!"
-101 101 |     msg2 = "Hello, world!"
-102     |-    msg3 = "Hello, world!"
-103 102 |     match x:
-104 103 |         case 1:
-105 104 |             print(msg1)
+99  | def f(x: int):
+100 |     msg1 = "Hello, world!"
+101 |     msg2 = "Hello, world!"
+    -     msg3 = "Hello, world!"
+102 |     match x:
+103 |         case 1:
+104 |             print(msg1)
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 F841 [*] Local variable `Baz` is assigned to but never used
    --> F841_0.py:115:5
@@ -239,16 +228,15 @@ F841 [*] Local variable `Baz` is assigned to but never used
 117 |     match x:
     |
 help: Remove assignment to unused variable `Baz`
-
-ℹ Unsafe fix
-112 112 | 
-113 113 |     Foo = enum.Enum("Foo", "A B")
-114 114 |     Bar = enum.Enum("Bar", "A B")
-115     |-    Baz = enum.Enum("Baz", "A B")
-    115 |+    enum.Enum("Baz", "A B")
-116 116 | 
-117 117 |     match x:
-118 118 |         case (Foo.A):
+112 | 
+113 |     Foo = enum.Enum("Foo", "A B")
+114 |     Bar = enum.Enum("Bar", "A B")
+    -     Baz = enum.Enum("Baz", "A B")
+115 +     enum.Enum("Baz", "A B")
+116 | 
+117 |     match x:
+118 |         case (Foo.A):
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 F841 Local variable `y` is assigned to but never used
    --> F841_0.py:122:14
@@ -281,16 +269,14 @@ F841 [*] Local variable `_` is assigned to but never used
 153 |         pass
     |
 help: Remove assignment to unused variable `_`
-
-ℹ Safe fix
-149 149 | def f():
-150 150 |     try:
-151 151 |         pass
-152     |-    except Exception as _:
-    152 |+    except Exception:
-153 153 |         pass
-154 154 | 
-155 155 | 
+149 | def f():
+150 |     try:
+151 |         pass
+    -     except Exception as _:
+152 +     except Exception:
+153 |         pass
+154 | 
+155 | 
 
 F841 [*] Local variable `__class__` is assigned to but never used
    --> F841_0.py:168:9
@@ -301,16 +287,15 @@ F841 [*] Local variable `__class__` is assigned to but never used
     |         ^^^^^^^^^
     |
 help: Remove assignment to unused variable `__class__`
-
-ℹ Unsafe fix
-165 165 | # variables that don't refer to the special `__class__` cell.
-166 166 | class A:
-167 167 |     def set_class(self, cls):
-168     |-        __class__ = cls  # F841
-    168 |+        pass  # F841
-169 169 | 
-170 170 | 
-171 171 | class A:
+165 | # variables that don't refer to the special `__class__` cell.
+166 | class A:
+167 |     def set_class(self, cls):
+    -         __class__ = cls  # F841
+168 +         pass  # F841
+169 | 
+170 | 
+171 | class A:
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 F841 [*] Local variable `__class__` is assigned to but never used
    --> F841_0.py:174:13
@@ -321,16 +306,15 @@ F841 [*] Local variable `__class__` is assigned to but never used
     |             ^^^^^^^^^
     |
 help: Remove assignment to unused variable `__class__`
-
-ℹ Unsafe fix
-171 171 | class A:
-172 172 |     class B:
-173 173 |         def set_class(self, cls):
-174     |-            __class__ = cls  # F841
-    174 |+            pass  # F841
-175 175 | 
-176 176 | 
-177 177 | class A:
+171 | class A:
+172 |     class B:
+173 |         def set_class(self, cls):
+    -             __class__ = cls  # F841
+174 +             pass  # F841
+175 | 
+176 | 
+177 | class A:
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 F841 [*] Local variable `__class__` is assigned to but never used
    --> F841_0.py:182:17
@@ -341,13 +325,12 @@ F841 [*] Local variable `__class__` is assigned to but never used
     |                 ^^^^^^^^^
     |
 help: Remove assignment to unused variable `__class__`
-
-ℹ Unsafe fix
-179 179 |         class B:
-180 180 |             print(__class__)
-181 181 |             def set_class(self, cls):
-182     |-                __class__ = cls  # F841
-    182 |+                pass  # F841
-183 183 | 
-184 184 | 
-185 185 | # OK, the `__class__` cell is nonlocal and declared as such.
+179 |         class B:
+180 |             print(__class__)
+181 |             def set_class(self, cls):
+    -                 __class__ = cls  # F841
+182 +                 pass  # F841
+183 | 
+184 | 
+185 | # OK, the `__class__` cell is nonlocal and declared as such.
+note: This is an unsafe fix and may remove comments or change runtime behavior

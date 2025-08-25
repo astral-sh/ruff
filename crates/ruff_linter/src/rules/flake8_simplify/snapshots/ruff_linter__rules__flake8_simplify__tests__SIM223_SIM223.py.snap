@@ -9,13 +9,12 @@ SIM223 [*] Use `False` instead of `... and False`
 2 |     pass
   |
 help: Replace with `False`
-
-ℹ Unsafe fix
-1   |-if a and False:  # SIM223
-  1 |+if False:  # SIM223
-2 2 |     pass
-3 3 | 
-4 4 | if (a or b) and False:  # SIM223
+  - if a and False:  # SIM223
+1 + if False:  # SIM223
+2 |     pass
+3 | 
+4 | if (a or b) and False:  # SIM223
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 SIM223 [*] Use `False` instead of `... and False`
  --> SIM223.py:4:4
@@ -27,16 +26,15 @@ SIM223 [*] Use `False` instead of `... and False`
 5 |     pass
   |
 help: Replace with `False`
-
-ℹ Unsafe fix
-1 1 | if a and False:  # SIM223
-2 2 |     pass
-3 3 | 
-4   |-if (a or b) and False:  # SIM223
-  4 |+if False:  # SIM223
-5 5 |     pass
-6 6 | 
-7 7 | if a or (b and False):  # SIM223
+1 | if a and False:  # SIM223
+2 |     pass
+3 | 
+  - if (a or b) and False:  # SIM223
+4 + if False:  # SIM223
+5 |     pass
+6 | 
+7 | if a or (b and False):  # SIM223
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 SIM223 [*] Use `False` instead of `... and False`
  --> SIM223.py:7:10
@@ -48,16 +46,15 @@ SIM223 [*] Use `False` instead of `... and False`
 8 |     pass
   |
 help: Replace with `False`
-
-ℹ Unsafe fix
-4 4 | if (a or b) and False:  # SIM223
-5 5 |     pass
-6 6 | 
-7   |-if a or (b and False):  # SIM223
-  7 |+if a or (False):  # SIM223
-8 8 |     pass
-9 9 | 
-10 10 | if a or False:
+4  | if (a or b) and False:  # SIM223
+5  |     pass
+6  | 
+   - if a or (b and False):  # SIM223
+7  + if a or (False):  # SIM223
+8  |     pass
+9  | 
+10 | if a or False:
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 SIM223 [*] Use `False` instead of `False and ...`
   --> SIM223.py:19:18
@@ -69,16 +66,15 @@ SIM223 [*] Use `False` instead of `False and ...`
 20 |     pass
    |
 help: Replace with `False`
-
-ℹ Unsafe fix
-16 16 | if a and f() and b and g() and False:  # OK
-17 17 |     pass
-18 18 | 
-19    |-if a and f() and False and g() and b:  # SIM223
-   19 |+if a and f() and False:  # SIM223
-20 20 |     pass
-21 21 | 
-22 22 | if False and f() and a and g() and b:  # SIM223
+16 | if a and f() and b and g() and False:  # OK
+17 |     pass
+18 | 
+   - if a and f() and False and g() and b:  # SIM223
+19 + if a and f() and False:  # SIM223
+20 |     pass
+21 | 
+22 | if False and f() and a and g() and b:  # SIM223
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 SIM223 [*] Use `False` instead of `False and ...`
   --> SIM223.py:22:4
@@ -90,16 +86,15 @@ SIM223 [*] Use `False` instead of `False and ...`
 23 |     pass
    |
 help: Replace with `False`
-
-ℹ Unsafe fix
-19 19 | if a and f() and False and g() and b:  # SIM223
-20 20 |     pass
-21 21 | 
-22    |-if False and f() and a and g() and b:  # SIM223
-   22 |+if False:  # SIM223
-23 23 |     pass
-24 24 | 
-25 25 | if a and False and f() and b and g():  # SIM223
+19 | if a and f() and False and g() and b:  # SIM223
+20 |     pass
+21 | 
+   - if False and f() and a and g() and b:  # SIM223
+22 + if False:  # SIM223
+23 |     pass
+24 | 
+25 | if a and False and f() and b and g():  # SIM223
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 SIM223 [*] Use `False` instead of `... and False and ...`
   --> SIM223.py:25:4
@@ -111,16 +106,15 @@ SIM223 [*] Use `False` instead of `... and False and ...`
 26 |     pass
    |
 help: Replace with `False`
-
-ℹ Unsafe fix
-22 22 | if False and f() and a and g() and b:  # SIM223
-23 23 |     pass
-24 24 | 
-25    |-if a and False and f() and b and g():  # SIM223
-   25 |+if False:  # SIM223
-26 26 |     pass
-27 27 | 
-28 28 | 
+22 | if False and f() and a and g() and b:  # SIM223
+23 |     pass
+24 | 
+   - if a and False and f() and b and g():  # SIM223
+25 + if False:  # SIM223
+26 |     pass
+27 | 
+28 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 SIM223 [*] Use `""` instead of `"" and ...`
   --> SIM223.py:42:7
@@ -131,16 +125,15 @@ SIM223 [*] Use `""` instead of `"" and ...`
 44 | a and "foo" and False and "bar"  # SIM223
    |
 help: Replace with `""`
-
-ℹ Unsafe fix
-39 39 |     pass
-40 40 | 
-41 41 | 
-42    |-a and "" and False  # SIM223
-   42 |+a and ""  # SIM223
-43 43 | 
-44 44 | a and "foo" and False and "bar"  # SIM223
-45 45 | 
+39 |     pass
+40 | 
+41 | 
+   - a and "" and False  # SIM223
+42 + a and ""  # SIM223
+43 | 
+44 | a and "foo" and False and "bar"  # SIM223
+45 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 SIM223 [*] Use `False` instead of `... and False and ...`
   --> SIM223.py:44:7
@@ -153,16 +146,15 @@ SIM223 [*] Use `False` instead of `... and False and ...`
 46 | a and 0 and False  # SIM223
    |
 help: Replace with `False`
-
-ℹ Unsafe fix
-41 41 | 
-42 42 | a and "" and False  # SIM223
-43 43 | 
-44    |-a and "foo" and False and "bar"  # SIM223
-   44 |+a and False  # SIM223
-45 45 | 
-46 46 | a and 0 and False  # SIM223
-47 47 | 
+41 | 
+42 | a and "" and False  # SIM223
+43 | 
+   - a and "foo" and False and "bar"  # SIM223
+44 + a and False  # SIM223
+45 | 
+46 | a and 0 and False  # SIM223
+47 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 SIM223 [*] Use `0` instead of `0 and ...`
   --> SIM223.py:46:7
@@ -175,16 +167,15 @@ SIM223 [*] Use `0` instead of `0 and ...`
 48 | a and 1 and False and 2  # SIM223
    |
 help: Replace with `0`
-
-ℹ Unsafe fix
-43 43 | 
-44 44 | a and "foo" and False and "bar"  # SIM223
-45 45 | 
-46    |-a and 0 and False  # SIM223
-   46 |+a and 0  # SIM223
-47 47 | 
-48 48 | a and 1 and False and 2  # SIM223
-49 49 | 
+43 | 
+44 | a and "foo" and False and "bar"  # SIM223
+45 | 
+   - a and 0 and False  # SIM223
+46 + a and 0  # SIM223
+47 | 
+48 | a and 1 and False and 2  # SIM223
+49 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 SIM223 [*] Use `False` instead of `... and False and ...`
   --> SIM223.py:48:7
@@ -197,16 +188,15 @@ SIM223 [*] Use `False` instead of `... and False and ...`
 50 | a and 0.0 and False  # SIM223
    |
 help: Replace with `False`
-
-ℹ Unsafe fix
-45 45 | 
-46 46 | a and 0 and False  # SIM223
-47 47 | 
-48    |-a and 1 and False and 2  # SIM223
-   48 |+a and False  # SIM223
-49 49 | 
-50 50 | a and 0.0 and False  # SIM223
-51 51 | 
+45 | 
+46 | a and 0 and False  # SIM223
+47 | 
+   - a and 1 and False and 2  # SIM223
+48 + a and False  # SIM223
+49 | 
+50 | a and 0.0 and False  # SIM223
+51 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 SIM223 [*] Use `0.0` instead of `0.0 and ...`
   --> SIM223.py:50:7
@@ -219,16 +209,15 @@ SIM223 [*] Use `0.0` instead of `0.0 and ...`
 52 | a and 0.1 and False and 0.2  # SIM223
    |
 help: Replace with `0.0`
-
-ℹ Unsafe fix
-47 47 | 
-48 48 | a and 1 and False and 2  # SIM223
-49 49 | 
-50    |-a and 0.0 and False  # SIM223
-   50 |+a and 0.0  # SIM223
-51 51 | 
-52 52 | a and 0.1 and False and 0.2  # SIM223
-53 53 | 
+47 | 
+48 | a and 1 and False and 2  # SIM223
+49 | 
+   - a and 0.0 and False  # SIM223
+50 + a and 0.0  # SIM223
+51 | 
+52 | a and 0.1 and False and 0.2  # SIM223
+53 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 SIM223 [*] Use `False` instead of `... and False and ...`
   --> SIM223.py:52:7
@@ -241,16 +230,15 @@ SIM223 [*] Use `False` instead of `... and False and ...`
 54 | a and [] and False  # SIM223
    |
 help: Replace with `False`
-
-ℹ Unsafe fix
-49 49 | 
-50 50 | a and 0.0 and False  # SIM223
-51 51 | 
-52    |-a and 0.1 and False and 0.2  # SIM223
-   52 |+a and False  # SIM223
-53 53 | 
-54 54 | a and [] and False  # SIM223
-55 55 | 
+49 | 
+50 | a and 0.0 and False  # SIM223
+51 | 
+   - a and 0.1 and False and 0.2  # SIM223
+52 + a and False  # SIM223
+53 | 
+54 | a and [] and False  # SIM223
+55 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 SIM223 [*] Use `[]` instead of `[] and ...`
   --> SIM223.py:54:7
@@ -263,16 +251,15 @@ SIM223 [*] Use `[]` instead of `[] and ...`
 56 | a and list([]) and False  # SIM223
    |
 help: Replace with `[]`
-
-ℹ Unsafe fix
-51 51 | 
-52 52 | a and 0.1 and False and 0.2  # SIM223
-53 53 | 
-54    |-a and [] and False  # SIM223
-   54 |+a and []  # SIM223
-55 55 | 
-56 56 | a and list([]) and False  # SIM223
-57 57 | 
+51 | 
+52 | a and 0.1 and False and 0.2  # SIM223
+53 | 
+   - a and [] and False  # SIM223
+54 + a and []  # SIM223
+55 | 
+56 | a and list([]) and False  # SIM223
+57 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 SIM223 [*] Use `list([])` instead of `list([]) and ...`
   --> SIM223.py:56:7
@@ -285,16 +272,15 @@ SIM223 [*] Use `list([])` instead of `list([]) and ...`
 58 | a and [1] and False and [2]  # SIM223
    |
 help: Replace with `list([])`
-
-ℹ Unsafe fix
-53 53 | 
-54 54 | a and [] and False  # SIM223
-55 55 | 
-56    |-a and list([]) and False  # SIM223
-   56 |+a and list([])  # SIM223
-57 57 | 
-58 58 | a and [1] and False and [2]  # SIM223
-59 59 | 
+53 | 
+54 | a and [] and False  # SIM223
+55 | 
+   - a and list([]) and False  # SIM223
+56 + a and list([])  # SIM223
+57 | 
+58 | a and [1] and False and [2]  # SIM223
+59 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 SIM223 [*] Use `False` instead of `... and False and ...`
   --> SIM223.py:58:7
@@ -307,16 +293,15 @@ SIM223 [*] Use `False` instead of `... and False and ...`
 60 | a and list([1]) and False and list([2])  # SIM223
    |
 help: Replace with `False`
-
-ℹ Unsafe fix
-55 55 | 
-56 56 | a and list([]) and False  # SIM223
-57 57 | 
-58    |-a and [1] and False and [2]  # SIM223
-   58 |+a and False  # SIM223
-59 59 | 
-60 60 | a and list([1]) and False and list([2])  # SIM223
-61 61 | 
+55 | 
+56 | a and list([]) and False  # SIM223
+57 | 
+   - a and [1] and False and [2]  # SIM223
+58 + a and False  # SIM223
+59 | 
+60 | a and list([1]) and False and list([2])  # SIM223
+61 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 SIM223 [*] Use `False` instead of `... and False and ...`
   --> SIM223.py:60:7
@@ -329,16 +314,15 @@ SIM223 [*] Use `False` instead of `... and False and ...`
 62 | a and {} and False  # SIM223
    |
 help: Replace with `False`
-
-ℹ Unsafe fix
-57 57 | 
-58 58 | a and [1] and False and [2]  # SIM223
-59 59 | 
-60    |-a and list([1]) and False and list([2])  # SIM223
-   60 |+a and False  # SIM223
-61 61 | 
-62 62 | a and {} and False  # SIM223
-63 63 | 
+57 | 
+58 | a and [1] and False and [2]  # SIM223
+59 | 
+   - a and list([1]) and False and list([2])  # SIM223
+60 + a and False  # SIM223
+61 | 
+62 | a and {} and False  # SIM223
+63 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 SIM223 [*] Use `{}` instead of `{} and ...`
   --> SIM223.py:62:7
@@ -351,16 +335,15 @@ SIM223 [*] Use `{}` instead of `{} and ...`
 64 | a and dict() and False  # SIM223
    |
 help: Replace with `{}`
-
-ℹ Unsafe fix
-59 59 | 
-60 60 | a and list([1]) and False and list([2])  # SIM223
-61 61 | 
-62    |-a and {} and False  # SIM223
-   62 |+a and {}  # SIM223
-63 63 | 
-64 64 | a and dict() and False  # SIM223
-65 65 | 
+59 | 
+60 | a and list([1]) and False and list([2])  # SIM223
+61 | 
+   - a and {} and False  # SIM223
+62 + a and {}  # SIM223
+63 | 
+64 | a and dict() and False  # SIM223
+65 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 SIM223 [*] Use `dict()` instead of `dict() and ...`
   --> SIM223.py:64:7
@@ -373,16 +356,15 @@ SIM223 [*] Use `dict()` instead of `dict() and ...`
 66 | a and {1: 1} and False and {2: 2}  # SIM223
    |
 help: Replace with `dict()`
-
-ℹ Unsafe fix
-61 61 | 
-62 62 | a and {} and False  # SIM223
-63 63 | 
-64    |-a and dict() and False  # SIM223
-   64 |+a and dict()  # SIM223
-65 65 | 
-66 66 | a and {1: 1} and False and {2: 2}  # SIM223
-67 67 | 
+61 | 
+62 | a and {} and False  # SIM223
+63 | 
+   - a and dict() and False  # SIM223
+64 + a and dict()  # SIM223
+65 | 
+66 | a and {1: 1} and False and {2: 2}  # SIM223
+67 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 SIM223 [*] Use `False` instead of `... and False and ...`
   --> SIM223.py:66:7
@@ -395,16 +377,15 @@ SIM223 [*] Use `False` instead of `... and False and ...`
 68 | a and dict({1: 1}) and False and dict({2: 2})  # SIM223
    |
 help: Replace with `False`
-
-ℹ Unsafe fix
-63 63 | 
-64 64 | a and dict() and False  # SIM223
-65 65 | 
-66    |-a and {1: 1} and False and {2: 2}  # SIM223
-   66 |+a and False  # SIM223
-67 67 | 
-68 68 | a and dict({1: 1}) and False and dict({2: 2})  # SIM223
-69 69 | 
+63 | 
+64 | a and dict() and False  # SIM223
+65 | 
+   - a and {1: 1} and False and {2: 2}  # SIM223
+66 + a and False  # SIM223
+67 | 
+68 | a and dict({1: 1}) and False and dict({2: 2})  # SIM223
+69 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 SIM223 [*] Use `False` instead of `... and False and ...`
   --> SIM223.py:68:7
@@ -417,16 +398,15 @@ SIM223 [*] Use `False` instead of `... and False and ...`
 70 | a and set() and False  # SIM223
    |
 help: Replace with `False`
-
-ℹ Unsafe fix
-65 65 | 
-66 66 | a and {1: 1} and False and {2: 2}  # SIM223
-67 67 | 
-68    |-a and dict({1: 1}) and False and dict({2: 2})  # SIM223
-   68 |+a and False  # SIM223
-69 69 | 
-70 70 | a and set() and False  # SIM223
-71 71 | 
+65 | 
+66 | a and {1: 1} and False and {2: 2}  # SIM223
+67 | 
+   - a and dict({1: 1}) and False and dict({2: 2})  # SIM223
+68 + a and False  # SIM223
+69 | 
+70 | a and set() and False  # SIM223
+71 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 SIM223 [*] Use `set()` instead of `set() and ...`
   --> SIM223.py:70:7
@@ -439,16 +419,15 @@ SIM223 [*] Use `set()` instead of `set() and ...`
 72 | a and set(set()) and False  # SIM223
    |
 help: Replace with `set()`
-
-ℹ Unsafe fix
-67 67 | 
-68 68 | a and dict({1: 1}) and False and dict({2: 2})  # SIM223
-69 69 | 
-70    |-a and set() and False  # SIM223
-   70 |+a and set()  # SIM223
-71 71 | 
-72 72 | a and set(set()) and False  # SIM223
-73 73 | 
+67 | 
+68 | a and dict({1: 1}) and False and dict({2: 2})  # SIM223
+69 | 
+   - a and set() and False  # SIM223
+70 + a and set()  # SIM223
+71 | 
+72 | a and set(set()) and False  # SIM223
+73 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 SIM223 [*] Use `set(set())` instead of `set(set()) and ...`
   --> SIM223.py:72:7
@@ -461,16 +440,15 @@ SIM223 [*] Use `set(set())` instead of `set(set()) and ...`
 74 | a and {1} and False and {2}  # SIM223
    |
 help: Replace with `set(set())`
-
-ℹ Unsafe fix
-69 69 | 
-70 70 | a and set() and False  # SIM223
-71 71 | 
-72    |-a and set(set()) and False  # SIM223
-   72 |+a and set(set())  # SIM223
-73 73 | 
-74 74 | a and {1} and False and {2}  # SIM223
-75 75 | 
+69 | 
+70 | a and set() and False  # SIM223
+71 | 
+   - a and set(set()) and False  # SIM223
+72 + a and set(set())  # SIM223
+73 | 
+74 | a and {1} and False and {2}  # SIM223
+75 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 SIM223 [*] Use `False` instead of `... and False and ...`
   --> SIM223.py:74:7
@@ -483,16 +461,15 @@ SIM223 [*] Use `False` instead of `... and False and ...`
 76 | a and set({1}) and False and set({2})  # SIM223
    |
 help: Replace with `False`
-
-ℹ Unsafe fix
-71 71 | 
-72 72 | a and set(set()) and False  # SIM223
-73 73 | 
-74    |-a and {1} and False and {2}  # SIM223
-   74 |+a and False  # SIM223
-75 75 | 
-76 76 | a and set({1}) and False and set({2})  # SIM223
-77 77 | 
+71 | 
+72 | a and set(set()) and False  # SIM223
+73 | 
+   - a and {1} and False and {2}  # SIM223
+74 + a and False  # SIM223
+75 | 
+76 | a and set({1}) and False and set({2})  # SIM223
+77 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 SIM223 [*] Use `False` instead of `... and False and ...`
   --> SIM223.py:76:7
@@ -505,16 +482,15 @@ SIM223 [*] Use `False` instead of `... and False and ...`
 78 | a and () and False  # SIM222
    |
 help: Replace with `False`
-
-ℹ Unsafe fix
-73 73 | 
-74 74 | a and {1} and False and {2}  # SIM223
-75 75 | 
-76    |-a and set({1}) and False and set({2})  # SIM223
-   76 |+a and False  # SIM223
-77 77 | 
-78 78 | a and () and False  # SIM222
-79 79 | 
+73 | 
+74 | a and {1} and False and {2}  # SIM223
+75 | 
+   - a and set({1}) and False and set({2})  # SIM223
+76 + a and False  # SIM223
+77 | 
+78 | a and () and False  # SIM222
+79 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 SIM223 [*] Use `()` instead of `() and ...`
   --> SIM223.py:78:7
@@ -527,16 +503,15 @@ SIM223 [*] Use `()` instead of `() and ...`
 80 | a and tuple(()) and False  # SIM222
    |
 help: Replace with `()`
-
-ℹ Unsafe fix
-75 75 | 
-76 76 | a and set({1}) and False and set({2})  # SIM223
-77 77 | 
-78    |-a and () and False  # SIM222
-   78 |+a and ()  # SIM222
-79 79 | 
-80 80 | a and tuple(()) and False  # SIM222
-81 81 | 
+75 | 
+76 | a and set({1}) and False and set({2})  # SIM223
+77 | 
+   - a and () and False  # SIM222
+78 + a and ()  # SIM222
+79 | 
+80 | a and tuple(()) and False  # SIM222
+81 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 SIM223 [*] Use `tuple(())` instead of `tuple(()) and ...`
   --> SIM223.py:80:7
@@ -549,16 +524,15 @@ SIM223 [*] Use `tuple(())` instead of `tuple(()) and ...`
 82 | a and (1,) and False and (2,)  # SIM222
    |
 help: Replace with `tuple(())`
-
-ℹ Unsafe fix
-77 77 | 
-78 78 | a and () and False  # SIM222
-79 79 | 
-80    |-a and tuple(()) and False  # SIM222
-   80 |+a and tuple(())  # SIM222
-81 81 | 
-82 82 | a and (1,) and False and (2,)  # SIM222
-83 83 | 
+77 | 
+78 | a and () and False  # SIM222
+79 | 
+   - a and tuple(()) and False  # SIM222
+80 + a and tuple(())  # SIM222
+81 | 
+82 | a and (1,) and False and (2,)  # SIM222
+83 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 SIM223 [*] Use `False` instead of `... and False and ...`
   --> SIM223.py:82:7
@@ -571,16 +545,15 @@ SIM223 [*] Use `False` instead of `... and False and ...`
 84 | a and tuple((1,)) and False and tuple((2,))  # SIM222
    |
 help: Replace with `False`
-
-ℹ Unsafe fix
-79 79 | 
-80 80 | a and tuple(()) and False  # SIM222
-81 81 | 
-82    |-a and (1,) and False and (2,)  # SIM222
-   82 |+a and False  # SIM222
-83 83 | 
-84 84 | a and tuple((1,)) and False and tuple((2,))  # SIM222
-85 85 | 
+79 | 
+80 | a and tuple(()) and False  # SIM222
+81 | 
+   - a and (1,) and False and (2,)  # SIM222
+82 + a and False  # SIM222
+83 | 
+84 | a and tuple((1,)) and False and tuple((2,))  # SIM222
+85 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 SIM223 [*] Use `False` instead of `... and False and ...`
   --> SIM223.py:84:7
@@ -593,16 +566,15 @@ SIM223 [*] Use `False` instead of `... and False and ...`
 86 | a and frozenset() and False  # SIM222
    |
 help: Replace with `False`
-
-ℹ Unsafe fix
-81 81 | 
-82 82 | a and (1,) and False and (2,)  # SIM222
-83 83 | 
-84    |-a and tuple((1,)) and False and tuple((2,))  # SIM222
-   84 |+a and False  # SIM222
-85 85 | 
-86 86 | a and frozenset() and False  # SIM222
-87 87 | 
+81 | 
+82 | a and (1,) and False and (2,)  # SIM222
+83 | 
+   - a and tuple((1,)) and False and tuple((2,))  # SIM222
+84 + a and False  # SIM222
+85 | 
+86 | a and frozenset() and False  # SIM222
+87 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 SIM223 [*] Use `frozenset()` instead of `frozenset() and ...`
   --> SIM223.py:86:7
@@ -615,16 +587,15 @@ SIM223 [*] Use `frozenset()` instead of `frozenset() and ...`
 88 | a and frozenset(frozenset()) and False  # SIM222
    |
 help: Replace with `frozenset()`
-
-ℹ Unsafe fix
-83 83 | 
-84 84 | a and tuple((1,)) and False and tuple((2,))  # SIM222
-85 85 | 
-86    |-a and frozenset() and False  # SIM222
-   86 |+a and frozenset()  # SIM222
-87 87 | 
-88 88 | a and frozenset(frozenset()) and False  # SIM222
-89 89 | 
+83 | 
+84 | a and tuple((1,)) and False and tuple((2,))  # SIM222
+85 | 
+   - a and frozenset() and False  # SIM222
+86 + a and frozenset()  # SIM222
+87 | 
+88 | a and frozenset(frozenset()) and False  # SIM222
+89 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 SIM223 [*] Use `frozenset(frozenset())` instead of `frozenset(frozenset()) and ...`
   --> SIM223.py:88:7
@@ -637,16 +608,15 @@ SIM223 [*] Use `frozenset(frozenset())` instead of `frozenset(frozenset()) and .
 90 | a and frozenset({1}) and False and frozenset({2})  # SIM222
    |
 help: Replace with `frozenset(frozenset())`
-
-ℹ Unsafe fix
-85 85 | 
-86 86 | a and frozenset() and False  # SIM222
-87 87 | 
-88    |-a and frozenset(frozenset()) and False  # SIM222
-   88 |+a and frozenset(frozenset())  # SIM222
-89 89 | 
-90 90 | a and frozenset({1}) and False and frozenset({2})  # SIM222
-91 91 | 
+85 | 
+86 | a and frozenset() and False  # SIM222
+87 | 
+   - a and frozenset(frozenset()) and False  # SIM222
+88 + a and frozenset(frozenset())  # SIM222
+89 | 
+90 | a and frozenset({1}) and False and frozenset({2})  # SIM222
+91 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 SIM223 [*] Use `False` instead of `... and False and ...`
   --> SIM223.py:90:7
@@ -659,16 +629,15 @@ SIM223 [*] Use `False` instead of `... and False and ...`
 92 | a and frozenset(frozenset({1})) and False and frozenset(frozenset({2}))  # SIM222
    |
 help: Replace with `False`
-
-ℹ Unsafe fix
-87 87 | 
-88 88 | a and frozenset(frozenset()) and False  # SIM222
-89 89 | 
-90    |-a and frozenset({1}) and False and frozenset({2})  # SIM222
-   90 |+a and False  # SIM222
-91 91 | 
-92 92 | a and frozenset(frozenset({1})) and False and frozenset(frozenset({2}))  # SIM222
-93 93 | 
+87 | 
+88 | a and frozenset(frozenset()) and False  # SIM222
+89 | 
+   - a and frozenset({1}) and False and frozenset({2})  # SIM222
+90 + a and False  # SIM222
+91 | 
+92 | a and frozenset(frozenset({1})) and False and frozenset(frozenset({2}))  # SIM222
+93 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 SIM223 [*] Use `False` instead of `... and False and ...`
   --> SIM223.py:92:7
@@ -679,16 +648,15 @@ SIM223 [*] Use `False` instead of `... and False and ...`
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
 help: Replace with `False`
-
-ℹ Unsafe fix
-89 89 | 
-90 90 | a and frozenset({1}) and False and frozenset({2})  # SIM222
-91 91 | 
-92    |-a and frozenset(frozenset({1})) and False and frozenset(frozenset({2}))  # SIM222
-   92 |+a and False  # SIM222
-93 93 | 
-94 94 | 
-95 95 | # Inside test `a` is simplified.
+89 | 
+90 | a and frozenset({1}) and False and frozenset({2})  # SIM222
+91 | 
+   - a and frozenset(frozenset({1})) and False and frozenset(frozenset({2}))  # SIM222
+92 + a and False  # SIM222
+93 | 
+94 | 
+95 | # Inside test `a` is simplified.
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 SIM223 [*] Use `False` instead of `... and False and ...`
   --> SIM223.py:97:6
@@ -701,16 +669,15 @@ SIM223 [*] Use `False` instead of `... and False and ...`
 99 | assert a and [] and False and []  # SIM223
    |
 help: Replace with `False`
-
-ℹ Unsafe fix
-94 94 | 
-95 95 | # Inside test `a` is simplified.
-96 96 | 
-97    |-bool(a and [] and False and [])  # SIM223
-   97 |+bool(False)  # SIM223
-98 98 | 
-99 99 | assert a and [] and False and []  # SIM223
-100 100 | 
+94  | 
+95  | # Inside test `a` is simplified.
+96  | 
+    - bool(a and [] and False and [])  # SIM223
+97  + bool(False)  # SIM223
+98  | 
+99  | assert a and [] and False and []  # SIM223
+100 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 SIM223 [*] Use `False` instead of `... and False and ...`
    --> SIM223.py:99:8
@@ -723,16 +690,15 @@ SIM223 [*] Use `False` instead of `... and False and ...`
 101 | if (a and [] and False and []) or (a and [] and False and []):  # SIM223
     |
 help: Replace with `False`
-
-ℹ Unsafe fix
-96  96  | 
-97  97  | bool(a and [] and False and [])  # SIM223
-98  98  | 
-99      |-assert a and [] and False and []  # SIM223
-    99  |+assert False  # SIM223
-100 100 | 
-101 101 | if (a and [] and False and []) or (a and [] and False and []):  # SIM223
-102 102 |     pass
+96  | 
+97  | bool(a and [] and False and [])  # SIM223
+98  | 
+    - assert a and [] and False and []  # SIM223
+99  + assert False  # SIM223
+100 | 
+101 | if (a and [] and False and []) or (a and [] and False and []):  # SIM223
+102 |     pass
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 SIM223 [*] Use `False` instead of `... and False and ...`
    --> SIM223.py:101:5
@@ -744,16 +710,15 @@ SIM223 [*] Use `False` instead of `... and False and ...`
 102 |     pass
     |
 help: Replace with `False`
-
-ℹ Unsafe fix
-98  98  | 
-99  99  | assert a and [] and False and []  # SIM223
-100 100 | 
-101     |-if (a and [] and False and []) or (a and [] and False and []):  # SIM223
-    101 |+if (False) or (a and [] and False and []):  # SIM223
-102 102 |     pass
-103 103 | 
-104 104 | 0 if a and [] and False and [] else 1  # SIM222
+98  | 
+99  | assert a and [] and False and []  # SIM223
+100 | 
+    - if (a and [] and False and []) or (a and [] and False and []):  # SIM223
+101 + if (False) or (a and [] and False and []):  # SIM223
+102 |     pass
+103 | 
+104 | 0 if a and [] and False and [] else 1  # SIM222
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 SIM223 [*] Use `False` instead of `... and False and ...`
    --> SIM223.py:101:36
@@ -765,16 +730,15 @@ SIM223 [*] Use `False` instead of `... and False and ...`
 102 |     pass
     |
 help: Replace with `False`
-
-ℹ Unsafe fix
-98  98  | 
-99  99  | assert a and [] and False and []  # SIM223
-100 100 | 
-101     |-if (a and [] and False and []) or (a and [] and False and []):  # SIM223
-    101 |+if (a and [] and False and []) or (False):  # SIM223
-102 102 |     pass
-103 103 | 
-104 104 | 0 if a and [] and False and [] else 1  # SIM222
+98  | 
+99  | assert a and [] and False and []  # SIM223
+100 | 
+    - if (a and [] and False and []) or (a and [] and False and []):  # SIM223
+101 + if (a and [] and False and []) or (False):  # SIM223
+102 |     pass
+103 | 
+104 | 0 if a and [] and False and [] else 1  # SIM222
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 SIM223 [*] Use `False` instead of `... and False and ...`
    --> SIM223.py:104:6
@@ -787,16 +751,15 @@ SIM223 [*] Use `False` instead of `... and False and ...`
 106 | while a and [] and False and []:  # SIM223
     |
 help: Replace with `False`
-
-ℹ Unsafe fix
-101 101 | if (a and [] and False and []) or (a and [] and False and []):  # SIM223
-102 102 |     pass
-103 103 | 
-104     |-0 if a and [] and False and [] else 1  # SIM222
-    104 |+0 if False else 1  # SIM222
-105 105 | 
-106 106 | while a and [] and False and []:  # SIM223
-107 107 |     pass
+101 | if (a and [] and False and []) or (a and [] and False and []):  # SIM223
+102 |     pass
+103 | 
+    - 0 if a and [] and False and [] else 1  # SIM222
+104 + 0 if False else 1  # SIM222
+105 | 
+106 | while a and [] and False and []:  # SIM223
+107 |     pass
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 SIM223 [*] Use `False` instead of `... and False and ...`
    --> SIM223.py:106:7
@@ -808,16 +771,15 @@ SIM223 [*] Use `False` instead of `... and False and ...`
 107 |     pass
     |
 help: Replace with `False`
-
-ℹ Unsafe fix
-103 103 | 
-104 104 | 0 if a and [] and False and [] else 1  # SIM222
-105 105 | 
-106     |-while a and [] and False and []:  # SIM223
-    106 |+while False:  # SIM223
-107 107 |     pass
-108 108 | 
-109 109 | [
+103 | 
+104 | 0 if a and [] and False and [] else 1  # SIM222
+105 | 
+    - while a and [] and False and []:  # SIM223
+106 + while False:  # SIM223
+107 |     pass
+108 | 
+109 | [
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 SIM223 [*] Use `False` instead of `... and False and ...`
    --> SIM223.py:113:8
@@ -830,16 +792,15 @@ SIM223 [*] Use `False` instead of `... and False and ...`
 115 | ]
     |
 help: Replace with `False`
-
-ℹ Unsafe fix
-110 110 |     0
-111 111 |     for a in range(10)
-112 112 |     for b in range(10)
-113     |-    if a and [] and False and []  # SIM223
-    113 |+    if False  # SIM223
-114 114 |     if b and [] and False and []  # SIM223
-115 115 | ]
-116 116 | 
+110 |     0
+111 |     for a in range(10)
+112 |     for b in range(10)
+    -     if a and [] and False and []  # SIM223
+113 +     if False  # SIM223
+114 |     if b and [] and False and []  # SIM223
+115 | ]
+116 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 SIM223 [*] Use `False` instead of `... and False and ...`
    --> SIM223.py:114:8
@@ -851,16 +812,15 @@ SIM223 [*] Use `False` instead of `... and False and ...`
 115 | ]
     |
 help: Replace with `False`
-
-ℹ Unsafe fix
-111 111 |     for a in range(10)
-112 112 |     for b in range(10)
-113 113 |     if a and [] and False and []  # SIM223
-114     |-    if b and [] and False and []  # SIM223
-    114 |+    if False  # SIM223
-115 115 | ]
-116 116 | 
-117 117 | {
+111 |     for a in range(10)
+112 |     for b in range(10)
+113 |     if a and [] and False and []  # SIM223
+    -     if b and [] and False and []  # SIM223
+114 +     if False  # SIM223
+115 | ]
+116 | 
+117 | {
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 SIM223 [*] Use `False` instead of `... and False and ...`
    --> SIM223.py:121:8
@@ -873,16 +833,15 @@ SIM223 [*] Use `False` instead of `... and False and ...`
 123 | }
     |
 help: Replace with `False`
-
-ℹ Unsafe fix
-118 118 |     0
-119 119 |     for a in range(10)
-120 120 |     for b in range(10)
-121     |-    if a and [] and False and []  # SIM223
-    121 |+    if False  # SIM223
-122 122 |     if b and [] and False and []  # SIM223
-123 123 | }
-124 124 | 
+118 |     0
+119 |     for a in range(10)
+120 |     for b in range(10)
+    -     if a and [] and False and []  # SIM223
+121 +     if False  # SIM223
+122 |     if b and [] and False and []  # SIM223
+123 | }
+124 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 SIM223 [*] Use `False` instead of `... and False and ...`
    --> SIM223.py:122:8
@@ -894,16 +853,15 @@ SIM223 [*] Use `False` instead of `... and False and ...`
 123 | }
     |
 help: Replace with `False`
-
-ℹ Unsafe fix
-119 119 |     for a in range(10)
-120 120 |     for b in range(10)
-121 121 |     if a and [] and False and []  # SIM223
-122     |-    if b and [] and False and []  # SIM223
-    122 |+    if False  # SIM223
-123 123 | }
-124 124 | 
-125 125 | {
+119 |     for a in range(10)
+120 |     for b in range(10)
+121 |     if a and [] and False and []  # SIM223
+    -     if b and [] and False and []  # SIM223
+122 +     if False  # SIM223
+123 | }
+124 | 
+125 | {
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 SIM223 [*] Use `False` instead of `... and False and ...`
    --> SIM223.py:129:8
@@ -916,16 +874,15 @@ SIM223 [*] Use `False` instead of `... and False and ...`
 131 | }
     |
 help: Replace with `False`
-
-ℹ Unsafe fix
-126 126 |     0: 0
-127 127 |     for a in range(10)
-128 128 |     for b in range(10)
-129     |-    if a and [] and False and []  # SIM223
-    129 |+    if False  # SIM223
-130 130 |     if b and [] and False and []  # SIM223
-131 131 | }
-132 132 | 
+126 |     0: 0
+127 |     for a in range(10)
+128 |     for b in range(10)
+    -     if a and [] and False and []  # SIM223
+129 +     if False  # SIM223
+130 |     if b and [] and False and []  # SIM223
+131 | }
+132 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 SIM223 [*] Use `False` instead of `... and False and ...`
    --> SIM223.py:130:8
@@ -937,16 +894,15 @@ SIM223 [*] Use `False` instead of `... and False and ...`
 131 | }
     |
 help: Replace with `False`
-
-ℹ Unsafe fix
-127 127 |     for a in range(10)
-128 128 |     for b in range(10)
-129 129 |     if a and [] and False and []  # SIM223
-130     |-    if b and [] and False and []  # SIM223
-    130 |+    if False  # SIM223
-131 131 | }
-132 132 | 
-133 133 | (
+127 |     for a in range(10)
+128 |     for b in range(10)
+129 |     if a and [] and False and []  # SIM223
+    -     if b and [] and False and []  # SIM223
+130 +     if False  # SIM223
+131 | }
+132 | 
+133 | (
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 SIM223 [*] Use `False` instead of `... and False and ...`
    --> SIM223.py:137:8
@@ -959,16 +915,15 @@ SIM223 [*] Use `False` instead of `... and False and ...`
 139 | )
     |
 help: Replace with `False`
-
-ℹ Unsafe fix
-134 134 |     0
-135 135 |     for a in range(10)
-136 136 |     for b in range(10)
-137     |-    if a and [] and False and []  # SIM223
-    137 |+    if False  # SIM223
-138 138 |     if b and [] and False and []  # SIM223
-139 139 | )
-140 140 | 
+134 |     0
+135 |     for a in range(10)
+136 |     for b in range(10)
+    -     if a and [] and False and []  # SIM223
+137 +     if False  # SIM223
+138 |     if b and [] and False and []  # SIM223
+139 | )
+140 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 SIM223 [*] Use `False` instead of `... and False and ...`
    --> SIM223.py:138:8
@@ -980,16 +935,15 @@ SIM223 [*] Use `False` instead of `... and False and ...`
 139 | )
     |
 help: Replace with `False`
-
-ℹ Unsafe fix
-135 135 |     for a in range(10)
-136 136 |     for b in range(10)
-137 137 |     if a and [] and False and []  # SIM223
-138     |-    if b and [] and False and []  # SIM223
-    138 |+    if False  # SIM223
-139 139 | )
-140 140 | 
-141 141 | # Outside test `a` is not simplified.
+135 |     for a in range(10)
+136 |     for b in range(10)
+137 |     if a and [] and False and []  # SIM223
+    -     if b and [] and False and []  # SIM223
+138 +     if False  # SIM223
+139 | )
+140 | 
+141 | # Outside test `a` is not simplified.
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 SIM223 [*] Use `[]` instead of `[] and ...`
    --> SIM223.py:143:7
@@ -1002,16 +956,15 @@ SIM223 [*] Use `[]` instead of `[] and ...`
 145 | if (a and [] and False and []) == (a and []):  # SIM223
     |
 help: Replace with `[]`
-
-ℹ Unsafe fix
-140 140 | 
-141 141 | # Outside test `a` is not simplified.
-142 142 | 
-143     |-a and [] and False and []  # SIM223
-    143 |+a and []  # SIM223
-144 144 | 
-145 145 | if (a and [] and False and []) == (a and []):  # SIM223
-146 146 |     pass
+140 | 
+141 | # Outside test `a` is not simplified.
+142 | 
+    - a and [] and False and []  # SIM223
+143 + a and []  # SIM223
+144 | 
+145 | if (a and [] and False and []) == (a and []):  # SIM223
+146 |     pass
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 SIM223 [*] Use `[]` instead of `[] and ...`
    --> SIM223.py:145:11
@@ -1023,16 +976,15 @@ SIM223 [*] Use `[]` instead of `[] and ...`
 146 |     pass
     |
 help: Replace with `[]`
-
-ℹ Unsafe fix
-142 142 | 
-143 143 | a and [] and False and []  # SIM223
-144 144 | 
-145     |-if (a and [] and False and []) == (a and []):  # SIM223
-    145 |+if (a and []) == (a and []):  # SIM223
-146 146 |     pass
-147 147 | 
-148 148 | if f(a and [] and False and []):  # SIM223
+142 | 
+143 | a and [] and False and []  # SIM223
+144 | 
+    - if (a and [] and False and []) == (a and []):  # SIM223
+145 + if (a and []) == (a and []):  # SIM223
+146 |     pass
+147 | 
+148 | if f(a and [] and False and []):  # SIM223
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 SIM223 [*] Use `[]` instead of `[] and ...`
    --> SIM223.py:148:12
@@ -1044,16 +996,15 @@ SIM223 [*] Use `[]` instead of `[] and ...`
 149 |     pass
     |
 help: Replace with `[]`
-
-ℹ Unsafe fix
-145 145 | if (a and [] and False and []) == (a and []):  # SIM223
-146 146 |     pass
-147 147 | 
-148     |-if f(a and [] and False and []):  # SIM223
-    148 |+if f(a and []):  # SIM223
-149 149 |     pass
-150 150 | 
-151 151 | # Regression test for: https://github.com/astral-sh/ruff/issues/9479
+145 | if (a and [] and False and []) == (a and []):  # SIM223
+146 |     pass
+147 | 
+    - if f(a and [] and False and []):  # SIM223
+148 + if f(a and []):  # SIM223
+149 |     pass
+150 | 
+151 | # Regression test for: https://github.com/astral-sh/ruff/issues/9479
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 SIM223 [*] Use `f"{''}{''}"` instead of `f"{''}{''}" and ...`
    --> SIM223.py:154:7
@@ -1065,13 +1016,12 @@ SIM223 [*] Use `f"{''}{''}"` instead of `f"{''}{''}" and ...`
 155 | print(f"{1}{''}" and "bar")
     |
 help: Replace with `f"{''}{''}"`
-
-ℹ Unsafe fix
-151 151 | # Regression test for: https://github.com/astral-sh/ruff/issues/9479
-152 152 | print(f"{a}{b}" and "bar")
-153 153 | print(f"{a}{''}" and "bar")
-154     |-print(f"{''}{''}" and "bar")
-    154 |+print(f"{''}{''}")
-155 155 | print(f"{1}{''}" and "bar")
-156 156 | 
-157 157 |
+151 | # Regression test for: https://github.com/astral-sh/ruff/issues/9479
+152 | print(f"{a}{b}" and "bar")
+153 | print(f"{a}{''}" and "bar")
+    - print(f"{''}{''}" and "bar")
+154 + print(f"{''}{''}")
+155 | print(f"{1}{''}" and "bar")
+156 | 
+157 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior

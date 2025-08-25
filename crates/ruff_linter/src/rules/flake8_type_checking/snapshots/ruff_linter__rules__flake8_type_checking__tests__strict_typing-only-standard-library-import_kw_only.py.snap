@@ -10,17 +10,16 @@ TC003 [*] Move standard library import `dataclasses.Field` into a type-checking 
   |                                             ^^^^^
   |
 help: Move into type-checking block
-
-ℹ Unsafe fix
-2  2  | 
-3  3  | from __future__ import annotations
-4  4  | 
-5     |-from dataclasses import KW_ONLY, dataclass, Field
-   5  |+from dataclasses import KW_ONLY, dataclass
-   6  |+from typing import TYPE_CHECKING
-   7  |+
-   8  |+if TYPE_CHECKING:
-   9  |+    from dataclasses import Field
-6  10 | 
-7  11 | 
-8  12 | @dataclass
+2  | 
+3  | from __future__ import annotations
+4  | 
+   - from dataclasses import KW_ONLY, dataclass, Field
+5  + from dataclasses import KW_ONLY, dataclass
+6  + from typing import TYPE_CHECKING
+7  + 
+8  + if TYPE_CHECKING:
+9  +     from dataclasses import Field
+10 | 
+11 | 
+12 | @dataclass
+note: This is an unsafe fix and may remove comments or change runtime behavior

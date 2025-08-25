@@ -30,11 +30,10 @@ D415 [*] First line should end with a period, question mark, or exclamation poin
 20 |     ...
    |
 help: Add closing punctuation
-
-ℹ Unsafe fix
-16 16 |     ...
-17 17 | 
-18 18 | def f():
-19    |-    """Here's a line ending with a whitespace  """
-   19 |+    """Here's a line ending with a whitespace.  """
-20 20 |     ...
+16 |     ...
+17 | 
+18 | def f():
+   -     """Here's a line ending with a whitespace  """
+19 +     """Here's a line ending with a whitespace.  """
+20 |     ...
+note: This is an unsafe fix and may remove comments or change runtime behavior

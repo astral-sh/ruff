@@ -12,16 +12,14 @@ PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `typ
 36 |     z: Union[  # comment
    |
 help: Combine multiple `type` members
-
-ℹ Safe fix
-31 31 | 
-32 32 | def func():
-33 33 |     # PYI055
-34    |-    x: type[requests_mock.Mocker] | type[httpretty] | type[str] = requests_mock.Mocker
-   34 |+    x: type[requests_mock.Mocker | httpretty | str] = requests_mock.Mocker
-35 35 |     y: Union[type[requests_mock.Mocker], type[httpretty], type[str]] = requests_mock.Mocker
-36 36 |     z: Union[  # comment
-37 37 |         type[requests_mock.Mocker], # another comment
+31 | 
+32 | def func():
+33 |     # PYI055
+   -     x: type[requests_mock.Mocker] | type[httpretty] | type[str] = requests_mock.Mocker
+34 +     x: type[requests_mock.Mocker | httpretty | str] = requests_mock.Mocker
+35 |     y: Union[type[requests_mock.Mocker], type[httpretty], type[str]] = requests_mock.Mocker
+36 |     z: Union[  # comment
+37 |         type[requests_mock.Mocker], # another comment
 
 PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[requests_mock.Mocker, httpretty, str]]`.
   --> PYI055.py:35:8
@@ -34,16 +32,14 @@ PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `typ
 37 |         type[requests_mock.Mocker], # another comment
    |
 help: Combine multiple `type` members
-
-ℹ Safe fix
-32 32 | def func():
-33 33 |     # PYI055
-34 34 |     x: type[requests_mock.Mocker] | type[httpretty] | type[str] = requests_mock.Mocker
-35    |-    y: Union[type[requests_mock.Mocker], type[httpretty], type[str]] = requests_mock.Mocker
-   35 |+    y: type[Union[requests_mock.Mocker, httpretty, str]] = requests_mock.Mocker
-36 36 |     z: Union[  # comment
-37 37 |         type[requests_mock.Mocker], # another comment
-38 38 |         type[httpretty], type[str]] = requests_mock.Mocker
+32 | def func():
+33 |     # PYI055
+34 |     x: type[requests_mock.Mocker] | type[httpretty] | type[str] = requests_mock.Mocker
+   -     y: Union[type[requests_mock.Mocker], type[httpretty], type[str]] = requests_mock.Mocker
+35 +     y: type[Union[requests_mock.Mocker, httpretty, str]] = requests_mock.Mocker
+36 |     z: Union[  # comment
+37 |         type[requests_mock.Mocker], # another comment
+38 |         type[httpretty], type[str]] = requests_mock.Mocker
 
 PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[requests_mock.Mocker, httpretty, str]]`.
   --> PYI055.py:36:8
@@ -57,18 +53,17 @@ PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `typ
    | |___________________________________^
    |
 help: Combine multiple `type` members
-
-ℹ Unsafe fix
-33 33 |     # PYI055
-34 34 |     x: type[requests_mock.Mocker] | type[httpretty] | type[str] = requests_mock.Mocker
-35 35 |     y: Union[type[requests_mock.Mocker], type[httpretty], type[str]] = requests_mock.Mocker
-36    |-    z: Union[  # comment
-37    |-        type[requests_mock.Mocker], # another comment
-38    |-        type[httpretty], type[str]] = requests_mock.Mocker
-   36 |+    z: type[Union[requests_mock.Mocker, httpretty, str]] = requests_mock.Mocker
-39 37 | 
-40 38 | 
-41 39 | def func():
+33 |     # PYI055
+34 |     x: type[requests_mock.Mocker] | type[httpretty] | type[str] = requests_mock.Mocker
+35 |     y: Union[type[requests_mock.Mocker], type[httpretty], type[str]] = requests_mock.Mocker
+   -     z: Union[  # comment
+   -         type[requests_mock.Mocker], # another comment
+   -         type[httpretty], type[str]] = requests_mock.Mocker
+36 +     z: type[Union[requests_mock.Mocker, httpretty, str]] = requests_mock.Mocker
+37 | 
+38 | 
+39 | def func():
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[requests_mock.Mocker, httpretty, str]]`.
   --> PYI055.py:45:8
@@ -78,16 +73,14 @@ PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `typ
    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
 help: Combine multiple `type` members
-
-ℹ Safe fix
-42 42 |     from typing import Union as U
-43 43 | 
-44 44 |     # PYI055
-45    |-    x: Union[type[requests_mock.Mocker], type[httpretty], type[str]] = requests_mock.Mocker
-   45 |+    x: type[Union[requests_mock.Mocker, httpretty, str]] = requests_mock.Mocker
-46 46 | 
-47 47 | 
-48 48 | def convert_union(union: UnionType) -> _T | None:
+42 |     from typing import Union as U
+43 | 
+44 |     # PYI055
+   -     x: Union[type[requests_mock.Mocker], type[httpretty], type[str]] = requests_mock.Mocker
+45 +     x: type[Union[requests_mock.Mocker, httpretty, str]] = requests_mock.Mocker
+46 | 
+47 | 
+48 | def convert_union(union: UnionType) -> _T | None:
 
 PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[_T | Converter[_T]]`.
   --> PYI055.py:50:9
@@ -100,16 +93,14 @@ PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `typ
 52 |     ...
    |
 help: Combine multiple `type` members
-
-ℹ Safe fix
-47 47 | 
-48 48 | def convert_union(union: UnionType) -> _T | None:
-49 49 |     converters: tuple[
-50    |-        type[_T] | type[Converter[_T]] | Converter[_T] | Callable[[str], _T], ...  # PYI055
-   50 |+        type[_T | Converter[_T]] | Converter[_T] | Callable[[str], _T], ...  # PYI055
-51 51 |     ] = union.__args__
-52 52 |     ...
-53 53 | 
+47 | 
+48 | def convert_union(union: UnionType) -> _T | None:
+49 |     converters: tuple[
+   -         type[_T] | type[Converter[_T]] | Converter[_T] | Callable[[str], _T], ...  # PYI055
+50 +         type[_T | Converter[_T]] | Converter[_T] | Callable[[str], _T], ...  # PYI055
+51 |     ] = union.__args__
+52 |     ...
+53 | 
 
 PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[_T | Converter[_T]]`.
   --> PYI055.py:56:9
@@ -122,16 +113,14 @@ PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `typ
 58 |     ...
    |
 help: Combine multiple `type` members
-
-ℹ Safe fix
-53 53 | 
-54 54 | def convert_union(union: UnionType) -> _T | None:
-55 55 |     converters: tuple[
-56    |-        Union[type[_T] | type[Converter[_T]] | Converter[_T] | Callable[[str], _T]], ...  # PYI055
-   56 |+        type[_T | Converter[_T]] | Converter[_T] | Callable[[str], _T], ...  # PYI055
-57 57 |     ] = union.__args__
-58 58 |     ...
-59 59 | 
+53 | 
+54 | def convert_union(union: UnionType) -> _T | None:
+55 |     converters: tuple[
+   -         Union[type[_T] | type[Converter[_T]] | Converter[_T] | Callable[[str], _T]], ...  # PYI055
+56 +         type[_T | Converter[_T]] | Converter[_T] | Callable[[str], _T], ...  # PYI055
+57 |     ] = union.__args__
+58 |     ...
+59 | 
 
 PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[_T | Converter[_T]]`.
   --> PYI055.py:62:9
@@ -144,16 +133,14 @@ PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `typ
 64 |     ...
    |
 help: Combine multiple `type` members
-
-ℹ Safe fix
-59 59 | 
-60 60 | def convert_union(union: UnionType) -> _T | None:
-61 61 |     converters: tuple[
-62    |-        Union[type[_T] | type[Converter[_T]]] | Converter[_T] | Callable[[str], _T], ...  # PYI055
-   62 |+        type[_T | Converter[_T]] | Converter[_T] | Callable[[str], _T], ...  # PYI055
-63 63 |     ] = union.__args__
-64 64 |     ...
-65 65 | 
+59 | 
+60 | def convert_union(union: UnionType) -> _T | None:
+61 |     converters: tuple[
+   -         Union[type[_T] | type[Converter[_T]]] | Converter[_T] | Callable[[str], _T], ...  # PYI055
+62 +         type[_T | Converter[_T]] | Converter[_T] | Callable[[str], _T], ...  # PYI055
+63 |     ] = union.__args__
+64 |     ...
+65 | 
 
 PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[_T | Converter[_T]]`.
   --> PYI055.py:68:9
@@ -166,13 +153,11 @@ PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `typ
 70 |     ...
    |
 help: Combine multiple `type` members
-
-ℹ Safe fix
-65 65 | 
-66 66 | def convert_union(union: UnionType) -> _T | None:
-67 67 |     converters: tuple[
-68    |-        Union[type[_T] | type[Converter[_T]] | str] | Converter[_T] | Callable[[str], _T], ...  # PYI055
-   68 |+        type[_T | Converter[_T]] | str | Converter[_T] | Callable[[str], _T], ...  # PYI055
-69 69 |     ] = union.__args__
-70 70 |     ...
-71 71 |
+65 | 
+66 | def convert_union(union: UnionType) -> _T | None:
+67 |     converters: tuple[
+   -         Union[type[_T] | type[Converter[_T]] | str] | Converter[_T] | Callable[[str], _T], ...  # PYI055
+68 +         type[_T | Converter[_T]] | str | Converter[_T] | Callable[[str], _T], ...  # PYI055
+69 |     ] = union.__args__
+70 |     ...
+71 |

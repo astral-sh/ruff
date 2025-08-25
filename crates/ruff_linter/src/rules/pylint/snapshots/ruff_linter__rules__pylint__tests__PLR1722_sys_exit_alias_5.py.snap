@@ -11,16 +11,15 @@ PLR1722 [*] Use `sys.exit()` instead of `exit`
 4 | quit(0)
   |
 help: Replace `exit` with `sys.exit()`
-
-ℹ Unsafe fix
-1 1 | from sys import *
-  2 |+import sys
-2 3 | 
-3   |-exit(0)
-  4 |+sys.exit(0)
-4 5 | quit(0)
-5 6 | 
-6 7 | 
+1 | from sys import *
+2 + import sys
+3 | 
+  - exit(0)
+4 + sys.exit(0)
+5 | quit(0)
+6 | 
+7 | 
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 PLR1722 [*] Use `sys.exit()` instead of `quit`
  --> sys_exit_alias_5.py:4:1
@@ -30,17 +29,16 @@ PLR1722 [*] Use `sys.exit()` instead of `quit`
   | ^^^^
   |
 help: Replace `quit` with `sys.exit()`
-
-ℹ Unsafe fix
-1 1 | from sys import *
-  2 |+import sys
-2 3 | 
-3 4 | exit(0)
-4   |-quit(0)
-  5 |+sys.exit(0)
-5 6 | 
-6 7 | 
-7 8 | def main():
+1 | from sys import *
+2 + import sys
+3 | 
+4 | exit(0)
+  - quit(0)
+5 + sys.exit(0)
+6 | 
+7 | 
+8 | def main():
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 PLR1722 [*] Use `sys.exit()` instead of `exit`
  --> sys_exit_alias_5.py:8:5
@@ -51,19 +49,18 @@ PLR1722 [*] Use `sys.exit()` instead of `exit`
 9 |     quit(1)
   |
 help: Replace `exit` with `sys.exit()`
-
-ℹ Unsafe fix
-1  1  | from sys import *
-   2  |+import sys
-2  3  | 
-3  4  | exit(0)
-4  5  | quit(0)
-5  6  | 
-6  7  | 
-7  8  | def main():
-8     |-    exit(1)
-   9  |+    sys.exit(1)
-9  10 |     quit(1)
+1  | from sys import *
+2  + import sys
+3  | 
+4  | exit(0)
+5  | quit(0)
+6  | 
+7  | 
+8  | def main():
+   -     exit(1)
+9  +     sys.exit(1)
+10 |     quit(1)
+note: This is an unsafe fix and may remove comments or change runtime behavior
 
 PLR1722 [*] Use `sys.exit()` instead of `quit`
  --> sys_exit_alias_5.py:9:5
@@ -74,16 +71,15 @@ PLR1722 [*] Use `sys.exit()` instead of `quit`
   |     ^^^^
   |
 help: Replace `quit` with `sys.exit()`
-
-ℹ Unsafe fix
-1  1  | from sys import *
-   2  |+import sys
-2  3  | 
-3  4  | exit(0)
-4  5  | quit(0)
+1  | from sys import *
+2  + import sys
+3  | 
+4  | exit(0)
+5  | quit(0)
 --------------------------------------------------------------------------------
-6  7  | 
-7  8  | def main():
-8  9  |     exit(1)
-9     |-    quit(1)
-   10 |+    sys.exit(1)
+7  | 
+8  | def main():
+9  |     exit(1)
+   -     quit(1)
+10 +     sys.exit(1)
+note: This is an unsafe fix and may remove comments or change runtime behavior
