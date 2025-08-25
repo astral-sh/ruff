@@ -22,6 +22,7 @@ if sys.version_info >= (3, 13):  # needed to satisfy pyright checks for Python <
         cross-interpreter container is destroyed.
         """
 
+        __slots__ = ()
         def __new__(cls) -> Never: ...
         @classonly
         def singleton(cls, kind: str, module: str, name: str = "UNBOUND") -> Self:

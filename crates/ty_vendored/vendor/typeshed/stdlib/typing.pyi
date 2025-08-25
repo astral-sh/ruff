@@ -1204,6 +1204,7 @@ class MutableSet(AbstractSet[_T]):
     def __isub__(self, it: AbstractSet[Any]) -> typing_extensions.Self: ...
 
 class MappingView(Sized):
+    __slots__ = ("_mapping",)
     def __init__(self, mapping: Sized) -> None: ...  # undocumented
     def __len__(self) -> int: ...
 

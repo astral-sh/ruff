@@ -21,7 +21,7 @@ from collections.abc import (
 )
 from importlib.machinery import ModuleSpec
 from typing import Any, ClassVar, Literal, TypeVar, final, overload
-from typing_extensions import ParamSpec, Self, TypeAliasType, TypeVarTuple, deprecated
+from typing_extensions import ParamSpec, Self, TypeAliasType, TypeVarTuple, deprecated, disjoint_base
 
 if sys.version_info >= (3, 14):
     from _typeshed import AnnotateFunc
@@ -384,23 +384,42 @@ class MappingProxyType(Mapping[_KT, _VT_co]):
     def __ror__(self, value: Mapping[_T1, _T2], /) -> dict[_KT | _T1, _VT_co | _T2]:
         """Return value|self."""
 
-class SimpleNamespace:
-    """A simple attribute-based namespace."""
+if sys.version_info >= (3, 12):
+    @disjoint_base
+    class SimpleNamespace:
+        """A simple attribute-based namespace."""
 
-    __hash__: ClassVar[None]  # type: ignore[assignment]
-    if sys.version_info >= (3, 13):
-        def __init__(self, mapping_or_iterable: Mapping[str, Any] | Iterable[tuple[str, Any]] = (), /, **kwargs: Any) -> None: ...
-    else:
+        __hash__: ClassVar[None]  # type: ignore[assignment]
+        if sys.version_info >= (3, 13):
+            def __init__(
+                self, mapping_or_iterable: Mapping[str, Any] | Iterable[tuple[str, Any]] = (), /, **kwargs: Any
+            ) -> None: ...
+        else:
+            def __init__(self, **kwargs: Any) -> None: ...
+
+        def __eq__(self, value: object, /) -> bool: ...
+        def __getattribute__(self, name: str, /) -> Any: ...
+        def __setattr__(self, name: str, value: Any, /) -> None: ...
+        def __delattr__(self, name: str, /) -> None: ...
+        if sys.version_info >= (3, 13):
+            def __replace__(self, **kwargs: Any) -> Self:
+                """Return a copy of the namespace object with new values for the specified attributes."""
+
+else:
+    class SimpleNamespace:
+        """A simple attribute-based namespace.
+
+        SimpleNamespace(**kwargs)
+        """
+
+        __hash__: ClassVar[None]  # type: ignore[assignment]
         def __init__(self, **kwargs: Any) -> None: ...
+        def __eq__(self, value: object, /) -> bool: ...
+        def __getattribute__(self, name: str, /) -> Any: ...
+        def __setattr__(self, name: str, value: Any, /) -> None: ...
+        def __delattr__(self, name: str, /) -> None: ...
 
-    def __eq__(self, value: object, /) -> bool: ...
-    def __getattribute__(self, name: str, /) -> Any: ...
-    def __setattr__(self, name: str, value: Any, /) -> None: ...
-    def __delattr__(self, name: str, /) -> None: ...
-    if sys.version_info >= (3, 13):
-        def __replace__(self, **kwargs: Any) -> Self:
-            """Return a copy of the namespace object with new values for the specified attributes."""
-
+@disjoint_base
 class ModuleType:
     """Create a module object.
 
@@ -881,7 +900,7 @@ def coroutine(func: Callable[_P, Generator[Any, Any, _R]]) -> Callable[_P, Await
 
 @overload
 def coroutine(func: _Fn) -> _Fn: ...
-
+@disjoint_base
 class GenericAlias:
     """Represent a PEP 585 generic type
 

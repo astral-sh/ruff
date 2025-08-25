@@ -1409,7 +1409,12 @@ mod implicit_globals {
     /// Conceptually this function could be a `Set` rather than a list,
     /// but the number of symbols declared in this scope is likely to be very small,
     /// so the cost of hashing the names is likely to be more expensive than it's worth.
-    #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(
+        returns(deref),
+        cycle_initial=module_type_symbols_initial,
+        cycle_fn=module_type_symbols_cycle_recover,
+        heap_size=ruff_memory_usage::heap_size
+    )]
     fn module_type_symbols<'db>(db: &'db dyn Db) -> smallvec::SmallVec<[ast::name::Name; 8]> {
         let Some(module_type) = KnownClass::ModuleType
             .to_class_literal(db)
@@ -1435,6 +1440,18 @@ mod implicit_globals {
             })
             .cloned()
             .collect()
+    }
+
+    fn module_type_symbols_initial(_db: &dyn Db) -> smallvec::SmallVec<[ast::name::Name; 8]> {
+        smallvec::SmallVec::default()
+    }
+
+    fn module_type_symbols_cycle_recover(
+        _db: &dyn Db,
+        _value: &smallvec::SmallVec<[ast::name::Name; 8]>,
+        _count: u32,
+    ) -> salsa::CycleRecoveryAction<smallvec::SmallVec<[ast::name::Name; 8]>> {
+        salsa::CycleRecoveryAction::Iterate
     }
 
     #[cfg(test)]
