@@ -1105,7 +1105,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     self.semantic.push_scope(ScopeKind::DunderClassCell);
                     let binding_id = self.semantic.push_binding(
                         TextRange::default(),
-                        BindingKind::ClassCell,
+                        BindingKind::DunderClassCell,
                         BindingFlags::empty(),
                     );
                     self.semantic

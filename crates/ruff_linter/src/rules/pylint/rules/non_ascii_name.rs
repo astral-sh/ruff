@@ -74,7 +74,7 @@ pub(crate) fn non_ascii_name(checker: &Checker, binding: &Binding) {
         | BindingKind::Deletion
         | BindingKind::ConditionalDeletion(_)
         | BindingKind::UnboundException(_)
-        | BindingKind::ClassCell => {
+        | BindingKind::DunderClassCell => {
             return;
         }
     };

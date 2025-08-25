@@ -357,7 +357,7 @@ impl Renamer {
             BindingKind::FutureImport
             | BindingKind::Builtin
             | BindingKind::Export(_)
-            | BindingKind::ClassCell => None,
+            | BindingKind::DunderClassCell => None,
             // By default, replace the binding's name with the target name.
             BindingKind::Annotation
             | BindingKind::Argument

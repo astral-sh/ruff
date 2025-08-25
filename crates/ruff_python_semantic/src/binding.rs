@@ -689,7 +689,7 @@ pub enum BindingKind<'a> {
     ///
     /// See <https://docs.python.org/3/reference/datamodel.html#creating-the-class-object> for more
     /// details.
-    ClassCell,
+    DunderClassCell,
 }
 
 bitflags! {
