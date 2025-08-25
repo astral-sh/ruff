@@ -1055,6 +1055,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             NodeWithScopeKind::GeneratorExpression(generator) => {
                 self.infer_generator_expression_scope(generator.node(self.module()));
             }
+            NodeWithScopeKind::DunderClassCell => {}
         }
 
         // Infer the deferred types for the definitions here to consider the end-of-scope

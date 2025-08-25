@@ -64,6 +64,7 @@ impl<'db> ScopeId<'db> {
             NodeWithScopeKind::SetComprehension(_) => "<setcomp>",
             NodeWithScopeKind::DictComprehension(_) => "<dictcomp>",
             NodeWithScopeKind::GeneratorExpression(_) => "<generator>",
+            NodeWithScopeKind::DunderClassCell => "<__class__ cell>",
         }
     }
 }
@@ -206,6 +207,10 @@ pub(crate) enum ScopeKind {
     Lambda,
     Comprehension,
     TypeAlias,
+    /// The implicit `__class__` scope surrounding a method which allows code in the method to
+    /// access `__class__` at runtime. The closure sits in between the class scope and the function
+    /// scope.
+    DunderClassCell,
 }
 
 impl ScopeKind {
@@ -218,7 +223,8 @@ impl ScopeKind {
             ScopeKind::Module
             | ScopeKind::Class
             | ScopeKind::Comprehension
-            | ScopeKind::TypeParams => ScopeLaziness::Eager,
+            | ScopeKind::TypeParams
+            | ScopeKind::DunderClassCell => ScopeLaziness::Eager,
             ScopeKind::Function | ScopeKind::Lambda | ScopeKind::TypeAlias => ScopeLaziness::Lazy,
         }
     }
@@ -230,7 +236,8 @@ impl ScopeKind {
             | ScopeKind::TypeAlias
             | ScopeKind::Function
             | ScopeKind::Lambda
-            | ScopeKind::Comprehension => ScopeVisibility::Private,
+            | ScopeKind::Comprehension
+            | ScopeKind::DunderClassCell => ScopeVisibility::Private,
         }
     }
 
@@ -279,6 +286,7 @@ pub(crate) enum NodeWithScopeRef<'a> {
     SetComprehension(&'a ast::ExprSetComp),
     DictComprehension(&'a ast::ExprDictComp),
     GeneratorExpression(&'a ast::ExprGenerator),
+    DunderClassCell,
 }
 
 impl NodeWithScopeRef<'_> {
@@ -321,6 +329,7 @@ impl NodeWithScopeRef<'_> {
             NodeWithScopeRef::GeneratorExpression(generator) => {
                 NodeWithScopeKind::GeneratorExpression(AstNodeRef::new(module, generator))
             }
+            NodeWithScopeRef::DunderClassCell => NodeWithScopeKind::DunderClassCell,
         }
     }
 
@@ -358,6 +367,7 @@ impl NodeWithScopeRef<'_> {
             NodeWithScopeRef::GeneratorExpression(generator) => {
                 NodeWithScopeKey::GeneratorExpression(NodeKey::from_node(generator))
             }
+            NodeWithScopeRef::DunderClassCell => NodeWithScopeKey::DunderClassCell,
         }
     }
 }
@@ -377,6 +387,7 @@ pub(crate) enum NodeWithScopeKind {
     SetComprehension(AstNodeRef<ast::ExprSetComp>),
     DictComprehension(AstNodeRef<ast::ExprDictComp>),
     GeneratorExpression(AstNodeRef<ast::ExprGenerator>),
+    DunderClassCell,
 }
 
 impl NodeWithScopeKind {
@@ -394,6 +405,7 @@ impl NodeWithScopeKind {
             | Self::SetComprehension(_)
             | Self::DictComprehension(_)
             | Self::GeneratorExpression(_) => ScopeKind::Comprehension,
+            Self::DunderClassCell => ScopeKind::DunderClassCell,
         }
     }
 
@@ -459,4 +471,5 @@ pub(crate) enum NodeWithScopeKey {
     SetComprehension(NodeKey),
     DictComprehension(NodeKey),
     GeneratorExpression(NodeKey),
+    DunderClassCell,
 }

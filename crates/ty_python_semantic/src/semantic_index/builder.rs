@@ -1267,6 +1267,12 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     self.visit_decorator(decorator);
                 }
 
+                let current_scope = &self.scopes[self.current_scope()];
+                let is_class = matches!(current_scope.kind(), ScopeKind::Class);
+                if is_class {
+                    self.push_scope(NodeWithScopeRef::DunderClassCell);
+                }
+
                 self.with_type_params(
                     NodeWithScopeRef::FunctionTypeParameters(function_def),
                     type_params.as_deref(),
@@ -1295,6 +1301,11 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         builder.pop_scope()
                     },
                 );
+
+                if is_class {
+                    self.pop_scope();
+                }
+
                 // The default value of the parameters needs to be evaluated in the
                 // enclosing scope.
                 for default in parameters
@@ -2649,7 +2660,8 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
                 ScopeKind::Comprehension
                 | ScopeKind::Module
                 | ScopeKind::TypeAlias
-                | ScopeKind::TypeParams => {}
+                | ScopeKind::TypeParams
+                | ScopeKind::DunderClassCell => {}
             }
         }
         false
@@ -2664,7 +2676,8 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
                 ScopeKind::Comprehension
                 | ScopeKind::Module
                 | ScopeKind::TypeAlias
-                | ScopeKind::TypeParams => {}
+                | ScopeKind::TypeParams
+                | ScopeKind::DunderClassCell => {}
             }
         }
         false
@@ -2676,7 +2689,10 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
             match scope.kind() {
                 ScopeKind::Class | ScopeKind::Comprehension => return false,
                 ScopeKind::Function | ScopeKind::Lambda => return true,
-                ScopeKind::Module | ScopeKind::TypeAlias | ScopeKind::TypeParams => {}
+                ScopeKind::Module
+                | ScopeKind::TypeAlias
+                | ScopeKind::TypeParams
+                | ScopeKind::DunderClassCell => {}
             }
         }
         false

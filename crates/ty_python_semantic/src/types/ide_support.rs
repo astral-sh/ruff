@@ -1382,7 +1382,8 @@ mod resolve_definition {
             | NodeWithScopeKind::ListComprehension(_)
             | NodeWithScopeKind::SetComprehension(_)
             | NodeWithScopeKind::DictComprehension(_)
-            | NodeWithScopeKind::GeneratorExpression(_) => {
+            | NodeWithScopeKind::GeneratorExpression(_)
+            | NodeWithScopeKind::DunderClassCell => {
                 // Not yet implemented
                 return Err(());
             }
