@@ -62,26 +62,6 @@ help: Add `thing_id` to function signature
 22 22 | 
 23 23 | 
 
-FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing` signature
-  --> FAST003.py:24:19
-   |
-24 | @app.get("/things/{thing_id : path}")
-   |                   ^^^^^^^^^^^^^^^^^
-25 | async def read_thing(query: str):
-26 |     return {"query": query}
-   |
-help: Add `thing_id` to function signature
-
-ℹ Unsafe fix
-22 22 | 
-23 23 | 
-24 24 | @app.get("/things/{thing_id : path}")
-25    |-async def read_thing(query: str):
-   25 |+async def read_thing(query: str, thing_id):
-26 26 |     return {"query": query}
-27 27 | 
-28 28 | 
-
 FAST003 [*] Parameter `title` appears in route path, but not in `read_thing` signature
   --> FAST003.py:29:27
    |
