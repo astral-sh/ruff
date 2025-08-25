@@ -1494,12 +1494,23 @@ impl<'db> Type<'db> {
             {
                 match bound_typevar.typevar(db).bound_or_constraints(db) {
                     None => unreachable!(),
+                    // Verify that the upper bound satisfies the relation. (If it does, than any
+                    // subtype of the upper bound will too.) Also add a safety constraint that
+                    // ensures that the typevar specializes to a subtype of the upper bound.
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        bound.has_relation_to_impl(db, target, relation, visitor)
+                        C::constrain_typevar(db, bound_typevar, Type::Never, bound)
+                            .implies(db, || {
+                                bound.has_relation_to_impl(db, target, relation, visitor)
+                            })
                     }
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                         constraints.elements(db).iter().when_all(db, |constraint| {
-                            constraint.has_relation_to_impl(db, target, relation, visitor)
+                            // Note that constrained typevars must specialize to _exactly_ one of the
+                            // constraints, not to a _subtype_ of one.
+                            C::constrain_typevar(db, bound_typevar, *constraint, *constraint)
+                                .implies(db, || {
+                                    constraint.has_relation_to_impl(db, target, relation, visitor)
+                                })
                         })
                     }
                 }
