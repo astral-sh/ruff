@@ -2633,17 +2633,20 @@ impl<'db> ClassLiteral<'db> {
                 //     self.name: <annotation>
                 //     self.name: <annotation> = …
 
-                if use_def_map(db, method_scope)
-                    .is_declaration_reachable(db, &attribute_declaration)
-                    .is_always_false()
-                {
+                let reachability = use_def_map(db, method_scope)
+                    .is_declaration_reachable(db, &attribute_declaration);
+
+                if reachability.is_always_false() {
                     continue;
                 }
 
                 let annotation = declaration_type(db, declaration);
-                let annotation =
+                let mut annotation =
                     Place::bound(annotation.inner).with_qualifiers(annotation.qualifiers);
 
+                if reachability.is_ambiguous() {
+                    annotation.qualifiers |= TypeQualifiers::NOT_BOUND;
+                }
                 if let Some(all_qualifiers) = annotation.is_bare_final() {
                     if let Some(value) = assignment.value(&module) {
                         // If we see an annotated assignment with a bare `Final` as in
@@ -2718,8 +2721,12 @@ impl<'db> ClassLiteral<'db> {
                     .is_binding_reachable(db, &attribute_assignment)
                     .and(is_method_reachable)
                 {
-                    Truthiness::AlwaysTrue | Truthiness::Ambiguous => {
+                    Truthiness::AlwaysTrue => {
                         is_attribute_bound = true;
+                    }
+                    Truthiness::Ambiguous => {
+                        is_attribute_bound = true;
+                        qualifiers |= TypeQualifiers::NOT_BOUND;
                     }
                     Truthiness::AlwaysFalse => {
                         continue;
