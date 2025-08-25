@@ -195,6 +195,10 @@ impl ScopeLaziness {
     pub(crate) const fn is_eager(self) -> bool {
         matches!(self, ScopeLaziness::Eager)
     }
+
+    pub(crate) const fn is_lazy(self) -> bool {
+        matches!(self, ScopeLaziness::Lazy)
+    }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -257,6 +261,10 @@ impl ScopeKind {
 
     pub(crate) const fn is_annotation(self) -> bool {
         matches!(self, ScopeKind::TypeParams | ScopeKind::TypeAlias)
+    }
+
+    pub(crate) const fn is_type_alias(self) -> bool {
+        matches!(self, ScopeKind::TypeAlias)
     }
 
     pub(crate) const fn is_non_lambda_function(self) -> bool {
