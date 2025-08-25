@@ -1,4 +1,5 @@
 use crate::Db;
+use crate::types::class::CodeGeneratorKind;
 use crate::types::generics::Specialization;
 use crate::types::tuple::TupleType;
 use crate::types::{
@@ -206,7 +207,7 @@ impl<'db> ClassBase<'db> {
                 SpecialFormType::Generic => Some(Self::Generic),
 
                 SpecialFormType::NamedTuple => {
-                    let fields = subclass.own_fields(db, None);
+                    let fields = subclass.own_fields(db, None, CodeGeneratorKind::NamedTuple);
                     Self::try_from_type(
                         db,
                         TupleType::heterogeneous(
