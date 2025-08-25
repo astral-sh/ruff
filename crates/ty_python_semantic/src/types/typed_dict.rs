@@ -15,7 +15,7 @@ use ordermap::OrderSet;
 
 bitflags! {
     /// Used for `TypedDict` class parameters.
-    /// Keeps track of the arguments that were passed in class definition.
+    /// Keeps track of the keyword arguments that were passed-in during class definition.
     /// (see https://typing.python.org/en/latest/spec/typeddict.html)
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     pub struct TypedDictParams: u8 {
