@@ -34,7 +34,6 @@ Inhabitants can also be created through a constructor call:
 bob = Person(name="Bob", age=25)
 
 reveal_type(bob["name"])  # revealed: str
-# TODO: we might consider emitting an error here since access may result in runtime exception
 reveal_type(bob["age"])  # revealed: int | None
 
 # error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "non_existing""
@@ -553,8 +552,8 @@ alice: Employee = {"name": "Alice", "employee_id": 1}
 eve: Employee = {"name": "Eve"}
 ```
 
-When inheriting from a `TypedDict` with a different `total=` setting, inherited fields maintain
-their original requirement status, while new fields follow the child class's `total=` setting:
+When inheriting from a `TypedDict` with a different `total` setting, inherited fields maintain their
+original requirement status, while new fields follow the child class's `total` setting:
 
 ```py
 from typing import TypedDict

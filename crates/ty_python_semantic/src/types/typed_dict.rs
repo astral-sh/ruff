@@ -103,7 +103,7 @@ pub(super) fn typed_dict_params_from_class_def(class_stmt: &StmtClassDef) -> Typ
 pub(super) enum TypedDictAssignmentKind {
     /// For subscript assignments like `d["key"] = value`
     Subscript,
-    /// For constructor arguments like `Dict(key=value)`
+    /// For constructor arguments like `MyTypedDict(key=value)`
     Constructor,
 }
 
