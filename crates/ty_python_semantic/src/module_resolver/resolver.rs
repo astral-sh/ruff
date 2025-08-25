@@ -675,6 +675,8 @@ fn resolve_name(db: &dyn Db, name: &ModuleName, mode: ModuleResolveMode) -> Opti
     let stub_name = name.to_stub_package();
     let mut is_namespace_package = false;
 
+    // Make an stub tracker variable. Don't return None until all paths have been checked.
+    let mut found_stub_without_module = false;
     for search_path in search_paths(db, mode) {
         // When a builtin module is imported, standard module resolution is bypassed:
         // the module name always resolves to the stdlib module,
@@ -718,7 +720,10 @@ fn resolve_name(db: &dyn Db, name: &ModuleName, mode: ModuleResolveMode) -> Opti
                         "Stub-package in `{search_path}` doesn't contain module: `{name}`"
                     );
                     // stub exists, but the module doesn't.
-                    return None;
+                    // mark the failure, but don't fail yet, wait for all paths
+                    // to be checked.
+                    found_stub_without_module = true;
+                    continue;
                 }
                 Err((PackageKind::Namespace, _)) => {
                     tracing::trace!(
@@ -754,7 +759,11 @@ fn resolve_name(db: &dyn Db, name: &ModuleName, mode: ModuleResolveMode) -> Opti
                     // For regular packages, don't search the next search path. All files of that
                     // package must be in the same location
                     tracing::trace!("Package in `{search_path}` doesn't contain module: `{name}`");
-                    return None;
+                    // stub exists, but the module doesn't.
+                    // mark the failure, but don't fail yet, wait for all paths
+                    // to be checked.
+                    found_stub_without_module = true;
+                    continue;
                 }
                 (PackageKind::Namespace, _) => {
                     tracing::trace!(
@@ -764,6 +773,12 @@ fn resolve_name(db: &dyn Db, name: &ModuleName, mode: ModuleResolveMode) -> Opti
                 }
             },
         }
+    }
+    if found_stub_without_module {
+        // There were one or more paths that had part of the module stub but the module
+        // was not found in any of them.
+        tracing::trace!("No search path contains module: `{name}`");
+        return None;
     }
 
     if is_namespace_package {
