@@ -26,6 +26,8 @@
 //! constraint set implementation, and the `bool` impl of the trait (and possibly the trait itself)
 //! will go away.
 
+use std::fmt::Display;
+
 use smallvec::{SmallVec, smallvec};
 
 use crate::Db;
@@ -82,6 +84,9 @@ pub(crate) trait Constraints<'db>: Clone + Sized {
         }
         self
     }
+
+    #[allow(dead_code)]
+    fn display(&self, db: &'db dyn Db) -> impl Display;
 }
 
 /// An extension trait for building constraint sets from [`Option`] values.
@@ -214,6 +219,31 @@ impl<'db> ConstraintSet<'db> {
             }
         }
     }
+
+    #[allow(dead_code)]
+    pub(crate) fn display(&self, db: &'db dyn Db) -> impl Display {
+        struct DisplayConstraintSet<'a, 'db> {
+            set: &'a ConstraintSet<'db>,
+            db: &'db dyn Db,
+        }
+
+        impl Display for DisplayConstraintSet<'_, '_> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                if self.set.clauses.is_empty() {
+                    return f.write_str("0");
+                }
+                for (i, clause) in self.set.clauses.iter().enumerate() {
+                    if i > 0 {
+                        f.write_str(" ∨ ")?;
+                    }
+                    clause.display(self.db).fmt(f)?;
+                }
+                Ok(())
+            }
+        }
+
+        DisplayConstraintSet { set: self, db }
+    }
 }
 
 impl<'db> Constraints<'db> for ConstraintSet<'db> {
@@ -249,6 +279,10 @@ impl<'db> Constraints<'db> for ConstraintSet<'db> {
             result.intersect_set(db, &clause.negate(db));
         }
         result
+    }
+
+    fn display(&self, db: &'db dyn Db) -> impl Display {
+        self.display(db)
     }
 }
 
@@ -380,6 +414,37 @@ impl<'db> ConstraintClause<'db> {
             result.union_clause(db, ConstraintClause::singleton(constraint.negate()));
         }
         result
+    }
+
+    fn display(&self, db: &'db dyn Db) -> impl Display {
+        struct DisplayConstraintClause<'a, 'db> {
+            clause: &'a ConstraintClause<'db>,
+            db: &'db dyn Db,
+        }
+
+        impl Display for DisplayConstraintClause<'_, '_> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                if self.clause.constraints.is_empty() {
+                    return f.write_str("1");
+                }
+
+                if self.clause.constraints.len() > 1 {
+                    f.write_str("(")?;
+                }
+                for (i, constraint) in self.clause.constraints.iter().enumerate() {
+                    if i > 0 {
+                        f.write_str(" ∧ ")?;
+                    }
+                    constraint.display(self.db).fmt(f)?;
+                }
+                if self.clause.constraints.len() > 1 {
+                    f.write_str(")")?;
+                }
+                Ok(())
+            }
+        }
+
+        DisplayConstraintClause { clause: self, db }
     }
 }
 
@@ -595,6 +660,35 @@ impl<'db> AtomicConstraint<'db> {
                     other.upper,
                 ),
             ),
+        }
+    }
+
+    fn display(self, db: &'db dyn Db) -> impl Display {
+        struct DisplayAtomicConstraint<'db> {
+            constraint: AtomicConstraint<'db>,
+            db: &'db dyn Db,
+        }
+
+        impl Display for DisplayAtomicConstraint<'_> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                if self.constraint.sign == ConstraintSign::Negative {
+                    f.write_str("¬")?;
+                }
+                f.write_str("(")?;
+                if !self.constraint.lower.is_never() {
+                    write!(f, "{} ≤ ", self.constraint.lower.display(self.db))?;
+                }
+                self.constraint.typevar.display(self.db).fmt(f)?;
+                if !self.constraint.upper.is_object(self.db) {
+                    write!(f, " ≤ {}", self.constraint.lower.display(self.db))?;
+                }
+                f.write_str(")")
+            }
+        }
+
+        DisplayAtomicConstraint {
+            constraint: self,
+            db,
         }
     }
 }
