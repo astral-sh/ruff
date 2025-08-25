@@ -164,7 +164,8 @@ class A:
 # The following three cases should technically be allowed because `__class__`
 # is a nonlocal variable in the method scope. However, `__class__` isn't easily
 # accessible in other methods, so setting it like this is still likely to be an
-# error, and we still emit a diagnostic. See https://github.com/astral-sh/ruff/pull/20048#discussion_r2296252395
+# error, and we still emit a diagnostic. See
+# https://github.com/astral-sh/ruff/pull/20048#discussion_r2296252395
 class A:
     def set_class(self, cls):
         __class__ = cls
