@@ -2448,6 +2448,7 @@ impl<'db> ClassLiteral<'db> {
         let use_def = use_def_map(db, class_body_scope);
 
         let typed_dict_params = self.compute_typed_dict_params(db);
+        let mut kw_only_sentinel_field_seen = false;
 
         for (symbol_id, declarations) in use_def.all_end_of_scope_symbol_declarations() {
             // Here, we exclude all declarations that are not annotated assignments. We need this because
@@ -2528,13 +2529,28 @@ impl<'db> ClassLiteral<'db> {
                     }
                 };
 
-                attributes.insert(
-                    symbol.name().clone(),
-                    Field {
-                        declared_ty: attr_ty.apply_optional_specialization(db, specialization),
-                        kind,
-                    },
-                );
+                let mut field = Field {
+                    declared_ty: attr_ty.apply_optional_specialization(db, specialization),
+                    kind,
+                };
+
+                // Check if this is a KW_ONLY sentinel and mark subsequent fields as keyword-only
+                if field.is_kw_only_sentinel(db) {
+                    kw_only_sentinel_field_seen = true;
+                }
+
+                // If no explicit kw_only setting and we've seen KW_ONLY sentinel, mark as keyword-only
+                if kw_only_sentinel_field_seen {
+                    if let FieldKind::Dataclass {
+                        kw_only: ref mut kw @ None,
+                        ..
+                    } = field.kind
+                    {
+                        *kw = Some(true);
+                    }
+                }
+
+                attributes.insert(symbol.name().clone(), field);
             }
         }
 
