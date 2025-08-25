@@ -5744,7 +5744,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
         }
-        todo_type!("Template")
+        KnownClass::Template.to_instance(self.db())
     }
 
     fn infer_ellipsis_literal_expression(
