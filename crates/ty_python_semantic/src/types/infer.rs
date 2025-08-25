@@ -2344,7 +2344,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn infer_type_alias(&mut self, type_alias: &ast::StmtTypeAlias) {
-        self.infer_annotation_expression(&type_alias.value, DeferredExpressionState::Deferred);
+        self.infer_annotation_expression(&type_alias.value, DeferredExpressionState::None);
     }
 
     /// If the current scope is a method inside an enclosing class,
