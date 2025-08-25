@@ -589,19 +589,58 @@ impl<'db> Specialization<'db> {
         type_mapping: &TypeMapping<'a, 'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
+        let applied_specialization_type = type_mapping.get_specialization_type(db);
+        let mut has_dynamic_invariant_typevar = false;
         let types: Box<[_]> = self
-            .types(db)
-            .iter()
-            .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, visitor))
+            .generic_context(db)
+            .variables(db)
+            .into_iter()
+            .zip(self.types(db))
+            .map(|(bound_typevar, vartype)| {
+                let ty = vartype.apply_type_mapping_impl(db, type_mapping, visitor);
+                match (applied_specialization_type, bound_typevar.variance(db)) {
+                    (None, _) => ty,
+                    (Some(_), TypeVarVariance::Bivariant) =>
+                    // With bivariance, all specializations are subtypes of each other,
+                    // so any materialization is acceptable.
+                    {
+                        ty.materialize(db, MaterializationType::Top)
+                    }
+                    (Some(materialization_type), TypeVarVariance::Covariant) => {
+                        ty.materialize(db, materialization_type)
+                    }
+                    (Some(materialization_type), TypeVarVariance::Contravariant) => {
+                        ty.materialize(db, materialization_type.flip())
+                    }
+                    (Some(_), TypeVarVariance::Invariant) => {
+                        let top_materialization = ty.materialize(db, MaterializationType::Top);
+                        if !ty.is_equivalent_to(db, top_materialization) {
+                            has_dynamic_invariant_typevar = true;
+                        }
+                        ty
+                    }
+                }
+            })
             .collect();
+
         let tuple_inner = self
             .tuple_inner(db)
             .and_then(|tuple| tuple.apply_type_mapping_impl(db, type_mapping, visitor));
+        let new_specialization_type = match (
+            self.specialization_type(db),
+            has_dynamic_invariant_typevar,
+            applied_specialization_type,
+        ) {
+            (existing, false, _) => existing,
+            (Some(existing_mat), true, _) => Some(existing_mat),
+            (None, _, Some(applied_mat)) => Some(applied_mat),
+            (None, true, None) => None,
+        };
         Specialization::new(
             db,
             self.generic_context(db),
             types,
-            self.specialization_type(db),
+            new_specialization_type,
             tuple_inner,
         )
     }

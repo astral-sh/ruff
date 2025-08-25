@@ -586,3 +586,37 @@ static_assert(not is_subtype_of(Bottom[list[int | Any]], Bottom[list[Any]]))
 ## Assignability
 
 TODO
+
+We need to take special care when an invariant class inherits from a covariant or contravariant one.
+This comes up frequently in practice because `list` (invariant) inherits from `Sequence` and a
+number of other covariant ABCs, but we'll use a synthetic example.
+
+```py
+from typing import Generic, TypeVar, Any
+from ty_extensions import static_assert, is_assignable_to, is_equivalent_to, Top
+
+class A:
+    pass
+
+class B(A):
+    pass
+
+T_co = TypeVar("T_co", covariant=True)
+T = TypeVar("T")
+
+class CovariantBase(Generic[T_co]):
+    def get(self) -> T_co:
+        raise NotImplementedError
+
+class InvariantChild(CovariantBase[T]):
+    def push(self, obj: T) -> None: ...
+
+static_assert(is_assignable_to(InvariantChild[A], CovariantBase[A]))
+static_assert(is_assignable_to(InvariantChild[B], CovariantBase[A]))
+static_assert(not is_assignable_to(InvariantChild[A], CovariantBase[B]))
+static_assert(not is_assignable_to(InvariantChild[B], InvariantChild[A]))
+static_assert(is_equivalent_to(Top[CovariantBase[Any]], CovariantBase[object]))
+static_assert(is_assignable_to(InvariantChild[Any], CovariantBase[A]))
+
+static_assert(not is_assignable_to(Top[InvariantChild[Any]], CovariantBase[A]))
+```

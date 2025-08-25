@@ -6667,6 +6667,13 @@ impl<'db> TypeMapping<'_, 'db> {
             }
         }
     }
+
+    fn get_specialization_type(&self, db: &'db dyn Db) -> Option<MaterializationType> {
+        match self {
+            TypeMapping::Specialization(specialization) => specialization.specialization_type(db),
+            _ => None,
+        }
+    }
 }
 
 /// Singleton types that are heavily special-cased by ty. Despite its name,
