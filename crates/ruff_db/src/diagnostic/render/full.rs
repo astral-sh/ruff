@@ -290,7 +290,7 @@ fn show_nonprinting(s: &str) -> Cow<'_, str> {
 
 #[cfg(test)]
 mod tests {
-    use ruff_diagnostics::{Applicability, Fix};
+    use ruff_diagnostics::{Applicability, Edit, Fix};
     use ruff_text_size::{TextLen, TextRange, TextSize};
 
     use crate::diagnostic::{
@@ -886,6 +886,75 @@ print()
         1 | unexpected eof
           |               ^
           |
+        ");
+    }
+
+    /// Test that we handle the width calculation for the line number correctly even for context
+    /// lines at the end of a diff. For example, we want it to render like this:
+    ///
+    /// ```
+    /// 8  |
+    /// 9  |
+    /// 10 |
+    /// ```
+    ///
+    /// and not like this:
+    ///
+    /// ```
+    /// 8 |
+    /// 9 |
+    /// 10 |
+    /// ```
+    #[test]
+    fn longer_line_number_end_of_context() {
+        let mut env = TestEnvironment::new();
+        let contents = "\
+line 1
+line 2
+line 3
+line 4
+line 5
+line 6
+line 7
+line 8
+line 9
+line 10
+        ";
+        env.add("example.py", contents);
+        env.format(DiagnosticFormat::Full);
+        env.show_fix_diff(true);
+
+        let mut diagnostic = env.err().primary("example.py", "3", "3", "label").build();
+        diagnostic.help("Start of diff:");
+        let target = "line 7";
+        let line9 = contents.find(target).unwrap();
+        let range = TextRange::at(TextSize::try_from(line9).unwrap(), target.text_len());
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+            format!("fixed {target}"),
+            range,
+        )));
+
+        insta::assert_snapshot!(env.render(&diagnostic), @r"
+        error[test-diagnostic]: main diagnostic message
+         --> example.py:3:1
+          |
+        1 | line 1
+        2 | line 2
+        3 | line 3
+          | ^^^^^^ label
+        4 | line 4
+        5 | line 5
+          |
+        help: Start of diff:
+        4 | line 4
+        5 | line 5
+        6 | line 6
+          - line 7
+        7 + fixed line 7
+        8 | line 8
+        9 | line 9
+        10 | line 10
+        note: This is an unsafe fix and may remove comments or change runtime behavior
         ");
     }
 }
