@@ -27,13 +27,14 @@ use crate::types::generics::{GenericContext, Specialization, walk_specialization
 use crate::types::infer::nearest_enclosing_class;
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType};
+use crate::types::typed_dict::typed_dict_params_from_class_def;
 use crate::types::{
     ApplyTypeMappingVisitor, Binding, BoundSuperError, BoundSuperType, CallableType,
     DataclassParams, DeprecatedInstance, HasRelationToVisitor, IsEquivalentVisitor,
     KnownInstanceType, ManualPEP695TypeAliasType, NormalizedVisitor, PropertyInstanceType,
     StringLiteralType, TypeAliasType, TypeMapping, TypeRelation, TypeVarBoundOrConstraints,
-    TypeVarInstance, TypeVarKind, VarianceInferable, declaration_type, infer_definition_types,
-    todo_type,
+    TypeVarInstance, TypeVarKind, TypedDictParams, VarianceInferable, declaration_type,
+    infer_definition_types, todo_type,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet, Program,
@@ -1241,24 +1242,51 @@ impl MethodDecorator {
     }
 }
 
+/// Kind-specific metadata for different types of fields
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum FieldKind<'db> {
+    /// `NamedTuple` field metadata
+    NamedTuple { default_ty: Option<Type<'db>> },
+    /// dataclass field metadata
+    Dataclass {
+        /// The type of the default value for this field
+        default_ty: Option<Type<'db>>,
+        /// Whether or not this field is "init-only". If this is true, it only appears in the
+        /// `__init__` signature, but is not accessible as a real field
+        init_only: bool,
+        /// Whether or not this field should appear in the signature of `__init__`.
+        init: bool,
+        /// Whether or not this field can only be passed as a keyword argument to `__init__`.
+        kw_only: Option<bool>,
+    },
+    /// `TypedDict` field metadata
+    TypedDict {
+        /// Whether this field is required
+        is_required: bool,
+    },
+}
+
 /// Metadata regarding a dataclass field/attribute or a `TypedDict` "item" / key-value pair.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Field<'db> {
     /// The declared type of the field
     pub(crate) declared_ty: Type<'db>,
+    /// Kind-specific metadata for this field
+    pub(crate) kind: FieldKind<'db>,
+}
 
-    /// The type of the default value for this field
-    pub(crate) default_ty: Option<Type<'db>>,
-
-    /// Whether or not this field is "init-only". If this is true, it only appears in the
-    /// `__init__` signature, but is not accessible as a real field
-    pub(crate) init_only: bool,
-
-    /// Whether or not this field should appear in the signature of `__init__`.
-    pub(crate) init: bool,
-
-    /// Whether or not this field can only be passed as a keyword argument to `__init__`.
-    pub(crate) kw_only: Option<bool>,
+impl Field<'_> {
+    pub(crate) const fn is_required(&self) -> bool {
+        match &self.kind {
+            FieldKind::NamedTuple { default_ty } => default_ty.is_none(),
+            // A dataclass field is NOT required if `default` (or `default_factory`) is set
+            // or if `init` has been set to `False`.
+            FieldKind::Dataclass {
+                init, default_ty, ..
+            } => default_ty.is_none() && *init,
+            FieldKind::TypedDict { is_required } => *is_required,
+        }
+    }
 }
 
 impl<'db> Field<'db> {
@@ -1664,6 +1692,17 @@ impl<'db> ClassLiteral<'db> {
             .any(|base| matches!(base, ClassBase::TypedDict))
     }
 
+    /// Compute `TypedDict` parameters dynamically based on MRO detection and AST parsing.
+    fn typed_dict_params(self, db: &'db dyn Db) -> Option<TypedDictParams> {
+        if !self.is_typed_dict(db) {
+            return None;
+        }
+
+        let module = parsed_module(db, self.file(db)).load(db);
+        let class_stmt = self.node(db, &module);
+        Some(typed_dict_params_from_class_def(class_stmt))
+    }
+
     /// Return the explicit `metaclass` of this class, if one is defined.
     ///
     /// ## Note
@@ -1967,7 +2006,10 @@ impl<'db> ClassLiteral<'db> {
         }
 
         if CodeGeneratorKind::NamedTuple.matches(db, self) {
-            if let Some(field) = self.own_fields(db, specialization).get(name) {
+            if let Some(field) = self
+                .own_fields(db, specialization, CodeGeneratorKind::NamedTuple)
+                .get(name)
+            {
                 let property_getter_signature = Signature::new(
                     Parameters::new([Parameter::positional_only(Some(Name::new_static("self")))]),
                     Some(field.declared_ty),
@@ -2033,17 +2075,19 @@ impl<'db> ClassLiteral<'db> {
             Type::instance(db, self.apply_optional_specialization(db, specialization));
 
         let signature_from_fields = |mut parameters: Vec<_>, return_ty: Option<Type<'db>>| {
-            for (
-                field_name,
-                field @ Field {
-                    declared_ty: mut field_ty,
-                    mut default_ty,
-                    init_only: _,
-                    init,
-                    kw_only,
-                },
-            ) in self.fields(db, specialization, field_policy)
-            {
+            for (field_name, field) in self.fields(db, specialization, field_policy) {
+                let (init, mut default_ty, kw_only) = match field.kind {
+                    FieldKind::NamedTuple { default_ty } => (true, default_ty, None),
+                    FieldKind::Dataclass {
+                        init,
+                        default_ty,
+                        kw_only,
+                        ..
+                    } => (init, default_ty, kw_only),
+                    FieldKind::TypedDict { .. } => continue,
+                };
+                let mut field_ty = field.declared_ty;
+
                 if name == "__init__" && !init {
                     // Skip fields with `init=False`
                     continue;
@@ -2351,7 +2395,7 @@ impl<'db> ClassLiteral<'db> {
         if field_policy == CodeGeneratorKind::NamedTuple {
             // NamedTuples do not allow multiple inheritance, so it is sufficient to enumerate the
             // fields of this class only.
-            return self.own_fields(db, specialization);
+            return self.own_fields(db, specialization, field_policy);
         }
 
         let matching_classes_in_mro: Vec<_> = self
@@ -2374,7 +2418,7 @@ impl<'db> ClassLiteral<'db> {
         matching_classes_in_mro
             .into_iter()
             .rev()
-            .flat_map(|(class, specialization)| class.own_fields(db, specialization))
+            .flat_map(|(class, specialization)| class.own_fields(db, specialization, field_policy))
             // We collect into a FxOrderMap here to deduplicate attributes
             .collect()
     }
@@ -2394,6 +2438,7 @@ impl<'db> ClassLiteral<'db> {
         self,
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
+        field_policy: CodeGeneratorKind,
     ) -> FxOrderMap<Name, Field<'db>> {
         let mut attributes = FxOrderMap::default();
 
@@ -2401,7 +2446,10 @@ impl<'db> ClassLiteral<'db> {
         let table = place_table(db, class_body_scope);
 
         let use_def = use_def_map(db, class_body_scope);
+
+        let typed_dict_params = self.typed_dict_params(db);
         let mut kw_only_sentinel_field_seen = false;
+
         for (symbol_id, declarations) in use_def.all_end_of_scope_symbol_declarations() {
             // Here, we exclude all declarations that are not annotated assignments. We need this because
             // things like function definitions and nested classes would otherwise be considered dataclass
@@ -2456,12 +2504,34 @@ impl<'db> ClassLiteral<'db> {
                     }
                 }
 
+                let kind = match field_policy {
+                    CodeGeneratorKind::NamedTuple => FieldKind::NamedTuple { default_ty },
+                    CodeGeneratorKind::DataclassLike => FieldKind::Dataclass {
+                        default_ty,
+                        init_only: attr.is_init_var(),
+                        init,
+                        kw_only,
+                    },
+                    CodeGeneratorKind::TypedDict => {
+                        let is_required = if attr.is_required() {
+                            // Explicit Required[T] annotation - always required
+                            true
+                        } else if attr.is_not_required() {
+                            // Explicit NotRequired[T] annotation - never required
+                            false
+                        } else {
+                            // No explicit qualifier - use class default (`total` parameter)
+                            typed_dict_params
+                                .expect("TypedDictParams should be available for CodeGeneratorKind::TypedDict")
+                                .contains(TypedDictParams::TOTAL)
+                        };
+                        FieldKind::TypedDict { is_required }
+                    }
+                };
+
                 let mut field = Field {
                     declared_ty: attr_ty.apply_optional_specialization(db, specialization),
-                    default_ty,
-                    init_only: attr.is_init_var(),
-                    init,
-                    kw_only,
+                    kind,
                 };
 
                 // Check if this is a KW_ONLY sentinel and mark subsequent fields as keyword-only
@@ -2470,8 +2540,14 @@ impl<'db> ClassLiteral<'db> {
                 }
 
                 // If no explicit kw_only setting and we've seen KW_ONLY sentinel, mark as keyword-only
-                if field.kw_only.is_none() && kw_only_sentinel_field_seen {
-                    field.kw_only = Some(true);
+                if kw_only_sentinel_field_seen {
+                    if let FieldKind::Dataclass {
+                        kw_only: ref mut kw @ None,
+                        ..
+                    } = field.kind
+                    {
+                        *kw = Some(true);
+                    }
                 }
 
                 attributes.insert(symbol.name().clone(), field);
