@@ -171,6 +171,7 @@ impl UvFormatCommand {
         // `uv format` or add a special error message when the subcommand doesn't exist
         let mut command = Command::new("uv");
         command.arg("format");
+        command.arg("--");
 
         let target_version = format!(
             "py{}{}",
@@ -534,7 +535,7 @@ def another_function(x,y,z):
             assert_snapshot!(result.as_code(), @r#"
             def messy_function(  a,  b,c   ):
                 return a+b+c
-            
+
             def another_function(x, y, z):
                 result = x + y + z
                 return result
@@ -729,7 +730,7 @@ bar = [1, 2, 3,]
 
             assert_snapshot!(result, @r#"
             foo = [1, 2, 3]
-            
+
             bar = [1, 2, 3]
             "#);
         }
