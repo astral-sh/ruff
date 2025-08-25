@@ -492,11 +492,9 @@ impl<'a> Iterator for PathParamIterator<'a> {
                         continue;
                     }
 
-                    let trimmed_param = param_name.trim();
-
-                    if !trimmed_param.is_empty() && is_identifier(trimmed_param) {
+                    if !param_name.is_empty() {
                         #[expect(clippy::range_plus_one)]
-                        return Some((trimmed_param, start..end + 1));
+                        return Some((param_name, start..end + 1));
                     }
                 }
             }
