@@ -320,47 +320,47 @@ impl<'db> ConstraintClause<'db> {
         mut self,
         db: &'db dyn Db,
         constraint: AtomicConstraint<'db>,
-    ) -> IntersectionResult<Self> {
+    ) -> Simplified<Self> {
         let Some((index, existing)) = (self.constraints.iter().enumerate())
             .find(|(_, existing)| existing.typevar == constraint.typevar)
         else {
             self.constraints.push(constraint);
-            return IntersectionResult::One(self);
+            return Simplified::One(self);
         };
 
         match existing.intersect(db, constraint) {
             // If the intersected constraint cannot be satisfied, that causes this whole clause to
             // be unsatisfiable too. (X ∩ 0 == 0)
-            IntersectionResult::Never => IntersectionResult::Never,
+            Simplified::Never => Simplified::Never,
 
             // If the intersected result is always satisfied, then the constraint no longer
             // contributes anything to the clause, and can be removed. (X ∩ 1 == X)
-            IntersectionResult::Always => {
+            Simplified::Always => {
                 self.constraints.swap_remove(index);
                 if self.constraints.is_empty() {
                     // If there are no further constraints in the clause, the clause is now always
                     // satisfied.
-                    IntersectionResult::Always
+                    Simplified::Always
                 } else {
-                    IntersectionResult::One(self)
+                    Simplified::One(self)
                 }
             }
 
             // If the intersection is a single constraint, we can reuse the existing constraint's
             // place in the clause's constraint list.
-            IntersectionResult::One(constraint) => {
+            Simplified::One(constraint) => {
                 self.constraints[index] = constraint;
-                IntersectionResult::One(self)
+                Simplified::One(self)
             }
 
             // If the intersection is a union of two constraints, we can reuse the existing
             // constraint's place in the clause's constraint list for one of the union elements;
             // and we must create a new clause to hold the second union eleme
-            IntersectionResult::Two(first, second) => {
+            Simplified::Two(first, second) => {
                 let mut extra = self.clone();
                 self.constraints[index] = first;
                 extra.constraints[index] = second;
-                IntersectionResult::Two(self, extra)
+                Simplified::Two(self, extra)
             }
         }
     }
@@ -375,18 +375,18 @@ impl<'db> ConstraintClause<'db> {
             std::mem::swap(&mut prev, &mut next);
             for clause in prev.clauses.drain(..) {
                 match clause.intersect_constraint(db, *constraint) {
-                    IntersectionResult::Never => {}
-                    IntersectionResult::Always => {
+                    Simplified::Never => {}
+                    Simplified::Always => {
                         // If any clause becomes always satisfiable, the set as a whole does too,
                         // and we don't have to process any more of the clauses.
                         next.clauses.clear();
                         next.clauses.push(ConstraintClause::always());
                         break;
                     }
-                    IntersectionResult::One(clause) => {
+                    Simplified::One(clause) => {
                         next.union_clause(db, clause);
                     }
-                    IntersectionResult::Two(first, second) => {
+                    Simplified::Two(first, second) => {
                         next.union_clause(db, first);
                         next.union_clause(db, second);
                     }
@@ -531,7 +531,7 @@ impl<'db> AtomicConstraint<'db> {
     /// `self` and `other` is `self`.
     fn subsumes(self, db: &'db dyn Db, other: Self) -> bool {
         debug_assert!(self.typevar == other.typevar);
-        self.intersect(db, other) == IntersectionResult::One(self)
+        self.intersect(db, other) == Simplified::One(self)
     }
 
     /// Returns the intersection of this atomic constraint and another. Because constraint bounds
@@ -539,7 +539,7 @@ impl<'db> AtomicConstraint<'db> {
     /// or two atomic constraints.
     ///
     /// Panics if the two constraints have different typevars.
-    fn intersect(self, db: &'db dyn Db, other: Self) -> IntersectionResult<AtomicConstraint<'db>> {
+    fn intersect(self, db: &'db dyn Db, other: Self) -> Simplified<AtomicConstraint<'db>> {
         debug_assert!(self.typevar == other.typevar);
 
         // We'll show our work for each match arm with a case analysis. We calculate "min" using
@@ -565,7 +565,7 @@ impl<'db> AtomicConstraint<'db> {
             // Note that in the last case, max(s₁,s₂) ≥: min(t₁,t₂), which will get simplified to ∅
             // by the `positive` and `from_one` helpers.
             (ConstraintSign::Positive, ConstraintSign::Positive) => {
-                IntersectionResult::from_one(Self::positive(
+                Simplified::from_one(Self::positive(
                     db,
                     self.typevar,
                     UnionType::from_elements(db, [self.lower, other.lower]),
@@ -587,7 +587,7 @@ impl<'db> AtomicConstraint<'db> {
             //
             // TODO: Oof, the positive constraint in the final example should have open lower and
             // upper bounds, not closed... (i.e, t₁ < T < s₂, not t₁ ≤ T ≤ s₂)
-            (ConstraintSign::Negative, ConstraintSign::Negative) => IntersectionResult::from_two(
+            (ConstraintSign::Negative, ConstraintSign::Negative) => Simplified::from_two(
                 Self::negative(
                     db,
                     self.typevar,
@@ -616,7 +616,7 @@ impl<'db> AtomicConstraint<'db> {
             //
             //   result:      ∅                  s₊┠─┨t₊                   ∅
             //                    t₋├─┨t₊                  ∅                    s₊┠─┨t₊
-            (ConstraintSign::Positive, ConstraintSign::Negative) => IntersectionResult::from_two(
+            (ConstraintSign::Positive, ConstraintSign::Negative) => Simplified::from_two(
                 Self::positive(
                     db,
                     self.typevar,
@@ -630,7 +630,7 @@ impl<'db> AtomicConstraint<'db> {
                     self.upper,
                 ),
             ),
-            (ConstraintSign::Negative, ConstraintSign::Positive) => IntersectionResult::from_two(
+            (ConstraintSign::Negative, ConstraintSign::Positive) => Simplified::from_two(
                 Self::positive(
                     db,
                     self.typevar,
@@ -685,30 +685,30 @@ enum Satisfiable<T> {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum IntersectionResult<T> {
+pub(crate) enum Simplified<T> {
     Never,
     Always,
     One(T),
     Two(T, T),
 }
 
-impl<T> IntersectionResult<T> {
+impl<T> Simplified<T> {
     fn from_one(constraint: Satisfiable<T>) -> Self {
         match constraint {
-            Satisfiable::Never => IntersectionResult::Never,
-            Satisfiable::Always => IntersectionResult::Always,
-            Satisfiable::Constrained(constraint) => IntersectionResult::One(constraint),
+            Satisfiable::Never => Simplified::Never,
+            Satisfiable::Always => Simplified::Always,
+            Satisfiable::Constrained(constraint) => Simplified::One(constraint),
         }
     }
 
     fn from_two(first: Satisfiable<T>, second: Satisfiable<T>) -> Self {
         match (first, second) {
-            (Satisfiable::Never, _) | (_, Satisfiable::Never) => IntersectionResult::Never,
-            (Satisfiable::Always, Satisfiable::Always) => IntersectionResult::Always,
+            (Satisfiable::Never, _) | (_, Satisfiable::Never) => Simplified::Never,
+            (Satisfiable::Always, Satisfiable::Always) => Simplified::Always,
             (Satisfiable::Constrained(one), Satisfiable::Always)
-            | (Satisfiable::Always, Satisfiable::Constrained(one)) => IntersectionResult::One(one),
+            | (Satisfiable::Always, Satisfiable::Constrained(one)) => Simplified::One(one),
             (Satisfiable::Constrained(first), Satisfiable::Constrained(second)) => {
-                IntersectionResult::Two(first, second)
+                Simplified::Two(first, second)
             }
         }
     }
