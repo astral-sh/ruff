@@ -748,6 +748,10 @@ impl<'db> Bindings<'db> {
 
                         Some(KnownFunction::IsProtocol) => {
                             if let [Some(ty)] = overload.parameter_types() {
+                                // We evaluate this to `Literal[True]` only if the runtime function `typing.is_protocol`
+                                // would return `True` for the given type. Internally we consider `SupportsAbs[int]` to
+                                // be a "(specialised) protocol class", but `typing.is_protocol(SupportsAbs[int])` returns
+                                // `False` at runtime, so we do not set the return type to `Literal[True]` in this case.
                                 overload.set_return_type(Type::BooleanLiteral(
                                     ty.into_class_literal()
                                         .is_some_and(|class| class.is_protocol(db)),
@@ -756,6 +760,9 @@ impl<'db> Bindings<'db> {
                         }
 
                         Some(KnownFunction::GetProtocolMembers) => {
+                            // Similarly to `is_protocol`, we only evaluate to this a frozenset of literal strings if a
+                            // class-literal is passed in, not if a generic alias is passed in, to emulate the behaviour
+                            // of `typing.get_protocol_members` at runtime.
                             if let [Some(Type::ClassLiteral(class))] = overload.parameter_types() {
                                 if let Some(protocol_class) = class.into_protocol_class(db) {
                                     let member_names = protocol_class
