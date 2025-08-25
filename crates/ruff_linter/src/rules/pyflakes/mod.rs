@@ -737,6 +737,7 @@ mod tests {
 
     /// A re-implementation of the Pyflakes test runner.
     /// Note that all tests marked with `#[ignore]` should be considered TODOs.
+    #[track_caller]
     fn flakes(contents: &str, expected: &[Rule]) {
         let contents = dedent(contents);
         let source_type = PySourceType::default();
