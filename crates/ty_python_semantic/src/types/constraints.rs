@@ -188,18 +188,43 @@ impl<'db> ConstraintSet<'db> {
     }
 
     /// Updates this set to be the union of itself and a clause.
-    fn union_clause(&mut self, db: &'db dyn Db, clause: ConstraintClause<'db>) {
-        // If there is an existing clause that is subsumed by (i.e., is bigger than) the new one,
-        // then the new clause doesn't provide any useful additional information, and we don't have
-        // to add it.
-        if (self.clauses.iter()).any(|existing| clause.subsumes(db, existing)) {
-            return;
+    fn union_clause(&mut self, db: &'db dyn Db, mut clause: ConstraintClause<'db>) {
+        let prev = std::mem::take(&mut self.clauses);
+        let mut clauses = prev.into_iter();
+        while let Some(lc) = clauses.next() {
+            match lc.union_clause(db, clause) {
+                Simplified::Never => {
+                    // If two clauses cancel out to ∅, that does NOT cause the entire set to become
+                    // ∅.  We need to keep whatever clauses have already been added to the result,
+                    // and also need to copy over any later clauses that we hadn't processed yet.
+                    self.clauses.extend(clauses);
+                    return;
+                }
+
+                Simplified::Always => {
+                    // If two clauses cancel out to 1, that makes the entire set 1.
+                    self.clauses.clear();
+                    self.clauses.push(ConstraintClause::always());
+                    return;
+                }
+
+                Simplified::Two(lc, c) => {
+                    // We couldn't simplify relative to lc, so add lc to the result.  Continue
+                    // trying to simplify clause against the later clauses in the set.
+                    self.clauses.push(lc);
+                    clause = c;
+                }
+
+                Simplified::One(c) => {
+                    // We were able to simplify relative to lc.  Don't add it to the result yet;
+                    // instead, try to simplify the result further against later clauses in s.
+                    clause = c;
+                }
+            }
         }
 
-        // If there are any existing clauses that subsume (i.e., are smaller than) the new one, we
-        // should delete them, since the new clause provides strictly more useful information.
-        self.clauses
-            .retain(|existing| !existing.subsumes(db, &clause));
+        // If we fall through then we need to add clause to the clause list (either because we
+        // couldn't simplify it with anything, or because we did without it canceling out).
         self.clauses.push(clause);
     }
 
@@ -394,6 +419,17 @@ impl<'db> ConstraintClause<'db> {
             }
         }
         next
+    }
+
+    /// Returns the union of this clause and another.
+    fn union_clause(self, db: &'db dyn Db, other: Self) -> Simplified<Self> {
+        if self.subsumes(db, &other) {
+            return Simplified::One(other);
+        }
+        if other.subsumes(db, &self) {
+            return Simplified::One(self);
+        }
+        Simplified::Two(self, other)
     }
 
     /// Returns whether this constraint set subsumes `other` — if every constraint in `other` is
