@@ -661,8 +661,10 @@ impl<'a> SemanticModel<'a> {
                 }
             }
 
-            class_variables_visible =
-                (scope.kind.is_type() && index == 0) || (scope.kind.is_class_cell() && index == 1);
+            class_variables_visible = matches!(
+                (scope.kind, index),
+                (ScopeKind::Type, 0) | (ScopeKind::DunderClassCell, 1)
+            );
 
             if let Some(binding_id) = scope.get(symbol) {
                 match self.bindings[binding_id].kind {
@@ -781,8 +783,10 @@ impl<'a> SemanticModel<'a> {
                 }
             }
 
-            class_variables_visible =
-                (scope.kind.is_type() && index == 0) || (scope.kind.is_class_cell() && index == 1);
+            class_variables_visible = matches!(
+                (scope.kind, index),
+                (ScopeKind::Type, 0) | (ScopeKind::DunderClassCell, 1)
+            );
             seen_function |= scope.kind.is_function();
 
             if let Some(binding_id) = scope.get(symbol) {
