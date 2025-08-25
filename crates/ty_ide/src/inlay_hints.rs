@@ -17,9 +17,9 @@ pub struct InlayHint {
 }
 
 impl InlayHint {
-    fn type_hint(position: TextSize, ty: Type, db: &dyn Db) -> Self {
+    fn variable_type(position: TextSize, ty: Type, db: &dyn Db) -> Self {
         let label_parts = vec![
-            InlayHintLabelPart::new(": ".into()),
+            InlayHintLabelPart::new(": "),
             InlayHintLabelPart::new(ty.display(db).to_string()),
         ];
 
@@ -31,10 +31,7 @@ impl InlayHint {
     }
 
     fn call_argument_name(position: TextSize, name: &str) -> Self {
-        let label_parts = vec![
-            InlayHintLabelPart::new(name.into()),
-            InlayHintLabelPart::new("=".into()),
-        ];
+        let label_parts = vec![InlayHintLabelPart::new(name), InlayHintLabelPart::new("=")];
 
         Self {
             position,
@@ -86,8 +83,11 @@ pub struct InlayHintLabelPart {
 }
 
 impl InlayHintLabelPart {
-    pub fn new(text: String) -> Self {
-        Self { text, target: None }
+    pub fn new(text: impl Into<String>) -> Self {
+        Self {
+            text: text.into(),
+            target: None,
+        }
     }
 
     pub fn text(&self) -> &str {
@@ -194,7 +194,8 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
         if !self.settings.variable_types {
             return;
         }
-        self.hints.push(InlayHint::type_hint(position, ty, self.db));
+        self.hints
+            .push(InlayHint::variable_type(position, ty, self.db));
     }
 
     fn add_call_argument_name(&mut self, position: TextSize, name: &str) {
