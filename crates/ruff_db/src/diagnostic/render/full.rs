@@ -163,9 +163,9 @@ impl std::fmt::Display for Diff<'_> {
             let digit_with = OneIndexed::from_zero_indexed(largest_new.max(largest_old)).digits();
 
             if let Some(cell) = cell {
-                // Room for 2 digits, 2 x 1 space before each digit, 1 space, and 1 `|`. This
-                // centers the three colons on the pipe.
-                writeln!(f, "{:>1$} cell {cell}", ":::", 2 * digit_with.get() + 4)?;
+                // Room for 1 digit, 1 space, 1 `|`, and 1 more following space. This centers the
+                // three colons on the pipe.
+                writeln!(f, "{:>1$} cell {cell}", ":::", digit_with.get() + 3)?;
             }
 
             for (idx, group) in diff.grouped_ops(3).iter().enumerate() {
@@ -702,11 +702,9 @@ print()
           |        ^^
           |
         help: Remove unused import: `os`
-
-        ℹ Safe fix
-           ::: cell 1
-        1 1 | # cell 1
-        2   |-import os
+         ::: cell 1
+        1 | # cell 1
+          - import os
 
         error[unused-import][*]: `math` imported but unused
          --> notebook.ipynb:cell 2:2:8
@@ -718,13 +716,11 @@ print()
         4 | print('hello world')
           |
         help: Remove unused import: `math`
-
-        ℹ Safe fix
-           ::: cell 2
-        1 1 | # cell 2
-        2   |-import math
-        3 2 | 
-        4 3 | print('hello world')
+         ::: cell 2
+        1 | # cell 2
+          - import math
+        2 | 
+        3 | print('hello world')
 
         error[unused-variable]: Local variable `x` is assigned to but never used
          --> notebook.ipynb:cell 3:4:5
@@ -735,14 +731,13 @@ print()
           |     ^
           |
         help: Remove assignment to unused variable `x`
-
-        ℹ Unsafe fix
-           ::: cell 3
-        1 1 | # cell 3
-        2 2 | def foo():
-        3 3 |     print()
-        4   |-    x = 1
-        5 4 |
+         ::: cell 3
+        1 | # cell 3
+        2 | def foo():
+        3 |     print()
+          -     x = 1
+        4 | 
+        note: This is an unsafe fix and may remove comments or change runtime behavior
         ");
     }
 
@@ -770,22 +765,21 @@ print()
           |        ^^
           |
         help: Remove unused import: `os`
-
-        ℹ Unsafe fix
-           ::: cell 1
-        1 1 | # cell 1
-        2   |-import os
-           ::: cell 2
-        1 1 | # cell 2
-        2   |-import math
-        3 2 | 
-        4 3 | print('hello world')
-           ::: cell 3
-        1 1 | # cell 3
-        2 2 | def foo():
-        3 3 |     print()
-        4   |-    x = 1
-        5 4 |
+         ::: cell 1
+        1 | # cell 1
+          - import os
+         ::: cell 2
+        1 | # cell 2
+          - import math
+        2 | 
+        3 | print('hello world')
+         ::: cell 3
+        1 | # cell 3
+        2 | def foo():
+        3 |     print()
+          -     x = 1
+        4 | 
+        note: This is an unsafe fix and may remove comments or change runtime behavior
         ");
     }
 
