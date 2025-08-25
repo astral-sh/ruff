@@ -6,6 +6,7 @@ is equivalent to the expression x+y.  The function names are those
 used for special methods; variants without leading and trailing
 '__' are also provided for convenience.
 """
+
 import sys
 from _operator import (
     abs as abs,
@@ -191,11 +192,12 @@ if sys.version_info >= (3, 11):
 @final
 class attrgetter(Generic[_T_co]):
     """Return a callable object that fetches the given attribute(s) from its operand.
-After f = attrgetter('name'), the call f(r) returns r.name.
-After g = attrgetter('name', 'date'), the call g(r) returns (r.name, r.date).
-After h = attrgetter('name.first', 'name.last'), the call h(r) returns
-(r.name.first, r.name.last).
-"""
+    After f = attrgetter('name'), the call f(r) returns r.name.
+    After g = attrgetter('name', 'date'), the call g(r) returns (r.name, r.date).
+    After h = attrgetter('name.first', 'name.last'), the call h(r) returns
+    (r.name.first, r.name.last).
+    """
+
     @overload
     def __new__(cls, attr: str, /) -> attrgetter[Any]: ...
     @overload
@@ -207,15 +209,15 @@ After h = attrgetter('name.first', 'name.last'), the call h(r) returns
     @overload
     def __new__(cls, attr: str, /, *attrs: str) -> attrgetter[tuple[Any, ...]]: ...
     def __call__(self, obj: Any, /) -> _T_co:
-        """Call self as a function.
-"""
+        """Call self as a function."""
 
 @final
 class itemgetter(Generic[_T_co]):
     """Return a callable object that fetches the given item(s) from its operand.
-After f = itemgetter(2), the call f(r) returns r[2].
-After g = itemgetter(2, 5, 3), the call g(r) returns (r[2], r[5], r[3])
-"""
+    After f = itemgetter(2), the call f(r) returns r[2].
+    After g = itemgetter(2, 5, 3), the call g(r) returns (r[2], r[5], r[3])
+    """
+
     @overload
     def __new__(cls, item: _T, /) -> itemgetter[_T]: ...
     @overload
@@ -228,17 +230,16 @@ After g = itemgetter(2, 5, 3), the call g(r) returns (r[2], r[5], r[3])
     # A suspected mypy issue prevents using [..., _T] instead of [..., Any] here.
     # https://github.com/python/mypy/issues/14032
     def __call__(self, obj: SupportsGetItem[Any, Any]) -> Any:
-        """Call self as a function.
-"""
+        """Call self as a function."""
 
 @final
 class methodcaller:
     """Return a callable object that calls the given method on its operand.
-After f = methodcaller('name'), the call f(r) returns r.name().
-After g = methodcaller('name', 'date', foo=1), the call g(r) returns
-r.name('date', foo=1).
-"""
+    After f = methodcaller('name'), the call f(r) returns r.name().
+    After g = methodcaller('name', 'date', foo=1), the call g(r) returns
+    r.name('date', foo=1).
+    """
+
     def __new__(cls, name: str, /, *args: Any, **kwargs: Any) -> Self: ...
     def __call__(self, obj: Any) -> Any:
-        """Call self as a function.
-"""
+        """Call self as a function."""

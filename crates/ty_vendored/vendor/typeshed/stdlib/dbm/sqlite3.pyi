@@ -29,14 +29,14 @@ class _Database(MutableMapping[bytes, bytes]):
 def open(filename: StrOrBytesPath, /, flag: Literal["r", "w,", "c", "n"] = "r", mode: int = 0o666) -> _Database:
     """Open a dbm.sqlite3 database and return the dbm object.
 
-The 'filename' parameter is the name of the database file.
+    The 'filename' parameter is the name of the database file.
 
-The optional 'flag' parameter can be one of ...:
-    'r' (default): open an existing database for read only access
-    'w': open an existing database for read/write access
-    'c': create a database if it does not exist; open for read/write access
-    'n': always create a new, empty database; open for read/write access
+    The optional 'flag' parameter can be one of ...:
+        'r' (default): open an existing database for read only access
+        'w': open an existing database for read/write access
+        'c': create a database if it does not exist; open for read/write access
+        'n': always create a new, empty database; open for read/write access
 
-The optional 'mode' parameter is the Unix file access mode of the database;
-only used when creating a new database. Default: 0o666.
-"""
+    The optional 'mode' parameter is the Unix file access mode of the database;
+    only used when creating a new database. Default: 0o666.
+    """

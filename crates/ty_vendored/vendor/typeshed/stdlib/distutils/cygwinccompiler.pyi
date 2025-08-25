@@ -5,6 +5,7 @@ handles the Cygwin port of the GNU C compiler to Windows.  It also contains
 the Mingw32CCompiler class which handles the mingw32 port of GCC (same as
 cygwin in no-cygwin mode).
 """
+
 from distutils.unixccompiler import UnixCCompiler
 from distutils.version import LooseVersion
 from re import Pattern
@@ -16,11 +17,10 @@ def get_msvcr() -> list[str] | None:
     """
 
 class CygwinCCompiler(UnixCCompiler):
-    """ Handles the Cygwin port of the GNU C compiler to Windows.
-    """
+    """Handles the Cygwin port of the GNU C compiler to Windows."""
+
 class Mingw32CCompiler(CygwinCCompiler):
-    """ Handles the Mingw32 port of the GNU C compiler to Windows.
-    """
+    """Handles the Mingw32 port of the GNU C compiler to Windows."""
 
 CONFIG_H_OK: Final = "ok"
 CONFIG_H_NOTOK: Final = "not ok"
@@ -47,10 +47,10 @@ def check_config_h() -> tuple[Literal["ok", "not ok", "uncertain"], str]:
 RE_VERSION: Final[Pattern[bytes]]
 
 def get_versions() -> tuple[LooseVersion | None, ...]:
-    """ Try to find out the versions of gcc, ld and dllwrap.
+    """Try to find out the versions of gcc, ld and dllwrap.
 
     If not possible it returns None for it.
     """
+
 def is_cygwingcc() -> bool:
-    """Try to determine if the gcc that would be used is from cygwin.
-"""
+    """Try to determine if the gcc that would be used is from cygwin."""
