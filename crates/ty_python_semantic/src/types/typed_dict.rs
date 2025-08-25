@@ -80,9 +80,7 @@ pub(crate) fn walk_typed_dict_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     visitor.visit_type(db, typed_dict.defining_class.into());
 }
 
-pub(super) fn compute_typed_dict_params_from_class_def(
-    class_stmt: &StmtClassDef,
-) -> TypedDictParams {
+pub(super) fn typed_dict_params_from_class_def(class_stmt: &StmtClassDef) -> TypedDictParams {
     let mut typed_dict_params = TypedDictParams::default();
 
     // Check for `total` keyword argument in the class definition

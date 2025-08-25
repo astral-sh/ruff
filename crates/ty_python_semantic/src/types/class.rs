@@ -27,7 +27,7 @@ use crate::types::generics::{GenericContext, Specialization, walk_specialization
 use crate::types::infer::nearest_enclosing_class;
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType};
-use crate::types::typed_dict::compute_typed_dict_params_from_class_def;
+use crate::types::typed_dict::typed_dict_params_from_class_def;
 use crate::types::{
     ApplyTypeMappingVisitor, Binding, BoundSuperError, BoundSuperType, CallableType,
     DataclassParams, DeprecatedInstance, HasRelationToVisitor, IsEquivalentVisitor,
@@ -1693,14 +1693,14 @@ impl<'db> ClassLiteral<'db> {
     }
 
     /// Compute `TypedDict` parameters dynamically based on MRO detection and AST parsing.
-    fn compute_typed_dict_params(self, db: &'db dyn Db) -> Option<TypedDictParams> {
+    fn typed_dict_params(self, db: &'db dyn Db) -> Option<TypedDictParams> {
         if !self.is_typed_dict(db) {
             return None;
         }
 
         let module = parsed_module(db, self.file(db)).load(db);
         let class_stmt = self.node(db, &module);
-        Some(compute_typed_dict_params_from_class_def(class_stmt))
+        Some(typed_dict_params_from_class_def(class_stmt))
     }
 
     /// Return the explicit `metaclass` of this class, if one is defined.
@@ -2447,7 +2447,7 @@ impl<'db> ClassLiteral<'db> {
 
         let use_def = use_def_map(db, class_body_scope);
 
-        let typed_dict_params = self.compute_typed_dict_params(db);
+        let typed_dict_params = self.typed_dict_params(db);
         let mut kw_only_sentinel_field_seen = false;
 
         for (symbol_id, declarations) in use_def.all_end_of_scope_symbol_declarations() {
