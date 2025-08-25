@@ -17,27 +17,31 @@ pub struct InlayHint {
 }
 
 impl InlayHint {
-    pub fn type_hint(position: TextSize, ty: Type, db: &dyn Db) -> Self {
-        let mut label = InlayHintLabel::simple(ty.display(db).to_string(), None);
+    fn type_hint(position: TextSize, ty: Type, db: &dyn Db) -> Self {
+        let mut label_parts = Vec::new();
 
-        label.prepend_str(": ");
+        label_parts.push(": ".into());
+
+        label_parts.push(InlayHintLabelPart::new(ty.display(db).to_string()));
 
         Self {
             position,
             kind: InlayHintKind::Type,
-            label,
+            label: InlayHintLabel { parts: label_parts },
         }
     }
 
-    pub fn call_argument_name(position: TextSize, name: &str) -> Self {
-        let mut label = InlayHintLabel::simple(name.to_string(), None);
+    fn call_argument_name(position: TextSize, name: &str) -> Self {
+        let mut label_parts = Vec::new();
 
-        label.append_str("=");
+        label_parts.push(InlayHintLabelPart::new(name.into()));
+
+        label_parts.push("=".into());
 
         Self {
             position,
             kind: InlayHintKind::CallArgumentName,
-            label,
+            label: InlayHintLabel { parts: label_parts },
         }
     }
 
@@ -54,62 +58,17 @@ pub enum InlayHintKind {
 
 #[derive(Debug, Clone)]
 pub struct InlayHintLabel {
-    pub parts: Vec<InlayHintLabelPart>,
+    parts: Vec<InlayHintLabelPart>,
 }
 
 impl InlayHintLabel {
-    pub fn simple(s: impl Into<String>, target: Option<crate::NavigationTarget>) -> InlayHintLabel {
-        InlayHintLabel {
-            parts: vec![InlayHintLabelPart {
-                text: s.into(),
-                target,
-            }],
-        }
-    }
-
-    pub fn prepend_str(&mut self, s: &str) {
-        match &mut *self.parts {
-            [InlayHintLabelPart { text, target: None }, ..] => text.insert_str(0, s),
-            _ => self.parts.insert(
-                0,
-                InlayHintLabelPart {
-                    text: s.into(),
-                    target: None,
-                },
-            ),
-        }
-    }
-
-    pub fn append_str(&mut self, s: &str) {
-        match &mut *self.parts {
-            [.., InlayHintLabelPart { text, target: None }] => text.push_str(s),
-            _ => self.parts.push(InlayHintLabelPart {
-                text: s.into(),
-                target: None,
-            }),
-        }
-    }
-}
-
-impl From<String> for InlayHintLabel {
-    fn from(s: String) -> Self {
-        Self {
-            parts: vec![InlayHintLabelPart {
-                text: s,
-                target: None,
-            }],
-        }
+    pub fn parts(&self) -> &[InlayHintLabelPart] {
+        &self.parts
     }
 }
 
 pub struct InlayHintDisplay<'a> {
-    pub inlay_hint: &'a InlayHint,
-}
-
-impl<'a> InlayHintDisplay<'a> {
-    pub fn new(label: &'a InlayHint) -> Self {
-        Self { inlay_hint: label }
-    }
+    inlay_hint: &'a InlayHint,
 }
 
 impl fmt::Display for InlayHintDisplay<'_> {
@@ -123,9 +82,41 @@ impl fmt::Display for InlayHintDisplay<'_> {
 
 #[derive(Default, Debug, Clone)]
 pub struct InlayHintLabelPart {
-    pub text: String,
+    text: String,
 
-    pub target: Option<crate::NavigationTarget>,
+    target: Option<crate::NavigationTarget>,
+}
+
+impl InlayHintLabelPart {
+    pub fn new(text: String) -> Self {
+        Self { text, target: None }
+    }
+
+    pub fn text(&self) -> &str {
+        &self.text
+    }
+
+    pub fn target(&self) -> Option<&crate::NavigationTarget> {
+        self.target.as_ref()
+    }
+}
+
+impl From<String> for InlayHintLabelPart {
+    fn from(s: String) -> Self {
+        Self {
+            text: s,
+            target: None,
+        }
+    }
+}
+
+impl From<&str> for InlayHintLabelPart {
+    fn from(s: &str) -> Self {
+        Self {
+            text: s.to_string(),
+            target: None,
+        }
+    }
 }
 
 pub fn inlay_hints(

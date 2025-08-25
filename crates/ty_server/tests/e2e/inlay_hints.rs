@@ -44,7 +44,10 @@ foo(1)
         },
         "label": [
           {
-            "value": ": Literal[1]"
+            "value": ": "
+          },
+          {
+            "value": "Literal[1]"
           }
         ],
         "kind": 1
@@ -56,7 +59,10 @@ foo(1)
         },
         "label": [
           {
-            "value": "a="
+            "value": "a"
+          },
+          {
+            "value": "="
           }
         ],
         "kind": 2
