@@ -28,6 +28,7 @@
 
 use std::fmt::Display;
 
+use itertools::{EitherOrBoth, Itertools};
 use smallvec::{SmallVec, smallvec};
 
 use crate::Db;
@@ -320,6 +321,7 @@ impl<'db> Constraints<'db> for ConstraintSet<'db> {
 /// ### Invariants
 ///
 /// - No two constraints in the clause will constrain the same typevar.
+/// - The constraints are sorted by typevar.
 #[derive(Clone, Debug)]
 pub(crate) struct ConstraintClause<'db> {
     constraints: SmallVec<[AtomicConstraint<'db>; 1]>,
@@ -346,14 +348,17 @@ impl<'db> ConstraintClause<'db> {
         db: &'db dyn Db,
         constraint: AtomicConstraint<'db>,
     ) -> Simplified<Self> {
-        let Some((index, existing)) = (self.constraints.iter().enumerate())
-            .find(|(_, existing)| existing.typevar == constraint.typevar)
-        else {
-            self.constraints.push(constraint);
-            return Simplified::One(self);
+        let index = match (self.constraints)
+            .binary_search_by_key(&constraint.typevar, |existing| existing.typevar)
+        {
+            Ok(index) => index,
+            Err(index) => {
+                self.constraints.insert(index, constraint);
+                return Simplified::One(self);
+            }
         };
 
-        match existing.intersect(db, constraint) {
+        match self.constraints[index].intersect(db, constraint) {
             // If the intersected constraint cannot be satisfied, that causes this whole clause to
             // be unsatisfiable too. (X ∩ 0 == 0)
             Simplified::Never => Simplified::Never,
@@ -361,7 +366,7 @@ impl<'db> ConstraintClause<'db> {
             // If the intersected result is always satisfied, then the constraint no longer
             // contributes anything to the clause, and can be removed. (X ∩ 1 == X)
             Simplified::Always => {
-                self.constraints.swap_remove(index);
+                self.constraints.remove(index);
                 if self.constraints.is_empty() {
                     // If there are no further constraints in the clause, the clause is now always
                     // satisfied.
@@ -436,11 +441,32 @@ impl<'db> ConstraintClause<'db> {
     /// subsumed by some constraint in `self`. (Or equivalently, if the intersection of `self` and
     /// `other` is `self`.)
     fn subsumes(&self, db: &'db dyn Db, other: &Self) -> bool {
-        other.constraints.iter().all(|other_constraint| {
-            self.constraints
-                .iter()
-                .any(|self_constraint| self_constraint.subsumes(db, *other_constraint))
-        })
+        if self.constraints.len() != other.constraints.len() {
+            return false;
+        }
+
+        let pairwise = (self.constraints.iter())
+            .merge_join_by(&other.constraints, |a, b| a.typevar.cmp(&b.typevar));
+        for pair in pairwise {
+            match pair {
+                // `other` contains a constraint whose typevar doesn't appear in `self`, so `self`
+                // cannot be smaller.
+                EitherOrBoth::Right(_) => return false,
+
+                // `self` contains a constraint whose typevar doesn't appear in `other`. `self`
+                // might be smaller, but we still have to check the remaining constraints.
+                EitherOrBoth::Left(_) => continue,
+
+                // Both clauses contain a constraint with this typevar; verify that the constraint
+                // in `self` is smaller.
+                EitherOrBoth::Both(self_constraint, other_constraint) => {
+                    if !self_constraint.subsumes(db, *other_constraint) {
+                        return false;
+                    }
+                }
+            }
+        }
+        true
     }
 
     /// Returns the negation of this clause.
