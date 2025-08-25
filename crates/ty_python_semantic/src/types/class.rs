@@ -1526,13 +1526,13 @@ impl<'db> ClassLiteral<'db> {
 
     /// Return `Some()` if this class is known to be a [`DisjointBase`], or `None` if it is not.
     pub(super) fn as_disjoint_base(self, db: &'db dyn Db) -> Option<DisjointBase<'db>> {
-        if let Some(known_class) = self.known(db) {
-            known_class
-                .is_disjoint_base()
-                .then_some(DisjointBase::hard_coded(self))
-        } else if self
-            .known_function_decorators(db)
-            .contains(&KnownFunction::DisjointBase)
+        // TODO: Typeshed cannot add `@disjoint_base` to its `tuple` definition without breaking pyright.
+        // See <https://github.com/microsoft/pyright/issues/10836>.
+        // This should be fixed soon; we can remove this workaround then.
+        if self.is_known(db, KnownClass::Tuple)
+            || self
+                .known_function_decorators(db)
+                .contains(&KnownFunction::DisjointBase)
         {
             Some(DisjointBase::due_to_decorator(self))
         } else if SlotsKind::from(db, self) == SlotsKind::NotEmpty {
@@ -3408,19 +3408,6 @@ pub(super) struct DisjointBase<'db> {
 
 impl<'db> DisjointBase<'db> {
     /// Creates a [`DisjointBase`] instance where we know the class is a disjoint base
-    /// because it is special-cased by ty.
-    ///
-    /// Practically speaking, none of these classes expose `__slots__` at the Python level,
-    /// so we internally record the "kind" as being the same as if they were decorated with
-    /// `@disjoint_base`.
-    fn hard_coded(class: ClassLiteral<'db>) -> Self {
-        Self {
-            class,
-            kind: DisjointBaseKind::DisjointBaseDecorator,
-        }
-    }
-
-    /// Creates a [`DisjointBase`] instance where we know the class is a disjoint base
     /// because it has the `@disjoint_base` decorator on its definition
     fn due_to_decorator(class: ClassLiteral<'db>) -> Self {
         Self {
@@ -3653,92 +3640,6 @@ impl KnownClass {
             | Self::TypedDictFallback => Some(Truthiness::Ambiguous),
 
             Self::Tuple => None,
-        }
-    }
-
-    /// Return `true` if this class is a [`DisjointBase`]
-    const fn is_disjoint_base(self) -> bool {
-        match self {
-            // Most non-`@final` builtins (other than `object`) are disjoint bases.
-            Self::Set
-            | Self::Object
-            | Self::FrozenSet
-            | Self::BaseException
-            | Self::Bytearray
-            | Self::Int
-            | Self::Float
-            | Self::Complex
-            | Self::Str
-            | Self::List
-            | Self::Tuple
-            | Self::Dict
-            | Self::Slice
-            | Self::Property
-            | Self::Staticmethod
-            | Self::Classmethod
-            | Self::Deprecated
-            | Self::Type
-            | Self::ModuleType
-            | Self::Super
-            | Self::GenericAlias
-            | Self::Deque
-            | Self::Bytes => true,
-
-            // It doesn't really make sense to ask the question for `@final` types,
-            // since these are "more than disjoint bases". But we'll anyway infer a `@final`
-            // class as being disjoint from a class that doesn't appear in its MRO,
-            // and we'll anyway complain if we see a class definition that includes a
-            // `@final` class in its bases. We therefore return `false` here to avoid
-            // unnecessary duplicate diagnostics elsewhere.
-            Self::TypeVarTuple
-            | Self::TypeAliasType
-            | Self::UnionType
-            | Self::NoDefaultType
-            | Self::MethodType
-            | Self::MethodWrapperType
-            | Self::FunctionType
-            | Self::GeneratorType
-            | Self::AsyncGeneratorType
-            | Self::StdlibAlias
-            | Self::SpecialForm
-            | Self::TypeVar
-            | Self::ParamSpec
-            | Self::ParamSpecArgs
-            | Self::ParamSpecKwargs
-            | Self::WrapperDescriptorType
-            | Self::EllipsisType
-            | Self::NotImplementedType
-            | Self::KwOnly
-            | Self::InitVar
-            | Self::VersionInfo
-            | Self::Bool
-            | Self::NoneType
-            | Self::CoroutineType => false,
-
-            // Anything that is implemented in pure Python without `__slots__` is not a disjoint base.
-            Self::ABCMeta
-            | Self::Awaitable
-            | Self::Generator
-            | Self::Enum
-            | Self::EnumType
-            | Self::Auto
-            | Self::Member
-            | Self::Nonmember
-            | Self::ChainMap
-            | Self::Exception
-            | Self::ExceptionGroup
-            | Self::Field
-            | Self::SupportsIndex
-            | Self::NamedTupleFallback
-            | Self::NamedTupleLike
-            | Self::TypedDictFallback
-            | Self::Counter
-            | Self::DefaultDict
-            | Self::OrderedDict
-            | Self::NewType
-            | Self::Iterable
-            | Self::Iterator
-            | Self::BaseExceptionGroup => false,
         }
     }
 
