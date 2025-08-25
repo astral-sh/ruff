@@ -116,5 +116,6 @@ class dict_items(ItemsView[_KT_co, _VT_co]):  # undocumented
 if sys.version_info >= (3, 12):
     @runtime_checkable
     class Buffer(Protocol):
+        __slots__ = ()
         @abstractmethod
         def __buffer__(self, flags: int, /) -> memoryview: ...

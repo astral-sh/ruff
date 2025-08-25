@@ -383,3 +383,42 @@ help: Replace with `deque()`
 101 101 | deque("abc") # OK
 102 102 | deque(b"abc") # OK
 103 103 | deque(f"" "a")  # OK
+
+RUF037 [*] Unnecessary empty iterable within a deque call
+   --> RUF037.py:107:1
+    |
+106 | # https://github.com/astral-sh/ruff/issues/19951
+107 | deque(t"")
+    | ^^^^^^^^^^
+108 | deque(t""  t"")
+109 | deque(t"{""}") # OK
+    |
+help: Replace with `deque()`
+
+ℹ Safe fix
+104 104 | deque(f"{x}" "")  # OK
+105 105 | 
+106 106 | # https://github.com/astral-sh/ruff/issues/19951
+107     |-deque(t"")
+    107 |+deque()
+108 108 | deque(t""  t"")
+109 109 | deque(t"{""}") # OK
+
+RUF037 [*] Unnecessary empty iterable within a deque call
+   --> RUF037.py:108:1
+    |
+106 | # https://github.com/astral-sh/ruff/issues/19951
+107 | deque(t"")
+108 | deque(t""  t"")
+    | ^^^^^^^^^^^^^^^
+109 | deque(t"{""}") # OK
+    |
+help: Replace with `deque()`
+
+ℹ Safe fix
+105 105 | 
+106 106 | # https://github.com/astral-sh/ruff/issues/19951
+107 107 | deque(t"")
+108     |-deque(t""  t"")
+    108 |+deque()
+109 109 | deque(t"{""}") # OK

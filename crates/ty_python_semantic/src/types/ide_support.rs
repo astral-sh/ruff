@@ -1,4 +1,5 @@
 use std::cmp::Ordering;
+use std::collections::HashMap;
 
 use crate::place::{
     Place, builtins_module_scope, imported_symbol, place_from_bindings, place_from_declarations,
@@ -15,8 +16,8 @@ use crate::types::{ClassBase, ClassLiteral, DynamicType, KnownClass, KnownInstan
 use crate::{Db, HasType, NameKind, SemanticModel};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::parsed_module;
-use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
+use ruff_python_ast::{self as ast};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 
@@ -34,15 +35,15 @@ pub(crate) fn all_declarations_and_bindings<'db>(
         .all_end_of_scope_symbol_declarations()
         .filter_map(move |(symbol_id, declarations)| {
             place_from_declarations(db, declarations)
-                .ok()
-                .and_then(|result| {
-                    result.place.ignore_possibly_unbound().map(|ty| {
-                        let symbol = table.symbol(symbol_id);
-                        Member {
-                            name: symbol.name().clone(),
-                            ty,
-                        }
-                    })
+                .ignore_conflicting_declarations()
+                .place
+                .ignore_possibly_unbound()
+                .map(|ty| {
+                    let symbol = table.symbol(symbol_id);
+                    Member {
+                        name: symbol.name().clone(),
+                        ty,
+                    }
                 })
         })
         .chain(use_def_map.all_end_of_scope_symbol_bindings().filter_map(
@@ -94,7 +95,7 @@ impl<'db> AllMembers<'db> {
             ),
 
             Type::NominalInstance(instance) => {
-                let (class_literal, _specialization) = instance.class.class_literal(db);
+                let (class_literal, _specialization) = instance.class(db).class_literal(db);
                 self.extend_with_instance_members(db, ty, class_literal);
             }
 
@@ -131,13 +132,14 @@ impl<'db> AllMembers<'db> {
 
             Type::Dynamic(_) | Type::Never | Type::AlwaysTruthy | Type::AlwaysFalsy => {}
 
+            Type::TypeAlias(alias) => self.extend_with_type(db, alias.value_type(db)),
+
             Type::IntLiteral(_)
             | Type::BooleanLiteral(_)
             | Type::StringLiteral(_)
             | Type::BytesLiteral(_)
             | Type::EnumLiteral(_)
             | Type::LiteralString
-            | Type::Tuple(_)
             | Type::PropertyInstance(_)
             | Type::FunctionLiteral(_)
             | Type::BoundMethod(_)
@@ -149,6 +151,7 @@ impl<'db> AllMembers<'db> {
             | Type::ProtocolInstance(_)
             | Type::SpecialForm(_)
             | Type::KnownInstance(_)
+            | Type::NonInferableTypeVar(_)
             | Type::TypeVar(_)
             | Type::BoundSuper(_)
             | Type::TypeIs(_) => match ty.to_meta_type(db) {
@@ -208,7 +211,7 @@ impl<'db> AllMembers<'db> {
                         match ty {
                             Type::NominalInstance(instance)
                                 if matches!(
-                                    instance.class.known(db),
+                                    instance.class(db).known(db),
                                     Some(
                                         KnownClass::TypeVar
                                             | KnownClass::TypeVarTuple
@@ -304,8 +307,7 @@ impl<'db> AllMembers<'db> {
             let file = class_body_scope.file(db);
             let index = semantic_index(db, file);
             for function_scope_id in attribute_scopes(db, class_body_scope) {
-                let place_table = index.place_table(function_scope_id);
-                for place_expr in place_table.members() {
+                for place_expr in index.place_table(function_scope_id).members() {
                     let Some(name) = place_expr.as_instance_attribute() else {
                         continue;
                     };
@@ -408,8 +410,9 @@ pub fn definition_kind_for_name<'db>(
     let symbol_id = place_table.symbol_id(name_str)?;
 
     // Get the use-def map and look up definitions for this place
-    let use_def_map = index.use_def_map(file_scope);
-    let declarations = use_def_map.all_reachable_symbol_declarations(symbol_id);
+    let declarations = index
+        .use_def_map(file_scope)
+        .all_reachable_symbol_declarations(symbol_id);
 
     // Find the first valid definition and return its kind
     for declaration in declarations {
@@ -659,9 +662,10 @@ pub fn definitions_for_attribute<'db>(
             let index = semantic_index(db, file);
 
             for function_scope_id in attribute_scopes(db, class_scope) {
-                let place_table = index.place_table(function_scope_id);
-
-                if let Some(place_id) = place_table.member_id_by_instance_attribute_name(name_str) {
+                if let Some(place_id) = index
+                    .place_table(function_scope_id)
+                    .member_id_by_instance_attribute_name(name_str)
+                {
                     let use_def = index.use_def_map(function_scope_id);
 
                     // Check declarations first
@@ -806,17 +810,16 @@ pub struct CallSignatureDetails<'db> {
 /// (in case of overloads or union types).
 pub fn call_signature_details<'db>(
     db: &'db dyn Db,
-    file: File,
+    model: &SemanticModel<'db>,
     call_expr: &ast::ExprCall,
 ) -> Vec<CallSignatureDetails<'db>> {
-    let model = SemanticModel::new(db, file);
-    let func_type = call_expr.func.inferred_type(&model);
+    let func_type = call_expr.func.inferred_type(model);
 
     // Use into_callable to handle all the complex type conversions
     if let Some(callable_type) = func_type.into_callable(db) {
         let call_arguments =
             CallArguments::from_arguments(db, &call_expr.arguments, |_, splatted_value| {
-                splatted_value.inferred_type(&model)
+                splatted_value.inferred_type(model)
             });
         let bindings = callable_type.bindings(db).match_parameters(&call_arguments);
 
@@ -846,6 +849,102 @@ pub fn call_signature_details<'db>(
     }
 }
 
+/// Find the active signature index from `CallSignatureDetails`.
+/// The active signature is the first signature where all arguments present in the call
+/// have valid mappings to parameters (i.e., none of the mappings are None).
+pub fn find_active_signature_from_details(
+    signature_details: &[CallSignatureDetails],
+) -> Option<usize> {
+    let first = signature_details.first()?;
+
+    // If there are no arguments in the mapping, just return the first signature.
+    if first.argument_to_parameter_mapping.is_empty() {
+        return Some(0);
+    }
+
+    // First, try to find a signature where all arguments have valid parameter mappings.
+    let perfect_match = signature_details.iter().position(|details| {
+        // Check if all arguments have valid parameter mappings.
+        details
+            .argument_to_parameter_mapping
+            .iter()
+            .all(|mapping| mapping.matched)
+    });
+
+    if let Some(index) = perfect_match {
+        return Some(index);
+    }
+
+    // If no perfect match, find the signature with the most valid argument mappings.
+    let (best_index, _) = signature_details
+        .iter()
+        .enumerate()
+        .max_by_key(|(_, details)| {
+            details
+                .argument_to_parameter_mapping
+                .iter()
+                .filter(|mapping| mapping.matched)
+                .count()
+        })?;
+
+    Some(best_index)
+}
+
+#[derive(Default)]
+pub struct InlayHintFunctionArgumentDetails {
+    pub argument_names: HashMap<usize, String>,
+}
+
+pub fn inlay_hint_function_argument_details<'db>(
+    db: &'db dyn Db,
+    model: &SemanticModel<'db>,
+    call_expr: &ast::ExprCall,
+) -> Option<InlayHintFunctionArgumentDetails> {
+    let signature_details = call_signature_details(db, model, call_expr);
+
+    if signature_details.is_empty() {
+        return None;
+    }
+
+    let active_signature_index = find_active_signature_from_details(&signature_details)?;
+
+    let call_signature_details = signature_details.get(active_signature_index)?;
+
+    let parameters = call_signature_details.signature.parameters();
+    let mut argument_names = HashMap::new();
+
+    for arg_index in 0..call_expr.arguments.args.len() {
+        let Some(arg_mapping) = call_signature_details
+            .argument_to_parameter_mapping
+            .get(arg_index)
+        else {
+            continue;
+        };
+
+        if !arg_mapping.matched {
+            continue;
+        }
+
+        let Some(param_index) = arg_mapping.parameters.first() else {
+            continue;
+        };
+
+        let Some(param) = parameters.get(*param_index) else {
+            continue;
+        };
+
+        // Only add hints for parameters that can be specified by name
+        if !param.is_positional_only() && !param.is_variadic() && !param.is_keyword_variadic() {
+            let Some(name) = param.name() else {
+                continue;
+            };
+            argument_names.insert(arg_index, name.to_string());
+        }
+    }
+
+    Some(InlayHintFunctionArgumentDetails { argument_names })
+}
+
 /// Find the text range of a specific parameter in function parameters by name.
 /// Only searches for parameters that can be addressed by name in keyword arguments.
 fn find_parameter_range(parameters: &ast::Parameters, parameter_name: &str) -> Option<TextRange> {
@@ -868,7 +967,7 @@ mod resolve_definition {
     pub enum ImportAliasResolution {
         /// Resolve import aliases to their original definitions
         ResolveAliases,
-        /// Keep import aliases as-is, don't resolve to original definitions  
+        /// Keep import aliases as-is, don't resolve to original definitions
         PreserveAliases,
     }
 
@@ -876,12 +975,11 @@ mod resolve_definition {
     use ruff_db::files::{File, FileRange};
     use ruff_db::parsed::{ParsedModuleRef, parsed_module};
     use ruff_python_ast as ast;
-    use ruff_text_size::{Ranged, TextRange};
     use rustc_hash::FxHashSet;
     use tracing::trace;
 
     use crate::module_resolver::file_to_module;
-    use crate::semantic_index::definition::{Definition, DefinitionKind};
+    use crate::semantic_index::definition::{Definition, DefinitionKind, module_docstring};
     use crate::semantic_index::scope::{NodeWithScopeKind, ScopeId};
     use crate::semantic_index::{global_scope, place_table, semantic_index, use_def_map};
     use crate::{Db, ModuleName, resolve_module, resolve_real_module};
@@ -895,6 +993,8 @@ mod resolve_definition {
     pub enum ResolvedDefinition<'db> {
         /// The import resolved to a specific definition within a module
         Definition(Definition<'db>),
+        /// The import resolved to an entire module
+        Module(File),
         /// The import resolved to a file with a specific range
         FileWithRange(FileRange),
     }
@@ -903,7 +1003,16 @@ mod resolve_definition {
         fn file(&self, db: &'db dyn Db) -> File {
             match self {
                 ResolvedDefinition::Definition(definition) => definition.file(db),
+                ResolvedDefinition::Module(file) => *file,
                 ResolvedDefinition::FileWithRange(file_range) => file_range.file(),
+            }
+        }
+
+        pub fn docstring(&self, db: &'db dyn Db) -> Option<String> {
+            match self {
+                ResolvedDefinition::Definition(definition) => definition.docstring(db),
+                ResolvedDefinition::Module(file) => module_docstring(db, *file),
+                ResolvedDefinition::FileWithRange(_) => None,
             }
         }
     }
@@ -973,10 +1082,7 @@ mod resolve_definition {
 
                 // For simple imports like "import os", we want to navigate to the module itself.
                 // Return the module file directly instead of trying to find definitions within it.
-                vec![ResolvedDefinition::FileWithRange(FileRange::new(
-                    module_file,
-                    TextRange::default(),
-                ))]
+                vec![ResolvedDefinition::Module(module_file)]
             }
 
             DefinitionKind::ImportFrom(import_from_def) => {
@@ -1186,24 +1292,19 @@ mod resolve_definition {
                 }
                 trace!("Built Definition Path: {path:?}");
             }
-            ResolvedDefinition::FileWithRange(file_range) => {
-                return if file_range.range() == TextRange::default() {
-                    trace!(
-                        "Found module mapping: {} => {}",
-                        stub_file.path(db),
-                        real_file.path(db)
-                    );
-                    // This is just a reference to a module, no need to do paths
-                    Some(vec![ResolvedDefinition::FileWithRange(FileRange::new(
-                        real_file,
-                        TextRange::default(),
-                    ))])
-                } else {
-                    // Not yet implemented -- in this case we want to recover something like a Definition
-                    // and build a Definition Path, but this input is a bit too abstract for now.
-                    trace!("Found arbitrary FileWithRange by stub mapping, giving up");
-                    None
-                };
+            ResolvedDefinition::Module(_) => {
+                trace!(
+                    "Found module mapping: {} => {}",
+                    stub_file.path(db),
+                    real_file.path(db)
+                );
+                return Some(vec![ResolvedDefinition::Module(real_file)]);
+            }
+            ResolvedDefinition::FileWithRange(_) => {
+                // Not yet implemented -- in this case we want to recover something like a Definition
+                // and build a Definition Path, but this input is a bit too abstract for now.
+                trace!("Found arbitrary FileWithRange while stub mapping, giving up");
+                return None;
             }
         }
 

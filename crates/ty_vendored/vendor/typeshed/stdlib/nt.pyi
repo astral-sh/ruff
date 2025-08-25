@@ -116,4 +116,7 @@ if sys.platform == "win32":
     if sys.version_info >= (3, 13):
         from os import fchmod as fchmod, lchmod as lchmod
 
+    if sys.version_info >= (3, 14):
+        from os import readinto as readinto
+
     environ: dict[str, str]

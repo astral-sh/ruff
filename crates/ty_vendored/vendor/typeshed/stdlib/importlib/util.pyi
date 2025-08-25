@@ -14,11 +14,15 @@ from importlib._bootstrap_external import (
     spec_from_file_location as spec_from_file_location,
 )
 from importlib.abc import Loader
-from typing_extensions import ParamSpec
+from typing_extensions import ParamSpec, deprecated
 
 _P = ParamSpec("_P")
 
 if sys.version_info < (3, 12):
+    @deprecated(
+        "Deprecated since Python 3.4; removed in Python 3.12. "
+        "`__name__`, `__package__` and `__loader__` are now set automatically."
+    )
     def module_for_loader(fxn: Callable[_P, types.ModuleType]) -> Callable[_P, types.ModuleType]:
         """Decorator to handle selecting the proper module for loaders.
 
@@ -38,6 +42,10 @@ if sys.version_info < (3, 12):
 
         """
 
+    @deprecated(
+        "Deprecated since Python 3.4; removed in Python 3.12. "
+        "`__name__`, `__package__` and `__loader__` are now set automatically."
+    )
     def set_loader(fxn: Callable[_P, types.ModuleType]) -> Callable[_P, types.ModuleType]:
         """Set __loader__ on the returned module.
 
@@ -45,6 +53,10 @@ if sys.version_info < (3, 12):
 
         """
 
+    @deprecated(
+        "Deprecated since Python 3.4; removed in Python 3.12. "
+        "`__name__`, `__package__` and `__loader__` are now set automatically."
+    )
     def set_package(fxn: Callable[_P, types.ModuleType]) -> Callable[_P, types.ModuleType]:
         """Set __package__ on the returned module.
 

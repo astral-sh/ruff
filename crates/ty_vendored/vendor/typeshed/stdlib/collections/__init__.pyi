@@ -18,8 +18,8 @@ import sys
 from _collections_abc import dict_items, dict_keys, dict_values
 from _typeshed import SupportsItems, SupportsKeysAndGetItem, SupportsRichComparison, SupportsRichComparisonT
 from types import GenericAlias
-from typing import Any, ClassVar, Generic, NoReturn, SupportsIndex, TypeVar, final, overload
-from typing_extensions import Self
+from typing import Any, ClassVar, Generic, NoReturn, SupportsIndex, TypeVar, final, overload, type_check_only
+from typing_extensions import Self, disjoint_base
 
 if sys.version_info >= (3, 10):
     from collections.abc import (
@@ -271,6 +271,7 @@ class UserString(Sequence[UserString]):
     def upper(self) -> Self: ...
     def zfill(self, width: int) -> Self: ...
 
+@disjoint_base
 class deque(MutableSequence[_T]):
     """A list-like sequence optimized for data accesses near its endpoints."""
 
@@ -631,17 +632,21 @@ class _OrderedDictValuesView(ValuesView[_VT_co]):
 # but they are not exposed anywhere)
 # pyright doesn't have a specific error code for subclassing error!
 @final
+@type_check_only
 class _odict_keys(dict_keys[_KT_co, _VT_co]):  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues]
     def __reversed__(self) -> Iterator[_KT_co]: ...
 
 @final
+@type_check_only
 class _odict_items(dict_items[_KT_co, _VT_co]):  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues]
     def __reversed__(self) -> Iterator[tuple[_KT_co, _VT_co]]: ...
 
 @final
+@type_check_only
 class _odict_values(dict_values[_KT_co, _VT_co]):  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues]
     def __reversed__(self) -> Iterator[_VT_co]: ...
 
+@disjoint_base
 class OrderedDict(dict[_KT, _VT]):
     """Dictionary that remembers insertion order"""
 
@@ -714,6 +719,7 @@ class OrderedDict(dict[_KT, _VT]):
     @overload
     def __ror__(self, value: dict[_T1, _T2], /) -> OrderedDict[_KT | _T1, _VT | _T2]: ...  # type: ignore[misc]
 
+@disjoint_base
 class defaultdict(dict[_KT, _VT]):
     """defaultdict(default_factory=None, /, [...]) --> dict with default factory
 
@@ -849,15 +855,23 @@ class ChainMap(MutableMapping[_KT, _VT]):
     __copy__ = copy
     # All arguments to `fromkeys` are passed to `dict.fromkeys` at runtime,
     # so the signature should be kept in line with `dict.fromkeys`.
-    @classmethod
-    @overload
-    def fromkeys(cls, iterable: Iterable[_T]) -> ChainMap[_T, Any | None]:
-        """Create a new ChainMap with keys from iterable and values set to value."""
+    if sys.version_info >= (3, 13):
+        @classmethod
+        @overload
+        def fromkeys(cls, iterable: Iterable[_T], /) -> ChainMap[_T, Any | None]:
+            """Create a new ChainMap with keys from iterable and values set to value."""
+    else:
+        @classmethod
+        @overload
+        def fromkeys(cls, iterable: Iterable[_T]) -> ChainMap[_T, Any | None]:
+            """Create a ChainMap with a single dict created from the iterable."""
 
     @classmethod
     @overload
     # Special-case None: the user probably wants to add non-None values later.
-    def fromkeys(cls, iterable: Iterable[_T], value: None, /) -> ChainMap[_T, Any | None]: ...
+    def fromkeys(cls, iterable: Iterable[_T], value: None, /) -> ChainMap[_T, Any | None]:
+        """Create a new ChainMap with keys from iterable and values set to value."""
+
     @classmethod
     @overload
     def fromkeys(cls, iterable: Iterable[_T], value: _S, /) -> ChainMap[_T, _S]: ...

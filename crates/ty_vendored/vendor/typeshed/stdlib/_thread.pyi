@@ -9,7 +9,7 @@ from collections.abc import Callable
 from threading import Thread
 from types import TracebackType
 from typing import Any, Final, NoReturn, final, overload
-from typing_extensions import TypeVarTuple, Unpack
+from typing_extensions import TypeVarTuple, Unpack, disjoint_base
 
 _Ts = TypeVarTuple("_Ts")
 
@@ -315,7 +315,7 @@ def stack_size(size: int = 0, /) -> int:
     the suggested approach in the absence of more specific information).
     """
 
-TIMEOUT_MAX: float
+TIMEOUT_MAX: Final[float]
 
 def get_native_id() -> int:  # only available on some platforms
     """Return a non-negative integer identifying the thread as reported
@@ -361,6 +361,7 @@ if sys.version_info >= (3, 14):
     def set_name(name: str) -> None:
         """Set the name of the current thread."""
 
+@disjoint_base
 class _local:
     """Thread-local data"""
 

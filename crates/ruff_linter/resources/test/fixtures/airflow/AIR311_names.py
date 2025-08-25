@@ -34,7 +34,7 @@ task_group()
 setup()
 from airflow.decorators import teardown
 from airflow.io.path import ObjectStoragePath
-from airflow.io.storage import attach
+from airflow.io.store import attach
 from airflow.models import DAG as DAGFromModel
 from airflow.models import (
     Connection,

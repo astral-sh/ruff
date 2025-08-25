@@ -1,6 +1,7 @@
 import io
-from typing import Any, Protocol
+from typing import Any, Protocol, type_check_only
 
+@type_check_only
 class _IOBytes(Protocol):
     def read(self, size: int, /) -> bytes: ...
     def seek(self, size: int, whence: int = ..., /) -> Any: ...

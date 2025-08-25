@@ -5,8 +5,8 @@ import types
 from _typeshed import SupportsAllComparisons, SupportsItems
 from collections.abc import Callable, Hashable, Iterable, Sized
 from types import GenericAlias
-from typing import Any, Final, Generic, Literal, NamedTuple, TypedDict, TypeVar, final, overload
-from typing_extensions import ParamSpec, Self, TypeAlias
+from typing import Any, Final, Generic, Literal, NamedTuple, TypedDict, TypeVar, final, overload, type_check_only
+from typing_extensions import ParamSpec, Self, TypeAlias, disjoint_base
 
 __all__ = [
     "update_wrapper",
@@ -81,6 +81,7 @@ class _CacheInfo(NamedTuple):
     maxsize: int | None
     currsize: int
 
+@type_check_only
 class _CacheParameters(TypedDict):
     maxsize: int
     typed: bool
@@ -168,8 +169,9 @@ else:
         tuple[Literal["__module__"], Literal["__name__"], Literal["__qualname__"], Literal["__doc__"], Literal["__annotations__"]]
     ]
 
-WRAPPER_UPDATES: tuple[Literal["__dict__"]]
+WRAPPER_UPDATES: Final[tuple[Literal["__dict__"]]]
 
+@type_check_only
 class _Wrapped(Generic[_PWrapped, _RWrapped, _PWrapper, _RWrapper]):
     __wrapped__: Callable[_PWrapped, _RWrapped]
     def __call__(self, *args: _PWrapper.args, **kwargs: _PWrapper.kwargs) -> _RWrapper: ...
@@ -177,6 +179,7 @@ class _Wrapped(Generic[_PWrapped, _RWrapped, _PWrapper, _RWrapper]):
     __name__: str
     __qualname__: str
 
+@type_check_only
 class _Wrapper(Generic[_PWrapped, _RWrapped]):
     def __call__(self, f: Callable[_PWrapper, _RWrapper]) -> _Wrapped[_PWrapped, _RWrapped, _PWrapper, _RWrapper]: ...
 
@@ -289,6 +292,7 @@ def cmp_to_key(mycmp: Callable[[_T, _T], int]) -> Callable[[_T], SupportsAllComp
       Function that compares two objects.
     """
 
+@disjoint_base
 class partial(Generic[_T]):
     """Create a new function with partial application of the given arguments
     and keywords.
@@ -327,10 +331,17 @@ class partialmethod(Generic[_T]):
     func: Callable[..., _T] | _Descriptor
     args: tuple[Any, ...]
     keywords: dict[str, Any]
-    @overload
-    def __init__(self, func: Callable[..., _T], /, *args: Any, **keywords: Any) -> None: ...
-    @overload
-    def __init__(self, func: _Descriptor, /, *args: Any, **keywords: Any) -> None: ...
+    if sys.version_info >= (3, 14):
+        @overload
+        def __new__(self, func: Callable[..., _T], /, *args: Any, **keywords: Any) -> Self: ...
+        @overload
+        def __new__(self, func: _Descriptor, /, *args: Any, **keywords: Any) -> Self: ...
+    else:
+        @overload
+        def __init__(self, func: Callable[..., _T], /, *args: Any, **keywords: Any) -> None: ...
+        @overload
+        def __init__(self, func: _Descriptor, /, *args: Any, **keywords: Any) -> None: ...
+
     def __get__(self, obj: Any, cls: type[Any] | None = None) -> Callable[..., _T]: ...
     @property
     def __isabstractmethod__(self) -> bool: ...
@@ -345,6 +356,7 @@ if sys.version_info >= (3, 11):
 else:
     _RegType: TypeAlias = type[Any]
 
+@type_check_only
 class _SingleDispatchCallable(Generic[_T]):
     registry: types.MappingProxyType[Any, Callable[..., _T]]
     def dispatch(self, cls: Any) -> Callable[..., _T]: ...

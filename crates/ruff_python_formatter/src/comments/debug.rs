@@ -196,12 +196,12 @@ mod tests {
     fn debug() {
         let continue_statement = StmtContinue {
             range: TextRange::new(TextSize::new(18), TextSize::new(26)),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
         };
 
         let break_statement = StmtBreak {
             range: TextRange::new(TextSize::new(55), TextSize::new(60)),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
         };
 
         let source = r"# leading comment

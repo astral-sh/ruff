@@ -159,6 +159,21 @@ pub(crate) const fn is_fix_os_getcwd_enabled(settings: &LinterSettings) -> bool 
     settings.preview.is_enabled()
 }
 
+// https://github.com/astral-sh/ruff/pull/19514
+pub(crate) const fn is_fix_os_mkdir_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/pull/19514
+pub(crate) const fn is_fix_os_makedirs_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/pull/20009
+pub(crate) const fn is_fix_os_symlink_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
 // https://github.com/astral-sh/ruff/pull/11436
 // https://github.com/astral-sh/ruff/pull/11168
 pub(crate) const fn is_dunder_init_fix_unused_import_enabled(settings: &LinterSettings) -> bool {
@@ -228,5 +243,10 @@ pub(crate) const fn is_add_future_annotations_imports_enabled(settings: &LinterS
 
 // https://github.com/astral-sh/ruff/pull/19390
 pub(crate) const fn is_trailing_comma_type_params_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/pull/19851
+pub(crate) const fn is_maxsplit_without_separator_fix_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }

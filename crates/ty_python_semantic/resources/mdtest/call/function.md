@@ -183,33 +183,27 @@ def takes_at_least_two_positional_only(x: int, y: int, /, *args) -> None: ...
 class SingleElementTuple(tuple[int]): ...
 
 def _(args: SingleElementTuple) -> None:
-    # TODO: we should emit `[too-many-positional-arguments]` here
-    takes_zero(*args)
+    takes_zero(*args)  # error: [too-many-positional-arguments]
 
     takes_one(*args)
 
-    # TODO: we should emit `[missing-argument]` on both of these
-    takes_two(*args)
-    takes_two_positional_only(*args)
+    takes_two(*args)  # error: [missing-argument]
+    takes_two_positional_only(*args)  # error: [missing-argument]
 
-    # TODO: these should both be `[missing-argument]`, not `[invalid-argument-type]`
-    takes_two_different(*args)  # error: [invalid-argument-type]
-    takes_two_different_positional_only(*args)  # error: [invalid-argument-type]
+    takes_two_different(*args)  # error: [missing-argument]
+    takes_two_different_positional_only(*args)  # error: [missing-argument]
 
     takes_at_least_zero(*args)
     takes_at_least_one(*args)
 
-    # TODO: we should emit `[missing-argument]` on both of these
-    takes_at_least_two(*args)
-    takes_at_least_two_positional_only(*args)
+    takes_at_least_two(*args)  # error: [missing-argument]
+    takes_at_least_two_positional_only(*args)  # error: [missing-argument]
 
 class TwoElementIntTuple(tuple[int, int]): ...
 
 def _(args: TwoElementIntTuple) -> None:
-    # TODO: we should emit `[too-many-positional-arguments]` on both of these
-    takes_zero(*args)
-    takes_one(*args)
-
+    takes_zero(*args)  # error: [too-many-positional-arguments]
+    takes_one(*args)  # error: [too-many-positional-arguments]
     takes_two(*args)
     takes_two_positional_only(*args)
     takes_two_different(*args)  # error: [invalid-argument-type]
@@ -222,39 +216,22 @@ def _(args: TwoElementIntTuple) -> None:
 class IntStrTuple(tuple[int, str]): ...
 
 def _(args: IntStrTuple) -> None:
-    # TODO: we should emit `[too-many-positional-arguments]` here
-    takes_zero(*args)
+    takes_zero(*args)  # error: [too-many-positional-arguments]
 
-    # TODO: this should be `[too-many-positional-arguments]`, not `[invalid-argument-type]`
-    takes_one(*args)  # error: [invalid-argument-type]
+    takes_one(*args)  # error: [too-many-positional-arguments]
 
-    # TODO: we should have one diagnostic for each of these, not two
-    # error: [invalid-argument-type]
     # error: [invalid-argument-type]
     takes_two(*args)
     # error: [invalid-argument-type]
-    # error: [invalid-argument-type]
     takes_two_positional_only(*args)
 
-    # TODO: these are all false positives
-    # error: [invalid-argument-type]
-    # error: [invalid-argument-type]
     takes_two_different(*args)
-    # error: [invalid-argument-type]
-    # error: [invalid-argument-type]
     takes_two_different_positional_only(*args)
-
     takes_at_least_zero(*args)
-
-    # TODO: false positive
-    # error: [invalid-argument-type]
     takes_at_least_one(*args)
 
-    # TODO: we should only emit one diagnostic for each of these, not two
-    # error: [invalid-argument-type]
     # error: [invalid-argument-type]
     takes_at_least_two(*args)
-    # error: [invalid-argument-type]
     # error: [invalid-argument-type]
     takes_at_least_two_positional_only(*args)
 ```
@@ -377,9 +354,7 @@ def takes_at_least_two_positional_only(x: int, y: int, /, *args) -> None: ...
 class IntStarInt(tuple[int, *tuple[int, ...]]): ...
 
 def _(args: IntStarInt) -> None:
-    # TODO: we should emit `[too-many-positional-arguments]` here
-    takes_zero(*args)
-
+    takes_zero(*args)  # error: [too-many-positional-arguments]
     takes_one(*args)
     takes_two(*args)
     takes_two_positional_only(*args)
@@ -393,50 +368,32 @@ def _(args: IntStarInt) -> None:
 class IntStarStr(tuple[int, *tuple[str, ...]]): ...
 
 def _(args: IntStarStr) -> None:
-    # TODO: we should emit `[too-many-positional-arguments]` here
-    takes_zero(*args)
+    takes_zero(*args)  # error: [too-many-positional-arguments]
 
-    # TODO: false positive
-    # error: [invalid-argument-type]
     takes_one(*args)
 
-    # TODO: we should only emit one diagnostic for each of these, not two
-    # error: [invalid-argument-type]
     # error: [invalid-argument-type]
     takes_two(*args)
     # error: [invalid-argument-type]
-    # error: [invalid-argument-type]
     takes_two_positional_only(*args)
 
-    # TODO: false positives
-    # error: [invalid-argument-type]
-    # error: [invalid-argument-type]
     takes_two_different(*args)
-    # error: [invalid-argument-type]
-    # error: [invalid-argument-type]
     takes_two_different_positional_only(*args)
 
     takes_at_least_zero(*args)
 
-    # TODO: false positive
-    # error: [invalid-argument-type]
     takes_at_least_one(*args)
 
-    # TODO: we should only have one diagnostic for each of these, not two
-    # error: [invalid-argument-type]
     # error: [invalid-argument-type]
     takes_at_least_two(*args)
-    # error: [invalid-argument-type]
     # error: [invalid-argument-type]
     takes_at_least_two_positional_only(*args)
 
 class IntIntStarInt(tuple[int, int, *tuple[int, ...]]): ...
 
 def _(args: IntIntStarInt) -> None:
-    # TODO: we should emit `[too-many-positional-arguments]` on both of these
-    takes_zero(*args)
-    takes_one(*args)
-
+    takes_zero(*args)  # error: [too-many-positional-arguments]
+    takes_one(*args)  # error: [too-many-positional-arguments]
     takes_two(*args)
     takes_two_positional_only(*args)
     takes_two_different(*args)  # error: [invalid-argument-type]
@@ -449,51 +406,31 @@ def _(args: IntIntStarInt) -> None:
 class IntIntStarStr(tuple[int, int, *tuple[str, ...]]): ...
 
 def _(args: IntIntStarStr) -> None:
-    # TODO: we should emit `[too-many-positional-arguments]` here
-    takes_zero(*args)
+    takes_zero(*args)  # error: [too-many-positional-arguments]
 
-    # TODO: this should be `[too-many-positional-arguments]`, not `invalid-argument-type`
-    takes_one(*args)  # error: [invalid-argument-type]
+    takes_one(*args)  # error: [too-many-positional-arguments]
 
-    # TODO: these are all false positives
-    # error: [invalid-argument-type]
-    # error: [invalid-argument-type]
     takes_two(*args)
-    # error: [invalid-argument-type]
-    # error: [invalid-argument-type]
     takes_two_positional_only(*args)
 
-    # TODO: each of these should only have one diagnostic, not two
-    # error: [invalid-argument-type]
     # error: [invalid-argument-type]
     takes_two_different(*args)
-    # error: [invalid-argument-type]
     # error: [invalid-argument-type]
     takes_two_different_positional_only(*args)
 
     takes_at_least_zero(*args)
 
-    # TODO: false positive
-    # error: [invalid-argument-type]
     takes_at_least_one(*args)
 
-    # TODO: these are both false positives
-    # error: [invalid-argument-type]
-    # error: [invalid-argument-type]
     takes_at_least_two(*args)
 
-    # TODO: these are both false positives
-    # error: [invalid-argument-type]
-    # error: [invalid-argument-type]
     takes_at_least_two_positional_only(*args)
 
 class IntStarIntInt(tuple[int, *tuple[int, ...], int]): ...
 
 def _(args: IntStarIntInt) -> None:
-    # TODO: we should emit `[too-many-positional-arguments]` on both of these
-    takes_zero(*args)
-    takes_one(*args)
-
+    takes_zero(*args)  # error: [too-many-positional-arguments]
+    takes_one(*args)  # error: [too-many-positional-arguments]
     takes_two(*args)
     takes_two_positional_only(*args)
     takes_two_different(*args)  # error: [invalid-argument-type]
@@ -506,40 +443,25 @@ def _(args: IntStarIntInt) -> None:
 class IntStarStrInt(tuple[int, *tuple[str, ...], int]): ...
 
 def _(args: IntStarStrInt) -> None:
-    # TODO: we should emit `too-many-positional-arguments` here
-    takes_zero(*args)
+    takes_zero(*args)  # error: [too-many-positional-arguments]
 
-    # TODO: this should be `too-many-positional-arguments`, not `invalid-argument-type`
-    takes_one(*args)  # error: [invalid-argument-type]
+    takes_one(*args)  # error: [too-many-positional-arguments]
 
-    # TODO: we should only emit one diagnostic for each of these
-    # error: [invalid-argument-type]
     # error: [invalid-argument-type]
     takes_two(*args)
     # error: [invalid-argument-type]
-    # error: [invalid-argument-type]
     takes_two_positional_only(*args)
 
-    # TODO: we should not emit diagnostics for these
-    # error: [invalid-argument-type]
-    # error: [invalid-argument-type]
     takes_two_different(*args)
-    # error: [invalid-argument-type]
-    # error: [invalid-argument-type]
     takes_two_different_positional_only(*args)
 
     takes_at_least_zero(*args)
 
-    # TODO: false positive
-    takes_at_least_one(*args)  # error: [invalid-argument-type]
+    takes_at_least_one(*args)
 
-    # TODO: should only have one diagnostic here
-    # error: [invalid-argument-type]
     # error: [invalid-argument-type]
     takes_at_least_two(*args)
 
-    # TODO: should only have one diagnostic here
-    # error: [invalid-argument-type]
     # error: [invalid-argument-type]
     takes_at_least_two_positional_only(*args)
 ```

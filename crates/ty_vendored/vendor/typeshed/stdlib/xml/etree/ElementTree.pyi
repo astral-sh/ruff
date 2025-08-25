@@ -38,7 +38,7 @@ from _collections_abc import dict_keys
 from _typeshed import FileDescriptorOrPath, ReadableBuffer, SupportsRead, SupportsWrite
 from collections.abc import Callable, Generator, ItemsView, Iterable, Iterator, Mapping, Sequence
 from typing import Any, Final, Generic, Literal, Protocol, SupportsIndex, TypeVar, overload, type_check_only
-from typing_extensions import TypeAlias, TypeGuard, deprecated
+from typing_extensions import TypeAlias, TypeGuard, deprecated, disjoint_base
 from xml.parsers.expat import XMLParserType
 
 __all__ = [
@@ -128,14 +128,13 @@ def canonicalize(
 ) -> None: ...
 
 # The tag for Element can be set to the Comment or ProcessingInstruction
-# functions defined in this module. _ElementCallable could be a recursive
-# type, but defining it that way uncovered a bug in pytype.
-_ElementCallable: TypeAlias = Callable[..., Element[Any]]
-_CallableElement: TypeAlias = Element[_ElementCallable]
+# functions defined in this module.
+_ElementCallable: TypeAlias = Callable[..., Element[_ElementCallable]]
 
 _Tag = TypeVar("_Tag", default=str, bound=str | _ElementCallable)
 _OtherTag = TypeVar("_OtherTag", default=str, bound=str | _ElementCallable)
 
+@disjoint_base
 class Element(Generic[_Tag]):
     tag: _Tag
     attrib: dict[str, str]
@@ -196,7 +195,7 @@ class Element(Generic[_Tag]):
         """True if self else False"""
 
 def SubElement(parent: Element, tag: str, attrib: dict[str, str] = ..., **extra: str) -> Element: ...
-def Comment(text: str | None = None) -> _CallableElement:
+def Comment(text: str | None = None) -> Element[_ElementCallable]:
     """Comment element factory.
 
     This function creates a special element which the standard serializer
@@ -206,7 +205,7 @@ def Comment(text: str | None = None) -> _CallableElement:
 
     """
 
-def ProcessingInstruction(target: str, text: str | None = None) -> _CallableElement:
+def ProcessingInstruction(target: str, text: str | None = None) -> Element[_ElementCallable]:
     """Processing Instruction element factory.
 
     This function creates a special element which the standard serializer
@@ -373,7 +372,7 @@ class ElementTree(Generic[_Root]):
 
     def write_c14n(self, file: _FileWriteC14N) -> None: ...
 
-HTML_EMPTY: set[str]
+HTML_EMPTY: Final[set[str]]
 
 def register_namespace(prefix: str, uri: str) -> None:
     """Register a namespace prefix.
@@ -594,6 +593,7 @@ def fromstringlist(sequence: Sequence[str | ReadableBuffer], parser: XMLParser |
 # elementfactories.
 _ElementFactory: TypeAlias = Callable[[Any, dict[Any, Any]], Element]
 
+@disjoint_base
 class TreeBuilder:
     # comment_factory can take None because passing None to Comment is not an error
     def __init__(
@@ -663,6 +663,7 @@ class C14NWriterTarget:
 # The target type is tricky, because the implementation doesn't
 # require any particular attribute to be present. This documents the attributes
 # that can be present, but uncommenting any of them would require them.
+@type_check_only
 class _Target(Protocol):
     # start: Callable[str, dict[str, str], Any] | None
     # end: Callable[[str], Any] | None
@@ -680,6 +681,7 @@ _E = TypeVar("_E", default=Element)
 # The default target is TreeBuilder, which returns Element.
 # C14NWriterTarget does not implement a close method, so using it results
 # in a type of XMLParser[None].
+@disjoint_base
 class XMLParser(Generic[_E]):
     parser: XMLParserType
     target: _Target

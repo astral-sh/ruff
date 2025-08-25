@@ -14,7 +14,7 @@ use crate::{
 };
 
 /// A cross-module identifier of a scope that can be used as a salsa query parameter.
-#[salsa::tracked(debug)]
+#[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct ScopeId<'db> {
     pub file: File,
 
@@ -29,8 +29,8 @@ impl<'db> ScopeId<'db> {
         self.node(db).scope_kind().is_function_like()
     }
 
-    pub(crate) fn is_type_parameter(self, db: &'db dyn Db) -> bool {
-        self.node(db).scope_kind().is_type_parameter()
+    pub(crate) fn is_annotation(self, db: &'db dyn Db) -> bool {
+        self.node(db).scope_kind().is_annotation()
     }
 
     pub(crate) fn node(self, db: &dyn Db) -> &NodeWithScopeKind {
@@ -200,7 +200,7 @@ impl ScopeLaziness {
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) enum ScopeKind {
     Module,
-    Annotation,
+    TypeParams,
     Class,
     Function,
     Lambda,
@@ -215,18 +215,18 @@ impl ScopeKind {
 
     pub(crate) const fn laziness(self) -> ScopeLaziness {
         match self {
-            ScopeKind::Module | ScopeKind::Class | ScopeKind::Comprehension => ScopeLaziness::Eager,
-            ScopeKind::Annotation
-            | ScopeKind::Function
-            | ScopeKind::Lambda
-            | ScopeKind::TypeAlias => ScopeLaziness::Lazy,
+            ScopeKind::Module
+            | ScopeKind::Class
+            | ScopeKind::Comprehension
+            | ScopeKind::TypeParams => ScopeLaziness::Eager,
+            ScopeKind::Function | ScopeKind::Lambda | ScopeKind::TypeAlias => ScopeLaziness::Lazy,
         }
     }
 
     pub(crate) const fn visibility(self) -> ScopeVisibility {
         match self {
             ScopeKind::Module | ScopeKind::Class => ScopeVisibility::Public,
-            ScopeKind::Annotation
+            ScopeKind::TypeParams
             | ScopeKind::TypeAlias
             | ScopeKind::Function
             | ScopeKind::Lambda
@@ -239,7 +239,7 @@ impl ScopeKind {
         // symbol table also uses the term "function-like" for these scopes.
         matches!(
             self,
-            ScopeKind::Annotation
+            ScopeKind::TypeParams
                 | ScopeKind::Function
                 | ScopeKind::Lambda
                 | ScopeKind::TypeAlias
@@ -255,8 +255,8 @@ impl ScopeKind {
         matches!(self, ScopeKind::Module)
     }
 
-    pub(crate) const fn is_type_parameter(self) -> bool {
-        matches!(self, ScopeKind::Annotation | ScopeKind::TypeAlias)
+    pub(crate) const fn is_annotation(self) -> bool {
+        matches!(self, ScopeKind::TypeParams | ScopeKind::TypeAlias)
     }
 
     pub(crate) const fn is_non_lambda_function(self) -> bool {
@@ -388,7 +388,7 @@ impl NodeWithScopeKind {
             Self::Lambda(_) => ScopeKind::Lambda,
             Self::FunctionTypeParameters(_)
             | Self::ClassTypeParameters(_)
-            | Self::TypeAliasTypeParameters(_) => ScopeKind::Annotation,
+            | Self::TypeAliasTypeParameters(_) => ScopeKind::TypeParams,
             Self::TypeAlias(_) => ScopeKind::TypeAlias,
             Self::ListComprehension(_)
             | Self::SetComprehension(_)

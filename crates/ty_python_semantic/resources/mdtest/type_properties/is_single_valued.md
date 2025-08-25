@@ -26,10 +26,8 @@ class HeterogeneousTupleSubclass(tuple[Literal[True], Literal[1]]): ...
 # from being overridden on a tuple subclass. This is something we plan to do as part of
 # our implementation of the Liskov Substitution Principle
 # (https://github.com/astral-sh/ty/issues/166)
-#
-# TODO: these should pass
-static_assert(is_single_valued(EmptyTupleSubclass))  # error: [static-assert-error]
-static_assert(is_single_valued(HeterogeneousTupleSubclass))  # error: [static-assert-error]
+static_assert(is_single_valued(EmptyTupleSubclass))
+static_assert(is_single_valued(HeterogeneousTupleSubclass))
 
 static_assert(not is_single_valued(str))
 static_assert(not is_single_valued(Never))

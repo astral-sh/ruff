@@ -240,6 +240,21 @@ def f(x: str | None):
 
     # When there is a reassignment, any narrowing constraints on the place are invalidated in lazy scopes.
     x = None
+
+def f(x: str | None):
+    def _():
+        if x is not None:
+            def closure():
+                reveal_type(x)  # revealed: str | None
+    x = None
+
+def f(x: str | None):
+    class C:
+        def _():
+            if x is not None:
+                def closure():
+                    reveal_type(x)  # revealed: str
+        x = None  # This assignment is not visible in the inner lazy scope, so narrowing is still valid.
 ```
 
 If a variable defined in a private scope is never reassigned, narrowing remains in effect in the
@@ -256,6 +271,12 @@ def f(const: str | None):
             reveal_type(const)  # revealed: str
 
         [reveal_type(const) for _ in range(1)]  # revealed: str
+
+def f(const: str | None):
+    def _():
+        if const is not None:
+            def closure():
+                reveal_type(const)  # revealed: str
 ```
 
 And even if there is an attribute or subscript assignment to the variable, narrowing of the variable

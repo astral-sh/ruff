@@ -728,13 +728,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     pylint::rules::non_ascii_module_import(checker, alias);
                 }
             }
-            if checker.is_rule_enabled(Rule::UnnecessaryFutureImport) {
-                if checker.target_version() >= PythonVersion::PY37 {
-                    if let Some("__future__") = module {
-                        pyupgrade::rules::unnecessary_future_import(checker, stmt, names);
-                    }
-                }
-            }
             if checker.is_rule_enabled(Rule::DeprecatedMockImport) {
                 pyupgrade::rules::deprecated_mock_import(checker, stmt);
             }

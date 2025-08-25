@@ -1,0 +1,117 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: too_many_positionals.md - too-many-positional-arguments diagnostics
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/too_many_positionals.md
+---
+
+# Python source files
+
+## module.py
+
+```
+1 | def f(a, b=42): ...
+2 | def g(a, b): ...
+3 | 
+4 | class Foo:
+5 |     def method(self, a): ...
+```
+
+## main.py
+
+```
+ 1 | from module import f, g, Foo
+ 2 | 
+ 3 | f(1, 2, 3)  # error: [too-many-positional-arguments]
+ 4 | 
+ 5 | def coinflip() -> bool:
+ 6 |     return True
+ 7 | 
+ 8 | h = f if coinflip() else g
+ 9 | 
+10 | # error: [too-many-positional-arguments]
+11 | # error: [too-many-positional-arguments]
+12 | h(1, 2, 3)
+13 | 
+14 | Foo().method(1, 2)  # error: [too-many-positional-arguments]
+```
+
+# Diagnostics
+
+```
+error[too-many-positional-arguments]: Too many positional arguments to function `f`: expected 2, got 3
+ --> src/main.py:3:9
+  |
+1 | from module import f, g, Foo
+2 |
+3 | f(1, 2, 3)  # error: [too-many-positional-arguments]
+  |         ^
+4 |
+5 | def coinflip() -> bool:
+  |
+info: Function signature here
+ --> src/module.py:1:5
+  |
+1 | def f(a, b=42): ...
+  |     ^^^^^^^^^^
+2 | def g(a, b): ...
+  |
+info: rule `too-many-positional-arguments` is enabled by default
+
+```
+
+```
+error[too-many-positional-arguments]: Too many positional arguments to function `f`: expected 2, got 3
+  --> src/main.py:12:9
+   |
+10 | # error: [too-many-positional-arguments]
+11 | # error: [too-many-positional-arguments]
+12 | h(1, 2, 3)
+   |         ^
+13 |
+14 | Foo().method(1, 2)  # error: [too-many-positional-arguments]
+   |
+info: Union variant `def f(a, b=Literal[42]) -> Unknown` is incompatible with this call site
+info: Attempted to call union type `(def f(a, b=Literal[42]) -> Unknown) | (def g(a, b) -> Unknown)`
+info: rule `too-many-positional-arguments` is enabled by default
+
+```
+
+```
+error[too-many-positional-arguments]: Too many positional arguments to function `g`: expected 2, got 3
+  --> src/main.py:12:9
+   |
+10 | # error: [too-many-positional-arguments]
+11 | # error: [too-many-positional-arguments]
+12 | h(1, 2, 3)
+   |         ^
+13 |
+14 | Foo().method(1, 2)  # error: [too-many-positional-arguments]
+   |
+info: Union variant `def g(a, b) -> Unknown` is incompatible with this call site
+info: Attempted to call union type `(def f(a, b=Literal[42]) -> Unknown) | (def g(a, b) -> Unknown)`
+info: rule `too-many-positional-arguments` is enabled by default
+
+```
+
+```
+error[too-many-positional-arguments]: Too many positional arguments to bound method `method`: expected 2, got 3
+  --> src/main.py:14:17
+   |
+12 | h(1, 2, 3)
+13 |
+14 | Foo().method(1, 2)  # error: [too-many-positional-arguments]
+   |                 ^
+   |
+info: Method signature here
+ --> src/module.py:5:9
+  |
+4 | class Foo:
+5 |     def method(self, a): ...
+  |         ^^^^^^^^^^^^^^^
+  |
+info: rule `too-many-positional-arguments` is enabled by default
+
+```

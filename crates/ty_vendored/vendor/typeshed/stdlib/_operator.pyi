@@ -37,6 +37,7 @@ class _SupportsDunderGT(Protocol):
 class _SupportsDunderLE(Protocol):
     def __le__(self, other: Any, /) -> Any: ...
 
+@type_check_only
 class _SupportsDunderGE(Protocol):
     def __ge__(self, other: Any, /) -> Any: ...
 

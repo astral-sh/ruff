@@ -1,23 +1,19 @@
 use std::io::Write;
 
-use ruff_db::diagnostic::{Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig};
+use ruff_db::diagnostic::{
+    Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, DisplayDiagnostics,
+};
 
-use crate::message::diff::Diff;
 use crate::message::{Emitter, EmitterContext};
 use crate::settings::types::UnsafeFixes;
 
 pub struct TextEmitter {
-    /// Whether to show the diff of a fix, for diagnostics that have a fix.
-    ///
-    /// Note that this is not currently exposed in the CLI (#7352) and is only used in tests.
-    show_fix_diff: bool,
     config: DisplayDiagnosticConfig,
 }
 
 impl Default for TextEmitter {
     fn default() -> Self {
         Self {
-            show_fix_diff: false,
             config: DisplayDiagnosticConfig::default()
                 .format(DiagnosticFormat::Concise)
                 .hide_severity(true)
@@ -35,7 +31,7 @@ impl TextEmitter {
 
     #[must_use]
     pub fn with_show_fix_diff(mut self, show_fix_diff: bool) -> Self {
-        self.show_fix_diff = show_fix_diff;
+        self.config = self.config.show_fix_diff(show_fix_diff);
         self
     }
 
@@ -77,15 +73,11 @@ impl Emitter for TextEmitter {
         diagnostics: &[Diagnostic],
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
-        for message in diagnostics {
-            write!(writer, "{}", message.display(context, &self.config))?;
-
-            if self.show_fix_diff {
-                if let Some(diff) = Diff::from_message(message) {
-                    writeln!(writer, "{diff}")?;
-                }
-            }
-        }
+        write!(
+            writer,
+            "{}",
+            DisplayDiagnostics::new(context, &self.config, diagnostics)
+        )?;
 
         Ok(())
     }

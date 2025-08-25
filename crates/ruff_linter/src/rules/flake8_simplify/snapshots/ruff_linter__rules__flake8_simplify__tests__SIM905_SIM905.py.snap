@@ -1402,6 +1402,8 @@ SIM905 [*] Consider using a list literal instead of `str.split`
 162 | | "swap" quote style
 163 | | "use' ugly triple quotes""".split("\n")
     | |_______________________________________^
+164 |
+165 |   # https://github.com/astral-sh/ruff/issues/19845
     |
 help: Replace with list literal
 
@@ -1414,3 +1416,90 @@ help: Replace with list literal
 162     |-"swap" quote style
 163     |-"use' ugly triple quotes""".split("\n")
     160 |+[r"first", r"'no need' to escape", r'"swap" quote style', r""""use' ugly triple quotes"""]
+164 161 | 
+165 162 | # https://github.com/astral-sh/ruff/issues/19845
+166 163 | print("S\x1cP\x1dL\x1eI\x1fT".split())
+
+SIM905 [*] Consider using a list literal instead of `str.split`
+   --> SIM905.py:166:7
+    |
+165 | # https://github.com/astral-sh/ruff/issues/19845
+166 | print("S\x1cP\x1dL\x1eI\x1fT".split())
+    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+167 | print("\x1c\x1d\x1e\x1f>".split(maxsplit=0))
+168 | print("<\x1c\x1d\x1e\x1f".rsplit(maxsplit=0))
+    |
+help: Replace with list literal
+
+ℹ Safe fix
+163 163 | "use' ugly triple quotes""".split("\n")
+164 164 | 
+165 165 | # https://github.com/astral-sh/ruff/issues/19845
+166     |-print("S\x1cP\x1dL\x1eI\x1fT".split())
+    166 |+print(["S", "P", "L", "I", "T"])
+167 167 | print("\x1c\x1d\x1e\x1f>".split(maxsplit=0))
+168 168 | print("<\x1c\x1d\x1e\x1f".rsplit(maxsplit=0))
+169 169 | 
+
+SIM905 [*] Consider using a list literal instead of `str.split`
+   --> SIM905.py:167:7
+    |
+165 | # https://github.com/astral-sh/ruff/issues/19845
+166 | print("S\x1cP\x1dL\x1eI\x1fT".split())
+167 | print("\x1c\x1d\x1e\x1f>".split(maxsplit=0))
+    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+168 | print("<\x1c\x1d\x1e\x1f".rsplit(maxsplit=0))
+    |
+help: Replace with list literal
+
+ℹ Safe fix
+164 164 | 
+165 165 | # https://github.com/astral-sh/ruff/issues/19845
+166 166 | print("S\x1cP\x1dL\x1eI\x1fT".split())
+167     |-print("\x1c\x1d\x1e\x1f>".split(maxsplit=0))
+    167 |+print([">"])
+168 168 | print("<\x1c\x1d\x1e\x1f".rsplit(maxsplit=0))
+169 169 | 
+170 170 | # leading/trailing whitespace should not count towards maxsplit
+
+SIM905 [*] Consider using a list literal instead of `str.split`
+   --> SIM905.py:168:7
+    |
+166 | print("S\x1cP\x1dL\x1eI\x1fT".split())
+167 | print("\x1c\x1d\x1e\x1f>".split(maxsplit=0))
+168 | print("<\x1c\x1d\x1e\x1f".rsplit(maxsplit=0))
+    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+169 |
+170 | # leading/trailing whitespace should not count towards maxsplit
+    |
+help: Replace with list literal
+
+ℹ Safe fix
+165 165 | # https://github.com/astral-sh/ruff/issues/19845
+166 166 | print("S\x1cP\x1dL\x1eI\x1fT".split())
+167 167 | print("\x1c\x1d\x1e\x1f>".split(maxsplit=0))
+168     |-print("<\x1c\x1d\x1e\x1f".rsplit(maxsplit=0))
+    168 |+print(["<"])
+169 169 | 
+170 170 | # leading/trailing whitespace should not count towards maxsplit
+171 171 | " a b c d ".split(maxsplit=2)  # ["a", "b", "c d "]
+
+SIM905 Consider using a list literal instead of `str.split`
+   --> SIM905.py:171:1
+    |
+170 | # leading/trailing whitespace should not count towards maxsplit
+171 | " a b c d ".split(maxsplit=2)  # ["a", "b", "c d "]
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+172 | " a b c d ".rsplit(maxsplit=2)  # [" a b", "c", "d"]
+    |
+help: Replace with list literal
+
+SIM905 Consider using a list literal instead of `str.split`
+   --> SIM905.py:172:1
+    |
+170 | # leading/trailing whitespace should not count towards maxsplit
+171 | " a b c d ".split(maxsplit=2)  # ["a", "b", "c d "]
+172 | " a b c d ".rsplit(maxsplit=2)  # [" a b", "c", "d"]
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: Replace with list literal

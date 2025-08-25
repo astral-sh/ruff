@@ -264,7 +264,12 @@ impl<'a> ResolvedDiagnostic<'a> {
             .annotations
             .iter()
             .filter_map(|ann| {
-                let path = ann.span.file.path(resolver);
+                let path = ann
+                    .span
+                    .file
+                    .relative_path(resolver)
+                    .to_str()
+                    .unwrap_or_else(|| ann.span.file.path(resolver));
                 let diagnostic_source = ann.span.file.diagnostic_source(resolver);
                 ResolvedAnnotation::new(path, &diagnostic_source, ann, resolver)
             })
@@ -710,7 +715,11 @@ impl<'r> RenderableAnnotation<'r> {
     /// lifetime parameter here refers to the lifetime of the resolver that
     /// created the given `ResolvedAnnotation`.
     fn new(snippet_start: TextSize, ann: &'_ ResolvedAnnotation<'r>) -> RenderableAnnotation<'r> {
-        let range = ann.range - snippet_start;
+        // This should only ever saturate if a BOM is present _and_ the annotation range points
+        // before the BOM (i.e. at offset 0). In Ruff this typically results from the use of
+        // `TextRange::default()` for a diagnostic range instead of a range relative to file
+        // contents.
+        let range = ann.range.checked_sub(snippet_start).unwrap_or(ann.range);
         RenderableAnnotation {
             range,
             message: ann.message,
@@ -2610,6 +2619,13 @@ watermelon
         pub(super) fn show_fix_status(&mut self, yes: bool) {
             let mut config = std::mem::take(&mut self.config);
             config = config.show_fix_status(yes);
+            self.config = config;
+        }
+
+        /// Show a diff for the fix when rendering.
+        pub(super) fn show_fix_diff(&mut self, yes: bool) {
+            let mut config = std::mem::take(&mut self.config);
+            config = config.show_fix_diff(yes);
             self.config = config;
         }
 

@@ -2,7 +2,7 @@ import _tkinter
 import itertools
 import sys
 import tkinter
-from typing import Any, ClassVar, Final, Literal, TypedDict, overload
+from typing import Any, ClassVar, Final, Literal, TypedDict, overload, type_check_only
 from typing_extensions import TypeAlias, Unpack
 
 __all__ = ["NORMAL", "ROMAN", "BOLD", "ITALIC", "nametofont", "Font", "families", "names"]
@@ -23,6 +23,7 @@ _FontDescription: TypeAlias = (
     | _tkinter.Tcl_Obj  # A font object constructed in Tcl
 )
 
+@type_check_only
 class _FontDict(TypedDict):
     family: str
     size: int
@@ -31,6 +32,7 @@ class _FontDict(TypedDict):
     underline: bool
     overstrike: bool
 
+@type_check_only
 class _MetricsDict(TypedDict):
     ascent: int
     descent: int
