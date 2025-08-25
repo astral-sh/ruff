@@ -17,6 +17,7 @@ use crate::db::Db;
 use crate::dunder_all::dunder_all_names;
 use crate::place::{Boundness, Place};
 use crate::types::call::arguments::{Expansion, is_expandable_type};
+use crate::types::constraints::{ConstraintSet, Constraints};
 use crate::types::diagnostic::{
     CALL_NON_CALLABLE, CONFLICTING_ARGUMENT_FORMS, INVALID_ARGUMENT_TYPE, MISSING_ARGUMENT,
     NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED, TOO_MANY_POSITIONAL_ARGUMENTS,
@@ -2198,7 +2199,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     argument_type.apply_specialization(self.db, inherited_specialization);
                 expected_ty = expected_ty.apply_specialization(self.db, inherited_specialization);
             }
-            if !argument_type.is_assignable_to(self.db, expected_ty) {
+            if argument_type
+                .when_assignable_to::<ConstraintSet>(self.db, expected_ty)
+                .is_never_satisfied(self.db)
+            {
                 let positional = matches!(argument, Argument::Positional | Argument::Synthetic)
                     && !parameter.is_variadic();
                 self.errors.push(BindingError::InvalidArgumentType {
