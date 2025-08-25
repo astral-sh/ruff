@@ -21,9 +21,6 @@ bitflags! {
     pub struct TypedDictParams: u8 {
         /// Whether keys are required by default (`total=True`)
         const TOTAL = 1 << 0;
-        // https://peps.python.org/pep-0728/
-        // const EXTRA_ITEMS = 1 << 1;
-        // const CLOSED = 1 << 2;
     }
 }
 
