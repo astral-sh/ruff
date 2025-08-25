@@ -461,7 +461,7 @@ impl<'db> ConstraintClause<'db> {
 ///   at all, and so we don't need a constraint in the corresponding constraint clause. A negative
 ///   constraint `not(Never ≤: T ≤: object)` means that there is no concrete type the typevar can
 ///   specialize to.)
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct AtomicConstraint<'db> {
     sign: ConstraintSign,
     typevar: BoundTypeVarInstance<'db>,
@@ -531,23 +531,7 @@ impl<'db> AtomicConstraint<'db> {
     /// `self` and `other` is `self`.
     fn subsumes(self, db: &'db dyn Db, other: Self) -> bool {
         debug_assert!(self.typevar == other.typevar);
-        match (self.sign, other.sign) {
-            (ConstraintSign::Positive, ConstraintSign::Positive) => {
-                other.lower.is_assignable_to(db, self.lower)
-                    && self.upper.is_assignable_to(db, other.upper)
-            }
-
-            (ConstraintSign::Negative, ConstraintSign::Negative) => {
-                self.lower.is_assignable_to(db, other.lower)
-                    && other.upper.is_assignable_to(db, self.upper)
-            }
-
-            (ConstraintSign::Positive, ConstraintSign::Negative) => {
-                self.upper.is_assignable_to(db, other.lower)
-            }
-
-            (ConstraintSign::Negative, ConstraintSign::Positive) => false,
-        }
+        self.intersect(db, other) == IntersectionResult::One(self)
     }
 
     /// Returns the intersection of this atomic constraint and another. Because constraint bounds
@@ -693,14 +677,14 @@ impl<'db> AtomicConstraint<'db> {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum Satisfiable<T> {
     Never,
     Always,
     Constrained(T),
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum IntersectionResult<T> {
     Never,
     Always,
