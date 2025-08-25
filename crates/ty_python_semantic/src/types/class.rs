@@ -2522,7 +2522,7 @@ impl<'db> ClassLiteral<'db> {
                         } else {
                             // No explicit qualifier - use class default (`total` parameter)
                             typed_dict_params
-                                .expect("TypedDictParams should be computed")
+                                .expect("TypedDictParams should be available for CodeGeneratorKind::TypedDict")
                                 .contains(TypedDictParams::TOTAL)
                         };
                         FieldKind::TypedDict { is_required }
