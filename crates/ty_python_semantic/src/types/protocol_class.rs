@@ -17,8 +17,9 @@ use crate::{
     semantic_index::{definition::Definition, use_def_map},
     types::{
         BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, HasRelationToVisitor,
-        IsDisjointVisitor, KnownFunction, NormalizedVisitor, PropertyInstanceType, Signature, Type,
-        TypeMapping, TypeQualifiers, TypeRelation, VarianceInferable,
+        IsDisjointVisitor, KnownFunction, MaterializationType, NormalizedVisitor,
+        PropertyInstanceType, Signature, Type, TypeMapping, TypeQualifiers, TypeRelation,
+        VarianceInferable,
         constraints::{Constraints, IteratorConstraintsExtension},
         signatures::{Parameter, Parameters},
     },
@@ -243,12 +244,16 @@ impl<'db> ProtocolInterface<'db> {
         )
     }
 
-    pub(super) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+    pub(super) fn materialize(
+        self,
+        db: &'db dyn Db,
+        materialization_type: MaterializationType,
+    ) -> Self {
         Self::new(
             db,
             self.inner(db)
                 .iter()
-                .map(|(name, data)| (name.clone(), data.materialize(db, variance)))
+                .map(|(name, data)| (name.clone(), data.materialize(db, materialization_type)))
                 .collect::<BTreeMap<_, _>>(),
         )
     }
@@ -353,9 +358,9 @@ impl<'db> ProtocolMemberData<'db> {
             .find_legacy_typevars(db, binding_context, typevars);
     }
 
-    fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+    fn materialize(&self, db: &'db dyn Db, materialization_type: MaterializationType) -> Self {
         Self {
-            kind: self.kind.materialize(db, variance),
+            kind: self.kind.materialize(db, materialization_type),
             qualifiers: self.qualifiers,
         }
     }
@@ -458,16 +463,16 @@ impl<'db> ProtocolMemberKind<'db> {
         }
     }
 
-    fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+    fn materialize(self, db: &'db dyn Db, materialization_type: MaterializationType) -> Self {
         match self {
             ProtocolMemberKind::Method(callable) => {
-                ProtocolMemberKind::Method(callable.materialize(db, variance))
+                ProtocolMemberKind::Method(callable.materialize(db, materialization_type))
             }
             ProtocolMemberKind::Property(property) => {
-                ProtocolMemberKind::Property(property.materialize(db, variance))
+                ProtocolMemberKind::Property(property.materialize(db, materialization_type))
             }
             ProtocolMemberKind::Other(ty) => {
-                ProtocolMemberKind::Other(ty.materialize(db, variance))
+                ProtocolMemberKind::Other(ty.materialize(db, materialization_type))
             }
         }
     }

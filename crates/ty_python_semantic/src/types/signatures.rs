@@ -21,7 +21,8 @@ use crate::types::constraints::{Constraints, IteratorConstraintsExtension};
 use crate::types::generics::{GenericContext, walk_generic_context};
 use crate::types::{
     BindingContext, BoundTypeVarInstance, HasRelationToVisitor, IsEquivalentVisitor, KnownClass,
-    NormalizedVisitor, TypeMapping, TypeRelation, VarianceInferable, todo_type,
+    MaterializationType, NormalizedVisitor, TypeMapping, TypeRelation, VarianceInferable,
+    todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -57,11 +58,15 @@ impl<'db> CallableSignature<'db> {
         self.overloads.iter()
     }
 
-    pub(super) fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+    pub(super) fn materialize(
+        &self,
+        db: &'db dyn Db,
+        materialization_type: MaterializationType,
+    ) -> Self {
         Self::from_overloads(
             self.overloads
                 .iter()
-                .map(|signature| signature.materialize(db, variance)),
+                .map(|signature| signature.materialize(db, materialization_type)),
         )
     }
 
@@ -405,17 +410,17 @@ impl<'db> Signature<'db> {
         self
     }
 
-    fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+    fn materialize(&self, db: &'db dyn Db, materialization_type: MaterializationType) -> Self {
         Self {
             generic_context: self.generic_context,
             inherited_generic_context: self.inherited_generic_context,
             definition: self.definition,
             // Parameters are at contravariant position, so the variance is flipped.
-            parameters: self.parameters.materialize(db, variance.flip()),
+            parameters: self.parameters.materialize(db, materialization_type.flip()),
             return_ty: Some(
                 self.return_ty
                     .unwrap_or(Type::unknown())
-                    .materialize(db, variance),
+                    .materialize(db, materialization_type),
             ),
         }
     }
@@ -1063,13 +1068,13 @@ impl<'db> Parameters<'db> {
         }
     }
 
-    fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+    fn materialize(&self, db: &'db dyn Db, materialization_type: MaterializationType) -> Self {
         if self.is_gradual {
             Parameters::object(db)
         } else {
             Parameters::new(
                 self.iter()
-                    .map(|parameter| parameter.materialize(db, variance)),
+                    .map(|parameter| parameter.materialize(db, materialization_type)),
             )
         }
     }
@@ -1395,12 +1400,12 @@ impl<'db> Parameter<'db> {
         self
     }
 
-    fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+    fn materialize(&self, db: &'db dyn Db, materialization_type: MaterializationType) -> Self {
         Self {
             annotated_type: Some(
                 self.annotated_type
                     .unwrap_or(Type::unknown())
-                    .materialize(db, variance),
+                    .materialize(db, materialization_type),
             ),
             kind: self.kind.clone(),
             form: self.form,
