@@ -169,7 +169,7 @@ bitflags! {
 #[derive(Debug, is_macro::Is)]
 pub enum ScopeKind<'a> {
     Class(&'a ast::StmtClassDef),
-    ClassCell,
+    DunderClassCell,
     Function(&'a ast::StmtFunctionDef),
     Generator {
         kind: GeneratorKind,

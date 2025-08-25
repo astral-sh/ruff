@@ -436,7 +436,7 @@ impl<'a> SemanticModel<'a> {
             // `__class__` closure created around methods and enclosing the type scope.
             class_variables_visible = matches!(
                 (scope.kind, index),
-                (ScopeKind::Type, 0) | (ScopeKind::ClassCell, 1)
+                (ScopeKind::Type, 0) | (ScopeKind::DunderClassCell, 1)
             );
 
             if let Some(binding_id) = scope.get(name.id.as_str()) {
@@ -1346,7 +1346,7 @@ impl<'a> SemanticModel<'a> {
     pub fn first_non_type_parent_scope(&self, scope: &Scope) -> Option<&Scope<'a>> {
         let mut current_scope = scope;
         while let Some(parent) = self.parent_scope(current_scope) {
-            if matches!(parent.kind, ScopeKind::Type | ScopeKind::ClassCell) {
+            if matches!(parent.kind, ScopeKind::Type | ScopeKind::DunderClassCell) {
                 current_scope = parent;
             } else {
                 return Some(parent);
@@ -1362,7 +1362,7 @@ impl<'a> SemanticModel<'a> {
         while let Some(parent_id) = self.parent_scope_id(current_scope_id) {
             if matches!(
                 self.scopes[parent_id].kind,
-                ScopeKind::Type | ScopeKind::ClassCell
+                ScopeKind::Type | ScopeKind::DunderClassCell
             ) {
                 current_scope_id = parent_id;
             } else {

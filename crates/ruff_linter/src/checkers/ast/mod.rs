@@ -706,7 +706,7 @@ impl SemanticSyntaxContext for Checker<'_> {
                 ScopeKind::Generator { .. }
                 | ScopeKind::Module
                 | ScopeKind::Type
-                | ScopeKind::ClassCell => {}
+                | ScopeKind::DunderClassCell => {}
             }
         }
         false
@@ -720,7 +720,7 @@ impl SemanticSyntaxContext for Checker<'_> {
                 ScopeKind::Generator { .. }
                 | ScopeKind::Module
                 | ScopeKind::Type
-                | ScopeKind::ClassCell => {}
+                | ScopeKind::DunderClassCell => {}
             }
         }
         false
@@ -731,7 +731,7 @@ impl SemanticSyntaxContext for Checker<'_> {
             match scope.kind {
                 ScopeKind::Class(_) | ScopeKind::Generator { .. } => return false,
                 ScopeKind::Function(_) | ScopeKind::Lambda(_) => return true,
-                ScopeKind::Module | ScopeKind::Type | ScopeKind::ClassCell => {}
+                ScopeKind::Module | ScopeKind::Type | ScopeKind::DunderClassCell => {}
             }
         }
         false
@@ -1138,7 +1138,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 //
                 // See <https://docs.python.org/3/reference/datamodel.html#creating-the-class-object>.
                 let added_dunder_class_scope = if self.semantic.current_scope().kind.is_class() {
-                    self.semantic.push_scope(ScopeKind::ClassCell);
+                    self.semantic.push_scope(ScopeKind::DunderClassCell);
                     let binding_id = self.semantic.push_binding(
                         TextRange::default(),
                         BindingKind::ClassCell,
