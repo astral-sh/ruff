@@ -2379,17 +2379,25 @@ impl<'db> ClassLiteral<'db> {
             .collect()
     }
 
-    /// Returns a list of all annotated attributes defined in the body of this class. This is similar
-    /// to the `__annotations__` attribute at runtime, but also contains default values.
+    /// Returns a map of all annotated attributes defined in the body of this class.
+    /// This extends the `__annotations__` attribute at runtime by also including default values
+    /// and computed field properties.
     ///
     /// For a class body like
     /// ```py
-    /// @dataclass
+    /// @dataclass(kw_only=True)
     /// class C:
     ///     x: int
-    ///     y: str = "a"
+    ///     y: str = "hello"
+    ///     z: float = field(kw_only=False, default=1.0)
     /// ```
-    /// we return a map `{"x": (int, None), "y": (str, Some(Literal["a"]))}`.
+    /// we return a map `{"x": Field, "y": Field, "z": Field}` where each `Field` contains
+    /// the annotated type, default value (if any), and field properties.
+    ///
+    /// **Important**: The returned `Field` objects represent our full understanding of the fields,
+    /// including properties inherited from class-level dataclass parameters (like `kw_only=True`)
+    /// and dataclass-transform parameters (like `kw_only_default=True`). They do not represent
+    /// only what is explicitly specified in each field definition.
     pub(super) fn own_fields(
         self,
         db: &'db dyn Db,
@@ -2441,7 +2449,6 @@ impl<'db> ClassLiteral<'db> {
                 let mut init = true;
                 let mut kw_only = None;
                 if let Some(Type::KnownInstance(KnownInstanceType::Field(field))) = default_ty {
-                    default_ty = Some(field.default_type(db));
                     if self
                         .dataclass_params(db)
                         .map(|params| params.contains(DataclassParams::NO_FIELD_SPECIFIERS))
@@ -2450,7 +2457,9 @@ impl<'db> ClassLiteral<'db> {
                         // This happens when constructing a `dataclass` with a `dataclass_transform`
                         // without defining the `field_specifiers`, meaning it should ignore
                         // `dataclasses.field` and `dataclasses.Field`.
+                        default_ty = Some(Type::unknown());
                     } else {
+                        default_ty = field.default_type(db);
                         init = field.init(db);
                         kw_only = field.kw_only(db);
                     }
@@ -2469,9 +2478,24 @@ impl<'db> ClassLiteral<'db> {
                     kw_only_sentinel_field_seen = true;
                 }
 
-                // If no explicit kw_only setting and we've seen KW_ONLY sentinel, mark as keyword-only
-                if field.kw_only.is_none() && kw_only_sentinel_field_seen {
-                    field.kw_only = Some(true);
+                // If no explicit field-level "kw_only" setting,
+                // we check for KW_ONLY sentinel or class-level settings
+                if field.kw_only.is_none() {
+                    if kw_only_sentinel_field_seen {
+                        // KW_ONLY sentinel makes subsequent fields keyword-only
+                        field.kw_only = Some(true);
+                    } else if self
+                        .dataclass_params(db)
+                        .is_some_and(|params| params.contains(DataclassParams::KW_ONLY))
+                        || self.try_metaclass(db).is_ok_and(|(_, transformer_params)| {
+                            transformer_params.is_some_and(|params| {
+                                params.contains(DataclassTransformerParams::KW_ONLY_DEFAULT)
+                            })
+                        })
+                    {
+                        // `@dataclass(kw_only=True)` or `@dataclass_transform(kw_only_default=True)`
+                        field.kw_only = Some(true);
+                    }
                 }
 
                 attributes.insert(symbol.name().clone(), field);

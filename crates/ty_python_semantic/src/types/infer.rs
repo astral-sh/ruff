@@ -93,9 +93,9 @@ use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorK
 use crate::types::class::{CodeGeneratorKind, MetaclassErrorKind};
 use crate::types::diagnostic::{
     self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS,
-    CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, DUPLICATE_KW_ONLY, INCONSISTENT_MRO,
-    INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE,
-    INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_KEY, INVALID_NAMED_TUPLE,
+    CYCLIC_CLASS_DEFINITION, DATACLASS_FIELD_ORDER, DIVISION_BY_ZERO, DUPLICATE_KW_ONLY,
+    INCONSISTENT_MRO, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS,
+    INVALID_BASE, INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_KEY, INVALID_NAMED_TUPLE,
     INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL,
     INVALID_TYPE_VARIABLE_CONSTRAINTS, IncompatibleBases, POSSIBLY_UNBOUND_IMPLICIT_CALL,
     POSSIBLY_UNBOUND_IMPORT, TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE,
@@ -1400,19 +1400,32 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            // (6) Check that a dataclass does not have more than one `KW_ONLY`.
+            // (6) Check that a dataclass does not have more than one `KW_ONLY`
+            // and that required fields are defined before default fields.
             if let Some(field_policy @ CodeGeneratorKind::DataclassLike) =
                 CodeGeneratorKind::from_class(self.db(), class)
             {
                 let specialization = None;
 
-                let kw_only_sentinel_fields: Vec<_> = class
-                    .fields(self.db(), specialization, field_policy)
-                    .into_iter()
-                    .filter_map(|(name, field)| {
-                        field.is_kw_only_sentinel(self.db()).then_some(name)
-                    })
-                    .collect();
+                let mut kw_only_sentinel_fields = vec![];
+                let mut required_after_default_field_names = vec![];
+                let mut has_seen_default_field = false;
+
+                for (name, field) in class.fields(self.db(), specialization, field_policy) {
+                    if field.is_kw_only_sentinel(self.db()) {
+                        kw_only_sentinel_fields.push(name);
+                        continue;
+                    }
+                    if !field.init || field.kw_only == Some(true) {
+                        continue;
+                    }
+
+                    if field.default_ty.is_some() {
+                        has_seen_default_field = true;
+                    } else if has_seen_default_field {
+                        required_after_default_field_names.push(name);
+                    }
+                }
 
                 if kw_only_sentinel_fields.len() > 1 {
                     // TODO: The fields should be displayed in a subdiagnostic.
@@ -1431,6 +1444,38 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 .map(|name| format!("`{name}`"))
                                 .join(", ")
                         ));
+                    }
+                }
+
+                if !required_after_default_field_names.is_empty() {
+                    // Report field ordering violations
+                    let body_scope = class.body_scope(self.db()).file_scope_id(self.db());
+                    let use_def_map = self.index.use_def_map(body_scope);
+                    let place_table = self.index.place_table(body_scope);
+
+                    for name in required_after_default_field_names {
+                        let Some(symbol_id) = place_table.symbol_id(name.as_str()) else {
+                            continue;
+                        };
+                        if let Some(ann_assign) = use_def_map
+                            .end_of_scope_symbol_declarations(symbol_id)
+                            .find_map(|decl_with_constraints| {
+                                decl_with_constraints
+                                    .declaration
+                                    .definition()?
+                                    .kind(self.db())
+                                    .as_annotated_assignment()
+                            })
+                        {
+                            if let Some(builder) = self.context.report_lint(
+                                &DATACLASS_FIELD_ORDER,
+                                ann_assign.target(self.module()),
+                            ) {
+                                builder.into_diagnostic(format_args!(
+                                "Required field `{name}` cannot be defined after fields with default values",
+                            ));
+                            }
+                        }
                     }
                 }
             }

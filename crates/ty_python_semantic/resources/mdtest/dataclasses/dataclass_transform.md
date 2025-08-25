@@ -110,6 +110,35 @@ CustomerModel(id=1, name="Test")
 CustomerModel()
 ```
 
+### Metaclass with `kw_only_default=True`
+
+```py
+from typing import dataclass_transform
+
+@dataclass_transform(kw_only_default=True)
+class ModelMeta(type):
+    pass
+
+class WithMeta(metaclass=ModelMeta):
+    x: int
+
+# error: [missing-argument]
+# error: [too-many-positional-arguments]
+WithMeta(3)
+
+@dataclass_transform(kw_only_default=True)
+def mydc():
+    return lambda func: func
+
+@mydc
+class WithDeco:
+    x: int
+
+# error: [missing-argument]
+# error: [too-many-positional-arguments]
+WithDeco(3)
+```
+
 ### Decorating a base class
 
 ```py
@@ -230,6 +259,28 @@ class CustomerModel:
 # error: [too-many-positional-arguments]
 c = CustomerModel(1, "Harry")
 ```
+
+When `kw_only_default=True` is set in the `dataclass_transform` decorator, all fields become
+keyword-only by default and should not participate in positional field ordering checks:
+
+```py
+from typing import dataclass_transform
+
+@dataclass_transform(kw_only_default=True)
+def create_model(): ...
+@create_model()
+class ModelGood:
+    x: int = 1
+    y: str
+
+@create_model()
+class ModelAlsoGood:
+    x: int
+    y: str = "default"
+    z: float
+```
+
+Overwrite with field specifiers are not yet supported.
 
 ### `field_specifiers`
 
