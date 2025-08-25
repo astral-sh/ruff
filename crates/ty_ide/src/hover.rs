@@ -468,6 +468,123 @@ mod tests {
         assert_snapshot!(test.hover(), @r"
         <class 'MyClass'>
         ---------------------------------------------
+        initializes MyClass (perfectly)
+
+        ---------------------------------------------
+        ```python
+        <class 'MyClass'>
+        ```
+        ---
+        ```text
+        initializes MyClass (perfectly)
+
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:24:5
+           |
+        22 |         return 0
+        23 |
+        24 | x = MyClass(0)
+           |     ^^^^^-^
+           |     |    |
+           |     |    Cursor offset
+           |     source
+           |
+        ");
+    }
+
+    #[test]
+    fn hover_class_init_attr() {
+        let test = CursorTest::builder()
+            .source(
+                "mymod.py",
+                r#"
+        class MyClass:
+            '''
+                This is such a great class!!
+
+                    Don't you know?
+                
+                Everyone loves my class!!
+
+            '''
+            def __init__(self, val):
+                """initializes MyClass (perfectly)"""
+                self.val = val
+        "#,
+            )
+            .source(
+                "main.py",
+                r#"
+        import mymod
+
+        x = mymod.MyCla<CURSOR>ss(0)
+        "#,
+            )
+            .build();
+
+        assert_snapshot!(test.hover(), @r"
+        <class 'MyClass'>
+        ---------------------------------------------
+        initializes MyClass (perfectly)
+
+        ---------------------------------------------
+        ```python
+        <class 'MyClass'>
+        ```
+        ---
+        ```text
+        initializes MyClass (perfectly)
+
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:4:11
+          |
+        2 | import mymod
+        3 |
+        4 | x = mymod.MyClass(0)
+          |           ^^^^^-^
+          |           |    |
+          |           |    Cursor offset
+          |           source
+          |
+        ");
+    }
+
+    #[test]
+    fn hover_class_init_no_init_docs() {
+        let test = cursor_test(
+            r#"
+        class MyClass:
+            '''
+                This is such a great class!!
+
+                    Don't you know?
+                
+                Everyone loves my class!!
+
+            '''
+            def __init__(self, val):
+                self.val = val
+            
+            def my_method(self, a, b):
+                '''This is such a great func!!
+
+                Args:
+                    a: first for a reason
+                    b: coming for `a`'s title
+                '''
+                return 0
+
+        x = MyCla<CURSOR>ss(0)
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        <class 'MyClass'>
+        ---------------------------------------------
         This is such a great class!!
 
             Don't you know?
@@ -489,11 +606,11 @@ mod tests {
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
-          --> main.py:24:5
+          --> main.py:23:5
            |
-        22 |         return 0
-        23 |
-        24 | x = MyClass(0)
+        21 |         return 0
+        22 |
+        23 | x = MyClass(0)
            |     ^^^^^-^
            |     |    |
            |     |    Cursor offset
@@ -791,7 +908,223 @@ mod tests {
     }
 
     #[test]
-    fn hover_overload() {
+    fn hover_overload_type_disambiguated1() {
+        let test = cursor_test(
+            r#"
+            from typing import overload
+
+            @overload
+            def ab(a: int):
+                """The first overload"""
+
+            @overload
+            def ab(a: str):
+                """The second overload"""
+
+            def ab(a): ...
+
+            a<CURSOR>b(1)
+            "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        (a: int) -> Unknown
+        (a: str) -> Unknown
+        ---------------------------------------------
+        The first overload
+
+        ---------------------------------------------
+        ```python
+        (a: int) -> Unknown
+        (a: str) -> Unknown
+        ```
+        ---
+        ```text
+        The first overload
+
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:14:1
+           |
+        12 | def ab(a): ...
+        13 |
+        14 | ab(1)
+           | ^-
+           | ||
+           | |Cursor offset
+           | source
+           |
+        ");
+    }
+
+    #[test]
+    fn hover_overload_type_disambiguated2() {
+        let test = cursor_test(
+            r#"
+            from typing import overload
+
+            @overload
+            def ab(a: int):
+                """The first overload"""
+
+            @overload
+            def ab(a: str):
+                """The second overload"""
+
+            def ab(a): ...
+
+            a<CURSOR>b("hello")
+            "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        (a: int) -> Unknown
+        (a: str) -> Unknown
+        ---------------------------------------------
+        The first overload
+
+        ---------------------------------------------
+        ```python
+        (a: int) -> Unknown
+        (a: str) -> Unknown
+        ```
+        ---
+        ```text
+        The first overload
+
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:14:1
+           |
+        12 | def ab(a): ...
+        13 |
+        14 | ab("hello")
+           | ^-
+           | ||
+           | |Cursor offset
+           | source
+           |
+        "#);
+    }
+
+    #[test]
+    fn hover_overload_arity_disambiguated1() {
+        let test = cursor_test(
+            r#"
+            from typing import overload
+
+            @overload
+            def ab(a: int, b: int):
+                """The first overload"""
+
+            @overload
+            def ab(a: int):
+                """The second overload"""
+
+            def ab(a, b = None): ...
+
+            a<CURSOR>b(1, 2)
+            "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        (
+            a: int,
+            b: int
+        ) -> Unknown
+        (a: int) -> Unknown
+        ---------------------------------------------
+        The first overload
+
+        ---------------------------------------------
+        ```python
+        (
+            a: int,
+            b: int
+        ) -> Unknown
+        (a: int) -> Unknown
+        ```
+        ---
+        ```text
+        The first overload
+
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:14:1
+           |
+        12 | def ab(a, b = None): ...
+        13 |
+        14 | ab(1, 2)
+           | ^-
+           | ||
+           | |Cursor offset
+           | source
+           |
+        ");
+    }
+
+    #[test]
+    fn hover_overload_arity_disambiguated2() {
+        let test = cursor_test(
+            r#"
+            from typing import overload
+
+            @overload
+            def ab(a: int, b: int):
+                """The first overload"""
+
+            @overload
+            def ab(a: int):
+                """The second overload"""
+
+            def ab(a, b = None): ...
+
+            a<CURSOR>b(1)
+            "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        (
+            a: int,
+            b: int
+        ) -> Unknown
+        (a: int) -> Unknown
+        ---------------------------------------------
+        The first overload
+
+        ---------------------------------------------
+        ```python
+        (
+            a: int,
+            b: int
+        ) -> Unknown
+        (a: int) -> Unknown
+        ```
+        ---
+        ```text
+        The first overload
+
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:14:1
+           |
+        12 | def ab(a, b = None): ...
+        13 |
+        14 | ab(1)
+           | ^-
+           | ||
+           | |Cursor offset
+           | source
+           |
+        ");
+    }
+
+    #[test]
+    fn hover_overload_ambiguous() {
         let test = cursor_test(
             r#"
             from typing import overload
@@ -858,7 +1191,7 @@ mod tests {
     }
 
     #[test]
-    fn hover_overload_compact() {
+    fn hover_overload_ambiguous_compact() {
         let test = cursor_test(
             r#"
             from typing import overload

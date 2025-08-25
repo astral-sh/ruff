@@ -126,6 +126,23 @@ mod tests {
         6 | instance = MyClass()
           |            ^^^^^^^
           |
+
+        info[goto-declaration]: Declaration
+         --> main.py:3:9
+          |
+        2 | class MyClass:
+        3 |     def __init__(self):
+          |         ^^^^^^^^
+        4 |         pass
+          |
+        info: Source
+         --> main.py:6:12
+          |
+        4 |         pass
+        5 |
+        6 | instance = MyClass()
+          |            ^^^^^^^
+          |
         ");
     }
 
