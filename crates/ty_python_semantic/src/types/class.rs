@@ -33,8 +33,8 @@ use crate::types::{
     DataclassParams, DeprecatedInstance, HasRelationToVisitor, IsEquivalentVisitor,
     KnownInstanceType, ManualPEP695TypeAliasType, MaterializationType, NormalizedVisitor,
     PropertyInstanceType, StringLiteralType, TypeAliasType, TypeMapping, TypeRelation,
-    TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, TypedDictParams, VarianceInferable, declaration_type,
-    infer_definition_types, todo_type,
+    TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, TypedDictParams, VarianceInferable,
+    declaration_type, infer_definition_types, todo_type,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet, Program,
