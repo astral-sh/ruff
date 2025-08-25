@@ -11726,6 +11726,14 @@ mod tests {
     fn unbound_symbol_no_reachability_constraint_check() {
         let mut db = setup_db();
 
+        // First, type-check a random other file so that we cache a result for the `module_type_symbols`
+        // query (which often encounters cycles due to `types.pyi` importing `typing_extensions` and
+        // `typing_extensions.pyi` importing `types`). Clear the events afterwards so that unrelated
+        // cycles from that query don't interfere with our test.
+        db.write_dedented("src/wherever.py", "print(x)").unwrap();
+        assert_file_diagnostics(&db, "src/wherever.py", &["Name `x` used when not defined"]);
+        db.clear_salsa_events();
+
         // If the bug we are testing for is not fixed, what happens is that when inferring the
         // `flag: bool = True` definitions, we look up `bool` as a deferred name (thus from end of
         // scope), and because of the early return its "unbound" binding has a reachability

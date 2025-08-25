@@ -292,6 +292,7 @@ class Path(PurePath):
         __slots__ = ()
     else:
         __slots__ = ("_accessor",)
+
     if sys.version_info >= (3, 12):
         def __new__(cls, *args: StrPath, **kwargs: Unused) -> Self: ...  # pyright: ignore[reportInconsistentConstructor]
     else:

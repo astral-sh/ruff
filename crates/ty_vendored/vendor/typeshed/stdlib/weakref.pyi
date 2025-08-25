@@ -11,7 +11,7 @@ from _weakrefset import WeakSet as WeakSet
 from collections.abc import Callable, Iterable, Iterator, Mapping, MutableMapping
 from types import GenericAlias
 from typing import Any, ClassVar, Generic, TypeVar, final, overload
-from typing_extensions import ParamSpec, Self
+from typing_extensions import ParamSpec, Self, disjoint_base
 
 __all__ = [
     "ref",
@@ -59,6 +59,7 @@ class ProxyType(Generic[_T]):  # "weakproxy"
     def __getattr__(self, attr: str) -> Any: ...
     __hash__: ClassVar[None]  # type: ignore[assignment]
 
+@disjoint_base
 class ReferenceType(Generic[_T]):  # "weakref"
     __callback__: Callable[[Self], Any]
     def __new__(cls, o: _T, callback: Callable[[Self], Any] | None = ..., /) -> Self: ...

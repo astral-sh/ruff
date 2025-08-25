@@ -1,5 +1,6 @@
 """_blake2b provides BLAKE2b for hashlib"""
 
+import sys
 from _typeshed import ReadableBuffer
 from typing import ClassVar, Final, final
 from typing_extensions import Self
@@ -24,24 +25,45 @@ class blake2b:
     block_size: int
     digest_size: int
     name: str
-    def __new__(
-        cls,
-        data: ReadableBuffer = b"",
-        /,
-        *,
-        digest_size: int = 64,
-        key: ReadableBuffer = b"",
-        salt: ReadableBuffer = b"",
-        person: ReadableBuffer = b"",
-        fanout: int = 1,
-        depth: int = 1,
-        leaf_size: int = 0,
-        node_offset: int = 0,
-        node_depth: int = 0,
-        inner_size: int = 0,
-        last_node: bool = False,
-        usedforsecurity: bool = True,
-    ) -> Self: ...
+    if sys.version_info >= (3, 13):
+        def __new__(
+            cls,
+            data: ReadableBuffer = b"",
+            *,
+            digest_size: int = 64,
+            key: ReadableBuffer = b"",
+            salt: ReadableBuffer = b"",
+            person: ReadableBuffer = b"",
+            fanout: int = 1,
+            depth: int = 1,
+            leaf_size: int = 0,
+            node_offset: int = 0,
+            node_depth: int = 0,
+            inner_size: int = 0,
+            last_node: bool = False,
+            usedforsecurity: bool = True,
+            string: ReadableBuffer | None = None,
+        ) -> Self: ...
+    else:
+        def __new__(
+            cls,
+            data: ReadableBuffer = b"",
+            /,
+            *,
+            digest_size: int = 64,
+            key: ReadableBuffer = b"",
+            salt: ReadableBuffer = b"",
+            person: ReadableBuffer = b"",
+            fanout: int = 1,
+            depth: int = 1,
+            leaf_size: int = 0,
+            node_offset: int = 0,
+            node_depth: int = 0,
+            inner_size: int = 0,
+            last_node: bool = False,
+            usedforsecurity: bool = True,
+        ) -> Self: ...
+
     def copy(self) -> Self:
         """Return a copy of the hash object."""
 
@@ -65,24 +87,45 @@ class blake2s:
     block_size: int
     digest_size: int
     name: str
-    def __new__(
-        cls,
-        data: ReadableBuffer = b"",
-        /,
-        *,
-        digest_size: int = 32,
-        key: ReadableBuffer = b"",
-        salt: ReadableBuffer = b"",
-        person: ReadableBuffer = b"",
-        fanout: int = 1,
-        depth: int = 1,
-        leaf_size: int = 0,
-        node_offset: int = 0,
-        node_depth: int = 0,
-        inner_size: int = 0,
-        last_node: bool = False,
-        usedforsecurity: bool = True,
-    ) -> Self: ...
+    if sys.version_info >= (3, 13):
+        def __new__(
+            cls,
+            data: ReadableBuffer = b"",
+            *,
+            digest_size: int = 32,
+            key: ReadableBuffer = b"",
+            salt: ReadableBuffer = b"",
+            person: ReadableBuffer = b"",
+            fanout: int = 1,
+            depth: int = 1,
+            leaf_size: int = 0,
+            node_offset: int = 0,
+            node_depth: int = 0,
+            inner_size: int = 0,
+            last_node: bool = False,
+            usedforsecurity: bool = True,
+            string: ReadableBuffer | None = None,
+        ) -> Self: ...
+    else:
+        def __new__(
+            cls,
+            data: ReadableBuffer = b"",
+            /,
+            *,
+            digest_size: int = 32,
+            key: ReadableBuffer = b"",
+            salt: ReadableBuffer = b"",
+            person: ReadableBuffer = b"",
+            fanout: int = 1,
+            depth: int = 1,
+            leaf_size: int = 0,
+            node_offset: int = 0,
+            node_depth: int = 0,
+            inner_size: int = 0,
+            last_node: bool = False,
+            usedforsecurity: bool = True,
+        ) -> Self: ...
+
     def copy(self) -> Self:
         """Return a copy of the hash object."""
 
