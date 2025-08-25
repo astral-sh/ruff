@@ -216,6 +216,9 @@ impl std::fmt::Display for Diff<'_> {
                                 write!(f, "{styled}")?;
                             }
                         }
+                        if change.missing_newline() {
+                            writeln!(f)?;
+                        }
                     }
                 }
             }
