@@ -152,22 +152,28 @@ def f():
     except Exception as _:
         pass
 
-# OK
-class A:
-    def set_class(self, cls):
-        __class__ = cls
 
-# OK
-class A:
-    class B:
-        def set_class(self, cls):
-            __class__ = cls
-# OK
+# OK -- `__class__` in this case is not the special `__class__` cell, it's just
+# a normal class variable, so we don't emit a diagnostic.
 class A:
     __class__ = 1
 
 
-# OK
+# The following three cases should technically be allowed because `__class__`
+# is a nonlocal variable in the method scope. However, `__class__` isn't easily
+# accessible in other methods, so setting it like this is still likely to be an
+# error, and we still emit a diagnostic.
+class A:
+    def set_class(self, cls):
+        __class__ = cls
+
+
+class A:
+    class B:
+        def set_class(self, cls):
+            __class__ = cls
+
+
 class A:
     def foo():
         class B:
