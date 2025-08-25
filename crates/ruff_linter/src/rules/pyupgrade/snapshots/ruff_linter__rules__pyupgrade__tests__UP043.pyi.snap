@@ -1,0 +1,19 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+UP043 [*] Unnecessary default type arguments
+  --> UP043.pyi:27:6
+   |
+25 |         threshold: float | None = 1e-07,
+26 |         seed: int | RandomState | None = None,
+27 | ) -> Generator[list[set[Incomplete]], None, None]: ...
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: Remove default type arguments
+
+ℹ Safe fix
+24 24 |         resolution: float | None = 1,
+25 25 |         threshold: float | None = 1e-07,
+26 26 |         seed: int | RandomState | None = None,
+27    |-) -> Generator[list[set[Incomplete]], None, None]: ...
+   27 |+) -> Generator[list[set[Incomplete]]]: ...
