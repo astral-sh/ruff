@@ -195,6 +195,25 @@ impl<'db> ConstraintSet<'db> {
         Self::Always
     }
 
+    /// Returns a constraint set that constraints a typevar to a particular range of types.
+    pub(crate) fn constrain_typevar(
+        db: &'db dyn Db,
+        typevar: BoundTypeVarInstance<'db>,
+        lower: Type<'db>,
+        upper: Type<'db>,
+    ) -> Self {
+        let lower = lower.bottom_materialization(db);
+        let upper = upper.top_materialization(db);
+        match Constraint::range(db, lower, upper) {
+            Satisfiable::Never => Self::never(),
+            Satisfiable::Always => Self::always(),
+            Satisfiable::Constrained(constraint) => Self::singleton(ConstraintClause::singleton(
+                db,
+                constraint.constrain(db, typevar),
+            )),
+        }
+    }
+
     /// Returns whether this constraint set never holds
     pub(crate) fn is_never_satisfied(&self) -> bool {
         matches!(self, Self::Never)
@@ -249,6 +268,20 @@ impl<'db> ConstraintSet<'db> {
             self.union(db, other());
         }
         self
+    }
+
+    /// Returns a constraint set encoding that this constraint set implies another.
+    ///
+    /// In Boolean logic, `p → q` is usually translated into `¬p ∨ q`. However, we translate it
+    /// into the equivalent `¬p ∨ (p ∧ q)`. This ensures that the constraints under which `q` is
+    /// true are compatible with the assumptions introduced by `p`.
+    pub(crate) fn implies(self, db: &'db dyn Db, other: impl FnOnce() -> Self) -> Self {
+        self.clone().negate(db).or(db, || self.and(db, other))
+    }
+
+    /// Returns a constraint set that contains a single clause.
+    fn singleton(clause: ConstraintClause<'db>) -> Self {
+        Self::Clauses(smallvec![clause])
     }
 
     pub(crate) fn range(
