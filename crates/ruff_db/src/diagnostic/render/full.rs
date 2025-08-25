@@ -2,12 +2,13 @@ use std::borrow::Cow;
 use std::num::NonZeroUsize;
 
 use anstyle::Style;
+use ruff_notebook::NotebookIndex;
 use similar::{ChangeTag, TextDiff};
 
 use ruff_annotate_snippets::Renderer as AnnotateRenderer;
 use ruff_diagnostics::{Applicability, Fix};
 use ruff_source_file::OneIndexed;
-use ruff_text_size::{Ranged, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::diagnostic::render::{FileResolver, Resolved};
 use crate::diagnostic::stylesheet::{DiagnosticStylesheet, fmt_styled};
@@ -81,6 +82,7 @@ impl<'a> FullRenderer<'a> {
 struct Diff<'a> {
     fix: &'a Fix,
     diagnostic_source: DiagnosticSource,
+    notebook_index: Option<NotebookIndex>,
     stylesheet: &'a DiagnosticStylesheet,
 }
 
@@ -90,12 +92,11 @@ impl<'a> Diff<'a> {
         stylesheet: &'a DiagnosticStylesheet,
         resolver: &'a dyn FileResolver,
     ) -> Option<Diff<'a>> {
+        let file = &diagnostic.primary_span_ref()?.file;
         Some(Diff {
             fix: diagnostic.fix()?,
-            diagnostic_source: diagnostic
-                .primary_span_ref()?
-                .file
-                .diagnostic_source(resolver),
+            diagnostic_source: file.diagnostic_source(resolver),
+            notebook_index: resolver.notebook_index(file),
             stylesheet,
         })
     }
@@ -106,19 +107,24 @@ impl std::fmt::Display for Diff<'_> {
         let source_code = self.diagnostic_source.as_source_code();
         let source_text = source_code.text();
 
-        // TODO(dhruvmanila): Add support for Notebook cells once it's user-facing
-        let mut output = String::with_capacity(source_text.len());
-        let mut last_end = TextSize::default();
-
-        for edit in self.fix.edits() {
-            output.push_str(source_code.slice(TextRange::new(last_end, edit.start())));
-            output.push_str(edit.content().unwrap_or_default());
-            last_end = edit.end();
-        }
-
-        output.push_str(&source_text[usize::from(last_end)..]);
-
-        let diff = TextDiff::from_lines(source_text, &output);
+        // Partition the source code into end offsets for each cell. If `self.notebook_index` is
+        // `None`, indicating a regular script file, all the lines will be in one "cell" under the
+        // `None` key.
+        let cells = if let Some(notebook_index) = &self.notebook_index {
+            let mut last_cell = OneIndexed::MIN;
+            let mut cells: Vec<(Option<OneIndexed>, TextSize)> = Vec::new();
+            for (row, cell) in notebook_index.iter() {
+                if cell != last_cell {
+                    let offset = source_code.line_start(row);
+                    cells.push((Some(last_cell), offset));
+                    last_cell = cell;
+                }
+            }
+            cells.push((Some(last_cell), source_text.text_len()));
+            cells
+        } else {
+            vec![(None, source_text.text_len())]
+        };
 
         let message = match self.fix.applicability() {
             // TODO(zanieb): Adjust this messaging once it's user-facing
@@ -133,59 +139,97 @@ impl std::fmt::Display for Diff<'_> {
         // tests, which is the only place these are currently used.
         writeln!(f, "ℹ {}", fmt_styled(message, self.stylesheet.separator))?;
 
-        let (largest_old, largest_new) = diff
-            .ops()
-            .last()
-            .map(|op| (op.old_range().start, op.new_range().start))
-            .unwrap_or_default();
+        let mut last_end = TextSize::ZERO;
+        for (cell, offset) in cells {
+            let range = TextRange::new(last_end, offset);
+            last_end = offset;
+            let input = source_code.slice(range);
 
-        let digit_with = OneIndexed::from_zero_indexed(largest_new.max(largest_old)).digits();
+            let mut output = String::with_capacity(input.len());
+            let mut last_end = range.start();
 
-        for (idx, group) in diff.grouped_ops(3).iter().enumerate() {
-            if idx > 0 {
-                writeln!(f, "{:-^1$}", "-", 80)?;
+            let mut applied = 0;
+            for edit in self.fix.edits() {
+                if range.contains_range(edit.range()) {
+                    output.push_str(source_code.slice(TextRange::new(last_end, edit.start())));
+                    output.push_str(edit.content().unwrap_or_default());
+                    last_end = edit.end();
+                    applied += 1;
+                }
             }
-            for op in group {
-                for change in diff.iter_inline_changes(op) {
-                    let sign = match change.tag() {
-                        ChangeTag::Delete => "-",
-                        ChangeTag::Insert => "+",
-                        ChangeTag::Equal => " ",
-                    };
 
-                    let line_style = LineStyle::from(change.tag(), self.stylesheet);
+            // No edits were applied, so there's no need to diff.
+            if applied == 0 {
+                continue;
+            }
 
-                    let old_index = change.old_index().map(OneIndexed::from_zero_indexed);
-                    let new_index = change.new_index().map(OneIndexed::from_zero_indexed);
+            output.push_str(&source_text[usize::from(last_end)..usize::from(range.end())]);
 
-                    write!(
-                        f,
-                        "{} {} |{}",
-                        Line {
-                            index: old_index,
-                            width: digit_with
-                        },
-                        Line {
-                            index: new_index,
-                            width: digit_with
-                        },
-                        fmt_styled(line_style.apply_to(sign), self.stylesheet.emphasis),
-                    )?;
+            let diff = TextDiff::from_lines(input, &output);
 
-                    for (emphasized, value) in change.iter_strings_lossy() {
-                        let value = show_nonprinting(&value);
-                        if emphasized {
-                            write!(
-                                f,
-                                "{}",
-                                fmt_styled(line_style.apply_to(&value), self.stylesheet.underline)
-                            )?;
-                        } else {
-                            write!(f, "{}", line_style.apply_to(&value))?;
+            let (largest_old, largest_new) = diff
+                .ops()
+                .last()
+                .map(|op| (op.old_range().start, op.new_range().start))
+                .unwrap_or_default();
+
+            let digit_with = OneIndexed::from_zero_indexed(largest_new.max(largest_old)).digits();
+
+            if let Some(cell) = cell {
+                // Room for 2 digits, 2 x 1 space before each digit, 1 space, and 1 `|`. This
+                // centers the three colons on the pipe.
+                writeln!(f, "{:>1$} cell {cell}", ":::", 2 * digit_with.get() + 4)?;
+            }
+
+            for (idx, group) in diff.grouped_ops(3).iter().enumerate() {
+                if idx > 0 {
+                    writeln!(f, "{:-^1$}", "-", 80)?;
+                }
+                for op in group {
+                    for change in diff.iter_inline_changes(op) {
+                        let sign = match change.tag() {
+                            ChangeTag::Delete => "-",
+                            ChangeTag::Insert => "+",
+                            ChangeTag::Equal => " ",
+                        };
+
+                        let line_style = LineStyle::from(change.tag(), self.stylesheet);
+
+                        let old_index = change.old_index().map(OneIndexed::from_zero_indexed);
+                        let new_index = change.new_index().map(OneIndexed::from_zero_indexed);
+
+                        write!(
+                            f,
+                            "{} {} |{}",
+                            Line {
+                                index: old_index,
+                                width: digit_with,
+                            },
+                            Line {
+                                index: new_index,
+                                width: digit_with,
+                            },
+                            fmt_styled(line_style.apply_to(sign), self.stylesheet.emphasis),
+                        )?;
+
+                        for (emphasized, value) in change.iter_strings_lossy() {
+                            let value = show_nonprinting(&value);
+                            if emphasized {
+                                write!(
+                                    f,
+                                    "{}",
+                                    fmt_styled(
+                                        line_style.apply_to(&value),
+                                        self.stylesheet.underline
+                                    )
+                                )?;
+                            } else {
+                                write!(f, "{}", line_style.apply_to(&value))?;
+                            }
                         }
-                    }
-                    if change.missing_newline() {
-                        writeln!(f)?;
+                        if change.missing_newline() {
+                            writeln!(f)?;
+                        }
                     }
                 }
             }
@@ -253,7 +297,7 @@ fn show_nonprinting(s: &str) -> Cow<'_, str> {
 
 #[cfg(test)]
 mod tests {
-    use ruff_diagnostics::Applicability;
+    use ruff_diagnostics::{Applicability, Fix};
     use ruff_text_size::{TextLen, TextRange, TextSize};
 
     use crate::diagnostic::{
@@ -651,6 +695,107 @@ print()
           | ----- print statement
           |
         help: Remove `print` statement
+        ");
+    }
+
+    /// Test that we remap notebook cell line numbers in the diff as well as the main diagnostic.
+    #[test]
+    fn notebook_output_with_diff() {
+        let (mut env, diagnostics) = create_notebook_diagnostics(DiagnosticFormat::Full);
+        env.show_fix_diff(true);
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r"
+        error[unused-import][*]: `os` imported but unused
+         --> notebook.ipynb:cell 1:2:8
+          |
+        1 | # cell 1
+        2 | import os
+          |        ^^
+          |
+        help: Remove unused import: `os`
+
+        ℹ Safe fix
+           ::: cell 1
+        1 1 | # cell 1
+        2   |-import os
+
+        error[unused-import][*]: `math` imported but unused
+         --> notebook.ipynb:cell 2:2:8
+          |
+        1 | # cell 2
+        2 | import math
+          |        ^^^^
+        3 |
+        4 | print('hello world')
+          |
+        help: Remove unused import: `math`
+
+        ℹ Safe fix
+           ::: cell 2
+        1 1 | # cell 2
+        2   |-import math
+        3 2 | 
+        4 3 | print('hello world')
+
+        error[unused-variable]: Local variable `x` is assigned to but never used
+         --> notebook.ipynb:cell 3:4:5
+          |
+        2 | def foo():
+        3 |     print()
+        4 |     x = 1
+          |     ^
+          |
+        help: Remove assignment to unused variable `x`
+
+        ℹ Unsafe fix
+           ::: cell 3
+        1 1 | # cell 3
+        2 2 | def foo():
+        3 3 |     print()
+        4   |-    x = 1
+        5 4 |
+        ");
+    }
+
+    #[test]
+    fn notebook_output_with_diff_spanning_cells() {
+        let (mut env, mut diagnostics) = create_notebook_diagnostics(DiagnosticFormat::Full);
+        env.show_fix_diff(true);
+
+        // Move all of the edits from the later diagnostics to the first diagnostic to simulate a
+        // single diagnostic with edits in different cells.
+        let mut diagnostic = diagnostics.swap_remove(0);
+        let fix = diagnostic.fix_mut().unwrap();
+        let mut edits = fix.edits().to_vec();
+        for diag in diagnostics {
+            edits.extend_from_slice(diag.fix().unwrap().edits());
+        }
+        *fix = Fix::unsafe_edits(edits.remove(0), edits);
+
+        insta::assert_snapshot!(env.render(&diagnostic), @r"
+        error[unused-import]: `os` imported but unused
+         --> notebook.ipynb:cell 1:2:8
+          |
+        1 | # cell 1
+        2 | import os
+          |        ^^
+          |
+        help: Remove unused import: `os`
+
+        ℹ Unsafe fix
+           ::: cell 1
+        1 1 | # cell 1
+        2   |-import os
+           ::: cell 2
+        1 1 | # cell 2
+        2   |-import math
+        3 2 | 
+        4 3 | print('hello world')
+           ::: cell 3
+        1 1 | # cell 3
+        2 2 | def foo():
+        3 3 |     print()
+        4   |-    x = 1
+        5 4 |
         ");
     }
 

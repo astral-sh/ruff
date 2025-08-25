@@ -325,6 +325,11 @@ impl Diagnostic {
         self.inner.fix.as_ref()
     }
 
+    #[cfg(test)]
+    pub(crate) fn fix_mut(&mut self) -> Option<&mut Fix> {
+        Arc::make_mut(&mut self.inner).fix.as_mut()
+    }
+
     /// Set the fix for this diagnostic.
     pub fn set_fix(&mut self, fix: Fix) {
         debug_assert!(
