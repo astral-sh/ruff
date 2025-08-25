@@ -23,19 +23,16 @@ One thing that is supported is error messages for using type qualifiers in type 
 from typing_extensions import Final, ClassVar, Required, NotRequired, ReadOnly
 
 def _(
-    a: (
-        Final  # error: [invalid-type-form] "Type qualifier `typing.Final` is not allowed in type expressions (only in annotation expressions)"
-        | int
-    ),
-    b: (
-        ClassVar  # error: [invalid-type-form] "Type qualifier `typing.ClassVar` is not allowed in type expressions (only in annotation expressions)"
-        | int
-    ),
-    c: ReadOnly,  # error: [invalid-type-form] "Type qualifier `typing.ReadOnly` is not allowed in type expressions (only in annotation expressions, and only with exactly one argument)"
+    # error: [invalid-type-form] "Type qualifier `typing.Final` is not allowed in type expressions (only in annotation expressions)"
+    a: Final | int,
+    # error: [invalid-type-form] "Type qualifier `typing.ClassVar` is not allowed in type expressions (only in annotation expressions)"
+    b: ClassVar | int,
+    # error: [invalid-type-form] "Type qualifier `typing.ReadOnly` is not allowed in type expressions (only in annotation expressions, and only with exactly one argument)"
+    c: ReadOnly | int,
 ) -> None:
     reveal_type(a)  # revealed: Unknown | int
     reveal_type(b)  # revealed: Unknown | int
-    reveal_type(c)  # revealed: Unknown
+    reveal_type(c)  # revealed: Unknown | int
 ```
 
 ## Inheritance

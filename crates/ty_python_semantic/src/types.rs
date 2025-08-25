@@ -6882,6 +6882,8 @@ bitflags! {
         const REQUIRED = 1 << 3;
         /// `typing_extensions.NotRequired`
         const NOT_REQUIRED = 1 << 4;
+        /// `typing_extensions.ReadOnly`
+        const READ_ONLY = 1 << 5;
     }
 }
 

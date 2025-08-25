@@ -9443,6 +9443,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         Type::SpecialForm(SpecialFormType::NotRequired) => {
                             TypeAndQualifiers::new(Type::unknown(), TypeQualifiers::NOT_REQUIRED)
                         }
+                        Type::SpecialForm(SpecialFormType::ReadOnly) => {
+                            TypeAndQualifiers::new(Type::unknown(), TypeQualifiers::READ_ONLY)
+                        }
                         Type::ClassLiteral(class)
                             if class.is_known(self.db(), KnownClass::InitVar) =>
                         {
@@ -9521,7 +9524,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         type_qualifier @ (SpecialFormType::ClassVar
                         | SpecialFormType::Final
                         | SpecialFormType::Required
-                        | SpecialFormType::NotRequired),
+                        | SpecialFormType::NotRequired
+                        | SpecialFormType::ReadOnly),
                     ) => {
                         let arguments = if let ast::Expr::Tuple(tuple) = slice {
                             &*tuple.elts
@@ -9545,6 +9549,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 }
                                 SpecialFormType::NotRequired => {
                                     type_and_qualifiers.add_qualifier(TypeQualifiers::NOT_REQUIRED);
+                                }
+                                SpecialFormType::ReadOnly => {
+                                    type_and_qualifiers.add_qualifier(TypeQualifiers::READ_ONLY);
                                 }
                                 _ => unreachable!(),
                             }
@@ -10832,14 +10839,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 KnownClass::Deque,
             ),
 
-            SpecialFormType::ReadOnly => {
-                self.infer_type_expression(arguments_slice);
-                todo_type!("`ReadOnly[]` type qualifier")
-            }
             SpecialFormType::ClassVar
             | SpecialFormType::Final
             | SpecialFormType::Required
-            | SpecialFormType::NotRequired => {
+            | SpecialFormType::NotRequired
+            | SpecialFormType::ReadOnly => {
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                     let diag = builder.into_diagnostic(format_args!(
                         "Type qualifier `{special_form}` is not allowed in type expressions \

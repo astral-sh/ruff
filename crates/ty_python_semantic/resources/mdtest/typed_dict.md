@@ -432,6 +432,20 @@ def _(person: Person, unknown_key: Any):
     person[unknown_key] = "Eve"
 ```
 
+## `ReadOnly`
+
+`ReadOnly` is not supported yet, but this test makes sure that we do not emit any false positive
+diagnostics:
+
+```py
+from typing_extensions import TypedDict, ReadOnly, Required
+
+class Person(TypedDict, total=False):
+    id: ReadOnly[Required[int]]
+    name: str
+    age: int | None
+```
+
 ## Methods on `TypedDict`
 
 ```py
