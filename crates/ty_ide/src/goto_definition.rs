@@ -181,6 +181,49 @@ def other_function(): ...
         "#);
     }
 
+    /// goto-definition on a function definition in a .pyi should go to the .py
+    #[test]
+    fn goto_definition_stub_map_function_def() {
+        let test = CursorTest::builder()
+            .source(
+                "mymodule.py",
+                r#"
+def my_function():
+    return "hello"
+
+def other_function():
+    return "other"
+"#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+def my_fun<CURSOR>ction(): ...
+
+def other_function(): ...
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r#"
+        info[goto-definition]: Definition
+         --> mymodule.py:2:5
+          |
+        2 | def my_function():
+          |     ^^^^^^^^^^^
+        3 |     return "hello"
+          |
+        info: Source
+         --> mymodule.pyi:2:5
+          |
+        2 | def my_function(): ...
+          |     ^^^^^^^^^^^
+        3 |
+        4 | def other_function(): ...
+          |
+        "#);
+    }
+
     /// goto-definition on a function that's redefined many times in the impl .py
     ///
     /// Currently this yields all instances. There's an argument for only yielding
@@ -324,6 +367,53 @@ class MyOtherClass:
         2 | from mymodule import MyClass
         3 | x = MyClass
           |     ^^^^^^^
+          |
+        ");
+    }
+
+    /// goto-definition on a class def in a .pyi should go to the .py
+    #[test]
+    fn goto_definition_stub_map_class_def() {
+        let test = CursorTest::builder()
+            .source(
+                "mymodule.py",
+                r#"
+class MyClass:
+    def __init__(self, val):
+        self.val = val
+
+class MyOtherClass:
+    def __init__(self, val):
+        self.val = val + 1
+"#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+class MyCl<CURSOR>ass:
+    def __init__(self, val: bool): ...
+
+class MyOtherClass:
+    def __init__(self, val: bool): ...
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Definition
+         --> mymodule.py:2:7
+          |
+        2 | class MyClass:
+          |       ^^^^^^^
+        3 |     def __init__(self, val):
+        4 |         self.val = val
+          |
+        info: Source
+         --> mymodule.pyi:2:7
+          |
+        2 | class MyClass:
+          |       ^^^^^^^
+        3 |     def __init__(self, val: bool): ...
           |
         ");
     }
@@ -536,6 +626,158 @@ class MyClass: ...
           |
         2 | from mymodule import MyClass
           |                      ^^^^^^^
+          |
+        ");
+    }
+
+    /// goto-definition on a nested call using a keyword arg where both funcs have that arg name
+    ///
+    /// In this case they ultimately have different signatures.
+    #[test]
+    fn goto_definition_nested_keyword_arg1() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+def my_func(ab, y, z = None): ...
+def my_other_func(ab, y): ...
+
+my_other_func(my_func(a<CURSOR>b=5, y=2), 0)
+my_func(my_other_func(ab=5, y=2), 0)
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Definition
+         --> main.py:2:13
+          |
+        2 | def my_func(ab, y, z = None): ...
+          |             ^^
+        3 | def my_other_func(ab, y): ...
+          |
+        info: Source
+         --> main.py:5:23
+          |
+        3 | def my_other_func(ab, y): ...
+        4 |
+        5 | my_other_func(my_func(ab=5, y=2), 0)
+          |                       ^^
+        6 | my_func(my_other_func(ab=5, y=2), 0)
+          |
+        ");
+    }
+
+    /// goto-definition on a nested call using a keyword arg where both funcs have that arg name
+    ///
+    /// In this case they ultimately have different signatures.
+    #[test]
+    fn goto_definition_nested_keyword_arg2() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+def my_func(ab, y, z = None): ...
+def my_other_func(ab, y): ...
+
+my_other_func(my_func(ab=5, y=2), 0)
+my_func(my_other_func(a<CURSOR>b=5, y=2), 0)
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Definition
+         --> main.py:3:19
+          |
+        2 | def my_func(ab, y, z = None): ...
+        3 | def my_other_func(ab, y): ...
+          |                   ^^
+        4 |
+        5 | my_other_func(my_func(ab=5, y=2), 0)
+          |
+        info: Source
+         --> main.py:6:23
+          |
+        5 | my_other_func(my_func(ab=5, y=2), 0)
+        6 | my_func(my_other_func(ab=5, y=2), 0)
+          |                       ^^
+          |
+        ");
+    }
+
+    /// goto-definition on a nested call using a keyword arg where both funcs have that arg name
+    ///
+    /// In this case they have identical signatures.
+    #[test]
+    fn goto_definition_nested_keyword_arg3() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+def my_func(ab, y): ...
+def my_other_func(ab, y): ...
+
+my_other_func(my_func(a<CURSOR>b=5, y=2), 0)
+my_func(my_other_func(ab=5, y=2), 0)
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Definition
+         --> main.py:2:13
+          |
+        2 | def my_func(ab, y): ...
+          |             ^^
+        3 | def my_other_func(ab, y): ...
+          |
+        info: Source
+         --> main.py:5:23
+          |
+        3 | def my_other_func(ab, y): ...
+        4 |
+        5 | my_other_func(my_func(ab=5, y=2), 0)
+          |                       ^^
+        6 | my_func(my_other_func(ab=5, y=2), 0)
+          |
+        ");
+    }
+
+    /// goto-definition on a nested call using a keyword arg where both funcs have that arg name
+    ///
+    /// In this case they have identical signatures.
+    #[test]
+    fn goto_definition_nested_keyword_arg4() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+def my_func(ab, y): ...
+def my_other_func(ab, y): ...
+
+my_other_func(my_func(ab=5, y=2), 0)
+my_func(my_other_func(a<CURSOR>b=5, y=2), 0)
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Definition
+         --> main.py:3:19
+          |
+        2 | def my_func(ab, y): ...
+        3 | def my_other_func(ab, y): ...
+          |                   ^^
+        4 |
+        5 | my_other_func(my_func(ab=5, y=2), 0)
+          |
+        info: Source
+         --> main.py:6:23
+          |
+        5 | my_other_func(my_func(ab=5, y=2), 0)
+        6 | my_func(my_other_func(ab=5, y=2), 0)
+          |                       ^^
           |
         ");
     }

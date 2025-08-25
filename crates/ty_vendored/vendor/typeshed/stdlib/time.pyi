@@ -35,28 +35,28 @@ timezone: int
 tzname: tuple[str, str]
 
 if sys.platform == "linux":
-    CLOCK_BOOTTIME: int
+    CLOCK_BOOTTIME: Final[int]
 if sys.platform != "linux" and sys.platform != "win32" and sys.platform != "darwin":
-    CLOCK_PROF: int  # FreeBSD, NetBSD, OpenBSD
-    CLOCK_UPTIME: int  # FreeBSD, OpenBSD
+    CLOCK_PROF: Final[int]  # FreeBSD, NetBSD, OpenBSD
+    CLOCK_UPTIME: Final[int]  # FreeBSD, OpenBSD
 
 if sys.platform != "win32":
-    CLOCK_MONOTONIC: int
-    CLOCK_MONOTONIC_RAW: int
-    CLOCK_PROCESS_CPUTIME_ID: int
-    CLOCK_REALTIME: int
-    CLOCK_THREAD_CPUTIME_ID: int
+    CLOCK_MONOTONIC: Final[int]
+    CLOCK_MONOTONIC_RAW: Final[int]
+    CLOCK_PROCESS_CPUTIME_ID: Final[int]
+    CLOCK_REALTIME: Final[int]
+    CLOCK_THREAD_CPUTIME_ID: Final[int]
     if sys.platform != "linux" and sys.platform != "darwin":
-        CLOCK_HIGHRES: int  # Solaris only
+        CLOCK_HIGHRES: Final[int]  # Solaris only
 
 if sys.platform == "darwin":
-    CLOCK_UPTIME_RAW: int
+    CLOCK_UPTIME_RAW: Final[int]
     if sys.version_info >= (3, 13):
-        CLOCK_UPTIME_RAW_APPROX: int
-        CLOCK_MONOTONIC_RAW_APPROX: int
+        CLOCK_UPTIME_RAW_APPROX: Final[int]
+        CLOCK_MONOTONIC_RAW_APPROX: Final[int]
 
 if sys.platform == "linux":
-    CLOCK_TAI: int
+    CLOCK_TAI: Final[int]
 
 # Constructor takes an iterable of any type, of length between 9 and 11 elements.
 # However, it always *behaves* like a tuple of 9 elements,

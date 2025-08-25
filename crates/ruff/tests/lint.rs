@@ -5801,3 +5801,32 @@ fn future_annotations_preview_warning() {
     ",
     );
 }
+
+#[test]
+fn up045_nested_optional_flatten_all() {
+    let contents = "\
+from typing import Optional
+nested_optional: Optional[Optional[Optional[str]]] = None
+";
+
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .args(["--select", "UP045", "--diff", "--target-version", "py312"])
+            .arg("-")
+            .pass_stdin(contents),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    @@ -1,2 +1,2 @@
+     from typing import Optional
+    -nested_optional: Optional[Optional[Optional[str]]] = None
+    +nested_optional: str | None = None
+
+
+    ----- stderr -----
+    Would fix 1 error.
+    ",
+    );
+}

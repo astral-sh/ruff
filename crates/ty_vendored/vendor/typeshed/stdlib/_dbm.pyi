@@ -1,7 +1,7 @@
 import sys
 from _typeshed import ReadOnlyBuffer, StrOrBytesPath
 from types import TracebackType
-from typing import TypeVar, final, overload, type_check_only
+from typing import Final, TypeVar, final, overload, type_check_only
 from typing_extensions import Self, TypeAlias
 
 if sys.platform != "win32":
@@ -10,7 +10,7 @@ if sys.platform != "win32":
     _ValueType: TypeAlias = str | ReadOnlyBuffer
 
     class error(OSError): ...
-    library: str
+    library: Final[str]
 
     # Actual typename dbm, not exposed by the implementation
     @final

@@ -169,7 +169,7 @@ else:
         tuple[Literal["__module__"], Literal["__name__"], Literal["__qualname__"], Literal["__doc__"], Literal["__annotations__"]]
     ]
 
-WRAPPER_UPDATES: tuple[Literal["__dict__"]]
+WRAPPER_UPDATES: Final[tuple[Literal["__dict__"]]]
 
 @type_check_only
 class _Wrapped(Generic[_PWrapped, _RWrapped, _PWrapper, _RWrapper]):

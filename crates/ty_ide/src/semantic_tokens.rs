@@ -337,7 +337,9 @@ impl<'db> SemanticTokenVisitor<'db> {
 
         match ty {
             Type::ClassLiteral(_) => (SemanticTokenType::Class, modifiers),
-            Type::TypeVar(_) => (SemanticTokenType::TypeParameter, modifiers),
+            Type::NonInferableTypeVar(_) | Type::TypeVar(_) => {
+                (SemanticTokenType::TypeParameter, modifiers)
+            }
             Type::FunctionLiteral(_) => {
                 // Check if this is a method based on current scope
                 if self.in_class_scope {
@@ -1403,34 +1405,34 @@ u = List.__name__        # __name__ should be variable<CURSOR>
         "MyClass" @ 89..96: Class [definition]
         "CONSTANT" @ 102..110: Variable [readonly]
         "42" @ 113..115: Number
-        "method" @ 129..135: Method [definition]
-        "self" @ 136..140: SelfParameter
-        "/"hello/"" @ 158..165: String
-        "property" @ 176..184: Decorator
-        "prop" @ 193..197: Method [definition]
-        "self" @ 198..202: SelfParameter
-        "self" @ 220..224: Variable
-        "CONSTANT" @ 225..233: Variable [readonly]
-        "obj" @ 235..238: Variable
-        "MyClass" @ 241..248: Class
-        "x" @ 286..287: Namespace
-        "os" @ 290..292: Namespace
-        "path" @ 293..297: Namespace
-        "y" @ 347..348: Method
-        "obj" @ 351..354: Variable
-        "method" @ 355..361: Method
-        "z" @ 413..414: Variable
-        "obj" @ 417..420: Variable
-        "CONSTANT" @ 421..429: Variable [readonly]
-        "w" @ 491..492: Variable
-        "obj" @ 495..498: Variable
-        "prop" @ 499..503: Variable
-        "v" @ 542..543: Function
-        "MyClass" @ 546..553: Class
-        "method" @ 554..560: Method
-        "u" @ 604..605: Variable
-        "List" @ 608..612: Variable
-        "__name__" @ 613..621: Variable
+        "method" @ 125..131: Method [definition]
+        "self" @ 132..136: SelfParameter
+        "/"hello/"" @ 154..161: String
+        "property" @ 168..176: Decorator
+        "prop" @ 185..189: Method [definition]
+        "self" @ 190..194: SelfParameter
+        "self" @ 212..216: Variable
+        "CONSTANT" @ 217..225: Variable [readonly]
+        "obj" @ 227..230: Variable
+        "MyClass" @ 233..240: Class
+        "x" @ 278..279: Namespace
+        "os" @ 282..284: Namespace
+        "path" @ 285..289: Namespace
+        "y" @ 339..340: Method
+        "obj" @ 343..346: Variable
+        "method" @ 347..353: Method
+        "z" @ 405..406: Variable
+        "obj" @ 409..412: Variable
+        "CONSTANT" @ 413..421: Variable [readonly]
+        "w" @ 483..484: Variable
+        "obj" @ 487..490: Variable
+        "prop" @ 491..495: Variable
+        "v" @ 534..535: Function
+        "MyClass" @ 538..545: Class
+        "method" @ 546..552: Method
+        "u" @ 596..597: Variable
+        "List" @ 600..604: Variable
+        "__name__" @ 605..613: Variable
         "#);
     }
 
@@ -1454,14 +1456,14 @@ y = obj.unknown_attr     # Should fall back to variable<CURSOR>
         "MyClass" @ 7..14: Class [definition]
         "some_attr" @ 20..29: Variable
         "/"value/"" @ 32..39: String
-        "obj" @ 45..48: Variable
-        "MyClass" @ 51..58: Class
-        "x" @ 121..122: Variable
-        "obj" @ 125..128: Variable
-        "some_attr" @ 129..138: Variable
-        "y" @ 191..192: Variable
-        "obj" @ 195..198: Variable
-        "unknown_attr" @ 199..211: Variable
+        "obj" @ 41..44: Variable
+        "MyClass" @ 47..54: Class
+        "x" @ 117..118: Variable
+        "obj" @ 121..124: Variable
+        "some_attr" @ 125..134: Variable
+        "y" @ 187..188: Variable
+        "obj" @ 191..194: Variable
+        "unknown_attr" @ 195..207: Variable
         "#);
     }
 
@@ -1495,20 +1497,20 @@ w = obj.A             # Should not have readonly modifier (length == 1)<CURSOR>
         "12" @ 72..74: Number
         "A" @ 79..80: Variable
         "1" @ 83..84: Number
-        "obj" @ 90..93: Variable
-        "MyClass" @ 96..103: Class
-        "x" @ 106..107: Variable
-        "obj" @ 110..113: Variable
-        "UPPER_CASE" @ 114..124: Variable [readonly]
-        "y" @ 160..161: Variable
-        "obj" @ 164..167: Variable
-        "lower_case" @ 168..178: Variable
-        "z" @ 220..221: Variable
-        "obj" @ 224..227: Variable
-        "MixedCase" @ 228..237: Variable
-        "w" @ 278..279: Variable
-        "obj" @ 282..285: Variable
-        "A" @ 286..287: Variable
+        "obj" @ 86..89: Variable
+        "MyClass" @ 92..99: Class
+        "x" @ 102..103: Variable
+        "obj" @ 106..109: Variable
+        "UPPER_CASE" @ 110..120: Variable [readonly]
+        "y" @ 156..157: Variable
+        "obj" @ 160..163: Variable
+        "lower_case" @ 164..174: Variable
+        "z" @ 216..217: Variable
+        "obj" @ 220..223: Variable
+        "MixedCase" @ 224..233: Variable
+        "w" @ 274..275: Variable
+        "obj" @ 278..281: Variable
+        "A" @ 282..283: Variable
         "#);
     }
 
@@ -1634,7 +1636,7 @@ def test_function(param: int, other: MyClass) -> Optional[List[str]]:
         "List" @ 236..240: Variable
         "str" @ 241..244: Class
         "/"hello/"" @ 249..256: String
-        "None" @ 361..365: BuiltinConstant
+        "None" @ 357..361: BuiltinConstant
         "#);
     }
 
@@ -1798,32 +1800,32 @@ class BoundedContainer[T: int, U = str]:
         "value1" @ 594..600: Parameter
         "U" @ 622..623: TypeParameter
         "value2" @ 626..632: Parameter
-        "get_first" @ 646..655: Method [definition]
-        "self" @ 656..660: SelfParameter
-        "T" @ 665..666: TypeParameter
-        "self" @ 683..687: Variable
-        "value1" @ 688..694: Variable
-        "get_second" @ 708..718: Method [definition]
-        "self" @ 719..723: SelfParameter
-        "U" @ 728..729: TypeParameter
-        "self" @ 746..750: Variable
-        "value2" @ 751..757: Variable
-        "BoundedContainer" @ 806..822: Class [definition]
-        "T" @ 823..824: TypeParameter [definition]
-        "int" @ 826..829: Class
-        "U" @ 831..832: TypeParameter [definition]
-        "str" @ 835..838: Class
-        "process" @ 849..856: Method [definition]
-        "self" @ 857..861: SelfParameter
-        "x" @ 863..864: Parameter
-        "T" @ 866..867: TypeParameter
-        "y" @ 869..870: Parameter
-        "U" @ 872..873: TypeParameter
-        "tuple" @ 878..883: Class
-        "T" @ 884..885: TypeParameter
-        "U" @ 887..888: TypeParameter
-        "x" @ 907..908: Parameter
-        "y" @ 910..911: Parameter
+        "get_first" @ 642..651: Method [definition]
+        "self" @ 652..656: SelfParameter
+        "T" @ 661..662: TypeParameter
+        "self" @ 679..683: Variable
+        "value1" @ 684..690: Variable
+        "get_second" @ 700..710: Method [definition]
+        "self" @ 711..715: SelfParameter
+        "U" @ 720..721: TypeParameter
+        "self" @ 738..742: Variable
+        "value2" @ 743..749: Variable
+        "BoundedContainer" @ 798..814: Class [definition]
+        "T" @ 815..816: TypeParameter [definition]
+        "int" @ 818..821: Class
+        "U" @ 823..824: TypeParameter [definition]
+        "str" @ 827..830: Class
+        "process" @ 841..848: Method [definition]
+        "self" @ 849..853: SelfParameter
+        "x" @ 855..856: Parameter
+        "T" @ 858..859: TypeParameter
+        "y" @ 861..862: Parameter
+        "U" @ 864..865: TypeParameter
+        "tuple" @ 870..875: Class
+        "T" @ 876..877: TypeParameter
+        "U" @ 879..880: TypeParameter
+        "x" @ 899..900: Parameter
+        "y" @ 902..903: Parameter
         "#);
     }
 
@@ -2069,24 +2071,24 @@ def outer():
         "/"outer_value/"" @ 63..76: String
         "z" @ 81..82: Variable
         "/"outer_local/"" @ 85..98: String
-        "inner" @ 112..117: Function [definition]
-        "x" @ 138..139: Variable
-        "z" @ 141..142: Variable
-        "y" @ 193..194: Variable
-        "x" @ 243..244: Variable
-        "/"modified/"" @ 247..257: String
-        "y" @ 266..267: Variable
-        "/"modified_global/"" @ 270..287: String
-        "z" @ 296..297: Variable
-        "/"modified_local/"" @ 300..316: String
-        "deeper" @ 338..344: Function [definition]
-        "x" @ 369..370: Variable
-        "y" @ 410..411: Variable
-        "x" @ 413..414: Variable
-        "x" @ 469..470: Variable
-        "y" @ 473..474: Variable
-        "deeper" @ 499..505: Function
-        "inner" @ 522..527: Function
+        "inner" @ 108..113: Function [definition]
+        "x" @ 134..135: Variable
+        "z" @ 137..138: Variable
+        "y" @ 189..190: Variable
+        "x" @ 239..240: Variable
+        "/"modified/"" @ 243..253: String
+        "y" @ 262..263: Variable
+        "/"modified_global/"" @ 266..283: String
+        "z" @ 292..293: Variable
+        "/"modified_local/"" @ 296..312: String
+        "deeper" @ 326..332: Function [definition]
+        "x" @ 357..358: Variable
+        "y" @ 398..399: Variable
+        "x" @ 401..402: Variable
+        "x" @ 457..458: Variable
+        "y" @ 461..462: Variable
+        "deeper" @ 479..485: Function
+        "inner" @ 498..503: Function
         "#);
     }
 
@@ -2113,20 +2115,20 @@ def test():
         "test" @ 34..38: Function [definition]
         "x" @ 53..54: Variable
         "y" @ 68..69: Variable
-        "a" @ 128..129: Variable
-        "b" @ 131..132: Variable
-        "c" @ 134..135: Variable
-        "d" @ 149..150: Variable
-        "e" @ 152..153: Variable
-        "f" @ 155..156: Variable
-        "x" @ 173..174: Variable
-        "y" @ 177..178: Variable
-        "a" @ 181..182: Variable
-        "b" @ 185..186: Variable
-        "c" @ 189..190: Variable
-        "d" @ 193..194: Variable
-        "e" @ 197..198: Variable
-        "f" @ 201..202: Variable
+        "a" @ 124..125: Variable
+        "b" @ 127..128: Variable
+        "c" @ 130..131: Variable
+        "d" @ 145..146: Variable
+        "e" @ 148..149: Variable
+        "f" @ 151..152: Variable
+        "x" @ 165..166: Variable
+        "y" @ 169..170: Variable
+        "a" @ 173..174: Variable
+        "b" @ 177..178: Variable
+        "c" @ 181..182: Variable
+        "d" @ 185..186: Variable
+        "e" @ 189..190: Variable
+        "f" @ 193..194: Variable
         "#);
     }
 

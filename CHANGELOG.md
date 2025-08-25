@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.12.10
+
+### Preview features
+
+- \[`flake8-simplify`\] Implement fix for `maxsplit` without separator (`SIM905`) ([#19851](https://github.com/astral-sh/ruff/pull/19851))
+- \[`flake8-use-pathlib`\] Add fixes for `PTH102` and `PTH103` ([#19514](https://github.com/astral-sh/ruff/pull/19514))
+
+### Bug fixes
+
+- \[`isort`\] Handle multiple continuation lines after module docstring (`I002`) ([#19818](https://github.com/astral-sh/ruff/pull/19818))
+- \[`pyupgrade`\] Avoid reporting `__future__` features as unnecessary when they are used (`UP010`) ([#19769](https://github.com/astral-sh/ruff/pull/19769))
+- \[`pyupgrade`\] Handle nested `Optional`s (`UP045`) ([#19770](https://github.com/astral-sh/ruff/pull/19770))
+
+### Rule changes
+
+- \[`pycodestyle`\] Make `E731` fix unsafe instead of display-only for class assignments ([#19700](https://github.com/astral-sh/ruff/pull/19700))
+- \[`pyflakes`\] Add secondary annotation showing previous definition (`F811`) ([#19900](https://github.com/astral-sh/ruff/pull/19900))
+
+### Documentation
+
+- Fix description of global config file discovery strategy ([#19188](https://github.com/astral-sh/ruff/pull/19188))
+- Update outdated links to <https://typing.python.org/en/latest/source/stubs.html> ([#19992](https://github.com/astral-sh/ruff/pull/19992))
+- \[`flake8-annotations`\] Remove unused import in example (`ANN401`) ([#20000](https://github.com/astral-sh/ruff/pull/20000))
+
 ## 0.12.9
 
 ### Preview features
@@ -24,7 +48,30 @@
 ### Other changes
 
 - Build `riscv64` binaries for release ([#19819](https://github.com/astral-sh/ruff/pull/19819))
+
 - Add rule code to error description in GitLab output ([#19896](https://github.com/astral-sh/ruff/pull/19896))
+
+- Improve rendering of the `full` output format ([#19415](https://github.com/astral-sh/ruff/pull/19415))
+
+    Below is an example diff for [`F401`](https://docs.astral.sh/ruff/rules/unused-import/):
+
+    ```diff
+    -unused.py:8:19: F401 [*] `pathlib` imported but unused
+    +F401 [*] `pathlib` imported but unused
+    +  --> unused.py:8:19
+        |
+      7 | # Unused, _not_ marked as required (due to the alias).
+      8 | import pathlib as non_alias
+    -   |                   ^^^^^^^^^ F401
+    +   |                   ^^^^^^^^^
+      9 |
+     10 | # Unused, marked as required.
+        |
+    -   = help: Remove unused import: `pathlib`
+    +help: Remove unused import: `pathlib`
+    ```
+
+    For now, the primary difference is the movement of the filename, line number, and column information to a second line in the header. This new representation will allow us to make further additions to Ruff's diagnostics, such as adding sub-diagnostics and multiple annotations to the same snippet.
 
 ## 0.12.8
 

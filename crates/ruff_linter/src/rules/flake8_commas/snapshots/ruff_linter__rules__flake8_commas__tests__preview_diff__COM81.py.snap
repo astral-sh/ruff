@@ -1,0 +1,136 @@
+---
+source: crates/ruff_linter/src/rules/flake8_commas/mod.rs
+---
+--- Linter settings ---
+-linter.preview = disabled
++linter.preview = enabled
+
+--- Summary ---
+Removed: 0
+Added: 6
+
+--- Added ---
+COM812 [*] Trailing comma missing
+   --> COM81.py:655:6
+    |
+654 | type X[
+655 |     T
+    |      ^
+656 | ] = T
+657 | def f[
+    |
+help: Add trailing comma
+
+ℹ Safe fix
+652 652 | }"""
+653 653 | 
+654 654 | type X[
+655     |-    T
+    655 |+    T,
+656 656 | ] = T
+657 657 | def f[
+658 658 |     T
+
+
+COM812 [*] Trailing comma missing
+   --> COM81.py:658:6
+    |
+656 | ] = T
+657 | def f[
+658 |     T
+    |      ^
+659 | ](): pass
+660 | class C[
+    |
+help: Add trailing comma
+
+ℹ Safe fix
+655 655 |     T
+656 656 | ] = T
+657 657 | def f[
+658     |-    T
+    658 |+    T,
+659 659 | ](): pass
+660 660 | class C[
+661 661 |     T
+
+
+COM812 [*] Trailing comma missing
+   --> COM81.py:661:6
+    |
+659 | ](): pass
+660 | class C[
+661 |     T
+    |      ^
+662 | ]: pass
+    |
+help: Add trailing comma
+
+ℹ Safe fix
+658 658 |     T
+659 659 | ](): pass
+660 660 | class C[
+661     |-    T
+    661 |+    T,
+662 662 | ]: pass
+663 663 | 
+664 664 | type X[T,] = T
+
+
+COM819 [*] Trailing comma prohibited
+   --> COM81.py:664:9
+    |
+662 | ]: pass
+663 |
+664 | type X[T,] = T
+    |         ^
+665 | def f[T,](): pass
+666 | class C[T,]: pass
+    |
+help: Remove trailing comma
+
+ℹ Safe fix
+661 661 |     T
+662 662 | ]: pass
+663 663 | 
+664     |-type X[T,] = T
+    664 |+type X[T] = T
+665 665 | def f[T,](): pass
+666 666 | class C[T,]: pass
+
+
+COM819 [*] Trailing comma prohibited
+   --> COM81.py:665:8
+    |
+664 | type X[T,] = T
+665 | def f[T,](): pass
+    |        ^
+666 | class C[T,]: pass
+    |
+help: Remove trailing comma
+
+ℹ Safe fix
+662 662 | ]: pass
+663 663 | 
+664 664 | type X[T,] = T
+665     |-def f[T,](): pass
+    665 |+def f[T](): pass
+666 666 | class C[T,]: pass
+
+
+COM819 [*] Trailing comma prohibited
+   --> COM81.py:666:10
+    |
+664 | type X[T,] = T
+665 | def f[T,](): pass
+666 | class C[T,]: pass
+    |          ^
+    |
+help: Remove trailing comma
+
+ℹ Safe fix
+663 663 | 
+664 664 | type X[T,] = T
+665 665 | def f[T,](): pass
+666     |-class C[T,]: pass
+    666 |+class C[T]: pass

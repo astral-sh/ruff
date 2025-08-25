@@ -42,6 +42,9 @@ impl EnvVars {
     /// Used to detect an activated virtual environment.
     pub const VIRTUAL_ENV: &'static str = "VIRTUAL_ENV";
 
+    /// Used to determine if an active Conda environment is the base environment or not.
+    pub const CONDA_DEFAULT_ENV: &'static str = "CONDA_DEFAULT_ENV";
+
     /// Used to detect an activated Conda environment location.
     /// If both `VIRTUAL_ENV` and `CONDA_PREFIX` are present, `VIRTUAL_ENV` will be preferred.
     pub const CONDA_PREFIX: &'static str = "CONDA_PREFIX";

@@ -65,6 +65,7 @@ use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::semantic_index;
 use crate::types::call::{Binding, CallArguments};
+use crate::types::constraints::Constraints;
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{
     REDUNDANT_CAST, STATIC_ASSERT_ERROR, TYPE_ASSERTION_FAILURE,
@@ -77,8 +78,9 @@ use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::any_over_type;
 use crate::types::{
     BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, ClassType,
-    DeprecatedInstance, DynamicType, KnownClass, NormalizedVisitor, Truthiness, Type, TypeMapping,
-    TypeRelation, TypeTransformer, UnionBuilder, all_members, walk_type_mapping,
+    DeprecatedInstance, DynamicType, HasRelationToVisitor, IsEquivalentVisitor, KnownClass,
+    NormalizedVisitor, Truthiness, Type, TypeMapping, TypeRelation, UnionBuilder, all_members,
+    walk_type_mapping,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -164,6 +166,7 @@ bitflags! {
         const ORDER_DEFAULT = 1 << 1;
         const KW_ONLY_DEFAULT = 1 << 2;
         const FROZEN_DEFAULT = 1 << 3;
+        const FIELD_SPECIFIERS= 1 << 4;
     }
 }
 
@@ -857,15 +860,16 @@ impl<'db> FunctionType<'db> {
         BoundMethodType::new(db, self, self_instance)
     }
 
-    pub(crate) fn has_relation_to(
+    pub(crate) fn has_relation_to_impl<C: Constraints<'db>>(
         self,
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
-    ) -> bool {
+        _visitor: &HasRelationToVisitor<'db, C>,
+    ) -> C {
         match relation {
-            TypeRelation::Subtyping => self.is_subtype_of(db, other),
-            TypeRelation::Assignability => self.is_assignable_to(db, other),
+            TypeRelation::Subtyping => C::from_bool(db, self.is_subtype_of(db, other)),
+            TypeRelation::Assignability => C::from_bool(db, self.is_assignable_to(db, other)),
         }
     }
 
@@ -894,16 +898,21 @@ impl<'db> FunctionType<'db> {
             && self.signature(db).is_assignable_to(db, other.signature(db))
     }
 
-    pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+    pub(crate) fn is_equivalent_to_impl<C: Constraints<'db>>(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        visitor: &IsEquivalentVisitor<'db, C>,
+    ) -> C {
         if self.normalized(db) == other.normalized(db) {
-            return true;
+            return C::always_satisfiable(db);
         }
         if self.literal(db) != other.literal(db) {
-            return false;
+            return C::unsatisfiable(db);
         }
         let self_signature = self.signature(db);
         let other_signature = other.signature(db);
-        self_signature.is_equivalent_to(db, other_signature)
+        self_signature.is_equivalent_to_impl(db, other_signature, visitor)
     }
 
     pub(crate) fn find_legacy_typevars(
@@ -919,7 +928,7 @@ impl<'db> FunctionType<'db> {
     }
 
     pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
-        self.normalized_impl(db, &TypeTransformer::default())
+        self.normalized_impl(db, &NormalizedVisitor::default())
     }
 
     pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
@@ -1014,6 +1023,7 @@ fn is_instance_truthiness<'db>(
         | Type::PropertyInstance(..)
         | Type::AlwaysTruthy
         | Type::AlwaysFalsy
+        | Type::NonInferableTypeVar(..)
         | Type::TypeVar(..)
         | Type::BoundSuper(..)
         | Type::TypeIs(..)
@@ -1158,10 +1168,6 @@ pub enum KnownFunction {
     AllMembers,
     /// `ty_extensions.has_member`
     HasMember,
-    /// `ty_extensions.top_materialization`
-    TopMaterialization,
-    /// `ty_extensions.bottom_materialization`
-    BottomMaterialization,
     /// `ty_extensions.reveal_protocol_interface`
     RevealProtocolInterface,
 }
@@ -1222,8 +1228,6 @@ impl KnownFunction {
             | Self::IsSingleValued
             | Self::IsSingleton
             | Self::IsSubtypeOf
-            | Self::TopMaterialization
-            | Self::BottomMaterialization
             | Self::GenericContext
             | Self::DunderAllNames
             | Self::EnumMembers
@@ -1559,8 +1563,6 @@ pub(crate) mod tests {
                 | KnownFunction::IsSingleValued
                 | KnownFunction::IsAssignableTo
                 | KnownFunction::IsEquivalentTo
-                | KnownFunction::TopMaterialization
-                | KnownFunction::BottomMaterialization
                 | KnownFunction::HasMember
                 | KnownFunction::RevealProtocolInterface
                 | KnownFunction::AllMembers => KnownModule::TyExtensions,

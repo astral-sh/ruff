@@ -128,10 +128,8 @@ def canonicalize(
 ) -> None: ...
 
 # The tag for Element can be set to the Comment or ProcessingInstruction
-# functions defined in this module. _ElementCallable could be a recursive
-# type, but defining it that way uncovered a bug in pytype.
-_ElementCallable: TypeAlias = Callable[..., Element[Any]]
-_CallableElement: TypeAlias = Element[_ElementCallable]
+# functions defined in this module.
+_ElementCallable: TypeAlias = Callable[..., Element[_ElementCallable]]
 
 _Tag = TypeVar("_Tag", default=str, bound=str | _ElementCallable)
 _OtherTag = TypeVar("_OtherTag", default=str, bound=str | _ElementCallable)
@@ -196,7 +194,7 @@ class Element(Generic[_Tag]):
         """True if self else False"""
 
 def SubElement(parent: Element, tag: str, attrib: dict[str, str] = ..., **extra: str) -> Element: ...
-def Comment(text: str | None = None) -> _CallableElement:
+def Comment(text: str | None = None) -> Element[_ElementCallable]:
     """Comment element factory.
 
     This function creates a special element which the standard serializer
@@ -206,7 +204,7 @@ def Comment(text: str | None = None) -> _CallableElement:
 
     """
 
-def ProcessingInstruction(target: str, text: str | None = None) -> _CallableElement:
+def ProcessingInstruction(target: str, text: str | None = None) -> Element[_ElementCallable]:
     """Processing Instruction element factory.
 
     This function creates a special element which the standard serializer
@@ -373,7 +371,7 @@ class ElementTree(Generic[_Root]):
 
     def write_c14n(self, file: _FileWriteC14N) -> None: ...
 
-HTML_EMPTY: set[str]
+HTML_EMPTY: Final[set[str]]
 
 def register_namespace(prefix: str, uri: str) -> None:
     """Register a namespace prefix.

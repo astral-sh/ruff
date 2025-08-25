@@ -11,6 +11,7 @@ use ruff_db::parsed::ParsedModuleRef;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_python_parser::TokenKind;
 use ruff_text_size::{Ranged, TextRange, TextSize};
+use ty_python_semantic::HasDefinition;
 use ty_python_semantic::ImportAliasResolution;
 use ty_python_semantic::ResolvedDefinition;
 use ty_python_semantic::types::Type;
@@ -158,6 +159,28 @@ pub(crate) enum DefinitionsOrTargets<'db> {
 }
 
 impl<'db> DefinitionsOrTargets<'db> {
+    pub(crate) fn from_ty(db: &'db dyn crate::Db, ty: Type<'db>) -> Option<Self> {
+        let ty_def = ty.definition(db)?;
+        let resolved = match ty_def {
+            ty_python_semantic::types::TypeDefinition::Module(module) => {
+                ResolvedDefinition::Module(module.file(db)?)
+            }
+            ty_python_semantic::types::TypeDefinition::Class(definition) => {
+                ResolvedDefinition::Definition(definition)
+            }
+            ty_python_semantic::types::TypeDefinition::Function(definition) => {
+                ResolvedDefinition::Definition(definition)
+            }
+            ty_python_semantic::types::TypeDefinition::TypeVar(definition) => {
+                ResolvedDefinition::Definition(definition)
+            }
+            ty_python_semantic::types::TypeDefinition::TypeAlias(definition) => {
+                ResolvedDefinition::Definition(definition)
+            }
+        };
+        Some(DefinitionsOrTargets::Definitions(vec![resolved]))
+    }
+
     /// Get the "goto-declaration" interpretation of this definition
     ///
     /// In this case it basically returns exactly what was found.
@@ -285,36 +308,24 @@ impl GotoTarget<'_> {
 
             // For already-defined symbols, they are their own definitions
             GotoTarget::FunctionDef(function) => {
-                let range = function.name.range;
-                Some(DefinitionsOrTargets::Targets(
-                    crate::NavigationTargets::single(NavigationTarget {
-                        file,
-                        focus_range: range,
-                        full_range: function.range(),
-                    }),
-                ))
+                let model = SemanticModel::new(db, file);
+                Some(DefinitionsOrTargets::Definitions(vec![
+                    ResolvedDefinition::Definition(function.definition(&model)),
+                ]))
             }
 
             GotoTarget::ClassDef(class) => {
-                let range = class.name.range;
-                Some(DefinitionsOrTargets::Targets(
-                    crate::NavigationTargets::single(NavigationTarget {
-                        file,
-                        focus_range: range,
-                        full_range: class.range(),
-                    }),
-                ))
+                let model = SemanticModel::new(db, file);
+                Some(DefinitionsOrTargets::Definitions(vec![
+                    ResolvedDefinition::Definition(class.definition(&model)),
+                ]))
             }
 
             GotoTarget::Parameter(parameter) => {
-                let range = parameter.name.range;
-                Some(DefinitionsOrTargets::Targets(
-                    crate::NavigationTargets::single(NavigationTarget {
-                        file,
-                        focus_range: range,
-                        full_range: parameter.range(),
-                    }),
-                ))
+                let model = SemanticModel::new(db, file);
+                Some(DefinitionsOrTargets::Definitions(vec![
+                    ResolvedDefinition::Definition(parameter.definition(&model)),
+                ]))
             }
 
             // For import aliases (offset within 'y' or 'z' in "from x import y as z")
@@ -376,14 +387,10 @@ impl GotoTarget<'_> {
 
             // For exception variables, they are their own definitions (like parameters)
             GotoTarget::ExceptVariable(except_handler) => {
-                if let Some(name) = &except_handler.name {
-                    let range = name.range;
-                    Some(DefinitionsOrTargets::Targets(
-                        crate::NavigationTargets::single(NavigationTarget::new(file, range)),
-                    ))
-                } else {
-                    None
-                }
+                let model = SemanticModel::new(db, file);
+                Some(DefinitionsOrTargets::Definitions(vec![
+                    ResolvedDefinition::Definition(except_handler.definition(&model)),
+                ]))
             }
 
             // For pattern match rest variables, they are their own definitions

@@ -10,7 +10,7 @@ use ruff_source_file::UniversalNewlines;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::{Edit, Fix, FixAvailability, Violation};
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for lambda expressions which are assigned to a variable.
@@ -105,29 +105,24 @@ pub(crate) fn lambda_assignment(
             }
         }
 
-        // Otherwise, if the assignment is in a class body, flag it, but use a display-only fix.
-        // Rewriting safely would require making this a static method.
-        //
-        // Similarly, if the lambda is shadowing a variable in the current scope,
+        // If the lambda is shadowing a variable in the current scope,
         // rewriting it as a function declaration may break type-checking.
         // See: https://github.com/astral-sh/ruff/issues/5421
-        if checker.semantic().current_scope().kind.is_class()
-            || checker
-                .semantic()
-                .current_scope()
-                .get_all(id)
-                .any(|binding_id| checker.semantic().binding(binding_id).kind.is_annotation())
+        let applicability = if checker
+            .semantic()
+            .current_scope()
+            .get_all(id)
+            .any(|binding_id| checker.semantic().binding(binding_id).kind.is_annotation())
         {
-            diagnostic.set_fix(Fix::display_only_edit(Edit::range_replacement(
-                indented,
-                stmt.range(),
-            )));
+            Applicability::DisplayOnly
         } else {
-            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                indented,
-                stmt.range(),
-            )));
-        }
+            Applicability::Unsafe
+        };
+
+        diagnostic.set_fix(Fix::applicable_edit(
+            Edit::range_replacement(indented, stmt.range()),
+            applicability,
+        ));
     }
 }
 
@@ -187,7 +182,7 @@ fn function(
             ExprEllipsisLiteral::default(),
         ))),
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     });
     let parameters = lambda.parameters.as_deref().cloned().unwrap_or_default();
     if let Some(annotation) = annotation {
@@ -235,7 +230,7 @@ fn function(
                 returns: Some(Box::new(return_type)),
                 type_params: None,
                 range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             });
             let generated = checker.generator().stmt(&func);
 
@@ -251,7 +246,7 @@ fn function(
         returns: None,
         type_params: None,
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     });
     let generated = checker.generator().stmt(&function);
 

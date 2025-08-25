@@ -102,28 +102,59 @@ reveal_type(alice2.name)  # revealed: @Todo(functional `NamedTuple` syntax)
 
 ### Definition
 
-TODO: Fields without default values should come before fields with.
+<!-- snapshot-diagnostics -->
+
+Fields without default values must come before fields with.
 
 ```py
 from typing import NamedTuple
 
 class Location(NamedTuple):
     altitude: float = 0.0
-    latitude: float  # this should be an error
+    # error: [invalid-named-tuple] "NamedTuple field without default value cannot follow field(s) with default value(s): Field `latitude` defined here without a default value"
+    latitude: float
+    # error: [invalid-named-tuple] "NamedTuple field without default value cannot follow field(s) with default value(s): Field `longitude` defined here without a default value"
     longitude: float
+
+class StrangeLocation(NamedTuple):
+    altitude: float
+    altitude: float = 0.0
+    altitude: float
+    altitude: float = 0.0
+    latitude: float  # error: [invalid-named-tuple]
+    longitude: float  # error: [invalid-named-tuple]
+
+class VeryStrangeLocation(NamedTuple):
+    altitude: float = 0.0
+    latitude: float  # error: [invalid-named-tuple]
+    longitude: float  # error: [invalid-named-tuple]
+    altitude: float = 0.0
 ```
 
 ### Multiple Inheritance
 
-Multiple inheritance is not supported for `NamedTuple` classes:
+<!-- snapshot-diagnostics -->
+
+Multiple inheritance is not supported for `NamedTuple` classes except with `Generic`:
 
 ```py
-from typing import NamedTuple
+from typing import NamedTuple, Protocol
 
-# This should ideally emit a diagnostic
+# error: [invalid-named-tuple] "NamedTuple class `C` cannot use multiple inheritance except with `Generic[]`"
 class C(NamedTuple, object):
     id: int
-    name: str
+
+# fmt: off
+
+class D(
+    int,  # error: [invalid-named-tuple]
+    NamedTuple
+): ...
+
+# fmt: on
+
+# error: [invalid-named-tuple]
+class E(NamedTuple, Protocol): ...
 ```
 
 ### Inheriting from a `NamedTuple`
@@ -243,7 +274,7 @@ class Person(NamedTuple):
 
 reveal_type(Person._field_defaults)  # revealed: dict[str, Any]
 reveal_type(Person._fields)  # revealed: tuple[str, ...]
-reveal_type(Person._make)  # revealed: bound method <class 'Person'>._make(iterable: Iterable[Any]) -> Self@_make
+reveal_type(Person._make)  # revealed: bound method <class 'Person'>._make(iterable: Iterable[Any]) -> Person
 reveal_type(Person._asdict)  # revealed: def _asdict(self) -> dict[str, Any]
 reveal_type(Person._replace)  # revealed: def _replace(self, **kwargs: Any) -> Self@_replace
 
@@ -266,6 +297,91 @@ Person = namedtuple("Person", ["id", "name", "age"], defaults=[None])
 
 alice = Person(1, "Alice", 42)
 bob = Person(2, "Bob")
+```
+
+## The symbol `NamedTuple` itself
+
+At runtime, `NamedTuple` is a function, and we understand this:
+
+```py
+import types
+import typing
+
+def expects_functiontype(x: types.FunctionType): ...
+
+expects_functiontype(typing.NamedTuple)
+```
+
+This means we also understand that all attributes on function objects are available on the symbol
+`typing.NamedTuple`:
+
+```py
+reveal_type(typing.NamedTuple.__name__)  # revealed: str
+reveal_type(typing.NamedTuple.__qualname__)  # revealed: str
+reveal_type(typing.NamedTuple.__kwdefaults__)  # revealed: dict[str, Any] | None
+
+# TODO: this should cause us to emit a diagnostic and reveal `Unknown` (function objects don't have an `__mro__` attribute),
+# but the fact that we don't isn't actually a `NamedTuple` bug (https://github.com/astral-sh/ty/issues/986)
+reveal_type(typing.NamedTuple.__mro__)  # revealed: tuple[<class 'FunctionType'>, <class 'object'>]
+```
+
+By the normal rules, `NamedTuple` and `type[NamedTuple]` should not be valid in type expressions --
+there is no object at runtime that is an "instance of `NamedTuple`", nor is there any class at
+runtime that is a "subclass of `NamedTuple`" -- these are both impossible, since `NamedTuple` is a
+function and not a class. However, for compatibility with other type checkers, we allow `NamedTuple`
+in type expressions and understand it as describing an interface that all `NamedTuple` classes would
+satisfy:
+
+```py
+def expects_named_tuple(x: typing.NamedTuple):
+    reveal_type(x)  # revealed: tuple[object, ...] & NamedTupleLike
+    reveal_type(x._make)  # revealed: bound method type[NamedTupleLike]._make(iterable: Iterable[Any]) -> NamedTupleLike
+    reveal_type(x._replace)  # revealed: bound method NamedTupleLike._replace(**kwargs) -> NamedTupleLike
+    # revealed: Overload[(value: tuple[object, ...], /) -> tuple[object, ...], (value: tuple[_T@__add__, ...], /) -> tuple[object, ...]]
+    reveal_type(x.__add__)
+    reveal_type(x.__iter__)  # revealed: bound method tuple[object, ...].__iter__() -> Iterator[object]
+
+def _(y: type[typing.NamedTuple]):
+    reveal_type(y)  # revealed: @Todo(unsupported type[X] special form)
+
+# error: [invalid-type-form] "Special form `typing.NamedTuple` expected no type parameter"
+def _(z: typing.NamedTuple[int]): ...
+```
+
+Any instance of a `NamedTuple` class can therefore be passed for a function parameter that is
+annotated with `NamedTuple`:
+
+```py
+from typing import NamedTuple, Protocol, Iterable, Any
+from ty_extensions import static_assert, is_assignable_to
+
+class Point(NamedTuple):
+    x: int
+    y: int
+
+reveal_type(Point._make)  # revealed: bound method <class 'Point'>._make(iterable: Iterable[Any]) -> Point
+reveal_type(Point._asdict)  # revealed: def _asdict(self) -> dict[str, Any]
+reveal_type(Point._replace)  # revealed: def _replace(self, **kwargs: Any) -> Self@_replace
+
+static_assert(is_assignable_to(Point, NamedTuple))
+
+expects_named_tuple(Point(x=42, y=56))  # fine
+
+# error: [invalid-argument-type] "Argument to function `expects_named_tuple` is incorrect: Expected `tuple[object, ...] & NamedTupleLike`, found `tuple[Literal[1], Literal[2]]`"
+expects_named_tuple((1, 2))
+```
+
+The type described by `NamedTuple` in type expressions is understood as being assignable to
+`tuple[object, ...]` and `tuple[Any, ...]`:
+
+```py
+static_assert(is_assignable_to(NamedTuple, tuple))
+static_assert(is_assignable_to(NamedTuple, tuple[object, ...]))
+static_assert(is_assignable_to(NamedTuple, tuple[Any, ...]))
+
+def expects_tuple(x: tuple[object, ...]): ...
+def _(x: NamedTuple):
+    expects_tuple(x)  # fine
 ```
 
 ## NamedTuple with custom `__getattr__`

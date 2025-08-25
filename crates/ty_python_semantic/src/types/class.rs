@@ -11,8 +11,14 @@ use super::{
 use crate::FxOrderMap;
 use crate::module_resolver::KnownModule;
 use crate::semantic_index::definition::{Definition, DefinitionState};
+use crate::semantic_index::place::ScopedPlaceId;
 use crate::semantic_index::scope::NodeWithScopeKind;
-use crate::semantic_index::{DeclarationWithConstraint, SemanticIndex, attribute_declarations};
+use crate::semantic_index::symbol::Symbol;
+use crate::semantic_index::{
+    BindingWithConstraints, DeclarationWithConstraint, SemanticIndex, attribute_declarations,
+    attribute_scopes,
+};
+use crate::types::constraints::{Constraints, IteratorConstraintsExtension};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{INVALID_LEGACY_TYPE_VARIABLE, INVALID_TYPE_ALIAS_TYPE};
 use crate::types::enums::enum_metadata;
@@ -22,11 +28,12 @@ use crate::types::infer::nearest_enclosing_class;
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
-    ApplyTypeMappingVisitor, BareTypeAliasType, Binding, BoundSuperError, BoundSuperType,
-    CallableType, DataclassParams, DeprecatedInstance, HasRelationToVisitor, KnownInstanceType,
-    NormalizedVisitor, PropertyInstanceType, StringLiteralType, TypeAliasType, TypeMapping,
-    TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, declaration_type,
-    infer_definition_types, todo_type,
+    ApplyTypeMappingVisitor, Binding, BoundSuperError, BoundSuperType, CallableType,
+    DataclassParams, DeprecatedInstance, HasRelationToVisitor, IsEquivalentVisitor,
+    KnownInstanceType, ManualPEP695TypeAliasType, NormalizedVisitor, PropertyInstanceType,
+    StringLiteralType, TypeAliasType, TypeMapping, TypeRelation, TypeVarBoundOrConstraints,
+    TypeVarInstance, TypeVarKind, VarianceInferable, declaration_type, infer_definition_types,
+    todo_type,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet, Program,
@@ -44,7 +51,7 @@ use crate::{
     },
     types::{
         CallArguments, CallError, CallErrorKind, MetaclassCandidate, UnionBuilder, UnionType,
-        cyclic::PairVisitor, definition_expression_type,
+        definition_expression_type,
     },
 };
 use indexmap::IndexSet;
@@ -197,10 +204,7 @@ impl CodeGeneratorKind {
                 Some(CodeGeneratorKind::DataclassLike)
             } else if class
                 .explicit_bases(db)
-                .iter()
-                .copied()
-                .filter_map(Type::into_class_literal)
-                .any(|class| class.is_known(db, KnownClass::NamedTuple))
+                .contains(&Type::SpecialForm(SpecialFormType::NamedTuple))
             {
                 Some(CodeGeneratorKind::NamedTuple)
             } else if class.is_typed_dict(db) {
@@ -230,7 +234,7 @@ impl CodeGeneratorKind {
         code_generator_of_class(db, class)
     }
 
-    fn matches(self, db: &dyn Db, class: ClassLiteral<'_>) -> bool {
+    pub(super) fn matches(self, db: &dyn Db, class: ClassLiteral<'_>) -> bool {
         CodeGeneratorKind::from_class(db, class) == Some(self)
     }
 }
@@ -311,6 +315,51 @@ impl<'db> GenericAlias<'db> {
 impl<'db> From<GenericAlias<'db>> for Type<'db> {
     fn from(alias: GenericAlias<'db>) -> Type<'db> {
         Type::GenericAlias(alias)
+    }
+}
+
+#[salsa::tracked]
+impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
+    #[salsa::tracked]
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+        let origin = self.origin(db);
+
+        let specialization = self.specialization(db);
+
+        // if the class is the thing defining the variable, then it can
+        // reference it without it being applied to the specialization
+        std::iter::once(origin.variance_of(db, typevar))
+            .chain(
+                specialization
+                    .generic_context(db)
+                    .variables(db)
+                    .iter()
+                    .zip(specialization.types(db))
+                    .map(|(generic_typevar, ty)| {
+                        if let Some(explicit_variance) =
+                            generic_typevar.typevar(db).explicit_variance(db)
+                        {
+                            ty.with_polarity(explicit_variance).variance_of(db, typevar)
+                        } else {
+                            // `with_polarity` composes the passed variance with the
+                            // inferred one. The inference is done lazily, as we can
+                            // sometimes determine the result just from the passed
+                            // variance. This operation is commutative, so we could
+                            // infer either first.  We choose to make the `ClassLiteral`
+                            // variance lazy, as it is known to be expensive, requiring
+                            // that we traverse all members.
+                            //
+                            // If salsa let us look at the cache, we could check first
+                            // to see if the class literal query was already run.
+
+                            let typevar_variance_in_substituted_type = ty.variance_of(db, typevar);
+                            origin
+                                .with_polarity(typevar_variance_in_substituted_type)
+                                .variance_of(db, *generic_typevar)
+                        }
+                    }),
+            )
+            .collect()
     }
 }
 
@@ -489,64 +538,88 @@ impl<'db> ClassType<'db> {
 
     /// Return `true` if `other` is present in this class's MRO.
     pub(super) fn is_subclass_of(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
-        self.has_relation_to_impl(db, other, TypeRelation::Subtyping, &PairVisitor::new(true))
+        self.when_subclass_of(db, other)
     }
 
-    pub(super) fn has_relation_to_impl(
+    pub(super) fn when_subclass_of<C: Constraints<'db>>(
+        self,
+        db: &'db dyn Db,
+        other: ClassType<'db>,
+    ) -> C {
+        self.has_relation_to_impl(
+            db,
+            other,
+            TypeRelation::Subtyping,
+            &HasRelationToVisitor::new(C::always_satisfiable(db)),
+        )
+    }
+
+    pub(super) fn has_relation_to_impl<C: Constraints<'db>>(
         self,
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
-        visitor: &HasRelationToVisitor<'db>,
-    ) -> bool {
-        self.iter_mro(db).any(|base| {
+        visitor: &HasRelationToVisitor<'db, C>,
+    ) -> C {
+        self.iter_mro(db).when_any(db, |base| {
             match base {
                 ClassBase::Dynamic(_) => match relation {
-                    TypeRelation::Subtyping => other.is_object(db),
-                    TypeRelation::Assignability => !other.is_final(db),
+                    TypeRelation::Subtyping => C::from_bool(db, other.is_object(db)),
+                    TypeRelation::Assignability => C::from_bool(db, !other.is_final(db)),
                 },
 
                 // Protocol and Generic are not represented by a ClassType.
-                ClassBase::Protocol | ClassBase::Generic => false,
+                ClassBase::Protocol | ClassBase::Generic => C::unsatisfiable(db),
 
                 ClassBase::Class(base) => match (base, other) {
-                    (ClassType::NonGeneric(base), ClassType::NonGeneric(other)) => base == other,
+                    (ClassType::NonGeneric(base), ClassType::NonGeneric(other)) => {
+                        C::from_bool(db, base == other)
+                    }
                     (ClassType::Generic(base), ClassType::Generic(other)) => {
-                        base.origin(db) == other.origin(db)
-                            && base.specialization(db).has_relation_to_impl(
+                        C::from_bool(db, base.origin(db) == other.origin(db)).and(db, || {
+                            base.specialization(db).has_relation_to_impl(
                                 db,
                                 other.specialization(db),
                                 relation,
                                 visitor,
                             )
+                        })
                     }
                     (ClassType::Generic(_), ClassType::NonGeneric(_))
-                    | (ClassType::NonGeneric(_), ClassType::Generic(_)) => false,
+                    | (ClassType::NonGeneric(_), ClassType::Generic(_)) => C::unsatisfiable(db),
                 },
 
                 ClassBase::TypedDict => {
                     // TODO: Implement subclassing and assignability for TypedDicts.
-                    true
+                    C::always_satisfiable(db)
                 }
             }
         })
     }
 
-    pub(super) fn is_equivalent_to(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
+    pub(super) fn is_equivalent_to_impl<C: Constraints<'db>>(
+        self,
+        db: &'db dyn Db,
+        other: ClassType<'db>,
+        visitor: &IsEquivalentVisitor<'db, C>,
+    ) -> C {
         if self == other {
-            return true;
+            return C::always_satisfiable(db);
         }
 
         match (self, other) {
             // A non-generic class is never equivalent to a generic class.
             // Two non-generic classes are only equivalent if they are equal (handled above).
-            (ClassType::NonGeneric(_), _) | (_, ClassType::NonGeneric(_)) => false,
+            (ClassType::NonGeneric(_), _) | (_, ClassType::NonGeneric(_)) => C::unsatisfiable(db),
 
             (ClassType::Generic(this), ClassType::Generic(other)) => {
-                this.origin(db) == other.origin(db)
-                    && this
-                        .specialization(db)
-                        .is_equivalent_to(db, other.specialization(db))
+                C::from_bool(db, this.origin(db) == other.origin(db)).and(db, || {
+                    this.specialization(db).is_equivalent_to_impl(
+                        db,
+                        other.specialization(db),
+                        visitor,
+                    )
+                })
             }
         }
     }
@@ -969,6 +1042,7 @@ impl<'db> ClassType<'db> {
 
     /// Return a callable type (or union of callable types) that represents the callable
     /// constructor signature of this class.
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     pub(super) fn into_callable(self, db: &'db dyn Db) -> Type<'db> {
         let self_ty = Type::from(self);
         let metaclass_dunder_call_function_symbol = self_ty
@@ -1020,9 +1094,10 @@ impl<'db> ClassType<'db> {
                 })
             });
 
+            let instance_ty = Type::instance(db, self);
             let dunder_new_bound_method = Type::Callable(CallableType::new(
                 db,
-                dunder_new_signature.bind_self(),
+                dunder_new_signature.bind_self(db, Some(instance_ty)),
                 true,
             ));
 
@@ -1060,9 +1135,10 @@ impl<'db> ClassType<'db> {
 
                 if let Some(signature) = signature {
                     let synthesized_signature = |signature: &Signature<'db>| {
+                        let instance_ty = Type::instance(db, self);
                         Signature::new(signature.parameters().clone(), Some(correct_return_type))
                             .with_definition(signature.definition())
-                            .bind_self()
+                            .bind_self(db, Some(instance_ty))
                     };
 
                     let synthesized_dunder_init_signature = CallableSignature::from_overloads(
@@ -1133,6 +1209,15 @@ impl<'db> From<ClassType<'db>> for Type<'db> {
     }
 }
 
+impl<'db> VarianceInferable<'db> for ClassType<'db> {
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+        match self {
+            Self::NonGeneric(class) => class.variance_of(db, typevar),
+            Self::Generic(generic) => generic.variance_of(db, typevar),
+        }
+    }
+}
+
 /// A filter that describes which methods are considered when looking for implicit attribute assignments
 /// in [`ClassLiteral::implicit_attribute`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -1174,6 +1259,16 @@ pub(crate) struct Field<'db> {
 
     /// Whether or not this field can only be passed as a keyword argument to `__init__`.
     pub(crate) kw_only: Option<bool>,
+}
+
+impl<'db> Field<'db> {
+    /// Returns true if this field is a `dataclasses.KW_ONLY` sentinel.
+    /// <https://docs.python.org/3/library/dataclasses.html#dataclasses.KW_ONLY>
+    pub(crate) fn is_kw_only_sentinel(&self, db: &'db dyn Db) -> bool {
+        self.declared_ty
+            .into_nominal_instance()
+            .is_some_and(|instance| instance.class(db).is_known(db, KnownClass::KwOnly))
+    }
 }
 
 /// Representation of a class definition statement in the AST: either a non-generic class, or a
@@ -1542,6 +1637,15 @@ impl<'db> ClassLiteral<'db> {
         // participate, so we should not return `True` if we find `Any/Unknown` in the MRO.
         self.iter_mro(db, specialization)
             .contains(&ClassBase::Class(other))
+    }
+
+    pub(super) fn when_subclass_of<C: Constraints<'db>>(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+        other: ClassType<'db>,
+    ) -> C {
+        C::from_bool(db, self.is_subclass_of(db, specialization, other))
     }
 
     /// Return `true` if this class constitutes a typed dict specification (inherits from
@@ -1929,10 +2033,9 @@ impl<'db> ClassLiteral<'db> {
             Type::instance(db, self.apply_optional_specialization(db, specialization));
 
         let signature_from_fields = |mut parameters: Vec<_>, return_ty: Option<Type<'db>>| {
-            let mut kw_only_field_seen = false;
             for (
                 field_name,
-                Field {
+                field @ Field {
                     declared_ty: mut field_ty,
                     mut default_ty,
                     init_only: _,
@@ -1946,14 +2049,10 @@ impl<'db> ClassLiteral<'db> {
                     continue;
                 }
 
-                if field_ty
-                    .into_nominal_instance()
-                    .is_some_and(|instance| instance.class(db).is_known(db, KnownClass::KwOnly))
-                {
+                if field.is_kw_only_sentinel(db) {
                     // Attributes annotated with `dataclass.KW_ONLY` are not present in the synthesized
                     // `__init__` method; they are used to indicate that the following parameters are
                     // keyword-only.
-                    kw_only_field_seen = true;
                     continue;
                 }
 
@@ -2003,9 +2102,7 @@ impl<'db> ClassLiteral<'db> {
                 }
 
                 let is_kw_only = name == "__replace__"
-                    || kw_only.unwrap_or(
-                        has_dataclass_param(DataclassParams::KW_ONLY) || kw_only_field_seen,
-                    );
+                    || kw_only.unwrap_or(has_dataclass_param(DataclassParams::KW_ONLY));
 
                 let mut parameter = if is_kw_only {
                     Parameter::keyword_only(field_name)
@@ -2304,6 +2401,7 @@ impl<'db> ClassLiteral<'db> {
         let table = place_table(db, class_body_scope);
 
         let use_def = use_def_map(db, class_body_scope);
+        let mut kw_only_sentinel_field_seen = false;
         for (symbol_id, declarations) in use_def.all_end_of_scope_symbol_declarations() {
             // Here, we exclude all declarations that are not annotated assignments. We need this because
             // things like function definitions and nested classes would otherwise be considered dataclass
@@ -2344,20 +2442,39 @@ impl<'db> ClassLiteral<'db> {
                 let mut kw_only = None;
                 if let Some(Type::KnownInstance(KnownInstanceType::Field(field))) = default_ty {
                     default_ty = Some(field.default_type(db));
-                    init = field.init(db);
-                    kw_only = field.kw_only(db);
+                    if self
+                        .dataclass_params(db)
+                        .map(|params| params.contains(DataclassParams::NO_FIELD_SPECIFIERS))
+                        .unwrap_or(false)
+                    {
+                        // This happens when constructing a `dataclass` with a `dataclass_transform`
+                        // without defining the `field_specifiers`, meaning it should ignore
+                        // `dataclasses.field` and `dataclasses.Field`.
+                    } else {
+                        init = field.init(db);
+                        kw_only = field.kw_only(db);
+                    }
                 }
 
-                attributes.insert(
-                    symbol.name().clone(),
-                    Field {
-                        declared_ty: attr_ty.apply_optional_specialization(db, specialization),
-                        default_ty,
-                        init_only: attr.is_init_var(),
-                        init,
-                        kw_only,
-                    },
-                );
+                let mut field = Field {
+                    declared_ty: attr_ty.apply_optional_specialization(db, specialization),
+                    default_ty,
+                    init_only: attr.is_init_var(),
+                    init,
+                    kw_only,
+                };
+
+                // Check if this is a KW_ONLY sentinel and mark subsequent fields as keyword-only
+                if field.is_kw_only_sentinel(db) {
+                    kw_only_sentinel_field_seen = true;
+                }
+
+                // If no explicit kw_only setting and we've seen KW_ONLY sentinel, mark as keyword-only
+                if field.kw_only.is_none() && kw_only_sentinel_field_seen {
+                    field.kw_only = Some(true);
+                }
+
+                attributes.insert(symbol.name().clone(), field);
             }
         }
 
@@ -2982,6 +3099,54 @@ impl<'db> ClassLiteral<'db> {
                 .unwrap_or_else(|| class_name.end()),
         )
     }
+
+    pub(super) fn declarations_of_name(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        index: &'db SemanticIndex<'db>,
+    ) -> Option<impl Iterator<Item = DeclarationWithConstraint<'db>>> {
+        let class_body_scope = self.body_scope(db).file_scope_id(db);
+        let symbol_id = index.place_table(class_body_scope).symbol_id(name)?;
+        let use_def = index.use_def_map(class_body_scope);
+        Some(use_def.end_of_scope_declarations(ScopedPlaceId::Symbol(symbol_id)))
+    }
+
+    pub(super) fn first_declaration_of_name(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        index: &'db SemanticIndex<'db>,
+    ) -> Option<DeclarationWithConstraint<'db>> {
+        self.declarations_of_name(db, name, index)
+            .into_iter()
+            .flatten()
+            .next()
+    }
+
+    pub(super) fn bindings_of_name(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        index: &'db SemanticIndex<'db>,
+    ) -> Option<impl Iterator<Item = BindingWithConstraints<'db, 'db>>> {
+        let class_body_scope = self.body_scope(db).file_scope_id(db);
+        let symbol_id = index.place_table(class_body_scope).symbol_id(name)?;
+        let use_def = index.use_def_map(class_body_scope);
+        Some(use_def.end_of_scope_bindings(ScopedPlaceId::Symbol(symbol_id)))
+    }
+
+    pub(super) fn first_binding_of_name(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        index: &'db SemanticIndex<'db>,
+    ) -> Option<BindingWithConstraints<'db, 'db>> {
+        self.bindings_of_name(db, name, index)
+            .into_iter()
+            .flatten()
+            .next()
+    }
 }
 
 impl<'db> From<ClassLiteral<'db>> for Type<'db> {
@@ -2993,6 +3158,126 @@ impl<'db> From<ClassLiteral<'db>> for Type<'db> {
 impl<'db> From<ClassLiteral<'db>> for ClassType<'db> {
     fn from(class: ClassLiteral<'db>) -> ClassType<'db> {
         ClassType::NonGeneric(class)
+    }
+}
+
+#[salsa::tracked]
+impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
+    #[salsa::tracked(cycle_fn=crate::types::variance_cycle_recover, cycle_initial=crate::types::variance_cycle_initial)]
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+        let typevar_in_generic_context = self
+            .generic_context(db)
+            .is_some_and(|generic_context| generic_context.variables(db).contains(&typevar));
+
+        if !typevar_in_generic_context {
+            return TypeVarVariance::Bivariant;
+        }
+        let class_body_scope = self.body_scope(db);
+
+        let file = class_body_scope.file(db);
+        let index = semantic_index(db, file);
+
+        let explicit_bases_variances = self
+            .explicit_bases(db)
+            .iter()
+            .map(|class| class.variance_of(db, typevar));
+
+        let default_attribute_variance = {
+            let is_namedtuple = CodeGeneratorKind::NamedTuple.matches(db, self);
+            // Python 3.13 introduced a synthesized `__replace__` method on dataclasses which uses
+            // their field types in contravariant position, thus meaning a frozen dataclass must
+            // still be invariant in its field types. Other synthesized methods on dataclasses are
+            // not considered here, since they don't use field types in their signatures. TODO:
+            // ideally we'd have a single source of truth for information about synthesized
+            // methods, so we just look them up normally and don't hardcode this knowledge here.
+            let is_frozen_dataclass = Program::get(db).python_version(db) <= PythonVersion::PY312
+                && self
+                    .dataclass_params(db)
+                    .is_some_and(|params| params.contains(DataclassParams::FROZEN));
+            if is_namedtuple || is_frozen_dataclass {
+                TypeVarVariance::Covariant
+            } else {
+                TypeVarVariance::Invariant
+            }
+        };
+
+        let init_name: &Name = &"__init__".into();
+        let new_name: &Name = &"__new__".into();
+
+        let use_def_map = index.use_def_map(class_body_scope.file_scope_id(db));
+        let table = place_table(db, class_body_scope);
+        let attribute_places_and_qualifiers =
+            use_def_map
+                .all_end_of_scope_symbol_declarations()
+                .map(|(symbol_id, declarations)| {
+                    let place_and_qual =
+                        place_from_declarations(db, declarations).ignore_conflicting_declarations();
+                    (symbol_id, place_and_qual)
+                })
+                .chain(use_def_map.all_end_of_scope_symbol_bindings().map(
+                    |(symbol_id, bindings)| (symbol_id, place_from_bindings(db, bindings).into()),
+                ))
+                .filter_map(|(symbol_id, place_and_qual)| {
+                    if let Some(name) = table.place(symbol_id).as_symbol().map(Symbol::name) {
+                        (![init_name, new_name].contains(&name))
+                            .then_some((name.to_string(), place_and_qual))
+                    } else {
+                        None
+                    }
+                });
+
+        // Dataclasses can have some additional synthesized methods (`__eq__`, `__hash__`,
+        // `__lt__`, etc.) but none of these will have field types type variables in their signatures, so we
+        // don't need to consider them for variance.
+
+        let attribute_names = attribute_scopes(db, self.body_scope(db))
+            .flat_map(|function_scope_id| {
+                index
+                    .place_table(function_scope_id)
+                    .members()
+                    .filter_map(|member| member.as_instance_attribute())
+                    .filter(|name| *name != init_name && *name != new_name)
+                    .map(std::string::ToString::to_string)
+                    .collect::<Vec<_>>()
+            })
+            .dedup();
+
+        let attribute_variances = attribute_names
+            .map(|name| {
+                let place_and_quals = self.own_instance_member(db, &name);
+                (name, place_and_quals)
+            })
+            .chain(attribute_places_and_qualifiers)
+            .dedup()
+            .filter_map(|(name, place_and_qual)| {
+                place_and_qual.place.ignore_possibly_unbound().map(|ty| {
+                    let variance = if place_and_qual
+                        .qualifiers
+                        // `CLASS_VAR || FINAL` is really `all()`, but
+                        // we want to be robust against new qualifiers
+                        .intersects(TypeQualifiers::CLASS_VAR | TypeQualifiers::FINAL)
+                        // We don't allow mutation of methods or properties
+                        || ty.is_function_literal()
+                        || ty.is_property_instance()
+                        // Underscore-prefixed attributes are assumed not to be externally mutated
+                        || name.starts_with('_')
+                    {
+                        // CLASS_VAR: class vars generally shouldn't contain the
+                        // type variable, but they could if it's a
+                        // callable type. They can't be mutated on instances.
+                        //
+                        // FINAL: final attributes are immutable, and thus covariant
+                        TypeVarVariance::Covariant
+                    } else {
+                        default_attribute_variance
+                    };
+                    ty.with_polarity(variance).variance_of(db, typevar)
+                })
+            });
+
+        attribute_variances
+            .chain(explicit_bases_variances)
+            .collect()
     }
 }
 
@@ -3137,7 +3422,6 @@ pub enum KnownClass {
     TypeVarTuple,
     TypeAliasType,
     NoDefaultType,
-    NamedTuple,
     NewType,
     SupportsIndex,
     Iterable,
@@ -3160,6 +3444,7 @@ pub enum KnownClass {
     InitVar,
     // _typeshed._type_checker_internals
     NamedTupleFallback,
+    NamedTupleLike,
     TypedDictFallback,
 }
 
@@ -3245,8 +3530,6 @@ impl KnownClass {
             | Self::ABCMeta
             | Self::Iterable
             | Self::Iterator
-            // Empty tuples are AlwaysFalse; non-empty tuples are AlwaysTrue
-            | Self::NamedTuple
             // Evaluating `NotImplementedType` in a boolean context was deprecated in Python 3.9
             // and raises a `TypeError` in Python >=3.14
             // (see https://docs.python.org/3/library/constants.html#NotImplemented)
@@ -3260,6 +3543,7 @@ impl KnownClass {
             | Self::KwOnly
             | Self::InitVar
             | Self::NamedTupleFallback
+            | Self::NamedTupleLike
             | Self::TypedDictFallback => Some(Truthiness::Ambiguous),
 
             Self::Tuple => None,
@@ -3342,8 +3626,8 @@ impl KnownClass {
             | Self::ExceptionGroup
             | Self::Field
             | Self::SupportsIndex
-            | Self::NamedTuple
             | Self::NamedTupleFallback
+            | Self::NamedTupleLike
             | Self::TypedDictFallback
             | Self::Counter
             | Self::DefaultDict
@@ -3412,7 +3696,6 @@ impl KnownClass {
             | KnownClass::TypeVarTuple
             | KnownClass::TypeAliasType
             | KnownClass::NoDefaultType
-            | KnownClass::NamedTuple
             | KnownClass::NewType
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
@@ -3429,6 +3712,7 @@ impl KnownClass {
             | KnownClass::KwOnly
             | KnownClass::InitVar
             | KnownClass::NamedTupleFallback
+            | KnownClass::NamedTupleLike
             | KnownClass::TypedDictFallback => false,
         }
     }
@@ -3489,7 +3773,6 @@ impl KnownClass {
             | KnownClass::TypeVarTuple
             | KnownClass::TypeAliasType
             | KnownClass::NoDefaultType
-            | KnownClass::NamedTuple
             | KnownClass::NewType
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
@@ -3506,6 +3789,7 @@ impl KnownClass {
             | KnownClass::KwOnly
             | KnownClass::InitVar
             | KnownClass::NamedTupleFallback
+            | KnownClass::NamedTupleLike
             | KnownClass::TypedDictFallback => false,
         }
     }
@@ -3566,7 +3850,6 @@ impl KnownClass {
             | KnownClass::TypeVarTuple
             | KnownClass::TypeAliasType
             | KnownClass::NoDefaultType
-            | KnownClass::NamedTuple
             | KnownClass::NewType
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
@@ -3582,6 +3865,7 @@ impl KnownClass {
             | KnownClass::KwOnly
             | KnownClass::InitVar
             | KnownClass::TypedDictFallback
+            | KnownClass::NamedTupleLike
             | KnownClass::NamedTupleFallback => false,
         }
     }
@@ -3604,6 +3888,7 @@ impl KnownClass {
             | Self::Iterable
             | Self::Iterator
             | Self::Awaitable
+            | Self::NamedTupleLike
             | Self::Generator => true,
 
             Self::Any
@@ -3648,7 +3933,6 @@ impl KnownClass {
             | Self::TypeVarTuple
             | Self::TypeAliasType
             | Self::NoDefaultType
-            | Self::NamedTuple
             | Self::NewType
             | Self::ChainMap
             | Self::Counter
@@ -3713,7 +3997,6 @@ impl KnownClass {
             Self::GeneratorType => "GeneratorType",
             Self::AsyncGeneratorType => "AsyncGeneratorType",
             Self::CoroutineType => "CoroutineType",
-            Self::NamedTuple => "NamedTuple",
             Self::NoneType => "NoneType",
             Self::SpecialForm => "_SpecialForm",
             Self::TypeVar => "TypeVar",
@@ -3767,6 +4050,7 @@ impl KnownClass {
             Self::KwOnly => "KW_ONLY",
             Self::InitVar => "InitVar",
             Self::NamedTupleFallback => "NamedTupleFallback",
+            Self::NamedTupleLike => "NamedTupleLike",
             Self::TypedDictFallback => "TypedDictFallback",
         }
     }
@@ -3937,6 +4221,14 @@ impl KnownClass {
             .is_ok_and(|class| class.is_subclass_of(db, None, other))
     }
 
+    pub(super) fn when_subclass_of<'db, C: Constraints<'db>>(
+        self,
+        db: &'db dyn Db,
+        other: ClassType<'db>,
+    ) -> C {
+        C::from_bool(db, self.is_subclass_of(db, other))
+    }
+
     /// Return the module in which we should look up the definition for this class
     fn canonical_module(self, db: &dyn Db) -> KnownModule {
         match self {
@@ -3984,7 +4276,6 @@ impl KnownClass {
             | Self::Generator
             | Self::SpecialForm
             | Self::TypeVar
-            | Self::NamedTuple
             | Self::StdlibAlias
             | Self::Iterable
             | Self::Iterator
@@ -4025,6 +4316,7 @@ impl KnownClass {
             | Self::OrderedDict => KnownModule::Collections,
             Self::Field | Self::KwOnly | Self::InitVar => KnownModule::Dataclasses,
             Self::NamedTupleFallback | Self::TypedDictFallback => KnownModule::TypeCheckerInternals,
+            Self::NamedTupleLike => KnownModule::TyExtensions,
         }
     }
 
@@ -4095,7 +4387,6 @@ impl KnownClass {
             | Self::Nonmember
             | Self::ABCMeta
             | Self::Super
-            | Self::NamedTuple
             | Self::NewType
             | Self::Field
             | Self::KwOnly
@@ -4103,6 +4394,7 @@ impl KnownClass {
             | Self::Iterable
             | Self::Iterator
             | Self::NamedTupleFallback
+            | Self::NamedTupleLike
             | Self::TypedDictFallback => Some(false),
 
             Self::Tuple => None,
@@ -4177,7 +4469,6 @@ impl KnownClass {
             | Self::ABCMeta
             | Self::Super
             | Self::UnionType
-            | Self::NamedTuple
             | Self::NewType
             | Self::Field
             | Self::KwOnly
@@ -4185,6 +4476,7 @@ impl KnownClass {
             | Self::Iterable
             | Self::Iterator
             | Self::NamedTupleFallback
+            | Self::NamedTupleLike
             | Self::TypedDictFallback => false,
         }
     }
@@ -4234,7 +4526,6 @@ impl KnownClass {
             "UnionType" => Self::UnionType,
             "MethodWrapperType" => Self::MethodWrapperType,
             "WrapperDescriptorType" => Self::WrapperDescriptorType,
-            "NamedTuple" => Self::NamedTuple,
             "NewType" => Self::NewType,
             "TypeAliasType" => Self::TypeAliasType,
             "TypeVar" => Self::TypeVar,
@@ -4275,6 +4566,7 @@ impl KnownClass {
             "KW_ONLY" => Self::KwOnly,
             "InitVar" => Self::InitVar,
             "NamedTupleFallback" => Self::NamedTupleFallback,
+            "NamedTupleLike" => Self::NamedTupleLike,
             "TypedDictFallback" => Self::TypedDictFallback,
             _ => return None,
         };
@@ -4341,6 +4633,7 @@ impl KnownClass {
             | Self::InitVar
             | Self::NamedTupleFallback
             | Self::TypedDictFallback
+            | Self::NamedTupleLike
             | Self::Awaitable
             | Self::Generator => module == self.canonical_module(db),
             Self::NoneType => matches!(module, KnownModule::Typeshed | KnownModule::Types),
@@ -4353,7 +4646,6 @@ impl KnownClass {
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
-            | Self::NamedTuple
             | Self::Iterable
             | Self::Iterator
             | Self::NewType => matches!(module, KnownModule::Typing | KnownModule::TypingExtensions),
@@ -4610,7 +4902,7 @@ impl KnownClass {
                         &target.id,
                         Some(containing_assignment),
                         bound_or_constraint,
-                        variance,
+                        Some(variance),
                         default.map(Into::into),
                         TypeVarKind::Legacy,
                     ),
@@ -4644,7 +4936,7 @@ impl KnownClass {
                     return;
                 };
                 overload.set_return_type(Type::KnownInstance(KnownInstanceType::TypeAliasType(
-                    TypeAliasType::Bare(BareTypeAliasType::new(
+                    TypeAliasType::ManualPEP695(ManualPEP695TypeAliasType::new(
                         db,
                         ast::name::Name::new(name.value(db)),
                         containing_assignment,

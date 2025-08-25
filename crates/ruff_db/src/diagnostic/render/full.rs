@@ -1,7 +1,17 @@
+use std::borrow::Cow;
+use std::num::NonZeroUsize;
+
+use anstyle::Style;
+use similar::{ChangeTag, TextDiff};
+
 use ruff_annotate_snippets::Renderer as AnnotateRenderer;
+use ruff_diagnostics::{Applicability, Fix};
+use ruff_source_file::OneIndexed;
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::diagnostic::render::{FileResolver, Resolved};
-use crate::diagnostic::{Diagnostic, DisplayDiagnosticConfig, stylesheet::DiagnosticStylesheet};
+use crate::diagnostic::stylesheet::{DiagnosticStylesheet, fmt_styled};
+use crate::diagnostic::{Diagnostic, DiagnosticSource, DisplayDiagnosticConfig};
 
 pub(super) struct FullRenderer<'a> {
     resolver: &'a dyn FileResolver,
@@ -48,9 +58,196 @@ impl<'a> FullRenderer<'a> {
                 writeln!(f, "{}", renderer.render(diag.to_annotate()))?;
             }
             writeln!(f)?;
+
+            if self.config.show_fix_diff {
+                if let Some(diff) = Diff::from_diagnostic(diag, &stylesheet, self.resolver) {
+                    writeln!(f, "{diff}")?;
+                }
+            }
         }
 
         Ok(())
+    }
+}
+
+/// Renders a diff that shows the code fixes.
+///
+/// The implementation isn't fully fledged out and only used by tests. Before using in production, try
+/// * Improve layout
+/// * Replace tabs with spaces for a consistent experience across terminals
+/// * Replace zero-width whitespaces
+/// * Print a simpler diff if only a single line has changed
+/// * Compute the diff from the `Edit` because diff calculation is expensive.
+struct Diff<'a> {
+    fix: &'a Fix,
+    diagnostic_source: DiagnosticSource,
+    stylesheet: &'a DiagnosticStylesheet,
+}
+
+impl<'a> Diff<'a> {
+    fn from_diagnostic(
+        diagnostic: &'a Diagnostic,
+        stylesheet: &'a DiagnosticStylesheet,
+        resolver: &'a dyn FileResolver,
+    ) -> Option<Diff<'a>> {
+        Some(Diff {
+            fix: diagnostic.fix()?,
+            diagnostic_source: diagnostic
+                .primary_span_ref()?
+                .file
+                .diagnostic_source(resolver),
+            stylesheet,
+        })
+    }
+}
+
+impl std::fmt::Display for Diff<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let source_code = self.diagnostic_source.as_source_code();
+        let source_text = source_code.text();
+
+        // TODO(dhruvmanila): Add support for Notebook cells once it's user-facing
+        let mut output = String::with_capacity(source_text.len());
+        let mut last_end = TextSize::default();
+
+        for edit in self.fix.edits() {
+            output.push_str(source_code.slice(TextRange::new(last_end, edit.start())));
+            output.push_str(edit.content().unwrap_or_default());
+            last_end = edit.end();
+        }
+
+        output.push_str(&source_text[usize::from(last_end)..]);
+
+        let diff = TextDiff::from_lines(source_text, &output);
+
+        let message = match self.fix.applicability() {
+            // TODO(zanieb): Adjust this messaging once it's user-facing
+            Applicability::Safe => "Safe fix",
+            Applicability::Unsafe => "Unsafe fix",
+            Applicability::DisplayOnly => "Display-only fix",
+        };
+
+        // TODO(brent) `stylesheet.separator` is cyan rather than blue, as we had before. I think
+        // we're getting rid of this soon anyway, so I didn't think it was worth adding another
+        // style to the stylesheet temporarily. The color doesn't appear at all in the snapshot
+        // tests, which is the only place these are currently used.
+        writeln!(f, "ℹ {}", fmt_styled(message, self.stylesheet.separator))?;
+
+        let (largest_old, largest_new) = diff
+            .ops()
+            .last()
+            .map(|op| (op.old_range().start, op.new_range().start))
+            .unwrap_or_default();
+
+        let digit_with = OneIndexed::from_zero_indexed(largest_new.max(largest_old)).digits();
+
+        for (idx, group) in diff.grouped_ops(3).iter().enumerate() {
+            if idx > 0 {
+                writeln!(f, "{:-^1$}", "-", 80)?;
+            }
+            for op in group {
+                for change in diff.iter_inline_changes(op) {
+                    let sign = match change.tag() {
+                        ChangeTag::Delete => "-",
+                        ChangeTag::Insert => "+",
+                        ChangeTag::Equal => " ",
+                    };
+
+                    let line_style = LineStyle::from(change.tag(), self.stylesheet);
+
+                    let old_index = change.old_index().map(OneIndexed::from_zero_indexed);
+                    let new_index = change.new_index().map(OneIndexed::from_zero_indexed);
+
+                    write!(
+                        f,
+                        "{} {} |{}",
+                        Line {
+                            index: old_index,
+                            width: digit_with
+                        },
+                        Line {
+                            index: new_index,
+                            width: digit_with
+                        },
+                        fmt_styled(line_style.apply_to(sign), self.stylesheet.emphasis),
+                    )?;
+
+                    for (emphasized, value) in change.iter_strings_lossy() {
+                        let value = show_nonprinting(&value);
+                        if emphasized {
+                            write!(
+                                f,
+                                "{}",
+                                fmt_styled(line_style.apply_to(&value), self.stylesheet.underline)
+                            )?;
+                        } else {
+                            write!(f, "{}", line_style.apply_to(&value))?;
+                        }
+                    }
+                    if change.missing_newline() {
+                        writeln!(f)?;
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+}
+
+struct LineStyle {
+    style: Style,
+}
+
+impl LineStyle {
+    fn apply_to(&self, input: &str) -> impl std::fmt::Display {
+        fmt_styled(input, self.style)
+    }
+
+    fn from(value: ChangeTag, stylesheet: &DiagnosticStylesheet) -> LineStyle {
+        match value {
+            ChangeTag::Equal => LineStyle {
+                style: stylesheet.none,
+            },
+            ChangeTag::Delete => LineStyle {
+                style: stylesheet.deletion,
+            },
+            ChangeTag::Insert => LineStyle {
+                style: stylesheet.insertion,
+            },
+        }
+    }
+}
+
+struct Line {
+    index: Option<OneIndexed>,
+    width: NonZeroUsize,
+}
+
+impl std::fmt::Display for Line {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self.index {
+            None => {
+                for _ in 0..self.width.get() {
+                    f.write_str(" ")?;
+                }
+                Ok(())
+            }
+            Some(idx) => write!(f, "{:<width$}", idx, width = self.width.get()),
+        }
+    }
+}
+
+fn show_nonprinting(s: &str) -> Cow<'_, str> {
+    if s.find(['\x07', '\x08', '\x1b', '\x7f']).is_some() {
+        Cow::Owned(
+            s.replace('\x07', "␇")
+                .replace('\x08', "␈")
+                .replace('\x1b', "␛")
+                .replace('\x7f', "␡"),
+        )
+    } else {
+        Cow::Borrowed(s)
     }
 }
 

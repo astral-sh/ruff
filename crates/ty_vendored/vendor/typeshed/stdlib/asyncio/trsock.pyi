@@ -21,6 +21,7 @@ class TransportSocket:
     operations (like "socket.close()") are banned.
     """
 
+    __slots__ = ("_sock",)
     def __init__(self, sock: socket.socket) -> None: ...
     @property
     def family(self) -> int: ...

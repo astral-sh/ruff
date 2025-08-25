@@ -9,7 +9,7 @@ use crate::session::client::Client;
 use lsp_types::request::InlayHintRequest;
 use lsp_types::{InlayHintParams, Url};
 use ruff_db::source::{line_index, source_text};
-use ty_ide::inlay_hints;
+use ty_ide::{InlayHintContent, inlay_hints};
 use ty_project::ProjectDatabase;
 
 pub(crate) struct InlayHintRequestHandler;
@@ -29,9 +29,9 @@ impl BackgroundDocumentRequestHandler for InlayHintRequestHandler {
         _client: &Client,
         params: InlayHintParams,
     ) -> crate::server::Result<Option<Vec<lsp_types::InlayHint>>> {
-        if snapshot
-            .workspace_settings()
-            .is_language_services_disabled()
+        let workspace_settings = snapshot.workspace_settings();
+        if workspace_settings.is_language_services_disabled()
+            || !workspace_settings.inlay_hints().any_enabled()
         {
             return Ok(None);
         }
@@ -47,7 +47,7 @@ impl BackgroundDocumentRequestHandler for InlayHintRequestHandler {
             .range
             .to_text_range(&source, &index, snapshot.encoding());
 
-        let inlay_hints = inlay_hints(db, file, range, snapshot.workspace_settings().inlay_hints());
+        let inlay_hints = inlay_hints(db, file, range, workspace_settings.inlay_hints());
 
         let inlay_hints = inlay_hints
             .into_iter()
@@ -56,7 +56,7 @@ impl BackgroundDocumentRequestHandler for InlayHintRequestHandler {
                     .position
                     .to_position(&source, &index, snapshot.encoding()),
                 label: lsp_types::InlayHintLabel::String(hint.display(db).to_string()),
-                kind: Some(lsp_types::InlayHintKind::TYPE),
+                kind: Some(inlay_hint_kind(&hint.content)),
                 tooltip: None,
                 padding_left: None,
                 padding_right: None,
@@ -70,3 +70,10 @@ impl BackgroundDocumentRequestHandler for InlayHintRequestHandler {
 }
 
 impl RetriableRequestHandler for InlayHintRequestHandler {}
+
+fn inlay_hint_kind(inlay_hint_content: &InlayHintContent) -> lsp_types::InlayHintKind {
+    match inlay_hint_content {
+        InlayHintContent::Type(_) => lsp_types::InlayHintKind::TYPE,
+        InlayHintContent::CallArgumentName(_) => lsp_types::InlayHintKind::PARAMETER,
+    }
+}

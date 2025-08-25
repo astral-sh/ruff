@@ -315,7 +315,7 @@ def stack_size(size: int = 0, /) -> int:
     the suggested approach in the absence of more specific information).
     """
 
-TIMEOUT_MAX: float
+TIMEOUT_MAX: Final[float]
 
 def get_native_id() -> int:  # only available on some platforms
     """Return a non-negative integer identifying the thread as reported

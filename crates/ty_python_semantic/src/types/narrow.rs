@@ -215,7 +215,7 @@ impl ClassInfoConstraintFunction {
             Type::Union(union) => {
                 union.try_map(db, |element| self.generate_constraint(db, *element))
             }
-            Type::TypeVar(bound_typevar) => match bound_typevar
+            Type::NonInferableTypeVar(bound_typevar) => match bound_typevar
                 .typevar(db)
                 .bound_or_constraints(db)?
             {
@@ -259,6 +259,7 @@ impl ClassInfoConstraintFunction {
             | Type::IntLiteral(_)
             | Type::KnownInstance(_)
             | Type::TypeIs(_)
+            | Type::TypeVar(_)
             | Type::WrapperDescriptor(_)
             | Type::DataclassTransformer(_)
             | Type::TypedDict(_) => None,
@@ -756,12 +757,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                             node_index: _,
                         },
                 }) if keywords.is_empty() => {
-                    let rhs_class = match rhs_ty {
-                        Type::ClassLiteral(class) => class,
-                        Type::GenericAlias(alias) => alias.origin(self.db),
-                        _ => {
-                            continue;
-                        }
+                    let Type::ClassLiteral(rhs_class) = rhs_ty else {
+                        continue;
                     };
 
                     let target = match &**args {
@@ -772,13 +769,15 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                         _ => continue,
                     };
 
-                    let is_valid_constraint = if is_positive {
+                    let is_positive = if is_positive {
                         op == &ast::CmpOp::Is
                     } else {
                         op == &ast::CmpOp::IsNot
                     };
 
-                    if !is_valid_constraint {
+                    // `else`-branch narrowing for `if type(x) is Y` can only be done
+                    // if `Y` is a final class
+                    if !rhs_class.is_final(self.db) && !is_positive {
                         continue;
                     }
 
@@ -791,7 +790,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                         let place = self.expect_place(&target);
                         constraints.insert(
                             place,
-                            Type::instance(self.db, rhs_class.unknown_specialization(self.db)),
+                            Type::instance(self.db, rhs_class.unknown_specialization(self.db))
+                                .negate_if(self.db, !is_positive),
                         );
                     }
                 }

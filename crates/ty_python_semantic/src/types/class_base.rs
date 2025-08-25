@@ -3,8 +3,7 @@ use crate::types::generics::Specialization;
 use crate::types::tuple::TupleType;
 use crate::types::{
     ApplyTypeMappingVisitor, ClassLiteral, ClassType, DynamicType, KnownClass, KnownInstanceType,
-    MroError, MroIterator, NormalizedVisitor, SpecialFormType, Type, TypeMapping, TypeTransformer,
-    todo_type,
+    MroError, MroIterator, NormalizedVisitor, SpecialFormType, Type, TypeMapping, todo_type,
 };
 
 /// Enumeration of the possible kinds of types we allow in class bases.
@@ -80,18 +79,6 @@ impl<'db> ClassBase<'db> {
             Type::ClassLiteral(literal) => {
                 if literal.is_known(db, KnownClass::Any) {
                     Some(Self::Dynamic(DynamicType::Any))
-                } else if literal.is_known(db, KnownClass::NamedTuple) {
-                    let fields = subclass.own_fields(db, None);
-                    Self::try_from_type(
-                        db,
-                        TupleType::heterogeneous(
-                            db,
-                            fields.values().map(|field| field.declared_ty),
-                        )?
-                        .to_class_type(db)
-                        .into(),
-                        subclass,
-                    )
                 } else {
                     Some(Self::Class(literal.default_specialization(db)))
                 }
@@ -167,6 +154,7 @@ impl<'db> ClassBase<'db> {
             | Type::StringLiteral(_)
             | Type::LiteralString
             | Type::ModuleLiteral(_)
+            | Type::NonInferableTypeVar(_)
             | Type::TypeVar(_)
             | Type::BoundSuper(_)
             | Type::ProtocolInstance(_)
@@ -204,6 +192,8 @@ impl<'db> ClassBase<'db> {
                 | SpecialFormType::ReadOnly
                 | SpecialFormType::Optional
                 | SpecialFormType::Not
+                | SpecialFormType::Top
+                | SpecialFormType::Bottom
                 | SpecialFormType::Intersection
                 | SpecialFormType::TypeOf
                 | SpecialFormType::CallableTypeOf
@@ -214,6 +204,20 @@ impl<'db> ClassBase<'db> {
 
                 SpecialFormType::Protocol => Some(Self::Protocol),
                 SpecialFormType::Generic => Some(Self::Generic),
+
+                SpecialFormType::NamedTuple => {
+                    let fields = subclass.own_fields(db, None);
+                    Self::try_from_type(
+                        db,
+                        TupleType::heterogeneous(
+                            db,
+                            fields.values().map(|field| field.declared_ty),
+                        )?
+                        .to_class_type(db)
+                        .into(),
+                        subclass,
+                    )
+                }
 
                 // TODO: Classes inheriting from `typing.Type` et al. also have `Generic` in their MRO
                 SpecialFormType::Dict => {
@@ -289,7 +293,7 @@ impl<'db> ClassBase<'db> {
             self.apply_type_mapping_impl(
                 db,
                 &TypeMapping::Specialization(specialization),
-                &TypeTransformer::default(),
+                &ApplyTypeMappingVisitor::default(),
             )
         } else {
             self
