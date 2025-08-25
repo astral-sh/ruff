@@ -166,7 +166,7 @@ bitflags! {
     }
 }
 
-#[derive(Debug, is_macro::Is)]
+#[derive(Clone, Copy, Debug, is_macro::Is)]
 pub enum ScopeKind<'a> {
     Class(&'a ast::StmtClassDef),
     /// The implicit `__class__` scope surrounding a method which allows code in the
