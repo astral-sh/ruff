@@ -118,7 +118,7 @@ error[no-matching-overload]: No overload of function `f` matches arguments
    | |_________^
 41 |       )
    |
-info: Limit of argument type expansions reached
+info: Limit of argument type expansion reached at argument 10
 info: First overload defined here
   --> src/overloaded.pyi:8:5
    |

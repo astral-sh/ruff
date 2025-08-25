@@ -133,7 +133,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
 
         /// Represents the state of the expansion process.
         enum State<'a, 'b, 'db> {
-            LimitReached,
+            LimitReached(usize),
             Expanding(ExpandingState<'a, 'b, 'db>),
         }
 
@@ -172,7 +172,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
             Some(State::Expanding(ExpandingState::Initial(&self.types))),
             move |previous| {
                 let state = match previous {
-                    State::LimitReached => return Some(State::LimitReached),
+                    State::LimitReached(index) => return Some(State::LimitReached(*index)),
                     State::Expanding(expanding_state) => expanding_state,
                 };
 
@@ -193,7 +193,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                         "Skipping argument type expansion as it would exceed the \
                     maximum number of expansions ({MAX_EXPANSIONS})"
                     );
-                    return Some(State::LimitReached);
+                    return Some(State::LimitReached(index));
                 }
 
                 let mut expanded_arguments = Vec::with_capacity(expansion_size);
@@ -219,7 +219,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         )
         .skip(1) // Skip the initial state, which has no expanded types.
         .map(|state| match state {
-            State::LimitReached => Expansion::LimitReached,
+            State::LimitReached(index) => Expansion::LimitReached(index),
             State::Expanding(ExpandingState::Initial(_)) => {
                 unreachable!("initial state should be skipped")
             }
@@ -234,7 +234,10 @@ impl<'a, 'db> CallArguments<'a, 'db> {
 pub(super) enum Expansion<'a, 'db> {
     /// Indicates that the expansion process has reached the maximum number of argument lists
     /// that can be generated in a single step.
-    LimitReached,
+    ///
+    /// The contained `usize` is the index of the argument type which would have been expanded
+    /// next, if not for the limit.
+    LimitReached(usize),
 
     /// Contains the expanded argument lists, where each list contains the same arguments, but with
     /// one or more of the argument types expanded.

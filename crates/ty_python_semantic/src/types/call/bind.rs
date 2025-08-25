@@ -1382,10 +1382,11 @@ impl<'db> CallableBinding<'db> {
 
         for expansion in expansions {
             let expanded_argument_lists = match expansion {
-                Expansion::LimitReached => {
+                Expansion::LimitReached(index) => {
                     snapshotter.restore(self, post_evaluation_snapshot);
-                    self.overload_call_return_type =
-                        Some(OverloadCallReturnType::ArgumentTypeExpansionLimitReached);
+                    self.overload_call_return_type = Some(
+                        OverloadCallReturnType::ArgumentTypeExpansionLimitReached(index),
+                    );
                     return;
                 }
                 Expansion::Expanded(argument_lists) => argument_lists,
@@ -1689,7 +1690,7 @@ impl<'db> CallableBinding<'db> {
         if let Some(overload_call_return_type) = self.overload_call_return_type {
             return match overload_call_return_type {
                 OverloadCallReturnType::ArgumentTypeExpansion(return_type) => return_type,
-                OverloadCallReturnType::ArgumentTypeExpansionLimitReached
+                OverloadCallReturnType::ArgumentTypeExpansionLimitReached(_)
                 | OverloadCallReturnType::Ambiguous => Type::unknown(),
             };
         }
@@ -1802,16 +1803,20 @@ impl<'db> CallableBinding<'db> {
                     }
                 ));
 
-                if self
-                    .overload_call_return_type
-                    .is_some_and(|overload_call_return_type| {
-                        matches!(
-                            overload_call_return_type,
-                            OverloadCallReturnType::ArgumentTypeExpansionLimitReached
+                if let Some(index) =
+                    self.overload_call_return_type
+                        .and_then(
+                            |overload_call_return_type| match overload_call_return_type {
+                                OverloadCallReturnType::ArgumentTypeExpansionLimitReached(
+                                    index,
+                                ) => Some(index),
+                                _ => None,
+                            },
                         )
-                    })
                 {
-                    diag.info("Limit of argument type expansions reached");
+                    diag.info(format_args!(
+                        "Limit of argument type expansion reached at argument {index}"
+                    ));
                 }
 
                 if let Some((kind, function)) = function_type_and_kind {
@@ -1880,7 +1885,7 @@ impl<'a, 'db> IntoIterator for &'a CallableBinding<'db> {
 #[derive(Debug, Copy, Clone)]
 enum OverloadCallReturnType<'db> {
     ArgumentTypeExpansion(Type<'db>),
-    ArgumentTypeExpansionLimitReached,
+    ArgumentTypeExpansionLimitReached(usize),
     Ambiguous,
 }
 
