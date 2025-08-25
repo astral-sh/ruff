@@ -8,8 +8,8 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::{QualifiedName, QualifiedNameBuilder};
 use ruff_python_ast::{self as ast, Stmt};
 use ruff_python_semantic::{
-    AnyImport, Binding, BindingId, BindingKind, Exceptions, Imported, NodeId, Scope, ScopeId,
-    SemanticModel, SubmoduleImport,
+    AnyImport, Binding, BindingFlags, BindingId, BindingKind, Exceptions, Imported, NodeId, Scope,
+    ScopeId, SemanticModel, SubmoduleImport,
 };
 use ruff_text_size::{Ranged, TextRange};
 
@@ -285,10 +285,6 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
     let mut ignored: BTreeMap<(NodeId, Exceptions), Vec<ImportBinding>> = BTreeMap::default();
 
     for binding in unused_imports_in_scope(checker.semantic(), scope) {
-        if binding.is_used() {
-            continue;
-        }
-
         let Some(import) = binding.as_any_import() else {
             continue;
         };
@@ -595,12 +591,15 @@ fn unused_imports_in_scope<'a, 'b>(
         .filter(|(_, bdg)| !bdg.is_global() && !bdg.is_nonlocal() && !bdg.is_explicit_export())
         .flat_map(|(id, bdg)| {
             if scope.shadowed_bindings(id).all(|shadow| {
+                let shadowed_binding = semantic.binding(shadow);
                 matches!(
-                    semantic.binding(shadow).kind,
+                    shadowed_binding.kind,
                     BindingKind::Import(_) | BindingKind::SubmoduleImport(_)
-                )
+                ) && !shadowed_binding.flags.contains(BindingFlags::ALIAS)
             }) {
                 unused_imports_from_binding(semantic, id, scope)
+            } else if bdg.is_used() {
+                vec![]
             } else {
                 vec![bdg]
             }
