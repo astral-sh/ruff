@@ -447,7 +447,7 @@ pub(crate) fn print_jupyter_messages(
         .with_show_fix_status(true)
         .with_show_fix_diff(true)
         .with_show_source(true)
-        .with_unsafe_fixes(UnsafeFixes::Enabled)
+        .with_fix_applicability(Applicability::DisplayOnly)
         .emit(
             &mut output,
             diagnostics,
@@ -468,7 +468,7 @@ pub(crate) fn print_messages(diagnostics: &[Diagnostic]) -> String {
         .with_show_fix_status(true)
         .with_show_fix_diff(true)
         .with_show_source(true)
-        .with_unsafe_fixes(UnsafeFixes::Enabled)
+        .with_fix_applicability(Applicability::DisplayOnly)
         .emit(
             &mut output,
             diagnostics,

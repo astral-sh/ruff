@@ -40,12 +40,13 @@ pub struct DiagnosticStylesheet {
     pub(crate) help: Style,
     pub(crate) line_no: Style,
     pub(crate) emphasis: Style,
-    pub(crate) underline: Style,
     pub(crate) none: Style,
     pub(crate) separator: Style,
     pub(crate) secondary_code: Style,
     pub(crate) insertion: Style,
     pub(crate) deletion: Style,
+    pub(crate) insertion_line_no: Style,
+    pub(crate) deletion_line_no: Style,
 }
 
 impl Default for DiagnosticStylesheet {
@@ -66,12 +67,13 @@ impl DiagnosticStylesheet {
             help: AnsiColor::BrightCyan.on_default().effects(Effects::BOLD),
             line_no: bright_blue.effects(Effects::BOLD),
             emphasis: Style::new().effects(Effects::BOLD),
-            underline: Style::new().effects(Effects::UNDERLINE),
             none: Style::new(),
             separator: AnsiColor::Cyan.on_default(),
             secondary_code: AnsiColor::Red.on_default().effects(Effects::BOLD),
             insertion: AnsiColor::Green.on_default(),
             deletion: AnsiColor::Red.on_default(),
+            insertion_line_no: AnsiColor::Green.on_default().effects(Effects::BOLD),
+            deletion_line_no: AnsiColor::Red.on_default().effects(Effects::BOLD),
         }
     }
 
@@ -84,12 +86,13 @@ impl DiagnosticStylesheet {
             help: Style::new(),
             line_no: Style::new(),
             emphasis: Style::new(),
-            underline: Style::new(),
             none: Style::new(),
             separator: Style::new(),
             secondary_code: Style::new(),
             insertion: Style::new(),
             deletion: Style::new(),
+            insertion_line_no: Style::new(),
+            deletion_line_no: Style::new(),
         }
     }
 }

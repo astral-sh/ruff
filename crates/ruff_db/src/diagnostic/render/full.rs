@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 use std::num::NonZeroUsize;
 
-use anstyle::Style;
 use similar::{ChangeTag, TextDiff};
 
 use ruff_annotate_snippets::Renderer as AnnotateRenderer;
@@ -57,13 +56,14 @@ impl<'a> FullRenderer<'a> {
             for diag in renderable.diagnostics.iter() {
                 writeln!(f, "{}", renderer.render(diag.to_annotate()))?;
             }
-            writeln!(f)?;
 
-            if self.config.show_fix_diff {
+            if self.config.show_fix_diff && diag.fix_applies(self.config) {
                 if let Some(diff) = Diff::from_diagnostic(diag, &stylesheet, self.resolver) {
-                    writeln!(f, "{diff}")?;
+                    write!(f, "{diff}")?;
                 }
             }
+
+            writeln!(f)?;
         }
 
         Ok(())
@@ -116,22 +116,9 @@ impl std::fmt::Display for Diff<'_> {
             last_end = edit.end();
         }
 
-        output.push_str(&source_text[usize::from(last_end)..]);
+        output.push_str(&source_code.text()[usize::from(last_end)..]);
 
-        let diff = TextDiff::from_lines(source_text, &output);
-
-        let message = match self.fix.applicability() {
-            // TODO(zanieb): Adjust this messaging once it's user-facing
-            Applicability::Safe => "Safe fix",
-            Applicability::Unsafe => "Unsafe fix",
-            Applicability::DisplayOnly => "Display-only fix",
-        };
-
-        // TODO(brent) `stylesheet.separator` is cyan rather than blue, as we had before. I think
-        // we're getting rid of this soon anyway, so I didn't think it was worth adding another
-        // style to the stylesheet temporarily. The color doesn't appear at all in the snapshot
-        // tests, which is the only place these are currently used.
-        writeln!(f, "ℹ {}", fmt_styled(message, self.stylesheet.separator))?;
+        let diff = TextDiff::from_lines(source_code.text(), &output);
 
         let (largest_old, largest_new) = diff
             .ops()
@@ -139,7 +126,7 @@ impl std::fmt::Display for Diff<'_> {
             .map(|op| (op.old_range().start, op.new_range().start))
             .unwrap_or_default();
 
-        let digit_with = OneIndexed::from_zero_indexed(largest_new.max(largest_old)).digits();
+        let digit_width = OneIndexed::from_zero_indexed(largest_new.max(largest_old)).digits();
 
         for (idx, group) in diff.grouped_ops(3).iter().enumerate() {
             if idx > 0 {
@@ -147,41 +134,46 @@ impl std::fmt::Display for Diff<'_> {
             }
             for op in group {
                 for change in diff.iter_inline_changes(op) {
-                    let sign = match change.tag() {
-                        ChangeTag::Delete => "-",
-                        ChangeTag::Insert => "+",
-                        ChangeTag::Equal => " ",
+                    let (sign, style, line_no_style, index) = match change.tag() {
+                        ChangeTag::Delete => (
+                            "-",
+                            self.stylesheet.deletion,
+                            self.stylesheet.deletion_line_no,
+                            None,
+                        ),
+                        ChangeTag::Insert => (
+                            "+",
+                            self.stylesheet.insertion,
+                            self.stylesheet.insertion_line_no,
+                            change.new_index(),
+                        ),
+                        ChangeTag::Equal => (
+                            "|",
+                            self.stylesheet.none,
+                            self.stylesheet.line_no,
+                            change.new_index(),
+                        ),
                     };
 
-                    let line_style = LineStyle::from(change.tag(), self.stylesheet);
-
-                    let old_index = change.old_index().map(OneIndexed::from_zero_indexed);
-                    let new_index = change.new_index().map(OneIndexed::from_zero_indexed);
+                    let line = Line {
+                        index: index.map(OneIndexed::from_zero_indexed),
+                        width: digit_width,
+                    };
 
                     write!(
                         f,
-                        "{} {} |{}",
-                        Line {
-                            index: old_index,
-                            width: digit_with
-                        },
-                        Line {
-                            index: new_index,
-                            width: digit_with
-                        },
-                        fmt_styled(line_style.apply_to(sign), self.stylesheet.emphasis),
+                        "{line} {sign} ",
+                        line = fmt_styled(line, self.stylesheet.line_no),
+                        sign = fmt_styled(sign, line_no_style),
                     )?;
 
                     for (emphasized, value) in change.iter_strings_lossy() {
                         let value = show_nonprinting(&value);
+                        let styled = fmt_styled(value, style);
                         if emphasized {
-                            write!(
-                                f,
-                                "{}",
-                                fmt_styled(line_style.apply_to(&value), self.stylesheet.underline)
-                            )?;
+                            write!(f, "{}", fmt_styled(styled, self.stylesheet.emphasis))?;
                         } else {
-                            write!(f, "{}", line_style.apply_to(&value))?;
+                            write!(f, "{styled}")?;
                         }
                     }
                     if change.missing_newline() {
@@ -191,31 +183,35 @@ impl std::fmt::Display for Diff<'_> {
             }
         }
 
-        Ok(())
-    }
-}
-
-struct LineStyle {
-    style: Style,
-}
-
-impl LineStyle {
-    fn apply_to(&self, input: &str) -> impl std::fmt::Display {
-        fmt_styled(input, self.style)
-    }
-
-    fn from(value: ChangeTag, stylesheet: &DiagnosticStylesheet) -> LineStyle {
-        match value {
-            ChangeTag::Equal => LineStyle {
-                style: stylesheet.none,
-            },
-            ChangeTag::Delete => LineStyle {
-                style: stylesheet.deletion,
-            },
-            ChangeTag::Insert => LineStyle {
-                style: stylesheet.insertion,
-            },
+        match self.fix.applicability() {
+            Applicability::Safe => {}
+            Applicability::Unsafe => {
+                writeln!(
+                    f,
+                    "{note}: {msg}",
+                    note = fmt_styled("note", self.stylesheet.warning),
+                    msg = fmt_styled(
+                        "This is an unsafe fix and may remove comments or change runtime behavior",
+                        self.stylesheet.emphasis
+                    )
+                )?;
+            }
+            Applicability::DisplayOnly => {
+                // Note that this is still only used in tests. There's no `--display-only-fixes`
+                // analog to `--unsafe-fixes` for users to activate this or see the styling.
+                writeln!(
+                    f,
+                    "{note}: {msg}",
+                    note = fmt_styled("note", self.stylesheet.error),
+                    msg = fmt_styled(
+                        "This is a display-only fix and is likely to be incorrect",
+                        self.stylesheet.emphasis
+                    )
+                )?;
+            }
         }
+
+        Ok(())
     }
 }
 

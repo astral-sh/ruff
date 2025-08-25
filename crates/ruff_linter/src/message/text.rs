@@ -3,9 +3,9 @@ use std::io::Write;
 use ruff_db::diagnostic::{
     Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, DisplayDiagnostics,
 };
+use ruff_diagnostics::Applicability;
 
 use crate::message::{Emitter, EmitterContext};
-use crate::settings::types::UnsafeFixes;
 
 pub struct TextEmitter {
     config: DisplayDiagnosticConfig,
@@ -46,10 +46,8 @@ impl TextEmitter {
     }
 
     #[must_use]
-    pub fn with_unsafe_fixes(mut self, unsafe_fixes: UnsafeFixes) -> Self {
-        self.config = self
-            .config
-            .fix_applicability(unsafe_fixes.required_applicability());
+    pub fn with_fix_applicability(mut self, applicability: Applicability) -> Self {
+        self.config = self.config.fix_applicability(applicability);
         self
     }
 
@@ -86,13 +84,13 @@ impl Emitter for TextEmitter {
 #[cfg(test)]
 mod tests {
     use insta::assert_snapshot;
+    use ruff_diagnostics::Applicability;
 
     use crate::message::TextEmitter;
     use crate::message::tests::{
         capture_emitter_notebook_output, capture_emitter_output, create_diagnostics,
         create_notebook_diagnostics, create_syntax_error_diagnostics,
     };
-    use crate::settings::types::UnsafeFixes;
 
     #[test]
     fn default() {
@@ -117,7 +115,7 @@ mod tests {
         let mut emitter = TextEmitter::default()
             .with_show_fix_status(true)
             .with_show_source(true)
-            .with_unsafe_fixes(UnsafeFixes::Enabled);
+            .with_fix_applicability(Applicability::Unsafe);
         let content = capture_emitter_output(&mut emitter, &create_diagnostics());
 
         assert_snapshot!(content);
@@ -128,7 +126,7 @@ mod tests {
         let mut emitter = TextEmitter::default()
             .with_show_fix_status(true)
             .with_show_source(true)
-            .with_unsafe_fixes(UnsafeFixes::Enabled);
+            .with_fix_applicability(Applicability::Unsafe);
         let (messages, notebook_indexes) = create_notebook_diagnostics();
         let content = capture_emitter_notebook_output(&mut emitter, &messages, &notebook_indexes);
 
