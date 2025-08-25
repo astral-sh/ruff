@@ -144,7 +144,7 @@ x: int = MagicMock()
 ```py
 from typing import Any
 
-# error: [invalid-type-form] "Type `typing.Any` expected no type parameter"
+# error: [invalid-type-form] "Special form `typing.Any` expected no type parameter"
 def f(x: Any[int]):
     reveal_type(x)  # revealed: Unknown
 ```

@@ -3069,15 +3069,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let maybe_known_class = KnownClass::try_from_file_and_name(self.db(), self.file(), name);
 
-        let ty = if maybe_known_class.is_none()
-            && &name.id == "NamedTuple"
-            && matches!(
+        let in_typing_module = || {
+            matches!(
                 file_to_module(self.db(), self.file()).and_then(|module| module.known(self.db())),
                 Some(KnownModule::Typing | KnownModule::TypingExtensions)
-            ) {
-            Type::SpecialForm(SpecialFormType::NamedTuple)
-        } else {
-            Type::from(ClassLiteral::new(
+            )
+        };
+
+        let ty = match (maybe_known_class, &*name.id) {
+            (None, "NamedTuple") if in_typing_module() => {
+                Type::SpecialForm(SpecialFormType::NamedTuple)
+            }
+            (None, "Any") if in_typing_module() => Type::SpecialForm(SpecialFormType::Any),
+            _ => Type::from(ClassLiteral::new(
                 self.db(),
                 name.id.clone(),
                 body_scope,
@@ -3085,7 +3089,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 deprecated,
                 dataclass_params,
                 dataclass_transformer_params,
-            ))
+            )),
         };
 
         self.add_declaration_with_binding(
@@ -10205,9 +10209,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let name_ty = self.infer_expression(slice);
                 match name_ty {
                     Type::ClassLiteral(class_literal) => {
-                        if class_literal.is_known(self.db(), KnownClass::Any) {
-                            SubclassOfType::subclass_of_any()
-                        } else if class_literal.is_protocol(self.db()) {
+                        if class_literal.is_protocol(self.db()) {
                             SubclassOfType::from(
                                 self.db(),
                                 todo_type!("type[T] for protocols").expect_dynamic(),
@@ -10219,6 +10221,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             )
                         }
                     }
+                    Type::SpecialForm(SpecialFormType::Any) => SubclassOfType::subclass_of_any(),
                     Type::SpecialForm(SpecialFormType::Unknown) => {
                         SubclassOfType::subclass_of_unknown()
                     }
@@ -10300,13 +10303,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 // false-positive `invalid-type-form` diagnostics (`1` is not a valid type
                 // expression).
                 self.infer_expression(&subscript.slice);
-                Type::unknown()
-            }
-            Type::ClassLiteral(literal) if literal.is_known(self.db(), KnownClass::Any) => {
-                self.infer_expression(slice);
-                if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
-                    builder.into_diagnostic("Type `typing.Any` expected no type parameter");
-                }
                 Type::unknown()
             }
             Type::SpecialForm(special_form) => {
@@ -10890,6 +10886,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             | SpecialFormType::TypeAlias
             | SpecialFormType::TypedDict
             | SpecialFormType::Unknown
+            | SpecialFormType::Any
             | SpecialFormType::NamedTuple => {
                 self.infer_type_expression(arguments_slice);
 
