@@ -19,7 +19,7 @@ pub struct InlayHint {
 impl InlayHint {
     fn variable_type(position: TextSize, ty: Type, db: &dyn Db) -> Self {
         let label_parts = vec![
-            InlayHintLabelPart::new(": "),
+            ": ".into(),
             InlayHintLabelPart::new(ty.display(db).to_string()),
         ];
 
@@ -31,7 +31,7 @@ impl InlayHint {
     }
 
     fn call_argument_name(position: TextSize, name: &str) -> Self {
-        let label_parts = vec![InlayHintLabelPart::new(name), InlayHintLabelPart::new("=")];
+        let label_parts = vec![InlayHintLabelPart::new(name), "=".into()];
 
         Self {
             position,
