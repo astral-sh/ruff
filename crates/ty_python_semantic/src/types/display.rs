@@ -8,6 +8,8 @@ use ruff_python_literal::escape::AsciiEscape;
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::Db;
+use crate::module_resolver::file_to_module;
+use crate::semantic_index::{scope::ScopeKind, semantic_index};
 use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
 use crate::types::function::{FunctionType, OverloadLiteral};
 use crate::types::generics::{GenericContext, Specialization};
@@ -17,23 +19,40 @@ use crate::types::{
     CallableType, IntersectionType, KnownClass, MethodWrapperKind, Protocol, StringLiteralType,
     SubclassOfInner, Type, UnionType, WrapperDescriptorKind,
 };
+use ruff_db::parsed::parsed_module;
 
 /// Settings for displaying types and signatures
 #[derive(Debug, Copy, Clone, Default)]
 pub struct DisplaySettings {
     /// Whether rendering can be multiline
     pub multiline: bool,
+    /// Whether rendering will show qualified display (e.g., module.class)
+    pub qualified: bool,
 }
 
 impl DisplaySettings {
     #[must_use]
     pub fn multiline(self) -> Self {
-        Self { multiline: true }
+        Self {
+            multiline: true,
+            ..self
+        }
     }
 
     #[must_use]
     pub fn singleline(self) -> Self {
-        Self { multiline: false }
+        Self {
+            multiline: false,
+            ..self
+        }
+    }
+
+    #[must_use]
+    pub fn qualified(self) -> Self {
+        Self {
+            qualified: true,
+            ..self
+        }
     }
 }
 
@@ -106,6 +125,50 @@ struct DisplayRepresentation<'db> {
     settings: DisplaySettings,
 }
 
+impl DisplayRepresentation<'_> {
+    fn class_parents(&self, class: ClassLiteral) -> Vec<String> {
+        let body_scope = class.body_scope(self.db);
+        let file = body_scope.file(self.db);
+        let module_ast = parsed_module(self.db, file).load(self.db);
+        let index = semantic_index(self.db, file);
+        let file_scope_id = body_scope.file_scope_id(self.db);
+
+        let mut name_parts = vec![];
+
+        // Skips itself
+        for (ancestor_file_scope_id, ancestor_scope) in index.ancestor_scopes(file_scope_id).skip(1)
+        {
+            let ancestor_scope_id = ancestor_file_scope_id.to_scope_id(self.db, file);
+            let node = ancestor_scope_id.node(self.db);
+
+            match ancestor_scope.kind() {
+                ScopeKind::Class => {
+                    if let Some(class_def) = node.as_class(&module_ast) {
+                        name_parts.push(class_def.name.as_str().to_string());
+                    }
+                }
+                ScopeKind::Function => {
+                    if let Some(function_def) = node.as_function(&module_ast) {
+                        name_parts.push(format!(
+                            "<locals of function '{}'>",
+                            function_def.name.as_str()
+                        ));
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        if let Some(module) = file_to_module(self.db, file) {
+            let module_name = module.name(self.db);
+            name_parts.push(module_name.as_str().to_string());
+        }
+
+        name_parts.reverse();
+        name_parts
+    }
+}
+
 impl Display for DisplayRepresentation<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self.ty {
@@ -123,13 +186,27 @@ impl Display for DisplayRepresentation<'_> {
                         .expect("Specialization::tuple() should always return `Some()` for `KnownClass::Tuple`")
                         .display_with(self.db, self.settings)
                         .fmt(f),
-                    (ClassType::NonGeneric(class), _) => f.write_str(class.name(self.db)),
+                    (ClassType::NonGeneric(class), _) => {
+                        if self.settings.qualified {
+                            f.write_fmt(format_args!("{}.{}", self.class_parents(class).join("."), class.name(self.db)))
+                        } else {
+                            f.write_str(class.name(self.db))
+                        }
+                    },
                     (ClassType::Generic(alias), _) => alias.display_with(self.db, self.settings).fmt(f),
                 }
             }
             Type::ProtocolInstance(protocol) => match protocol.inner {
                 Protocol::FromClass(ClassType::NonGeneric(class)) => {
-                    f.write_str(class.name(self.db))
+                    if self.settings.qualified {
+                        f.write_fmt(format_args!(
+                            "{}.{}",
+                            self.class_parents(class).join("."),
+                            class.name(self.db)
+                        ))
+                    } else {
+                        f.write_str(class.name(self.db))
+                    }
                 }
                 Protocol::FromClass(ClassType::Generic(alias)) => {
                     alias.display_with(self.db, self.settings).fmt(f)
@@ -154,7 +231,15 @@ impl Display for DisplayRepresentation<'_> {
                 write!(f, "<module '{}'>", module.module(self.db).name(self.db))
             }
             Type::ClassLiteral(class) => {
-                write!(f, "<class '{}'>", class.name(self.db))
+                if self.settings.qualified {
+                    f.write_fmt(format_args!(
+                        "<class '{}.{}'>",
+                        self.class_parents(class).join("."),
+                        class.name(self.db)
+                    ))
+                } else {
+                    write!(f, "<class '{}'>", class.name(self.db))
+                }
             }
             Type::GenericAlias(generic) => write!(
                 f,
@@ -163,7 +248,15 @@ impl Display for DisplayRepresentation<'_> {
             ),
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 SubclassOfInner::Class(ClassType::NonGeneric(class)) => {
-                    write!(f, "type[{}]", class.name(self.db))
+                    if self.settings.qualified {
+                        f.write_fmt(format_args!(
+                            "type[{}.{}]",
+                            self.class_parents(class).join("."),
+                            class.name(self.db)
+                        ))
+                    } else {
+                        write!(f, "type[{}]", class.name(self.db))
+                    }
                 }
                 SubclassOfInner::Class(ClassType::Generic(alias)) => {
                     write!(
@@ -274,12 +367,23 @@ impl Display for DisplayRepresentation<'_> {
                 escape.bytes_repr(TripleQuotes::No).write(f)
             }
             Type::EnumLiteral(enum_literal) => {
-                write!(
-                    f,
-                    "{enum_class}.{name}",
-                    enum_class = enum_literal.enum_class(self.db).name(self.db),
-                    name = enum_literal.name(self.db),
-                )
+                if self.settings.qualified {
+                    let enum_class = enum_literal.enum_class(self.db);
+                    write!(
+                        f,
+                        "{parents}.{enum_class}.{name}",
+                        parents = self.class_parents(enum_class).join("."),
+                        enum_class = enum_class.name(self.db),
+                        name = enum_literal.name(self.db),
+                    )
+                } else {
+                    write!(
+                        f,
+                        "{enum_class}.{name}",
+                        enum_class = enum_literal.enum_class(self.db).name(self.db),
+                        name = enum_literal.name(self.db),
+                    )
+                }
             }
             Type::NonInferableTypeVar(bound_typevar) | Type::TypeVar(bound_typevar) => {
                 f.write_str(bound_typevar.typevar(self.db).name(self.db))?;
@@ -315,7 +419,21 @@ impl Display for DisplayRepresentation<'_> {
                 }
                 f.write_str("]")
             }
-            Type::TypedDict(typed_dict) => f.write_str(typed_dict.defining_class.name(self.db)),
+            Type::TypedDict(typed_dict) => {
+                if self.settings.qualified {
+                    let class = match typed_dict.defining_class {
+                        ClassType::NonGeneric(literal) => literal,
+                        ClassType::Generic(alias) => alias.origin(self.db),
+                    };
+                    f.write_fmt(format_args!(
+                        "{}.{}",
+                        self.class_parents(class).join("."),
+                        class.name(self.db)
+                    ))
+                } else {
+                    f.write_str(typed_dict.defining_class.name(self.db))
+                }
+            }
             Type::TypeAlias(alias) => f.write_str(alias.name(self.db)),
         }
     }

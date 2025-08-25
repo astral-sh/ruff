@@ -33,6 +33,10 @@ when necessary, e.g. to watch for file system changes or a dedicated UI thread.
 
 ty also reads the following externally defined environment variables:
 
+### `CONDA_DEFAULT_ENV`
+
+Used to determine if an active Conda environment is the base environment or not.
+
 ### `CONDA_PREFIX`
 
 Used to detect an activated Conda environment location.
