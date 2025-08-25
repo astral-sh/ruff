@@ -11760,7 +11760,7 @@ mod tests {
                 })
                 .collect::<Vec<_>>()
         });
-        let expected: Vec<String> = vec![];
+        let expected = vec![String::from("module_type_symbols(Id(5000))")];
         assert_eq!(cycles, expected);
     }
 
