@@ -154,13 +154,14 @@ impl std::fmt::Display for Diff<'_> {
 
             let diff = TextDiff::from_lines(input, &output);
 
-            let (largest_old, largest_new) = diff
-                .ops()
-                .last()
-                .map(|op| (op.old_range().start, op.new_range().start))
-                .unwrap_or_default();
+            let grouped_ops = diff.grouped_ops(3);
 
-            let digit_with = OneIndexed::from_zero_indexed(largest_new.max(largest_old)).digits();
+            // Find the new line number with the largest number of digits to align all of the line
+            // number separators.
+            let last_op = grouped_ops.last().and_then(|group| group.last());
+            let largest_new = last_op.map(|op| op.new_range().end).unwrap_or_default();
+
+            let digit_with = OneIndexed::new(largest_new).unwrap_or_default().digits();
 
             if let Some(cell) = cell {
                 // Room for 1 digit, 1 space, 1 `|`, and 1 more following space. This centers the
@@ -168,7 +169,7 @@ impl std::fmt::Display for Diff<'_> {
                 writeln!(f, "{:>1$} cell {cell}", ":::", digit_with.get() + 3)?;
             }
 
-            for (idx, group) in diff.grouped_ops(3).iter().enumerate() {
+            for (idx, group) in grouped_ops.iter().enumerate() {
                 if idx > 0 {
                     writeln!(f, "{:-^1$}", "-", 80)?;
                 }
@@ -946,13 +947,13 @@ line 10
         5 | line 5
           |
         help: Start of diff:
-        4 | line 4
-        5 | line 5
-        6 | line 6
-          - line 7
-        7 + fixed line 7
-        8 | line 8
-        9 | line 9
+        4  | line 4
+        5  | line 5
+        6  | line 6
+           - line 7
+        7  + fixed line 7
+        8  | line 8
+        9  | line 9
         10 | line 10
         note: This is an unsafe fix and may remove comments or change runtime behavior
         ");
