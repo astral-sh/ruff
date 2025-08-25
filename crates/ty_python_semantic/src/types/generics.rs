@@ -432,7 +432,7 @@ pub(super) fn walk_specialization<'db, V: super::visitor::TypeVisitor<'db> + ?Si
     }
 }
 
-fn is_subtype_with_materialization<'db, C: Constraints<'db>>(
+fn is_subtype_in_invariant_position<'db, C: Constraints<'db>>(
     db: &'db dyn Db,
     derived_type: &Type<'db>,
     derived_materialization: MaterializationType,
@@ -481,7 +481,7 @@ fn is_subtype_with_materialization<'db, C: Constraints<'db>>(
 
 /// Whether two types have a relation (subtyping or assignability), taking into account
 /// that `base_type` may come from a top or bottom materialization.
-fn has_relation_with_materialization<'db, C: Constraints<'db>>(
+fn has_relation_in_invariant_position<'db, C: Constraints<'db>>(
     db: &'db dyn Db,
     derived_type: &Type<'db>,
     derived_materialization: Option<MaterializationType>,
@@ -493,7 +493,7 @@ fn has_relation_with_materialization<'db, C: Constraints<'db>>(
         // Top and bottom materializations are fully static types, so subtyping
         // is the same as assignability.
         (Some(derived_mat), Some(base_mat), _) => {
-            is_subtype_with_materialization(db, derived_type, derived_mat, base_type, base_mat)
+            is_subtype_in_invariant_position(db, derived_type, derived_mat, base_type, base_mat)
         }
         // Subtyping between invariant type parameters without a top/bottom materialization involved
         // is equivalence
@@ -506,14 +506,14 @@ fn has_relation_with_materialization<'db, C: Constraints<'db>>(
                 && base_type.is_assignable_to(db, *derived_type),
         ),
         // For gradual types, A <: B (subtyping) is defined as Top[A] <: Bottom[B]
-        (None, Some(base_mat), TypeRelation::Subtyping) => is_subtype_with_materialization(
+        (None, Some(base_mat), TypeRelation::Subtyping) => is_subtype_in_invariant_position(
             db,
             derived_type,
             MaterializationType::Top,
             base_type,
             base_mat,
         ),
-        (Some(derived_mat), None, TypeRelation::Subtyping) => is_subtype_with_materialization(
+        (Some(derived_mat), None, TypeRelation::Subtyping) => is_subtype_in_invariant_position(
             db,
             derived_type,
             derived_mat,
@@ -521,14 +521,14 @@ fn has_relation_with_materialization<'db, C: Constraints<'db>>(
             MaterializationType::Bottom,
         ),
         // And A <~ B (assignability) is Bottom[A] <: Top[B]
-        (None, Some(base_mat), TypeRelation::Assignability) => is_subtype_with_materialization(
+        (None, Some(base_mat), TypeRelation::Assignability) => is_subtype_in_invariant_position(
             db,
             derived_type,
             MaterializationType::Bottom,
             base_type,
             base_mat,
         ),
-        (Some(derived_mat), None, TypeRelation::Assignability) => is_subtype_with_materialization(
+        (Some(derived_mat), None, TypeRelation::Assignability) => is_subtype_in_invariant_position(
             db,
             derived_type,
             derived_mat,
@@ -764,7 +764,7 @@ impl<'db> Specialization<'db> {
             //   - invariant: verify that self_type <: other_type AND other_type <: self_type
             //   - bivariant: skip, can't make subtyping/assignability false
             let compatible = match bound_typevar.variance(db) {
-                TypeVarVariance::Invariant => has_relation_with_materialization(
+                TypeVarVariance::Invariant => has_relation_in_invariant_position(
                     db,
                     self_type,
                     self_materialization_type,

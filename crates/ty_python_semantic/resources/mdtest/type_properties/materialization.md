@@ -513,12 +513,43 @@ static_assert(is_equivalent_to(Top[Bottom[list[Any]]], Bottom[list[Any]]))
 
 ## Subtyping
 
-Any `list[T]` is a subtype of `top[list[Any]]`.
+Any `list[T]` is a subtype of `Top[list[Any]]`, but with more restrictive gradual types, not all
+other specializations are subtypes.
 
 ```py
 from typing import Any
-from ty_extensions import is_subtype_of, static_assert, Top
+from ty_extensions import is_subtype_of, static_assert, Top, Intersection, Bottom
 
+# None and Top
 static_assert(is_subtype_of(list[int], Top[list[Any]]))
 static_assert(not is_subtype_of(Top[list[Any]], list[int]))
+static_assert(is_subtype_of(list[bool], Top[list[Intersection[int, Any]]]))
+static_assert(is_subtype_of(list[int], Top[list[Intersection[int, Any]]]))
+static_assert(not is_subtype_of(list[int | str], Top[list[Intersection[int, Any]]]))
+static_assert(not is_subtype_of(list[object], Top[list[Intersection[int, Any]]]))
+static_assert(not is_subtype_of(list[str], Top[list[Intersection[int, Any]]]))
+static_assert(not is_subtype_of(list[str | bool], Top[list[Intersection[int, Any]]]))
+
+# Top and Top
+static_assert(is_subtype_of(Top[list[int | Any]], Top[list[Any]]))
+static_assert(not is_subtype_of(Top[list[Any]], Top[list[int | Any]]))
+static_assert(is_subtype_of(Top[list[Intersection[int, Any]]], Top[list[Any]]))
+static_assert(not is_subtype_of(Top[list[Any]], Top[list[Intersection[int, Any]]]))
+static_assert(not is_subtype_of(Top[list[Intersection[int, Any]]], Top[list[int | Any]]))
+static_assert(not is_subtype_of(Top[list[int | Any]], Top[list[Intersection[int, Any]]]))
+static_assert(not is_subtype_of(Top[list[str | Any]], Top[list[int | Any]]))
+static_assert(is_subtype_of(Top[list[str | int | Any]], Top[list[int | Any]]))
+static_assert(not is_subtype_of(Top[list[int | Any]], Top[list[str | int | Any]]))
+
+# Bottom and Top
+static_assert(is_subtype_of(Bottom[list[Any]], Top[list[Any]]))
+static_assert(is_subtype_of(Bottom[list[Any]], Top[list[int | Any]]))
+static_assert(is_subtype_of(Bottom[list[int | Any]], Top[list[Any]]))
+static_assert(is_subtype_of(Bottom[list[Intersection[int, Any]]], Top[list[Intersection[str, Any]]]))
+
+# TODO: more combinations
 ```
+
+## Assignability
+
+TODO
