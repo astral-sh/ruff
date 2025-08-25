@@ -1457,7 +1457,6 @@ impl std::error::Error for ToSettingsError {}
 
 #[cfg(feature = "schemars")]
 mod schema {
-    use crate::DEFAULT_LINT_REGISTRY;
     use schemars::JsonSchema;
     use schemars::r#gen::SchemaGenerator;
     use schemars::schema::{
@@ -1473,7 +1472,7 @@ mod schema {
         }
 
         fn json_schema(generator: &mut SchemaGenerator) -> Schema {
-            let registry = &*DEFAULT_LINT_REGISTRY;
+            let registry = ty_python_semantic::default_lint_registry();
 
             let level_schema = generator.subschema_for::<Level>();
 

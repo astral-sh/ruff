@@ -77,6 +77,10 @@ pub enum SpecialFormType {
     TypeOf,
     /// The symbol `ty_extensions.CallableTypeOf`
     CallableTypeOf,
+    /// The symbol `ty_extensions.Top`
+    Top,
+    /// The symbol `ty_extensions.Bottom`
+    Bottom,
     /// The symbol `typing.Callable`
     /// (which can also be found as `typing_extensions.Callable` or as `collections.abc.Callable`)
     Callable,
@@ -151,11 +155,14 @@ impl SpecialFormType {
             | Self::TypeIs
             | Self::TypeOf
             | Self::Not
+            | Self::Top
+            | Self::Bottom
             | Self::Intersection
             | Self::CallableTypeOf
             | Self::Protocol  // actually `_ProtocolMeta` at runtime but this is what typeshed says
-            | Self::Generic  // actually `type` at runtime but this is what typeshed says
             | Self::ReadOnly => KnownClass::SpecialForm,
+
+            Self::Generic => KnownClass::Type,
 
             Self::List
             | Self::Dict
@@ -246,6 +253,8 @@ impl SpecialFormType {
             | Self::AlwaysTruthy
             | Self::AlwaysFalsy
             | Self::Not
+            | Self::Top
+            | Self::Bottom
             | Self::Intersection
             | Self::TypeOf
             | Self::CallableTypeOf => module.is_ty_extensions(),
@@ -290,6 +299,8 @@ impl SpecialFormType {
             | Self::AlwaysTruthy
             | Self::AlwaysFalsy
             | Self::Not
+            | Self::Top
+            | Self::Bottom
             | Self::Intersection
             | Self::TypeOf
             | Self::CallableTypeOf
@@ -351,6 +362,8 @@ impl SpecialFormType {
             SpecialFormType::Intersection => "ty_extensions.Intersection",
             SpecialFormType::TypeOf => "ty_extensions.TypeOf",
             SpecialFormType::CallableTypeOf => "ty_extensions.CallableTypeOf",
+            SpecialFormType::Top => "ty_extensions.Top",
+            SpecialFormType::Bottom => "ty_extensions.Bottom",
             SpecialFormType::Protocol => "typing.Protocol",
             SpecialFormType::Generic => "typing.Generic",
             SpecialFormType::NamedTuple => "typing.NamedTuple",

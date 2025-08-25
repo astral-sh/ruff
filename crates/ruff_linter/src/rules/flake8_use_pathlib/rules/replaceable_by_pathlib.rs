@@ -7,10 +7,7 @@ use crate::rules::flake8_use_pathlib::helpers::{
 };
 use crate::rules::flake8_use_pathlib::{
     rules::Glob,
-    violations::{
-        BuiltinOpen, Joiner, OsListdir, OsMakedirs, OsMkdir, OsPathJoin, OsPathSplitext, OsStat,
-        OsSymlink, PyPath,
-    },
+    violations::{BuiltinOpen, Joiner, OsListdir, OsPathJoin, OsPathSplitext, OsStat, PyPath},
 };
 
 pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
@@ -20,21 +17,6 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
 
     let range = call.func.range();
     match qualified_name.segments() {
-        // PTH102
-        ["os", "makedirs"] => checker.report_diagnostic_if_enabled(OsMakedirs, range),
-        // PTH103
-        ["os", "mkdir"] => {
-            // `dir_fd` is not supported by pathlib, so check if it's set to non-default values.
-            // Signature as of Python 3.13 (https://docs.python.org/3/library/os.html#os.mkdir)
-            // ```text
-            //           0     1                2
-            // os.mkdir(path, mode=0o777, *, dir_fd=None)
-            // ```
-            if is_keyword_only_argument_non_default(&call.arguments, "dir_fd") {
-                return;
-            }
-            checker.report_diagnostic_if_enabled(OsMkdir, range)
-        }
         // PTH116
         ["os", "stat"] => {
             // `dir_fd` is not supported by pathlib, so check if it's set to non-default values.
@@ -78,20 +60,6 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
         ),
         // PTH122
         ["os", "path", "splitext"] => checker.report_diagnostic_if_enabled(OsPathSplitext, range),
-        // PTH211
-        ["os", "symlink"] => {
-            // `dir_fd` is not supported by pathlib, so check if there are non-default values.
-            // Signature as of Python 3.13 (https://docs.python.org/3/library/os.html#os.symlink)
-            // ```text
-            //            0    1    2                             3
-            // os.symlink(src, dst, target_is_directory=False, *, dir_fd=None)
-            // ```
-            if is_keyword_only_argument_non_default(&call.arguments, "dir_fd") {
-                return;
-            }
-            checker.report_diagnostic_if_enabled(OsSymlink, range)
-        }
-
         // PTH123
         ["" | "builtins", "open"] => {
             // `closefd` and `opener` are not supported by pathlib, so check if they

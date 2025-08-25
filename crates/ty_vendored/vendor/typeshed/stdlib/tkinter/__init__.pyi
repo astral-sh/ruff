@@ -37,7 +37,7 @@ from collections.abc import Callable, Iterable, Mapping, Sequence
 from tkinter.constants import *
 from tkinter.font import _FontDescription
 from types import GenericAlias, TracebackType
-from typing import Any, ClassVar, Generic, Literal, NamedTuple, Protocol, TypedDict, TypeVar, overload, type_check_only
+from typing import Any, ClassVar, Final, Generic, Literal, NamedTuple, Protocol, TypedDict, TypeVar, overload, type_check_only
 from typing_extensions import TypeAlias, TypeVarTuple, Unpack, deprecated
 
 if sys.version_info >= (3, 11):
@@ -185,11 +185,11 @@ __all__ = [
 
 TclError = _tkinter.TclError
 wantobjects: int
-TkVersion: float
-TclVersion: float
-READABLE = _tkinter.READABLE
-WRITABLE = _tkinter.WRITABLE
-EXCEPTION = _tkinter.EXCEPTION
+TkVersion: Final[float]
+TclVersion: Final[float]
+READABLE: Final = _tkinter.READABLE
+WRITABLE: Final = _tkinter.WRITABLE
+EXCEPTION: Final = _tkinter.EXCEPTION
 
 # Quick guide for figuring out which widget class to choose:
 #   - Misc: any widget (don't use BaseWidget because Tk doesn't inherit from BaseWidget)
@@ -445,53 +445,96 @@ class Variable:
 
     def trace_info(self) -> list[tuple[tuple[Literal["array", "read", "write", "unset"], ...], str]]:
         """Return all trace callback information."""
+    if sys.version_info >= (3, 14):
+        @deprecated("Deprecated since Python 3.14. Use `trace_add()` instead.")
+        def trace(self, mode, callback) -> str:
+            """Define a trace callback for the variable.
 
-    @deprecated("use trace_add() instead of trace()")
-    def trace(self, mode, callback):
-        """Define a trace callback for the variable.
+            MODE is one of "r", "w", "u" for read, write, undefine.
+            CALLBACK must be a function which is called when
+            the variable is read, written or undefined.
 
-        MODE is one of "r", "w", "u" for read, write, undefine.
-        CALLBACK must be a function which is called when
-        the variable is read, written or undefined.
+            Return the name of the callback.
 
-        Return the name of the callback.
+            This deprecated method wraps a deprecated Tcl method removed
+            in Tcl 9.0.  Use trace_add() instead.
+            """
 
-        This deprecated method wraps a deprecated Tcl method removed
-        in Tcl 9.0.  Use trace_add() instead.
-        """
+        @deprecated("Deprecated since Python 3.14. Use `trace_add()` instead.")
+        def trace_variable(self, mode, callback) -> str:
+            """Define a trace callback for the variable.
 
-    @deprecated("use trace_add() instead of trace_variable()")
-    def trace_variable(self, mode, callback):
-        """Define a trace callback for the variable.
+            MODE is one of "r", "w", "u" for read, write, undefine.
+            CALLBACK must be a function which is called when
+            the variable is read, written or undefined.
 
-        MODE is one of "r", "w", "u" for read, write, undefine.
-        CALLBACK must be a function which is called when
-        the variable is read, written or undefined.
+            Return the name of the callback.
 
-        Return the name of the callback.
+            This deprecated method wraps a deprecated Tcl method removed
+            in Tcl 9.0.  Use trace_add() instead.
+            """
 
-        This deprecated method wraps a deprecated Tcl method removed
-        in Tcl 9.0.  Use trace_add() instead.
-        """
+        @deprecated("Deprecated since Python 3.14. Use `trace_remove()` instead.")
+        def trace_vdelete(self, mode, cbname) -> None:
+            """Delete the trace callback for a variable.
 
-    @deprecated("use trace_remove() instead of trace_vdelete()")
-    def trace_vdelete(self, mode, cbname) -> None:
-        """Delete the trace callback for a variable.
+            MODE is one of "r", "w", "u" for read, write, undefine.
+            CBNAME is the name of the callback returned from trace_variable or trace.
 
-        MODE is one of "r", "w", "u" for read, write, undefine.
-        CBNAME is the name of the callback returned from trace_variable or trace.
+            This deprecated method wraps a deprecated Tcl method removed
+            in Tcl 9.0.  Use trace_remove() instead.
+            """
 
-        This deprecated method wraps a deprecated Tcl method removed
-        in Tcl 9.0.  Use trace_remove() instead.
-        """
+        @deprecated("Deprecated since Python 3.14. Use `trace_info()` instead.")
+        def trace_vinfo(self):
+            """Return all trace callback information.
 
-    @deprecated("use trace_info() instead of trace_vinfo()")
-    def trace_vinfo(self):
-        """Return all trace callback information.
+            This deprecated method wraps a deprecated Tcl method removed
+            in Tcl 9.0.  Use trace_info() instead.
+            """
+    else:
+        def trace(self, mode, callback) -> str:
+            """Define a trace callback for the variable.
 
-        This deprecated method wraps a deprecated Tcl method removed
-        in Tcl 9.0.  Use trace_info() instead.
-        """
+            MODE is one of "r", "w", "u" for read, write, undefine.
+            CALLBACK must be a function which is called when
+            the variable is read, written or undefined.
+
+            Return the name of the callback.
+
+            This deprecated method wraps a deprecated Tcl method that will
+            likely be removed in the future.  Use trace_add() instead.
+            """
+
+        def trace_variable(self, mode, callback) -> str:
+            """Define a trace callback for the variable.
+
+            MODE is one of "r", "w", "u" for read, write, undefine.
+            CALLBACK must be a function which is called when
+            the variable is read, written or undefined.
+
+            Return the name of the callback.
+
+            This deprecated method wraps a deprecated Tcl method that will
+            likely be removed in the future.  Use trace_add() instead.
+            """
+
+        def trace_vdelete(self, mode, cbname) -> None:
+            """Delete the trace callback for a variable.
+
+            MODE is one of "r", "w", "u" for read, write, undefine.
+            CBNAME is the name of the callback returned from trace_variable or trace.
+
+            This deprecated method wraps a deprecated Tcl method that will
+            likely be removed in the future.  Use trace_remove() instead.
+            """
+
+        def trace_vinfo(self):
+            """Return all trace callback information.
+
+            This deprecated method wraps a deprecated Tcl method that will
+            likely be removed in the future.  Use trace_info() instead.
+            """
 
     def __eq__(self, other: object) -> bool: ...
     def __del__(self) -> None:
@@ -581,8 +624,8 @@ class BooleanVar(Variable):
 def mainloop(n: int = 0) -> None:
     """Run the main loop of Tcl."""
 
-getint: Incomplete
-getdouble: Incomplete
+getint = int
+getdouble = float
 
 def getboolean(s):
     """Convert Tcl object to True or False."""

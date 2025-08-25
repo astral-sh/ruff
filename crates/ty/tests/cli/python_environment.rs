@@ -345,6 +345,51 @@ import bar",
     Ok(())
 }
 
+/// On Unix systems, a virtual environment can come with multiple `site-packages` directories:
+/// one at `<sys.prefix>/lib/pythonX.Y/site-packages` and one at
+/// `<sys.prefix>/lib64/pythonX.Y/site-packages`. According to [the stdlib docs], the `lib64`
+/// is not *meant* to have any Python files in it (only C extensions and similar). Empirically,
+/// however, it sometimes does indeed have Python files in it: popular tools such as poetry
+/// appear to sometimes install Python packages into the `lib64` site-packages directory even
+/// though they probably shouldn't. We therefore check for both a `lib64` and a `lib` directory,
+/// and add them both as search paths if they both exist.
+///
+/// See:
+/// - <https://github.com/astral-sh/ty/issues/1043>
+/// - <https://github.com/astral-sh/ty/issues/257>.
+///
+/// [the stdlib docs]: https://docs.python.org/3/library/sys.html#sys.platlibdir
+#[cfg(unix)]
+#[test]
+fn lib64_site_packages_directory_on_unix() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (".venv/lib/python3.13/site-packages/foo.py", ""),
+        (".venv/lib64/python3.13/site-packages/bar.py", ""),
+        ("test.py", "import foo, bar, baz"),
+    ])?;
+
+    assert_cmd_snapshot!(case.command().arg("--python").arg(".venv"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Cannot resolve imported module `baz`
+     --> test.py:1:18
+      |
+    1 | import foo, bar, baz
+      |                  ^^^
+      |
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+    info: rule `unresolved-import` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    Ok(())
+}
+
 #[test]
 fn pyvenv_cfg_file_annotation_showing_where_python_version_set() -> anyhow::Result<()> {
     let case = CliTest::with_files([
@@ -762,7 +807,7 @@ fn unix_system_installation_with_no_lib_directory() -> anyhow::Result<()> {
     WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ty failed
       Cause: Failed to discover the site-packages directory
-      Cause: Failed to iterate over the contents of the `lib` directory of the Python installation
+      Cause: Failed to iterate over the contents of the `lib`/`lib64` directories of the Python installation
 
     --> Invalid setting in configuration file `<temp_dir>/pyproject.toml`
       |
@@ -771,8 +816,6 @@ fn unix_system_installation_with_no_lib_directory() -> anyhow::Result<()> {
     3 | python = "directory-but-no-site-packages"
       |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
       |
-
-      Cause: No such file or directory (os error 2)
     "#);
 
     Ok(())
@@ -857,59 +900,165 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
 /// The `site-packages` directory is used by ty for external import.
 /// Ty does the following checks to discover the `site-packages` directory in the order:
 /// 1) If `VIRTUAL_ENV` environment variable is set
-/// 2) If `CONDA_PREFIX` environment variable is set
+/// 2) If `CONDA_PREFIX` environment variable is set (and .filename != `CONDA_DEFAULT_ENV`)
 /// 3) If a `.venv` directory exists at the project root
+/// 4) If `CONDA_PREFIX` environment variable is set (and .filename == `CONDA_DEFAULT_ENV`)
 ///
-/// This test is aiming at validating the logic around `CONDA_PREFIX`.
+/// This test (and the next one) is aiming at validating the logic around these cases.
 ///
-/// A conda-like environment file structure is used
-/// We test by first not setting the `CONDA_PREFIX` and expect a fail.
-/// Then we test by setting `CONDA_PREFIX` to `conda-env` and expect a pass.
+/// To do this we create a program that has these 4 imports:
+///
+/// ```python
+/// from package1 import ActiveVenv
+/// from package1 import ChildConda
+/// from package1 import WorkingVenv
+/// from package1 import BaseConda
+/// ```
+///
+/// We then create 4 different copies of package1. Each copy defines all of these
+/// classes... except the one that describes it. Therefore we know we got e.g.
+/// the working venv if we get a diagnostic like this:
+///
+/// ```text
+/// Unresolved import
+/// 4 | from package1 import WorkingVenv
+///   |                      ^^^^^^^^^^^
+/// ```
+///
+/// This test uses a directory structure as follows:
 ///
 /// ├── project
-/// │   └── test.py
-/// └── conda-env
-///     └── lib
-///         └── python3.13
-///             └── site-packages
-///                 └── package1
-///                     └── __init__.py
+/// │   ├── test.py
+/// │   └── .venv
+/// │       ├── pyvenv.cfg
+/// │       └── lib
+/// │           └── python3.13
+/// │               └── site-packages
+/// │                   └── package1
+/// │                       └── __init__.py
+/// ├── myvenv
+/// │   ├── pyvenv.cfg
+/// │   └── lib
+/// │       └── python3.13
+/// │           └── site-packages
+/// │               └── package1
+/// │                   └── __init__.py
+/// ├── conda-env
+/// │   └── lib
+/// │       └── python3.13
+/// │           └── site-packages
+/// │               └── package1
+/// │                   └── __init__.py
+/// └── conda
+///     └── envs
+///         └── base
+///             └── lib
+///                 └── python3.13
+///                     └── site-packages
+///                         └── package1
+///                             └── __init__.py
 ///
 /// test.py imports package1
 /// And the command is run in the `child` directory.
 #[test]
-fn check_conda_prefix_var_to_resolve_path() -> anyhow::Result<()> {
-    let conda_package1_path = if cfg!(windows) {
+fn check_venv_resolution_with_working_venv() -> anyhow::Result<()> {
+    let child_conda_package1_path = if cfg!(windows) {
         "conda-env/Lib/site-packages/package1/__init__.py"
     } else {
         "conda-env/lib/python3.13/site-packages/package1/__init__.py"
+    };
+
+    let base_conda_package1_path = if cfg!(windows) {
+        "conda/envs/base/Lib/site-packages/package1/__init__.py"
+    } else {
+        "conda/envs/base/lib/python3.13/site-packages/package1/__init__.py"
+    };
+
+    let working_venv_package1_path = if cfg!(windows) {
+        "project/.venv/Lib/site-packages/package1/__init__.py"
+    } else {
+        "project/.venv/lib/python3.13/site-packages/package1/__init__.py"
+    };
+
+    let active_venv_package1_path = if cfg!(windows) {
+        "myvenv/Lib/site-packages/package1/__init__.py"
+    } else {
+        "myvenv/lib/python3.13/site-packages/package1/__init__.py"
     };
 
     let case = CliTest::with_files([
         (
             "project/test.py",
             r#"
-            import package1
+            from package1 import ActiveVenv
+            from package1 import ChildConda
+            from package1 import WorkingVenv
+            from package1 import BaseConda
             "#,
         ),
         (
-            conda_package1_path,
+            "project/.venv/pyvenv.cfg",
             r#"
+home = ./
+
+            "#,
+        ),
+        (
+            "myvenv/pyvenv.cfg",
+            r#"
+home = ./
+
+            "#,
+        ),
+        (
+            active_venv_package1_path,
+            r#"
+            class ChildConda: ...
+            class WorkingVenv: ...
+            class BaseConda: ...
+            "#,
+        ),
+        (
+            child_conda_package1_path,
+            r#"
+            class ActiveVenv: ...
+            class WorkingVenv: ...
+            class BaseConda: ...
+            "#,
+        ),
+        (
+            working_venv_package1_path,
+            r#"
+            class ActiveVenv: ...
+            class ChildConda: ...
+            class BaseConda: ...
+            "#,
+        ),
+        (
+            base_conda_package1_path,
+            r#"
+            class ActiveVenv: ...
+            class ChildConda: ...
+            class WorkingVenv: ...
             "#,
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command().current_dir(case.root().join("project")), @r"
+    // Run with nothing set, should find the working venv
+    assert_cmd_snapshot!(case.command()
+        .current_dir(case.root().join("project")), @r"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `package1`
-     --> test.py:2:8
+    error[unresolved-import]: Module `package1` has no member `WorkingVenv`
+     --> test.py:4:22
       |
-    2 | import package1
-      |        ^^^^^^^^
+    2 | from package1 import ActiveVenv
+    3 | from package1 import ChildConda
+    4 | from package1 import WorkingVenv
+      |                      ^^^^^^^^^^^
+    5 | from package1 import BaseConda
       |
-    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
@@ -918,12 +1067,373 @@ fn check_conda_prefix_var_to_resolve_path() -> anyhow::Result<()> {
     WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
-    // do command : CONDA_PREFIX=<temp_dir>/conda_env
-    assert_cmd_snapshot!(case.command().current_dir(case.root().join("project")).env("CONDA_PREFIX", case.root().join("conda-env")), @r"
-    success: true
-    exit_code: 0
+    // Run with VIRTUAL_ENV set, should find the active venv
+    assert_cmd_snapshot!(case.command()
+        .current_dir(case.root().join("project"))
+        .env("VIRTUAL_ENV", case.root().join("myvenv")), @r"
+    success: false
+    exit_code: 1
     ----- stdout -----
-    All checks passed!
+    error[unresolved-import]: Module `package1` has no member `ActiveVenv`
+     --> test.py:2:22
+      |
+    2 | from package1 import ActiveVenv
+      |                      ^^^^^^^^^^
+    3 | from package1 import ChildConda
+    4 | from package1 import WorkingVenv
+      |
+    info: rule `unresolved-import` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    // run with CONDA_PREFIX set, should find the child conda
+    assert_cmd_snapshot!(case.command()
+        .current_dir(case.root().join("project"))
+        .env("CONDA_PREFIX", case.root().join("conda-env")), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Module `package1` has no member `ChildConda`
+     --> test.py:3:22
+      |
+    2 | from package1 import ActiveVenv
+    3 | from package1 import ChildConda
+      |                      ^^^^^^^^^^
+    4 | from package1 import WorkingVenv
+    5 | from package1 import BaseConda
+      |
+    info: rule `unresolved-import` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    // run with CONDA_PREFIX and CONDA_DEFAULT_ENV set (unequal), should find child conda
+    assert_cmd_snapshot!(case.command()
+        .current_dir(case.root().join("project"))
+        .env("CONDA_PREFIX", case.root().join("conda-env"))
+        .env("CONDA_DEFAULT_ENV", "base"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Module `package1` has no member `ChildConda`
+     --> test.py:3:22
+      |
+    2 | from package1 import ActiveVenv
+    3 | from package1 import ChildConda
+      |                      ^^^^^^^^^^
+    4 | from package1 import WorkingVenv
+    5 | from package1 import BaseConda
+      |
+    info: rule `unresolved-import` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    // run with CONDA_PREFIX and CONDA_DEFAULT_ENV (unequal) and VIRTUAL_ENV set,
+    // should find child active venv
+    assert_cmd_snapshot!(case.command()
+        .current_dir(case.root().join("project"))
+        .env("CONDA_PREFIX", case.root().join("conda-env"))
+        .env("CONDA_DEFAULT_ENV", "base")
+        .env("VIRTUAL_ENV", case.root().join("myvenv")), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Module `package1` has no member `ActiveVenv`
+     --> test.py:2:22
+      |
+    2 | from package1 import ActiveVenv
+      |                      ^^^^^^^^^^
+    3 | from package1 import ChildConda
+    4 | from package1 import WorkingVenv
+      |
+    info: rule `unresolved-import` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    // run with CONDA_PREFIX and CONDA_DEFAULT_ENV (equal!) set, should find working venv
+    assert_cmd_snapshot!(case.command()
+        .current_dir(case.root().join("project"))
+        .env("CONDA_PREFIX", case.root().join("conda/envs/base"))
+        .env("CONDA_DEFAULT_ENV", "base"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Module `package1` has no member `WorkingVenv`
+     --> test.py:4:22
+      |
+    2 | from package1 import ActiveVenv
+    3 | from package1 import ChildConda
+    4 | from package1 import WorkingVenv
+      |                      ^^^^^^^^^^^
+    5 | from package1 import BaseConda
+      |
+    info: rule `unresolved-import` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    Ok(())
+}
+
+/// The exact same test as above, but without a working venv
+///
+/// In this case the Base Conda should be a possible outcome.
+#[test]
+fn check_venv_resolution_without_working_venv() -> anyhow::Result<()> {
+    let child_conda_package1_path = if cfg!(windows) {
+        "conda-env/Lib/site-packages/package1/__init__.py"
+    } else {
+        "conda-env/lib/python3.13/site-packages/package1/__init__.py"
+    };
+
+    let base_conda_package1_path = if cfg!(windows) {
+        "conda/envs/base/Lib/site-packages/package1/__init__.py"
+    } else {
+        "conda/envs/base/lib/python3.13/site-packages/package1/__init__.py"
+    };
+
+    let active_venv_package1_path = if cfg!(windows) {
+        "myvenv/Lib/site-packages/package1/__init__.py"
+    } else {
+        "myvenv/lib/python3.13/site-packages/package1/__init__.py"
+    };
+
+    let case = CliTest::with_files([
+        (
+            "project/test.py",
+            r#"
+            from package1 import ActiveVenv
+            from package1 import ChildConda
+            from package1 import WorkingVenv
+            from package1 import BaseConda
+            "#,
+        ),
+        (
+            "myvenv/pyvenv.cfg",
+            r#"
+home = ./
+
+            "#,
+        ),
+        (
+            active_venv_package1_path,
+            r#"
+            class ChildConda: ...
+            class WorkingVenv: ...
+            class BaseConda: ...
+            "#,
+        ),
+        (
+            child_conda_package1_path,
+            r#"
+            class ActiveVenv: ...
+            class WorkingVenv: ...
+            class BaseConda: ...
+            "#,
+        ),
+        (
+            base_conda_package1_path,
+            r#"
+            class ActiveVenv: ...
+            class ChildConda: ...
+            class WorkingVenv: ...
+            "#,
+        ),
+    ])?;
+
+    // Run with nothing set, should fail to find anything
+    assert_cmd_snapshot!(case.command()
+        .current_dir(case.root().join("project")), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Cannot resolve imported module `package1`
+     --> test.py:2:6
+      |
+    2 | from package1 import ActiveVenv
+      |      ^^^^^^^^
+    3 | from package1 import ChildConda
+    4 | from package1 import WorkingVenv
+      |
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+    info: rule `unresolved-import` is enabled by default
+
+    error[unresolved-import]: Cannot resolve imported module `package1`
+     --> test.py:3:6
+      |
+    2 | from package1 import ActiveVenv
+    3 | from package1 import ChildConda
+      |      ^^^^^^^^
+    4 | from package1 import WorkingVenv
+    5 | from package1 import BaseConda
+      |
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+    info: rule `unresolved-import` is enabled by default
+
+    error[unresolved-import]: Cannot resolve imported module `package1`
+     --> test.py:4:6
+      |
+    2 | from package1 import ActiveVenv
+    3 | from package1 import ChildConda
+    4 | from package1 import WorkingVenv
+      |      ^^^^^^^^
+    5 | from package1 import BaseConda
+      |
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+    info: rule `unresolved-import` is enabled by default
+
+    error[unresolved-import]: Cannot resolve imported module `package1`
+     --> test.py:5:6
+      |
+    3 | from package1 import ChildConda
+    4 | from package1 import WorkingVenv
+    5 | from package1 import BaseConda
+      |      ^^^^^^^^
+      |
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+    info: rule `unresolved-import` is enabled by default
+
+    Found 4 diagnostics
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    // Run with VIRTUAL_ENV set, should find the active venv
+    assert_cmd_snapshot!(case.command()
+        .current_dir(case.root().join("project"))
+        .env("VIRTUAL_ENV", case.root().join("myvenv")), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Module `package1` has no member `ActiveVenv`
+     --> test.py:2:22
+      |
+    2 | from package1 import ActiveVenv
+      |                      ^^^^^^^^^^
+    3 | from package1 import ChildConda
+    4 | from package1 import WorkingVenv
+      |
+    info: rule `unresolved-import` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    // run with CONDA_PREFIX set, should find the child conda
+    assert_cmd_snapshot!(case.command()
+        .current_dir(case.root().join("project"))
+        .env("CONDA_PREFIX", case.root().join("conda-env")), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Module `package1` has no member `ChildConda`
+     --> test.py:3:22
+      |
+    2 | from package1 import ActiveVenv
+    3 | from package1 import ChildConda
+      |                      ^^^^^^^^^^
+    4 | from package1 import WorkingVenv
+    5 | from package1 import BaseConda
+      |
+    info: rule `unresolved-import` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    // run with CONDA_PREFIX and CONDA_DEFAULT_ENV set (unequal), should find child conda
+    assert_cmd_snapshot!(case.command()
+        .current_dir(case.root().join("project"))
+        .env("CONDA_PREFIX", case.root().join("conda-env"))
+        .env("CONDA_DEFAULT_ENV", "base"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Module `package1` has no member `ChildConda`
+     --> test.py:3:22
+      |
+    2 | from package1 import ActiveVenv
+    3 | from package1 import ChildConda
+      |                      ^^^^^^^^^^
+    4 | from package1 import WorkingVenv
+    5 | from package1 import BaseConda
+      |
+    info: rule `unresolved-import` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    // run with CONDA_PREFIX and CONDA_DEFAULT_ENV (unequal) and VIRTUAL_ENV set,
+    // should find child active venv
+    assert_cmd_snapshot!(case.command()
+        .current_dir(case.root().join("project"))
+        .env("CONDA_PREFIX", case.root().join("conda-env"))
+        .env("CONDA_DEFAULT_ENV", "base")
+        .env("VIRTUAL_ENV", case.root().join("myvenv")), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Module `package1` has no member `ActiveVenv`
+     --> test.py:2:22
+      |
+    2 | from package1 import ActiveVenv
+      |                      ^^^^^^^^^^
+    3 | from package1 import ChildConda
+    4 | from package1 import WorkingVenv
+      |
+    info: rule `unresolved-import` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    // run with CONDA_PREFIX and CONDA_DEFAULT_ENV (equal!) set, should find base conda
+    assert_cmd_snapshot!(case.command()
+        .current_dir(case.root().join("project"))
+        .env("CONDA_PREFIX", case.root().join("conda/envs/base"))
+        .env("CONDA_DEFAULT_ENV", "base"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Module `package1` has no member `BaseConda`
+     --> test.py:5:22
+      |
+    3 | from package1 import ChildConda
+    4 | from package1 import WorkingVenv
+    5 | from package1 import BaseConda
+      |                      ^^^^^^^^^
+      |
+    info: rule `unresolved-import` is enabled by default
+
+    Found 1 diagnostic
 
     ----- stderr -----
     WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.

@@ -1,17 +1,17 @@
 """_blake2b provides BLAKE2b for hashlib"""
 
 from _typeshed import ReadableBuffer
-from typing import ClassVar, final
+from typing import ClassVar, Final, final
 from typing_extensions import Self
 
-BLAKE2B_MAX_DIGEST_SIZE: int = 64
-BLAKE2B_MAX_KEY_SIZE: int = 64
-BLAKE2B_PERSON_SIZE: int = 16
-BLAKE2B_SALT_SIZE: int = 16
-BLAKE2S_MAX_DIGEST_SIZE: int = 32
-BLAKE2S_MAX_KEY_SIZE: int = 32
-BLAKE2S_PERSON_SIZE: int = 8
-BLAKE2S_SALT_SIZE: int = 8
+BLAKE2B_MAX_DIGEST_SIZE: Final = 64
+BLAKE2B_MAX_KEY_SIZE: Final = 64
+BLAKE2B_PERSON_SIZE: Final = 16
+BLAKE2B_SALT_SIZE: Final = 16
+BLAKE2S_MAX_DIGEST_SIZE: Final = 32
+BLAKE2S_MAX_KEY_SIZE: Final = 32
+BLAKE2S_PERSON_SIZE: Final = 8
+BLAKE2S_SALT_SIZE: Final = 8
 
 @final
 class blake2b:
