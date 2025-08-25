@@ -457,6 +457,9 @@ fn parameter_alias<'a>(parameter: &'a Parameter, semantic: &SemanticModel) -> Op
 ///
 /// The iterator yields tuples of the parameter name and the range of the parameter in the input,
 /// inclusive of curly braces.
+///
+/// FastAPI only recognizes path parameters when there are no leading or trailing spaces around
+/// the parameter name. For example, `/{x}` is a valid parameter, but `/{ x }` is treated literally.
 #[derive(Debug)]
 struct PathParamIterator<'a> {
     input: &'a str,
@@ -483,10 +486,18 @@ impl<'a> Iterator for PathParamIterator<'a> {
                     // We ignore text after a colon, since those are path converters
                     // See also: https://fastapi.tiangolo.com/tutorial/path-params/?h=path#path-convertor
                     let param_name_end = param_content.find(':').unwrap_or(param_content.len());
-                    let param_name = &param_content[..param_name_end].trim();
+                    let param_name = &param_content[..param_name_end];
 
-                    #[expect(clippy::range_plus_one)]
-                    return Some((param_name, start..end + 1));
+                    if param_name.starts_with(' ') || param_name.ends_with(' ') {
+                        continue;
+                    }
+
+                    let trimmed_param = param_name.trim();
+
+                    if !trimmed_param.is_empty() && is_identifier(trimmed_param) {
+                        #[expect(clippy::range_plus_one)]
+                        return Some((trimmed_param, start..end + 1));
+                    }
                 }
             }
         }
