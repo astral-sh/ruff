@@ -9,7 +9,7 @@ use crate::session::client::Client;
 use lsp_types::request::InlayHintRequest;
 use lsp_types::{InlayHintParams, Url};
 use ruff_db::source::{line_index, source_text};
-use ty_ide::{InlayHintContent, inlay_hints};
+use ty_ide::{InlayHintKind, InlayHintLabel, inlay_hints};
 use ty_project::ProjectDatabase;
 
 pub(crate) struct InlayHintRequestHandler;
@@ -55,8 +55,8 @@ impl BackgroundDocumentRequestHandler for InlayHintRequestHandler {
                 position: hint
                     .position
                     .to_position(&source, &index, snapshot.encoding()),
-                label: lsp_types::InlayHintLabel::String(hint.display(db).to_string()),
-                kind: Some(inlay_hint_kind(&hint.content)),
+                label: inlay_hint_label(&hint.label),
+                kind: Some(inlay_hint_kind(&hint.kind)),
                 tooltip: None,
                 padding_left: None,
                 padding_right: None,
@@ -71,9 +71,22 @@ impl BackgroundDocumentRequestHandler for InlayHintRequestHandler {
 
 impl RetriableRequestHandler for InlayHintRequestHandler {}
 
-fn inlay_hint_kind(inlay_hint_content: &InlayHintContent) -> lsp_types::InlayHintKind {
-    match inlay_hint_content {
-        InlayHintContent::Type(_) => lsp_types::InlayHintKind::TYPE,
-        InlayHintContent::CallArgumentName(_) => lsp_types::InlayHintKind::PARAMETER,
+fn inlay_hint_kind(inlay_hint_kind: &InlayHintKind) -> lsp_types::InlayHintKind {
+    match inlay_hint_kind {
+        InlayHintKind::Type => lsp_types::InlayHintKind::TYPE,
+        InlayHintKind::CallArgumentName => lsp_types::InlayHintKind::PARAMETER,
     }
+}
+
+fn inlay_hint_label(inlay_hint_label: &InlayHintLabel) -> lsp_types::InlayHintLabel {
+    let mut label_parts = Vec::new();
+    for part in inlay_hint_label.parts() {
+        label_parts.push(lsp_types::InlayHintLabelPart {
+            value: part.text().into(),
+            location: None,
+            tooltip: None,
+            command: None,
+        });
+    }
+    lsp_types::InlayHintLabel::LabelParts(label_parts)
 }

@@ -42,7 +42,14 @@ foo(1)
           "line": 0,
           "character": 1
         },
-        "label": ": Literal[1]",
+        "label": [
+          {
+            "value": ": "
+          },
+          {
+            "value": "Literal[1]"
+          }
+        ],
         "kind": 1
       },
       {
@@ -50,7 +57,14 @@ foo(1)
           "line": 5,
           "character": 4
         },
-        "label": "a=",
+        "label": [
+          {
+            "value": "a"
+          },
+          {
+            "value": "="
+          }
+        ],
         "kind": 2
       }
     ]
