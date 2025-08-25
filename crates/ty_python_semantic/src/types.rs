@@ -39,7 +39,7 @@ use crate::suppression::check_suppressions;
 use crate::types::call::{Binding, Bindings, CallArguments, CallableBinding};
 pub(crate) use crate::types::class_base::ClassBase;
 use crate::types::constraints::{
-    Constraints, IteratorConstraintsExtension, OptionConstraintsExtension,
+    ConstraintSet, Constraints, IteratorConstraintsExtension, OptionConstraintsExtension,
 };
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{INVALID_AWAIT, INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
@@ -1331,7 +1331,8 @@ impl<'db> Type<'db> {
     /// intersection simplification dependent on the order in which elements are added), so we do
     /// not use this more general definition of subtyping.
     pub(crate) fn is_subtype_of(self, db: &'db dyn Db, target: Type<'db>) -> bool {
-        self.when_subtype_of(db, target)
+        self.when_subtype_of::<ConstraintSet>(db, target)
+            .is_always_satisfied(db)
     }
 
     fn when_subtype_of<C: Constraints<'db>>(self, db: &'db dyn Db, target: Type<'db>) -> C {
@@ -1342,7 +1343,8 @@ impl<'db> Type<'db> {
     ///
     /// [assignable to]: https://typing.python.org/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation
     pub(crate) fn is_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
-        self.when_assignable_to(db, target)
+        self.when_assignable_to::<ConstraintSet>(db, target)
+            .is_always_satisfied(db)
     }
 
     fn when_assignable_to<C: Constraints<'db>>(self, db: &'db dyn Db, target: Type<'db>) -> C {
@@ -1820,7 +1822,8 @@ impl<'db> Type<'db> {
     ///
     /// [equivalent to]: https://typing.python.org/en/latest/spec/glossary.html#term-equivalent
     pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Type<'db>) -> bool {
-        self.when_equivalent_to(db, other)
+        self.when_equivalent_to::<ConstraintSet>(db, other)
+            .is_always_satisfied(db)
     }
 
     fn when_equivalent_to<C: Constraints<'db>>(self, db: &'db dyn Db, other: Type<'db>) -> C {
@@ -1920,7 +1923,8 @@ impl<'db> Type<'db> {
     /// Note: This function aims to have no false positives, but might return
     /// wrong `false` answers in some cases.
     pub(crate) fn is_disjoint_from(self, db: &'db dyn Db, other: Type<'db>) -> bool {
-        self.when_disjoint_from(db, other)
+        self.when_disjoint_from::<ConstraintSet>(db, other)
+            .is_always_satisfied(db)
     }
 
     fn when_disjoint_from<C: Constraints<'db>>(self, db: &'db dyn Db, other: Type<'db>) -> C {
@@ -9607,6 +9611,19 @@ pub(super) fn walk_intersection_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>
 }
 
 impl<'db> IntersectionType<'db> {
+    pub(crate) fn from_elements<I, T>(db: &'db dyn Db, elements: I) -> Type<'db>
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<Type<'db>>,
+    {
+        elements
+            .into_iter()
+            .fold(IntersectionBuilder::new(db), |builder, element| {
+                builder.add_positive(element.into())
+            })
+            .build()
+    }
+
     /// Return a new `IntersectionType` instance with the positive and negative types sorted
     /// according to a canonical ordering, and other normalizations applied to each element as applicable.
     ///

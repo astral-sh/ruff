@@ -18,7 +18,7 @@ use crate::semantic_index::{
     BindingWithConstraints, DeclarationWithConstraint, SemanticIndex, attribute_declarations,
     attribute_scopes,
 };
-use crate::types::constraints::{Constraints, IteratorConstraintsExtension};
+use crate::types::constraints::{ConstraintSet, Constraints, IteratorConstraintsExtension};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{INVALID_LEGACY_TYPE_VARIABLE, INVALID_TYPE_ALIAS_TYPE};
 use crate::types::enums::enum_metadata;
@@ -539,7 +539,8 @@ impl<'db> ClassType<'db> {
 
     /// Return `true` if `other` is present in this class's MRO.
     pub(super) fn is_subclass_of(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
-        self.when_subclass_of(db, other)
+        self.when_subclass_of::<ConstraintSet>(db, other)
+            .is_always_satisfied(db)
     }
 
     pub(super) fn when_subclass_of<C: Constraints<'db>>(
