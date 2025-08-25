@@ -233,7 +233,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             module: "airflow.sdk",
             name: "ObjectStoragePath".to_string(),
         },
-        ["airflow", "io", "storage", "attach"] => Replacement::SourceModuleMoved {
+        ["airflow", "io", "store", "attach"] => Replacement::SourceModuleMoved {
             module: "airflow.sdk.io",
             name: "attach".to_string(),
         },
