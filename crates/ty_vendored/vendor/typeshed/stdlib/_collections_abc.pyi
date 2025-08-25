@@ -1,8 +1,3 @@
-"""Abstract Base Classes (ABCs) for collections, according to PEP 3119.
-
-Unit tests are in test_collections.
-"""
-
 import sys
 from abc import abstractmethod
 from types import MappingProxyType
@@ -79,39 +74,31 @@ _VT_co = TypeVar("_VT_co", covariant=True)  # Value type covariant containers.
 @final
 class dict_keys(KeysView[_KT_co], Generic[_KT_co, _VT_co]):  # undocumented
     def __eq__(self, value: object, /) -> bool: ...
-    def __reversed__(self) -> Iterator[_KT_co]:
-        """Return a reverse iterator over the dict keys."""
+    def __reversed__(self) -> Iterator[_KT_co]: ...
     __hash__: ClassVar[None]  # type: ignore[assignment]
     if sys.version_info >= (3, 13):
-        def isdisjoint(self, other: Iterable[_KT_co], /) -> bool:
-            """Return True if the view and the given iterable have a null intersection."""
+        def isdisjoint(self, other: Iterable[_KT_co], /) -> bool: ...
     if sys.version_info >= (3, 10):
         @property
-        def mapping(self) -> MappingProxyType[_KT_co, _VT_co]:
-            """dictionary that this view refers to"""
+        def mapping(self) -> MappingProxyType[_KT_co, _VT_co]: ...
 
 @final
 class dict_values(ValuesView[_VT_co], Generic[_KT_co, _VT_co]):  # undocumented
-    def __reversed__(self) -> Iterator[_VT_co]:
-        """Return a reverse iterator over the dict values."""
+    def __reversed__(self) -> Iterator[_VT_co]: ...
     if sys.version_info >= (3, 10):
         @property
-        def mapping(self) -> MappingProxyType[_KT_co, _VT_co]:
-            """dictionary that this view refers to"""
+        def mapping(self) -> MappingProxyType[_KT_co, _VT_co]: ...
 
 @final
 class dict_items(ItemsView[_KT_co, _VT_co]):  # undocumented
     def __eq__(self, value: object, /) -> bool: ...
-    def __reversed__(self) -> Iterator[tuple[_KT_co, _VT_co]]:
-        """Return a reverse iterator over the dict items."""
+    def __reversed__(self) -> Iterator[tuple[_KT_co, _VT_co]]: ...
     __hash__: ClassVar[None]  # type: ignore[assignment]
     if sys.version_info >= (3, 13):
-        def isdisjoint(self, other: Iterable[tuple[_KT_co, _VT_co]], /) -> bool:
-            """Return True if the view and the given iterable have a null intersection."""
+        def isdisjoint(self, other: Iterable[tuple[_KT_co, _VT_co]], /) -> bool: ...
     if sys.version_info >= (3, 10):
         @property
-        def mapping(self) -> MappingProxyType[_KT_co, _VT_co]:
-            """dictionary that this view refers to"""
+        def mapping(self) -> MappingProxyType[_KT_co, _VT_co]: ...
 
 if sys.version_info >= (3, 12):
     @runtime_checkable
