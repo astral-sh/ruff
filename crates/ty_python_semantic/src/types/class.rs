@@ -3485,7 +3485,6 @@ pub enum KnownClass {
     // Typeshed
     NoneType, // Part of `types` for Python >= 3.10
     // Typing
-    Any,
     Awaitable,
     Generator,
     Deprecated,
@@ -3568,8 +3567,7 @@ impl KnownClass {
 
             Self::NoneType => Some(Truthiness::AlwaysFalse),
 
-            Self::Any
-            | Self::BaseException
+            Self::BaseException
             | Self::Exception
             | Self::ExceptionGroup
             | Self::Object
@@ -3689,7 +3687,6 @@ impl KnownClass {
             // Anything with a *runtime* MRO (N.B. sometimes different from the MRO that typeshed gives!)
             // with length >2, or anything that is implemented in pure Python, is not a solid base.
             Self::ABCMeta
-            | Self::Any
             | Self::Awaitable
             | Self::Generator
             | Self::Enum
@@ -3762,7 +3759,6 @@ impl KnownClass {
             | KnownClass::AsyncGeneratorType
             | KnownClass::CoroutineType
             | KnownClass::NoneType
-            | KnownClass::Any
             | KnownClass::StdlibAlias
             | KnownClass::SpecialForm
             | KnownClass::TypeVar
@@ -3839,7 +3835,6 @@ impl KnownClass {
             | KnownClass::AsyncGeneratorType
             | KnownClass::CoroutineType
             | KnownClass::NoneType
-            | KnownClass::Any
             | KnownClass::StdlibAlias
             | KnownClass::SpecialForm
             | KnownClass::TypeVar
@@ -3916,7 +3911,6 @@ impl KnownClass {
             | KnownClass::AsyncGeneratorType
             | KnownClass::CoroutineType
             | KnownClass::NoneType
-            | KnownClass::Any
             | KnownClass::StdlibAlias
             | KnownClass::SpecialForm
             | KnownClass::TypeVar
@@ -3967,8 +3961,7 @@ impl KnownClass {
             | Self::NamedTupleLike
             | Self::Generator => true,
 
-            Self::Any
-            | Self::Bool
+            Self::Bool
             | Self::Object
             | Self::Bytes
             | Self::Bytearray
@@ -4037,7 +4030,6 @@ impl KnownClass {
 
     pub(crate) fn name(self, db: &dyn Db) -> &'static str {
         match self {
-            Self::Any => "Any",
             Self::Bool => "bool",
             Self::Object => "object",
             Self::Bytes => "bytes",
@@ -4347,8 +4339,7 @@ impl KnownClass {
             | Self::UnionType
             | Self::WrapperDescriptorType => KnownModule::Types,
             Self::NoneType => KnownModule::Typeshed,
-            Self::Any
-            | Self::Awaitable
+            Self::Awaitable
             | Self::Generator
             | Self::SpecialForm
             | Self::TypeVar
@@ -4409,8 +4400,7 @@ impl KnownClass {
             | Self::UnionType
             | Self::NotImplementedType => Some(true),
 
-            Self::Any
-            | Self::Bool
+            Self::Bool
             | Self::Object
             | Self::Bytes
             | Self::Bytearray
@@ -4489,8 +4479,7 @@ impl KnownClass {
             | Self::TypeAliasType
             | Self::NotImplementedType => true,
 
-            Self::Any
-            | Self::Bool
+            Self::Bool
             | Self::Object
             | Self::Bytes
             | Self::Bytearray
@@ -4565,7 +4554,6 @@ impl KnownClass {
         // We assert that this match is exhaustive over the right-hand side in the unit test
         // `known_class_roundtrip_from_str()`
         let candidate = match class_name {
-            "Any" => Self::Any,
             "bool" => Self::Bool,
             "object" => Self::Object,
             "bytes" => Self::Bytes,
@@ -4655,8 +4643,7 @@ impl KnownClass {
     /// Return `true` if the module of `self` matches `module`
     fn check_module(self, db: &dyn Db, module: KnownModule) -> bool {
         match self {
-            Self::Any
-            | Self::Bool
+            Self::Bool
             | Self::Object
             | Self::Bytes
             | Self::Bytearray
