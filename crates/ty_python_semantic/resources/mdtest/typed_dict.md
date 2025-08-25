@@ -222,6 +222,7 @@ david = OptionalPerson(name="David")
 emily = OptionalPerson(age=30)
 frank = OptionalPerson(name="Frank", age=25)
 
+# TODO: we could emit an error here, because these fields are not guaranteed to exist
 reveal_type(charlie["name"])  # revealed: str
 reveal_type(david["age"])  # revealed: int | None
 ```
