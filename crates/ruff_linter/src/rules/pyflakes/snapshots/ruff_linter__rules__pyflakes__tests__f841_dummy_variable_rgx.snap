@@ -293,58 +293,58 @@ help: Remove assignment to unused variable `_`
 155 155 | 
 
 F841 [*] Local variable `__class__` is assigned to but never used
-   --> F841_0.py:168:9
+   --> F841_0.py:170:9
     |
-166 | class A:
-167 |     def set_class(self, cls):
-168 |         __class__ = cls
+168 | class A:
+169 |     def set_class(self, cls):
+170 |         __class__ = cls
     |         ^^^^^^^^^
     |
 help: Remove assignment to unused variable `__class__`
 
 ℹ Unsafe fix
-165 165 | # error, and we still emit a diagnostic.
-166 166 | class A:
-167 167 |     def set_class(self, cls):
-168     |-        __class__ = cls
-    168 |+        pass
-169 169 | 
-170 170 | 
-171 171 | class A:
+167 167 | # error, and we still emit a diagnostic. See https://github.com/astral-sh/ruff/pull/20048#discussion_r2296252395
+168 168 | class A:
+169 169 |     def set_class(self, cls):
+170     |-        __class__ = cls
+    170 |+        pass
+171 171 | 
+172 172 | 
+173 173 | class A:
 
 F841 [*] Local variable `__class__` is assigned to but never used
-   --> F841_0.py:174:13
+   --> F841_0.py:176:13
     |
-172 |     class B:
-173 |         def set_class(self, cls):
-174 |             __class__ = cls
+174 |     class B:
+175 |         def set_class(self, cls):
+176 |             __class__ = cls
     |             ^^^^^^^^^
     |
 help: Remove assignment to unused variable `__class__`
 
 ℹ Unsafe fix
-171 171 | class A:
-172 172 |     class B:
-173 173 |         def set_class(self, cls):
-174     |-            __class__ = cls
-    174 |+            pass
-175 175 | 
-176 176 | 
-177 177 | class A:
+173 173 | class A:
+174 174 |     class B:
+175 175 |         def set_class(self, cls):
+176     |-            __class__ = cls
+    176 |+            pass
+177 177 | 
+178 178 | 
+179 179 | class A:
 
 F841 [*] Local variable `__class__` is assigned to but never used
-   --> F841_0.py:182:17
+   --> F841_0.py:184:17
     |
-180 |             print(__class__)
-181 |             def set_class(self, cls):
-182 |                 __class__ = cls
+182 |             print(__class__)
+183 |             def set_class(self, cls):
+184 |                 __class__ = cls
     |                 ^^^^^^^^^
     |
 help: Remove assignment to unused variable `__class__`
 
 ℹ Unsafe fix
-179 179 |         class B:
-180 180 |             print(__class__)
-181 181 |             def set_class(self, cls):
-182     |-                __class__ = cls
-    182 |+                pass
+181 181 |         class B:
+182 182 |             print(__class__)
+183 183 |             def set_class(self, cls):
+184     |-                __class__ = cls
+    184 |+                pass
