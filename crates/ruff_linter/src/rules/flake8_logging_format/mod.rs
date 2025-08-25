@@ -22,6 +22,7 @@ mod tests {
     #[test_case(Path::new("G002.py"))]
     #[test_case(Path::new("G003.py"))]
     #[test_case(Path::new("G004.py"))]
+    #[test_case(Path::new("G005.py"))]
     #[test_case(Path::new("G010.py"))]
     #[test_case(Path::new("G101_1.py"))]
     #[test_case(Path::new("G101_2.py"))]
@@ -38,6 +39,7 @@ mod tests {
                     Rule::LoggingPercentFormat,
                     Rule::LoggingStringConcat,
                     Rule::LoggingFString,
+                    Rule::LoggingPreFormat,
                     Rule::LoggingWarn,
                     Rule::LoggingExtraAttrClash,
                     Rule::LoggingExcInfo,

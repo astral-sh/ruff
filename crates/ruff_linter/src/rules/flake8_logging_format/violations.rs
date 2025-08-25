@@ -1,4 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_literal::format::FormatConversion;
 
 use crate::{AlwaysFixableViolation, Violation};
 
@@ -330,6 +331,76 @@ impl Violation for LoggingFString {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Logging statement uses f-string".to_string()
+    }
+}
+
+/// ## What it does
+/// Checks for pre-formatting of arguments to `logging` calls.
+///
+/// ## Why is this bad?
+/// Arguments to `logging` calls will be formatted as strings automatically, so it
+/// is unnecessary and less efficient to eagerly format the arguments before passing
+/// them in.
+///
+/// ## Known problems
+///
+/// This rule detects uses of the `logging` module via a heuristic.
+/// Specifically, it matches against:
+///
+/// - Uses of the `logging` module itself (e.g., `import logging; logging.info(...)`).
+/// - Uses of `flask.current_app.logger` (e.g., `from flask import current_app; current_app.logger.info(...)`).
+/// - Objects whose name starts with `log` or ends with `logger` or `logging`,
+///   when used in the same file in which they are defined (e.g., `logger = logging.getLogger(); logger.info(...)`).
+/// - Imported objects marked as loggers via the [`lint.logger-objects`] setting, which can be
+///   used to enforce these rules against shared logger objects (e.g., `from module import logger; logger.info(...)`,
+///   when [`lint.logger-objects`] is set to `["module.logger"]`).
+///
+/// ## Example
+/// ```python
+/// import logging
+///
+/// logging.basicConfig(format="%(message)s", level=logging.INFO)
+///
+/// user = "Maria"
+///
+/// logging.info("%s - Something happened", str(user))
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import logging
+///
+/// logging.basicConfig(format="%(message)s", level=logging.INFO)
+///
+/// user = "Maria"
+///
+/// logging.info("%s - Something happened", user)
+/// ```
+///
+/// ## Options
+/// - `lint.logger-objects`
+///
+/// ## References
+/// - [Python documentation: `logging`](https://docs.python.org/3/library/logging.html)
+/// - [Python documentation: Optimization](https://docs.python.org/3/howto/logging.html#optimization)
+#[derive(ViolationMetadata)]
+pub(crate) struct LoggingPreFormat {
+    pub(crate) format_conversion: FormatConversion,
+}
+
+impl Violation for LoggingPreFormat {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let LoggingPreFormat { format_conversion } = self;
+        let (format_str, call_arg) = match format_conversion {
+            FormatConversion::Str => ("%s", "str()"),
+            FormatConversion::Repr => ("%r", "repr()"),
+            FormatConversion::Ascii => ("%a", "ascii()"),
+            FormatConversion::Bytes => ("%b", "bytes()"),
+        };
+        format!(
+            "Unnecessary cast `{call_arg}` in logging values when formatting with `{format_str}`"
+        )
     }
 }
 

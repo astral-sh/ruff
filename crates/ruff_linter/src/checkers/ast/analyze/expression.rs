@@ -1149,6 +1149,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 Rule::LoggingExtraAttrClash,
                 Rule::LoggingExcInfo,
                 Rule::LoggingRedundantExcInfo,
+                Rule::LoggingPreFormat,
             ]) {
                 flake8_logging_format::rules::logging_call(checker, call);
             }
