@@ -291,3 +291,64 @@ help: Remove assignment to unused variable `_`
 153 153 |         pass
 154 154 | 
 155 155 | # OK
+
+F841 [*] Local variable `__class__` is assigned to but never used
+   --> F841_0.py:158:9
+    |
+156 | class A:
+157 |     def set_class(self, cls):
+158 |         __class__ = cls
+    |         ^^^^^^^^^
+159 |
+160 | # OK
+    |
+help: Remove assignment to unused variable `__class__`
+
+ℹ Unsafe fix
+155 155 | # OK
+156 156 | class A:
+157 157 |     def set_class(self, cls):
+158     |-        __class__ = cls
+    158 |+        pass
+159 159 | 
+160 160 | # OK
+161 161 | class A:
+
+F841 [*] Local variable `__class__` is assigned to but never used
+   --> F841_0.py:164:13
+    |
+162 |     class B:
+163 |         def set_class(self, cls):
+164 |             __class__ = cls
+    |             ^^^^^^^^^
+165 | # OK
+166 | class A:
+    |
+help: Remove assignment to unused variable `__class__`
+
+ℹ Unsafe fix
+161 161 | class A:
+162 162 |     class B:
+163 163 |         def set_class(self, cls):
+164     |-            __class__ = cls
+    164 |+            pass
+165 165 | # OK
+166 166 | class A:
+167 167 |     __class__ = 1
+
+F841 [*] Local variable `__class__` is assigned to but never used
+   --> F841_0.py:176:17
+    |
+174 |             print(__class__)
+175 |             def set_class(self, cls):
+176 |                 __class__ = cls
+    |                 ^^^^^^^^^
+    |
+help: Remove assignment to unused variable `__class__`
+
+ℹ Unsafe fix
+173 173 |         class B:
+174 174 |             print(__class__)
+175 175 |             def set_class(self, cls):
+176     |-                __class__ = cls
+    176 |+                pass
