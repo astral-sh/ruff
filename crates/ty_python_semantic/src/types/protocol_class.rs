@@ -719,6 +719,8 @@ fn cached_protocol_interface<'db>(
     ProtocolInterface::new(db, members)
 }
 
+// If we use `expect(clippy::trivially_copy_pass_by_ref)` here,
+// the lint expectation is unfulfilled on WASM
 #[allow(clippy::trivially_copy_pass_by_ref)]
 fn proto_interface_cycle_recover<'db>(
     _db: &dyn Db,
