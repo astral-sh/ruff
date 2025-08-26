@@ -424,9 +424,9 @@ impl ReachabilityConstraintsBuilder {
         }
     }
 
-    /// Returns whether `a` or `b` has a "larger" atom. TDDs are ordered such that interior nodes
-    /// can only have edges to "larger" nodes. Terminals are considered to have a larger atom than
-    /// any internal node, since they are leaf nodes.
+    /// Implements an ordering of constraint IDs based on their atoms. TDDs are ordered such that
+    /// interior nodes can only have edges to "larger" nodes (with a "smaller" atom). Terminals
+    /// are considered to have a larger atom than any internal node, since they are leaf nodes.
     fn cmp_atoms(
         &self,
         a: ScopedReachabilityConstraintId,
@@ -439,7 +439,9 @@ impl ReachabilityConstraintsBuilder {
         } else if b.is_terminal() {
             Ordering::Less
         } else {
-            self.interiors[a].atom.cmp(&self.interiors[b].atom)
+            // See https://github.com/astral-sh/ruff/pull/20098 for an explanation of why this
+            // ordering is reversed.
+            self.interiors[b].atom.cmp(&self.interiors[a].atom)
         }
     }
 
