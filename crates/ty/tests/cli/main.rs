@@ -264,8 +264,8 @@ fn cli_arguments_are_relative_to_the_current_directory() -> anyhow::Result<()> {
     4 | stat = add(10, 15)
       |
     info: Searched in the following paths during module resolution:
-      1. <temp_dir>/ (first-party code)
-      2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info:   1. <temp_dir>/ (first-party code)
+    info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
 
@@ -493,8 +493,8 @@ fn check_specific_paths() -> anyhow::Result<()> {
     4 | print(z)
       |
     info: Searched in the following paths during module resolution:
-      1. <temp_dir>/ (first-party code)
-      2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info:   1. <temp_dir>/ (first-party code)
+    info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
 
@@ -505,8 +505,8 @@ fn check_specific_paths() -> anyhow::Result<()> {
       |        ^^^^^^^^^^^^^^
       |
     info: Searched in the following paths during module resolution:
-      1. <temp_dir>/ (first-party code)
-      2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info:   1. <temp_dir>/ (first-party code)
+    info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
 
@@ -534,8 +534,8 @@ fn check_specific_paths() -> anyhow::Result<()> {
     4 | print(z)
       |
     info: Searched in the following paths during module resolution:
-      1. <temp_dir>/ (first-party code)
-      2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info:   1. <temp_dir>/ (first-party code)
+    info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
 
@@ -546,8 +546,8 @@ fn check_specific_paths() -> anyhow::Result<()> {
       |        ^^^^^^^^^^^^^^
       |
     info: Searched in the following paths during module resolution:
-      1. <temp_dir>/ (first-party code)
-      2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info:   1. <temp_dir>/ (first-party code)
+    info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
 

@@ -334,9 +334,9 @@ import bar",
     2 | import bar
       |
     info: Searched in the following paths during module resolution:
-      1. <temp_dir>/ (first-party code)
-      2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
-      3. <temp_dir>/strange-venv-location/lib/python3.13/site-packages (site-packages)
+    info:   1. <temp_dir>/ (first-party code)
+    info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info:   3. <temp_dir>/strange-venv-location/lib/python3.13/site-packages (site-packages)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
 
@@ -383,10 +383,10 @@ fn lib64_site_packages_directory_on_unix() -> anyhow::Result<()> {
       |                  ^^^
       |
     info: Searched in the following paths during module resolution:
-      1. <temp_dir>/ (first-party code)
-      2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
-      3. <temp_dir>/.venv/lib/python3.13/site-packages (site-packages)
-      4. <temp_dir>/.venv/lib64/python3.13/site-packages (site-packages)
+    info:   1. <temp_dir>/ (first-party code)
+    info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info:   3. <temp_dir>/.venv/lib/python3.13/site-packages (site-packages)
+    info:   4. <temp_dir>/.venv/lib64/python3.13/site-packages (site-packages)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
 
@@ -1283,8 +1283,8 @@ home = ./
     4 | from package1 import WorkingVenv
       |
     info: Searched in the following paths during module resolution:
-      1. <temp_dir>/project (first-party code)
-      2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info:   1. <temp_dir>/project (first-party code)
+    info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
 
@@ -1298,8 +1298,8 @@ home = ./
     5 | from package1 import BaseConda
       |
     info: Searched in the following paths during module resolution:
-      1. <temp_dir>/project (first-party code)
-      2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info:   1. <temp_dir>/project (first-party code)
+    info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
 
@@ -1313,8 +1313,8 @@ home = ./
     5 | from package1 import BaseConda
       |
     info: Searched in the following paths during module resolution:
-      1. <temp_dir>/project (first-party code)
-      2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info:   1. <temp_dir>/project (first-party code)
+    info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
 
@@ -1327,8 +1327,8 @@ home = ./
       |      ^^^^^^^^
       |
     info: Searched in the following paths during module resolution:
-      1. <temp_dir>/project (first-party code)
-      2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info:   1. <temp_dir>/project (first-party code)
+    info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
 
@@ -1738,9 +1738,9 @@ fn default_root_tests_package() -> anyhow::Result<()> {
     5 | print(f"{foo} {bar}")
       |
     info: Searched in the following paths during module resolution:
-      1. <temp_dir>/ (first-party code)
-      2. <temp_dir>/src (first-party code)
-      3. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info:   1. <temp_dir>/ (first-party code)
+    info:   2. <temp_dir>/src (first-party code)
+    info:   3. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
 
