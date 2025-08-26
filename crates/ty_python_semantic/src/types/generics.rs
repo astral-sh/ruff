@@ -461,13 +461,16 @@ fn is_subtype_in_invariant_position<'db, C: Constraints<'db>>(
                 && base_top.is_subtype_of(db, derived_top),
         ),
         // A bottom materialization is a subtype of top if it's a subtype of some part of the range of materializations
-        // covered by top, i.e. either the top or bottom of derived is between the top and derived of base.
+        // covered by top, i.e. either the top or bottom of derived is between the top and derived of base, or both
+        // materializations of base are between the top and bottom of derived.
         (MaterializationType::Bottom, MaterializationType::Top) => C::from_bool(
             db,
             (base_bottom.is_subtype_of(db, derived_bottom)
                 && derived_bottom.is_subtype_of(db, base_top))
                 || (base_bottom.is_subtype_of(db, derived_top)
-                    && derived_top.is_subtype_of(db, base_top)),
+                    && derived_top.is_subtype_of(db, base_top)
+                    || (base_top.is_subtype_of(db, derived_top)
+                        && derived_bottom.is_subtype_of(db, base_top))),
         ),
         // A top materialization is a subtype of a bottom materialization only if both are the
         // same fully static type.
