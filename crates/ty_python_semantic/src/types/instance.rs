@@ -12,10 +12,8 @@ use crate::types::enums::is_single_member_enum;
 use crate::types::protocol_class::walk_protocol_interface;
 use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
-    ApplyTypeMappingVisitor, ApplyTypeMappingVisitor, ClassBase, ClassBase, DynamicType,
-    HasRelationToVisitor, HasRelationToVisitor, IsDisjointVisitor, IsDisjointVisitor,
-    IsEquivalentVisitor, IsEquivalentVisitor, MaterializationType, NormalizedVisitor,
-    NormalizedVisitor, TypeMapping, TypeMapping, TypeRelation, TypeRelation, VarianceInferable,
+    ApplyTypeMappingVisitor, ClassBase, HasRelationToVisitor, IsDisjointVisitor,
+    IsEquivalentVisitor, MaterializationType, NormalizedVisitor, TypeMapping, TypeRelation,
     VarianceInferable,
 };
 use crate::{Db, FxOrderSet};

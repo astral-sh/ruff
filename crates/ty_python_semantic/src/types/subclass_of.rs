@@ -3,12 +3,9 @@ use crate::semantic_index::definition::Definition;
 use crate::types::constraints::Constraints;
 use crate::types::variance::VarianceInferable;
 use crate::types::{
-    ApplyTypeMappingVisitor, ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance,
-    BoundTypeVarInstance, ClassType, ClassType, DynamicType, DynamicType, HasRelationToVisitor,
-    HasRelationToVisitor, IsDisjointVisitor, IsDisjointVisitor, KnownClass, KnownClass,
-    MaterializationType, MemberLookupPolicy, MemberLookupPolicy, NormalizedVisitor,
-    NormalizedVisitor, SpecialFormType, Type, Type, TypeMapping, TypeMapping, TypeRelation,
-    TypeRelation, TypeVarInstance,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, DynamicType, HasRelationToVisitor,
+    IsDisjointVisitor, KnownClass, MaterializationType, MemberLookupPolicy, NormalizedVisitor,
+    SpecialFormType, Type, TypeMapping, TypeRelation,
 };
 use crate::{Db, FxOrderSet};
 
