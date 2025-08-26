@@ -167,8 +167,6 @@ impl UvFormatCommand {
         path: &Path,
         range_with_index: Option<(TextRange, &LineIndex, &str)>,
     ) -> Command {
-        // TODO(zanieb): We should probably check the uv version to make sure it supports
-        // `uv format` or add a special error message when the subcommand doesn't exist
         let mut command = Command::new("uv");
         command.arg("format");
         command.arg("--");
@@ -178,17 +176,13 @@ impl UvFormatCommand {
             self.options.target_version().major,
             self.options.target_version().minor
         );
-        let line_width = FormatOptions::line_width(&self.options).value().to_string();
-        let indent_width = FormatOptions::indent_width(&self.options)
-            .value()
-            .to_string();
 
         // Add only the formatting options that the CLI supports
         command.arg("--target-version");
         command.arg(&target_version);
 
         command.arg("--line-length");
-        command.arg(&line_width);
+        command.arg(self.options.line_width().to_string());
 
         if self.options.preview().is_enabled() {
             command.arg("--preview");
@@ -198,16 +192,16 @@ impl UvFormatCommand {
         command.arg("--config");
         command.arg(format!(
             "format.indent-style = '{}'",
-            FormatOptions::indent_style(&self.options).as_str()
+            self.options.indent_style()
         ));
 
         command.arg("--config");
-        command.arg(format!("indent-width = {indent_width}"));
+        command.arg(format!("indent-width = {}", self.options.indent_width()));
 
         command.arg("--config");
         command.arg(format!(
             "format.quote-style = '{}'",
-            self.options.quote_style().as_str()
+            self.options.quote_style()
         ));
 
         command.arg("--config");
@@ -259,7 +253,13 @@ impl UvFormatCommand {
     ) -> crate::Result<Option<String>> {
         let mut command =
             self.build_command(path, range_with_index.map(|(r, idx)| (r, idx, source)));
-        let mut child = command.spawn().context("Failed to spawn uv")?;
+        let mut child = match command.spawn() {
+            Ok(child) => child,
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                anyhow::bail!("uv was not found; is it installed and on the PATH?")
+            }
+            Err(err) => return Err(err).context("Failed to spawn uv"),
+        };
 
         let mut stdin = child
             .stdin
@@ -280,6 +280,12 @@ impl UvFormatCommand {
             if stderr.contains("Failed to parse") {
                 tracing::warn!("Unable to format document: {}", stderr);
                 return Ok(None);
+            }
+            // Special-case for when `uv format` is not available
+            if stderr.contains("unrecognized subcommand 'format'") {
+                anyhow::bail!(
+                    "The installed version of uv does not support `uv format`; upgrade to a newer version"
+                );
             }
             anyhow::bail!("Failed to format document: {}", stderr);
         }
