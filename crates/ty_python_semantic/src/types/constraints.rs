@@ -188,6 +188,24 @@ impl<'db> ConstraintSet<'db> {
         }
     }
 
+    /// Updates this set to be the union of itself and a constraint.
+    fn union_constraint(
+        &mut self,
+        db: &'db dyn Db,
+        constraint: Satisfiable<AtomicConstraint<'db>>,
+    ) {
+        match constraint {
+            Satisfiable::Never => {}
+            Satisfiable::Always => {
+                self.clauses.clear();
+                self.clauses.push(ConstraintClause::always());
+            }
+            Satisfiable::Constrained(constraint) => {
+                self.union_clause(db, ConstraintClause::singleton(constraint));
+            }
+        }
+    }
+
     /// Updates this set to be the union of itself and a clause.
     fn union_clause(&mut self, db: &'db dyn Db, mut clause: ConstraintClause<'db>) {
         let prev = std::mem::take(&mut self.clauses);
@@ -547,7 +565,7 @@ impl<'db> ConstraintClause<'db> {
     fn negate(&self, db: &'db dyn Db) -> ConstraintSet<'db> {
         let mut result = ConstraintSet::never();
         for constraint in &self.constraints {
-            result.union_clause(db, ConstraintClause::singleton(constraint.negate()));
+            result.union_set(db, constraint.negate(db));
         }
         result
     }
@@ -584,70 +602,228 @@ impl<'db> ConstraintClause<'db> {
     }
 }
 
-/// A constraint on a single typevar.
+/// A constraint on a single typevar, providing lower and upper bounds for the types that it can
+/// specialize to. The lower and upper bounds can each be either _closed_ (the bound itself is
+/// included) or _open_ (the bound itself is not included).
+///
+/// We render constraints using a normal interval notation: `[s, t]`, `(s, t)`, `[s, t)`, or
+/// `(s, t]`, where a square bracket indicates that bound is closed, and a parenthesis indicates
+/// that it is open.
+///
+/// We will also sometimes render them graphically: `s┠──┨t`, `s╟──╢t`, `s┠──╢t`, or `s╟──┨t`,
+/// where a solid bar indicates a closed bound, and a double bar indicates an open  bound.
 ///
 /// ### Invariants
 ///
-/// - The bounds must be ordered correctly: `lower ≤: upper`. (A constraint `upper <: lower` does
+/// - The bounds must be ordered correctly: `lower ≤: upper`. (A constraint `[upper, lower]` does
 ///   _not_ mean that the typevar can only specialize to `Never`; it means that there is no
 ///   concrete type that the typevar can specialize to.)
 ///
-/// - The bounds must actually constrain the typevar: `lower` must not be `Never` or `upper` must
-///   not be `object`. (A positive constraint `Never ≤: T ≤: object` doesn't constrain the typevar
-///   at all, and so we don't need a constraint in the corresponding constraint clause. A negative
-///   constraint `not(Never ≤: T ≤: object)` means that there is no concrete type the typevar can
-///   specialize to.)
+/// - The bounds must actually constrain the typevar: `lower` must not be a closed bound of
+///   `Never`, or `upper` must not be a closed bound of `object`. (The constraint `[Never, object]`
+///   doesn't constrain the typevar at all, and so we don't need a constraint in the corresponding
+///   constraint clause.)
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct AtomicConstraint<'db> {
-    sign: ConstraintSign,
     typevar: BoundTypeVarInstance<'db>,
-    lower: Type<'db>,
-    upper: Type<'db>,
+    lower: ConstraintBound<'db>,
+    upper: ConstraintBound<'db>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum ConstraintSign {
-    Positive,
-    Negative,
+pub(crate) enum ConstraintBound<'db> {
+    Open(Type<'db>),
+    Closed(Type<'db>),
+}
+
+impl<'db> ConstraintBound<'db> {
+    fn flip(self) -> Self {
+        match self {
+            ConstraintBound::Open(bound) => ConstraintBound::Closed(bound),
+            ConstraintBound::Closed(bound) => ConstraintBound::Open(bound),
+        }
+    }
+
+    fn bound_type(self) -> Type<'db> {
+        match self {
+            ConstraintBound::Open(bound) => bound,
+            ConstraintBound::Closed(bound) => bound,
+        }
+    }
+
+    fn is_open(self) -> bool {
+        matches!(self, ConstraintBound::Open(_))
+    }
+
+    /// A lower bound is assignable to an upper bound if the underlying types are assignable; and
+    /// if both bounds are open, if the types are not equivalent.
+    fn is_assignable_to(self, db: &'db dyn Db, other: Self) -> bool {
+        let self_type = self.bound_type();
+        let other_type = other.bound_type();
+        if !self_type.is_assignable_to(db, other_type) {
+            return false;
+        }
+        if self.is_open() && other.is_open() {
+            return !self_type.is_equivalent_to(db, other_type);
+        }
+        true
+    }
+
+    /// Returns the minimum of two upper bounds.
+    ///
+    /// We use intersection to combine the types of the bounds (mnemonic: minimum and intersection
+    /// both make the result smaller).
+    ///
+    /// If either of the input upper bounds is open — `[s, t)` or `(s, t)` — then `t` must not be
+    /// included in the result. If the intersection is equivalent to `t`, then the result must
+    /// therefore be an open bound. If the intersection is not equivalent to `t`, then it must be
+    /// smaller than `t`, since intersection cannot make the result larger; therefore `t` is
+    /// already not included in the result, and the bound will be closed.
+    fn min_upper(self, db: &'db dyn Db, other: Self) -> Self {
+        let result_bound =
+            IntersectionType::from_elements(db, [self.bound_type(), other.bound_type()]);
+        match (self, other) {
+            (ConstraintBound::Open(bound), _) | (_, ConstraintBound::Open(bound))
+                if bound.is_equivalent_to(db, result_bound) =>
+            {
+                ConstraintBound::Open(result_bound)
+            }
+            _ => ConstraintBound::Closed(result_bound),
+        }
+    }
+
+    /// Returns the maximum of two upper bounds.
+    ///
+    /// We use union to combine the types of the bounds (mnemonic: maximum and union both make the
+    /// result larger).
+    ///
+    /// For the result to be open, the union must be equivalent to one of the input bounds. (Union
+    /// can only make types "bigger", so if the union is not equivalent to either input, it is
+    /// strictly larger than both, and the result bound should therefore be closed.)
+    ///
+    /// There are only three situations where the result is open:
+    ///
+    /// ```
+    /// ────╢t₁    ────╢t₁    ────╢t₁    ────┨t₁    ────┨t₁    ────┨t₁    ────╢t₁
+    /// ──╢t₂      ──┨t₂      ────╢t₂    ──╢t₂      ──┨t₂      ────┨t₂    ────┨t₂
+    ///     ⇓          ⇓          ⇓          ⇓          ⇓          ⇓          ⇓
+    /// ────╢t₁    ────╢t₁    ────╢t₁    ────┨t₁    ────┨t₁    ────┨t₁    ────┨t₁
+    /// ```
+    ///
+    /// In all of these cases, the union is equivalent to `t₁`. (There are symmetric cases
+    /// where the intersection is equivalent to `t₂`, but we'll handle them by deciding to call the
+    /// "smaller" input `t₁`.) Note that the result is open if `t₂ < t₁` (_strictly_ less than), or
+    /// if _both_ inputs are open and `t₁ = t₂`. In all other cases, the result is closed.
+    fn max_upper(self, db: &'db dyn Db, other: Self) -> Self {
+        let result_bound = UnionType::from_elements(db, [self.bound_type(), other.bound_type()]);
+        match (self, other) {
+            (ConstraintBound::Open(self_bound), ConstraintBound::Open(other_bound))
+                if self_bound.is_equivalent_to(db, result_bound)
+                    || other_bound.is_equivalent_to(db, result_bound) =>
+            {
+                ConstraintBound::Open(result_bound)
+            }
+
+            (ConstraintBound::Closed(other_bound), ConstraintBound::Open(open_bound))
+            | (ConstraintBound::Open(open_bound), ConstraintBound::Closed(other_bound))
+                if open_bound.is_equivalent_to(db, result_bound)
+                    && other_bound.is_assignable_to(db, open_bound)
+                    && !other_bound.is_equivalent_to(db, open_bound) =>
+            {
+                ConstraintBound::Open(result_bound)
+            }
+
+            _ => ConstraintBound::Closed(result_bound),
+        }
+    }
+
+    /// Returns the minimum of two lower bounds.
+    ///
+    /// We use intersection to combine the types of the bounds (mnemonic: minimum and intersection
+    /// both make the result smaller).
+    ///
+    /// For the result to be open, the intersection must be equivalent to one of the input bounds.
+    /// (Intersection can only make types "smaller", so if the intersection is not equivalent to
+    /// either input, it is strictly smaller than both, and the result bound should therefore be
+    /// closed.)
+    ///
+    /// There are only three situations where the result is open:
+    ///
+    /// ```
+    /// s₁╟────    s₁╟────    s₁╟────    s₁┠────    s₁┠────    s₁┠────    s₁╟────
+    /// s₂╟──      s₂┠──      s₂╟────    s₂╟──      s₂┠──      s₂┠────    s₂┠────
+    ///     ⇓          ⇓          ⇓          ⇓          ⇓          ⇓          ⇓
+    /// s₁╟────    s₁╟────    s₁╟────    s₁┠────    s₁┠────    s₁┠────    s₁┠────
+    /// ```
+    ///
+    /// In all of these cases, the intersection is equivalent to `s₁`. (There are symmetric cases
+    /// where the intersection is equivalent to `s₂`, but we'll handle them by deciding to call the
+    /// "smaller" input `s₁`.) Note that the result is open if `s₁ < s₂` (_strictly_ less than), or
+    /// if _both_ inputs are open and `s₁ = s₂`. In all other cases, the result is closed.
+    fn min_lower(self, db: &'db dyn Db, other: Self) -> Self {
+        let result_bound =
+            IntersectionType::from_elements(db, [self.bound_type(), other.bound_type()]);
+        match (self, other) {
+            (ConstraintBound::Open(self_bound), ConstraintBound::Open(other_bound))
+                if self_bound.is_equivalent_to(db, result_bound)
+                    || other_bound.is_equivalent_to(db, result_bound) =>
+            {
+                ConstraintBound::Open(result_bound)
+            }
+
+            (ConstraintBound::Closed(other_bound), ConstraintBound::Open(open_bound))
+            | (ConstraintBound::Open(open_bound), ConstraintBound::Closed(other_bound))
+                if open_bound.is_equivalent_to(db, result_bound)
+                    && open_bound.is_assignable_to(db, other_bound)
+                    && !open_bound.is_equivalent_to(db, other_bound) =>
+            {
+                ConstraintBound::Open(result_bound)
+            }
+
+            _ => ConstraintBound::Closed(result_bound),
+        }
+    }
+
+    /// Returns the maximum of two lower bounds.
+    ///
+    /// We use union to combine the types of the bounds (mnemonic: maximum and union both make the
+    /// result larger).
+    ///
+    /// If either of the input lower bounds is open — `(s, t]` or `(s, t)` — then `s` must not be
+    /// included in the result. If the union is equivalent to `s`, then the result must therefore
+    /// be an open bound. If the union is not equivalent to `s`, then it must be larger than `s`,
+    /// since union cannot make the result smaller; therefore `s` is already not included in the
+    /// result, and the bound will be closed.
+    fn max_lower(self, db: &'db dyn Db, other: Self) -> Self {
+        let result_bound = UnionType::from_elements(db, [self.bound_type(), other.bound_type()]);
+        match (self, other) {
+            (ConstraintBound::Open(bound), _) | (_, ConstraintBound::Open(bound))
+                if bound.is_equivalent_to(db, result_bound) =>
+            {
+                ConstraintBound::Open(result_bound)
+            }
+            _ => ConstraintBound::Closed(result_bound),
+        }
+    }
 }
 
 impl<'db> AtomicConstraint<'db> {
-    /// Returns a new positive atomic constraint, ensuring that all invariants are held.
-    fn positive(
+    /// Returns a new atomic constraint, ensuring that all invariants are held.
+    fn new(
         db: &'db dyn Db,
         typevar: BoundTypeVarInstance<'db>,
-        lower: Type<'db>,
-        upper: Type<'db>,
+        lower: ConstraintBound<'db>,
+        upper: ConstraintBound<'db>,
     ) -> Satisfiable<Self> {
-        if !lower.is_assignable_to(db, upper) {
+        if !lower.bound_type().is_assignable_to(db, upper.bound_type()) {
             return Satisfiable::Never;
         }
-        if lower.is_never() && upper.is_object(db) {
-            return Satisfiable::Always;
+        if let (ConstraintBound::Closed(lower), ConstraintBound::Closed(upper)) = (lower, upper) {
+            if lower.is_never() && upper.is_object(db) {
+                return Satisfiable::Always;
+            }
         }
         Satisfiable::Constrained(Self {
-            sign: ConstraintSign::Positive,
-            typevar,
-            lower,
-            upper,
-        })
-    }
-
-    /// Returns a new negative atomic constraint, ensuring that all invariants are held.
-    fn negative(
-        db: &'db dyn Db,
-        typevar: BoundTypeVarInstance<'db>,
-        lower: Type<'db>,
-        upper: Type<'db>,
-    ) -> Satisfiable<Self> {
-        if !lower.is_assignable_to(db, upper) {
-            return Satisfiable::Always;
-        }
-        if lower.is_never() && upper.is_object(db) {
-            return Satisfiable::Never;
-        }
-        Satisfiable::Constrained(Self {
-            sign: ConstraintSign::Negative,
             typevar,
             lower,
             upper,
@@ -655,12 +831,27 @@ impl<'db> AtomicConstraint<'db> {
     }
 
     /// Returns the negation of this atomic constraint.
-    fn negate(mut self) -> Self {
-        self.sign = match self.sign {
-            ConstraintSign::Positive => ConstraintSign::Negative,
-            ConstraintSign::Negative => ConstraintSign::Positive,
-        };
-        self
+    fn negate(self, db: &'db dyn Db) -> ConstraintSet<'db> {
+        let mut result = ConstraintSet::never();
+        result.union_constraint(
+            db,
+            Self::new(
+                db,
+                self.typevar,
+                ConstraintBound::Closed(Type::Never),
+                self.lower.flip(),
+            ),
+        );
+        result.union_constraint(
+            db,
+            Self::new(
+                db,
+                self.typevar,
+                self.upper.flip(),
+                ConstraintBound::Closed(Type::object(db)),
+            ),
+        );
+        result
     }
 
     /// Returns whether `self` has tighter bounds than `other` — that is, if the intersection of
@@ -670,248 +861,48 @@ impl<'db> AtomicConstraint<'db> {
         self.intersect(db, other) == Simplified::One(self)
     }
 
-    /// Returns the intersection of this atomic constraint and another. Because constraint bounds
-    /// can be negated, the result might be unsatisfiable; always satisfiable; or the union of one
-    /// or two atomic constraints.
+    /// Returns the intersection of this atomic constraint and another.
     ///
     /// Panics if the two constraints have different typevars.
-    fn intersect(self, db: &'db dyn Db, other: Self) -> Simplified<AtomicConstraint<'db>> {
+    fn intersect(self, db: &'db dyn Db, other: Self) -> Simplified<Self> {
         debug_assert!(self.typevar == other.typevar);
 
-        // We'll show our work for each match arm with a case analysis. We calculate "min" using
-        // intersection, and "max" using union.
-        //
-        // We use `s : t` for the positive constraint `s ≤: T ≤: t`, and draw it like this:
-        //
-        //         s┠───┨t
-        //
-        // We use `¬(s : t)` for the corresponding negative constraint, and draw it like this:
-        //
-        //     0┠───┤s t├───┨1
-
-        match (self.sign, other.sign) {
-            // When both constraints are positive, the result is always
-            //   max(s₁,s₂) : min(t₁,t₂)
-            //
-            //   self:    s₁┠─────┨t₁    s₁┠────┨t₁       s₁┠─┨t₁
-            //   other:     s₂┠─┨t₂         s₂┠────┨t₂         s₂┠─┨t₂
-            //
-            //   result:    s₂┠─┨t₂         s₂┠─┨t₁            ∅
-            //
-            // Note that in the last case, max(s₁,s₂) ≥: min(t₁,t₂), which will get simplified to ∅
-            // by the `positive` and `from_one` helpers.
-            (ConstraintSign::Positive, ConstraintSign::Positive) => {
-                Simplified::from_one(Self::positive(
-                    db,
-                    self.typevar,
-                    UnionType::from_elements(db, [self.lower, other.lower]),
-                    IntersectionType::from_elements(db, [self.upper, other.upper]),
-                ))
-            }
-
-            // When both constraints are negative, the result is always
-            //   ¬(min(s₁,s₂) : max(t₁,t₂)) ⊔ (min(t₁,t₂) : max(s₁,s₂))
-            //
-            //   self:    0┠─┤s₁     t₁├─┨1     0┠───┤s₁ t₁├─┨1     0┠─┤s₁ t₁├─────────┨1
-            //   other:   0┠───┤s₂ t₂├───┨1     0┠─┤s₂ t₂├───┨1     0┠─────────┤s₂ t₂├─┨1
-            //
-            //   result:  0┠─┤s₁     t₁├─┨1     0┠─┤s₂   t₁├─┨1     0┠─┤s₁         t₂├─┨1
-            //                    ∅                    ∅                   t₁├─┤s₂
-            //
-            // Note that in the first two cases, min(t₁,t₂) ≥: max(s₁,s₂), which will get
-            // simplified to ∅ by the `positive` and `from_two` helpers.
-            //
-            // TODO: Oof, the positive constraint in the final example should have open lower and
-            // upper bounds, not closed... (i.e, t₁ < T < s₂, not t₁ ≤ T ≤ s₂)
-            (ConstraintSign::Negative, ConstraintSign::Negative) => Simplified::from_two(
-                Self::negative(
-                    db,
-                    self.typevar,
-                    IntersectionType::from_elements(db, [self.lower, other.lower]),
-                    UnionType::from_elements(db, [self.upper, other.upper]),
-                ),
-                Self::positive(
-                    db,
-                    self.typevar,
-                    IntersectionType::from_elements(db, [self.upper, other.upper]),
-                    UnionType::from_elements(db, [self.lower, other.lower]),
-                ),
-            ),
-
-            // When one constraint is positive and the other negative, the result is always
-            //   (s₊ : min(s₋, t₊)) ⊔ (max(s₊,t₋) : t₊)
-            //
-            //   self:      s₊┠─────────┨t₊          s₊┠─┨t₊          s₊┠───┨t₊
-            //   other:   0┠────┤s₋ t₋├────┨1    0┠──┤s₋ t₋├──┨1    0┠────┤s₋ t₋├──┨1
-            //
-            //   result:    s₊┠─┤s₋                     ∅             s₊┠─┤s₋
-            //                      t₋├─┨t₊             ∅                      ∅
-            //
-            //   self:          s₊┠───┨t₊        s₊┠─┨t₊                        s₊┠─┨t₊
-            //   other:   0┠──┤s₋ t₋├────┨1    0┠───────┤s₋ t₋├─┨1    0┠─┤s₋ t₋├───────┨1
-            //
-            //   result:      ∅                  s₊┠─┨t₊                   ∅
-            //                    t₋├─┨t₊                  ∅                    s₊┠─┨t₊
-            (ConstraintSign::Positive, ConstraintSign::Negative) => Simplified::from_two(
-                Self::positive(
-                    db,
-                    self.typevar,
-                    self.lower,
-                    IntersectionType::from_elements(db, [other.lower, self.upper]),
-                ),
-                Self::positive(
-                    db,
-                    self.typevar,
-                    UnionType::from_elements(db, [self.lower, other.upper]),
-                    self.upper,
-                ),
-            ),
-            (ConstraintSign::Negative, ConstraintSign::Positive) => Simplified::from_two(
-                Self::positive(
-                    db,
-                    self.typevar,
-                    other.lower,
-                    IntersectionType::from_elements(db, [self.lower, other.upper]),
-                ),
-                Self::positive(
-                    db,
-                    self.typevar,
-                    UnionType::from_elements(db, [other.lower, self.upper]),
-                    other.upper,
-                ),
-            ),
-        }
+        // The result is always `max_lower(s₁,s₂) : min_upper(t₁,t₂)`. (Note that `max_lower` and
+        // `min_upper` determine whether the corresponding bound is open or closed.)
+        Simplified::from_one(Self::new(
+            db,
+            self.typevar,
+            self.lower.max_lower(db, other.lower),
+            self.upper.min_upper(db, other.upper),
+        ))
     }
 
-    /// Returns the union of this atomic constraint and another. Because constraint bounds
-    /// can be negated, the result might be unsatisfiable; always satisfiable; or the union of one
-    /// or two atomic constraints.
+    /// Returns the union of this atomic constraint and another.
     ///
     /// Panics if the two constraints have different typevars.
-    fn union(self, db: &'db dyn Db, other: Self) -> Simplified<AtomicConstraint<'db>> {
+    fn union(self, db: &'db dyn Db, other: Self) -> Simplified<Self> {
         debug_assert!(self.typevar == other.typevar);
 
-        // We'll show our work for each match arm with a case analysis. We calculate "min" using
-        // intersection, and "max" using union.
+        // When the two constraints are disjoint, then they cannot be simplified.
         //
-        // We use `s : t` for the positive constraint `s ≤: T ≤: t`, and draw it like this:
+        //   self:    s₁┠─┨t₁
+        //   other:           s₂┠─┨t₂
         //
-        //         s┠───┨t
-        //
-        // We use `¬(s : t)` for the corresponding negative constraint, and draw it like this:
-        //
-        //     0┠───┤s t├───┨1
-
-        match (self.sign, other.sign) {
-            // When both constraints are positive and disjoint, then they cannot be simplified.
-            // Otherwise the result is
-            //   min(s₁,s₂) : max(t₁,t₂)
-            //
-            //   self:    s₁┠─────┨t₁    s₁┠────┨t₁       s₁┠─┨t₁
-            //   other:     s₂┠─┨t₂         s₂┠────┨t₂            s₂┠─┨t₂
-            //
-            //   result:  s₁┠─────┨t₁    s₁┠───────┨t₂    s₁┠─┨t₁ s₂┠─┨t₂
-            (ConstraintSign::Positive, ConstraintSign::Positive) => {
-                if !self.lower.is_assignable_to(db, other.upper)
-                    || !other.lower.is_assignable_to(db, self.upper)
-                {
-                    return Simplified::Two(self, other);
-                }
-                Simplified::from_one(Self::positive(
-                    db,
-                    self.typevar,
-                    IntersectionType::from_elements(db, [self.lower, other.lower]),
-                    UnionType::from_elements(db, [self.upper, other.upper]),
-                ))
-            }
-
-            // When both constraints are negative, and their "gaps" are disjoint, the result is
-            // always satisfiable. Otherwise the result is
-            //   ¬(max(s₁,s₂) : min(t₁,t₂))
-            //
-            //   self:    0┠─┤s₁     t₁├─┨1     0┠───┤s₁   t₁├─┨1     0┠─┤s₁ t₁├─────────┨1
-            //   other:   0┠───┤s₂ t₂├───┨1     0┠─┤s₂   t₂├───┨1     0┠─────────┤s₂ t₂├─┨1
-            //
-            //   result:  0┠───┤s₂ t₂├───┨1     0┠─┤s₂   t₂├───┨1     0┠─────────────────┨1
-            (ConstraintSign::Negative, ConstraintSign::Negative) => {
-                if self.upper.is_assignable_to(db, other.lower)
-                    || other.upper.is_assignable_to(db, self.lower)
-                {
-                    return Simplified::Always;
-                }
-
-                Simplified::from_one(Self::negative(
-                    db,
-                    self.typevar,
-                    UnionType::from_elements(db, [self.lower, other.lower]),
-                    IntersectionType::from_elements(db, [self.upper, other.upper]),
-                ))
-            }
-
-            // When one constraint is positive and the other negative, the result is always
-            //   (s₊ : min(s₋, t₊)) ⊔ (max(s₊,t₋) : t₊)
-            //
-            //   self:      s₊┠─────────┨t₊       s₊┠───┨t₊             s₊┠─┨t₊
-            //   other:   0┠────┤s₋ t₋├────┨1   0┠────┤s₋   t₋├──┨1   0┠───────┤s₋ t₋├─┨1
-            //
-            //   result:  0┠───────────────┨1   0┠──────┨t₊ t₋├──┨1   0┠───────┤s₋ t₋├─┨1
-            //
-            //   self:            s₊┠─┨t₊
-            //   other:   0┠──┤s₋         t₋├──┨1
-            //
-            //   result:  0┠──┤s₋ s₊┠─┨t₊ t₋├──┨1
-            //
-            //   self:            s₊┠───┨t₊                 s₊┠─┨t₊
-            //   other:   0┠──┤s₋   t₋├────┨1     0┠─┤s₋ t₋├───────┨1
-            //
-            //   result:  0┠──┤s₋ s₊┠──────┨1     0┠─┤s₋ t₋├───────┨1
-            (ConstraintSign::Positive, ConstraintSign::Negative) => {
-                if self.lower.is_assignable_to(db, other.lower) {
-                    if other.upper.is_assignable_to(db, self.upper) {
-                        Simplified::Always
-                    } else {
-                        Simplified::from_one(Self::negative(
-                            db,
-                            self.typevar,
-                            UnionType::from_elements(db, [other.lower, self.upper]),
-                            other.upper,
-                        ))
-                    }
-                } else if self.upper.is_assignable_to(db, other.upper) {
-                    Simplified::Two(self, other)
-                } else {
-                    Simplified::from_one(Self::negative(
-                        db,
-                        self.typevar,
-                        other.lower,
-                        IntersectionType::from_elements(db, [self.lower, other.upper]),
-                    ))
-                }
-            }
-            (ConstraintSign::Negative, ConstraintSign::Positive) => {
-                if other.lower.is_assignable_to(db, self.lower) {
-                    if self.upper.is_assignable_to(db, other.upper) {
-                        Simplified::Always
-                    } else {
-                        Simplified::from_one(Self::negative(
-                            db,
-                            other.typevar,
-                            UnionType::from_elements(db, [self.lower, other.upper]),
-                            self.upper,
-                        ))
-                    }
-                } else if other.upper.is_assignable_to(db, self.upper) {
-                    Simplified::Two(self, other)
-                } else {
-                    Simplified::from_one(Self::negative(
-                        db,
-                        self.typevar,
-                        self.lower,
-                        IntersectionType::from_elements(db, [other.lower, self.upper]),
-                    ))
-                }
-            }
+        //   result:  s₁┠─┨t₁ s₂┠─┨t₂
+        if !self.lower.is_assignable_to(db, other.upper)
+            || !other.lower.is_assignable_to(db, self.upper)
+        {
+            return Simplified::Two(self, other);
         }
+
+        // Otherwise the result is `min_lower(s₁,s₂) : max_upper(t₁,t₂)`. (Note that `min_lower`
+        // and `max_upper` determine whether the corresponding bound is open or closed.)
+        Simplified::from_one(Self::new(
+            db,
+            self.typevar,
+            self.lower.min_lower(db, other.lower),
+            self.upper.max_upper(db, other.upper),
+        ))
     }
 
     fn display(self, db: &'db dyn Db) -> impl Display {
@@ -922,16 +913,17 @@ impl<'db> AtomicConstraint<'db> {
 
         impl Display for DisplayAtomicConstraint<'_> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                if self.constraint.sign == ConstraintSign::Negative {
-                    f.write_str("¬")?;
-                }
                 f.write_str("(")?;
-                if !self.constraint.lower.is_never() {
-                    write!(f, "{} ≤ ", self.constraint.lower.display(self.db))?;
+                match self.constraint.lower {
+                    ConstraintBound::Closed(bound) if bound.is_never() => {}
+                    ConstraintBound::Closed(bound) => write!(f, "{} ≤ ", bound.display(self.db))?,
+                    ConstraintBound::Open(bound) => write!(f, "{} < ", bound.display(self.db))?,
                 }
                 self.constraint.typevar.display(self.db).fmt(f)?;
-                if !self.constraint.upper.is_object(self.db) {
-                    write!(f, " ≤ {}", self.constraint.lower.display(self.db))?;
+                match self.constraint.upper {
+                    ConstraintBound::Closed(bound) if bound.is_object(self.db) => {}
+                    ConstraintBound::Closed(bound) => write!(f, " ≤ {}", bound.display(self.db))?,
+                    ConstraintBound::Open(bound) => write!(f, " < {}", bound.display(self.db))?,
                 }
                 f.write_str(")")
             }
@@ -965,18 +957,6 @@ impl<T> Simplified<T> {
             Satisfiable::Never => Simplified::Never,
             Satisfiable::Always => Simplified::Always,
             Satisfiable::Constrained(constraint) => Simplified::One(constraint),
-        }
-    }
-
-    fn from_two(first: Satisfiable<T>, second: Satisfiable<T>) -> Self {
-        match (first, second) {
-            (Satisfiable::Never, _) | (_, Satisfiable::Never) => Simplified::Never,
-            (Satisfiable::Always, Satisfiable::Always) => Simplified::Always,
-            (Satisfiable::Constrained(one), Satisfiable::Always)
-            | (Satisfiable::Always, Satisfiable::Constrained(one)) => Simplified::One(one),
-            (Satisfiable::Constrained(first), Satisfiable::Constrained(second)) => {
-                Simplified::Two(first, second)
-            }
         }
     }
 }
