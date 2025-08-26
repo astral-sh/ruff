@@ -12,8 +12,10 @@ use crate::types::enums::is_single_member_enum;
 use crate::types::protocol_class::walk_protocol_interface;
 use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
-    ApplyTypeMappingVisitor, ClassBase, DynamicType, HasRelationToVisitor, IsDisjointVisitor,
-    IsEquivalentVisitor, MaterializationType, NormalizedVisitor, TypeMapping, TypeRelation,
+    ApplyTypeMappingVisitor, ApplyTypeMappingVisitor, ClassBase, ClassBase, DynamicType,
+    HasRelationToVisitor, HasRelationToVisitor, IsDisjointVisitor, IsDisjointVisitor,
+    IsEquivalentVisitor, IsEquivalentVisitor, MaterializationType, NormalizedVisitor,
+    NormalizedVisitor, TypeMapping, TypeMapping, TypeRelation, TypeRelation, VarianceInferable,
     VarianceInferable,
 };
 use crate::{Db, FxOrderSet};
@@ -24,20 +26,20 @@ impl<'db> Type<'db> {
     pub(crate) fn instance(db: &'db dyn Db, class: ClassType<'db>) -> Self {
         let (class_literal, specialization) = class.class_literal(db);
 
-        match class_literal.known(db) {
-            Some(KnownClass::Any) => Type::Dynamic(DynamicType::Any),
-            Some(KnownClass::Tuple) => Type::tuple(TupleType::new(
+        if class_literal.is_known(db, KnownClass::Tuple) {
+            Type::tuple(TupleType::new(
                 db,
                 specialization
                     .and_then(|spec| Some(Cow::Borrowed(spec.tuple(db)?)))
                     .unwrap_or_else(|| Cow::Owned(TupleSpec::homogeneous(Type::unknown())))
                     .as_ref(),
-            )),
-            _ if class_literal.is_protocol(db) => {
-                Self::ProtocolInstance(ProtocolInstanceType::from_class(class))
-            }
-            _ if class_literal.is_typed_dict(db) => Type::typed_dict(class),
-            _ => Type::non_tuple_instance(class),
+            ))
+        } else if class_literal.is_protocol(db) {
+            Self::ProtocolInstance(ProtocolInstanceType::from_class(class))
+        } else if class_literal.is_typed_dict(db) {
+            Type::typed_dict(class)
+        } else {
+            Type::non_tuple_instance(class)
         }
     }
 

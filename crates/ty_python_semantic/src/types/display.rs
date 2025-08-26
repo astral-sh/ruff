@@ -76,9 +76,6 @@ impl Display for DisplayType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let representation = self.ty.representation(self.db, self.settings);
         match self.ty {
-            Type::ClassLiteral(literal) if literal.is_known(self.db, KnownClass::Any) => {
-                write!(f, "typing.Any")
-            }
             Type::IntLiteral(_)
             | Type::BooleanLiteral(_)
             | Type::StringLiteral(_)

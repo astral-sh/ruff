@@ -270,6 +270,8 @@ pub enum KnownModule {
     Dataclasses,
     Collections,
     Inspect,
+    #[strum(serialize = "string.templatelib")]
+    Templatelib,
     #[strum(serialize = "_typeshed._type_checker_internals")]
     TypeCheckerInternals,
     TyExtensions,
@@ -305,6 +307,7 @@ impl KnownModule {
             Self::UnittestMock => "unittest.mock",
             #[cfg(test)]
             Self::Uuid => "uuid",
+            Self::Templatelib => "string.templatelib",
         }
     }
 

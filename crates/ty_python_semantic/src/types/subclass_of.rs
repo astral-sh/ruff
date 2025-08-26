@@ -3,9 +3,12 @@ use crate::semantic_index::definition::Definition;
 use crate::types::constraints::Constraints;
 use crate::types::variance::VarianceInferable;
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, DynamicType, HasRelationToVisitor,
-    IsDisjointVisitor, KnownClass, MaterializationType, MemberLookupPolicy, NormalizedVisitor,
-    Type, TypeMapping, TypeRelation,
+    ApplyTypeMappingVisitor, ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance,
+    BoundTypeVarInstance, ClassType, ClassType, DynamicType, DynamicType, HasRelationToVisitor,
+    HasRelationToVisitor, IsDisjointVisitor, IsDisjointVisitor, KnownClass, KnownClass,
+    MaterializationType, MemberLookupPolicy, MemberLookupPolicy, NormalizedVisitor,
+    NormalizedVisitor, SpecialFormType, Type, Type, TypeMapping, TypeMapping, TypeRelation,
+    TypeRelation, TypeVarInstance,
 };
 use crate::{Db, FxOrderSet};
 
@@ -45,14 +48,10 @@ impl<'db> SubclassOfType<'db> {
             SubclassOfInner::Class(class) => {
                 if class.is_final(db) {
                     Type::from(class)
+                } else if class.is_object(db) {
+                    KnownClass::Type.to_instance(db)
                 } else {
-                    match class.known(db) {
-                        Some(KnownClass::Object) => KnownClass::Type.to_instance(db),
-                        Some(KnownClass::Any) => Type::SubclassOf(Self {
-                            subclass_of: SubclassOfInner::Dynamic(DynamicType::Any),
-                        }),
-                        _ => Type::SubclassOf(Self { subclass_of }),
-                    }
+                    Type::SubclassOf(Self { subclass_of })
                 }
             }
         }
@@ -267,12 +266,9 @@ impl<'db> SubclassOfInner<'db> {
     pub(crate) fn try_from_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
         match ty {
             Type::Dynamic(dynamic) => Some(Self::Dynamic(dynamic)),
-            Type::ClassLiteral(literal) => Some(if literal.is_known(db, KnownClass::Any) {
-                Self::Dynamic(DynamicType::Any)
-            } else {
-                Self::Class(literal.default_specialization(db))
-            }),
+            Type::ClassLiteral(literal) => Some(Self::Class(literal.default_specialization(db))),
             Type::GenericAlias(generic) => Some(Self::Class(ClassType::Generic(generic))),
+            Type::SpecialForm(SpecialFormType::Any) => Some(Self::Dynamic(DynamicType::Any)),
             _ => None,
         }
     }

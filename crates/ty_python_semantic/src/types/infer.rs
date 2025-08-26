@@ -1147,7 +1147,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             let is_protocol = class.is_protocol(self.db());
 
-            let mut solid_bases = IncompatibleBases::default();
+            let mut disjoint_bases = IncompatibleBases::default();
 
             // (3) Iterate through the class's explicit bases to check for various possible errors:
             //     - Check for inheritance from plain `Generic`,
@@ -1209,8 +1209,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     _ => continue,
                 };
 
-                if let Some(solid_base) = base_class.nearest_solid_base(self.db()) {
-                    solid_bases.insert(solid_base, i, base_class.class_literal(self.db()).0);
+                if let Some(disjoint_base) = base_class.nearest_disjoint_base(self.db()) {
+                    disjoint_bases.insert(disjoint_base, i, base_class.class_literal(self.db()).0);
                 }
 
                 if is_protocol
@@ -1301,14 +1301,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 },
                 Ok(_) => {
-                    solid_bases.remove_redundant_entries(self.db());
+                    disjoint_bases.remove_redundant_entries(self.db());
 
-                    if solid_bases.len() > 1 {
+                    if disjoint_bases.len() > 1 {
                         report_instance_layout_conflict(
                             &self.context,
                             class,
                             class_node,
-                            &solid_bases,
+                            &disjoint_bases,
                         );
                     }
                 }
@@ -2344,7 +2344,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn infer_type_alias(&mut self, type_alias: &ast::StmtTypeAlias) {
-        self.infer_annotation_expression(&type_alias.value, DeferredExpressionState::Deferred);
+        self.infer_annotation_expression(&type_alias.value, DeferredExpressionState::None);
     }
 
     /// If the current scope is a method inside an enclosing class,
@@ -3080,15 +3080,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let maybe_known_class = KnownClass::try_from_file_and_name(self.db(), self.file(), name);
 
-        let ty = if maybe_known_class.is_none()
-            && &name.id == "NamedTuple"
-            && matches!(
+        let in_typing_module = || {
+            matches!(
                 file_to_module(self.db(), self.file()).and_then(|module| module.known(self.db())),
                 Some(KnownModule::Typing | KnownModule::TypingExtensions)
-            ) {
-            Type::SpecialForm(SpecialFormType::NamedTuple)
-        } else {
-            Type::from(ClassLiteral::new(
+            )
+        };
+
+        let ty = match (maybe_known_class, &*name.id) {
+            (None, "NamedTuple") if in_typing_module() => {
+                Type::SpecialForm(SpecialFormType::NamedTuple)
+            }
+            (None, "Any") if in_typing_module() => Type::SpecialForm(SpecialFormType::Any),
+            _ => Type::from(ClassLiteral::new(
                 self.db(),
                 name.id.clone(),
                 body_scope,
@@ -3096,7 +3100,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 deprecated,
                 dataclass_params,
                 dataclass_transformer_params,
-            ))
+            )),
         };
 
         self.add_declaration_with_binding(
@@ -5740,7 +5744,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
         }
-        todo_type!("Template")
+        KnownClass::Template.to_instance(self.db())
     }
 
     fn infer_ellipsis_literal_expression(
@@ -10242,9 +10246,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let name_ty = self.infer_expression(slice);
                 match name_ty {
                     Type::ClassLiteral(class_literal) => {
-                        if class_literal.is_known(self.db(), KnownClass::Any) {
-                            SubclassOfType::subclass_of_any()
-                        } else if class_literal.is_protocol(self.db()) {
+                        if class_literal.is_protocol(self.db()) {
                             SubclassOfType::from(
                                 self.db(),
                                 todo_type!("type[T] for protocols").expect_dynamic(),
@@ -10256,6 +10258,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             )
                         }
                     }
+                    Type::SpecialForm(SpecialFormType::Any) => SubclassOfType::subclass_of_any(),
                     Type::SpecialForm(SpecialFormType::Unknown) => {
                         SubclassOfType::subclass_of_unknown()
                     }
@@ -10337,13 +10340,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 // false-positive `invalid-type-form` diagnostics (`1` is not a valid type
                 // expression).
                 self.infer_expression(&subscript.slice);
-                Type::unknown()
-            }
-            Type::ClassLiteral(literal) if literal.is_known(self.db(), KnownClass::Any) => {
-                self.infer_expression(slice);
-                if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
-                    builder.into_diagnostic("Type `typing.Any` expected no type parameter");
-                }
                 Type::unknown()
             }
             Type::SpecialForm(special_form) => {
@@ -10919,6 +10915,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             | SpecialFormType::TypeAlias
             | SpecialFormType::TypedDict
             | SpecialFormType::Unknown
+            | SpecialFormType::Any
             | SpecialFormType::NamedTuple => {
                 self.infer_type_expression(arguments_slice);
 
@@ -11728,6 +11725,14 @@ mod tests {
     #[test]
     fn unbound_symbol_no_reachability_constraint_check() {
         let mut db = setup_db();
+
+        // First, type-check a random other file so that we cache a result for the `module_type_symbols`
+        // query (which often encounters cycles due to `types.pyi` importing `typing_extensions` and
+        // `typing_extensions.pyi` importing `types`). Clear the events afterwards so that unrelated
+        // cycles from that query don't interfere with our test.
+        db.write_dedented("src/wherever.py", "print(x)").unwrap();
+        assert_file_diagnostics(&db, "src/wherever.py", &["Name `x` used when not defined"]);
+        db.clear_salsa_events();
 
         // If the bug we are testing for is not fixed, what happens is that when inferring the
         // `flag: bool = True` definitions, we look up `bool` as a deferred name (thus from end of

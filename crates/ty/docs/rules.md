@@ -422,7 +422,7 @@ class D(A, B, C): ...
 **Known problems**
 
 Classes that have "dynamic" definitions of `__slots__` (definitions do not consist
-of string literals, or tuples of string literals) are not currently considered solid
+of string literals, or tuples of string literals) are not currently considered disjoint
 bases by ty.
 
 Additionally, this check is not exhaustive: many C extensions (including several in

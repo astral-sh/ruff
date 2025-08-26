@@ -64,7 +64,7 @@ def crc_hqx(data: ReadableBuffer, crc: int, /) -> int:
 def crc32(data: ReadableBuffer, crc: int = 0, /) -> int:
     """Compute CRC-32 incrementally."""
 
-def b2a_hex(data: ReadableBuffer, sep: str | bytes = ..., bytes_per_sep: int = ...) -> bytes:
+def b2a_hex(data: ReadableBuffer, sep: str | bytes = ..., bytes_per_sep: int = 1) -> bytes:
     """Hexadecimal representation of binary data.
 
       sep
@@ -85,7 +85,7 @@ def b2a_hex(data: ReadableBuffer, sep: str | bytes = ..., bytes_per_sep: int = .
     b'b9_01ef'
     """
 
-def hexlify(data: ReadableBuffer, sep: str | bytes = ..., bytes_per_sep: int = ...) -> bytes:
+def hexlify(data: ReadableBuffer, sep: str | bytes = ..., bytes_per_sep: int = 1) -> bytes:
     """Hexadecimal representation of binary data.
 
       sep

@@ -27,6 +27,7 @@ use std::str::FromStr;
     get_size2::GetSize,
 )]
 pub enum SpecialFormType {
+    Any,
     /// The symbol `typing.Annotated` (which can also be found as `typing_extensions.Annotated`)
     Annotated,
     /// The symbol `typing.Literal` (which can also be found as `typing_extensions.Literal`)
@@ -162,7 +163,7 @@ impl SpecialFormType {
             | Self::Protocol  // actually `_ProtocolMeta` at runtime but this is what typeshed says
             | Self::ReadOnly => KnownClass::SpecialForm,
 
-            Self::Generic => KnownClass::Type,
+            Self::Generic | Self::Any => KnownClass::Type,
 
             Self::List
             | Self::Dict
@@ -245,6 +246,7 @@ impl SpecialFormType {
             | Self::TypingSelf
             | Self::Protocol
             | Self::NamedTuple
+            | Self::Any
             | Self::ReadOnly => {
                 matches!(module, KnownModule::Typing | KnownModule::TypingExtensions)
             }
@@ -317,6 +319,7 @@ impl SpecialFormType {
             | Self::TypeIs
             | Self::ReadOnly
             | Self::Protocol
+            | Self::Any
             | Self::Generic => false,
         }
     }
@@ -324,6 +327,7 @@ impl SpecialFormType {
     /// Return the repr of the symbol at runtime
     pub(super) const fn repr(self) -> &'static str {
         match self {
+            SpecialFormType::Any => "typing.Any",
             SpecialFormType::Annotated => "typing.Annotated",
             SpecialFormType::Literal => "typing.Literal",
             SpecialFormType::LiteralString => "typing.LiteralString",
