@@ -9389,8 +9389,8 @@ impl<'db> UnionType<'db> {
             .build()
     }
 
-    /// Create a union from a list of elements with minimal simplification
-    pub(crate) fn from_elements_minimal_simplify<I, T>(db: &'db dyn Db, elements: I) -> Type<'db>
+    /// Create a union from a list of elements without unpacking type aliases.
+    pub(crate) fn from_elements_leave_aliases<I, T>(db: &'db dyn Db, elements: I) -> Type<'db>
     where
         I: IntoIterator<Item = T>,
         T: Into<Type<'db>>,
@@ -9398,7 +9398,7 @@ impl<'db> UnionType<'db> {
         elements
             .into_iter()
             .fold(
-                UnionBuilder::new(db).minimal_simplify(),
+                UnionBuilder::new(db).unpack_aliases(false),
                 |builder, element| builder.add(element.into()),
             )
             .build()

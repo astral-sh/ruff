@@ -204,18 +204,10 @@ enum ReduceResult<'db> {
 // representations, so that we can make large unions of literals fast in all operations.
 const MAX_UNION_LITERALS: usize = 200;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum SimplificationStrategy {
-    /// Attempt to fully simplify the union: eliminate subtypes and unpack aliases.
-    Full,
-    /// Leave the union mostly as-given: eliminate equivalent types only.
-    Minimal,
-}
-
 pub(crate) struct UnionBuilder<'db> {
     elements: Vec<UnionElement<'db>>,
     db: &'db dyn Db,
-    simplification_strategy: SimplificationStrategy,
+    unpack_aliases: bool,
 }
 
 impl<'db> UnionBuilder<'db> {
@@ -223,19 +215,13 @@ impl<'db> UnionBuilder<'db> {
         Self {
             db,
             elements: vec![],
-            // default to full simplification: unions we synthetically create should be
-            // fully simplified, only user-provided unions should not
-            simplification_strategy: SimplificationStrategy::Full,
+            unpack_aliases: true,
         }
     }
 
-    pub(crate) fn minimal_simplify(mut self) -> Self {
-        self.simplification_strategy = SimplificationStrategy::Minimal;
+    pub(crate) fn unpack_aliases(mut self, val: bool) -> Self {
+        self.unpack_aliases = val;
         self
-    }
-
-    const fn should_simplify_full(&self) -> bool {
-        matches!(self.simplification_strategy, SimplificationStrategy::Full)
     }
 
     pub(crate) fn is_empty(&self) -> bool {
@@ -271,11 +257,14 @@ impl<'db> UnionBuilder<'db> {
             }
             // Adding `Never` to a union is a no-op.
             Type::Never => {}
-            Type::TypeAlias(alias)
-                if self.should_simplify_full() && !seen_aliases.contains(&ty) =>
-            {
-                seen_aliases.push(ty);
-                self.add_in_place_impl(alias.value_type(self.db), seen_aliases);
+            Type::TypeAlias(alias) if self.unpack_aliases => {
+                if seen_aliases.contains(&ty) {
+                    // Union contains itself recursively via a type alias. This is an error, just
+                    // leave out the recursive alias. TODO surface this error.
+                } else {
+                    seen_aliases.push(ty);
+                    self.add_in_place_impl(alias.value_type(self.db), seen_aliases);
+                }
             }
             // If adding a string literal, look for an existing `UnionElement::StringLiterals` to
             // add it to, or an existing element that is a super-type of string literals, which
@@ -459,7 +448,10 @@ impl<'db> UnionBuilder<'db> {
                     None
                 };
 
-                let should_simplify_full = self.should_simplify_full();
+                // If an alias gets here, it means we aren't unpacking aliases, and we also
+                // shouldn't try to simplify aliases out of the union, because that will require
+                // unpacking them.
+                let should_simplify_full = !matches!(ty, Type::TypeAlias(_));
 
                 let mut to_remove = SmallVec::<[usize; 2]>::new();
                 let ty_negated = if should_simplify_full {
@@ -485,17 +477,20 @@ impl<'db> UnionBuilder<'db> {
                             return;
                         }
                     };
+
+                    if ty == element_type {
+                        return;
+                    }
+
                     if Some(element_type) == bool_pair {
                         self.add_in_place_impl(KnownClass::Bool.to_instance(self.db), seen_aliases);
                         return;
                     }
 
-                    if ty.is_equivalent_to(self.db, element_type) {
-                        return;
-                    }
-
-                    if should_simplify_full {
-                        if ty.is_subtype_of(self.db, element_type) {
+                    if should_simplify_full && !matches!(element_type, Type::TypeAlias(_)) {
+                        if ty.is_equivalent_to(self.db, element_type)
+                            || ty.is_subtype_of(self.db, element_type)
+                        {
                             return;
                         } else if element_type.is_subtype_of(self.db, ty) {
                             to_remove.push(index);
@@ -594,7 +589,14 @@ impl<'db> IntersectionBuilder<'db> {
         seen_aliases: &mut Vec<Type<'db>>,
     ) -> Self {
         match ty {
-            Type::TypeAlias(alias) if !seen_aliases.contains(&ty) => {
+            Type::TypeAlias(alias) => {
+                if seen_aliases.contains(&ty) {
+                    // Recursive alias, add it without expanding to avoid infinite recursion.
+                    for inner in &mut self.intersections {
+                        inner.positive.insert(ty);
+                    }
+                    return self;
+                }
                 seen_aliases.push(ty);
                 let value_type = alias.value_type(self.db);
                 self.add_positive_impl(value_type, seen_aliases)
@@ -697,7 +699,14 @@ impl<'db> IntersectionBuilder<'db> {
 
         // See comments above in `add_positive`; this is just the negated version.
         match ty {
-            Type::TypeAlias(alias) if !seen_aliases.contains(&ty) => {
+            Type::TypeAlias(alias) => {
+                if seen_aliases.contains(&ty) {
+                    // Recursive alias, add it without expanding to avoid infinite recursion.
+                    for inner in &mut self.intersections {
+                        inner.negative.insert(ty);
+                    }
+                    return self;
+                }
                 seen_aliases.push(ty);
                 let value_type = alias.value_type(self.db);
                 self.add_negative_impl(value_type, seen_aliases)

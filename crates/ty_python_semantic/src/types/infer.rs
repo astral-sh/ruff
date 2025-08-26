@@ -9776,7 +9776,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     ast::Operator::BitOr => {
                         let left_ty = self.infer_type_expression(&binary.left);
                         let right_ty = self.infer_type_expression(&binary.right);
-                        UnionType::from_elements_minimal_simplify(self.db(), [left_ty, right_ty])
+                        UnionType::from_elements_leave_aliases(self.db(), [left_ty, right_ty])
                     }
                     // anything else is an invalid annotation:
                     op => {
@@ -10288,7 +10288,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
             }
             ast::Expr::BinOp(binary) if binary.op == ast::Operator::BitOr => {
-                let union_ty = UnionType::from_elements_minimal_simplify(
+                let union_ty = UnionType::from_elements_leave_aliases(
                     self.db(),
                     [
                         self.infer_subclass_of_type_expression(&binary.left),
@@ -10314,7 +10314,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let parameters_ty = match self.infer_expression(value) {
                     Type::SpecialForm(SpecialFormType::Union) => match &**parameters {
                         ast::Expr::Tuple(tuple) => {
-                            let ty = UnionType::from_elements_minimal_simplify(
+                            let ty = UnionType::from_elements_leave_aliases(
                                 self.db(),
                                 tuple
                                     .iter()
@@ -10548,11 +10548,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             },
             SpecialFormType::Optional => {
                 let param_type = self.infer_type_expression(arguments_slice);
-                UnionType::from_elements_minimal_simplify(db, [param_type, Type::none(db)])
+                UnionType::from_elements_leave_aliases(db, [param_type, Type::none(db)])
             }
             SpecialFormType::Union => match arguments_slice {
                 ast::Expr::Tuple(t) => {
-                    let union_ty = UnionType::from_elements_minimal_simplify(
+                    let union_ty = UnionType::from_elements_leave_aliases(
                         db,
                         t.iter().map(|elt| self.infer_type_expression(elt)),
                     );
