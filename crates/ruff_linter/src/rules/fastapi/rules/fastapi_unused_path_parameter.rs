@@ -488,14 +488,8 @@ impl<'a> Iterator for PathParamIterator<'a> {
                     let param_name_end = param_content.find(':').unwrap_or(param_content.len());
                     let param_name = &param_content[..param_name_end];
 
-                    if param_name.starts_with(' ') || param_name.ends_with(' ') {
-                        continue;
-                    }
-
-                    if !param_name.is_empty() {
-                        #[expect(clippy::range_plus_one)]
-                        return Some((param_name, start..end + 1));
-                    }
+                    #[expect(clippy::range_plus_one)]
+                    return Some((param_name, start..end + 1));
                 }
             }
         }
