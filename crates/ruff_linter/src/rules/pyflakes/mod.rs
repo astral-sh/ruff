@@ -737,7 +737,7 @@ mod tests {
 
     /// A re-implementation of the Pyflakes test runner.
     /// Note that all tests marked with `#[ignore]` should be considered TODOs.
-    fn flakes(contents: &str, expected: &[Rule]) {
+    fn flakes(contents: &str) -> Vec<&str> {
         let contents = dedent(contents);
         let source_type = PySourceType::default();
         let source_kind = SourceKind::Python(contents.to_string());
@@ -772,35 +772,43 @@ mod tests {
             target_version,
         );
         messages.sort_by_key(|diagnostic| diagnostic.expect_range().start());
-        let actual = messages
+        messages
             .iter()
             .filter(|msg| !msg.is_invalid_syntax())
             .map(Diagnostic::name)
-            .collect::<Vec<_>>();
-        let expected: Vec<_> = expected.iter().map(|rule| rule.name().as_str()).collect();
-        assert_eq!(actual, expected);
+            .collect::<Vec<_>>()
     }
 
     /// See: <https://github.com/PyCQA/pyflakes/blob/04ecb0c324ef3b61124e2f80f9e1af6c3a4c7b26/pyflakes/test/test_undefined_names.py>
     #[test]
     fn undefined() {
-        flakes("bar", &[Rule::UndefinedName]);
+        let actual = flakes("bar");
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "undefined-name",
+        ]
+        "###);
     }
 
     #[test]
     fn defined_in_list_comp() {
-        flakes("[a for a in range(10) if a]", &[]);
+        let actual = flakes("[a for a in range(10) if a]");
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn undefined_in_list_comp() {
-        flakes(
+        let actual = flakes(
             r"
-        [a for a in range(10)]
-        a
-        ",
-            &[Rule::UndefinedName],
+                [a for a in range(10)]
+                a
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "undefined-name",
+        ]
+        "###);
     }
 
     #[test]
@@ -808,16 +816,16 @@ mod tests {
         // Exception names can't be used after the except: block.
         //
         // The exc variable is unused inside the exception handler.
-        flakes(
+        let actual = flakes(
             r"
-        try:
-            raise ValueError('ve')
-        except ValueError as exc:
-            pass
-        exc
-        ",
-            &[Rule::UnusedVariable, Rule::UndefinedName],
+                try:
+        raise ValueError('ve')
+                except ValueError as exc:
+        pass
+                exc
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
@@ -826,16 +834,16 @@ mod tests {
         //
         // This shows the example in test_undefinedExceptionName is
         // different.
-        flakes(
+        let actual = flakes(
             r"
-        try:
-            raise ValueError('ve')
-        except ValueError as exc:
-            e = exc
-        e
-        ",
-            &[],
+                try:
+        raise ValueError('ve')
+                except ValueError as exc:
+        e = exc
+                e
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
@@ -844,360 +852,386 @@ mod tests {
         //
         // Last line will raise UnboundLocalError.
         // The exc variable is unused inside the exception handler.
-        flakes(
+        let actual = flakes(
             r"
-        try:
-            raise ValueError('ve')
-        except ValueError as exc:
-            pass
-        print(exc)
-        exc = 'Original value'
-        ",
-            &[Rule::UnusedVariable, Rule::UndefinedName],
+                try:
+        raise ValueError('ve')
+                except ValueError as exc:
+        pass
+                print(exc)
+                exc = 'Original value'
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn del_exception_in_except() {
         // The exception name can be deleted in the except: block.
-        flakes(
+        let actual = flakes(
             r"
-        try:
-            pass
-        except Exception as exc:
-            del exc
-        ",
-            &[],
+                try:
+        pass
+                except Exception as exc:
+        del exc
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn functions_need_global_scope() {
-        flakes(
+        let actual = flakes(
             r"
-        class a:
-            def b():
-                fu
-        fu = 1
-        ",
-            &[],
+                class a:
+        def b():
+            fu
+                fu = 1
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn builtins() {
-        flakes("range(10)", &[]);
+        let actual = flakes("range(10)");
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn builtin_windows_error() {
         // C{WindowsError} is sometimes a builtin name, so no warning is emitted
         // for using it.
-        flakes("WindowsError", &[]);
+        let actual = flakes("WindowsError");
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn module_annotations() {
         // Use of the C{__annotations__} in module scope should not emit
         // an undefined name warning when version is greater than or equal to 3.6.
-        flakes("__annotations__", &[]);
+        let actual = flakes("__annotations__");
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn magic_globals_file() {
         // Use of the C{__file__} magic global should not emit an undefined name
         // warning.
-        flakes("__file__", &[]);
+        let actual = flakes("__file__");
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn magic_globals_builtins() {
         // Use of the C{__builtins__} magic global should not emit an undefined
         // name warning.
-        flakes("__builtins__", &[]);
+        let actual = flakes("__builtins__");
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn magic_globals_name() {
         // Use of the C{__name__} magic global should not emit an undefined name
         // warning.
-        flakes("__name__", &[]);
+        let actual = flakes("__name__");
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn magic_module_in_class_scope() {
         // Use of the C{__module__} magic builtin should not emit an undefined
         // name warning if used in class scope.
-        flakes("__module__", &[Rule::UndefinedName]);
-        flakes(
+        let actual = flakes("__module__");
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "undefined-name",
+        ]
+        "###);
+        let actual = flakes(
             r"
-        class Foo:
+                class Foo:
+        __module__
+                ",
+        );
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes(
+            r"
+                class Foo:
+        def bar(self):
             __module__
-        ",
-            &[],
+                ",
         );
-        flakes(
-            r"
-        class Foo:
-            def bar(self):
-                __module__
-        ",
-            &[Rule::UndefinedName],
-        );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn magic_qualname_in_class_scope() {
         // Use of the C{__qualname__} magic builtin should not emit an undefined
         // name warning if used in class scope.
-        flakes("__qualname__", &[Rule::UndefinedName]);
-        flakes(
+        let actual = flakes("__qualname__");
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "undefined-name",
+        ]
+        "###);
+        let actual = flakes(
             r"
+                class Foo:
+        __qualname__
+                ",
+        );
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes(
+            r"
+                class Foo:
+        def bar(self):
+            __qualname__
+                ",
+        );
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes(
+            r"
+                def f():
+        __qualname__ = 1
+
         class Foo:
             __qualname__
-        ",
-            &[],
+                ",
         );
-        flakes(
-            r"
-        class Foo:
-            def bar(self):
-                __qualname__
-        ",
-            &[Rule::UndefinedName],
-        );
-        flakes(
-            r"
-        def f():
-            __qualname__ = 1
-
-            class Foo:
-                __qualname__
-        ",
-            &[Rule::UnusedVariable],
-        );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn global_import_star() {
         // Can't find undefined names with import *.
-        flakes(
-            "from fu import *; bar",
-            &[
-                Rule::UndefinedLocalWithImportStar,
-                Rule::UndefinedLocalWithImportStarUsage,
-            ],
-        );
+        let actual = flakes("from fu import *; bar");
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "undefined-local-with-import-star",
+            "undefined-local-with-import-star-usage",
+        ]
+        "###);
     }
 
     #[test]
     fn defined_by_global() {
         // "global" can make an otherwise undefined name in another function
         // defined.
-        flakes(
+        let actual = flakes(
             r"
-        def a(): global fu; fu = 1
-        def b(): fu
-        ",
-            &[],
+                def a(): global fu; fu = 1
+                def b(): fu
+                ",
         );
-        flakes(
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes(
             r"
-        def c(): bar
-        def b(): global bar; bar = 1
-        ",
-            &[],
+                def c(): bar
+                def b(): global bar; bar = 1
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
         // TODO(charlie): Extract globals recursively (such that we don't raise F821).
-        flakes(
+        let actual = flakes(
             r"
-        def c(): bar
-        def d():
-            def b():
-                global bar; bar = 1
-        ",
-            &[Rule::UndefinedName],
+                def c(): bar
+                def d():
+        def b():
+            global bar; bar = 1
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn defined_by_global_multiple_names() {
         // "global" can accept multiple names.
-        flakes(
+        let actual = flakes(
             r"
-        def a(): global fu, bar; fu = 1; bar = 2
-        def b(): fu; bar
-        ",
-            &[],
+                def a(): global fu, bar; fu = 1; bar = 2
+                def b(): fu; bar
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn global_in_global_scope() {
         // A global statement in the global scope is ignored.
-        flakes(
+        let actual = flakes(
             r"
-        global x
-        def foo():
-            print(x)
-        ",
-            &[Rule::UndefinedName],
+                global x
+                def foo():
+        print(x)
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn global_reset_name_only() {
         // A global statement does not prevent other names being undefined.
-        flakes(
+        let actual = flakes(
             r"
-        def f1():
-            s
+                def f1():
+        s
 
-        def f2():
-            global m
-        ",
-            &[Rule::UndefinedName],
+                def f2():
+        global m
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn del() {
         // Del deletes bindings.
-        flakes("a = 1; del a; a", &[Rule::UndefinedName]);
+        let actual = flakes("a = 1; del a; a");
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "undefined-name",
+        ]
+        "###);
     }
 
     #[test]
     fn del_global() {
         // Del a global binding from a function.
-        flakes(
+        let actual = flakes(
             r"
-        a = 1
-        def f():
-            global a
-            del a
-        a
-        ",
-            &[],
+                a = 1
+                def f():
+        global a
+        del a
+                a
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn del_undefined() {
         // Del an undefined name.
-        flakes("del a", &[Rule::UndefinedName]);
+        let actual = flakes("del a");
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "undefined-name",
+        ]
+        "###);
     }
 
     #[test]
     fn del_conditional() {
         // Ignores conditional bindings deletion.
-        flakes(
+        let actual = flakes(
             r"
-        context = None
-        test = True
-        if False:
-            del(test)
-        assert(test)
-        ",
-            &[],
+                context = None
+                test = True
+                if False:
+        del(test)
+                assert(test)
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn del_conditional_nested() {
         // Ignored conditional bindings deletion even if they are nested in other
         // blocks.
-        flakes(
+        let actual = flakes(
             r"
-        context = None
-        test = True
-        if False:
-            with context():
-                del(test)
-        assert(test)
-        ",
-            &[],
+                context = None
+                test = True
+                if False:
+        with context():
+            del(test)
+                assert(test)
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn del_while() {
         // Ignore bindings deletion if called inside the body of a while
         // statement.
-        flakes(
+        let actual = flakes(
             r"
-        def test():
-            foo = 'bar'
-            while False:
-                del foo
-            assert(foo)
-        ",
-            &[],
+                def test():
+        foo = 'bar'
+        while False:
+            del foo
+        assert(foo)
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn del_while_test_usage() {
         // Ignore bindings deletion if called inside the body of a while
         // statement and name is used inside while's test part.
-        flakes(
+        let actual = flakes(
             r"
-        def _worker():
-            o = True
-            while o is not True:
-                del o
-                o = False
-        ",
-            &[],
+                def _worker():
+        o = True
+        while o is not True:
+            del o
+            o = False
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn del_while_nested() {
         // Ignore bindings deletions if node is part of while's test, even when
         // del is in a nested block.
-        flakes(
+        let actual = flakes(
             r"
-        context = None
-        def _worker():
-            o = True
-            while o is not True:
-                while True:
-                    with context():
-                        del o
-                o = False
-        ",
-            &[],
+                context = None
+                def _worker():
+        o = True
+        while o is not True:
+            while True:
+                with context():
+                    del o
+            o = False
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn global_from_nested_scope() {
         // Global names are available from nested scopes.
-        flakes(
+        let actual = flakes(
             r"
-        a = 1
-        def b():
-            def c():
-                a
-        ",
-            &[],
+                a = 1
+                def b():
+        def c():
+            a
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn later_redefined_global_from_nested_scope() {
         // Test that referencing a local name that shadows a global, before it is
         // defined, generates a warning.
-        flakes(
+        let actual = flakes(
             r"
-        a = 1
-        def fun():
-            a
-            a = 2
-            return a
-        ",
-            &[Rule::UndefinedLocal],
+                a = 1
+                def fun():
+        a
+        a = 2
+        return a
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
@@ -1205,18 +1239,22 @@ mod tests {
         // Test that referencing a local name in a nested scope that shadows a
         // global declared in an enclosing scope, before it is defined, generates
         // a warning.
-        flakes(
+        let actual = flakes(
             r"
-            a = 1
-            def fun():
-                global a
-                def fun2():
-                    a
-                    a = 2
-                    return a
-        ",
-            &[Rule::UndefinedLocal],
+        a = 1
+        def fun():
+            global a
+            def fun2():
+                a
+                a = 2
+                return a
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "undefined-local",
+        ]
+        "###);
     }
 
     #[test]
@@ -1225,1911 +1263,2138 @@ mod tests {
         // and the name is used locally before it is bound, an unbound local
         // warning is emitted, even if there is a class scope between the enclosing
         // scope and the local scope.
-        flakes(
+        let actual = flakes(
             r"
-        def f():
-            x = 1
-            class g:
-                def h(self):
-                    a = x
-                    x = None
-                    print(x, a)
-            print(x)
-        ",
-            &[Rule::UndefinedLocal],
+                def f():
+        x = 1
+        class g:
+            def h(self):
+                a = x
+                x = None
+                print(x, a)
+        print(x)
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn later_redefined_global_from_nested_scope3() {
         // Test that referencing a local name in a nested scope that shadows a
         // global, before it is defined, generates a warning.
-        flakes(
+        let actual = flakes(
             r"
-            def fun():
+        def fun():
+            a = 1
+            def fun2():
+                a
                 a = 1
-                def fun2():
-                    a
-                    a = 1
-                    return a
                 return a
-        ",
-            &[Rule::UndefinedLocal],
+            return a
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "undefined-local",
+        ]
+        "###);
     }
 
     #[test]
     fn undefined_augmented_assignment() {
-        flakes(
+        let actual = flakes(
             r"
-            def f(seq):
-                a = 0
-                seq[a] += 1
-                seq[b] /= 2
-                c[0] *= 2
-                a -= 3
-                d += 4
-                e[any] = 5
-            ",
-            &[
-                Rule::UndefinedName,
-                Rule::UndefinedName,
-                Rule::UndefinedName,
-                Rule::UnusedVariable,
-                Rule::UndefinedName,
-            ],
+        def f(seq):
+            a = 0
+            seq[a] += 1
+            seq[b] /= 2
+            c[0] *= 2
+            a -= 3
+            d += 4
+            e[any] = 5
+        ",
         );
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "undefined-name",
+            "undefined-name",
+            "undefined-name",
+            "unused-variable",
+            "undefined-name",
+        ]
+        "###);
     }
 
     #[test]
     fn nested_class() {
         // Nested classes can access enclosing scope.
-        flakes(
+        let actual = flakes(
             r"
-        def f(foo):
-            class C:
-                bar = foo
-                def f(self):
-                    return foo
-            return C()
+                def f(foo):
+        class C:
+            bar = foo
+            def f(self):
+                return foo
+        return C()
 
-        f(123).f()
-        ",
-            &[],
+                f(123).f()
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn bad_nested_class() {
         // Free variables in nested classes must bind at class creation.
-        flakes(
+        let actual = flakes(
             r"
-        def f():
-            class C:
-                bar = foo
-            foo = 456
-            return foo
-        f()
-        ",
-            &[Rule::UndefinedName],
+                def f():
+        class C:
+            bar = foo
+        foo = 456
+        return foo
+                f()
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn defined_as_star_args() {
         // Star and double-star arg names are defined.
-        flakes(
+        let actual = flakes(
             r"
-        def f(a, *b, **c):
-            print(a, b, c)
-        ",
-            &[],
+                def f(a, *b, **c):
+        print(a, b, c)
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn defined_as_star_unpack() {
         // Star names in unpack are defined.
-        flakes(
+        let actual = flakes(
             r"
-        a, *b = range(10)
-        print(a, b)
-        ",
-            &[],
+                a, *b = range(10)
+                print(a, b)
+                ",
         );
-        flakes(
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes(
             r"
-        *a, b = range(10)
-        print(a, b)
-        ",
-            &[],
+                *a, b = range(10)
+                print(a, b)
+                ",
         );
-        flakes(
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes(
             r"
-        a, *b, c = range(10)
-        print(a, b, c)
-        ",
-            &[],
+                a, *b, c = range(10)
+                print(a, b, c)
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn used_as_star_unpack() {
         // In stable, starred names in unpack are used if RHS is not a tuple/list literal.
         // In preview, these should be marked as unused.
-        flakes(
+        let actual = flakes(
             r"
-        def f():
-            a, *b = range(10)
-        ",
-            &[],
+                def f():
+        a, *b = range(10)
+                ",
         );
-        flakes(
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes(
             r"
-        def f():
-            (*a, b) = range(10)
-        ",
-            &[],
+                def f():
+        (*a, b) = range(10)
+                ",
         );
-        flakes(
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes(
             r"
-        def f():
-            [a, *b, c] = range(10)
-        ",
-            &[],
+                def f():
+        [a, *b, c] = range(10)
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn keyword_only_args() {
         // Keyword-only arg names are defined.
-        flakes(
+        let actual = flakes(
             r"
-        def f(*, a, b=None):
-            print(a, b)
-        ",
-            &[],
+                def f(*, a, b=None):
+        print(a, b)
+                ",
         );
-        flakes(
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes(
             r"
-        import default_b
-        def f(*, a, b=default_b):
-            print(a, b)
-        ",
-            &[],
+                import default_b
+                def f(*, a, b=default_b):
+        print(a, b)
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn keyword_only_args_undefined() {
         // Typo in kwonly name.
-        flakes(
+        let actual = flakes(
             r"
-        def f(*, a, b=default_c):
-            print(a, b)
-        ",
-            &[Rule::UndefinedName],
+                def f(*, a, b=default_c):
+        print(a, b)
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn annotation_undefined() {
         // Undefined annotations.
-        flakes(
+        let actual = flakes(
             r"
-        from abc import note1, note2, note3, note4, note5
-        def func(a: note1, *args: note2,
-                 b: note3=12, **kw: note4) -> note5: pass
-        ",
-            &[],
+                from abc import note1, note2, note3, note4, note5
+                def func(a: note1, *args: note2,
+             b: note3=12, **kw: note4) -> note5: pass
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
 
-        flakes(
+        let actual = flakes(
             r"
-        def func():
-            d = e = 42
-            def func(a: {1, d}) -> (lambda c: e): pass
-        ",
-            &[],
+                def func():
+        d = e = 42
+        def func(a: {1, d}) -> (lambda c: e): pass
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn meta_class_undefined() {
-        flakes(
+        let actual = flakes(
             r"
-        from abc import ABCMeta
-        class A(metaclass=ABCMeta): pass
-        ",
-            &[],
+                from abc import ABCMeta
+                class A(metaclass=ABCMeta): pass
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn defined_in_gen_exp() {
         // Using the loop variable of a generator expression results in no
         // warnings.
-        flakes("(a for a in [1, 2, 3] if a)", &[]);
+        let actual = flakes("(a for a in [1, 2, 3] if a)");
+        insta::assert_debug_snapshot!(actual,@"[]");
 
-        flakes("(b for b in (a for a in [1, 2, 3] if a) if b)", &[]);
+        let actual = flakes("(b for b in (a for a in [1, 2, 3] if a) if b)");
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn undefined_in_gen_exp_nested() {
         // The loop variables of generator expressions nested together are
         // not defined in the other generator.
-        flakes(
-            "(b for b in (a for a in [1, 2, 3] if b) if b)",
-            &[Rule::UndefinedName],
-        );
+        let actual = flakes("(b for b in (a for a in [1, 2, 3] if b) if b)");
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "undefined-name",
+        ]
+        "###);
 
-        flakes(
-            "(b for b in (a for a in [1, 2, 3] if a) if a)",
-            &[Rule::UndefinedName],
-        );
+        let actual = flakes("(b for b in (a for a in [1, 2, 3] if a) if a)");
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "undefined-name",
+        ]
+        "###);
     }
 
     #[test]
     fn undefined_with_error_handler() {
         // Some compatibility code checks explicitly for NameError.
         // It should not trigger warnings.
-        flakes(
+        let actual = flakes(
             r"
-        try:
-            socket_map
-        except NameError:
-            socket_map = {}
-        ",
-            &[],
+                try:
+        socket_map
+                except NameError:
+        socket_map = {}
+                ",
         );
-        flakes(
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes(
             r#"
-        try:
-            _memoryview.contiguous
-        except (NameError, AttributeError):
-            raise RuntimeError("Python >= 3.3 is required")
-        "#,
-            &[],
+                try:
+        _memoryview.contiguous
+                except (NameError, AttributeError):
+        raise RuntimeError("Python >= 3.3 is required")
+                "#,
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
         // If NameError is not explicitly handled, generate a warning.
-        flakes(
+        let actual = flakes(
             r"
-        try:
-            socket_map
-        except:
-            socket_map = {}
-        ",
-            &[Rule::UndefinedName],
+                try:
+        socket_map
+                except:
+        socket_map = {}
+                ",
         );
-        flakes(
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes(
             r"
-        try:
-            socket_map
-        except Exception:
-            socket_map = {}
-        ",
-            &[Rule::UndefinedName],
+                try:
+        socket_map
+                except Exception:
+        socket_map = {}
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn defined_in_class() {
         // Defined name for generator expressions and dict/set comprehension.
-        flakes(
+        let actual = flakes(
             r"
-        class A:
-            T = range(10)
+                class A:
+        T = range(10)
 
-            Z = (x for x in T)
-            L = [x for x in T]
-            B = dict((i, str(i)) for i in T)
-        ",
-            &[],
+        Z = (x for x in T)
+        L = [x for x in T]
+        B = dict((i, str(i)) for i in T)
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
 
-        flakes(
+        let actual = flakes(
             r"
-        class A:
-            T = range(10)
+                class A:
+        T = range(10)
 
-            X = {x for x in T}
-            Y = {x:x for x in T}
-        ",
-            &[],
+        X = {x for x in T}
+        Y = {x:x for x in T}
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
 
-        flakes(
+        let actual = flakes(
             r"
-        class A:
-            T = 1
+                class A:
+        T = 1
 
-            # In each case, `T` is undefined. Only the first `iter` uses the class scope.
-            X = (T for x in range(10))
-            Y = [x for x in range(10) if T]
-            Z = [x for x in range(10) for y in T]
-        ",
-            &[
-                Rule::UndefinedName,
-                Rule::UndefinedName,
-                Rule::UndefinedName,
-            ],
+        # In each case, `T` is undefined. Only the first `iter` uses the class scope.
+        X = (T for x in range(10))
+        Y = [x for x in range(10) if T]
+        Z = [x for x in range(10) for y in T]
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn defined_in_class_nested() {
         // Defined name for nested generator expressions in a class.
-        flakes(
+        let actual = flakes(
             r"
-        class A:
-            T = range(10)
+                class A:
+        T = range(10)
 
-            Z = (x for x in (a for a in T))
-        ",
-            &[],
+        Z = (x for x in (a for a in T))
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn undefined_in_loop() {
         // The loop variable is defined after the expression is computed.
-        flakes(
+        let actual = flakes(
             r"
-        for i in range(i):
-            print(i)
-        ",
-            &[Rule::UndefinedName],
+                for i in range(i):
+        print(i)
+                ",
         );
-        flakes(
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes(
             r"
-        [42 for i in range(i)]
-        ",
-            &[Rule::UndefinedName],
+                [42 for i in range(i)]
+                ",
         );
-        flakes(
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "undefined-name",
+        ]
+        "###);
+        let actual = flakes(
             r"
-        (42 for i in range(i))
-        ",
-            &[Rule::UndefinedName],
+                (42 for i in range(i))
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "undefined-name",
+        ]
+        "###);
     }
 
     #[test]
     fn defined_from_lambda_in_dictionary_comprehension() {
         // Defined name referenced from a lambda function within a dict/set
         // comprehension.
-        flakes(
+        let actual = flakes(
             r"
-        {lambda: id(x) for x in range(10)}
-        ",
-            &[],
+                {lambda: id(x) for x in range(10)}
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn defined_from_lambda_in_generator() {
         // Defined name referenced from a lambda function within a generator
         // expression.
-        flakes(
+        let actual = flakes(
             r"
-        any(lambda: id(x) for x in range(10))
-        ",
-            &[],
+                any(lambda: id(x) for x in range(10))
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn undefined_from_lambda_in_dictionary_comprehension() {
         // Undefined name referenced from a lambda function within a dict/set
         // comprehension.
-        flakes(
+        let actual = flakes(
             r"
-        {lambda: id(y) for x in range(10)}
-        ",
-            &[Rule::UndefinedName],
+                {lambda: id(y) for x in range(10)}
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "undefined-name",
+        ]
+        "###);
     }
 
     #[test]
     fn undefined_from_lambda_in_comprehension() {
         // Undefined name referenced from a lambda function within a generator
         // expression.
-        flakes(
+        let actual = flakes(
             r"
-        any(lambda: id(y) for x in range(10))
-        ",
-            &[Rule::UndefinedName],
+                any(lambda: id(y) for x in range(10))
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "undefined-name",
+        ]
+        "###);
     }
 
     #[test]
     fn dunder_class() {
-        flakes(
+        let actual = flakes(
             r"
-        class Test(object):
-            def __init__(self):
-                print(__class__.__name__)
-                self.x = 1
-
-        t = Test()
-        ",
-            &[],
-        );
-        flakes(
-            r"
-        class Test(object):
-            print(__class__.__name__)
-
-            def __init__(self):
-                self.x = 1
-
-        t = Test()
-        ",
-            &[Rule::UndefinedName],
-        );
-        flakes(
-            r"
-        class Test(object):
-            X = [__class__ for _ in range(10)]
-
-            def __init__(self):
-                self.x = 1
-
-        t = Test()
-        ",
-            &[Rule::UndefinedName],
-        );
-        flakes(
-            r"
-        def f(self):
+                class Test(object):
+        def __init__(self):
             print(__class__.__name__)
             self.x = 1
 
-        f()
-        ",
-            &[Rule::UndefinedName],
+                t = Test()
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes(
+            r"
+                class Test(object):
+        print(__class__.__name__)
+
+        def __init__(self):
+            self.x = 1
+
+                t = Test()
+                ",
+        );
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes(
+            r"
+                class Test(object):
+        X = [__class__ for _ in range(10)]
+
+        def __init__(self):
+            self.x = 1
+
+                t = Test()
+                ",
+        );
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes(
+            r"
+                def f(self):
+        print(__class__.__name__)
+        self.x = 1
+
+                f()
+                ",
+        );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     /// See: <https://github.com/PyCQA/pyflakes/blob/04ecb0c324ef3b61124e2f80f9e1af6c3a4c7b26/pyflakes/test/test_imports.py>
     #[test]
     fn unused_import() {
-        flakes("import fu, bar", &[Rule::UnusedImport, Rule::UnusedImport]);
-        flakes(
-            "from baz import fu, bar",
-            &[Rule::UnusedImport, Rule::UnusedImport],
-        );
+        let actual = flakes("import fu, bar");
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "unused-import",
+            "unused-import",
+        ]
+        "###);
+        let actual = flakes("from baz import fu, bar");
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "unused-import",
+            "unused-import",
+        ]
+        "###);
     }
 
     #[test]
     fn unused_import_relative() {
-        flakes("from . import fu", &[Rule::UnusedImport]);
-        flakes("from . import fu as baz", &[Rule::UnusedImport]);
-        flakes("from .. import fu", &[Rule::UnusedImport]);
-        flakes("from ... import fu", &[Rule::UnusedImport]);
-        flakes("from .. import fu as baz", &[Rule::UnusedImport]);
-        flakes("from .bar import fu", &[Rule::UnusedImport]);
-        flakes("from ..bar import fu", &[Rule::UnusedImport]);
-        flakes("from ...bar import fu", &[Rule::UnusedImport]);
-        flakes("from ...bar import fu as baz", &[Rule::UnusedImport]);
+        let actual = flakes("from . import fu");
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "unused-import",
+        ]
+        "###);
+        let actual = flakes("from . import fu as baz");
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "unused-import",
+        ]
+        "###);
+        let actual = flakes("from .. import fu");
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "unused-import",
+        ]
+        "###);
+        let actual = flakes("from ... import fu");
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "unused-import",
+        ]
+        "###);
+        let actual = flakes("from .. import fu as baz");
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "unused-import",
+        ]
+        "###);
+        let actual = flakes("from .bar import fu");
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "unused-import",
+        ]
+        "###);
+        let actual = flakes("from ..bar import fu");
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "unused-import",
+        ]
+        "###);
+        let actual = flakes("from ...bar import fu");
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "unused-import",
+        ]
+        "###);
+        let actual = flakes("from ...bar import fu as baz");
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "unused-import",
+        ]
+        "###);
     }
 
     #[test]
     fn aliased_import() {
-        flakes(
-            "import fu as FU, bar as FU",
-            &[Rule::RedefinedWhileUnused, Rule::UnusedImport],
-        );
-        flakes(
-            "from moo import fu as FU, bar as FU",
-            &[Rule::RedefinedWhileUnused, Rule::UnusedImport],
-        );
+        let actual = flakes("import fu as FU, bar as FU");
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "redefined-while-unused",
+            "unused-import",
+        ]
+        "###);
+        let actual = flakes("from moo import fu as FU, bar as FU");
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "redefined-while-unused",
+            "unused-import",
+        ]
+        "###);
     }
 
     #[test]
     fn aliased_import_shadow_module() {
         // Imported aliases can shadow the source of the import.
-        flakes("from moo import fu as moo; moo", &[]);
-        flakes("import fu as fu; fu", &[]);
-        flakes("import fu.bar as fu; fu", &[]);
+        let actual = flakes("from moo import fu as moo; moo");
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes("import fu as fu; fu");
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes("import fu.bar as fu; fu");
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn used_import() {
-        flakes("import fu; print(fu)", &[]);
-        flakes("from baz import fu; print(fu)", &[]);
-        flakes("import fu; del fu", &[]);
+        let actual = flakes("import fu; print(fu)");
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes("from baz import fu; print(fu)");
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes("import fu; del fu");
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn used_import_relative() {
-        flakes("from . import fu; assert fu", &[]);
-        flakes("from .bar import fu; assert fu", &[]);
-        flakes("from .. import fu; assert fu", &[]);
-        flakes("from ..bar import fu as baz; assert baz", &[]);
+        let actual = flakes("from . import fu; assert fu");
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes("from .bar import fu; assert fu");
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes("from .. import fu; assert fu");
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes("from ..bar import fu as baz; assert baz");
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn redefined_while_unused() {
-        flakes("import fu; fu = 3", &[Rule::RedefinedWhileUnused]);
-        flakes("import fu; fu, bar = 3", &[Rule::RedefinedWhileUnused]);
-        flakes("import fu; [fu, bar] = 3", &[Rule::RedefinedWhileUnused]);
+        let actual = flakes("import fu; fu = 3");
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "redefined-while-unused",
+        ]
+        "###);
+        let actual = flakes("import fu; fu, bar = 3");
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "redefined-while-unused",
+        ]
+        "###);
+        let actual = flakes("import fu; [fu, bar] = 3");
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "redefined-while-unused",
+        ]
+        "###);
     }
 
     #[test]
     fn redefined_if() {
         // Test that importing a module twice within an if
         // block does raise a warning.
-        flakes(
+        let actual = flakes(
             r"
-        i = 2
-        if i==1:
-            import os
-            import os
-        os.path
-        ",
-            &[Rule::RedefinedWhileUnused],
+                i = 2
+                if i==1:
+        import os
+        import os
+                os.path
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn redefined_if_else() {
         // Test that importing a module twice in if
         // and else blocks does not raise a warning.
-        flakes(
+        let actual = flakes(
             r"
-        i = 2
-        if i==1:
-            import os
-        else:
-            import os
-        os.path
-        ",
-            &[],
+                i = 2
+                if i==1:
+        import os
+                else:
+        import os
+                os.path
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn redefined_try() {
         // Test that importing a module twice in a try block
         // does raise a warning.
-        flakes(
+        let actual = flakes(
             r"
-        try:
-            import os
-            import os
-        except:
-            pass
-        os.path
-        ",
-            &[Rule::RedefinedWhileUnused],
+                try:
+        import os
+        import os
+                except:
+        pass
+                os.path
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn redefined_try_except() {
         // Test that importing a module twice in a try
         // and except block does not raise a warning.
-        flakes(
+        let actual = flakes(
             r"
-        try:
-            import os
-        except:
-            import os
-        os.path
-        ",
-            &[],
+                try:
+        import os
+                except:
+        import os
+                os.path
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn redefined_try_nested() {
         // Test that importing a module twice using a nested
         // try/except and if blocks does not issue a warning.
-        flakes(
+        let actual = flakes(
             r"
-        try:
+                try:
+        if True:
             if True:
-                if True:
-                    import os
-        except:
-            import os
-        os.path
-        ",
-            &[],
+                import os
+                except:
+        import os
+                os.path
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn redefined_try_except_multi() {
-        flakes(
+        let actual = flakes(
             r"
-        try:
-            from aa import mixer
-        except AttributeError:
-            from bb import mixer
-        except RuntimeError:
-            from cc import mixer
-        except:
-            from dd import mixer
-        mixer(123)
-        ",
-            &[],
+                try:
+        from aa import mixer
+                except AttributeError:
+        from bb import mixer
+                except RuntimeError:
+        from cc import mixer
+                except:
+        from dd import mixer
+                mixer(123)
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn redefined_try_else() {
-        flakes(
+        let actual = flakes(
             r"
-        try:
-            from aa import mixer
-        except ImportError:
-            pass
-        else:
-            from bb import mixer
-        mixer(123)
-        ",
-            &[Rule::RedefinedWhileUnused],
+                try:
+        from aa import mixer
+                except ImportError:
+        pass
+                else:
+        from bb import mixer
+                mixer(123)
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn redefined_try_except_else() {
-        flakes(
+        let actual = flakes(
             r"
-        try:
-            import funca
-        except ImportError:
-            from bb import funca
-            from bb import funcb
-        else:
-            from bbb import funcb
-        print(funca, funcb)
-        ",
-            &[],
+                try:
+        import funca
+                except ImportError:
+        from bb import funca
+        from bb import funcb
+                else:
+        from bbb import funcb
+                print(funca, funcb)
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn redefined_try_except_finally() {
-        flakes(
+        let actual = flakes(
             r"
-        try:
-            from aa import a
-        except ImportError:
-            from bb import a
-        finally:
-            a = 42
-        print(a)
-        ",
-            &[],
+                try:
+        from aa import a
+                except ImportError:
+        from bb import a
+                finally:
+        a = 42
+                print(a)
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn redefined_try_except_else_finally() {
-        flakes(
+        let actual = flakes(
             r"
-        try:
-            import b
-        except ImportError:
-            b = Ellipsis
-            from bb import a
-        else:
-            from aa import a
-        finally:
-            a = 42
-        print(a, b)
-        ",
-            &[],
+                try:
+        import b
+                except ImportError:
+        b = Ellipsis
+        from bb import a
+                else:
+        from aa import a
+                finally:
+        a = 42
+                print(a, b)
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn redefined_by_function() {
-        flakes(
+        let actual = flakes(
             r"
-        import fu
-        def fu():
-            pass
-        ",
-            &[Rule::RedefinedWhileUnused],
+                import fu
+                def fu():
+        pass
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn redefined_in_nested_function() {
         // Test that shadowing a global name with a nested function definition
         // generates a warning.
-        flakes(
+        let actual = flakes(
             r"
-        import fu
-        def bar():
-            def baz():
-                def fu():
-                    pass
-        ",
-            &[Rule::UnusedImport, Rule::RedefinedWhileUnused],
+                import fu
+                def bar():
+        def baz():
+            def fu():
+                pass
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn redefined_in_nested_function_twice() {
         // Test that shadowing a global name with a nested function definition
         // generates a warning.
-        flakes(
+        let actual = flakes(
             r"
+                import fu
+                def bar():
         import fu
-        def bar():
-            import fu
-            def baz():
-                def fu():
-                    pass
-        ",
-            &[
-                Rule::UnusedImport,
-                Rule::RedefinedWhileUnused,
-                Rule::UnusedImport,
-                Rule::RedefinedWhileUnused,
-            ],
+        def baz():
+            def fu():
+                pass
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn redefined_but_used_later() {
         // Test that a global import which is redefined locally,
         // but used later in another scope does not generate a warning.
-        flakes(
+        let actual = flakes(
             r"
-        import unittest, transport
+                import unittest, transport
 
-        class GetTransportTestCase(unittest.TestCase):
-            def test_get_transport(self):
-                transport = 'transport'
-                self.assertIsNotNone(transport)
+                class GetTransportTestCase(unittest.TestCase):
+        def test_get_transport(self):
+            transport = 'transport'
+            self.assertIsNotNone(transport)
 
-        class TestTransportMethodArgs(unittest.TestCase):
-            def test_send_defaults(self):
-                transport.Transport()",
-            &[],
+                class TestTransportMethodArgs(unittest.TestCase):
+        def test_send_defaults(self):
+            transport.Transport()",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn redefined_by_class() {
-        flakes(
+        let actual = flakes(
             r"
-        import fu
-        class fu:
-            pass
-        ",
-            &[Rule::RedefinedWhileUnused],
+                import fu
+                class fu:
+        pass
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn redefined_by_subclass() {
         // If an imported name is redefined by a class statement which also uses
         // that name in the bases list, no warning is emitted.
-        flakes(
+        let actual = flakes(
             r"
-        from fu import bar
-        class bar(bar):
-            pass
-        ",
-            &[],
+                from fu import bar
+                class bar(bar):
+        pass
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn redefined_in_class() {
         // Test that shadowing a global with a class attribute does not produce a
         // warning.
-        flakes(
+        let actual = flakes(
             r"
-        import fu
-        class bar:
-            fu = 1
-        print(fu)
-        ",
-            &[],
+                import fu
+                class bar:
+        fu = 1
+                print(fu)
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn import_in_class() {
         // Test that import within class is a locally scoped attribute.
-        flakes(
+        let actual = flakes(
             r"
-        class bar:
-            import fu
-        ",
-            &[],
+                class bar:
+        import fu
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
 
-        flakes(
+        let actual = flakes(
             r"
-        class bar:
-            import fu
+                class bar:
+        import fu
 
-        fu
-        ",
-            &[Rule::UndefinedName],
+                fu
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn used_in_function() {
-        flakes(
+        let actual = flakes(
             r"
-        import fu
-        def fun():
-            print(fu)
-        ",
-            &[],
+                import fu
+                def fun():
+        print(fu)
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn shadowed_by_parameter() {
-        flakes(
+        let actual = flakes(
             r"
-        import fu
-        def fun(fu):
-            print(fu)
-        ",
-            &[Rule::UnusedImport, Rule::RedefinedWhileUnused],
-        );
-
-        flakes(
-            r"
-        import fu
-        def fun(fu):
-            print(fu)
+                import fu
+                def fun(fu):
         print(fu)
-        ",
-            &[],
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
+
+        let actual = flakes(
+            r"
+                import fu
+                def fun(fu):
+        print(fu)
+                print(fu)
+                ",
+        );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn new_assignment() {
-        flakes("fu = None", &[]);
+        let actual = flakes("fu = None");
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn used_in_getattr() {
-        flakes("import fu; fu.bar.baz", &[]);
-        flakes("import fu; \"bar\".fu.baz", &[Rule::UnusedImport]);
+        let actual = flakes("import fu; fu.bar.baz");
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes("import fu; \"bar\".fu.baz");
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "unused-import",
+        ]
+        "###);
     }
 
     #[test]
     fn used_in_slice() {
-        flakes("import fu; print(fu.bar[1:])", &[]);
+        let actual = flakes("import fu; print(fu.bar[1:])");
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn used_in_if_body() {
-        flakes(
+        let actual = flakes(
             r"
-        import fu
-        if True: print(fu)
-        ",
-            &[],
+                import fu
+                if True: print(fu)
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn used_in_if_conditional() {
-        flakes(
+        let actual = flakes(
             r"
-        import fu
-        if fu: pass
-        ",
-            &[],
+                import fu
+                if fu: pass
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn used_in_elif_conditional() {
-        flakes(
+        let actual = flakes(
             r"
-        import fu
-        if False: pass
-        elif fu: pass
-        ",
-            &[],
+                import fu
+                if False: pass
+                elif fu: pass
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn used_in_else() {
-        flakes(
+        let actual = flakes(
             r"
-        import fu
-        if False: pass
-        else: print(fu)
-        ",
-            &[],
+                import fu
+                if False: pass
+                else: print(fu)
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn used_in_call() {
-        flakes("import fu; fu.bar()", &[]);
+        let actual = flakes("import fu; fu.bar()");
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn used_in_class() {
-        flakes(
+        let actual = flakes(
             r"
-        import fu
-        class bar:
-            bar = fu
-        ",
-            &[],
+                import fu
+                class bar:
+        bar = fu
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn used_in_class_base() {
-        flakes(
+        let actual = flakes(
             r"
-        import fu
-        class bar(object, fu.baz):
-            pass
-        ",
-            &[],
+                import fu
+                class bar(object, fu.baz):
+        pass
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn not_used_in_nested_scope() {
-        flakes(
+        let actual = flakes(
             r"
-        import fu
-        def bleh():
-            pass
-        print(fu)
-        ",
-            &[],
+                import fu
+                def bleh():
+        pass
+                print(fu)
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn used_in_for() {
-        flakes(
+        let actual = flakes(
             r"
-        import fu
-        for bar in range(9):
-            print(fu)
-        ",
-            &[],
+                import fu
+                for bar in range(9):
+        print(fu)
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn used_in_for_else() {
-        flakes(
+        let actual = flakes(
             r"
-        import fu
-        for bar in range(10):
-            pass
-        else:
-            print(fu)
-        ",
-            &[],
+                import fu
+                for bar in range(10):
+        pass
+                else:
+        print(fu)
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn redefined_by_for() {
-        flakes(
+        let actual = flakes(
             r"
-        import fu
-        for fu in range(2):
-            pass
-        ",
-            &[Rule::ImportShadowedByLoopVar],
+                import fu
+                for fu in range(2):
+        pass
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn shadowed_by_for() {
         // Test that shadowing a global name with a for loop variable generates a
         // warning.
-        flakes(
+        let actual = flakes(
             r"
-        import fu
-        fu.bar()
-        for fu in ():
-            pass
-        ",
-            &[Rule::ImportShadowedByLoopVar],
+                import fu
+                fu.bar()
+                for fu in ():
+        pass
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn shadowed_by_for_deep() {
         // Test that shadowing a global name with a for loop variable nested in a
         // tuple unpack generates a warning.
-        flakes(
+        let actual = flakes(
             r"
-        import fu
-        fu.bar()
-        for (x, y, z, (a, b, c, (fu,))) in ():
-            pass
-        ",
-            &[Rule::ImportShadowedByLoopVar],
+                import fu
+                fu.bar()
+                for (x, y, z, (a, b, c, (fu,))) in ():
+        pass
+                ",
         );
-        flakes(
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes(
             r"
-        import fu
-        fu.bar()
-        for [x, y, z, (a, b, c, (fu,))] in ():
-            pass
-        ",
-            &[Rule::ImportShadowedByLoopVar],
+                import fu
+                fu.bar()
+                for [x, y, z, (a, b, c, (fu,))] in ():
+        pass
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn used_in_return() {
-        flakes(
+        let actual = flakes(
             r"
-        import fu
-        def fun():
-            return fu
-        ",
-            &[],
+                import fu
+                def fun():
+        return fu
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn used_in_operators() {
-        flakes("import fu; 3 + fu.bar", &[]);
-        flakes("import fu; 3 % fu.bar", &[]);
-        flakes("import fu; 3 - fu.bar", &[]);
-        flakes("import fu; 3 * fu.bar", &[]);
-        flakes("import fu; 3 ** fu.bar", &[]);
-        flakes("import fu; 3 / fu.bar", &[]);
-        flakes("import fu; 3 // fu.bar", &[]);
-        flakes("import fu; -fu.bar", &[]);
-        flakes("import fu; ~fu.bar", &[]);
-        flakes("import fu; 1 == fu.bar", &[]);
-        flakes("import fu; 1 | fu.bar", &[]);
-        flakes("import fu; 1 & fu.bar", &[]);
-        flakes("import fu; 1 ^ fu.bar", &[]);
-        flakes("import fu; 1 >> fu.bar", &[]);
-        flakes("import fu; 1 << fu.bar", &[]);
+        let actual = flakes("import fu; 3 + fu.bar");
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes("import fu; 3 % fu.bar");
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes("import fu; 3 - fu.bar");
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes("import fu; 3 * fu.bar");
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes("import fu; 3 ** fu.bar");
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes("import fu; 3 / fu.bar");
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes("import fu; 3 // fu.bar");
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes("import fu; -fu.bar");
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes("import fu; ~fu.bar");
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes("import fu; 1 == fu.bar");
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes("import fu; 1 | fu.bar");
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes("import fu; 1 & fu.bar");
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes("import fu; 1 ^ fu.bar");
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes("import fu; 1 >> fu.bar");
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes("import fu; 1 << fu.bar");
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn used_in_assert() {
-        flakes("import fu; assert fu.bar", &[]);
+        let actual = flakes("import fu; assert fu.bar");
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn used_in_subscript() {
-        flakes("import fu; fu.bar[1]", &[]);
+        let actual = flakes("import fu; fu.bar[1]");
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn used_in_logic() {
-        flakes("import fu; fu and False", &[]);
-        flakes("import fu; fu or False", &[]);
-        flakes("import fu; not fu.bar", &[]);
+        let actual = flakes("import fu; fu and False");
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes("import fu; fu or False");
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes("import fu; not fu.bar");
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn used_in_list() {
-        flakes("import fu; [fu]", &[]);
+        let actual = flakes("import fu; [fu]");
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn used_in_tuple() {
-        flakes("import fu; (fu,)", &[]);
+        let actual = flakes("import fu; (fu,)");
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn used_in_try() {
-        flakes(
+        let actual = flakes(
             r"
-        import fu
-        try: fu
-        except: pass
-        ",
-            &[],
+                import fu
+                try: fu
+                except: pass
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn used_in_except() {
-        flakes(
+        let actual = flakes(
             r"
-        import fu
-        try: fu
-        except: pass
-        ",
-            &[],
+                import fu
+                try: fu
+                except: pass
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn redefined_by_except() {
-        flakes(
+        let actual = flakes(
             r"
-        import fu
-        try: pass
-        except Exception as fu: pass
-        ",
-            &[Rule::UnusedVariable, Rule::RedefinedWhileUnused],
+                import fu
+                try: pass
+                except Exception as fu: pass
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "unused-variable",
+            "redefined-while-unused",
+        ]
+        "###);
     }
 
     #[test]
     fn used_in_raise() {
-        flakes(
+        let actual = flakes(
             r"
-        import fu
-        raise fu.bar
-        ",
-            &[],
+                import fu
+                raise fu.bar
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn used_in_yield() {
-        flakes(
+        let actual = flakes(
             r"
-        import fu
-        def gen():
-            yield fu
-        ",
-            &[],
+                import fu
+                def gen():
+        yield fu
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn used_in_dict() {
-        flakes("import fu; {fu:None}", &[]);
-        flakes("import fu; {1:fu}", &[]);
+        let actual = flakes("import fu; {fu:None}");
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes("import fu; {1:fu}");
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn used_in_parameter_default() {
-        flakes(
+        let actual = flakes(
             r"
-        import fu
-        def f(bar=fu):
-            pass
-        ",
-            &[],
+                import fu
+                def f(bar=fu):
+        pass
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn used_in_attribute_assign() {
-        flakes("import fu; fu.bar = 1", &[]);
+        let actual = flakes("import fu; fu.bar = 1");
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn used_in_keyword_arg() {
-        flakes("import fu; fu.bar(stuff=fu)", &[]);
+        let actual = flakes("import fu; fu.bar(stuff=fu)");
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn used_in_assignment() {
-        flakes("import fu; bar=fu", &[]);
-        flakes("import fu; n=0; n+=fu", &[]);
+        let actual = flakes("import fu; bar=fu");
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes("import fu; n=0; n+=fu");
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn used_in_list_comp() {
-        flakes("import fu; [fu for _ in range(1)]", &[]);
-        flakes("import fu; [1 for _ in range(1) if fu]", &[]);
+        let actual = flakes("import fu; [fu for _ in range(1)]");
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes("import fu; [1 for _ in range(1) if fu]");
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn used_in_try_finally() {
-        flakes(
+        let actual = flakes(
             r"
-        import fu
-        try: pass
-        finally: fu
-        ",
-            &[],
+                import fu
+                try: pass
+                finally: fu
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
 
-        flakes(
+        let actual = flakes(
             r"
-        import fu
-        try: fu
-        finally: pass
-        ",
-            &[],
+                import fu
+                try: fu
+                finally: pass
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn used_in_while() {
-        flakes(
+        let actual = flakes(
             r"
-        import fu
-        while 0:
-            fu
-        ",
-            &[],
+                import fu
+                while 0:
+        fu
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
 
-        flakes(
+        let actual = flakes(
             r"
-        import fu
-        while fu: pass
-        ",
-            &[],
+                import fu
+                while fu: pass
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn used_in_global() {
         // A 'global' statement shadowing an unused import should not prevent it
         // from being reported.
-        flakes(
+        let actual = flakes(
             r"
-        import fu
-        def f(): global fu
-        ",
-            &[Rule::UnusedImport],
+                import fu
+                def f(): global fu
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "unused-import",
+        ]
+        "###);
     }
 
     #[test]
     fn used_and_global() {
         // A 'global' statement shadowing a used import should not cause it to be
         // reported as unused.
-        flakes(
+        let actual = flakes(
             r"
-            import foo
-            def f(): global foo
-            def g(): foo.is_used()
-        ",
-            &[],
+        import foo
+        def f(): global foo
+        def g(): foo.is_used()
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn assigned_to_global() {
         // Binding an import to a declared global should not cause it to be
         // reported as unused.
-        flakes(
+        let actual = flakes(
             r"
-            def f(): global foo; import foo
-            def g(): foo.is_used()
-        ",
-            &[],
+        def f(): global foo; import foo
+        def g(): foo.is_used()
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn used_in_exec() {
-        flakes("import fu; exec('print(1)', fu.bar)", &[]);
+        let actual = flakes("import fu; exec('print(1)', fu.bar)");
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn used_in_lambda() {
-        flakes(
+        let actual = flakes(
             r"import fu;
-lambda: fu
-        ",
-            &[],
+        lambda: fu
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn shadowed_by_lambda() {
-        flakes(
-            "import fu; lambda fu: fu",
-            &[Rule::UnusedImport, Rule::RedefinedWhileUnused],
-        );
-        flakes("import fu; lambda fu: fu\nfu()", &[]);
+        let actual = flakes("import fu; lambda fu: fu");
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "unused-import",
+            "redefined-while-unused",
+        ]
+        "###);
+        let actual = flakes("import fu; lambda fu: fu\nfu()");
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn used_in_slice_obj() {
-        flakes(
+        let actual = flakes(
             r#"import fu;
-"meow"[::fu]
-        "#,
-            &[],
+        "meow"[::fu]
+                "#,
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn unused_in_nested_scope() {
-        flakes(
+        let actual = flakes(
             r"
-        def bar():
-            import fu
-        fu
-        ",
-            &[Rule::UnusedImport, Rule::UndefinedName],
+                def bar():
+        import fu
+                fu
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn methods_dont_use_class_scope() {
-        flakes(
+        let actual = flakes(
             r"
-        class bar:
-            import fu
-            def fun(self):
-                fu
-        ",
-            &[Rule::UndefinedName],
+                class bar:
+        import fu
+        def fun(self):
+            fu
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn nested_functions_nest_scope() {
-        flakes(
+        let actual = flakes(
             r"
-        def a():
-            def b():
-                fu
-            import fu
-        ",
-            &[],
+                def a():
+        def b():
+            fu
+        import fu
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn nested_class_and_function_scope() {
-        flakes(
+        let actual = flakes(
             r"
-        def a():
-            import fu
-            class b:
-                def c(self):
-                    print(fu)
-        ",
-            &[],
+                def a():
+        import fu
+        class b:
+            def c(self):
+                print(fu)
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn package_import() {
         // If a dotted name is imported and used, no warning is reported.
-        flakes(
+        let actual = flakes(
             r"
-        import fu.bar
-        fu.bar
-        ",
-            &[],
+                import fu.bar
+                fu.bar
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn unused_package_import() {
         // If a dotted name is imported and not used, an unused import warning is
         // reported.
-        flakes("import fu.bar", &[Rule::UnusedImport]);
+        let actual = flakes("import fu.bar");
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "unused-import",
+        ]
+        "###);
     }
 
     #[test]
     fn duplicate_submodule_import() {
         // If a submodule of a package is imported twice, an unused import warning and a
         // redefined while unused warning are reported.
-        flakes(
+        let actual = flakes(
             r"
-        import fu.bar, fu.bar
-        fu.bar
-        ",
-            &[Rule::RedefinedWhileUnused],
+                import fu.bar, fu.bar
+                fu.bar
+                ",
         );
-        flakes(
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "redefined-while-unused",
+        ]
+        "###);
+        let actual = flakes(
             r"
-        import fu.bar
-        import fu.bar
-        fu.bar
-        ",
-            &[Rule::RedefinedWhileUnused],
+                import fu.bar
+                import fu.bar
+                fu.bar
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "redefined-while-unused",
+        ]
+        "###);
     }
 
     #[test]
     fn different_submodule_import() {
         // If two different submodules of a package are imported, no duplicate import
         // warning is reported for the package.
-        flakes(
+        let actual = flakes(
             r"
-        import fu.bar, fu.baz
-        fu.bar, fu.baz
-        ",
-            &[],
+                import fu.bar, fu.baz
+                fu.bar, fu.baz
+                ",
         );
-        flakes(
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes(
             r"
-        import fu.bar
-        import fu.baz
-        fu.bar, fu.baz
-        ",
-            &[],
+                import fu.bar
+                import fu.baz
+                fu.bar, fu.baz
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn aliased_submodule_import() {
-        flakes(
+        let actual = flakes(
             r"
-        import fu.bar as baz
-        import fu.bar as baz
-        baz
-        ",
-            &[Rule::RedefinedWhileUnused],
+                import fu.bar as baz
+                import fu.bar as baz
+                baz
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "redefined-while-unused",
+        ]
+        "###);
 
-        flakes(
+        let actual = flakes(
             r"
-        import fu.bar as baz
-        import baz
-        baz
-        ",
-            &[Rule::RedefinedWhileUnused],
+                import fu.bar as baz
+                import baz
+                baz
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "redefined-while-unused",
+        ]
+        "###);
 
-        flakes(
+        let actual = flakes(
             r"
-        import fu.bar as baz
-        import fu.bar as bop
-        baz, bop
-        ",
-            &[],
+                import fu.bar as baz
+                import fu.bar as bop
+                baz, bop
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
 
-        flakes(
+        let actual = flakes(
             r"
-        import foo.baz
-        import foo.baz as foo
-        foo
-        ",
-            &[Rule::RedefinedWhileUnused],
+                import foo.baz
+                import foo.baz as foo
+                foo
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "redefined-while-unused",
+        ]
+        "###);
     }
 
     #[test]
     fn used_package_with_submodule_import() {
         // Usage of package marks submodule imports as used.
-        flakes(
+        let actual = flakes(
             r"
-        import fu
-        import fu.bar
-        fu.x
-        ",
-            &[],
+                import fu
+                import fu.bar
+                fu.x
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
 
-        flakes(
+        let actual = flakes(
             r"
-        import fu.bar
-        import fu
-        fu.x
-        ",
-            &[],
+                import fu.bar
+                import fu
+                fu.x
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn used_package_with_submodule_import_of_alias() {
         // Usage of package by alias marks submodule imports as used.
-        flakes(
+        let actual = flakes(
             r"
-        import foo as f
-        import foo.bar
-        f.bar.do_something()
-        ",
-            &[],
+                import foo as f
+                import foo.bar
+                f.bar.do_something()
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
 
-        flakes(
+        let actual = flakes(
             r"
-        import foo as f
-        import foo.bar.blah
-        f.bar.blah.do_something()
-        ",
-            &[],
+                import foo as f
+                import foo.bar.blah
+                f.bar.blah.do_something()
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn unused_package_with_submodule_import() {
         // When a package and its submodule are imported, only report once.
-        flakes(
+        let actual = flakes(
             r"
-        import fu
-        import fu.bar
-        ",
-            &[Rule::UnusedImport],
+                import fu
+                import fu.bar
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "unused-import",
+        ]
+        "###);
     }
 
     #[test]
     fn assign_rhs_first() {
-        flakes("import fu; fu = fu", &[]);
-        flakes("import fu; fu, bar = fu", &[]);
-        flakes("import fu; [fu, bar] = fu", &[]);
-        flakes("import fu; fu += fu", &[]);
+        let actual = flakes("import fu; fu = fu");
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes("import fu; fu, bar = fu");
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes("import fu; [fu, bar] = fu");
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes("import fu; fu += fu");
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn trying_multiple_imports() {
-        flakes(
+        let actual = flakes(
             r"
-        try:
-            import fu
-        except ImportError:
-            import bar as fu
-        fu
-        ",
-            &[],
+                try:
+        import fu
+                except ImportError:
+        import bar as fu
+                fu
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn non_global_does_not_redefine() {
-        flakes(
+        let actual = flakes(
             r"
-        import fu
-        def a():
-            fu = 3
-            return fu
-        fu
-        ",
-            &[],
+                import fu
+                def a():
+        fu = 3
+        return fu
+                fu
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn functions_run_later() {
-        flakes(
+        let actual = flakes(
             r"
-        def a():
-            fu
-        import fu
-        ",
-            &[],
+                def a():
+        fu
+                import fu
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn function_names_are_bound_now() {
-        flakes(
+        let actual = flakes(
             r"
-        import fu
-        def fu():
-            fu
+                import fu
+                def fu():
         fu
-        ",
-            &[Rule::RedefinedWhileUnused],
+                fu
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn ignore_non_import_redefinitions() {
-        flakes("a = 1; a = 2", &[]);
+        let actual = flakes("a = 1; a = 2");
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn imported_in_class() {
         // Imports in class scope can be used through self.
-        flakes(
+        let actual = flakes(
             r"
-        class C:
-            import i
-            def __init__(self):
-                self.i
-        ",
-            &[],
+                class C:
+        import i
+        def __init__(self):
+            self.i
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn import_used_in_method_definition() {
         // Method named 'foo' with default args referring to module named 'foo'.
-        flakes(
+        let actual = flakes(
             r"
-        import foo
+                import foo
 
-        class Thing(object):
-            def foo(self, parser=foo.parse_foo):
-                pass
-        ",
-            &[],
+                class Thing(object):
+        def foo(self, parser=foo.parse_foo):
+            pass
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn future_import() {
         // __future__ is special.
-        flakes("from __future__ import division", &[]);
-        flakes(
+        let actual = flakes("from __future__ import division");
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes(
             r#"
-        "docstring is allowed before future import"
-        from __future__ import division
-        "#,
-            &[],
+                "docstring is allowed before future import"
+                from __future__ import division
+                "#,
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn future_import_first() {
         // __future__ imports must come before anything else.
-        flakes(
+        let actual = flakes(
             r"
-        x = 5
-        from __future__ import division
-        ",
-            &[Rule::LateFutureImport],
+                x = 5
+                from __future__ import division
+                ",
         );
-        flakes(
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "late-future-import",
+        ]
+        "###);
+        let actual = flakes(
             r"
-        from foo import bar
-        from __future__ import division
-        bar
-        ",
-            &[Rule::LateFutureImport],
+                from foo import bar
+                from __future__ import division
+                bar
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "late-future-import",
+        ]
+        "###);
     }
 
     #[test]
     fn future_import_used() {
         // __future__ is special, but names are injected in the namespace.
-        flakes(
+        let actual = flakes(
             r"
-        from __future__ import division
-        from __future__ import print_function
+                from __future__ import division
+                from __future__ import print_function
 
-        assert print_function is not division
-        ",
-            &[],
+                assert print_function is not division
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn future_import_undefined() {
         // Importing undefined names from __future__ fails.
-        flakes(
+        let actual = flakes(
             r"
-        from __future__ import print_statement
-        ",
-            &[Rule::FutureFeatureNotDefined],
+                from __future__ import print_statement
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "future-feature-not-defined",
+        ]
+        "###);
     }
 
     #[test]
     fn future_import_star() {
         // Importing '*' from __future__ fails.
-        flakes(
+        let actual = flakes(
             r"
-        from __future__ import *
-        ",
-            &[Rule::FutureFeatureNotDefined],
+                from __future__ import *
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "future-feature-not-defined",
+        ]
+        "###);
     }
 
     #[test]
     fn ignored_in_function() {
         // An C{__all__} definition does not suppress unused import warnings in a
         // function scope.
-        flakes(
+        let actual = flakes(
             r#"
-        def foo():
-            import bar
-            __all__ = ["bar"]
-        "#,
-            &[Rule::UnusedImport, Rule::UnusedVariable],
+                def foo():
+        import bar
+        __all__ = ["bar"]
+                "#,
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn ignored_in_class() {
         // An C{__all__} definition in a class does not suppress unused import warnings.
-        flakes(
+        let actual = flakes(
             r#"
-        import bar
-        class foo:
-            __all__ = ["bar"]
-        "#,
-            &[Rule::UnusedImport],
+                import bar
+                class foo:
+        __all__ = ["bar"]
+                "#,
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn ignored_when_not_directly_assigned() {
-        flakes(
+        let actual = flakes(
             r#"
-        import bar
-        (__all__,) = ("foo",)
-        "#,
-            &[Rule::UnusedImport],
+                import bar
+                (__all__,) = ("foo",)
+                "#,
         );
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "unused-import",
+        ]
+        "###);
     }
 
     #[test]
     fn warning_suppressed() {
         // If a name is imported and unused but is named in C{__all__}, no warning
         // is reported.
-        flakes(
+        let actual = flakes(
             r#"
-        import foo
-        __all__ = ["foo"]
-        "#,
-            &[],
+                import foo
+                __all__ = ["foo"]
+                "#,
         );
-        flakes(
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes(
             r#"
-        import foo
-        __all__ = ("foo",)
-        "#,
-            &[],
+                import foo
+                __all__ = ("foo",)
+                "#,
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn augmented_assignment() {
         // The C{__all__} variable is defined incrementally.
-        flakes(
+        let actual = flakes(
             r"
-        import a
-        import c
-        __all__ = ['a']
-        __all__ += ['b']
-        if 1 < 3:
-            __all__ += ['c', 'd']
-        ",
-            &[Rule::UndefinedExport, Rule::UndefinedExport],
+                import a
+                import c
+                __all__ = ['a']
+                __all__ += ['b']
+                if 1 < 3:
+        __all__ += ['c', 'd']
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn list_concatenation_assignment() {
         // The C{__all__} variable is defined through list concatenation.
-        flakes(
+        let actual = flakes(
             r"
-        import sys
-        __all__ = ['a'] + ['b'] + ['c']
-        ",
-            &[
-                Rule::UnusedImport,
-                Rule::UndefinedExport,
-                Rule::UndefinedExport,
-                Rule::UndefinedExport,
-            ],
+                import sys
+                __all__ = ['a'] + ['b'] + ['c']
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "unused-import",
+            "undefined-export",
+            "undefined-export",
+            "undefined-export",
+        ]
+        "###);
     }
 
     #[test]
     fn tuple_concatenation_assignment() {
         // The C{__all__} variable is defined through tuple concatenation.
-        flakes(
+        let actual = flakes(
             r"
-        import sys
-        __all__ = ('a',) + ('b',) + ('c',)
-        ",
-            &[
-                Rule::UnusedImport,
-                Rule::UndefinedExport,
-                Rule::UndefinedExport,
-                Rule::UndefinedExport,
-            ],
+                import sys
+                __all__ = ('a',) + ('b',) + ('c',)
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "unused-import",
+            "undefined-export",
+            "undefined-export",
+            "undefined-export",
+        ]
+        "###);
     }
 
     #[test]
     fn all_with_attributes() {
-        flakes(
+        let actual = flakes(
             r"
-        from foo import bar
-        __all__ = [bar.__name__]
-        ",
-            &[],
+                from foo import bar
+                __all__ = [bar.__name__]
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn all_with_names() {
-        flakes(
+        let actual = flakes(
             r"
-        from foo import bar
-        __all__ = [bar]
-        ",
-            &[],
+                from foo import bar
+                __all__ = [bar]
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn all_with_attributes_added() {
-        flakes(
+        let actual = flakes(
             r"
-        from foo import bar
-        from bar import baz
-        __all__ = [bar.__name__] + [baz.__name__]
-        ",
-            &[],
+                from foo import bar
+                from bar import baz
+                __all__ = [bar.__name__] + [baz.__name__]
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn all_mixed_attributes_and_strings() {
-        flakes(
+        let actual = flakes(
             r"
-        from foo import bar
-        from foo import baz
-        __all__ = ['bar', baz.__name__]
-        ",
-            &[],
+                from foo import bar
+                from foo import baz
+                __all__ = ['bar', baz.__name__]
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn unbound_exported() {
         // If C{__all__} includes a name which is not bound, a warning is emitted.
-        flakes(
+        let actual = flakes(
             r#"
-        __all__ = ["foo"]
-        "#,
-            &[Rule::UndefinedExport],
+                __all__ = ["foo"]
+                "#,
         );
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "undefined-export",
+        ]
+        "###);
     }
 
     #[test]
     fn import_star_exported() {
         // Report undefined if import * is used
-        flakes(
+        let actual = flakes(
             r"
-        from math import *
-        __all__ = ['sin', 'cos']
-        csc(1)
-        ",
-            &[
-                Rule::UndefinedLocalWithImportStar,
-                Rule::UndefinedLocalWithImportStarUsage,
-                Rule::UndefinedLocalWithImportStarUsage,
-                Rule::UndefinedLocalWithImportStarUsage,
-            ],
+                from math import *
+                __all__ = ['sin', 'cos']
+                csc(1)
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "undefined-local-with-import-star",
+            "undefined-local-with-import-star-usage",
+            "undefined-local-with-import-star-usage",
+            "undefined-local-with-import-star-usage",
+        ]
+        "###);
     }
 
     #[ignore]
     #[test]
     fn import_star_not_exported() {
         // Report unused import when not needed to satisfy __all__.
-        flakes(
+        let actual = flakes(
             r"
-        from foolib import *
-        a = 1
-        __all__ = ['a']
-        ",
-            &[Rule::UndefinedLocalWithImportStar, Rule::UnusedImport],
+                from foolib import *
+                a = 1
+                __all__ = ['a']
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@r#""#);
     }
 
     #[test]
     fn used_in_gen_exp() {
         // Using a global in a generator expression results in no warnings.
-        flakes("import fu; (fu for _ in range(1))", &[]);
-        flakes("import fu; (1 for _ in range(1) if fu)", &[]);
+        let actual = flakes("import fu; (fu for _ in range(1))");
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes("import fu; (1 for _ in range(1) if fu)");
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn redefined_by_gen_exp() {
         // Reusing a global name as the loop variable for a generator
         // expression results in a redefinition warning.
-        flakes(
-            "import fu; (1 for fu in range(1))",
-            &[Rule::UnusedImport, Rule::RedefinedWhileUnused],
-        );
+        let actual = flakes("import fu; (1 for fu in range(1))");
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "unused-import",
+            "redefined-while-unused",
+        ]
+        "###);
     }
 
     #[test]
@@ -3137,24 +3402,24 @@ lambda: fu
         // Using a global name in a decorator statement results in no warnings,
         // but using an undefined name in a decorator statement results in an
         // undefined name warning.
-        flakes(
+        let actual = flakes(
             r#"
-        from interior import decorate
-        @decorate
-        def f():
-            return "hello"
-        "#,
-            &[],
+                from interior import decorate
+                @decorate
+                def f():
+        return "hello"
+                "#,
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
 
-        flakes(
+        let actual = flakes(
             r#"
-        @decorate
-        def f():
-            return "hello"
-        "#,
-            &[Rule::UndefinedName],
+                @decorate
+                def f():
+        return "hello"
+                "#,
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
@@ -3162,773 +3427,842 @@ lambda: fu
         // Using an imported name as a class decorator results in no warnings,
         // but using an undefined name as a class decorator results in an
         // undefined name warning.
-        flakes(
+        let actual = flakes(
             r"
-        from interior import decorate
-        @decorate
-        class foo:
-            pass
-        ",
-            &[],
+                from interior import decorate
+                @decorate
+                class foo:
+        pass
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
 
-        flakes(
+        let actual = flakes(
             r#"
-        from interior import decorate
-        @decorate("foo")
-        class bar:
-            pass
-        "#,
-            &[],
+                from interior import decorate
+                @decorate("foo")
+                class bar:
+        pass
+                "#,
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
 
-        flakes(
+        let actual = flakes(
             r"
-        @decorate
-        class foo:
-            pass
-        ",
-            &[Rule::UndefinedName],
+                @decorate
+                class foo:
+        pass
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     /// See: <https://github.com/PyCQA/pyflakes/blob/04ecb0c324ef3b61124e2f80f9e1af6c3a4c7b26/pyflakes/test/test_type_annotations.py>
     #[test]
     fn typing_overload() {
         // Allow intentional redefinitions via @typing.overload.
-        flakes(
+        let actual = flakes(
             r"
-        import typing
-        from typing import overload
+                import typing
+                from typing import overload
 
-        @overload
-        def f(s: None) -> None:
-            pass
+                @overload
+                def f(s: None) -> None:
+        pass
 
-        @overload
-        def f(s: int) -> int:
-            pass
+                @overload
+                def f(s: int) -> int:
+        pass
 
-        def f(s):
-            return s
+                def f(s):
+        return s
 
-        @typing.overload
-        def g(s: None) -> None:
-            pass
+                @typing.overload
+                def g(s: None) -> None:
+        pass
 
-        @typing.overload
-        def g(s: int) -> int:
-            pass
+                @typing.overload
+                def g(s: int) -> int:
+        pass
 
-        def g(s):
-            return s
-        ",
-            &[],
+                def g(s):
+        return s
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn typing_extensions_overload() {
         // Allow intentional redefinitions via @typing_extensions.overload.
-        flakes(
+        let actual = flakes(
             r"
-        import typing_extensions
-        from typing_extensions import overload
+                import typing_extensions
+                from typing_extensions import overload
 
-        @overload
-        def f(s: None) -> None:
-            pass
+                @overload
+                def f(s: None) -> None:
+        pass
 
-        @overload
-        def f(s: int) -> int:
-            pass
+                @overload
+                def f(s: int) -> int:
+        pass
 
-        def f(s):
-            return s
+                def f(s):
+        return s
 
-        @typing_extensions.overload
-        def g(s: None) -> None:
-            pass
+                @typing_extensions.overload
+                def g(s: None) -> None:
+        pass
 
-        @typing_extensions.overload
-        def g(s: int) -> int:
-            pass
+                @typing_extensions.overload
+                def g(s: int) -> int:
+        pass
 
-        def g(s):
-            return s
-        ",
-            &[],
+                def g(s):
+        return s
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn typing_overload_async() {
         // Allow intentional redefinitions via @typing.overload (async).
-        flakes(
+        let actual = flakes(
             r"
-        from typing import overload
+                from typing import overload
 
-        @overload
-        async def f(s: None) -> None:
-            pass
+                @overload
+                async def f(s: None) -> None:
+        pass
 
-        @overload
-        async def f(s: int) -> int:
-            pass
+                @overload
+                async def f(s: int) -> int:
+        pass
 
-        async def f(s):
-            return s
-        ",
-            &[],
+                async def f(s):
+        return s
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn overload_with_multiple_decorators() {
-        flakes(
+        let actual = flakes(
             r"
-            from typing import overload
-            dec = lambda f: f
+        from typing import overload
+        dec = lambda f: f
 
-            @dec
-            @overload
-            def f(x: int) -> int:
-                pass
+        @dec
+        @overload
+        def f(x: int) -> int:
+            pass
 
-            @dec
-            @overload
-            def f(x: str) -> str:
-                pass
+        @dec
+        @overload
+        def f(x: str) -> str:
+            pass
 
-            @dec
-            def f(x): return x
-       ",
-            &[],
+        @dec
+        def f(x): return x
+               ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn overload_in_class() {
-        flakes(
+        let actual = flakes(
             r"
-        from typing import overload
+                from typing import overload
 
-        class C:
-            @overload
-            def f(self, x: int) -> int:
-                pass
+                class C:
+        @overload
+        def f(self, x: int) -> int:
+            pass
 
-            @overload
-            def f(self, x: str) -> str:
-                pass
+        @overload
+        def f(self, x: str) -> str:
+            pass
 
-            def f(self, x): return x
-        ",
-            &[],
+        def f(self, x): return x
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn aliased_typing_import() {
         // Detect when typing is imported as another name.
-        flakes(
+        let actual = flakes(
             r"
-        import typing as t
+                import typing as t
 
-        @t.overload
-        def f(s: None) -> None:
-            pass
+                @t.overload
+                def f(s: None) -> None:
+        pass
 
-        @t.overload
-        def f(s: int) -> int:
-            pass
+                @t.overload
+                def f(s: int) -> int:
+        pass
 
-        def f(s):
-            return s
-        ",
-            &[],
+                def f(s):
+        return s
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn not_a_typing_overload() {
         // regression test for @typing.overload detection bug in 2.1.0.
-        flakes(
+        let actual = flakes(
             r"
-            def foo(x):
-                return x
+        def foo(x):
+            return x
 
-            @foo
-            def bar():
-                pass
+        @foo
+        def bar():
+            pass
 
-            def bar():
-                pass
-        ",
-            &[Rule::RedefinedWhileUnused],
+        def bar():
+            pass
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "redefined-while-unused",
+        ]
+        "###);
     }
 
     #[test]
     fn variable_annotations() {
-        flakes(
+        let actual = flakes(
             r"
+                name: str
+                age: int
+                ",
+        );
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes(
+            r"
+                name: str = 'Bob'
+                age: int = 18
+                ",
+        );
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes(
+            r"
+                class C:
         name: str
         age: int
-        ",
-            &[],
+                ",
         );
-        flakes(
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes(
             r"
+                class C:
         name: str = 'Bob'
         age: int = 18
-        ",
-            &[],
+                ",
         );
-        flakes(
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes(
             r"
-        class C:
-            name: str
-            age: int
-        ",
-            &[],
+                def f():
+        name: str
+        age: int
+                ",
         );
-        flakes(
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes(
             r"
-        class C:
-            name: str = 'Bob'
-            age: int = 18
-        ",
-            &[],
-        );
-        flakes(
-            r"
-        def f():
-            name: str
-            age: int
-        ",
-            &[Rule::UnusedAnnotation, Rule::UnusedAnnotation],
-        );
-        flakes(
-            r"
-        def f():
-            name: str = 'Bob'
-            age: int = 18
-            foo: not_a_real_type = None
-        ",
-            &[
-                Rule::UnusedVariable,
-                Rule::UnusedVariable,
-                Rule::UnusedVariable,
-                Rule::UndefinedName,
-            ],
-        );
-        flakes(
-            r"
-        def f():
-            name: str
-            print(name)
-        ",
-            &[Rule::UndefinedName],
-        );
-        flakes(
-            r"
-        from typing import Any
-        def f():
-            a: Any
-        ",
-            &[Rule::UnusedAnnotation],
-        );
-        flakes(
-            r"
-        foo: not_a_real_type
-        ",
-            &[Rule::UndefinedName],
-        );
-        flakes(
-            r"
+                def f():
+        name: str = 'Bob'
+        age: int = 18
         foo: not_a_real_type = None
-        ",
-            &[Rule::UndefinedName],
+                ",
         );
-        flakes(
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes(
             r"
+                def f():
+        name: str
+        print(name)
+                ",
+        );
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes(
+            r"
+                from typing import Any
+                def f():
+        a: Any
+                ",
+        );
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes(
+            r"
+                foo: not_a_real_type
+                ",
+        );
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "undefined-name",
+        ]
+        "###);
+        let actual = flakes(
+            r"
+                foo: not_a_real_type = None
+                ",
+        );
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "undefined-name",
+        ]
+        "###);
+        let actual = flakes(
+            r"
+                class C:
+        foo: not_a_real_type
+                ",
+        );
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes(
+            r"
+                class C:
+        foo: not_a_real_type = None
+                ",
+        );
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes(
+            r"
+                def f():
         class C:
             foo: not_a_real_type
-        ",
-            &[Rule::UndefinedName],
+                ",
         );
-        flakes(
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes(
             r"
+                def f():
         class C:
             foo: not_a_real_type = None
-        ",
-            &[Rule::UndefinedName],
+                ",
         );
-        flakes(
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes(
             r"
-        def f():
-            class C:
-                foo: not_a_real_type
-        ",
-            &[Rule::UndefinedName],
+                from foo import Bar
+                bar: Bar
+                ",
         );
-        flakes(
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes(
             r"
-        def f():
-            class C:
-                foo: not_a_real_type = None
-        ",
-            &[Rule::UndefinedName],
+                from foo import Bar
+                bar: 'Bar'
+                ",
         );
-        flakes(
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes(
             r"
-        from foo import Bar
-        bar: Bar
-        ",
-            &[],
+                import foo
+                bar: foo.Bar
+                ",
         );
-        flakes(
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes(
             r"
-        from foo import Bar
-        bar: 'Bar'
-        ",
-            &[],
+                import foo
+                bar: 'foo.Bar'
+                ",
         );
-        flakes(
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes(
             r"
-        import foo
-        bar: foo.Bar
-        ",
-            &[],
+                from foo import Bar
+                def f(bar: Bar): pass
+                ",
         );
-        flakes(
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes(
             r"
-        import foo
-        bar: 'foo.Bar'
-        ",
-            &[],
+                from foo import Bar
+                def f(bar: 'Bar'): pass
+                ",
         );
-        flakes(
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes(
             r"
-        from foo import Bar
-        def f(bar: Bar): pass
-        ",
-            &[],
+                from foo import Bar
+                def f(bar) -> Bar: return bar
+                ",
         );
-        flakes(
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes(
             r"
-        from foo import Bar
-        def f(bar: 'Bar'): pass
-        ",
-            &[],
+                from foo import Bar
+                def f(bar) -> 'Bar': return bar
+                ",
         );
-        flakes(
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes(
             r"
-        from foo import Bar
-        def f(bar) -> Bar: return bar
-        ",
-            &[],
+                bar: 'Bar'
+                ",
         );
-        flakes(
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "undefined-name",
+        ]
+        "###);
+        let actual = flakes(
             r"
-        from foo import Bar
-        def f(bar) -> 'Bar': return bar
-        ",
-            &[],
+                bar: 'foo.Bar'
+                ",
         );
-        flakes(
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "undefined-name",
+        ]
+        "###);
+        let actual = flakes(
             r"
-        bar: 'Bar'
-        ",
-            &[Rule::UndefinedName],
+                from foo import Bar
+                bar: str
+                ",
         );
-        flakes(
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "unused-import",
+        ]
+        "###);
+        let actual = flakes(
             r"
-        bar: 'foo.Bar'
-        ",
-            &[Rule::UndefinedName],
+                from foo import Bar
+                def f(bar: str): pass
+                ",
         );
-        flakes(
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "unused-import",
+        ]
+        "###);
+        let actual = flakes(
             r"
-        from foo import Bar
-        bar: str
-        ",
-            &[Rule::UnusedImport],
+                def f(a: A) -> A: pass
+                class A: pass
+                ",
         );
-        flakes(
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "undefined-name",
+            "undefined-name",
+        ]
+        "###);
+        let actual = flakes(
             r"
-        from foo import Bar
-        def f(bar: str): pass
-        ",
-            &[Rule::UnusedImport],
+                def f(a: 'A') -> 'A': return a
+                class A: pass
+                ",
         );
-        flakes(
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes(
             r"
-        def f(a: A) -> A: pass
-        class A: pass
-        ",
-            &[Rule::UndefinedName, Rule::UndefinedName],
+                a: A
+                class A: pass
+                ",
         );
-        flakes(
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "undefined-name",
+        ]
+        "###);
+        let actual = flakes(
             r"
-        def f(a: 'A') -> 'A': return a
-        class A: pass
-        ",
-            &[],
+                a: 'A'
+                class A: pass
+                ",
         );
-        flakes(
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes(
             r"
-        a: A
-        class A: pass
-        ",
-            &[Rule::UndefinedName],
+                T: object
+                def f(t: T): pass
+                ",
         );
-        flakes(
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "undefined-name",
+        ]
+        "###);
+        let actual = flakes(
             r"
-        a: 'A'
-        class A: pass
-        ",
-            &[],
+                T: object
+                def g(t: 'T'): pass
+                ",
         );
-        flakes(
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "undefined-name",
+        ]
+        "###);
+        let actual = flakes(
             r"
-        T: object
-        def f(t: T): pass
-        ",
-            &[Rule::UndefinedName],
+                T = object
+                def f(t: T): pass
+                ",
         );
-        flakes(
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes(
             r"
-        T: object
-        def g(t: 'T'): pass
-        ",
-            &[Rule::UndefinedName],
+                T = object
+                def g(t: 'T'): pass
+                ",
         );
-        flakes(
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes(
             r"
-        T = object
-        def f(t: T): pass
-        ",
-            &[],
+                a: 'A B'
+                ",
         );
-        flakes(
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "forward-annotation-syntax-error",
+        ]
+        "###);
+        let actual = flakes(
             r"
-        T = object
-        def g(t: 'T'): pass
-        ",
-            &[],
+                a: 'A; B'
+                ",
         );
-        flakes(
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "forward-annotation-syntax-error",
+        ]
+        "###);
+        let actual = flakes(
             r"
-        a: 'A B'
-        ",
-            &[Rule::ForwardAnnotationSyntaxError],
+                a: '1 + 2'
+                ",
         );
-        flakes(
-            r"
-        a: 'A; B'
-        ",
-            &[Rule::ForwardAnnotationSyntaxError],
-        );
-        flakes(
-            r"
-        a: '1 + 2'
-        ",
-            &[],
-        );
-        flakes(
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes(
             r#"
-        a: 'a: "A"'
-        "#,
-            &[Rule::ForwardAnnotationSyntaxError],
+                a: 'a: "A"'
+                "#,
         );
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "forward-annotation-syntax-error",
+        ]
+        "###);
     }
 
     #[test]
     fn variable_annotation_references_self_name_undefined() {
-        flakes(
+        let actual = flakes(
             r"
-        x: int = x
-        ",
-            &[Rule::UndefinedName],
+                x: int = x
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "undefined-name",
+        ]
+        "###);
     }
 
     #[test]
     fn use_pep695_type_aliass() {
-        flakes(
+        let actual = flakes(
             r"
-        from typing_extensions import TypeAlias
-        from foo import Bar
+                from typing_extensions import TypeAlias
+                from foo import Bar
 
+                bar: TypeAlias = Bar
+                ",
+        );
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes(
+            r"
+                from typing_extensions import TypeAlias
+                from foo import Bar
+
+                bar: TypeAlias = 'Bar'
+                ",
+        );
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes(
+            r"
+                from typing_extensions import TypeAlias
+                from foo import Bar
+
+                class A:
         bar: TypeAlias = Bar
-        ",
-            &[],
+                ",
         );
-        flakes(
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes(
             r"
-        from typing_extensions import TypeAlias
-        from foo import Bar
+                from typing_extensions import TypeAlias
+                from foo import Bar
 
+                class A:
         bar: TypeAlias = 'Bar'
-        ",
-            &[],
+                ",
         );
-        flakes(
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes(
             r"
-        from typing_extensions import TypeAlias
-        from foo import Bar
+                from typing_extensions import TypeAlias
 
-        class A:
-            bar: TypeAlias = Bar
-        ",
-            &[],
+                bar: TypeAlias
+                ",
         );
-        flakes(
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes(
             r"
-        from typing_extensions import TypeAlias
-        from foo import Bar
+                from typing_extensions import TypeAlias
+                from foo import Bar
 
-        class A:
-            bar: TypeAlias = 'Bar'
-        ",
-            &[],
+                bar: TypeAlias
+                ",
         );
-        flakes(
-            r"
-        from typing_extensions import TypeAlias
-
-        bar: TypeAlias
-        ",
-            &[],
-        );
-        flakes(
-            r"
-        from typing_extensions import TypeAlias
-        from foo import Bar
-
-        bar: TypeAlias
-        ",
-            &[Rule::UnusedImport],
-        );
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "unused-import",
+        ]
+        "###);
     }
 
     #[test]
     fn annotating_an_import() {
-        flakes(
+        let actual = flakes(
             r"
-            from a import b, c
-            b: c
-            print(b)
-        ",
-            &[],
+        from a import b, c
+        b: c
+        print(b)
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn unused_annotation() {
         // Unused annotations are fine in module and class scope.
-        flakes(
+        let actual = flakes(
             r"
+                x: int
+                class Cls:
+        y: int
+                ",
+        );
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes(
+            r"
+                def f():
         x: int
-        class Cls:
-            y: int
-        ",
-            &[],
+                ",
         );
-        flakes(
-            r"
-        def f():
-            x: int
-        ",
-            &[Rule::UnusedAnnotation],
-        );
+        insta::assert_debug_snapshot!(actual,@"[]");
         // This should only print one UnusedVariable message.
-        flakes(
+        let actual = flakes(
             r"
-        def f():
-            x: int
-            x = 3
-        ",
-            &[Rule::UnusedVariable],
+                def f():
+        x: int
+        x = 3
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn unassigned_annotation_is_undefined() {
-        flakes(
+        let actual = flakes(
             r"
-        name: str
-        print(name)
-        ",
-            &[Rule::UndefinedName],
+                name: str
+                print(name)
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "undefined-name",
+        ]
+        "###);
     }
 
     #[test]
     fn annotated_async_def() {
-        flakes(
+        let actual = flakes(
             r"
-        class c: pass
-        async def func(c: c) -> None: pass
-        ",
-            &[],
+                class c: pass
+                async def func(c: c) -> None: pass
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn postponed_annotations() {
-        flakes(
+        let actual = flakes(
             r"
-        from __future__ import annotations
-        def f(a: A) -> A: pass
-        class A:
-            b: B
-        class B: pass
-        ",
-            &[],
+                from __future__ import annotations
+                def f(a: A) -> A: pass
+                class A:
+        b: B
+                class B: pass
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
 
-        flakes(
+        let actual = flakes(
             r"
-        from __future__ import annotations
-        def f(a: A) -> A: pass
-        class A:
-            b: Undefined
-        class B: pass
-        ",
-            &[Rule::UndefinedName],
+                from __future__ import annotations
+                def f(a: A) -> A: pass
+                class A:
+        b: Undefined
+                class B: pass
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
 
-        flakes(
+        let actual = flakes(
             r"
-        from __future__ import annotations
-        T: object
-        def f(t: T): pass
-        def g(t: 'T'): pass
-        ",
-            &[Rule::UndefinedName, Rule::UndefinedName],
+                from __future__ import annotations
+                T: object
+                def f(t: T): pass
+                def g(t: 'T'): pass
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "undefined-name",
+            "undefined-name",
+        ]
+        "###);
 
-        flakes(
+        let actual = flakes(
             r"
-        from __future__ import annotations
-        T = object
-        def f(t: T): pass
-        def g(t: 'T'): pass
-        ",
-            &[],
+                from __future__ import annotations
+                T = object
+                def f(t: T): pass
+                def g(t: 'T'): pass
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn type_annotation_clobbers_all() {
-        flakes(
+        let actual = flakes(
             r#"
-        from typing import TYPE_CHECKING, List
+                from typing import TYPE_CHECKING, List
 
-        from y import z
+                from y import z
 
-        if not TYPE_CHECKING:
-            __all__ = ("z",)
-        else:
-            __all__: List[str]
-        "#,
-            &[],
+                if not TYPE_CHECKING:
+        __all__ = ("z",)
+                else:
+        __all__: List[str]
+                "#,
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn return_annotation_is_class_scope_variable() {
-        flakes(
+        let actual = flakes(
             r"
-        from typing import TypeVar
-        class Test:
-            Y = TypeVar('Y')
+                from typing import TypeVar
+                class Test:
+        Y = TypeVar('Y')
 
-            def t(self, x: Y) -> Y:
-                return x
-        ",
-            &[],
+        def t(self, x: Y) -> Y:
+            return x
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn return_annotation_is_function_body_variable() {
-        flakes(
+        let actual = flakes(
             r"
-        class Test:
-            def t(self) -> Y:
-                Y = 2
-                return Y
-        ",
-            &[Rule::UndefinedName],
+                class Test:
+        def t(self) -> Y:
+            Y = 2
+            return Y
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn positional_only_argument_annotations() {
-        flakes(
+        let actual = flakes(
             r"
-        from x import C
+                from x import C
 
-        def f(c: C, /): ...
-        ",
-            &[],
+                def f(c: C, /): ...
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn partially_quoted_type_annotation() {
-        flakes(
+        let actual = flakes(
             r"
-        from queue import Queue
-        from typing import Optional
+                from queue import Queue
+                from typing import Optional
 
-        def f() -> Optional['Queue[str]']:
-            return None
-        ",
-            &[],
+                def f() -> Optional['Queue[str]']:
+        return None
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn partially_quoted_type_assignment() {
-        flakes(
+        let actual = flakes(
             r"
-        from queue import Queue
-        from typing import Optional
+                from queue import Queue
+                from typing import Optional
 
-        MaybeQueue = Optional['Queue[str]']
-        ",
-            &[],
+                MaybeQueue = Optional['Queue[str]']
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn nested_partially_quoted_type_assignment() {
-        flakes(
+        let actual = flakes(
             r"
-        from queue import Queue
-        from typing import Callable
+                from queue import Queue
+                from typing import Callable
 
-        Func = Callable[['Queue[str]'], None]
-        ",
-            &[],
+                Func = Callable[['Queue[str]'], None]
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn quoted_type_cast() {
-        flakes(
+        let actual = flakes(
             r"
-        from typing import cast, Optional
+                from typing import cast, Optional
 
-        maybe_int = cast('Optional[int]', 42)
-        ",
-            &[],
+                maybe_int = cast('Optional[int]', 42)
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
@@ -3936,116 +4270,116 @@ lambda: fu
         // Checks that our handling of quoted type annotations in the first
         // argument to `cast` doesn't cause issues when (only) the _second_
         // argument is a literal str which looks a bit like a type annotation.
-        flakes(
+        let actual = flakes(
             r"
-        from typing import cast
+                from typing import cast
 
-        a_string = cast(str, 'Optional[int]')
-        ",
-            &[],
+                a_string = cast(str, 'Optional[int]')
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn quoted_type_cast_renamed_import() {
-        flakes(
+        let actual = flakes(
             r"
-        from typing import cast as tsac, Optional as Maybe
+                from typing import cast as tsac, Optional as Maybe
 
-        maybe_int = tsac('Maybe[int]', 42)
-        ",
-            &[],
+                maybe_int = tsac('Maybe[int]', 42)
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn quoted_type_var_constraints() {
-        flakes(
+        let actual = flakes(
             r"
-        from typing import TypeVar, Optional
+                from typing import TypeVar, Optional
 
-        T = TypeVar('T', 'str', 'Optional[int]', bytes)
-        ",
-            &[],
+                T = TypeVar('T', 'str', 'Optional[int]', bytes)
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn quoted_type_var_bound() {
-        flakes(
+        let actual = flakes(
             r"
-        from typing import TypeVar, Optional, List
+                from typing import TypeVar, Optional, List
 
-        T = TypeVar('T', bound='Optional[int]')
-        S = TypeVar('S', int, bound='List[int]')
-        ",
-            &[],
+                T = TypeVar('T', bound='Optional[int]')
+                S = TypeVar('S', int, bound='List[int]')
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn literal_type_typing() {
-        flakes(
+        let actual = flakes(
             r"
-        from typing import Literal
+                from typing import Literal
 
-        def f(x: Literal['some string']) -> None:
-            return None
-        ",
-            &[],
+                def f(x: Literal['some string']) -> None:
+        return None
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn literal_type_typing_extensions() {
-        flakes(
+        let actual = flakes(
             r"
-        from typing_extensions import Literal
+                from typing_extensions import Literal
 
-        def f(x: Literal['some string']) -> None:
-            return None
-        ",
-            &[],
+                def f(x: Literal['some string']) -> None:
+        return None
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn annotated_type_typing_missing_forward_type_multiple_args() {
-        flakes(
+        let actual = flakes(
             r"
-        from typing import Annotated
+                from typing import Annotated
 
-        def f(x: Annotated['integer', 1]) -> None:
-            return None
-        ",
-            &[Rule::UndefinedName],
+                def f(x: Annotated['integer', 1]) -> None:
+        return None
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn annotated_type_typing_with_string_args() {
-        flakes(
+        let actual = flakes(
             r"
-        from typing import Annotated
+                from typing import Annotated
 
-        def f(x: Annotated[int, '> 0']) -> None:
-            return None
-        ",
-            &[],
+                def f(x: Annotated[int, '> 0']) -> None:
+        return None
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn annotated_type_typing_with_string_args_in_union() {
-        flakes(
+        let actual = flakes(
             r"
-        from typing import Annotated, Union
+                from typing import Annotated, Union
 
-        def f(x: Union[Annotated['int', '>0'], 'integer']) -> None:
-            return None
-        ",
-            &[Rule::UndefinedName],
+                def f(x: Union[Annotated['int', '>0'], 'integer']) -> None:
+        return None
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     // We err on the side of assuming strings are forward references.
@@ -4053,232 +4387,234 @@ lambda: fu
     #[test]
     fn literal_type_some_other_module() {
         // err on the side of false-negatives for types named Literal.
-        flakes(
+        let actual = flakes(
             r"
-        from my_module import compat
-        from my_module.compat import Literal
+                from my_module import compat
+                from my_module.compat import Literal
 
-        def f(x: compat.Literal['some string']) -> None:
-            return None
-        def g(x: Literal['some string']) -> None:
-            return None
-        ",
-            &[],
+                def f(x: compat.Literal['some string']) -> None:
+        return None
+                def g(x: Literal['some string']) -> None:
+        return None
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@r#""#);
     }
 
     #[test]
     fn literal_union_type_typing() {
-        flakes(
+        let actual = flakes(
             r"
-        from typing import Literal
+                from typing import Literal
 
-        def f(x: Literal['some string', 'foo bar']) -> None:
-            return None
-        ",
-            &[],
+                def f(x: Literal['some string', 'foo bar']) -> None:
+        return None
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     // TODO(charlie): Support nested deferred string annotations.
     #[ignore]
     #[test]
     fn deferred_twice_annotation() {
-        flakes(
+        let actual = flakes(
             r#"
-            from queue import Queue
-            from typing import Optional
+        from queue import Queue
+        from typing import Optional
 
-            def f() -> "Optional['Queue[str]']":
-                return None
-        "#,
-            &[],
+        def f() -> "Optional['Queue[str]']":
+            return None
+                "#,
         );
+        insta::assert_debug_snapshot!(actual,@r#""#);
     }
 
     #[test]
     fn partial_string_annotations_with_future_annotations() {
-        flakes(
+        let actual = flakes(
             r"
-            from __future__ import annotations
+        from __future__ import annotations
 
-            from queue import Queue
-            from typing import Optional
+        from queue import Queue
+        from typing import Optional
 
-            def f() -> Optional['Queue[str]']:
-                return None
-        ",
-            &[],
+        def f() -> Optional['Queue[str]']:
+            return None
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn forward_annotations_for_classes_in_scope() {
-        flakes(
+        let actual = flakes(
             r#"
-        from typing import Optional
+                from typing import Optional
 
-        def f():
-            class C:
-                a: "D"
-                b: Optional["D"]
-                c: "Optional[D]"
+                def f():
+        class C:
+            a: "D"
+            b: Optional["D"]
+            c: "Optional[D]"
 
-            class D: pass
-        "#,
-            &[],
+        class D: pass
+                "#,
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn idiomiatic_typing_guards() {
         // typing.TYPE_CHECKING: python3.5.3+.
-        flakes(
+        let actual = flakes(
             r"
-            from typing import TYPE_CHECKING
+        from typing import TYPE_CHECKING
 
-            if TYPE_CHECKING:
-                from t import T
+        if TYPE_CHECKING:
+            from t import T
 
-            def f() -> T:
-                pass
-        ",
-            &[],
+        def f() -> T:
+            pass
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
         // False: the old, more-compatible approach.
-        flakes(
+        let actual = flakes(
             r"
-            if False:
-                from t import T
+        if False:
+            from t import T
 
-            def f() -> T:
-                pass
-        ",
-            &[],
+        def f() -> T:
+            pass
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
         // Some choose to assign a constant and do it that way.
-        flakes(
+        let actual = flakes(
             r"
-            MYPY = False
+        MYPY = False
 
-            if MYPY:
-                from t import T
+        if MYPY:
+            from t import T
 
-            def f() -> T:
-                pass
-        ",
-            &[],
+        def f() -> T:
+            pass
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn typing_guard_for_protocol() {
-        flakes(
+        let actual = flakes(
             r"
-            from typing import TYPE_CHECKING
+        from typing import TYPE_CHECKING
 
-            if TYPE_CHECKING:
-                from typing import Protocol
-            else:
-                Protocol = object
+        if TYPE_CHECKING:
+            from typing import Protocol
+        else:
+            Protocol = object
 
-            class C(Protocol):
-                def f() -> int:
-                    pass
-        ",
-            &[],
+        class C(Protocol):
+            def f() -> int:
+                pass
+                ",
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn typed_names_correct_forward_ref() {
-        flakes(
+        let actual = flakes(
             r#"
-            from typing import TypedDict, List, NamedTuple
+        from typing import TypedDict, List, NamedTuple
 
-            List[TypedDict("x", {})]
-            List[TypedDict("x", x=int)]
-            List[NamedTuple("a", a=int)]
-            List[NamedTuple("a", [("a", int)])]
-        "#,
-            &[],
+        List[TypedDict("x", {})]
+        List[TypedDict("x", x=int)]
+        List[NamedTuple("a", a=int)]
+        List[NamedTuple("a", [("a", int)])]
+                "#,
         );
-        flakes(
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes(
             r#"
-            from typing import TypedDict, List, NamedTuple, TypeVar
+        from typing import TypedDict, List, NamedTuple, TypeVar
 
-            List[TypedDict("x", {"x": "Y"})]
-            List[TypedDict("x", x="Y")]
-            List[NamedTuple("a", [("a", "Y")])]
-            List[NamedTuple("a", a="Y")]
-            List[TypedDict("x", {"x": List["a"]})]
-            List[TypeVar("A", bound="C")]
-            List[TypeVar("A", List["C"])]
-        "#,
-            &[
-                Rule::UndefinedName,
-                Rule::UndefinedName,
-                Rule::UndefinedName,
-                Rule::UndefinedName,
-                Rule::UndefinedName,
-                Rule::UndefinedName,
-                Rule::UndefinedName,
-            ],
+        List[TypedDict("x", {"x": "Y"})]
+        List[TypedDict("x", x="Y")]
+        List[NamedTuple("a", [("a", "Y")])]
+        List[NamedTuple("a", a="Y")]
+        List[TypedDict("x", {"x": List["a"]})]
+        List[TypeVar("A", bound="C")]
+        List[TypeVar("A", List["C"])]
+                "#,
         );
-        flakes(
+        insta::assert_debug_snapshot!(actual,@r###"
+        [
+            "undefined-name",
+            "undefined-name",
+            "undefined-name",
+            "undefined-name",
+            "undefined-name",
+            "undefined-name",
+            "undefined-name",
+        ]
+        "###);
+        let actual = flakes(
             r#"
-            from typing import NamedTuple, TypeVar, cast
-            from t import A, B, C, D, E
+        from typing import NamedTuple, TypeVar, cast
+        from t import A, B, C, D, E
 
-            NamedTuple("A", [("a", A["C"])])
-            TypeVar("A", bound=A["B"])
-            TypeVar("A", A["D"])
-            cast(A["E"], [])
-        "#,
-            &[],
+        NamedTuple("A", [("a", A["C"])])
+        TypeVar("A", bound=A["B"])
+        TypeVar("A", A["D"])
+        cast(A["E"], [])
+                "#,
         );
-        flakes(
+        insta::assert_debug_snapshot!(actual,@"[]");
+        let actual = flakes(
             r#"
-            from typing import NewType
+        from typing import NewType
 
-            def f():
-                name = "x"
-                NewType(name, int)
-        "#,
-            &[],
+        def f():
+            name = "x"
+            NewType(name, int)
+                "#,
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn named_types_classes() {
-        flakes(
+        let actual = flakes(
             r#"
-            from typing import TypedDict, NamedTuple
-            class X(TypedDict):
-                y: TypedDict("z", {"zz":int})
+        from typing import TypedDict, NamedTuple
+        class X(TypedDict):
+            y: TypedDict("z", {"zz":int})
 
-            class Y(NamedTuple):
-                y: NamedTuple("v", [("vv", int)])
-        "#,
-            &[],
+        class Y(NamedTuple):
+            y: NamedTuple("v", [("vv", int)])
+                "#,
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 
     #[test]
     fn gh_issue_17196_regression_test() {
-        flakes(
+        let actual = flakes(
             r#"
-            from typing import Annotated
+        from typing import Annotated
 
-            def type_annotations_from_tuple():
-                annos = (str, "foo", "bar")
-                return Annotated[annos]
+        def type_annotations_from_tuple():
+            annos = (str, "foo", "bar")
+            return Annotated[annos]
 
-            def type_annotations_from_filtered_tuple():
-                annos = (str, None, "foo", None, "bar")
-                return Annotated[tuple([a for a in annos if a is not None])]
-        "#,
-            &[],
+        def type_annotations_from_filtered_tuple():
+            annos = (str, None, "foo", None, "bar")
+            return Annotated[tuple([a for a in annos if a is not None])]
+                "#,
         );
+        insta::assert_debug_snapshot!(actual,@"[]");
     }
 }
