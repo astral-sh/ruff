@@ -4241,6 +4241,7 @@ name = "ty_ide"
 version = "0.0.0"
 dependencies = [
  "bitflags 2.9.3",
+ "camino",
  "get-size2",
  "insta",
  "itertools 0.14.0",

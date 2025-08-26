@@ -33,7 +33,7 @@ smallvec = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
-
+camino = { workspace = true }
 insta = { workspace = true, features = ["filters"] }
 
 [lints]
