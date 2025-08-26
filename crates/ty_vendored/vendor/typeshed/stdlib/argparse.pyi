@@ -260,7 +260,7 @@ class ArgumentParser(_AttributeHolder, _ActionsContainer):
             exit_on_error: bool = True,
             *,
             suggest_on_error: bool = False,
-            color: bool = False,
+            color: bool = True,
         ) -> None: ...
     else:
         def __init__(

@@ -1,3 +1,7 @@
+#![warn(
+    clippy::disallowed_methods,
+    reason = "Prefer System trait methods over std methods in ty crates"
+)]
 use std::hash::BuildHasherDefault;
 
 use rustc_hash::FxHasher;

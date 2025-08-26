@@ -660,9 +660,9 @@ class Foo:
 
 ```py
 from overloaded import A, B, C, Foo, f
-from typing_extensions import reveal_type
+from typing_extensions import Any, reveal_type
 
-def _(ab: A | B, a=1):
+def _(ab: A | B, a: int | Any):
     reveal_type(f(a1=a, a2=a, a3=a))  # revealed: C
     reveal_type(f(A(), a1=a, a2=a, a3=a))  # revealed: A
     reveal_type(f(B(), a1=a, a2=a, a3=a))  # revealed: B
@@ -750,7 +750,7 @@ def _(ab: A | B, a=1):
         )
     )
 
-def _(foo: Foo, ab: A | B, a=1):
+def _(foo: Foo, ab: A | B, a: int | Any):
     reveal_type(foo.f(a1=a, a2=a, a3=a))  # revealed: C
     reveal_type(foo.f(A(), a1=a, a2=a, a3=a))  # revealed: A
     reveal_type(foo.f(B(), a1=a, a2=a, a3=a))  # revealed: B
@@ -797,6 +797,76 @@ def _(foo: Foo, ab: A | B, a=1):
         # revealed: A | B
         foo.f(
             ab,
+            a1=a,
+            a2=a,
+            a3=a,
+            a4=a,
+            a5=a,
+            a6=a,
+            a7=a,
+            a8=a,
+            a9=a,
+            a10=a,
+            a11=a,
+            a12=a,
+            a13=a,
+            a14=a,
+            a15=a,
+            a16=a,
+            a17=a,
+            a18=a,
+            a19=a,
+            a20=a,
+            a21=a,
+            a22=a,
+            a23=a,
+            a24=a,
+            a25=a,
+            a26=a,
+            a27=a,
+            a28=a,
+            a29=a,
+            a30=a,
+        )
+    )
+```
+
+### Optimization: Limit expansion size
+
+<!-- snapshot-diagnostics -->
+
+To prevent combinatorial explosion, ty limits the number of argument lists created by expanding a
+single argument.
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+class A: ...
+class B: ...
+class C: ...
+
+@overload
+def f() -> None: ...
+@overload
+def f(**kwargs: int) -> C: ...
+@overload
+def f(x: A, /, **kwargs: int) -> A: ...
+@overload
+def f(x: B, /, **kwargs: int) -> B: ...
+```
+
+```py
+from overloaded import A, B, f
+from typing_extensions import reveal_type
+
+def _(a: int | None):
+    reveal_type(
+        # error: [no-matching-overload]
+        # revealed: Unknown
+        f(
+            A(),
             a1=a,
             a2=a,
             a3=a,

@@ -304,6 +304,11 @@ impl fmt::Display for PyVersionRange {
 
 #[cfg(test)]
 mod tests {
+    #![expect(
+        clippy::disallowed_methods,
+        reason = "These are tests, so it's fine to do I/O by-passing System."
+    )]
+
     use std::fmt::Write as _;
     use std::num::{IntErrorKind, NonZeroU16};
     use std::path::Path;

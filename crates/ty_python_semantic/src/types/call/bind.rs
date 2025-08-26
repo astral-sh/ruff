@@ -16,7 +16,7 @@ use crate::Program;
 use crate::db::Db;
 use crate::dunder_all::dunder_all_names;
 use crate::place::{Boundness, Place};
-use crate::types::call::arguments::is_expandable_type;
+use crate::types::call::arguments::{Expansion, is_expandable_type};
 use crate::types::diagnostic::{
     CALL_NON_CALLABLE, CONFLICTING_ARGUMENT_FORMS, INVALID_ARGUMENT_TYPE, MISSING_ARGUMENT,
     NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED, TOO_MANY_POSITIONAL_ARGUMENTS,
@@ -726,18 +726,6 @@ impl<'db> Bindings<'db> {
                             }
                         }
 
-                        Some(KnownFunction::TopMaterialization) => {
-                            if let [Some(ty)] = overload.parameter_types() {
-                                overload.set_return_type(ty.top_materialization(db));
-                            }
-                        }
-
-                        Some(KnownFunction::BottomMaterialization) => {
-                            if let [Some(ty)] = overload.parameter_types() {
-                                overload.set_return_type(ty.bottom_materialization(db));
-                            }
-                        }
-
                         Some(KnownFunction::Len) => {
                             if let [Some(first_arg)] = overload.parameter_types() {
                                 if let Some(len_ty) = first_arg.len(db) {
@@ -1380,7 +1368,18 @@ impl<'db> CallableBinding<'db> {
             }
         }
 
-        for expanded_argument_lists in expansions {
+        for expansion in expansions {
+            let expanded_argument_lists = match expansion {
+                Expansion::LimitReached(index) => {
+                    snapshotter.restore(self, post_evaluation_snapshot);
+                    self.overload_call_return_type = Some(
+                        OverloadCallReturnType::ArgumentTypeExpansionLimitReached(index),
+                    );
+                    return;
+                }
+                Expansion::Expanded(argument_lists) => argument_lists,
+            };
+
             // This is the merged state of the bindings after evaluating all of the expanded
             // argument lists. This will be the final state to restore the bindings to if all of
             // the expanded argument lists evaluated successfully.
@@ -1679,7 +1678,8 @@ impl<'db> CallableBinding<'db> {
         if let Some(overload_call_return_type) = self.overload_call_return_type {
             return match overload_call_return_type {
                 OverloadCallReturnType::ArgumentTypeExpansion(return_type) => return_type,
-                OverloadCallReturnType::Ambiguous => Type::unknown(),
+                OverloadCallReturnType::ArgumentTypeExpansionLimitReached(_)
+                | OverloadCallReturnType::Ambiguous => Type::unknown(),
             };
         }
         if let Some((_, first_overload)) = self.matching_overloads().next() {
@@ -1790,6 +1790,23 @@ impl<'db> CallableBinding<'db> {
                         String::new()
                     }
                 ));
+
+                if let Some(index) =
+                    self.overload_call_return_type
+                        .and_then(
+                            |overload_call_return_type| match overload_call_return_type {
+                                OverloadCallReturnType::ArgumentTypeExpansionLimitReached(
+                                    index,
+                                ) => Some(index),
+                                _ => None,
+                            },
+                        )
+                {
+                    diag.info(format_args!(
+                        "Limit of argument type expansion reached at argument {index}"
+                    ));
+                }
+
                 if let Some((kind, function)) = function_type_and_kind {
                     let (overloads, implementation) =
                         function.overloads_and_implementation(context.db());
@@ -1856,6 +1873,7 @@ impl<'a, 'db> IntoIterator for &'a CallableBinding<'db> {
 #[derive(Debug, Copy, Clone)]
 enum OverloadCallReturnType<'db> {
     ArgumentTypeExpansion(Type<'db>),
+    ArgumentTypeExpansionLimitReached(usize),
     Ambiguous,
 }
 

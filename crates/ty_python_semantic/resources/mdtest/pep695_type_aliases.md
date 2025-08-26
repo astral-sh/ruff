@@ -75,6 +75,32 @@ def f(x: T):
     reveal_type(b)  # revealed: str
 ```
 
+## Scoping
+
+PEP 695 type aliases delay runtime evaluation of their right-hand side, so they are a lazy (not
+eager) nested scope.
+
+```py
+type Alias = Foo | str
+
+def f(x: Alias):
+    reveal_type(x)  # revealed: Foo | str
+
+class Foo:
+    pass
+```
+
+But narrowing of names used in the type alias is still respected:
+
+```py
+def _(flag: bool):
+    t = int if flag else None
+    if t is not None:
+        type Alias = t | str
+        def f(x: Alias):
+            reveal_type(x)  # revealed: int | str
+```
+
 ## Generic type aliases
 
 ```py

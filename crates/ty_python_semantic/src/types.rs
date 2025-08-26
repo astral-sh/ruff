@@ -37,7 +37,6 @@ use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{imported_modules, place_table, semantic_index};
 use crate::suppression::check_suppressions;
 use crate::types::call::{Binding, Bindings, CallArguments, CallableBinding};
-use crate::types::class::{CodeGeneratorKind, Field};
 pub(crate) use crate::types::class_base::ClassBase;
 use crate::types::constraints::{
     Constraints, IteratorConstraintsExtension, OptionConstraintsExtension,
@@ -63,10 +62,11 @@ use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
 use crate::types::signatures::{Parameter, ParameterForm, Parameters, walk_signature};
 use crate::types::tuple::TupleSpec;
+pub(crate) use crate::types::typed_dict::{TypedDictParams, TypedDictType, walk_typed_dict_type};
 use crate::types::variance::{TypeVarVariance, VarianceInferable};
 use crate::unpack::EvaluationMode;
 pub use crate::util::diagnostics::add_inferred_python_version_hint_to_diagnostic;
-use crate::{Db, FxOrderMap, FxOrderSet, Module, Program};
+use crate::{Db, FxOrderSet, Module, Program};
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, KnownClass};
 use instance::Protocol;
 pub use instance::{NominalInstanceType, ProtocolInstanceType};
@@ -96,6 +96,7 @@ mod string_annotation;
 mod subclass_of;
 mod tuple;
 mod type_ordering;
+mod typed_dict;
 mod unpacker;
 mod variance;
 mod visitor;
@@ -1039,9 +1040,7 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) fn typed_dict(defining_class: impl Into<ClassType<'db>>) -> Self {
-        Self::TypedDict(TypedDictType {
-            defining_class: defining_class.into(),
-        })
+        Self::TypedDict(TypedDictType::new(defining_class.into()))
     }
 
     #[must_use]
@@ -4143,21 +4142,6 @@ impl<'db> Type<'db> {
                     .into()
                 }
 
-                Some(KnownFunction::TopMaterialization | KnownFunction::BottomMaterialization) => {
-                    Binding::single(
-                        self,
-                        Signature::new(
-                            Parameters::new([Parameter::positional_only(Some(Name::new_static(
-                                "type",
-                            )))
-                            .type_form()
-                            .with_annotated_type(Type::any())]),
-                            Some(Type::any()),
-                        ),
-                    )
-                    .into()
-                }
-
                 Some(KnownFunction::AssertType) => Binding::single(
                     self,
                     Signature::new(
@@ -4917,6 +4901,12 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         mode: EvaluationMode,
     ) -> Result<Cow<'db, TupleSpec<'db>>, IterationError<'db>> {
+        // We will not infer precise heterogeneous tuple specs for literals with lengths above this threshold.
+        // The threshold here is somewhat arbitrary and conservative; it could be increased if needed.
+        // However, it's probably very rare to need heterogeneous unpacking inference for long string literals
+        // or bytes literals, and creating long heterogeneous tuple specs has a performance cost.
+        const MAX_TUPLE_LENGTH: usize = 128;
+
         if mode.is_async() {
             let try_call_dunder_anext_on_iterator = |iterator: Type<'db>| -> Result<
                 Result<Type<'db>, AwaitError<'db>>,
@@ -4972,26 +4962,38 @@ impl<'db> Type<'db> {
             };
         }
 
-        match self {
-            Type::NominalInstance(nominal) => {
-                if let Some(spec) = nominal.tuple_spec(db) {
-                    return Ok(spec);
-                }
-            }
+        let special_case = match self {
+            Type::NominalInstance(nominal) => nominal.tuple_spec(db),
             Type::GenericAlias(alias) if alias.origin(db).is_tuple(db) => {
-                return Ok(Cow::Owned(TupleSpec::homogeneous(todo_type!(
+                Some(Cow::Owned(TupleSpec::homogeneous(todo_type!(
                     "*tuple[] annotations"
-                ))));
+                ))))
             }
             Type::StringLiteral(string_literal_ty) => {
-                // We could go further and deconstruct to an array of `StringLiteral`
-                // with each individual character, instead of just an array of
-                // `LiteralString`, but there would be a cost and it's not clear that
-                // it's worth it.
-                return Ok(Cow::Owned(TupleSpec::heterogeneous(std::iter::repeat_n(
-                    Type::LiteralString,
-                    string_literal_ty.python_len(db),
-                ))));
+                let string_literal = string_literal_ty.value(db);
+                let spec = if string_literal.len() < MAX_TUPLE_LENGTH {
+                    TupleSpec::heterogeneous(
+                        string_literal
+                            .chars()
+                            .map(|c| Type::string_literal(db, &c.to_string())),
+                    )
+                } else {
+                    TupleSpec::homogeneous(Type::LiteralString)
+                };
+                Some(Cow::Owned(spec))
+            }
+            Type::BytesLiteral(bytes) => {
+                let bytes_literal = bytes.value(db);
+                let spec = if bytes_literal.len() < MAX_TUPLE_LENGTH {
+                    TupleSpec::heterogeneous(
+                        bytes_literal
+                            .iter()
+                            .map(|b| Type::IntLiteral(i64::from(*b))),
+                    )
+                } else {
+                    TupleSpec::homogeneous(KnownClass::Int.to_instance(db))
+                };
+                Some(Cow::Owned(spec))
             }
             Type::Never => {
                 // The dunder logic below would have us return `tuple[Never, ...]`, which eagerly
@@ -4999,25 +5001,27 @@ impl<'db> Type<'db> {
                 // index into the tuple. Using `tuple[Unknown, ...]` avoids these false positives.
                 // TODO: Consider removing this special case, and instead hide the indexing
                 // diagnostic in unreachable code.
-                return Ok(Cow::Owned(TupleSpec::homogeneous(Type::unknown())));
+                Some(Cow::Owned(TupleSpec::homogeneous(Type::unknown())))
             }
             Type::TypeAlias(alias) => {
-                return alias.value_type(db).try_iterate_with_mode(db, mode);
+                Some(alias.value_type(db).try_iterate_with_mode(db, mode)?)
             }
             Type::NonInferableTypeVar(tvar) => match tvar.typevar(db).bound_or_constraints(db) {
                 Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                    return bound.try_iterate_with_mode(db, mode);
+                    Some(bound.try_iterate_with_mode(db, mode)?)
                 }
                 // TODO: could we create a "union of tuple specs"...?
                 // (Same question applies to the `Type::Union()` branch lower down)
-                Some(TypeVarBoundOrConstraints::Constraints(_)) | None => {}
+                Some(TypeVarBoundOrConstraints::Constraints(_)) | None => None
             },
             Type::TypeVar(_) => unreachable!(
                 "should not be able to iterate over type variable {} in inferable position",
                 self.display(db)
             ),
-            Type::Dynamic(_)
-            | Type::FunctionLiteral(_)
+            // N.B. These special cases aren't strictly necessary, they're just obvious optimizations
+            Type::LiteralString | Type::Dynamic(_) => Some(Cow::Owned(TupleSpec::homogeneous(self))),
+
+            Type::FunctionLiteral(_)
             | Type::GenericAlias(_)
             | Type::BoundMethod(_)
             | Type::MethodWrapper(_)
@@ -5026,6 +5030,10 @@ impl<'db> Type<'db> {
             | Type::DataclassTransformer(_)
             | Type::Callable(_)
             | Type::ModuleLiteral(_)
+            // We could infer a precise tuple spec for enum classes with members,
+            // but it's not clear whether that's worth the added complexity:
+            // you'd have to check that `EnumMeta.__iter__` is not overridden for it to be sound
+            // (enums can have `EnumMeta` subclasses as their metaclasses).
             | Type::ClassLiteral(_)
             | Type::SubclassOf(_)
             | Type::ProtocolInstance(_)
@@ -5039,11 +5047,13 @@ impl<'db> Type<'db> {
             | Type::IntLiteral(_)
             | Type::BooleanLiteral(_)
             | Type::EnumLiteral(_)
-            | Type::LiteralString
-            | Type::BytesLiteral(_)
             | Type::BoundSuper(_)
             | Type::TypeIs(_)
-            | Type::TypedDict(_) => {}
+            | Type::TypedDict(_) => None
+        };
+
+        if let Some(special_case) = special_case {
+            return Ok(special_case);
         }
 
         let try_call_dunder_getitem = || {
@@ -5518,7 +5528,6 @@ impl<'db> Type<'db> {
             // https://typing.python.org/en/latest/spec/special-types.html#special-cases-for-float-and-complex
             Type::ClassLiteral(class) => {
                 let ty = match class.known(db) {
-                    Some(KnownClass::Any) => Type::any(),
                     Some(KnownClass::Complex) => UnionType::from_elements(
                         db,
                         [
@@ -5612,6 +5621,7 @@ impl<'db> Type<'db> {
             Type::SpecialForm(special_form) => match special_form {
                 SpecialFormType::Never | SpecialFormType::NoReturn => Ok(Type::Never),
                 SpecialFormType::LiteralString => Ok(Type::LiteralString),
+                SpecialFormType::Any => Ok(Type::any()),
                 SpecialFormType::Unknown => Ok(Type::unknown()),
                 SpecialFormType::AlwaysTruthy => Ok(Type::AlwaysTruthy),
                 SpecialFormType::AlwaysFalsy => Ok(Type::AlwaysFalsy),
@@ -5715,6 +5725,8 @@ impl<'db> Type<'db> {
 
                 SpecialFormType::Optional
                 | SpecialFormType::Not
+                | SpecialFormType::Top
+                | SpecialFormType::Bottom
                 | SpecialFormType::TypeOf
                 | SpecialFormType::TypeIs
                 | SpecialFormType::TypeGuard
@@ -5886,7 +5898,7 @@ impl<'db> Type<'db> {
             Type::AlwaysTruthy | Type::AlwaysFalsy => KnownClass::Type.to_instance(db),
             Type::BoundSuper(_) => KnownClass::Super.to_class_literal(db),
             Type::ProtocolInstance(protocol) => protocol.to_meta_type(db),
-            Type::TypedDict(typed_dict) => SubclassOfType::from(db, typed_dict.defining_class),
+            Type::TypedDict(typed_dict) => SubclassOfType::from(db, typed_dict.defining_class()),
             Type::TypeAlias(alias) => alias.value_type(db).to_meta_type(db),
         }
     }
@@ -6353,7 +6365,7 @@ impl<'db> Type<'db> {
             },
 
             Type::TypedDict(typed_dict) => {
-                Some(TypeDefinition::Class(typed_dict.defining_class.definition(db)))
+                Some(TypeDefinition::Class(typed_dict.defining_class().definition(db)))
             }
 
             Self::Union(_) | Self::Intersection(_) => None,
@@ -6866,6 +6878,12 @@ bitflags! {
         const FINAL     = 1 << 1;
         /// `dataclasses.InitVar`
         const INIT_VAR  = 1 << 2;
+        /// `typing_extensions.Required`
+        const REQUIRED = 1 << 3;
+        /// `typing_extensions.NotRequired`
+        const NOT_REQUIRED = 1 << 4;
+        /// `typing_extensions.ReadOnly`
+        const READ_ONLY = 1 << 5;
     }
 }
 
@@ -6881,6 +6899,8 @@ impl TypeQualifiers {
             Self::CLASS_VAR => "ClassVar",
             Self::FINAL => "Final",
             Self::INIT_VAR => "InitVar",
+            Self::REQUIRED => "Required",
+            Self::NOT_REQUIRED => "NotRequired",
             _ => {
                 unreachable!("Only a single bit should be set when calling `TypeQualifiers::name`")
             }
@@ -9834,43 +9854,6 @@ impl<'db> EnumLiteralType<'db> {
     pub(crate) fn enum_class_instance(self, db: &'db dyn Db) -> Type<'db> {
         self.enum_class(db).to_non_generic_instance(db)
     }
-}
-
-/// Type that represents the set of all inhabitants (`dict` instances) that conform to
-/// a given `TypedDict` schema.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, salsa::Update, Hash, get_size2::GetSize)]
-pub struct TypedDictType<'db> {
-    /// A reference to the class (inheriting from `typing.TypedDict`) that specifies the
-    /// schema of this `TypedDict`.
-    defining_class: ClassType<'db>,
-}
-
-impl<'db> TypedDictType<'db> {
-    pub(crate) fn items(self, db: &'db dyn Db) -> FxOrderMap<Name, Field<'db>> {
-        let (class_literal, specialization) = self.defining_class.class_literal(db);
-        class_literal.fields(db, specialization, CodeGeneratorKind::TypedDict)
-    }
-
-    pub(crate) fn apply_type_mapping_impl<'a>(
-        self,
-        db: &'db dyn Db,
-        type_mapping: &TypeMapping<'a, 'db>,
-        visitor: &ApplyTypeMappingVisitor<'db>,
-    ) -> Self {
-        Self {
-            defining_class: self
-                .defining_class
-                .apply_type_mapping_impl(db, type_mapping, visitor),
-        }
-    }
-}
-
-fn walk_typed_dict_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
-    db: &'db dyn Db,
-    typed_dict: TypedDictType<'db>,
-    visitor: &V,
-) {
-    visitor.visit_type(db, typed_dict.defining_class.into());
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

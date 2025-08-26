@@ -102,3 +102,8 @@ deque("abc") # OK
 deque(b"abc") # OK
 deque(f"" "a")  # OK
 deque(f"{x}" "")  # OK
+
+# https://github.com/astral-sh/ruff/issues/19951
+deque(t"")
+deque(t""  t"")
+deque(t"{""}") # OK

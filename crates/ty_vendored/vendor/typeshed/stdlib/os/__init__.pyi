@@ -1746,7 +1746,7 @@ def getcwd() -> str:
 def getcwdb() -> bytes:
     """Return a bytes string representing the current working directory."""
 
-def chmod(path: FileDescriptorOrPath, mode: int, *, dir_fd: int | None = None, follow_symlinks: bool = ...) -> None:
+def chmod(path: FileDescriptorOrPath, mode: int, *, dir_fd: int | None = None, follow_symlinks: bool = True) -> None:
     """Change the access permissions of a file.
 
       path

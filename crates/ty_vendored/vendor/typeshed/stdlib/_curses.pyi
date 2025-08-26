@@ -573,7 +573,7 @@ def newpad(nlines: int, ncols: int, /) -> window:
       Width.
     """
 
-def newwin(nlines: int, ncols: int, begin_y: int = ..., begin_x: int = ..., /) -> window:
+def newwin(nlines: int, ncols: int, begin_y: int = 0, begin_x: int = 0, /) -> window:
     """newwin(nlines, ncols, [begin_y=0, begin_x=0])
     Return a new window.
 
@@ -1016,7 +1016,7 @@ class window:  # undocumented
         """
 
     @overload
-    def box(self, vertch: _ChType = ..., horch: _ChType = ...) -> None: ...
+    def box(self, vertch: _ChType = 0, horch: _ChType = 0) -> None: ...
     @overload
     def chgat(self, attr: int) -> None:
         """chgat([y, x,] [n=-1,] attr)
@@ -1289,7 +1289,7 @@ class window:  # undocumented
     @overload
     def insstr(self, y: int, x: int, str: str, attr: int = ...) -> None: ...
     @overload
-    def instr(self, n: int = ...) -> bytes:
+    def instr(self, n: int = 2047) -> bytes:
         """instr([y, x,] n=2047)
         Return a string of characters, extracted from the window.
 
@@ -1307,7 +1307,7 @@ class window:  # undocumented
         """
 
     @overload
-    def instr(self, y: int, x: int, n: int = ...) -> bytes: ...
+    def instr(self, y: int, x: int, n: int = 2047) -> bytes: ...
     def is_linetouched(self, line: int, /) -> bool:
         """Return True if the specified line was modified, otherwise return False.
 
@@ -1415,7 +1415,7 @@ class window:  # undocumented
     @overload
     def refresh(self, pminrow: int, pmincol: int, sminrow: int, smincol: int, smaxrow: int, smaxcol: int) -> None: ...
     def resize(self, nlines: int, ncols: int) -> None: ...
-    def scroll(self, lines: int = ...) -> None:
+    def scroll(self, lines: int = 1) -> None:
         """scroll([lines=1])
         Scroll the screen or scrolling region.
 
@@ -1483,7 +1483,7 @@ class window:  # undocumented
     def syncok(self, flag: bool) -> None: ...
     def syncup(self) -> None: ...
     def timeout(self, delay: int) -> None: ...
-    def touchline(self, start: int, count: int, changed: bool = ...) -> None:
+    def touchline(self, start: int, count: int, changed: bool = True) -> None:
         """touchline(start, count, [changed=True])
         Pretend count lines have been changed, starting with line start.
 

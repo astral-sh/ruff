@@ -5,7 +5,7 @@ The 'interpreters' module provides a more convenient interface.
 import types
 from collections.abc import Callable
 from typing import Any, Final, Literal, SupportsIndex, TypeVar, overload
-from typing_extensions import TypeAlias
+from typing_extensions import TypeAlias, disjoint_base
 
 _R = TypeVar("_R")
 
@@ -20,6 +20,7 @@ class InterpreterNotFoundError(InterpreterError):
 
 class NotShareableError(ValueError): ...
 
+@disjoint_base
 class CrossInterpreterBufferView:
     def __buffer__(self, flags: int, /) -> memoryview:
         """Return a buffer object that exposes the underlying memory of the object."""

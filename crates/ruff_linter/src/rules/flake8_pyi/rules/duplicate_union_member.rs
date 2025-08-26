@@ -187,7 +187,7 @@ fn generate_pep604_fix(
                     op: Operator::BitOr,
                     right: Box::new(right.clone()),
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 }))
             } else {
                 Some(right.clone())
@@ -202,7 +202,7 @@ fn generate_pep604_fix(
 }
 
 static VIRTUAL_NONE_LITERAL: Expr = Expr::NoneLiteral(ExprNoneLiteral {
-    node_index: AtomicNodeIndex::dummy(),
+    node_index: AtomicNodeIndex::NONE,
     range: TextRange::new(TextSize::new(0), TextSize::new(0)),
 });
 
