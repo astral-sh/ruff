@@ -2,6 +2,7 @@
     clippy::disallowed_methods,
     reason = "Prefer System trait methods over std methods in ty crates"
 )]
+mod all_symbols;
 mod completion;
 mod doc_highlights;
 mod docstring;
@@ -24,6 +25,7 @@ mod stub_mapping;
 mod symbols;
 mod workspace_symbols;
 
+pub use all_symbols::{AllSymbolInfo, all_symbols};
 pub use completion::completion;
 pub use doc_highlights::document_highlights;
 pub use document_symbols::document_symbols;
