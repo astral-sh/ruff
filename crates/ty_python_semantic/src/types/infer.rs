@@ -64,7 +64,9 @@ use super::string_annotation::{
 use super::subclass_of::SubclassOfInner;
 use super::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::module_name::{ModuleName, ModuleNameResolutionError};
-use crate::module_resolver::{KnownModule, file_to_module, resolve_module};
+use crate::module_resolver::{
+    KnownModule, ModuleResolveMode, file_to_module, resolve_module, search_paths,
+};
 use crate::node_key::NodeKey;
 use crate::place::{
     Boundness, ConsideredDefinitions, LookupError, Place, PlaceAndQualifiers,
@@ -4980,6 +4982,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         );
                         return;
                     }
+                }
+            }
+
+            // Add search paths information to the diagnostic
+            // Use the same search paths function that is used in actual module resolution
+            let mut search_paths =
+                search_paths(self.db(), ModuleResolveMode::StubsAllowed).peekable();
+
+            if search_paths.peek().is_some() {
+                diagnostic.info(format_args!(
+                    "Searched in the following paths during module resolution:"
+                ));
+
+                for (index, path) in search_paths.enumerate() {
+                    diagnostic.info(format_args!(
+                        "  {}. {} ({})",
+                        index + 1,
+                        path,
+                        path.describe_kind()
+                    ));
                 }
             }
 
