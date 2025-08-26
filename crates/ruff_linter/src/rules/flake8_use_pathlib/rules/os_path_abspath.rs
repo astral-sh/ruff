@@ -1,9 +1,15 @@
-use crate::checkers::ast::Checker;
-use crate::preview::is_fix_os_path_abspath_enabled;
-use crate::rules::flake8_use_pathlib::helpers::check_os_pathlib_single_arg_calls;
-use crate::{FixAvailability, Violation};
+use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::ExprCall;
+use ruff_text_size::Ranged;
+
+use crate::checkers::ast::Checker;
+use crate::importer::ImportRequest;
+use crate::preview::is_fix_os_path_abspath_enabled;
+use crate::rules::flake8_use_pathlib::helpers::{
+    has_unknown_keywords_or_starred_expr, is_pathlib_path_call,
+};
+use crate::{FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for uses of `os.path.abspath`.
@@ -36,6 +42,10 @@ use ruff_python_ast::ExprCall;
 /// ## Fix Safety
 /// This rule's fix is marked as unsafe if the replacement would remove comments attached to the original expression.
 ///
+/// `Path.resolve()` resolves symlinks, while `os.path.abspath()` does not.
+/// If preserving symlinks is important, you may need to use `Path.absolute()`.
+/// The suggested autofix is marked as unsafe because it can change behavior.
+///
 /// ## References
 /// - [Python documentation: `Path.resolve`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.resolve)
 /// - [Python documentation: `os.path.abspath`](https://docs.python.org/3/library/os.path.html#os.path.abspath)
@@ -63,12 +73,45 @@ pub(crate) fn os_path_abspath(checker: &Checker, call: &ExprCall, segments: &[&s
     if segments != ["os", "path", "abspath"] {
         return;
     }
-    check_os_pathlib_single_arg_calls(
-        checker,
-        call,
-        "resolve()",
-        "path",
-        is_fix_os_path_abspath_enabled(checker.settings()),
-        OsPathAbspath,
-    );
+
+    if call.arguments.len() != 1 {
+        return;
+    }
+
+    let Some(arg) = call.arguments.find_argument_value("path", 0) else {
+        return;
+    };
+
+    let arg_code = checker.locator().slice(arg.range());
+    let range = call.range();
+
+    let mut diagnostic = checker.report_diagnostic(OsPathAbspath, call.func.range());
+
+    if has_unknown_keywords_or_starred_expr(&call.arguments, &["path"]) {
+        return;
+    }
+
+    if !is_fix_os_path_abspath_enabled(checker.settings()) {
+        return;
+    }
+
+    diagnostic.try_set_fix(|| {
+        let (import_edit, binding) = checker.importer().get_or_import_symbol(
+            &ImportRequest::import("pathlib", "Path"),
+            call.start(),
+            checker.semantic(),
+        )?;
+
+        let replacement = if is_pathlib_path_call(checker, arg) {
+            format!("{arg_code}.resolve()")
+        } else {
+            format!("{binding}({arg_code}).resolve()")
+        };
+
+        Ok(Fix::applicable_edits(
+            Edit::range_replacement(replacement, range),
+            [import_edit],
+            Applicability::Unsafe,
+        ))
+    });
 }
