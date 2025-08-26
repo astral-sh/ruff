@@ -286,10 +286,12 @@ impl HasNavigationTargets for TypeDefinition<'_> {
 
 #[cfg(test)]
 mod tests {
+    use camino::Utf8Component;
     use insta::internals::SettingsBindDropGuard;
+
     use ruff_db::Db;
     use ruff_db::diagnostic::{Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig};
-    use ruff_db::files::{File, system_path_to_file};
+    use ruff_db::files::{File, FileRootKind, system_path_to_file};
     use ruff_db::system::{DbWithWritableSystem, SystemPath, SystemPathBuf};
     use ruff_python_trivia::textwrap::dedent;
     use ruff_text_size::TextSize;
@@ -377,6 +379,19 @@ mod tests {
             {
                 db.write_file(path, contents)
                     .expect("write to memory file system to be successful");
+
+                // Add a root for the top-most component.
+                let top = path.components().find_map(|c| match c {
+                    Utf8Component::Normal(c) => Some(c),
+                    _ => None,
+                });
+                if let Some(top) = top {
+                    let top = SystemPath::new(top);
+                    if db.system().is_directory(top) {
+                        db.files()
+                            .try_add_root(&db, top, FileRootKind::LibrarySearchPath);
+                    }
+                }
 
                 let file = system_path_to_file(&db, path).expect("newly written file to existing");
 
