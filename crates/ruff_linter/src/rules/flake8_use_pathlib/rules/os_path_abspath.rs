@@ -40,10 +40,12 @@ use crate::{FixAvailability, Violation};
 /// especially on older versions of Python.
 ///
 /// ## Fix Safety
-/// This rule's fix is always marked as unsafe because `Path.resolve()` resolves symlinks, while `os.path.abspath()` does not.
-/// If resolving symlinks is important, you may need to use `Path.absolute()`.
-/// However, `Path.absolute()` also does not remove any `..` components in a path, unlike `os.path.abspath()` and `Path.resolve()`, so if that specific combination of behaviors is required, there's no existing `pathlib` alternative.
-/// See CPython issue [#69200](https://github.com/python/cpython/issues/69200).
+/// This rule's fix is always marked as unsafe because `Path.resolve()` resolves symlinks, while
+/// `os.path.abspath()` does not. If resolving symlinks is important, you may need to use
+/// `Path.absolute()`. However, `Path.absolute()` also does not remove any `..` components in a
+/// path, unlike `os.path.abspath()` and `Path.resolve()`, so if that specific combination of
+/// behaviors is required, there's no existing `pathlib` alternative. See CPython issue
+/// [#69200](https://github.com/python/cpython/issues/69200).
 ///
 /// ## References
 /// - [Python documentation: `Path.resolve`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.resolve)
