@@ -428,19 +428,21 @@ impl<'db> ConstraintClause<'db> {
 
     /// Returns the union of this clause and another.
     fn union_clause(self, db: &'db dyn Db, other: Self) -> Simplified<Self> {
-        if self.subsumes(db, &other) {
+        if self.subsumes_via_intersection(db, &other) {
             return Simplified::One(other);
         }
-        if other.subsumes(db, &self) {
+        if other.subsumes_via_intersection(db, &self) {
             return Simplified::One(self);
+        }
+        if let Some(simplified) = self.simplifies_via_union(db, &other) {
+            return Simplified::One(simplified);
         }
         Simplified::Two(self, other)
     }
 
-    /// Returns whether this constraint set subsumes `other` — if every constraint in `other` is
-    /// subsumed by some constraint in `self`. (Or equivalently, if the intersection of `self` and
-    /// `other` is `self`.)
-    fn subsumes(&self, db: &'db dyn Db, other: &Self) -> bool {
+    /// Returns whether this clause subsumes `other` via intersection — that is, if the
+    /// intersection of `self` and `other` is `self`.
+    fn subsumes_via_intersection(&self, db: &'db dyn Db, other: &Self) -> bool {
         if self.constraints.len() != other.constraints.len() {
             return false;
         }
@@ -467,6 +469,70 @@ impl<'db> ConstraintClause<'db> {
             }
         }
         true
+    }
+
+    /// If the union of two clauses is simpler than either of the individual clauses, returns the
+    /// union. This happens when (a) they mention the same set of typevars, (b) the union of the
+    /// constraints for exactly one typevar simplifies to a single constraint, and (c) the
+    /// constraints for all other typevars are identical. Otherwise returns `None`.
+    fn simplifies_via_union(&self, db: &'db dyn Db, other: &Self) -> Option<Self> {
+        if self.constraints.len() != other.constraints.len() {
+            return None;
+        }
+
+        // Verify that the constraints for precisely one typevar simplify, and the constraints for
+        // all other typevars are identical. Remember the index of the typevar whose constraints
+        // simplify.
+        let mut simplified_index = None;
+        let pairwise = (self.constraints.iter())
+            .merge_join_by(&other.constraints, |a, b| a.typevar.cmp(&b.typevar));
+        for (index, pair) in pairwise.enumerate() {
+            match pair {
+                // If either clause contains a constraint whose typevar doesn't appear in the
+                // other, the clauses don't simplify.
+                EitherOrBoth::Left(_) | EitherOrBoth::Right(_) => return None,
+
+                EitherOrBoth::Both(self_constraint, other_constraint) => {
+                    if self_constraint == other_constraint {
+                        continue;
+                    }
+                    let union_constraint = match self_constraint.union(db, *other_constraint) {
+                        Simplified::Two(_, _) => {
+                            // The constraints for this typevar are not identical, nor do they
+                            // simplify.
+                            return None;
+                        }
+                        Simplified::One(union_constraint) => Some(union_constraint),
+                        Simplified::Always => None,
+                        Simplified::Never => {
+                            panic!("unioning two non-never constraints should not be never")
+                        }
+                    };
+                    if simplified_index
+                        .replace((index, union_constraint))
+                        .is_some()
+                    {
+                        // More than one constraint simplify, which doesn't allow the clause as a
+                        // whole to simplify.
+                        return None;
+                    }
+                }
+            }
+        }
+
+        let Some((index, union_constraint)) = simplified_index else {
+            // We never found a typevar whose constraints simplify.
+            return None;
+        };
+        let mut constraints = self.constraints.clone();
+        if let Some(union_constraint) = union_constraint {
+            constraints[index] = union_constraint;
+        } else {
+            // If the simplified union of constraints is Always, then we can remove this typevar
+            // from the constraint completely.
+            constraints.remove(index);
+        }
+        Some(Self { constraints })
     }
 
     /// Returns the negation of this clause.
@@ -706,6 +772,137 @@ impl<'db> AtomicConstraint<'db> {
                     other.upper,
                 ),
             ),
+        }
+    }
+
+    /// Returns the union of this atomic constraint and another. Because constraint bounds
+    /// can be negated, the result might be unsatisfiable; always satisfiable; or the union of one
+    /// or two atomic constraints.
+    ///
+    /// Panics if the two constraints have different typevars.
+    fn union(self, db: &'db dyn Db, other: Self) -> Simplified<AtomicConstraint<'db>> {
+        debug_assert!(self.typevar == other.typevar);
+
+        // We'll show our work for each match arm with a case analysis. We calculate "min" using
+        // intersection, and "max" using union.
+        //
+        // We use `s : t` for the positive constraint `s ≤: T ≤: t`, and draw it like this:
+        //
+        //         s┠───┨t
+        //
+        // We use `¬(s : t)` for the corresponding negative constraint, and draw it like this:
+        //
+        //     0┠───┤s t├───┨1
+
+        match (self.sign, other.sign) {
+            // When both constraints are positive and disjoint, then they cannot be simplified.
+            // Otherwise the result is
+            //   min(s₁,s₂) : max(t₁,t₂)
+            //
+            //   self:    s₁┠─────┨t₁    s₁┠────┨t₁       s₁┠─┨t₁
+            //   other:     s₂┠─┨t₂         s₂┠────┨t₂            s₂┠─┨t₂
+            //
+            //   result:  s₁┠─────┨t₁    s₁┠───────┨t₂    s₁┠─┨t₁ s₂┠─┨t₂
+            (ConstraintSign::Positive, ConstraintSign::Positive) => {
+                if !self.lower.is_assignable_to(db, other.upper)
+                    || !other.lower.is_assignable_to(db, self.upper)
+                {
+                    return Simplified::Two(self, other);
+                }
+                Simplified::from_one(Self::positive(
+                    db,
+                    self.typevar,
+                    IntersectionType::from_elements(db, [self.lower, other.lower]),
+                    UnionType::from_elements(db, [self.upper, other.upper]),
+                ))
+            }
+
+            // When both constraints are negative, and their "gaps" are disjoint, the result is
+            // always satisfiable. Otherwise the result is
+            //   ¬(max(s₁,s₂) : min(t₁,t₂))
+            //
+            //   self:    0┠─┤s₁     t₁├─┨1     0┠───┤s₁   t₁├─┨1     0┠─┤s₁ t₁├─────────┨1
+            //   other:   0┠───┤s₂ t₂├───┨1     0┠─┤s₂   t₂├───┨1     0┠─────────┤s₂ t₂├─┨1
+            //
+            //   result:  0┠───┤s₂ t₂├───┨1     0┠─┤s₂   t₂├───┨1     0┠─────────────────┨1
+            (ConstraintSign::Negative, ConstraintSign::Negative) => {
+                if self.upper.is_assignable_to(db, other.lower)
+                    || other.upper.is_assignable_to(db, self.lower)
+                {
+                    return Simplified::Always;
+                }
+
+                Simplified::from_one(Self::negative(
+                    db,
+                    self.typevar,
+                    UnionType::from_elements(db, [self.lower, other.lower]),
+                    IntersectionType::from_elements(db, [self.upper, other.upper]),
+                ))
+            }
+
+            // When one constraint is positive and the other negative, the result is always
+            //   (s₊ : min(s₋, t₊)) ⊔ (max(s₊,t₋) : t₊)
+            //
+            //   self:      s₊┠─────────┨t₊       s₊┠───┨t₊             s₊┠─┨t₊
+            //   other:   0┠────┤s₋ t₋├────┨1   0┠────┤s₋   t₋├──┨1   0┠───────┤s₋ t₋├─┨1
+            //
+            //   result:  0┠───────────────┨1   0┠──────┨t₊ t₋├──┨1   0┠───────┤s₋ t₋├─┨1
+            //
+            //   self:            s₊┠─┨t₊
+            //   other:   0┠──┤s₋         t₋├──┨1
+            //
+            //   result:  0┠──┤s₋ s₊┠─┨t₊ t₋├──┨1
+            //
+            //   self:            s₊┠───┨t₊                 s₊┠─┨t₊
+            //   other:   0┠──┤s₋   t₋├────┨1     0┠─┤s₋ t₋├───────┨1
+            //
+            //   result:  0┠──┤s₋ s₊┠──────┨1     0┠─┤s₋ t₋├───────┨1
+            (ConstraintSign::Positive, ConstraintSign::Negative) => {
+                if self.lower.is_assignable_to(db, other.lower) {
+                    if other.upper.is_assignable_to(db, self.upper) {
+                        Simplified::Always
+                    } else {
+                        Simplified::from_one(Self::negative(
+                            db,
+                            self.typevar,
+                            UnionType::from_elements(db, [other.lower, self.upper]),
+                            other.upper,
+                        ))
+                    }
+                } else if self.upper.is_assignable_to(db, other.upper) {
+                    Simplified::Two(self, other)
+                } else {
+                    Simplified::from_one(Self::negative(
+                        db,
+                        self.typevar,
+                        other.lower,
+                        IntersectionType::from_elements(db, [self.lower, other.upper]),
+                    ))
+                }
+            }
+            (ConstraintSign::Negative, ConstraintSign::Positive) => {
+                if other.lower.is_assignable_to(db, self.lower) {
+                    if self.upper.is_assignable_to(db, other.upper) {
+                        Simplified::Always
+                    } else {
+                        Simplified::from_one(Self::negative(
+                            db,
+                            other.typevar,
+                            UnionType::from_elements(db, [self.lower, other.upper]),
+                            self.upper,
+                        ))
+                    }
+                } else if other.upper.is_assignable_to(db, self.upper) {
+                    Simplified::Two(self, other)
+                } else {
+                    Simplified::from_one(Self::negative(
+                        db,
+                        self.typevar,
+                        self.lower,
+                        IntersectionType::from_elements(db, [other.lower, self.upper]),
+                    ))
+                }
+            }
         }
     }
 
