@@ -38,7 +38,7 @@ from _collections_abc import dict_keys
 from _typeshed import FileDescriptorOrPath, ReadableBuffer, SupportsRead, SupportsWrite
 from collections.abc import Callable, Generator, ItemsView, Iterable, Iterator, Mapping, Sequence
 from typing import Any, Final, Generic, Literal, Protocol, SupportsIndex, TypeVar, overload, type_check_only
-from typing_extensions import TypeAlias, TypeGuard, deprecated
+from typing_extensions import TypeAlias, TypeGuard, deprecated, disjoint_base
 from xml.parsers.expat import XMLParserType
 
 __all__ = [
@@ -134,6 +134,7 @@ _ElementCallable: TypeAlias = Callable[..., Element[_ElementCallable]]
 _Tag = TypeVar("_Tag", default=str, bound=str | _ElementCallable)
 _OtherTag = TypeVar("_OtherTag", default=str, bound=str | _ElementCallable)
 
+@disjoint_base
 class Element(Generic[_Tag]):
     tag: _Tag
     attrib: dict[str, str]
@@ -592,6 +593,7 @@ def fromstringlist(sequence: Sequence[str | ReadableBuffer], parser: XMLParser |
 # elementfactories.
 _ElementFactory: TypeAlias = Callable[[Any, dict[Any, Any]], Element]
 
+@disjoint_base
 class TreeBuilder:
     # comment_factory can take None because passing None to Comment is not an error
     def __init__(
@@ -679,6 +681,7 @@ _E = TypeVar("_E", default=Element)
 # The default target is TreeBuilder, which returns Element.
 # C14NWriterTarget does not implement a close method, so using it results
 # in a type of XMLParser[None].
+@disjoint_base
 class XMLParser(Generic[_E]):
     parser: XMLParserType
     target: _Target

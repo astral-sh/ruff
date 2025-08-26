@@ -47,9 +47,9 @@ if sys.platform == "win32":
         def __new__(
             cls,
             args: subprocess._CMD,
-            stdin: subprocess._FILE | None = ...,
-            stdout: subprocess._FILE | None = ...,
-            stderr: subprocess._FILE | None = ...,
+            stdin: subprocess._FILE | None = None,
+            stdout: subprocess._FILE | None = None,
+            stderr: subprocess._FILE | None = None,
             **kwds: Any,
         ) -> Self: ...
         def __init__(

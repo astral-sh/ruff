@@ -13,7 +13,7 @@ from abc import ABCMeta, abstractmethod
 from collections.abc import Callable, Sequence
 from concurrent.futures import Executor
 from contextvars import Context
-from socket import AddressFamily, SocketKind, _Address, _RetAddress, socket
+from socket import AddressFamily, AddressInfo, SocketKind, _Address, _RetAddress, socket
 from typing import IO, Any, Literal, Protocol, TypeVar, overload, type_check_only
 from typing_extensions import Self, TypeAlias, TypeVarTuple, Unpack, deprecated
 
@@ -352,8 +352,8 @@ class AbstractEventLoop:
             host: str | Sequence[str] | None = None,
             port: int = ...,
             *,
-            family: int = ...,
-            flags: int = ...,
+            family: int = AddressFamily.AF_UNSPEC,
+            flags: int = AddressInfo.AI_PASSIVE,
             sock: None = None,
             backlog: int = 100,
             ssl: _SSLContext = None,
@@ -424,8 +424,8 @@ class AbstractEventLoop:
             host: None = None,
             port: None = None,
             *,
-            family: int = ...,
-            flags: int = ...,
+            family: int = AddressFamily.AF_UNSPEC,
+            flags: int = AddressInfo.AI_PASSIVE,
             sock: socket = ...,
             backlog: int = 100,
             ssl: _SSLContext = None,
@@ -445,8 +445,8 @@ class AbstractEventLoop:
             host: str | Sequence[str] | None = None,
             port: int = ...,
             *,
-            family: int = ...,
-            flags: int = ...,
+            family: int = AddressFamily.AF_UNSPEC,
+            flags: int = AddressInfo.AI_PASSIVE,
             sock: None = None,
             backlog: int = 100,
             ssl: _SSLContext = None,
@@ -513,8 +513,8 @@ class AbstractEventLoop:
             host: None = None,
             port: None = None,
             *,
-            family: int = ...,
-            flags: int = ...,
+            family: int = AddressFamily.AF_UNSPEC,
+            flags: int = AddressInfo.AI_PASSIVE,
             sock: socket = ...,
             backlog: int = 100,
             ssl: _SSLContext = None,
@@ -533,8 +533,8 @@ class AbstractEventLoop:
             host: str | Sequence[str] | None = None,
             port: int = ...,
             *,
-            family: int = ...,
-            flags: int = ...,
+            family: int = AddressFamily.AF_UNSPEC,
+            flags: int = AddressInfo.AI_PASSIVE,
             sock: None = None,
             backlog: int = 100,
             ssl: _SSLContext = None,
@@ -596,8 +596,8 @@ class AbstractEventLoop:
             host: None = None,
             port: None = None,
             *,
-            family: int = ...,
-            flags: int = ...,
+            family: int = AddressFamily.AF_UNSPEC,
+            flags: int = AddressInfo.AI_PASSIVE,
             sock: socket = ...,
             backlog: int = 100,
             ssl: _SSLContext = None,
@@ -872,7 +872,7 @@ class AbstractEventLoop:
         bufsize: Literal[0] = 0,
         encoding: None = None,
         errors: None = None,
-        text: Literal[False] | None = ...,
+        text: Literal[False] | None = None,
         **kwargs: Any,
     ) -> tuple[SubprocessTransport, _ProtocolT]: ...
     @abstractmethod

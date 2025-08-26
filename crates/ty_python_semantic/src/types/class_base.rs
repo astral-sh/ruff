@@ -1,4 +1,5 @@
 use crate::Db;
+use crate::types::class::CodeGeneratorKind;
 use crate::types::generics::Specialization;
 use crate::types::tuple::TupleType;
 use crate::types::{
@@ -76,13 +77,7 @@ impl<'db> ClassBase<'db> {
     ) -> Option<Self> {
         match ty {
             Type::Dynamic(dynamic) => Some(Self::Dynamic(dynamic)),
-            Type::ClassLiteral(literal) => {
-                if literal.is_known(db, KnownClass::Any) {
-                    Some(Self::Dynamic(DynamicType::Any))
-                } else {
-                    Some(Self::Class(literal.default_specialization(db)))
-                }
-            }
+            Type::ClassLiteral(literal) => Some(Self::Class(literal.default_specialization(db))),
             Type::GenericAlias(generic) => Some(Self::Class(ClassType::Generic(generic))),
             Type::NominalInstance(instance)
                 if instance.class(db).is_known(db, KnownClass::GenericAlias) =>
@@ -200,13 +195,14 @@ impl<'db> ClassBase<'db> {
                 | SpecialFormType::AlwaysTruthy
                 | SpecialFormType::AlwaysFalsy => None,
 
+                SpecialFormType::Any => Some(Self::Dynamic(DynamicType::Any)),
                 SpecialFormType::Unknown => Some(Self::unknown()),
 
                 SpecialFormType::Protocol => Some(Self::Protocol),
                 SpecialFormType::Generic => Some(Self::Generic),
 
                 SpecialFormType::NamedTuple => {
-                    let fields = subclass.own_fields(db, None);
+                    let fields = subclass.own_fields(db, None, CodeGeneratorKind::NamedTuple);
                     Self::try_from_type(
                         db,
                         TupleType::heterogeneous(

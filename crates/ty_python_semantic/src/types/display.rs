@@ -95,9 +95,6 @@ impl Display for DisplayType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let representation = self.ty.representation(self.db, self.settings);
         match self.ty {
-            Type::ClassLiteral(literal) if literal.is_known(self.db, KnownClass::Any) => {
-                write!(f, "typing.Any")
-            }
             Type::IntLiteral(_)
             | Type::BooleanLiteral(_)
             | Type::StringLiteral(_)
@@ -421,17 +418,15 @@ impl Display for DisplayRepresentation<'_> {
             }
             Type::TypedDict(typed_dict) => {
                 if self.settings.qualified {
-                    let class = match typed_dict.defining_class {
-                        ClassType::NonGeneric(literal) => literal,
-                        ClassType::Generic(alias) => alias.origin(self.db),
-                    };
+                    let defining_class = typed_dict.defining_class();
+                    let (literal, _) = defining_class.class_literal(self.db);
                     f.write_fmt(format_args!(
-                        "{}.{}",
-                        self.class_parents(class).join("."),
-                        class.name(self.db)
+                        "{parents}.{name}",
+                        parents = self.class_parents(literal).join("."),
+                        name = defining_class.name(self.db)
                     ))
                 } else {
-                    f.write_str(typed_dict.defining_class.name(self.db))
+                    f.write_str(typed_dict.defining_class().name(self.db))
                 }
             }
             Type::TypeAlias(alias) => f.write_str(alias.name(self.db)),

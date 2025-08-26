@@ -34,7 +34,7 @@ if sys.version_info >= (3, 10):
         port: int | str | None = None,
         *,
         limit: int = 65536,
-        ssl_handshake_timeout: float | None = ...,
+        ssl_handshake_timeout: float | None = None,
         **kwds: Any,
     ) -> tuple[StreamReader, StreamWriter]:
         """A wrapper for create_connection() returning a (reader, writer) pair.
@@ -61,7 +61,7 @@ if sys.version_info >= (3, 10):
         port: int | str | None = None,
         *,
         limit: int = 65536,
-        ssl_handshake_timeout: float | None = ...,
+        ssl_handshake_timeout: float | None = None,
         **kwds: Any,
     ) -> Server:
         """Start a socket server, call back for each client connected.
@@ -92,7 +92,7 @@ else:
         *,
         loop: events.AbstractEventLoop | None = None,
         limit: int = 65536,
-        ssl_handshake_timeout: float | None = ...,
+        ssl_handshake_timeout: float | None = None,
         **kwds: Any,
     ) -> tuple[StreamReader, StreamWriter]:
         """A wrapper for create_connection() returning a (reader, writer) pair.
@@ -120,7 +120,7 @@ else:
         *,
         loop: events.AbstractEventLoop | None = None,
         limit: int = 65536,
-        ssl_handshake_timeout: float | None = ...,
+        ssl_handshake_timeout: float | None = None,
         **kwds: Any,
     ) -> Server:
         """Start a socket server, call back for each client connected.
