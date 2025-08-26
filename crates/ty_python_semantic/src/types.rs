@@ -9389,6 +9389,21 @@ impl<'db> UnionType<'db> {
             .build()
     }
 
+    /// Create a union from a list of elements without unpacking type aliases.
+    pub(crate) fn from_elements_leave_aliases<I, T>(db: &'db dyn Db, elements: I) -> Type<'db>
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<Type<'db>>,
+    {
+        elements
+            .into_iter()
+            .fold(
+                UnionBuilder::new(db).unpack_aliases(false),
+                |builder, element| builder.add(element.into()),
+            )
+            .build()
+    }
+
     /// A fallible version of [`UnionType::from_elements`].
     ///
     /// If all items in `elements` are `Some()`, the result of unioning all elements is returned.
