@@ -3,7 +3,7 @@ use ruff_source_file::Line;
 
 use crate::{Violation, checkers::ast::LintContext};
 
-const BIDI_UNICODE: [char; 10] = [
+const BIDI_UNICODE: [char; 11] = [
     '\u{202A}', //{LEFT-TO-RIGHT EMBEDDING}
     '\u{202B}', //{RIGHT-TO-LEFT EMBEDDING}
     '\u{202C}', //{POP DIRECTIONAL FORMATTING}
@@ -13,6 +13,7 @@ const BIDI_UNICODE: [char; 10] = [
     '\u{2067}', //{RIGHT-TO-LEFT ISOLATE}
     '\u{2068}', //{FIRST STRONG ISOLATE}
     '\u{2069}', //{POP DIRECTIONAL ISOLATE}
+    '\u{061C}', //{ARABIC LETTER MARK}
     // The following was part of PEP 672:
     // https://peps.python.org/pep-0672/
     // so the list above might not be complete
