@@ -13,7 +13,7 @@ PTH100 [*] `os.path.abspath()` should be replaced by `Path.resolve()`
    |
 help: Replace with `Path(...).resolve()`
 
-ℹ Safe fix
+ℹ Unsafe fix
 7  7  | from os.path import isfile as xisfile, islink as xislink, isabs as xisabs
 8  8  | from os.path import join as xjoin, basename as xbasename, dirname as xdirname
 9  9  | from os.path import samefile as xsamefile, splitext as xsplitext
