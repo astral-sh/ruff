@@ -4993,19 +4993,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Add search paths information to the diagnostic
             // Use the same search paths function that is used in actual module resolution
-            let search_paths_list: Vec<String> =
-                search_paths(self.db(), ModuleResolveMode::StubsAllowed)
-                    .enumerate()
-                    .map(|(index, path)| {
-                        format!("  {}. {} ({})", index + 1, path, path.describe_kind())
-                    })
-                    .collect();
+            let search_paths: Vec<_> =
+                search_paths(self.db(), ModuleResolveMode::StubsAllowed).collect();
 
-            if !search_paths_list.is_empty() {
+            if !search_paths.is_empty() {
                 diagnostic.info(format_args!(
-                    "Searched in the following paths during module resolution:\n{}",
-                    search_paths_list.join("\n")
+                    "Searched in the following paths during module resolution:"
                 ));
+
+                for (index, path) in search_paths.iter().enumerate() {
+                    diagnostic.info(format_args!(
+                        "  {}. {} ({})",
+                        index + 1,
+                        path,
+                        path.describe_kind()
+                    ));
+                }
             }
 
             diagnostic.info(
