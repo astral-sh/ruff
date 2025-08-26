@@ -523,7 +523,17 @@ impl<'config> WalkPythonFilesState<'config> {
         let (files, error) = self.merged.into_inner().unwrap();
         error?;
 
-        Ok((files, self.resolver.into_inner().unwrap()))
+        // Deduplicate files by path to avoid processing the same file multiple times
+        // This can happen when both a directory and specific files within that directory are provided
+        let deduplicated_files: Vec<Result<ResolvedFile, ignore::Error>> = files
+            .into_iter()
+            .unique_by(|result| match result {
+                Ok(resolved_file) => Some(resolved_file.path().to_path_buf()),
+                Err(_) => None,
+            })
+            .collect();
+
+        Ok((deduplicated_files, self.resolver.into_inner().unwrap()))
     }
 }
 
@@ -999,6 +1009,32 @@ mod tests {
             .sorted()
             .collect::<Vec<_>>();
         assert_eq!(paths, [file2, file1]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn find_python_files_deduplicated() -> Result<()> {
+        // Initialize the filesystem:
+        //   root
+        //   ├── file1.py
+        let tmp_dir = TempDir::new()?;
+        let root = tmp_dir.path();
+        let file1 = root.join("file1.py");
+        File::create(&file1)?;
+
+        let (paths, _) = python_files_in_path(
+            &[root.to_path_buf(), file1.clone()],
+            &PyprojectConfig::new(PyprojectDiscoveryStrategy::Fixed, Settings::default(), None),
+            &NoOpTransformer,
+        )?;
+        let paths = paths
+            .into_iter()
+            .flatten()
+            .map(ResolvedFile::into_path)
+            .sorted()
+            .collect::<Vec<_>>();
+        assert_eq!(paths, [file1]);
 
         Ok(())
     }
