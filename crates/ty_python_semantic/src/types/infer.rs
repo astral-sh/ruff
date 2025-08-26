@@ -74,7 +74,6 @@ use crate::place::{
     module_type_implicit_global_declaration, module_type_implicit_global_symbol, place,
     place_from_bindings, place_from_declarations, typing_extensions_symbol,
 };
-
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::{HasScopedUseId, ScopedUseId};
 use crate::semantic_index::definition::{
@@ -4963,13 +4962,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let Some(builder) = self.context.report_lint(&UNRESOLVED_IMPORT, range) else {
             return;
         };
-
         let mut diagnostic = builder.into_diagnostic(format_args!(
             "Cannot resolve imported module `{}{}`",
             ".".repeat(level as usize),
             module.unwrap_or_default()
         ));
-
         if level == 0 {
             if let Some(module_name) = module.and_then(ModuleName::new) {
                 let program = Program::get(self.db());
