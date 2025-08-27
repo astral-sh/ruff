@@ -63,9 +63,10 @@ impl Serialize for SerializedMessages<'_> {
 
         for diagnostic in self.diagnostics {
             let span = diagnostic.expect_primary_span();
+            let file = span.file();
             let filename = diagnostic.expect_ruff_filename();
 
-            let (start_location, end_location) = if self.resolver.is_notebook(span.file()) {
+            let (start_location, end_location) = if self.resolver.is_notebook(file) {
                 // We can't give a reasonable location for the structured formats,
                 // so we show one that's clearly a fallback
                 Default::default()
@@ -77,7 +78,7 @@ impl Serialize for SerializedMessages<'_> {
             };
 
             let path = self.project_dir.as_ref().map_or_else(
-                || relativize_path(&filename),
+                || file.relative_path(self.resolver).display().to_string(),
                 |project_dir| relativize_path_to(&filename, project_dir),
             );
 
