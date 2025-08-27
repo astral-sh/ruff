@@ -239,7 +239,7 @@ impl<'db> ConstraintSet<'db> {
         let mut existing_clauses = prev.into_iter();
         while let Some(existing) = existing_clauses.next() {
             // Try to simplify the new clause against an existing clause.
-            match existing.union_clause(db, clause) {
+            match existing.simplify_clauses(db, clause) {
                 Simplified::Never => {
                     // If two clauses cancel out to 0, that does NOT cause the entire set to become
                     // 0.  We need to keep whatever clauses have already been added to the result,
@@ -473,23 +473,46 @@ impl<'db> ConstraintClause<'db> {
         }
     }
 
-    /// Returns the union of this clause and another.
-    fn union_clause(self, db: &'db dyn Db, other: Self) -> Simplified<Self> {
+    /// Tries to simplify the union of two clauses into a single clause, if possible.
+    fn simplify_clauses(self, db: &'db dyn Db, other: Self) -> Simplified<Self> {
+        // Saturation
+        //
+        // If either clause is always satisfiable, the union is too. (`1 ∪ C₂ = 1`, `C₁ ∪ 1 = 1`)
         if self.is_always() || other.is_always() {
             return Simplified::One(Self::always());
         }
+
+        // Subsumption
+        //
+        // If either clause subsumes (is "smaller than") the other, then the union simplifies to
+        // the "bigger" clause (the one being subsumed):
+        //
+        // - `A ∩ B` must be at least as large as `A ∩ B ∩ C`
+        // - Therefore, `(A ∩ B) ∪ (A ∩ B ∩ C) = (A ∩ B)`
+        //
+        // (Note that possibly counterintuitively, "bigger" here means _fewer_ constraints in the
+        // intersection, since intersecting more things can only make the result smaller.)
         if self.subsumes_via_intersection(db, &other) {
             return Simplified::One(other);
         }
         if other.subsumes_via_intersection(db, &self) {
             return Simplified::One(self);
         }
-        if let Some(simplified) = self.simplifies_via_union(db, &other) {
+
+        // Distribution
+        //
+        // If the two clauses constrain the same typevar in an "overlapping" way, we can factor
+        // that out:
+        //
+        // (A₁ ∩ B ∩ C) ∪ (A₂ ∩ B ∩ C) = (A₁ ∪ A₂) ∩ B ∩ C
+        if let Some(simplified) = self.simplifies_via_distribution(db, &other) {
             if simplified.is_always() {
                 return Simplified::Always;
             }
             return Simplified::One(simplified);
         }
+
+        // Can't be simplified
         Simplified::Two(self, other)
     }
 
@@ -528,7 +551,7 @@ impl<'db> ConstraintClause<'db> {
     /// union. This happens when (a) they mention the same set of typevars, (b) the union of the
     /// constraints for exactly one typevar simplifies to a single constraint, and (c) the
     /// constraints for all other typevars are identical. Otherwise returns `None`.
-    fn simplifies_via_union(&self, db: &'db dyn Db, other: &Self) -> Option<Self> {
+    fn simplifies_via_distribution(&self, db: &'db dyn Db, other: &Self) -> Option<Self> {
         if self.constraints.len() != other.constraints.len() {
             return None;
         }
