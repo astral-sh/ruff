@@ -1614,7 +1614,15 @@ impl<'db> Type<'db> {
                     .constraints(db)
                     .when_some_and(|constraints| {
                         constraints.iter().when_all(db, |constraint| {
-                            self.has_relation_to_impl(db, *constraint, relation, visitor)
+                            ConstraintSet::constrain_typevar(
+                                db,
+                                bound_typevar,
+                                *constraint,
+                                *constraint,
+                            )
+                            .implies(db, || {
+                                self.has_relation_to_impl(db, *constraint, relation, visitor)
+                            })
                         })
                     })
                     .is_never_satisfied() =>
@@ -1628,7 +1636,15 @@ impl<'db> Type<'db> {
                     .constraints(db)
                     .when_some_and(|constraints| {
                         constraints.iter().when_all(db, |constraint| {
-                            self.has_relation_to_impl(db, *constraint, relation, visitor)
+                            ConstraintSet::constrain_typevar(
+                                db,
+                                bound_typevar,
+                                *constraint,
+                                *constraint,
+                            )
+                            .implies(db, || {
+                                self.has_relation_to_impl(db, *constraint, relation, visitor)
+                            })
                         })
                     })
             }
