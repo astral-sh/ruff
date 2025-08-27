@@ -31,7 +31,7 @@ use crate::types::typed_dict::typed_dict_params_from_class_def;
 use crate::types::{
     ApplyTypeMappingVisitor, Binding, BoundSuperError, BoundSuperType, CallableType,
     DataclassParams, DeprecatedInstance, HasRelationToVisitor, IsEquivalentVisitor,
-    KnownInstanceType, ManualPEP695TypeAliasType, MaterializationType, NormalizedVisitor,
+    KnownInstanceType, ManualPEP695TypeAliasType, MaterializationKind, NormalizedVisitor,
     PropertyInstanceType, StringLiteralType, TypeAliasType, TypeMapping, TypeRelation,
     TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, TypedDictParams, VarianceInferable,
     declaration_type, infer_definition_types, todo_type,
@@ -275,13 +275,13 @@ impl<'db> GenericAlias<'db> {
     pub(super) fn materialize(
         self,
         db: &'db dyn Db,
-        materialization_type: MaterializationType,
+        materialization_kind: MaterializationKind,
     ) -> Self {
         Self::new(
             db,
             self.origin(db),
             self.specialization(db)
-                .materialize(db, materialization_type),
+                .materialize(db, materialization_kind),
         )
     }
 
@@ -412,11 +412,11 @@ impl<'db> ClassType<'db> {
     pub(super) fn materialize(
         self,
         db: &'db dyn Db,
-        materialization_type: MaterializationType,
+        materialization_kind: MaterializationKind,
     ) -> Self {
         match self {
             Self::NonGeneric(_) => self,
-            Self::Generic(generic) => Self::Generic(generic.materialize(db, materialization_type)),
+            Self::Generic(generic) => Self::Generic(generic.materialize(db, materialization_kind)),
         }
     }
 

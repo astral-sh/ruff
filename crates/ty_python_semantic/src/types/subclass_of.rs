@@ -4,7 +4,7 @@ use crate::types::constraints::Constraints;
 use crate::types::variance::VarianceInferable;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, DynamicType, HasRelationToVisitor,
-    IsDisjointVisitor, KnownClass, MaterializationType, MemberLookupPolicy, NormalizedVisitor,
+    IsDisjointVisitor, KnownClass, MaterializationKind, MemberLookupPolicy, NormalizedVisitor,
     SpecialFormType, Type, TypeMapping, TypeRelation,
 };
 use crate::{Db, FxOrderSet};
@@ -82,12 +82,12 @@ impl<'db> SubclassOfType<'db> {
     pub(super) fn materialize(
         self,
         db: &'db dyn Db,
-        materialization_type: MaterializationType,
+        materialization_kind: MaterializationKind,
     ) -> Type<'db> {
         match self.subclass_of {
-            SubclassOfInner::Dynamic(_) => match materialization_type {
-                MaterializationType::Top => KnownClass::Type.to_instance(db),
-                MaterializationType::Bottom => Type::Never,
+            SubclassOfInner::Dynamic(_) => match materialization_kind {
+                MaterializationKind::Top => KnownClass::Type.to_instance(db),
+                MaterializationKind::Bottom => Type::Never,
             },
             SubclassOfInner::Class(_) => Type::SubclassOf(self),
         }

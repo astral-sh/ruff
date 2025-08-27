@@ -13,7 +13,7 @@ use crate::types::protocol_class::walk_protocol_interface;
 use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
     ApplyTypeMappingVisitor, ClassBase, HasRelationToVisitor, IsDisjointVisitor,
-    IsEquivalentVisitor, MaterializationType, NormalizedVisitor, TypeMapping, TypeRelation,
+    IsEquivalentVisitor, MaterializationKind, NormalizedVisitor, TypeMapping, TypeRelation,
     VarianceInferable,
 };
 use crate::{Db, FxOrderSet};
@@ -263,14 +263,14 @@ impl<'db> NominalInstanceType<'db> {
     pub(super) fn materialize(
         self,
         db: &'db dyn Db,
-        materialization_type: MaterializationType,
+        materialization_kind: MaterializationKind,
     ) -> Type<'db> {
         match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => {
-                Type::tuple(tuple.materialize(db, materialization_type))
+                Type::tuple(tuple.materialize(db, materialization_kind))
             }
             NominalInstanceInner::NonTuple(class) => {
-                Type::non_tuple_instance(class.materialize(db, materialization_type))
+                Type::non_tuple_instance(class.materialize(db, materialization_kind))
             }
         }
     }
@@ -587,13 +587,13 @@ impl<'db> ProtocolInstanceType<'db> {
     pub(super) fn materialize(
         self,
         db: &'db dyn Db,
-        materialization_type: MaterializationType,
+        materialization_kind: MaterializationKind,
     ) -> Self {
         match self.inner {
             // TODO: This should also materialize via `class.materialize(db, variance)`
             Protocol::FromClass(class) => Self::from_class(class),
             Protocol::Synthesized(synthesized) => {
-                Self::synthesized(synthesized.materialize(db, materialization_type))
+                Self::synthesized(synthesized.materialize(db, materialization_kind))
             }
         }
     }
@@ -681,7 +681,7 @@ mod synthesized_protocol {
     use crate::semantic_index::definition::Definition;
     use crate::types::protocol_class::ProtocolInterface;
     use crate::types::{
-        ApplyTypeMappingVisitor, BoundTypeVarInstance, MaterializationType, NormalizedVisitor,
+        ApplyTypeMappingVisitor, BoundTypeVarInstance, MaterializationKind, NormalizedVisitor,
         TypeMapping, TypeVarVariance, VarianceInferable,
     };
     use crate::{Db, FxOrderSet};
@@ -712,9 +712,9 @@ mod synthesized_protocol {
         pub(super) fn materialize(
             self,
             db: &'db dyn Db,
-            materialization_type: MaterializationType,
+            materialization_kind: MaterializationKind,
         ) -> Self {
-            Self(self.0.materialize(db, materialization_type))
+            Self(self.0.materialize(db, materialization_kind))
         }
 
         pub(super) fn apply_type_mapping_impl<'a>(

@@ -14,7 +14,7 @@ use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::tuple::TupleSpec;
 use crate::types::{
-    CallableType, IntersectionType, KnownClass, MaterializationType, MethodWrapperKind, Protocol,
+    CallableType, IntersectionType, KnownClass, MaterializationKind, MethodWrapperKind, Protocol,
     StringLiteralType, SubclassOfInner, Type, UnionType, WrapperDescriptorKind,
 };
 
@@ -530,12 +530,12 @@ impl Display for DisplayGenericAlias<'_> {
         if let Some(tuple) = self.specialization.tuple(self.db) {
             tuple.display_with(self.db, self.settings).fmt(f)
         } else {
-            let prefix = match self.specialization.specialization_type(self.db) {
+            let prefix = match self.specialization.materialization_kind(self.db) {
                 None => "",
-                Some(MaterializationType::Top) => "Top[",
-                Some(MaterializationType::Bottom) => "Bottom[",
+                Some(MaterializationKind::Top) => "Top[",
+                Some(MaterializationKind::Bottom) => "Bottom[",
             };
-            let suffix = match self.specialization.specialization_type(self.db) {
+            let suffix = match self.specialization.materialization_kind(self.db) {
                 None => "",
                 Some(_) => "]",
             };

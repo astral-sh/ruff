@@ -199,7 +199,7 @@ pub(crate) struct Normalized;
 ///
 /// This matters only if there is at least one invariant type parameter.
 /// For example, we represent `Top[list[Any]]` as a `GenericAlias` with
-/// `MaterializationType` set to Top, which we denote as `Top[list[Any]]`.
+/// `MaterializationKind` set to Top, which we denote as `Top[list[Any]]`.
 /// A type `Top[list[T]]` includes all fully static list types `list[U]` where `U` is
 /// a supertype of `Bottom[T]` and a subtype of `Top[T]`.
 ///
@@ -207,12 +207,12 @@ pub(crate) struct Normalized;
 /// This type is harder to make sense of in a set-theoretic framework, but
 /// it is a subtype of all materializations of `list[Any]`.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
-pub enum MaterializationType {
+pub enum MaterializationKind {
     Top,
     Bottom,
 }
 
-impl MaterializationType {
+impl MaterializationKind {
     /// Flip the materialization type: `Top` becomes `Bottom` and vice versa.
     #[must_use]
     pub const fn flip(self) -> Self {
@@ -517,13 +517,13 @@ impl<'db> PropertyInstanceType<'db> {
         }
     }
 
-    fn materialize(self, db: &'db dyn Db, materialization_type: MaterializationType) -> Self {
+    fn materialize(self, db: &'db dyn Db, materialization_kind: MaterializationKind) -> Self {
         Self::new(
             db,
             self.getter(db)
-                .map(|ty| ty.materialize(db, materialization_type)),
+                .map(|ty| ty.materialize(db, materialization_kind)),
             self.setter(db)
-                .map(|ty| ty.materialize(db, materialization_type)),
+                .map(|ty| ty.materialize(db, materialization_kind)),
         )
     }
 }
@@ -768,14 +768,14 @@ impl<'db> Type<'db> {
     /// most general form of the type that is fully static.
     #[must_use]
     pub(crate) fn top_materialization(&self, db: &'db dyn Db) -> Type<'db> {
-        self.materialize(db, MaterializationType::Top)
+        self.materialize(db, MaterializationKind::Top)
     }
 
     /// Returns the bottom materialization (or lower bound materialization) of this type, which is
     /// the most specific form of the type that is fully static.
     #[must_use]
     pub(crate) fn bottom_materialization(&self, db: &'db dyn Db) -> Type<'db> {
-        self.materialize(db, MaterializationType::Bottom)
+        self.materialize(db, MaterializationKind::Bottom)
     }
 
     /// If this type is an instance type where the class has a tuple spec, returns the tuple spec.
@@ -810,11 +810,11 @@ impl<'db> Type<'db> {
     /// - In covariant position, it's replaced with `object`
     /// - In contravariant position, it's replaced with `Never`
     /// - In invariant position, it's replaced with an unresolved type variable
-    fn materialize(&self, db: &'db dyn Db, materialization_type: MaterializationType) -> Type<'db> {
+    fn materialize(&self, db: &'db dyn Db, materialization_kind: MaterializationKind) -> Type<'db> {
         match self {
-            Type::Dynamic(_) => match materialization_type {
-                MaterializationType::Top => Type::object(db),
-                MaterializationType::Bottom => Type::Never,
+            Type::Dynamic(_) => match materialization_kind {
+                MaterializationKind::Top => Type::object(db),
+                MaterializationKind::Bottom => Type::Never,
             },
 
             Type::Never
@@ -837,7 +837,7 @@ impl<'db> Type<'db> {
             | Type::BoundSuper(_) => *self,
 
             Type::PropertyInstance(property_instance) => {
-                Type::PropertyInstance(property_instance.materialize(db, materialization_type))
+                Type::PropertyInstance(property_instance.materialize(db, materialization_kind))
             }
 
             Type::FunctionLiteral(_) | Type::BoundMethod(_) => {
@@ -846,15 +846,15 @@ impl<'db> Type<'db> {
                 *self
             }
 
-            Type::NominalInstance(instance) => instance.materialize(db, materialization_type),
+            Type::NominalInstance(instance) => instance.materialize(db, materialization_kind),
             Type::GenericAlias(generic_alias) => {
-                Type::GenericAlias(generic_alias.materialize(db, materialization_type))
+                Type::GenericAlias(generic_alias.materialize(db, materialization_kind))
             }
             Type::Callable(callable_type) => {
-                Type::Callable(callable_type.materialize(db, materialization_type))
+                Type::Callable(callable_type.materialize(db, materialization_kind))
             }
             Type::SubclassOf(subclass_of_type) => {
-                subclass_of_type.materialize(db, materialization_type)
+                subclass_of_type.materialize(db, materialization_kind)
             }
             Type::ProtocolInstance(protocol_instance_type) => {
                 // TODO: Add tests for this once subtyping/assignability is implemented for
@@ -864,30 +864,30 @@ impl<'db> Type<'db> {
                 // > read-only property members, and method members, on protocols act covariantly;
                 // > write-only property members act contravariantly; and read/write attribute
                 // > members on protocols act invariantly
-                Type::ProtocolInstance(protocol_instance_type.materialize(db, materialization_type))
+                Type::ProtocolInstance(protocol_instance_type.materialize(db, materialization_kind))
             }
             Type::Union(union_type) => {
-                union_type.map(db, |ty| ty.materialize(db, materialization_type))
+                union_type.map(db, |ty| ty.materialize(db, materialization_kind))
             }
             Type::Intersection(intersection_type) => IntersectionBuilder::new(db)
                 .positive_elements(
                     intersection_type
                         .positive(db)
                         .iter()
-                        .map(|ty| ty.materialize(db, materialization_type)),
+                        .map(|ty| ty.materialize(db, materialization_kind)),
                 )
                 .negative_elements(
                     intersection_type
                         .negative(db)
                         .iter()
-                        .map(|ty| ty.materialize(db, materialization_type.flip())),
+                        .map(|ty| ty.materialize(db, materialization_kind.flip())),
                 )
                 .build(),
             Type::TypeVar(bound_typevar) => {
-                Type::TypeVar(bound_typevar.materialize(db, materialization_type))
+                Type::TypeVar(bound_typevar.materialize(db, materialization_kind))
             }
             Type::NonInferableTypeVar(bound_typevar) => {
-                Type::NonInferableTypeVar(bound_typevar.materialize(db, materialization_type))
+                Type::NonInferableTypeVar(bound_typevar.materialize(db, materialization_kind))
             }
             Type::TypeIs(type_is) => {
                 // TODO(jelle): this seems wrong, should be invariant?
@@ -895,14 +895,14 @@ impl<'db> Type<'db> {
                     db,
                     type_is
                         .return_type(db)
-                        .materialize(db, materialization_type),
+                        .materialize(db, materialization_kind),
                 )
             }
             Type::TypedDict(_) => {
                 // TODO: Materialization of gradual TypedDicts
                 *self
             }
-            Type::TypeAlias(alias) => alias.value_type(db).materialize(db, materialization_type),
+            Type::TypeAlias(alias) => alias.value_type(db).materialize(db, materialization_kind),
         }
     }
 
@@ -6667,9 +6667,9 @@ impl<'db> TypeMapping<'_, 'db> {
         }
     }
 
-    fn get_specialization_type(&self, db: &'db dyn Db) -> Option<MaterializationType> {
+    fn materialization_kind(&self, db: &'db dyn Db) -> Option<MaterializationKind> {
         match self {
-            TypeMapping::Specialization(specialization) => specialization.specialization_type(db),
+            TypeMapping::Specialization(specialization) => specialization.materialization_kind(db),
             _ => None,
         }
     }
@@ -7357,7 +7357,7 @@ impl<'db> TypeVarInstance<'db> {
         )
     }
 
-    fn materialize(self, db: &'db dyn Db, materialization_type: MaterializationType) -> Self {
+    fn materialize(self, db: &'db dyn Db, materialization_kind: MaterializationKind) -> Self {
         Self::new(
             db,
             self.name(db),
@@ -7366,26 +7366,26 @@ impl<'db> TypeVarInstance<'db> {
                 .and_then(|bound_or_constraints| match bound_or_constraints {
                     TypeVarBoundOrConstraintsEvaluation::Eager(bound_or_constraints) => Some(
                         bound_or_constraints
-                            .materialize(db, materialization_type)
+                            .materialize(db, materialization_kind)
                             .into(),
                     ),
                     TypeVarBoundOrConstraintsEvaluation::LazyUpperBound => self
                         .lazy_bound(db)
-                        .map(|bound| bound.materialize(db, materialization_type).into()),
+                        .map(|bound| bound.materialize(db, materialization_kind).into()),
                     TypeVarBoundOrConstraintsEvaluation::LazyConstraints => {
                         self.lazy_constraints(db).map(|constraints| {
-                            constraints.materialize(db, materialization_type).into()
+                            constraints.materialize(db, materialization_kind).into()
                         })
                     }
                 }),
             self.explicit_variance(db),
             self._default(db).and_then(|default| match default {
                 TypeVarDefaultEvaluation::Eager(ty) => {
-                    Some(ty.materialize(db, materialization_type).into())
+                    Some(ty.materialize(db, materialization_kind).into())
                 }
                 TypeVarDefaultEvaluation::Lazy => self
                     .lazy_default(db)
-                    .map(|ty| ty.materialize(db, materialization_type).into()),
+                    .map(|ty| ty.materialize(db, materialization_kind).into()),
             }),
             self.kind(db),
         )
@@ -7547,10 +7547,10 @@ impl<'db> BoundTypeVarInstance<'db> {
         )
     }
 
-    fn materialize(self, db: &'db dyn Db, materialization_type: MaterializationType) -> Self {
+    fn materialize(self, db: &'db dyn Db, materialization_kind: MaterializationKind) -> Self {
         Self::new(
             db,
-            self.typevar(db).materialize(db, materialization_type),
+            self.typevar(db).materialize(db, materialization_kind),
             self.binding_context(db),
         )
     }
@@ -7627,10 +7627,10 @@ impl<'db> TypeVarBoundOrConstraints<'db> {
         }
     }
 
-    fn materialize(self, db: &'db dyn Db, materialization_type: MaterializationType) -> Self {
+    fn materialize(self, db: &'db dyn Db, materialization_kind: MaterializationKind) -> Self {
         match self {
             TypeVarBoundOrConstraints::UpperBound(bound) => {
-                TypeVarBoundOrConstraints::UpperBound(bound.materialize(db, materialization_type))
+                TypeVarBoundOrConstraints::UpperBound(bound.materialize(db, materialization_kind))
             }
             TypeVarBoundOrConstraints::Constraints(constraints) => {
                 TypeVarBoundOrConstraints::Constraints(UnionType::new(
@@ -7638,7 +7638,7 @@ impl<'db> TypeVarBoundOrConstraints<'db> {
                     constraints
                         .elements(db)
                         .iter()
-                        .map(|ty| ty.materialize(db, materialization_type))
+                        .map(|ty| ty.materialize(db, materialization_kind))
                         .collect::<Vec<_>>()
                         .into_boxed_slice(),
                 ))
@@ -8880,10 +8880,10 @@ impl<'db> CallableType<'db> {
         ))
     }
 
-    fn materialize(self, db: &'db dyn Db, materialization_type: MaterializationType) -> Self {
+    fn materialize(self, db: &'db dyn Db, materialization_kind: MaterializationKind) -> Self {
         CallableType::new(
             db,
-            self.signatures(db).materialize(db, materialization_type),
+            self.signatures(db).materialize(db, materialization_kind),
             self.is_function_like(db),
         )
     }

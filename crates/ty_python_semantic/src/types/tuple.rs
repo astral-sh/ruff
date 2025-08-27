@@ -27,7 +27,7 @@ use crate::types::class::{ClassType, KnownClass};
 use crate::types::constraints::{Constraints, IteratorConstraintsExtension};
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, HasRelationToVisitor, IsDisjointVisitor,
-    IsEquivalentVisitor, MaterializationType, NormalizedVisitor, Type, TypeMapping, TypeRelation,
+    IsEquivalentVisitor, MaterializationKind, NormalizedVisitor, Type, TypeMapping, TypeRelation,
     UnionBuilder, UnionType,
 };
 use crate::util::subscript::{Nth, OutOfBoundsError, PyIndex, PySlice, StepSizeZeroError};
@@ -231,9 +231,9 @@ impl<'db> TupleType<'db> {
     pub(crate) fn materialize(
         self,
         db: &'db dyn Db,
-        materialization_type: MaterializationType,
+        materialization_kind: MaterializationKind,
     ) -> Option<Self> {
-        TupleType::new(db, &self.tuple(db).materialize(db, materialization_type))
+        TupleType::new(db, &self.tuple(db).materialize(db, materialization_kind))
     }
 
     pub(crate) fn apply_type_mapping_impl<'a>(
@@ -393,11 +393,11 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         Self::from_elements(self.0.iter().map(|ty| ty.normalized_impl(db, visitor)))
     }
 
-    fn materialize(&self, db: &'db dyn Db, materialization_type: MaterializationType) -> Self {
+    fn materialize(&self, db: &'db dyn Db, materialization_kind: MaterializationKind) -> Self {
         Self::from_elements(
             self.0
                 .iter()
-                .map(|ty| ty.materialize(db, materialization_type)),
+                .map(|ty| ty.materialize(db, materialization_kind)),
         )
     }
 
@@ -714,16 +714,16 @@ impl<'db> VariableLengthTuple<Type<'db>> {
     fn materialize(
         &self,
         db: &'db dyn Db,
-        materialization_type: MaterializationType,
+        materialization_kind: MaterializationKind,
     ) -> TupleSpec<'db> {
         Self::mixed(
             self.prefix
                 .iter()
-                .map(|ty| ty.materialize(db, materialization_type)),
-            self.variable.materialize(db, materialization_type),
+                .map(|ty| ty.materialize(db, materialization_kind)),
+            self.variable.materialize(db, materialization_kind),
             self.suffix
                 .iter()
-                .map(|ty| ty.materialize(db, materialization_type)),
+                .map(|ty| ty.materialize(db, materialization_kind)),
         )
     }
 
@@ -1077,11 +1077,11 @@ impl<'db> Tuple<Type<'db>> {
     pub(crate) fn materialize(
         &self,
         db: &'db dyn Db,
-        materialization_type: MaterializationType,
+        materialization_kind: MaterializationKind,
     ) -> Self {
         match self {
-            Tuple::Fixed(tuple) => Tuple::Fixed(tuple.materialize(db, materialization_type)),
-            Tuple::Variable(tuple) => tuple.materialize(db, materialization_type),
+            Tuple::Fixed(tuple) => Tuple::Fixed(tuple.materialize(db, materialization_kind)),
+            Tuple::Variable(tuple) => tuple.materialize(db, materialization_kind),
         }
     }
 
