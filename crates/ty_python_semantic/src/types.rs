@@ -3395,19 +3395,14 @@ impl<'db> Type<'db> {
         let name_str = name.as_str();
 
         match self {
-            Type::Union(union) => union
-                .map_with_boundness(db, |elem| {
-                    elem.member_lookup_with_policy(db, name_str.into(), policy)
-                        .place
-                })
-                .into(),
+            Type::Union(union) => union.map_with_boundness_and_qualifiers(db, |elem| {
+                elem.member_lookup_with_policy(db, name_str.into(), policy)
+            }),
 
             Type::Intersection(intersection) => intersection
-                .map_with_boundness(db, |elem| {
+                .map_with_boundness_and_qualifiers(db, |elem| {
                     elem.member_lookup_with_policy(db, name_str.into(), policy)
-                        .place
-                })
-                .into(),
+                }),
 
             Type::Dynamic(..) | Type::Never => Place::bound(self).into(),
 
@@ -10177,8 +10172,8 @@ impl<'db> IntersectionType<'db> {
         let mut builder = IntersectionBuilder::new(db);
         let mut qualifiers = TypeQualifiers::empty();
 
-        let mut any_unbound = false;
-        let mut any_possibly_unbound = false;
+        let mut all_unbound = true;
+        let mut any_definitely_bound = false;
         for ty in self.positive_elements_or_object(db) {
             let PlaceAndQualifiers {
                 place: member,
@@ -10186,12 +10181,11 @@ impl<'db> IntersectionType<'db> {
             } = transform_fn(&ty);
             qualifiers |= new_qualifiers;
             match member {
-                Place::Unbound => {
-                    any_unbound = true;
-                }
+                Place::Unbound => {}
                 Place::Type(ty_member, member_boundness) => {
-                    if member_boundness == Boundness::PossiblyUnbound {
-                        any_possibly_unbound = true;
+                    all_unbound = false;
+                    if member_boundness == Boundness::Bound {
+                        any_definitely_bound = true;
                     }
 
                     builder = builder.add_positive(ty_member);
@@ -10200,15 +10194,15 @@ impl<'db> IntersectionType<'db> {
         }
 
         PlaceAndQualifiers {
-            place: if any_unbound {
+            place: if all_unbound {
                 Place::Unbound
             } else {
                 Place::Type(
                     builder.build(),
-                    if any_possibly_unbound {
-                        Boundness::PossiblyUnbound
-                    } else {
+                    if any_definitely_bound {
                         Boundness::Bound
+                    } else {
+                        Boundness::PossiblyUnbound
                     },
                 )
             },
