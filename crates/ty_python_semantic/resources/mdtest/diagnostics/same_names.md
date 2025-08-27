@@ -4,6 +4,8 @@ ty prints the fully qualified name to disambiguate objects with the same name.
 
 ## Nested class
 
+`test.py`:
+
 ```py
 class A:
     class B:
@@ -13,7 +15,23 @@ class C:
     class B:
         pass
 
-a: A.B = C.B()  # error: [invalid-assignment] "Object of type `mdtest_snippet.C.B` is not assignable to `mdtest_snippet.A.B`"
+a: A.B = C.B()  # error: [invalid-assignment] "Object of type `test.C.B` is not assignable to `test.A.B`"
+```
+
+## Nested class in function
+
+`test.py`:
+
+```py
+class B:
+    pass
+
+def f(b: B):
+    class B:
+        pass
+
+    # error: [invalid-assignment] "Object of type `test.<locals of function 'f'>.B` is not assignable to `test.B`"
+    b = B()
 ```
 
 ## Class from different modules
@@ -76,6 +94,8 @@ class Status(Enum):
 
 ## Nested enum
 
+`test.py`:
+
 ```py
 from enum import Enum
 
@@ -89,7 +109,7 @@ class C:
         ACTIVE = "active"
         INACTIVE = "inactive"
 
-# error: [invalid-assignment] "Object of type `Literal[mdtest_snippet.C.B.ACTIVE]` is not assignable to `mdtest_snippet.A.B`"
+# error: [invalid-assignment] "Object of type `Literal[test.C.B.ACTIVE]` is not assignable to `test.A.B`"
 a: A.B = C.B.ACTIVE
 ```
 
