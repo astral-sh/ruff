@@ -677,7 +677,7 @@ impl<'db> ConstraintBound<'db> {
     ///
     /// There are only three situations where the result is open:
     ///
-    /// ```
+    /// ```text
     /// ────╢t₁    ────╢t₁    ────╢t₁    ────┨t₁    ────┨t₁    ────┨t₁    ────╢t₁
     /// ──╢t₂      ──┨t₂      ────╢t₂    ──╢t₂      ──┨t₂      ────┨t₂    ────┨t₂
     ///     ⇓          ⇓          ⇓          ⇓          ⇓          ⇓          ⇓
@@ -723,7 +723,7 @@ impl<'db> ConstraintBound<'db> {
     ///
     /// There are only three situations where the result is open:
     ///
-    /// ```
+    /// ```text
     /// s₁╟────    s₁╟────    s₁╟────    s₁┠────    s₁┠────    s₁┠────    s₁╟────
     /// s₂╟──      s₂┠──      s₂╟────    s₂╟──      s₂┠──      s₂┠────    s₂┠────
     ///     ⇓          ⇓          ⇓          ⇓          ⇓          ⇓          ⇓
