@@ -698,8 +698,8 @@ static_assert(is_assignable_to(FooWithZero, HasXWithDefault))
 # in a throwaway comment in the spec's prose.
 static_assert(is_subtype_of(Foo, HasXWithDefault))
 static_assert(is_assignable_to(Foo, HasXWithDefault))
-static_assert(is_subtype_of(Qux, HasXWithDefault))  # error: [static-assert-error]
-static_assert(is_assignable_to(Qux, HasXWithDefault))  # error: [static-assert-error]
+static_assert(is_subtype_of(Qux, HasXWithDefault))
+static_assert(is_assignable_to(Qux, HasXWithDefault))
 
 class HasClassVarX(Protocol):
     x: ClassVar[int]
