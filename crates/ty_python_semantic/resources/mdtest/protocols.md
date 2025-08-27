@@ -1060,6 +1060,11 @@ class A(Protocol):
 
 ## Equivalence of protocols
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 Two protocols are considered equivalent types if they specify the same interface, even if they have
 different names:
 
@@ -1106,6 +1111,28 @@ class UnionProto2(Protocol):
 
 static_assert(is_equivalent_to(UnionProto1, UnionProto2))
 static_assert(is_equivalent_to(UnionProto1 | A | B, B | UnionProto2 | A))
+```
+
+Different generic protocols with equivalent specializations can be equivalent, but generic protocols
+with different specializations are not considered equivalent:
+
+```py
+from typing import TypeVar
+
+S = TypeVar("S")
+
+class GenericProto[T](Protocol):
+    x: T
+
+class LegacyGenericProto(Protocol[S]):
+    x: S
+
+static_assert(is_equivalent_to(GenericProto[int], LegacyGenericProto[int]))
+
+static_assert(not is_equivalent_to(GenericProto[str], GenericProto[int]))
+static_assert(not is_equivalent_to(GenericProto[str], LegacyGenericProto[int]))
+static_assert(not is_equivalent_to(GenericProto, GenericProto[int]))
+static_assert(not is_equivalent_to(LegacyGenericProto, LegacyGenericProto[int]))
 ```
 
 ## Intersections of protocols
