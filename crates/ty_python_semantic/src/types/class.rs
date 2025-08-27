@@ -1198,6 +1198,14 @@ impl<'db> ClassType<'db> {
             }
         }
     }
+
+    pub(super) fn is_protocol(self, db: &'db dyn Db) -> bool {
+        self.class_literal(db).0.is_protocol(db)
+    }
+
+    pub(super) fn header_span(self, db: &'db dyn Db) -> Span {
+        self.class_literal(db).0.header_span(db)
+    }
 }
 
 impl<'db> From<GenericAlias<'db>> for ClassType<'db> {

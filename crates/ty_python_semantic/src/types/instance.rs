@@ -645,10 +645,8 @@ impl<'db> Protocol<'db> {
     fn interface(self, db: &'db dyn Db) -> ProtocolInterface<'db> {
         match self {
             Self::FromClass(class) => class
-                .class_literal(db)
-                .0
                 .into_protocol_class(db)
-                .expect("Protocol class literal should be a protocol class")
+                .expect("Class wrapped by `Protocol` should be a protocol class")
                 .interface(db),
             Self::Synthesized(synthesized) => synthesized.interface(),
         }
