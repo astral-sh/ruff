@@ -154,11 +154,11 @@ struct Position {
 }
 
 /// Generate a unique fingerprint to identify a violation.
-fn fingerprint(message: &Diagnostic, project_path: &str, salt: u64) -> u64 {
+fn fingerprint(diagnostic: &Diagnostic, project_path: &str, salt: u64) -> u64 {
     let mut hasher = DefaultHasher::new();
 
     salt.hash(&mut hasher);
-    message.name().hash(&mut hasher);
+    diagnostic.name().hash(&mut hasher);
     project_path.hash(&mut hasher);
 
     hasher.finish()
