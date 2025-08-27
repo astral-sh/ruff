@@ -170,13 +170,12 @@ impl DisplayRepresentation<'_> {
         f: &mut Formatter<'_>,
         class: ClassLiteral,
     ) -> fmt::Result {
-        if !self.settings.qualified {
-            return f.write_str(class.name(self.db));
-        }
-        let parents = self.class_parents(class);
-        if !parents.is_empty() {
-            f.write_str(&parents.join("."))?;
-            f.write_char('.')?;
+        if self.settings.qualified {
+            let parents = self.class_parents(class);
+            if !parents.is_empty() {
+                f.write_str(&parents.join("."))?;
+                f.write_char('.')?;
+            }
         }
         f.write_str(class.name(self.db))
     }
