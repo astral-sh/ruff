@@ -224,7 +224,9 @@ impl<'db> AllMembers<'db> {
                             }
                             Type::ClassLiteral(class) if class.is_protocol(db) => continue,
                             Type::KnownInstance(
-                                KnownInstanceType::TypeVar(_) | KnownInstanceType::TypeAliasType(_),
+                                KnownInstanceType::TypeVar(_)
+                                | KnownInstanceType::TypeAliasType(_)
+                                | KnownInstanceType::TypeAlias(_),
                             ) => continue,
                             _ => {}
                         }

@@ -4833,7 +4833,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) {
         // Annotated assignments defer the entire value expression in case of a PEP 613 type alias.
         // SAFETY `infer_annotated_assignment_definition` does not defer if there is no RHS
-        let value_node = assignment.value(&self.module()).unwrap();
+        let value_node = assignment.value(self.module()).unwrap();
         self.infer_type_expression(value_node);
     }
 
