@@ -292,7 +292,15 @@ impl<'db> ConstraintSet<'db> {
         let self_clauses = std::mem::take(&mut self.clauses);
         for self_clause in &self_clauses {
             for other_clause in &other.clauses {
-                self.union_set(db, self_clause.intersect_clause(db, other_clause));
+                match self_clause.intersect_clause(db, other_clause) {
+                    Satisfiable::Never => continue,
+                    Satisfiable::Always => {
+                        self.clauses.clear();
+                        self.clauses.push(ConstraintClause::always());
+                        return;
+                    }
+                    Satisfiable::Constrained(clause) => self.union_clause(db, clause),
+                }
             }
         }
     }
@@ -400,10 +408,10 @@ impl<'db> ConstraintClause<'db> {
 
     /// Returns the intersection of this clause and an atomic constraint.
     fn intersect_constraint(
-        mut self,
+        &mut self,
         db: &'db dyn Db,
         constraint: AtomicConstraint<'db>,
-    ) -> Satisfiable<Self> {
+    ) -> Satisfiable<()> {
         // If the clause does not already contain a constraint for this typevar, we just insert the
         // new constraint into the clause and return.
         let index = match (self.constraints)
@@ -412,7 +420,7 @@ impl<'db> ConstraintClause<'db> {
             Ok(index) => index,
             Err(index) => {
                 self.constraints.insert(index, constraint);
-                return Satisfiable::Constrained(self);
+                return Satisfiable::Constrained(());
             }
         };
 
@@ -429,12 +437,12 @@ impl<'db> ConstraintClause<'db> {
             // contributes anything to the clause, and can be removed.
             Satisfiable::Always => {
                 self.constraints.remove(index);
-                if self.constraints.is_empty() {
+                if self.is_always() {
                     // If there are no further constraints in the clause, the clause is now always
                     // satisfied.
                     Satisfiable::Always
                 } else {
-                    Satisfiable::Constrained(self)
+                    Satisfiable::Constrained(())
                 }
             }
 
@@ -443,36 +451,26 @@ impl<'db> ConstraintClause<'db> {
             // place in the clause's constraint list.
             Satisfiable::Constrained(constraint) => {
                 self.constraints[index] = constraint;
-                Satisfiable::Constrained(self)
+                Satisfiable::Constrained(())
             }
         }
     }
 
-    /// Returns the intersection of this clause with another. The result is a full constraint set,
-    /// since the intersection of each constraint in the clause might result in a union of
-    /// constraints.
-    fn intersect_clause(&self, db: &'db dyn Db, other: &Self) -> ConstraintSet<'db> {
-        let mut prev = ConstraintSet::never();
-        let mut next = ConstraintSet::singleton(self.clone());
+    /// Returns the intersection of this clause with another.
+    fn intersect_clause(&self, db: &'db dyn Db, other: &Self) -> Satisfiable<Self> {
+        // Add each `other` constraint in turn. Short-circuit if the result ever becomes 0.
+        let mut result = self.clone();
         for constraint in &other.constraints {
-            std::mem::swap(&mut prev, &mut next);
-            for clause in prev.clauses.drain(..) {
-                match clause.intersect_constraint(db, *constraint) {
-                    Satisfiable::Never => {}
-                    Satisfiable::Always => {
-                        // If any clause becomes always satisfiable, the set as a whole does too,
-                        // and we don't have to process any more of the clauses.
-                        next.clauses.clear();
-                        next.clauses.push(ConstraintClause::always());
-                        break;
-                    }
-                    Satisfiable::Constrained(clause) => {
-                        next.union_clause(db, clause);
-                    }
-                }
+            match result.intersect_constraint(db, *constraint) {
+                Satisfiable::Never => return Satisfiable::Never,
+                Satisfiable::Always | Satisfiable::Constrained(()) => {}
             }
         }
-        next
+        if result.is_always() {
+            Satisfiable::Always
+        } else {
+            Satisfiable::Constrained(result)
+        }
     }
 
     /// Returns the union of this clause and another.
