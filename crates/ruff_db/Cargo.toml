@@ -34,6 +34,7 @@ glob = { workspace = true }
 ignore = { workspace = true, optional = true }
 matchit = { workspace = true }
 path-slash = { workspace = true }
+pathdiff = { workspace = true }
 quick-junit = { workspace = true, optional = true }
 rustc-hash = { workspace = true }
 salsa = { workspace = true }

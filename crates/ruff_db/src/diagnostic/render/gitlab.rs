@@ -33,6 +33,12 @@ impl GitlabRenderer<'_> {
             serde_json::json!(SerializedMessages {
                 diagnostics,
                 resolver: self.resolver,
+                #[expect(
+                    clippy::disallowed_methods,
+                    reason = "We don't have access to a `System` here, \
+                              and this is only intended for use by GitLab CI, \
+                              which runs on a real `System`."
+                )]
                 project_dir: std::env::var("CI_PROJECT_DIR").ok().as_deref(),
             })
         )
@@ -50,8 +56,84 @@ impl Serialize for SerializedMessages<'_> {
     where
         S: Serializer,
     {
-        todo!()
+        let mut s = serializer.serialize_seq(Some(self.diagnostics.len()))?;
+        let mut fingerprints = HashSet::<u64>::with_capacity(self.diagnostics.len());
+
+        for diagnostic in self.diagnostics {
+            let span = diagnostic.expect_primary_span();
+            let file = span.file();
+            let filename = diagnostic.expect_ruff_filename();
+
+            let (start_location, end_location) = if self.resolver.is_notebook(file) {
+                // We can't give a reasonable location for the structured formats,
+                // so we show one that's clearly a fallback
+                Default::default()
+            } else {
+                (
+                    diagnostic.expect_ruff_start_location(),
+                    diagnostic.expect_ruff_end_location(),
+                )
+            };
+
+            let path = self.project_dir.as_ref().map_or_else(
+                || file.relative_path(self.resolver).display().to_string(),
+                |project_dir| relativize_path_to(&filename, project_dir),
+            );
+
+            let mut message_fingerprint = fingerprint(diagnostic, &path, 0);
+
+            // Make sure that we do not get a fingerprint that is already in use
+            // by adding in the previously generated one.
+            while fingerprints.contains(&message_fingerprint) {
+                message_fingerprint = fingerprint(diagnostic, &path, message_fingerprint);
+            }
+            fingerprints.insert(message_fingerprint);
+
+            let description = diagnostic.body();
+            let check_name = diagnostic.secondary_code_or_id();
+
+            let value = json!({
+                "check_name": check_name,
+                // GitLab doesn't display the separate `check_name` field in a Code Quality report,
+                // so prepend it to the description too.
+                "description": format!("{check_name}: {description}"),
+                "severity": "major",
+                "fingerprint": format!("{:x}", message_fingerprint),
+                "location": {
+                    "path": path,
+                    "positions": {
+                        "begin": start_location,
+                        "end": end_location,
+                    },
+                },
+            });
+
+            s.serialize_element(&value)?;
+        }
+
+        s.end()
     }
+}
+
+/// Generate a unique fingerprint to identify a violation.
+fn fingerprint(message: &Diagnostic, project_path: &str, salt: u64) -> u64 {
+    let mut hasher = DefaultHasher::new();
+
+    salt.hash(&mut hasher);
+    message.name().hash(&mut hasher);
+    project_path.hash(&mut hasher);
+
+    hasher.finish()
+}
+
+/// Convert an absolute path to be relative to the specified project root.
+fn relativize_path_to<P: AsRef<Path>, R: AsRef<Path>>(path: P, project_root: R) -> String {
+    format!(
+        "{}",
+        pathdiff::diff_paths(&path, project_root)
+            .expect("Could not diff paths")
+            .display()
+    )
 }
 
 #[cfg(test)]
@@ -61,15 +143,24 @@ mod tests {
         render::tests::{create_diagnostics, create_syntax_error_diagnostics},
     };
 
+    const FINGERPRINT_FILTERS: [(&str, &str); 1] = [(
+        r#""fingerprint": "[a-z0-9]+","#,
+        r#""fingerprint": "<redacted>","#,
+    )];
+
     #[test]
     fn output() {
         let (env, diagnostics) = create_diagnostics(DiagnosticFormat::Gitlab);
-        insta::assert_snapshot!(env.render_diagnostics(&diagnostics));
+        insta::with_settings!({filters => FINGERPRINT_FILTERS}, {
+            insta::assert_snapshot!(env.render_diagnostics(&diagnostics));
+        });
     }
 
     #[test]
     fn syntax_errors() {
         let (env, diagnostics) = create_syntax_error_diagnostics(DiagnosticFormat::Gitlab);
-        insta::assert_snapshot!(env.render_diagnostics(&diagnostics));
+        insta::with_settings!({filters => FINGERPRINT_FILTERS}, {
+            insta::assert_snapshot!(env.render_diagnostics(&diagnostics));
+        });
     }
 }
