@@ -5965,7 +5965,12 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         specialization: Specialization<'db>,
     ) -> Type<'db> {
-        self.apply_type_mapping(db, &TypeMapping::Specialization(specialization))
+        let new_specialization =
+            self.apply_type_mapping(db, &TypeMapping::Specialization(specialization));
+        match specialization.specialization_type(db) {
+            None => new_specialization,
+            Some(materialization_type) => new_specialization.materialize(db, materialization_type),
+        }
     }
 
     fn apply_type_mapping<'a>(
@@ -6659,13 +6664,6 @@ impl<'db> TypeMapping<'_, 'db> {
             TypeMapping::MarkTypeVarsInferable(binding_context) => {
                 TypeMapping::MarkTypeVarsInferable(*binding_context)
             }
-        }
-    }
-
-    fn materialization_kind(&self, db: &'db dyn Db) -> Option<MaterializationKind> {
-        match self {
-            TypeMapping::Specialization(specialization) => specialization.materialization_kind(db),
-            _ => None,
         }
     }
 }

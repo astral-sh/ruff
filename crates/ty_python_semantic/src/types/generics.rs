@@ -581,7 +581,12 @@ impl<'db> Specialization<'db> {
     /// That lets us produce the generic alias `A[int]`, which is the corresponding entry in the
     /// MRO of `B[int]`.
     pub(crate) fn apply_specialization(self, db: &'db dyn Db, other: Specialization<'db>) -> Self {
-        self.apply_type_mapping(db, &TypeMapping::Specialization(other))
+        let new_specialization = self.apply_type_mapping(db, &TypeMapping::Specialization(other));
+        let result = match other.specialization_type(db) {
+            None => new_specialization,
+            Some(materialization_type) => new_specialization.materialize(db, materialization_type),
+        };
+        result
     }
 
     pub(crate) fn apply_type_mapping<'a>(
@@ -598,59 +603,20 @@ impl<'db> Specialization<'db> {
         type_mapping: &TypeMapping<'a, 'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
-        // TODO it seems like this should be possible to do in a much simpler way in
-        // `Self::apply_specialization`; just apply the type mapping to create the new
-        // specialization, then materialize the new specialization appropriately, if the type
-        // mapping is a materialization. But this doesn't work; see discussion in
-        // https://github.com/astral-sh/ruff/pull/20076
-        let applied_materialization_kind = type_mapping.materialization_kind(db);
-        let mut has_dynamic_invariant_typevar = false;
         let types: Box<[_]> = self
-            .generic_context(db)
-            .variables(db)
-            .into_iter()
-            .zip(self.types(db))
-            .map(|(bound_typevar, vartype)| {
-                let ty = vartype.apply_type_mapping_impl(db, type_mapping, visitor);
-                match (applied_materialization_kind, bound_typevar.variance(db)) {
-                    (None, _) => ty,
-                    (Some(_), TypeVarVariance::Bivariant) =>
-                    // With bivariance, all specializations are subtypes of each other,
-                    // so any materialization is acceptable.
-                    {
-                        ty.materialize(db, MaterializationKind::Top)
-                    }
-                    (Some(materialization_kind), TypeVarVariance::Covariant) => {
-                        ty.materialize(db, materialization_kind)
-                    }
-                    (Some(materialization_kind), TypeVarVariance::Contravariant) => {
-                        ty.materialize(db, materialization_kind.flip())
-                    }
-                    (Some(_), TypeVarVariance::Invariant) => {
-                        let top_materialization = ty.materialize(db, MaterializationKind::Top);
-                        if !ty.is_equivalent_to(db, top_materialization) {
-                            has_dynamic_invariant_typevar = true;
-                        }
-                        ty
-                    }
-                }
-            })
+            .types(db)
+            .iter()
+            .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, visitor))
             .collect();
 
         let tuple_inner = self
             .tuple_inner(db)
             .and_then(|tuple| tuple.apply_type_mapping_impl(db, type_mapping, visitor));
-        let new_materialization_kind = if has_dynamic_invariant_typevar {
-            self.materialization_kind(db)
-                .or(applied_materialization_kind)
-        } else {
-            None
-        };
         Specialization::new(
             db,
             self.generic_context(db),
             types,
-            new_materialization_kind,
+            self.specialization_type(db),
             tuple_inner,
         )
     }
