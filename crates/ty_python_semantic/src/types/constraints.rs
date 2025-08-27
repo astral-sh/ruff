@@ -615,14 +615,9 @@ impl<'db> ConstraintClause<'db> {
 ///
 /// ### Invariants
 ///
-/// - The bounds must be ordered correctly: `lower ≤: upper`. (A constraint `[upper, lower]` does
-///   _not_ mean that the typevar can only specialize to `Never`; it means that there is no
-///   concrete type that the typevar can specialize to.)
-///
-/// - The bounds must actually constrain the typevar: `lower` must not be a closed bound of
-///   `Never`, or `upper` must not be a closed bound of `object`. (The constraint `[Never, object]`
-///   doesn't constrain the typevar at all, and so we don't need a constraint in the corresponding
-///   constraint clause.)
+/// - The bounds must actually constraint the typevar. If the typevar can be specialized to any
+///   type, or if there is no valid type that it can be specialized to, then we don't create an
+///   `AtomicConstraint` for the typevar.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct AtomicConstraint<'db> {
     typevar: BoundTypeVarInstance<'db>,
@@ -815,7 +810,12 @@ impl<'db> AtomicConstraint<'db> {
         lower: ConstraintBound<'db>,
         upper: ConstraintBound<'db>,
     ) -> Satisfiable<Self> {
-        if !lower.bound_type().is_assignable_to(db, upper.bound_type()) {
+        let lower_type = lower.bound_type();
+        let upper_type = upper.bound_type();
+        if !lower_type.is_assignable_to(db, upper_type) {
+            return Satisfiable::Never;
+        }
+        if (lower.is_open() || upper.is_open()) && lower_type.is_equivalent_to(db, upper_type) {
             return Satisfiable::Never;
         }
         if let (ConstraintBound::Closed(lower), ConstraintBound::Closed(upper)) = (lower, upper) {
