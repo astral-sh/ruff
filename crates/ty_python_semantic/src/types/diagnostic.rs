@@ -1970,6 +1970,9 @@ pub(super) fn report_invalid_assignment(
     );
 }
 
+// TODO: generalize this to a method that takes any two types, walks them recursively, and returns
+// a set of types with ambiguous names whose display should be qualified. Then we can use this in
+// any diagnostic that displays two types.
 fn type_to_class_literal<'db>(ty: Type<'db>, db: &'db dyn crate::Db) -> Option<ClassLiteral<'db>> {
     match ty {
         Type::ClassLiteral(class) => Some(class),
