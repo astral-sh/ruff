@@ -355,7 +355,7 @@ _T = TypeVar("_T")
 _P = ParamSpec("_P")
 _Mode: TypeAlias = Literal["inline", "cli"]
 
-line_prefix: str  # undocumented
+line_prefix: Final[str]  # undocumented
 
 class Restart(Exception):
     """Causes a debugger to be restarted for the debugged python program."""
@@ -606,23 +606,40 @@ class Pdb(Bdb, Cmd):
         print anything, you will see no sign that the breakpoint was
         reached.
         """
+    if sys.version_info >= (3, 14):
+        def do_break(self, arg: str, temporary: bool = False) -> bool | None:
+            """b(reak) [ ([filename:]lineno | function) [, condition] ]
 
-    def do_break(self, arg: str, temporary: bool = ...) -> bool | None:
-        """b(reak) [ ([filename:]lineno | function) [, condition] ]
+            Without argument, list all breaks.
 
-        Without argument, list all breaks.
+            With a line number argument, set a break at this line in the
+            current file.  With a function name, set a break at the first
+            executable line of that function.  If a second argument is
+            present, it is a string specifying an expression which must
+            evaluate to true before the breakpoint is honored.
 
-        With a line number argument, set a break at this line in the
-        current file.  With a function name, set a break at the first
-        executable line of that function.  If a second argument is
-        present, it is a string specifying an expression which must
-        evaluate to true before the breakpoint is honored.
+            The line number may be prefixed with a filename and a colon,
+            to specify a breakpoint in another file (probably one that
+            hasn't been loaded yet).  The file is searched for on
+            sys.path; the .py suffix may be omitted.
+            """
+    else:
+        def do_break(self, arg: str, temporary: bool | Literal[0, 1] = 0) -> bool | None:
+            """b(reak) [ ([filename:]lineno | function) [, condition] ]
 
-        The line number may be prefixed with a filename and a colon,
-        to specify a breakpoint in another file (probably one that
-        hasn't been loaded yet).  The file is searched for on
-        sys.path; the .py suffix may be omitted.
-        """
+            Without argument, list all breaks.
+
+            With a line number argument, set a break at this line in the
+            current file.  With a function name, set a break at the first
+            executable line of that function.  If a second argument is
+            present, it is a string specifying an expression which must
+            evaluate to true before the breakpoint is honored.
+
+            The line number may be prefixed with a filename and a colon,
+            to specify a breakpoint in another file (probably one that
+            hasn't been loaded yet).  The file is searched for on
+            sys.path; the .py suffix may be omitted.
+            """
 
     def do_tbreak(self, arg: str) -> bool | None:
         """tbreak [ ([filename:]lineno | function) [, condition] ]

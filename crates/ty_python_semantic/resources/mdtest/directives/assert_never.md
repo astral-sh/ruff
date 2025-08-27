@@ -34,12 +34,6 @@ def _():
     assert_never(None)  # error: [type-assertion-failure]
 
 def _():
-    assert_never([])  # error: [type-assertion-failure]
-
-def _():
-    assert_never({})  # error: [type-assertion-failure]
-
-def _():
     assert_never(())  # error: [type-assertion-failure]
 
 def _(flag: bool, never: Never):

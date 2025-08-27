@@ -139,6 +139,12 @@ pub enum PythonEnvironment {
 }
 
 impl PythonEnvironment {
+    /// Discover the python environment using the following priorities:
+    ///
+    /// 1. activated virtual environment
+    /// 2. conda (child)
+    /// 3. working dir virtual environment
+    /// 4. conda (base)
     pub fn discover(
         project_root: &SystemPath,
         system: &dyn System,
@@ -161,13 +167,9 @@ impl PythonEnvironment {
             .map(Some);
         }
 
-        if let Ok(conda_env) = system.env_var(EnvVars::CONDA_PREFIX) {
-            return resolve_environment(
-                system,
-                SystemPath::new(&conda_env),
-                SysPrefixPathOrigin::CondaPrefixVar,
-            )
-            .map(Some);
+        if let Some(conda_env) = conda_environment_from_env(system, CondaEnvironmentKind::Child) {
+            return resolve_environment(system, &conda_env, SysPrefixPathOrigin::CondaPrefixVar)
+                .map(Some);
         }
 
         tracing::debug!("Discovering virtual environment in `{project_root}`");
@@ -190,6 +192,11 @@ impl PythonEnvironment {
             }
         }
 
+        if let Some(conda_env) = conda_environment_from_env(system, CondaEnvironmentKind::Base) {
+            return resolve_environment(system, &conda_env, SysPrefixPathOrigin::CondaPrefixVar)
+                .map(Some);
+        }
+
         Ok(None)
     }
 
@@ -204,7 +211,7 @@ impl PythonEnvironment {
         match VirtualEnvironment::new(path, system) {
             Ok(venv) => Ok(Self::Virtual(venv)),
             // If there's not a `pyvenv.cfg` marker, attempt to inspect as a system environment
-            Err(SitePackagesDiscoveryError::NoPyvenvCfgFile(path, _))
+            Err(SitePackagesDiscoveryError::NoPyvenvCfgFile(path, _, _))
                 if !path.origin.must_be_virtual_env() =>
             {
                 Ok(Self::System(SystemEnvironment::new(path)))
@@ -371,7 +378,13 @@ impl VirtualEnvironment {
 
         let pyvenv_cfg = match system.read_to_string(&pyvenv_cfg_path) {
             Ok(pyvenv_cfg) => pyvenv_cfg,
-            Err(err) => return Err(SitePackagesDiscoveryError::NoPyvenvCfgFile(path, err)),
+            Err(err) => {
+                return Err(SitePackagesDiscoveryError::NoPyvenvCfgFile(
+                    path,
+                    err,
+                    system.dyn_clone(),
+                ));
+            }
         };
 
         let parsed_pyvenv_cfg =
@@ -589,6 +602,62 @@ System stdlib will not be used for module definitions.",
     }
 }
 
+/// Different kinds of conda environment
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+pub(crate) enum CondaEnvironmentKind {
+    /// The base Conda environment; treated like a system Python environment.
+    Base,
+    /// Any other Conda environment; treated like a virtual environment.
+    Child,
+}
+
+impl CondaEnvironmentKind {
+    /// Compute the kind of `CONDA_PREFIX` we have.
+    ///
+    /// When the base environment is used, `CONDA_DEFAULT_ENV` will be set to a name, i.e., `base` or
+    /// `root` which does not match the prefix, e.g. `/usr/local` instead of
+    /// `/usr/local/conda/envs/<name>`.
+    fn from_prefix_path(system: &dyn System, path: &SystemPath) -> Self {
+        // If we cannot read `CONDA_DEFAULT_ENV`, there's no way to know if the base environment
+        let Ok(default_env) = system.env_var(EnvVars::CONDA_DEFAULT_ENV) else {
+            return CondaEnvironmentKind::Child;
+        };
+
+        // These are the expected names for the base environment
+        if default_env != "base" && default_env != "root" {
+            return CondaEnvironmentKind::Child;
+        }
+
+        let Some(name) = path.file_name() else {
+            return CondaEnvironmentKind::Child;
+        };
+
+        if name == default_env {
+            CondaEnvironmentKind::Base
+        } else {
+            CondaEnvironmentKind::Child
+        }
+    }
+}
+
+/// Read `CONDA_PREFIX` and confirm that it has the expected kind
+pub(crate) fn conda_environment_from_env(
+    system: &dyn System,
+    kind: CondaEnvironmentKind,
+) -> Option<SystemPathBuf> {
+    let dir = system
+        .env_var(EnvVars::CONDA_PREFIX)
+        .ok()
+        .filter(|value| !value.is_empty())?;
+    let path = SystemPathBuf::from(dir);
+
+    if kind != CondaEnvironmentKind::from_prefix_path(system, &path) {
+        return None;
+    }
+
+    Some(path)
+}
+
 /// A parser for `pyvenv.cfg` files: metadata files for virtual environments.
 ///
 /// Note that a `pyvenv.cfg` file *looks* like a `.ini` file, but actually isn't valid `.ini` syntax!
@@ -770,16 +839,26 @@ impl SystemEnvironment {
 #[derive(Debug)]
 pub enum SitePackagesDiscoveryError {
     /// `site-packages` discovery failed because the provided path couldn't be canonicalized.
-    CanonicalizationError(SystemPathBuf, SysPrefixPathOrigin, io::Error),
+    CanonicalizationError(
+        SystemPathBuf,
+        SysPrefixPathOrigin,
+        io::Error,
+        Box<dyn System>,
+    ),
 
     /// `site-packages` discovery failed because the provided path doesn't appear to point to
     /// a Python executable or a `sys.prefix` directory.
-    PathNotExecutableOrDirectory(SystemPathBuf, SysPrefixPathOrigin, Option<io::Error>),
+    PathNotExecutableOrDirectory(
+        SystemPathBuf,
+        SysPrefixPathOrigin,
+        Option<io::Error>,
+        Box<dyn System>,
+    ),
 
     /// `site-packages` discovery failed because the [`SysPrefixPathOrigin`] indicated that
     /// the provided path should point to the `sys.prefix` of a virtual environment,
     /// but there was no file at `<sys.prefix>/pyvenv.cfg`.
-    NoPyvenvCfgFile(SysPrefixPath, io::Error),
+    NoPyvenvCfgFile(SysPrefixPath, io::Error, Box<dyn System>),
 
     /// `site-packages` discovery failed because the `pyvenv.cfg` file could not be parsed.
     PyvenvCfgParseError(SystemPathBuf, PyvenvCfgParseErrorKind),
@@ -789,11 +868,11 @@ pub enum SitePackagesDiscoveryError {
     /// would be relative to the `sys.prefix` path, and we tried to fallback to iterating
     /// through the `<sys.prefix>/lib` directory looking for a `site-packages` directory,
     /// but we came across some I/O error while trying to do so.
-    CouldNotReadLibDirectory(SysPrefixPath),
+    CouldNotReadLibDirectory(SysPrefixPath, Box<dyn System>),
 
     /// We looked everywhere we could think of for the `site-packages` directory,
     /// but none could be found despite our best endeavours.
-    NoSitePackagesDirFound(SysPrefixPath),
+    NoSitePackagesDirFound(SysPrefixPath, Box<dyn System>),
 }
 
 /// Enumeration of ways in which stdlib discovery can fail.
@@ -801,13 +880,13 @@ pub enum SitePackagesDiscoveryError {
 pub enum StdlibDiscoveryError {
     /// We looked everywhere we could think of for the standard library's directory,
     /// but none could be found despite our best endeavours.
-    NoStdlibFound(SysPrefixPath),
+    NoStdlibFound(SysPrefixPath, Box<dyn System>),
     /// Stdlib discovery failed because we're on a Unix system,
     /// we weren't able to figure out from the `pyvenv.cfg` file exactly where the stdlib
     /// would be relative to the `sys.prefix` path, and we tried to fallback to iterating
     /// through the `<sys.prefix>/lib` directory looking for a stdlib directory,
     /// but we came across some I/O error while trying to do so.
-    CouldNotReadLibDirectory(SysPrefixPath, io::Error),
+    CouldNotReadLibDirectory(SysPrefixPath, io::Error, Box<dyn System>),
     /// We failed to resolve the value of `sys.prefix`.
     NoSysPrefixFound(SystemPathBuf),
 }
@@ -815,14 +894,14 @@ pub enum StdlibDiscoveryError {
 impl std::error::Error for SitePackagesDiscoveryError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            Self::CanonicalizationError(_, _, io_err) => Some(io_err),
-            Self::PathNotExecutableOrDirectory(_, _, io_err) => {
+            Self::CanonicalizationError(_, _, io_err, _) => Some(io_err),
+            Self::PathNotExecutableOrDirectory(_, _, io_err, _) => {
                 io_err.as_ref().map(|e| e as &dyn std::error::Error)
             }
-            Self::NoPyvenvCfgFile(_, io_err) => Some(io_err),
+            Self::NoPyvenvCfgFile(_, io_err, _) => Some(io_err),
             Self::PyvenvCfgParseError(_, _)
-            | Self::CouldNotReadLibDirectory(_)
-            | Self::NoSitePackagesDirFound(_) => None,
+            | Self::CouldNotReadLibDirectory(_, _)
+            | Self::NoSitePackagesDirFound(_, _) => None,
         }
     }
 }
@@ -830,10 +909,15 @@ impl std::error::Error for SitePackagesDiscoveryError {
 impl std::fmt::Display for SitePackagesDiscoveryError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::CanonicalizationError(given_path, origin, _) => {
-                display_error(f, origin, given_path, "Failed to canonicalize", None)
-            }
-            Self::PathNotExecutableOrDirectory(path, origin, _) => {
+            Self::CanonicalizationError(given_path, origin, _, system) => display_error(
+                f,
+                origin,
+                given_path,
+                "Failed to canonicalize",
+                None,
+                &**system,
+            ),
+            Self::PathNotExecutableOrDirectory(path, origin, _, system) => {
                 let thing = if origin.must_point_directly_to_sys_prefix() {
                     "directory on disk"
                 } else {
@@ -845,14 +929,16 @@ impl std::fmt::Display for SitePackagesDiscoveryError {
                     path,
                     &format!("Invalid {origin}"),
                     Some(&format!("does not point to a {thing}")),
+                    &**system,
                 )
             }
-            Self::NoPyvenvCfgFile(SysPrefixPath { inner, origin }, _) => display_error(
+            Self::NoPyvenvCfgFile(SysPrefixPath { inner, origin }, _, system) => display_error(
                 f,
                 origin,
                 inner,
                 &format!("Invalid {origin}"),
                 Some("points to a broken venv with no pyvenv.cfg file"),
+                &**system,
             ),
             Self::PyvenvCfgParseError(path, kind) => {
                 write!(
@@ -860,14 +946,17 @@ impl std::fmt::Display for SitePackagesDiscoveryError {
                     "Failed to parse the `pyvenv.cfg` file at `{path}` because {kind}"
                 )
             }
-            Self::CouldNotReadLibDirectory(SysPrefixPath { inner, origin }) => display_error(
-                f,
-                origin,
-                inner,
-                "Failed to iterate over the contents of the `lib`/`lib64` directories of the Python installation",
-                None,
-            ),
-            Self::NoSitePackagesDirFound(SysPrefixPath { inner, origin }) => display_error(
+            Self::CouldNotReadLibDirectory(SysPrefixPath { inner, origin }, system) => {
+                display_error(
+                    f,
+                    origin,
+                    inner,
+                    "Failed to iterate over the contents of the `lib`/`lib64` directories of the Python installation",
+                    None,
+                    &**system,
+                )
+            }
+            Self::NoSitePackagesDirFound(SysPrefixPath { inner, origin }, system) => display_error(
                 f,
                 origin,
                 inner,
@@ -875,6 +964,7 @@ impl std::fmt::Display for SitePackagesDiscoveryError {
                 Some(
                     "Could not find a `site-packages` directory for this Python installation/executable",
                 ),
+                &**system,
             ),
         }
     }
@@ -883,8 +973,8 @@ impl std::fmt::Display for SitePackagesDiscoveryError {
 impl std::error::Error for StdlibDiscoveryError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            Self::CouldNotReadLibDirectory(_, io_err) => Some(io_err),
-            Self::NoStdlibFound(_) => None,
+            Self::CouldNotReadLibDirectory(_, io_err, _) => Some(io_err),
+            Self::NoStdlibFound(_, _) => None,
             Self::NoSysPrefixFound(_) => None,
         }
     }
@@ -899,19 +989,23 @@ impl std::fmt::Display for StdlibDiscoveryError {
                     "Failed to resolve a `sys.prefix` from the `pyvenv.cfg` file at `{path}`"
                 )
             }
-            Self::CouldNotReadLibDirectory(SysPrefixPath { inner, origin }, _) => display_error(
-                f,
-                origin,
-                inner,
-                "Failed to iterate over the contents of the `lib` directory of the Python installation",
-                None,
-            ),
-            Self::NoStdlibFound(SysPrefixPath { inner, origin }) => display_error(
+            Self::CouldNotReadLibDirectory(SysPrefixPath { inner, origin }, _, system) => {
+                display_error(
+                    f,
+                    origin,
+                    inner,
+                    "Failed to iterate over the contents of the `lib` directory of the Python installation",
+                    None,
+                    &**system,
+                )
+            }
+            Self::NoStdlibFound(SysPrefixPath { inner, origin }, system) => display_error(
                 f,
                 origin,
                 inner,
                 &format!("Invalid {origin}"),
                 Some("Could not find a stdlib directory for this Python installation/executable"),
+                &**system,
             ),
         }
     }
@@ -923,6 +1017,7 @@ fn display_error(
     given_path: &SystemPath,
     primary_message: &str,
     secondary_message: Option<&str>,
+    system: &dyn System,
 ) -> std::fmt::Result {
     let fallback: &mut dyn FnMut() -> std::fmt::Result = &mut || {
         f.write_str(primary_message)?;
@@ -940,7 +1035,7 @@ fn display_error(
         return fallback();
     };
 
-    let Ok(config_file_source) = std::fs::read_to_string((**config_file_path).as_ref()) else {
+    let Ok(config_file_source) = system.read_to_string(config_file_path) else {
         return fallback();
     };
 
@@ -1036,7 +1131,10 @@ fn site_packages_directories_from_sys_prefix(
             .is_directory(&site_packages)
             .then(|| SitePackagesPaths::from([site_packages]))
             .ok_or_else(|| {
-                SitePackagesDiscoveryError::NoSitePackagesDirFound(sys_prefix_path.to_owned())
+                SitePackagesDiscoveryError::NoSitePackagesDirFound(
+                    sys_prefix_path.to_owned(),
+                    system.dyn_clone(),
+                )
             });
     }
 
@@ -1143,10 +1241,12 @@ fn site_packages_directories_from_sys_prefix(
         if found_at_least_one_lib_dir {
             Err(SitePackagesDiscoveryError::NoSitePackagesDirFound(
                 sys_prefix_path.to_owned(),
+                system.dyn_clone(),
             ))
         } else {
             Err(SitePackagesDiscoveryError::CouldNotReadLibDirectory(
                 sys_prefix_path.to_owned(),
+                system.dyn_clone(),
             ))
         }
     } else {
@@ -1175,7 +1275,7 @@ fn real_stdlib_directory_from_sys_prefix(
     if cfg!(target_os = "windows") {
         let stdlib = sys_prefix_path.join("Lib");
         return system.is_directory(&stdlib).then_some(stdlib).ok_or(
-            StdlibDiscoveryError::NoStdlibFound(sys_prefix_path.to_owned()),
+            StdlibDiscoveryError::NoStdlibFound(sys_prefix_path.to_owned(), system.dyn_clone()),
         );
     }
 
@@ -1211,7 +1311,11 @@ fn real_stdlib_directory_from_sys_prefix(
         // must be `lib`, not `lib64`, for the stdlib
         .read_directory(&sys_prefix_path.join(UnixLibDir::Lib))
         .map_err(|io_err| {
-            StdlibDiscoveryError::CouldNotReadLibDirectory(sys_prefix_path.to_owned(), io_err)
+            StdlibDiscoveryError::CouldNotReadLibDirectory(
+                sys_prefix_path.to_owned(),
+                io_err,
+                system.dyn_clone(),
+            )
         })?
     {
         let Ok(entry) = entry_result else {
@@ -1236,6 +1340,7 @@ fn real_stdlib_directory_from_sys_prefix(
     }
     Err(StdlibDiscoveryError::NoStdlibFound(
         sys_prefix_path.to_owned(),
+        system.dyn_clone(),
     ))
 }
 
@@ -1294,6 +1399,7 @@ impl SysPrefixPath {
                     unvalidated_path.to_path_buf(),
                     origin,
                     None,
+                    system.dyn_clone(),
                 ));
             };
             sys_prefix
@@ -1313,12 +1419,14 @@ impl SysPrefixPath {
                         unvalidated_path,
                         origin,
                         Some(io_err),
+                        system.dyn_clone(),
                     )
                 } else {
                     SitePackagesDiscoveryError::CanonicalizationError(
                         unvalidated_path,
                         origin,
                         io_err,
+                        system.dyn_clone(),
                     )
                 };
                 return Err(err);
@@ -1330,6 +1438,7 @@ impl SysPrefixPath {
                 unvalidated_path.to_path_buf(),
                 origin,
                 None,
+                system.dyn_clone(),
             ));
         }
 

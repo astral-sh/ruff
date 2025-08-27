@@ -56,7 +56,7 @@ if sys.version_info >= (3, 11):
 
 if sys.version_info >= (3, 12):
     def run(
-        main: Coroutine[Any, Any, _T], *, debug: bool | None = ..., loop_factory: Callable[[], AbstractEventLoop] | None = ...
+        main: Coroutine[Any, Any, _T], *, debug: bool | None = None, loop_factory: Callable[[], AbstractEventLoop] | None = None
     ) -> _T:
         """Execute the coroutine and return the result.
 

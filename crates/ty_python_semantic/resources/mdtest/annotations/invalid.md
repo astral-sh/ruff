@@ -48,6 +48,24 @@ def _(
         reveal_type(h_)  # revealed: Unknown
         reveal_type(i_)  # revealed: Unknown
         reveal_type(j_)  # revealed: Unknown
+
+# Inspired by the conformance test suite at
+# https://github.com/python/typing/blob/d4f39b27a4a47aac8b6d4019e1b0b5b3156fabdc/conformance/tests/aliases_implicit.py#L88-L122
+B = [x for x in range(42)]
+C = {x for x in range(42)}
+D = {x: y for x, y in enumerate(range(42))}
+E = (x for x in range(42))
+
+def _(
+    b: B,  # error: [invalid-type-form]
+    c: C,  # error: [invalid-type-form]
+    d: D,  # error: [invalid-type-form]
+    e: E,  # error: [invalid-type-form]
+):
+    reveal_type(b)  # revealed: Unknown
+    reveal_type(c)  # revealed: Unknown
+    reveal_type(d)  # revealed: Unknown
+    reveal_type(e)  # revealed: Unknown
 ```
 
 ## Invalid AST nodes

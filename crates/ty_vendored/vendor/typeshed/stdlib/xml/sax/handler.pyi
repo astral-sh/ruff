@@ -10,10 +10,10 @@ $Id$
 """
 
 import sys
-from typing import Literal, NoReturn, Protocol, type_check_only
+from typing import Final, NoReturn, Protocol, type_check_only
 from xml.sax import xmlreader
 
-version: str
+version: Final[str]
 
 @type_check_only
 class _ErrorHandlerProtocol(Protocol):  # noqa: Y046  # Protocol is not used
@@ -261,20 +261,20 @@ class EntityResolver:
         to read from.
         """
 
-feature_namespaces: str
-feature_namespace_prefixes: str
-feature_string_interning: str
-feature_validation: str
-feature_external_ges: str
-feature_external_pes: str
-all_features: list[str]
-property_lexical_handler: Literal["http://xml.org/sax/properties/lexical-handler"]
-property_declaration_handler: Literal["http://xml.org/sax/properties/declaration-handler"]
-property_dom_node: Literal["http://xml.org/sax/properties/dom-node"]
-property_xml_string: Literal["http://xml.org/sax/properties/xml-string"]
-property_encoding: Literal["http://www.python.org/sax/properties/encoding"]
-property_interning_dict: Literal["http://www.python.org/sax/properties/interning-dict"]
-all_properties: list[str]
+feature_namespaces: Final = "http://xml.org/sax/features/namespaces"
+feature_namespace_prefixes: Final = "http://xml.org/sax/features/namespace-prefixes"
+feature_string_interning: Final = "http://xml.org/sax/features/string-interning"
+feature_validation: Final = "http://xml.org/sax/features/validation"
+feature_external_ges: Final[str]  # too long string
+feature_external_pes: Final[str]  # too long string
+all_features: Final[list[str]]
+property_lexical_handler: Final = "http://xml.org/sax/properties/lexical-handler"
+property_declaration_handler: Final = "http://xml.org/sax/properties/declaration-handler"
+property_dom_node: Final = "http://xml.org/sax/properties/dom-node"
+property_xml_string: Final = "http://xml.org/sax/properties/xml-string"
+property_encoding: Final = "http://www.python.org/sax/properties/encoding"
+property_interning_dict: Final[str]  # too long string
+all_properties: Final[list[str]]
 
 if sys.version_info >= (3, 10):
     class LexicalHandler:

@@ -166,7 +166,7 @@ fn assert(expr: &Expr, msg: Option<&Expr>) -> Stmt {
         test: Box::new(expr.clone()),
         msg: msg.map(|msg| Box::new(msg.clone())),
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     })
 }
 
@@ -176,7 +176,7 @@ fn compare(left: &Expr, cmp_op: CmpOp, right: &Expr) -> Expr {
         ops: Box::from([cmp_op]),
         comparators: Box::from([right.clone()]),
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     })
 }
 
@@ -296,7 +296,7 @@ impl UnittestAssert {
                                 op: UnaryOp::Not,
                                 operand: Box::new(expr.clone()),
                                 range: TextRange::default(),
-                                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                             }),
                             msg,
                         )
@@ -370,7 +370,7 @@ impl UnittestAssert {
                 };
                 let node = Expr::NoneLiteral(ast::ExprNoneLiteral {
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 });
                 let expr = compare(expr, cmp_op, &node);
                 Ok(assert(&expr, msg))
@@ -387,7 +387,7 @@ impl UnittestAssert {
                     id: Name::new_static("isinstance"),
                     ctx: ExprContext::Load,
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 };
                 let node1 = ast::ExprCall {
                     func: Box::new(node.into()),
@@ -395,10 +395,10 @@ impl UnittestAssert {
                         args: Box::from([(**obj).clone(), (**cls).clone()]),
                         keywords: Box::from([]),
                         range: TextRange::default(),
-                        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                     },
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 };
                 let isinstance = node1.into();
                 if matches!(self, UnittestAssert::IsInstance) {
@@ -408,7 +408,7 @@ impl UnittestAssert {
                         op: UnaryOp::Not,
                         operand: Box::new(isinstance),
                         range: TextRange::default(),
-                        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                     };
                     let expr = node.into();
                     Ok(assert(&expr, msg))
@@ -429,14 +429,14 @@ impl UnittestAssert {
                     id: Name::new_static("re"),
                     ctx: ExprContext::Load,
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 };
                 let node1 = ast::ExprAttribute {
                     value: Box::new(node.into()),
                     attr: Identifier::new("search".to_string(), TextRange::default()),
                     ctx: ExprContext::Load,
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 };
                 let node2 = ast::ExprCall {
                     func: Box::new(node1.into()),
@@ -444,10 +444,10 @@ impl UnittestAssert {
                         args: Box::from([(**regex).clone(), (**text).clone()]),
                         keywords: Box::from([]),
                         range: TextRange::default(),
-                        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                     },
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 };
                 let re_search = node2.into();
                 if matches!(self, UnittestAssert::Regex | UnittestAssert::RegexpMatches) {
@@ -457,7 +457,7 @@ impl UnittestAssert {
                         op: UnaryOp::Not,
                         operand: Box::new(re_search),
                         range: TextRange::default(),
-                        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                     };
                     Ok(assert(&node.into(), msg))
                 }

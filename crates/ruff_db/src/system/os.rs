@@ -1,3 +1,5 @@
+#![allow(clippy::disallowed_methods)]
+
 use super::walk_directory::{
     self, DirectoryWalker, WalkDirectoryBuilder, WalkDirectoryConfiguration,
     WalkDirectoryVisitorBuilder, WalkState,
@@ -254,6 +256,10 @@ impl System for OsSystem {
 
     fn env_var(&self, name: &str) -> std::result::Result<String, std::env::VarError> {
         std::env::var(name)
+    }
+
+    fn dyn_clone(&self) -> Box<dyn System> {
+        Box::new(self.clone())
     }
 }
 

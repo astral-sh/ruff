@@ -7,7 +7,12 @@ use ruff_python_ast::name::Name;
 use rustc_hash::FxHashMap;
 
 use super::TypeVarVariance;
-use crate::semantic_index::place_table;
+use crate::semantic_index::place::ScopedPlaceId;
+use crate::semantic_index::{SemanticIndex, place_table};
+use crate::types::constraints::{Constraints, OptionConstraintsExtension};
+use crate::types::context::InferContext;
+use crate::types::diagnostic::report_undeclared_protocol_member;
+use crate::types::variance::VarianceInferable;
 use crate::types::{
     AttributeAssignmentError, CallArguments, HasRelationToVisitor, Signature, UnionType,
 };
@@ -18,7 +23,6 @@ use crate::{
     types::{
         BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, KnownFunction,
         NormalizedVisitor, PropertyInstanceType, Type, TypeMapping, TypeQualifiers, TypeRelation,
-        TypeTransformer,
     },
 };
 
@@ -56,6 +60,59 @@ impl<'db> ProtocolClassLiteral<'db> {
     pub(super) fn is_runtime_checkable(self, db: &'db dyn Db) -> bool {
         self.known_function_decorators(db)
             .contains(&KnownFunction::RuntimeCheckable)
+    }
+
+    /// Iterate through the body of the protocol class. Check that all definitions
+    /// in the protocol class body are either explicitly declared directly in the
+    /// class body, or are declared in a superclass of the protocol class.
+    pub(super) fn validate_members(self, context: &InferContext, index: &SemanticIndex<'db>) {
+        let db = context.db();
+        let interface = self.interface(db);
+        let class_place_table = index.place_table(self.body_scope(db).file_scope_id(db));
+
+        for (symbol_id, mut bindings_iterator) in
+            use_def_map(db, self.body_scope(db)).all_end_of_scope_symbol_bindings()
+        {
+            let symbol_name = class_place_table.symbol(symbol_id).name();
+
+            if !interface.includes_member(db, symbol_name) {
+                continue;
+            }
+
+            let has_declaration = self
+                .iter_mro(db, None)
+                .filter_map(ClassBase::into_class)
+                .any(|superclass| {
+                    let superclass_scope = superclass.class_literal(db).0.body_scope(db);
+                    let Some(scoped_symbol_id) =
+                        place_table(db, superclass_scope).symbol_id(symbol_name)
+                    else {
+                        return false;
+                    };
+                    !place_from_declarations(
+                        db,
+                        index
+                            .use_def_map(superclass_scope.file_scope_id(db))
+                            .end_of_scope_declarations(ScopedPlaceId::Symbol(scoped_symbol_id)),
+                    )
+                    .into_place_and_conflicting_declarations()
+                    .0
+                    .place
+                    .is_unbound()
+                });
+
+            if has_declaration {
+                continue;
+            }
+
+            let Some(first_definition) =
+                bindings_iterator.find_map(|binding| binding.binding.definition())
+            else {
+                continue;
+            };
+
+            report_undeclared_protocol_member(context, first_definition, self, class_place_table);
+        }
     }
 }
 
@@ -150,6 +207,10 @@ impl<'db> ProtocolInterface<'db> {
         })
     }
 
+    pub(super) fn includes_member(self, db: &'db dyn Db, name: &str) -> bool {
+        self.inner(db).contains_key(name)
+    }
+
     pub(super) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
         self.member_by_name(db, name)
             .map(|member| {
@@ -167,10 +228,20 @@ impl<'db> ProtocolInterface<'db> {
     /// Return `true` if if all members on `self` are also members of `other`.
     ///
     /// TODO: this method should consider the types of the members as well as their names.
-    pub(super) fn is_sub_interface_of(self, db: &'db dyn Db, other: Self) -> bool {
-        self.inner(db)
-            .keys()
-            .all(|member_name| other.inner(db).contains_key(member_name))
+    pub(super) fn is_sub_interface_of<C: Constraints<'db>>(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        _visitor: &HasRelationToVisitor<'db, C>,
+    ) -> C {
+        // TODO: This could just return a bool as written, but this form is what will be needed to
+        // combine the constraints when we do assignability checks on each member.
+        C::from_bool(
+            db,
+            self.inner(db)
+                .keys()
+                .all(|member_name| other.inner(db).contains_key(member_name)),
+        )
     }
 
     pub(super) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
@@ -249,6 +320,25 @@ impl<'db> ProtocolInterface<'db> {
     }
 }
 
+impl<'db> VarianceInferable<'db> for ProtocolInterface<'db> {
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+        self.members(db)
+            .flat_map(|member| {
+                member
+                    .instance_get_type(db)
+                    .into_iter()
+                    .map(|get_type| get_type.variance_of(db, typevar))
+                    .chain(
+                        member
+                            .instance_set_type()
+                            .into_iter()
+                            .map(|set_type| set_type.variance_of(db, typevar).flip()),
+                    )
+            })
+            .collect()
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone, Hash, salsa::Update, get_size2::GetSize)]
 pub(super) struct ProtocolMemberData<'db> {
     kind: ProtocolMemberKind<'db>,
@@ -257,7 +347,7 @@ pub(super) struct ProtocolMemberData<'db> {
 
 impl<'db> ProtocolMemberData<'db> {
     fn normalized(&self, db: &'db dyn Db) -> Self {
-        self.normalized_impl(db, &TypeTransformer::default())
+        self.normalized_impl(db, &NormalizedVisitor::default())
     }
 
     fn normalized_impl(&self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
@@ -426,32 +516,37 @@ impl<'db> PropertyMember<'db> {
         }
     }
 
-    fn is_satisfied_by(
+    fn is_satisfied_by<C: Constraints<'db>>(
         &self,
         db: &'db dyn Db,
         other: Type<'db>,
         attribute: &str,
         relation: TypeRelation,
-        visitor: &HasRelationToVisitor<'db>,
-    ) -> bool {
-        if let Some(get_type) = self.get_type {
-            let Place::Type(attribute_type, Boundness::Bound) = other.member(db, attribute).place
-            else {
-                return false;
-            };
-            if !attribute_type.has_relation_to_impl(db, get_type, relation, visitor) {
-                return false;
-            }
-        }
-        if let Some(set_type) = self.set_type {
-            if other
-                .validate_attribute_assignment(db, attribute, set_type)
-                .is_err()
-            {
-                return false;
-            }
-        }
-        true
+        visitor: &HasRelationToVisitor<'db, C>,
+    ) -> C {
+        let validate_getter = || {
+            self.get_type.when_none_or(db, |get_type| {
+                let Place::Type(attribute_type, Boundness::Bound) =
+                    other.member(db, attribute).place
+                else {
+                    return C::unsatisfiable(db);
+                };
+                attribute_type.has_relation_to_impl(db, get_type, relation, visitor)
+            })
+        };
+
+        let validate_setter = || {
+            self.set_type.when_none_or(db, |set_type| {
+                C::from_bool(
+                    db,
+                    other
+                        .validate_attribute_assignment(db, attribute, set_type)
+                        .is_ok(),
+                )
+            })
+        };
+
+        validate_getter().and(db, validate_setter)
     }
 }
 
@@ -492,52 +587,56 @@ impl<'db> AttributeMember<'db> {
         }
     }
 
-    fn is_satisfied_by(
+    fn is_satisfied_by<C: Constraints<'db>>(
         &self,
         db: &'db dyn Db,
         other: Type<'db>,
         attribute: &str,
         qualifiers: TypeQualifiers,
         relation: TypeRelation,
-        visitor: &HasRelationToVisitor<'db>,
-    ) -> bool {
+        visitor: &HasRelationToVisitor<'db, C>,
+    ) -> C {
         // An attribute member must always be bound on the instance,
         // and have the correct type.
         let Place::Type(attribute_type, Boundness::Bound) = other.member(db, attribute).place
         else {
-            return false;
+            return C::unsatisfiable(db);
         };
-        if !attribute_type.has_relation_to_impl(db, self.ty, relation, visitor) {
-            return false;
-        }
 
-        // If the attribute member was declared as a `ClassVar` in the protocol
-        // or had a class-level default, it must also be bound on the meta-type
-        // of the instance, and have the correct type there too.
-        if self.bound_on_class.is_yes() {
-            let Place::Type(meta_attribute_type, Boundness::Bound) =
-                other.to_meta_type(db).member(db, attribute).place
-            else {
-                return false;
-            };
-            if !meta_attribute_type.has_relation_to_impl(db, self.ty, relation, visitor) {
-                return false;
-            }
-        }
-
-        // If the attribute member was declared as a `ClassVar` in the protocol,
-        // it must be valid to assign to it on the meta-type of the instance.
-        // Otherwise, it must be valid to assign to it on the instance.
-        if qualifiers.contains(TypeQualifiers::CLASS_VAR) {
-            other
-                .to_meta_type(db)
-                .validate_attribute_assignment(db, attribute, self.ty)
-                .is_ok()
-        } else {
-            other
-                .validate_attribute_assignment(db, attribute, self.ty)
-                .is_ok()
-        }
+        attribute_type
+            .has_relation_to_impl(db, self.ty, relation, visitor)
+            .and(db, || {
+                // If the attribute member was declared as a `ClassVar` in the protocol
+                // or had a class-level default, it must also be bound on the meta-type
+                // of the instance, and have the correct type there too.
+                if self.bound_on_class.is_no() {
+                    return C::always_satisfiable(db);
+                }
+                let Place::Type(meta_attribute_type, Boundness::Bound) =
+                    other.to_meta_type(db).member(db, attribute).place
+                else {
+                    return C::unsatisfiable(db);
+                };
+                meta_attribute_type.has_relation_to_impl(db, self.ty, relation, visitor)
+            })
+            .and(db, || {
+                // If the attribute member was declared as a `ClassVar` in the protocol,
+                // it must be valid to assign to it on the meta-type of the instance.
+                // Otherwise, it must be valid to assign to it on the instance.
+                C::from_bool(
+                    db,
+                    if qualifiers.contains(TypeQualifiers::CLASS_VAR) {
+                        other
+                            .to_meta_type(db)
+                            .validate_attribute_assignment(db, attribute, self.ty)
+                            .is_ok()
+                    } else {
+                        other
+                            .validate_attribute_assignment(db, attribute, self.ty)
+                            .is_ok()
+                    },
+                )
+            })
     }
 }
 
@@ -677,18 +776,21 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
 
     /// Return `true` if `other` contains an attribute/method/property that satisfies
     /// the part of the interface defined by this protocol member.
-    pub(super) fn is_satisfied_by(
+    pub(super) fn is_satisfied_by<C: Constraints<'db>>(
         &self,
         db: &'db dyn Db,
         other: Type<'db>,
         relation: TypeRelation,
-        visitor: &HasRelationToVisitor<'db>,
-    ) -> bool {
+        visitor: &HasRelationToVisitor<'db, C>,
+    ) -> C {
         match &self.kind {
             // TODO: consider the types of the attribute on `other` for method members
-            ProtocolMemberKind::Method(_) => matches!(
-                other.to_meta_type(db).member(db, self.name).place,
-                Place::Type(_, Boundness::Bound)
+            ProtocolMemberKind::Method(_) => C::from_bool(
+                db,
+                matches!(
+                    other.to_meta_type(db).member(db, self.name).place,
+                    Place::Type(_, Boundness::Bound)
+                ),
             ),
             // TODO: consider the types of the attribute on `other` for property members
             ProtocolMemberKind::Property(property) => {
@@ -757,6 +859,10 @@ impl BoundOnClass {
 
     const fn is_yes(self) -> bool {
         matches!(self, BoundOnClass::Yes)
+    }
+
+    const fn is_no(self) -> bool {
+        matches!(self, BoundOnClass::No)
     }
 }
 

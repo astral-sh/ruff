@@ -2622,6 +2622,13 @@ watermelon
             self.config = config;
         }
 
+        /// Show a diff for the fix when rendering.
+        pub(super) fn show_fix_diff(&mut self, yes: bool) {
+            let mut config = std::mem::take(&mut self.config);
+            config = config.show_fix_diff(yes);
+            self.config = config;
+        }
+
         /// The lowest fix applicability to show when rendering.
         pub(super) fn fix_applicability(&mut self, applicability: Applicability) {
             let mut config = std::mem::take(&mut self.config);

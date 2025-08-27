@@ -75,6 +75,32 @@ def f(x: T):
     reveal_type(b)  # revealed: str
 ```
 
+## Scoping
+
+PEP 695 type aliases delay runtime evaluation of their right-hand side, so they are a lazy (not
+eager) nested scope.
+
+```py
+type Alias = Foo | str
+
+def f(x: Alias):
+    reveal_type(x)  # revealed: Foo | str
+
+class Foo:
+    pass
+```
+
+But narrowing of names used in the type alias is still respected:
+
+```py
+def _(flag: bool):
+    t = int if flag else None
+    if t is not None:
+        type Alias = t | str
+        def f(x: Alias):
+            reveal_type(x)  # revealed: int | str
+```
+
 ## Generic type aliases
 
 ```py
@@ -178,13 +204,17 @@ def f(x: OptNestedInt) -> None:
 ### Invalid self-referential
 
 ```py
-# TODO emit a diagnostic here
+# TODO emit a diagnostic on these two lines
 type IntOr = int | IntOr
+type OrInt = OrInt | int
 
-def f(x: IntOr):
+def f(x: IntOr, y: OrInt):
     reveal_type(x)  # revealed: int
+    reveal_type(y)  # revealed: int
     if not isinstance(x, int):
         reveal_type(x)  # revealed: Never
+    if not isinstance(y, int):
+        reveal_type(y)  # revealed: Never
 ```
 
 ### Mutually recursive
@@ -207,4 +237,43 @@ from ty_extensions import Intersection
 
 def h(x: Intersection[A, B]):
     reveal_type(x)  # revealed: tuple[B] | None
+```
+
+### Union inside generic
+
+#### With old-style union
+
+```py
+from typing import Union
+
+type A = list[Union["A", str]]
+
+def f(x: A):
+    reveal_type(x)  # revealed: list[A | str]
+    for item in x:
+        reveal_type(item)  # revealed: list[A | str] | str
+```
+
+#### With new-style union
+
+```py
+type A = list["A" | str]
+
+def f(x: A):
+    reveal_type(x)  # revealed: list[A | str]
+    for item in x:
+        reveal_type(item)  # revealed: list[A | str] | str
+```
+
+#### With Optional
+
+```py
+from typing import Optional, Union
+
+type A = list[Optional[Union["A", str]]]
+
+def f(x: A):
+    reveal_type(x)  # revealed: list[A | str | None]
+    for item in x:
+        reveal_type(item)  # revealed: list[A | str | None] | str | None
 ```
