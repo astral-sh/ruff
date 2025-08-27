@@ -13,7 +13,7 @@ PTH100 [*] `os.path.abspath()` should be replaced by `Path.resolve()`
   |
 help: Replace with `Path(...).resolve()`
 
-ℹ Safe fix
+ℹ Unsafe fix
 1 1 | import os
 2 2 | import os.path
   3 |+import pathlib

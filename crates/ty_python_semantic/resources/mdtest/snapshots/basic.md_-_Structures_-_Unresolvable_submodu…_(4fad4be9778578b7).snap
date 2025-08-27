@@ -36,6 +36,9 @@ error[unresolved-import]: Cannot resolve imported module `a.foo`
 3 |
 4 | # Topmost component unresolvable:
   |
+info: Searched in the following paths during module resolution:
+info:   1. /src (first-party code)
+info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
 info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
 info: rule `unresolved-import` is enabled by default
 
@@ -49,6 +52,9 @@ error[unresolved-import]: Cannot resolve imported module `b.foo`
 5 | import b.foo  # error: [unresolved-import] "Cannot resolve imported module `b.foo`"
   |        ^^^^^
   |
+info: Searched in the following paths during module resolution:
+info:   1. /src (first-party code)
+info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
 info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
 info: rule `unresolved-import` is enabled by default
 

@@ -614,6 +614,8 @@ AIR311 [*] `airflow.utils.dag_parsing_context.get_parsing_context` is removed in
 75 | # airflow.utils.dag_parsing_context
 76 | get_parsing_context()
    | ^^^^^^^^^^^^^^^^^^^
+77 |
+78 | from airflow.decorators.base import (
    |
 help: Use `get_parsing_context` from `airflow.sdk` instead.
 
@@ -626,3 +628,211 @@ help: Use `get_parsing_context` from `airflow.sdk` instead.
 71 71 | 
 72 72 | # airflow.timetables.datasets
 73 73 | DatasetOrTimeSchedule()
+
+AIR311 [*] `airflow.decorators.base.DecoratedMappedOperator` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+  --> AIR311_names.py:87:1
+   |
+86 | # airflow.decorators.base
+87 | DecoratedMappedOperator()
+   | ^^^^^^^^^^^^^^^^^^^^^^^
+88 | DecoratedOperator()
+89 | TaskDecorator()
+   |
+help: Use `DecoratedMappedOperator` from `airflow.sdk.bases.decorator` instead.
+
+ℹ Unsafe fix
+76 76 | get_parsing_context()
+77 77 | 
+78 78 | from airflow.decorators.base import (
+79    |-    DecoratedMappedOperator,
+80 79 |     DecoratedOperator,
+81 80 |     TaskDecorator,
+82 81 |     get_unique_task_id,
+83 82 |     task_decorator_factory,
+84 83 | )
+   84 |+from airflow.sdk.bases.decorator import DecoratedMappedOperator
+85 85 | 
+86 86 | # airflow.decorators.base
+87 87 | DecoratedMappedOperator()
+
+AIR311 [*] `airflow.decorators.base.DecoratedOperator` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+  --> AIR311_names.py:88:1
+   |
+86 | # airflow.decorators.base
+87 | DecoratedMappedOperator()
+88 | DecoratedOperator()
+   | ^^^^^^^^^^^^^^^^^
+89 | TaskDecorator()
+90 | get_unique_task_id()
+   |
+help: Use `DecoratedOperator` from `airflow.sdk.bases.decorator` instead.
+
+ℹ Unsafe fix
+77 77 | 
+78 78 | from airflow.decorators.base import (
+79 79 |     DecoratedMappedOperator,
+80    |-    DecoratedOperator,
+81 80 |     TaskDecorator,
+82 81 |     get_unique_task_id,
+83 82 |     task_decorator_factory,
+84 83 | )
+   84 |+from airflow.sdk.bases.decorator import DecoratedOperator
+85 85 | 
+86 86 | # airflow.decorators.base
+87 87 | DecoratedMappedOperator()
+
+AIR311 [*] `airflow.decorators.base.TaskDecorator` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+  --> AIR311_names.py:89:1
+   |
+87 | DecoratedMappedOperator()
+88 | DecoratedOperator()
+89 | TaskDecorator()
+   | ^^^^^^^^^^^^^
+90 | get_unique_task_id()
+91 | task_decorator_factory()
+   |
+help: Use `TaskDecorator` from `airflow.sdk.bases.decorator` instead.
+
+ℹ Unsafe fix
+78 78 | from airflow.decorators.base import (
+79 79 |     DecoratedMappedOperator,
+80 80 |     DecoratedOperator,
+81    |-    TaskDecorator,
+82 81 |     get_unique_task_id,
+83 82 |     task_decorator_factory,
+84 83 | )
+   84 |+from airflow.sdk.bases.decorator import TaskDecorator
+85 85 | 
+86 86 | # airflow.decorators.base
+87 87 | DecoratedMappedOperator()
+
+AIR311 [*] `airflow.decorators.base.get_unique_task_id` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+  --> AIR311_names.py:90:1
+   |
+88 | DecoratedOperator()
+89 | TaskDecorator()
+90 | get_unique_task_id()
+   | ^^^^^^^^^^^^^^^^^^
+91 | task_decorator_factory()
+   |
+help: Use `get_unique_task_id` from `airflow.sdk.bases.decorator` instead.
+
+ℹ Unsafe fix
+79 79 |     DecoratedMappedOperator,
+80 80 |     DecoratedOperator,
+81 81 |     TaskDecorator,
+82    |-    get_unique_task_id,
+83 82 |     task_decorator_factory,
+84 83 | )
+   84 |+from airflow.sdk.bases.decorator import get_unique_task_id
+85 85 | 
+86 86 | # airflow.decorators.base
+87 87 | DecoratedMappedOperator()
+
+AIR311 [*] `airflow.decorators.base.task_decorator_factory` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+  --> AIR311_names.py:91:1
+   |
+89 | TaskDecorator()
+90 | get_unique_task_id()
+91 | task_decorator_factory()
+   | ^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: Use `task_decorator_factory` from `airflow.sdk.bases.decorator` instead.
+
+ℹ Unsafe fix
+80 80 |     DecoratedOperator,
+81 81 |     TaskDecorator,
+82 82 |     get_unique_task_id,
+83    |-    task_decorator_factory,
+84 83 | )
+   84 |+from airflow.sdk.bases.decorator import task_decorator_factory
+85 85 | 
+86 86 | # airflow.decorators.base
+87 87 | DecoratedMappedOperator()
+
+AIR311 [*] `airflow.models.Param` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+  --> AIR311_names.py:97:1
+   |
+96 | # airflow.models
+97 | Param()
+   | ^^^^^
+   |
+help: Use `Param` from `airflow.sdk.definitions.param` instead.
+
+ℹ Unsafe fix
+91 91 | task_decorator_factory()
+92 92 | 
+93 93 | 
+94    |-from airflow.models import Param
+   94 |+from airflow.sdk.definitions.param import Param
+95 95 | 
+96 96 | # airflow.models
+97 97 | Param()
+
+AIR311 [*] `airflow.sensors.base.BaseSensorOperator` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+   --> AIR311_names.py:107:1
+    |
+106 | # airflow.sensors.base
+107 | BaseSensorOperator()
+    | ^^^^^^^^^^^^^^^^^^
+108 | PokeReturnValue()
+109 | poke_mode_only()
+    |
+help: Use `BaseSensorOperator` from `airflow.sdk` instead.
+
+ℹ Unsafe fix
+98  98  | 
+99  99  | 
+100 100 | from airflow.sensors.base import (
+101     |-    BaseSensorOperator,
+102 101 |     PokeReturnValue,
+103 102 |     poke_mode_only,
+104 103 | )
+    104 |+from airflow.sdk import BaseSensorOperator
+105 105 | 
+106 106 | # airflow.sensors.base
+107 107 | BaseSensorOperator()
+
+AIR311 [*] `airflow.sensors.base.PokeReturnValue` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+   --> AIR311_names.py:108:1
+    |
+106 | # airflow.sensors.base
+107 | BaseSensorOperator()
+108 | PokeReturnValue()
+    | ^^^^^^^^^^^^^^^
+109 | poke_mode_only()
+    |
+help: Use `PokeReturnValue` from `airflow.sdk` instead.
+
+ℹ Unsafe fix
+99  99  | 
+100 100 | from airflow.sensors.base import (
+101 101 |     BaseSensorOperator,
+102     |-    PokeReturnValue,
+103 102 |     poke_mode_only,
+104 103 | )
+    104 |+from airflow.sdk import PokeReturnValue
+105 105 | 
+106 106 | # airflow.sensors.base
+107 107 | BaseSensorOperator()
+
+AIR311 [*] `airflow.sensors.base.poke_mode_only` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+   --> AIR311_names.py:109:1
+    |
+107 | BaseSensorOperator()
+108 | PokeReturnValue()
+109 | poke_mode_only()
+    | ^^^^^^^^^^^^^^
+    |
+help: Use `poke_mode_only` from `airflow.sdk` instead.
+
+ℹ Unsafe fix
+100 100 | from airflow.sensors.base import (
+101 101 |     BaseSensorOperator,
+102 102 |     PokeReturnValue,
+103     |-    poke_mode_only,
+104 103 | )
+    104 |+from airflow.sdk import poke_mode_only
+105 105 | 
+106 106 | # airflow.sensors.base
+107 107 | BaseSensorOperator()

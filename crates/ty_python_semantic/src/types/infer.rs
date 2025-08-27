@@ -64,7 +64,9 @@ use super::string_annotation::{
 use super::subclass_of::SubclassOfInner;
 use super::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::module_name::{ModuleName, ModuleNameResolutionError};
-use crate::module_resolver::{KnownModule, file_to_module, resolve_module};
+use crate::module_resolver::{
+    KnownModule, ModuleResolveMode, file_to_module, resolve_module, search_paths,
+};
 use crate::node_key::NodeKey;
 use crate::place::{
     Boundness, ConsideredDefinitions, LookupError, Place, PlaceAndQualifiers,
@@ -1214,8 +1216,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
 
                 if is_protocol
-                    && !(base_class.class_literal(self.db()).0.is_protocol(self.db())
-                        || base_class.is_known(self.db(), KnownClass::Object))
+                    && !(base_class.is_protocol(self.db()) || base_class.is_object(self.db()))
                 {
                     if let Some(builder) = self
                         .context
@@ -4983,6 +4984,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
+            // Add search paths information to the diagnostic
+            // Use the same search paths function that is used in actual module resolution
+            let mut search_paths =
+                search_paths(self.db(), ModuleResolveMode::StubsAllowed).peekable();
+
+            if search_paths.peek().is_some() {
+                diagnostic.info(format_args!(
+                    "Searched in the following paths during module resolution:"
+                ));
+
+                for (index, path) in search_paths.enumerate() {
+                    diagnostic.info(format_args!(
+                        "  {}. {} ({})",
+                        index + 1,
+                        path,
+                        path.describe_kind()
+                    ));
+                }
+            }
+
             diagnostic.info(
                 "make sure your Python environment is properly configured: \
                 https://docs.astral.sh/ty/modules/#python-environment",
@@ -5783,8 +5804,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.infer_expression(elt);
         }
 
-        // TODO generic
-        KnownClass::List.to_instance(self.db())
+        KnownClass::List
+            .to_specialized_instance(self.db(), [todo_type!("list literal element type")])
     }
 
     fn infer_set_expression(&mut self, set: &ast::ExprSet) -> Type<'db> {
@@ -5798,8 +5819,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.infer_expression(elt);
         }
 
-        // TODO generic
-        KnownClass::Set.to_instance(self.db())
+        KnownClass::Set.to_specialized_instance(self.db(), [todo_type!("set literal element type")])
     }
 
     fn infer_dict_expression(&mut self, dict: &ast::ExprDict) -> Type<'db> {
@@ -5814,8 +5834,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.infer_expression(&item.value);
         }
 
-        // TODO generic
-        KnownClass::Dict.to_instance(self.db())
+        KnownClass::Dict.to_specialized_instance(
+            self.db(),
+            [
+                todo_type!("dict literal key type"),
+                todo_type!("dict literal value type"),
+            ],
+        )
     }
 
     /// Infer the type of the `iter` expression of the first comprehension.
@@ -5838,7 +5863,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         self.infer_first_comprehension_iter(generators);
 
-        todo_type!("generator type")
+        KnownClass::GeneratorType.to_specialized_instance(
+            self.db(),
+            [
+                todo_type!("generator expression yield type"),
+                todo_type!("generator expression send type"),
+                todo_type!("generator expression return type"),
+            ],
+        )
     }
 
     fn infer_list_comprehension_expression(&mut self, listcomp: &ast::ExprListComp) -> Type<'db> {
@@ -5851,7 +5883,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         self.infer_first_comprehension_iter(generators);
 
-        todo_type!("list comprehension type")
+        KnownClass::List
+            .to_specialized_instance(self.db(), [todo_type!("list comprehension element type")])
     }
 
     fn infer_dict_comprehension_expression(&mut self, dictcomp: &ast::ExprDictComp) -> Type<'db> {
@@ -5865,7 +5898,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         self.infer_first_comprehension_iter(generators);
 
-        todo_type!("dict comprehension type")
+        KnownClass::Dict.to_specialized_instance(
+            self.db(),
+            [
+                todo_type!("dict comprehension key type"),
+                todo_type!("dict comprehension value type"),
+            ],
+        )
     }
 
     fn infer_set_comprehension_expression(&mut self, setcomp: &ast::ExprSetComp) -> Type<'db> {
@@ -5878,7 +5917,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         self.infer_first_comprehension_iter(generators);
 
-        todo_type!("set comprehension type")
+        KnownClass::Set
+            .to_specialized_instance(self.db(), [todo_type!("set comprehension element type")])
     }
 
     fn infer_generator_expression_scope(&mut self, generator: &ast::ExprGenerator) {
@@ -6208,11 +6248,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // subclasses of the protocol to be passed to parameters that accept `type[SomeProtocol]`.
             // <https://typing.python.org/en/latest/spec/protocol.html#type-and-class-objects-vs-protocols>.
             if !callable_type.is_subclass_of() {
-                if let Some(protocol) = class
-                    .class_literal(self.db())
-                    .0
-                    .into_protocol_class(self.db())
-                {
+                if let Some(protocol) = class.into_protocol_class(self.db()) {
                     report_attempted_protocol_instantiation(
                         &self.context,
                         call_expression,
@@ -9754,7 +9790,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     ast::Operator::BitOr => {
                         let left_ty = self.infer_type_expression(&binary.left);
                         let right_ty = self.infer_type_expression(&binary.right);
-                        UnionType::from_elements(self.db(), [left_ty, right_ty])
+                        UnionType::from_elements_leave_aliases(self.db(), [left_ty, right_ty])
                     }
                     // anything else is an invalid annotation:
                     op => {
@@ -10266,7 +10302,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
             }
             ast::Expr::BinOp(binary) if binary.op == ast::Operator::BitOr => {
-                let union_ty = UnionType::from_elements(
+                let union_ty = UnionType::from_elements_leave_aliases(
                     self.db(),
                     [
                         self.infer_subclass_of_type_expression(&binary.left),
@@ -10292,7 +10328,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let parameters_ty = match self.infer_expression(value) {
                     Type::SpecialForm(SpecialFormType::Union) => match &**parameters {
                         ast::Expr::Tuple(tuple) => {
-                            let ty = UnionType::from_elements(
+                            let ty = UnionType::from_elements_leave_aliases(
                                 self.db(),
                                 tuple
                                     .iter()
@@ -10526,11 +10562,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             },
             SpecialFormType::Optional => {
                 let param_type = self.infer_type_expression(arguments_slice);
-                UnionType::from_elements(db, [param_type, Type::none(db)])
+                UnionType::from_elements_leave_aliases(db, [param_type, Type::none(db)])
             }
             SpecialFormType::Union => match arguments_slice {
                 ast::Expr::Tuple(t) => {
-                    let union_ty = UnionType::from_elements(
+                    let union_ty = UnionType::from_elements_leave_aliases(
                         db,
                         t.iter().map(|elt| self.infer_type_expression(elt)),
                     );

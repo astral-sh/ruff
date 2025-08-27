@@ -1046,7 +1046,6 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 Rule::PyPath,
                 Rule::Glob,
                 Rule::OsListdir,
-                Rule::OsSymlink,
             ]) {
                 flake8_use_pathlib::rules::replaceable_by_pathlib(checker, call);
             }
