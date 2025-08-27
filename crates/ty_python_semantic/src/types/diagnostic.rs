@@ -6,14 +6,19 @@ use super::{
     add_inferred_python_version_hint_to_diagnostic,
 };
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
+use crate::semantic_index::SemanticIndex;
+use crate::semantic_index::definition::Definition;
+use crate::semantic_index::place::{PlaceTable, ScopedPlaceId};
 use crate::suppression::FileSuppressionId;
-use crate::types::LintDiagnosticGuard;
-use crate::types::class::{Field, SolidBase, SolidBaseKind};
+use crate::types::class::{DisjointBase, DisjointBaseKind, Field};
 use crate::types::function::KnownFunction;
 use crate::types::string_annotation::{
     BYTE_STRING_TYPE_ANNOTATION, ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION, FSTRING_TYPE_ANNOTATION,
     IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION, INVALID_SYNTAX_IN_FORWARD_ANNOTATION,
     RAW_STRING_TYPE_ANNOTATION,
+};
+use crate::types::{
+    DynamicType, LintDiagnosticGuard, Protocol, ProtocolInstanceType, SubclassOfInner, binding_type,
 };
 use crate::types::{SpecialFormType, Type, protocol_class::ProtocolClassLiteral};
 use crate::util::diagnostics::format_enumeration;
@@ -28,6 +33,7 @@ use std::fmt::Formatter;
 
 /// Registers all known type check lints.
 pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
+    registry.register_lint(&AMBIGUOUS_PROTOCOL_MEMBER);
     registry.register_lint(&CALL_NON_CALLABLE);
     registry.register_lint(&POSSIBLY_UNBOUND_IMPLICIT_CALL);
     registry.register_lint(&CONFLICTING_ARGUMENT_FORMS);
@@ -90,6 +96,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_ATTRIBUTE_ACCESS);
     registry.register_lint(&REDUNDANT_CAST);
     registry.register_lint(&UNRESOLVED_GLOBAL);
+    registry.register_lint(&MISSING_TYPED_DICT_KEY);
 
     // String annotations
     registry.register_lint(&BYTE_STRING_TYPE_ANNOTATION);
@@ -398,7 +405,7 @@ declare_lint! {
     ///
     /// ## Known problems
     /// Classes that have "dynamic" definitions of `__slots__` (definitions do not consist
-    /// of string literals, or tuples of string literals) are not currently considered solid
+    /// of string literals, or tuples of string literals) are not currently considered disjoint
     /// bases by ty.
     ///
     /// Additionally, this check is not exhaustive: many C extensions (including several in
@@ -423,7 +430,7 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks for invalidly defined protocol classes.
+    /// Checks for protocol classes that will raise `TypeError` at runtime.
     ///
     /// ## Why is this bad?
     /// An invalidly defined protocol class may lead to the type checker inferring
@@ -446,6 +453,41 @@ declare_lint! {
         summary: "detects invalid protocol class definitions",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for protocol classes with members that will lead to ambiguous interfaces.
+    ///
+    /// ## Why is this bad?
+    /// Assigning to an undeclared variable in a protocol class leads to an ambiguous
+    /// interface which may lead to the type checker inferring unexpected things. It's
+    /// recommended to ensure that all members of a protocol class are explicitly declared.
+    ///
+    /// ## Examples
+    ///
+    /// ```py
+    /// from typing import Protocol
+    ///
+    /// class BaseProto(Protocol):
+    ///     a: int                               # fine (explicitly declared as `int`)
+    ///     def method_member(self) -> int: ...  # fine: a method definition using `def` is considered a declaration
+    ///     c = "some variable"                  # error: no explicit declaration, leading to ambiguity
+    ///     b = method_member                    # error: no explicit declaration, leading to ambiguity
+    ///
+    ///     # error: this creates implicit assignments of `d` and `e` in the protocol class body.
+    ///     # Were they really meant to be considered protocol members?
+    ///     for d, e in enumerate(range(42)):
+    ///         pass
+    ///
+    /// class SubProto(BaseProto, Protocol):
+    ///     a = 42  # fine (declared in superclass)
+    /// ```
+    pub(crate) static AMBIGUOUS_PROTOCOL_MEMBER = {
+        summary: "detects protocol classes with ambiguous interfaces",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Warn,
     }
 }
 
@@ -1717,6 +1759,33 @@ declare_lint! {
     }
 }
 
+declare_lint! {
+    /// ## What it does
+    /// Detects missing required keys in `TypedDict` constructor calls.
+    ///
+    /// ## Why is this bad?
+    /// `TypedDict` requires all non-optional keys to be provided during construction.
+    /// Missing items can lead to a `KeyError` at runtime.
+    ///
+    /// ## Example
+    /// ```python
+    /// from typing import TypedDict
+    ///
+    /// class Person(TypedDict):
+    ///     name: str
+    ///     age: int
+    ///
+    /// alice: Person = {"name": "Alice"}  # missing required key 'age'
+    ///
+    /// alice["age"]  # KeyError
+    /// ```
+    pub(crate) static MISSING_TYPED_DICT_KEY = {
+        summary: "detects missing required keys in `TypedDict` constructors",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
 /// A collection of type check diagnostics.
 #[derive(Default, Eq, PartialEq, get_size2::GetSize)]
 pub struct TypeCheckDiagnostics {
@@ -2101,9 +2170,9 @@ pub(crate) fn report_instance_layout_conflict(
     context: &InferContext,
     class: ClassLiteral,
     node: &ast::StmtClassDef,
-    solid_bases: &IncompatibleBases,
+    disjoint_bases: &IncompatibleBases,
 ) {
-    debug_assert!(solid_bases.len() > 1);
+    debug_assert!(disjoint_bases.len() > 1);
 
     let db = context.db();
 
@@ -2117,7 +2186,7 @@ pub(crate) fn report_instance_layout_conflict(
 
     diagnostic.set_primary_message(format_args!(
         "Bases {} cannot be combined in multiple inheritance",
-        solid_bases.describe_problematic_class_bases(db)
+        disjoint_bases.describe_problematic_class_bases(db)
     ));
 
     let mut subdiagnostic = SubDiagnostic::new(
@@ -2126,23 +2195,23 @@ pub(crate) fn report_instance_layout_conflict(
         have incompatible memory layouts",
     );
 
-    for (solid_base, solid_base_info) in solid_bases {
+    for (disjoint_base, disjoint_base_info) in disjoint_bases {
         let IncompatibleBaseInfo {
             node_index,
             originating_base,
-        } = solid_base_info;
+        } = disjoint_base_info;
 
         let span = context.span(&node.bases()[*node_index]);
         let mut annotation = Annotation::secondary(span.clone());
-        if solid_base.class == *originating_base {
-            match solid_base.kind {
-                SolidBaseKind::DefinesSlots => {
+        if disjoint_base.class == *originating_base {
+            match disjoint_base.kind {
+                DisjointBaseKind::DefinesSlots => {
                     annotation = annotation.message(format_args!(
                         "`{base}` instances have a distinct memory layout because `{base}` defines non-empty `__slots__`",
                         base = originating_base.name(db)
                     ));
                 }
-                SolidBaseKind::HardCoded => {
+                DisjointBaseKind::DisjointBaseDecorator => {
                     annotation = annotation.message(format_args!(
                         "`{base}` instances have a distinct memory layout because of the way `{base}` \
                         is implemented in a C extension",
@@ -2154,26 +2223,28 @@ pub(crate) fn report_instance_layout_conflict(
         } else {
             annotation = annotation.message(format_args!(
                 "`{base}` instances have a distinct memory layout \
-                because `{base}` inherits from `{solid_base}`",
+                because `{base}` inherits from `{disjoint_base}`",
                 base = originating_base.name(db),
-                solid_base = solid_base.class.name(db)
+                disjoint_base = disjoint_base.class.name(db)
             ));
             subdiagnostic.annotate(annotation);
 
             let mut additional_annotation = Annotation::secondary(span);
 
-            additional_annotation = match solid_base.kind {
-                SolidBaseKind::DefinesSlots => additional_annotation.message(format_args!(
-                    "`{solid_base}` instances have a distinct memory layout because `{solid_base}` \
+            additional_annotation = match disjoint_base.kind {
+                DisjointBaseKind::DefinesSlots => additional_annotation.message(format_args!(
+                    "`{disjoint_base}` instances have a distinct memory layout because `{disjoint_base}` \
                         defines non-empty `__slots__`",
-                    solid_base = solid_base.class.name(db),
+                    disjoint_base = disjoint_base.class.name(db),
                 )),
 
-                SolidBaseKind::HardCoded => additional_annotation.message(format_args!(
-                    "`{solid_base}` instances have a distinct memory layout \
-                        because of the way `{solid_base}` is implemented in a C extension",
-                    solid_base = solid_base.class.name(db),
-                )),
+                DisjointBaseKind::DisjointBaseDecorator => {
+                    additional_annotation.message(format_args!(
+                        "`{disjoint_base}` instances have a distinct memory layout \
+                        because of the way `{disjoint_base}` is implemented in a C extension",
+                        disjoint_base = disjoint_base.class.name(db),
+                    ))
+                }
             };
 
             subdiagnostic.annotate(additional_annotation);
@@ -2183,20 +2254,20 @@ pub(crate) fn report_instance_layout_conflict(
     diagnostic.sub(subdiagnostic);
 }
 
-/// Information regarding the conflicting solid bases a class is inferred to have in its MRO.
+/// Information regarding the conflicting disjoint bases a class is inferred to have in its MRO.
 ///
-/// For each solid base, we record information about which element in the class's bases list
-/// caused the solid base to be included in the class's MRO.
+/// For each disjoint base, we record information about which element in the class's bases list
+/// caused the disjoint base to be included in the class's MRO.
 ///
-/// The inner data is an `IndexMap` to ensure that diagnostics regarding conflicting solid bases
+/// The inner data is an `IndexMap` to ensure that diagnostics regarding conflicting disjoint bases
 /// are reported in a stable order.
 #[derive(Debug, Default)]
-pub(super) struct IncompatibleBases<'db>(FxIndexMap<SolidBase<'db>, IncompatibleBaseInfo<'db>>);
+pub(super) struct IncompatibleBases<'db>(FxIndexMap<DisjointBase<'db>, IncompatibleBaseInfo<'db>>);
 
 impl<'db> IncompatibleBases<'db> {
     pub(super) fn insert(
         &mut self,
-        base: SolidBase<'db>,
+        base: DisjointBase<'db>,
         node_index: usize,
         class: ClassLiteral<'db>,
     ) {
@@ -2218,19 +2289,19 @@ impl<'db> IncompatibleBases<'db> {
         self.0.len()
     }
 
-    /// Two solid bases are allowed to coexist in an MRO if one is a subclass of the other.
+    /// Two disjoint bases are allowed to coexist in an MRO if one is a subclass of the other.
     /// This method therefore removes any entry in `self` that is a subclass of one or more
     /// other entries also contained in `self`.
     pub(super) fn remove_redundant_entries(&mut self, db: &'db dyn Db) {
         self.0 = self
             .0
             .iter()
-            .filter(|(solid_base, _)| {
+            .filter(|(disjoint_base, _)| {
                 self.0
                     .keys()
-                    .filter(|other_base| other_base != solid_base)
+                    .filter(|other_base| other_base != disjoint_base)
                     .all(|other_base| {
-                        !solid_base.class.is_subclass_of(
+                        !disjoint_base.class.is_subclass_of(
                             db,
                             None,
                             other_base.class.default_specialization(db),
@@ -2243,25 +2314,25 @@ impl<'db> IncompatibleBases<'db> {
 }
 
 impl<'a, 'db> IntoIterator for &'a IncompatibleBases<'db> {
-    type Item = (&'a SolidBase<'db>, &'a IncompatibleBaseInfo<'db>);
-    type IntoIter = indexmap::map::Iter<'a, SolidBase<'db>, IncompatibleBaseInfo<'db>>;
+    type Item = (&'a DisjointBase<'db>, &'a IncompatibleBaseInfo<'db>);
+    type IntoIter = indexmap::map::Iter<'a, DisjointBase<'db>, IncompatibleBaseInfo<'db>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.iter()
     }
 }
 
-/// Information about which class base the "solid base" stems from
+/// Information about which class base the "disjoint base" stems from
 #[derive(Debug, Copy, Clone)]
 pub(super) struct IncompatibleBaseInfo<'db> {
     /// The index of the problematic base in the [`ast::StmtClassDef`]'s bases list.
     node_index: usize,
 
     /// The base class in the [`ast::StmtClassDef`]'s bases list that caused
-    /// the solid base to be included in the class's MRO.
+    /// the disjoint base to be included in the class's MRO.
     ///
-    /// This won't necessarily be the same class as the `SolidBase`'s class,
-    /// as the `SolidBase` may have found its way into the class's MRO by dint of it being a
+    /// This won't necessarily be the same class as the `DisjointBase`'s class,
+    /// as the `DisjointBase` may have found its way into the class's MRO by dint of it being a
     /// superclass of one of the classes in the class definition's bases list.
     originating_base: ClassLiteral<'db>,
 }
@@ -2455,6 +2526,95 @@ pub(crate) fn report_attempted_protocol_instantiation(
     diagnostic.sub(class_def_diagnostic);
 }
 
+pub(crate) fn report_undeclared_protocol_member(
+    context: &InferContext,
+    definition: Definition,
+    protocol_class: ProtocolClassLiteral,
+    class_symbol_table: &PlaceTable,
+) {
+    /// We want to avoid suggesting an annotation for e.g. `x = None`,
+    /// because the user almost certainly doesn't want to write `x: None = None`.
+    /// We also want to avoid suggesting invalid syntax such as `x: <class 'int'> = int`.
+    fn should_give_hint<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+        let class = match ty {
+            Type::ProtocolInstance(ProtocolInstanceType {
+                inner: Protocol::FromClass(_),
+                ..
+            }) => return true,
+            Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
+                SubclassOfInner::Class(class) => class,
+                SubclassOfInner::Dynamic(DynamicType::Any) => return true,
+                SubclassOfInner::Dynamic(_) => return false,
+            },
+            Type::NominalInstance(instance) => instance.class(db),
+            _ => return false,
+        };
+
+        !matches!(
+            class.known(db),
+            Some(KnownClass::NoneType | KnownClass::EllipsisType)
+        )
+    }
+
+    let db = context.db();
+
+    let Some(builder) = context.report_lint(
+        &AMBIGUOUS_PROTOCOL_MEMBER,
+        definition.full_range(db, context.module()),
+    ) else {
+        return;
+    };
+
+    let ScopedPlaceId::Symbol(symbol_id) = definition.place(db) else {
+        return;
+    };
+
+    let symbol_name = class_symbol_table.symbol(symbol_id).name();
+    let class_name = protocol_class.name(db);
+
+    let mut diagnostic = builder
+        .into_diagnostic("Cannot assign to undeclared variable in the body of a protocol class");
+
+    if definition.kind(db).is_unannotated_assignment() {
+        let binding_type = binding_type(db, definition);
+
+        let suggestion = binding_type
+            .literal_fallback_instance(db)
+            .unwrap_or(binding_type);
+
+        if should_give_hint(db, suggestion) {
+            diagnostic.set_primary_message(format_args!(
+                "Consider adding an annotation, e.g. `{symbol_name}: {} = ...`",
+                suggestion.display(db)
+            ));
+        } else {
+            diagnostic.set_primary_message(format_args!(
+                "Consider adding an annotation for `{symbol_name}`"
+            ));
+        }
+    } else {
+        diagnostic.set_primary_message(format_args!(
+            "`{symbol_name}` is not declared as a protocol member"
+        ));
+    }
+
+    let mut class_def_diagnostic = SubDiagnostic::new(
+        SubDiagnosticSeverity::Info,
+        "Assigning to an undeclared variable in a protocol class \
+    leads to an ambiguous interface",
+    );
+    class_def_diagnostic.annotate(
+        Annotation::primary(protocol_class.header_span(db))
+            .message(format_args!("`{class_name}` declared as a protocol here",)),
+    );
+    diagnostic.sub(class_def_diagnostic);
+
+    diagnostic.info(format_args!(
+        "No declarations found for `{symbol_name}` \
+        in the body of `{class_name}` or any of its superclasses"
+    ));
+}
+
 pub(crate) fn report_duplicate_bases(
     context: &InferContext,
     class: ClassLiteral,
@@ -2631,18 +2791,18 @@ fn report_invalid_base<'ctx, 'db>(
 
 pub(crate) fn report_invalid_key_on_typed_dict<'db>(
     context: &InferContext<'db, '_>,
-    value_node: AnyNodeRef,
-    slice_node: AnyNodeRef,
-    value_ty: Type<'db>,
-    slice_ty: Type<'db>,
+    typed_dict_node: AnyNodeRef,
+    key_node: AnyNodeRef,
+    typed_dict_ty: Type<'db>,
+    key_ty: Type<'db>,
     items: &FxOrderMap<Name, Field<'db>>,
 ) {
     let db = context.db();
-    if let Some(builder) = context.report_lint(&INVALID_KEY, slice_node) {
-        match slice_ty {
+    if let Some(builder) = context.report_lint(&INVALID_KEY, key_node) {
+        match key_ty {
             Type::StringLiteral(key) => {
                 let key = key.value(db);
-                let typed_dict_name = value_ty.display(db);
+                let typed_dict_name = typed_dict_ty.display(db);
 
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "Invalid key access on TypedDict `{typed_dict_name}`",
@@ -2650,7 +2810,7 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
 
                 diagnostic.annotate(
                     context
-                        .secondary(value_node)
+                        .secondary(typed_dict_node)
                         .message(format_args!("TypedDict `{typed_dict_name}`")),
                 );
 
@@ -2669,10 +2829,79 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
             }
             _ => builder.into_diagnostic(format_args!(
                 "TypedDict `{}` cannot be indexed with a key of type `{}`",
-                value_ty.display(db),
-                slice_ty.display(db),
+                typed_dict_ty.display(db),
+                key_ty.display(db),
             )),
         };
+    }
+}
+
+pub(super) fn report_namedtuple_field_without_default_after_field_with_default<'db>(
+    context: &InferContext<'db, '_>,
+    class: ClassLiteral<'db>,
+    index: &'db SemanticIndex<'db>,
+    field_name: &str,
+    field_with_default: &str,
+) {
+    let db = context.db();
+    let module = context.module();
+
+    let diagnostic_range = class
+        .first_declaration_of_name(db, field_name, index)
+        .and_then(|definition| definition.declaration.definition())
+        .map(|definition| definition.kind(db).full_range(module))
+        .unwrap_or_else(|| class.header_range(db));
+
+    let Some(builder) = context.report_lint(&INVALID_NAMED_TUPLE, diagnostic_range) else {
+        return;
+    };
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "NamedTuple field without default value cannot follow field(s) with default value(s)",
+    ));
+
+    diagnostic.set_primary_message(format_args!(
+        "Field `{field_name}` defined here without a default value"
+    ));
+
+    let Some(field_with_default_range) = class
+        .first_binding_of_name(db, field_with_default, index)
+        .and_then(|definition| definition.binding.definition())
+        .map(|definition| definition.kind(db).full_range(module))
+    else {
+        return;
+    };
+
+    // If the end-of-scope definition in the class scope of the field-with-a-default-value
+    // occurs after the range of the field-without-a-default-value,
+    // avoid adding a subdiagnostic that points to the definition of the
+    // field-with-a-default-value. It's confusing to talk about a field "before" the
+    // field without the default value but then point to a definition that actually
+    // occurs after the field without-a-default-value.
+    if field_with_default_range.end() < diagnostic_range.start() {
+        diagnostic.annotate(
+            Annotation::secondary(context.span(field_with_default_range)).message(format_args!(
+                "Earlier field `{field_with_default}` defined here with a default value",
+            )),
+        );
+    } else {
+        diagnostic.info(format_args!(
+            "Earlier field `{field_with_default}` was defined with a default value"
+        ));
+    }
+}
+
+pub(crate) fn report_missing_typed_dict_key<'db>(
+    context: &InferContext<'db, '_>,
+    constructor_node: AnyNodeRef,
+    typed_dict_ty: Type<'db>,
+    missing_field: &str,
+) {
+    let db = context.db();
+    if let Some(builder) = context.report_lint(&MISSING_TYPED_DICT_KEY, constructor_node) {
+        let typed_dict_name = typed_dict_ty.display(db);
+        builder.into_diagnostic(format_args!(
+            "Missing required key '{missing_field}' in TypedDict `{typed_dict_name}` constructor",
+        ));
     }
 }
 

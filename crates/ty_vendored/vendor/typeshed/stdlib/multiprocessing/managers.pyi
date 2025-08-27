@@ -42,6 +42,7 @@ class Token:
     Type to uniquely identify a shared object
     """
 
+    __slots__ = ("typeid", "address", "id")
     typeid: str | bytes | None
     address: _Address | None
     id: str | bytes | int | None

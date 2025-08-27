@@ -36,6 +36,7 @@ class Fraction(Rational):
 
     """
 
+    __slots__ = ("_numerator", "_denominator")
     @overload
     def __new__(cls, numerator: int | Rational = 0, denominator: int | Rational | None = None) -> Self:
         """Constructs a Rational.

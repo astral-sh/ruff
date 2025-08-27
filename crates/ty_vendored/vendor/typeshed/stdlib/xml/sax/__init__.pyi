@@ -22,7 +22,7 @@ expatreader -- Driver that allows use of the Expat parser with SAX.
 import sys
 from _typeshed import ReadableBuffer, StrPath, SupportsRead, _T_co
 from collections.abc import Iterable
-from typing import Protocol, type_check_only
+from typing import Final, Protocol, type_check_only
 from typing_extensions import TypeAlias
 from xml.sax._exceptions import (
     SAXException as SAXException,
@@ -40,7 +40,7 @@ class _SupportsReadClose(SupportsRead[_T_co], Protocol[_T_co]):
 
 _Source: TypeAlias = StrPath | _SupportsReadClose[bytes] | _SupportsReadClose[str]
 
-default_parser_list: list[str]
+default_parser_list: Final[list[str]]
 
 def make_parser(parser_list: Iterable[str] = ()) -> XMLReader:
     """Creates and returns a SAX parser.

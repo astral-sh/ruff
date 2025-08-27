@@ -137,6 +137,22 @@ from unittest.mock import MagicMock
 x: int = MagicMock()
 ```
 
+## Runtime properties
+
+`typing.Any` is a class at runtime on Python 3.11+, and `typing_extensions.Any` is always a class.
+On earlier versions of Python, `typing.Any` was an instance of `typing._SpecialForm`, but this is
+not currently modeled by ty. We currently infer `Any` has having all attributes a class would have
+on all versions of Python:
+
+```py
+from typing import Any
+from ty_extensions import TypeOf, static_assert, is_assignable_to
+
+reveal_type(Any.__base__)  # revealed: type | None
+reveal_type(Any.__bases__)  # revealed: tuple[type, ...]
+static_assert(is_assignable_to(TypeOf[Any], type))
+```
+
 ## Invalid
 
 `Any` cannot be parameterized:
@@ -144,7 +160,32 @@ x: int = MagicMock()
 ```py
 from typing import Any
 
-# error: [invalid-type-form] "Type `typing.Any` expected no type parameter"
+# error: [invalid-type-form] "Special form `typing.Any` expected no type parameter"
 def f(x: Any[int]):
     reveal_type(x)  # revealed: Unknown
+```
+
+`Any` cannot be called (this leads to a `TypeError` at runtime):
+
+```py
+Any()  # error: [call-non-callable] "Object of type `typing.Any` is not callable"
+```
+
+`Any` also cannot be used as a metaclass (under the hood, this leads to an implicit call to `Any`):
+
+```py
+class F(metaclass=Any): ...  # error: [invalid-metaclass] "Metaclass type `typing.Any` is not callable"
+```
+
+And `Any` cannot be used in `isinstance()` checks:
+
+```py
+# error: [invalid-argument-type] "`typing.Any` cannot be used with `isinstance()`: This call will raise `TypeError` at runtime"
+isinstance("", Any)
+```
+
+But `issubclass()` checks are fine:
+
+```py
+issubclass(object, Any)  # no error!
 ```

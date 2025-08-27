@@ -50,7 +50,7 @@ if sys.platform != "win32":
 # So, it is special cased.
 if sys.version_info < (3, 14):
     if sys.version_info >= (3, 12):
-        @deprecated("Deprecated as of Python 3.12; will be removed in Python 3.14")
+        @deprecated("Deprecated since Python 3.12; removed in Python 3.14.")
         class AbstractChildWatcher:
             """Abstract base class for monitoring child processes.
 
@@ -228,7 +228,7 @@ if sys.platform != "win32":
                 def is_active(self) -> bool: ...
                 def attach_loop(self, loop: events.AbstractEventLoop | None) -> None: ...
 
-            @deprecated("Deprecated as of Python 3.12; will be removed in Python 3.14")
+            @deprecated("Deprecated since Python 3.12; removed in Python 3.14.")
             class SafeChildWatcher(BaseChildWatcher):
                 """'Safe' child watcher implementation.
 
@@ -249,7 +249,7 @@ if sys.platform != "win32":
                 ) -> None: ...
                 def remove_child_handler(self, pid: int) -> bool: ...
 
-            @deprecated("Deprecated as of Python 3.12; will be removed in Python 3.14")
+            @deprecated("Deprecated since Python 3.12; removed in Python 3.14.")
             class FastChildWatcher(BaseChildWatcher):
                 """'Fast' child watcher implementation.
 
@@ -348,14 +348,14 @@ if sys.platform != "win32":
             """UNIX event loop policy with a watcher for child processes."""
 
             if sys.version_info >= (3, 12):
-                @deprecated("Deprecated as of Python 3.12; will be removed in Python 3.14")
+                @deprecated("Deprecated since Python 3.12; removed in Python 3.14.")
                 def get_child_watcher(self) -> AbstractChildWatcher:
                     """Get the watcher for child processes.
 
                     If not yet set, a ThreadedChildWatcher object is automatically created.
                     """
 
-                @deprecated("Deprecated as of Python 3.12; will be removed in Python 3.14")
+                @deprecated("Deprecated since Python 3.12; removed in Python 3.14.")
                 def set_child_watcher(self, watcher: AbstractChildWatcher | None) -> None:
                     """Set the watcher for child processes."""
             else:
@@ -380,7 +380,7 @@ if sys.platform != "win32":
 
     if sys.version_info < (3, 14):
         if sys.version_info >= (3, 12):
-            @deprecated("Deprecated as of Python 3.12; will be removed in Python 3.14")
+            @deprecated("Deprecated since Python 3.12; removed in Python 3.14.")
             class MultiLoopChildWatcher(AbstractChildWatcher):
                 """A watcher that doesn't require running loop in the main thread.
 

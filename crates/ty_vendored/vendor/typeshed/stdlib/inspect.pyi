@@ -54,7 +54,7 @@ from types import (
     WrapperDescriptorType,
 )
 from typing import Any, ClassVar, Final, Literal, NamedTuple, Protocol, TypeVar, overload, type_check_only
-from typing_extensions import ParamSpec, Self, TypeAlias, TypeGuard, TypeIs, deprecated
+from typing_extensions import ParamSpec, Self, TypeAlias, TypeGuard, TypeIs, deprecated, disjoint_base
 
 if sys.version_info >= (3, 14):
     from annotationlib import Format
@@ -640,6 +640,7 @@ class Signature:
         to parameters (simulating 'functools.partial' behavior.)
     """
 
+    __slots__ = ("_return_annotation", "_parameters")
     def __init__(
         self, parameters: Sequence[Parameter] | None = None, *, return_annotation: Any = ..., __validate_parameters__: bool = True
     ) -> None:
@@ -842,6 +843,7 @@ class Parameter:
         `Parameter.KEYWORD_ONLY`, `Parameter.VAR_KEYWORD`.
     """
 
+    __slots__ = ("_name", "_kind", "_default", "_annotation")
     def __init__(self, name: str, kind: _ParameterKind, *, default: Any = ..., annotation: Any = ...) -> None: ...
     empty = _empty
 
@@ -890,6 +892,7 @@ class BoundArguments:
         Dict of keyword arguments values.
     """
 
+    __slots__ = ("arguments", "_signature", "__weakref__")
     arguments: OrderedDict[str, Any]
     @property
     def args(self) -> tuple[Any, ...]: ...
@@ -1140,19 +1143,6 @@ if sys.version_info >= (3, 11):
         code_context: list[str] | None
         index: int | None  # type: ignore[assignment]
 
-    class Traceback(_Traceback):
-        positions: dis.Positions | None
-        def __new__(
-            cls,
-            filename: str,
-            lineno: int,
-            function: str,
-            code_context: list[str] | None,
-            index: int | None,
-            *,
-            positions: dis.Positions | None = None,
-        ) -> Self: ...
-
     class _FrameInfo(NamedTuple):
         """_FrameInfo(frame, filename, lineno, function, code_context, index)"""
 
@@ -1163,19 +1153,63 @@ if sys.version_info >= (3, 11):
         code_context: list[str] | None
         index: int | None  # type: ignore[assignment]
 
-    class FrameInfo(_FrameInfo):
-        positions: dis.Positions | None
-        def __new__(
-            cls,
-            frame: FrameType,
-            filename: str,
-            lineno: int,
-            function: str,
-            code_context: list[str] | None,
-            index: int | None,
-            *,
-            positions: dis.Positions | None = None,
-        ) -> Self: ...
+    if sys.version_info >= (3, 12):
+        class Traceback(_Traceback):
+            positions: dis.Positions | None
+            def __new__(
+                cls,
+                filename: str,
+                lineno: int,
+                function: str,
+                code_context: list[str] | None,
+                index: int | None,
+                *,
+                positions: dis.Positions | None = None,
+            ) -> Self: ...
+
+        class FrameInfo(_FrameInfo):
+            positions: dis.Positions | None
+            def __new__(
+                cls,
+                frame: FrameType,
+                filename: str,
+                lineno: int,
+                function: str,
+                code_context: list[str] | None,
+                index: int | None,
+                *,
+                positions: dis.Positions | None = None,
+            ) -> Self: ...
+
+    else:
+        @disjoint_base
+        class Traceback(_Traceback):
+            positions: dis.Positions | None
+            def __new__(
+                cls,
+                filename: str,
+                lineno: int,
+                function: str,
+                code_context: list[str] | None,
+                index: int | None,
+                *,
+                positions: dis.Positions | None = None,
+            ) -> Self: ...
+
+        @disjoint_base
+        class FrameInfo(_FrameInfo):
+            positions: dis.Positions | None
+            def __new__(
+                cls,
+                frame: FrameType,
+                filename: str,
+                lineno: int,
+                function: str,
+                code_context: list[str] | None,
+                index: int | None,
+                *,
+                positions: dis.Positions | None = None,
+            ) -> Self: ...
 
 else:
     class Traceback(NamedTuple):

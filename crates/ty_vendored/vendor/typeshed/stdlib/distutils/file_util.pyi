@@ -59,7 +59,7 @@ def copy_file(
 ) -> tuple[_BytesPathT | bytes, bool]: ...
 @overload
 def move_file(
-    src: StrPath, dst: _StrPathT, verbose: bool | Literal[0, 1] = 0, dry_run: bool | Literal[0, 1] = 0
+    src: StrPath, dst: _StrPathT, verbose: bool | Literal[0, 1] = 1, dry_run: bool | Literal[0, 1] = 0
 ) -> _StrPathT | str:
     """Move a file 'src' to 'dst'.  If 'dst' is a directory, the file will
     be moved into it with the same name; otherwise, 'src' is just renamed
@@ -71,7 +71,7 @@ def move_file(
 
 @overload
 def move_file(
-    src: BytesPath, dst: _BytesPathT, verbose: bool | Literal[0, 1] = 0, dry_run: bool | Literal[0, 1] = 0
+    src: BytesPath, dst: _BytesPathT, verbose: bool | Literal[0, 1] = 1, dry_run: bool | Literal[0, 1] = 0
 ) -> _BytesPathT | bytes: ...
 def write_file(filename: StrOrBytesPath, contents: Iterable[str]) -> None:
     """Create a file with the specified name and write 'contents' (a

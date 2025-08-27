@@ -7,20 +7,20 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/parenthesize
 ```
 Module(
     ModModule {
-        node_index: AtomicNodeIndex(..),
+        node_index: NodeIndex(None),
         range: 0..125,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 66..70,
                     value: Starred(
                         ExprStarred {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 67..69,
                             value: Name(
                                 ExprName {
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     range: 68..69,
                                     id: Name("x"),
                                     ctx: Load,
@@ -33,11 +33,11 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 119..120,
                     value: Name(
                         ExprName {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 119..120,
                             id: Name("x"),
                             ctx: Load,
@@ -47,11 +47,11 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 124..125,
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 124..125,
                             value: Int(
                                 1,

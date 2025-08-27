@@ -84,3 +84,47 @@ reveal_type(field(default=1))  # revealed: dataclasses.Field[Literal[1]]
 reveal_type(field(default=None))  # revealed: dataclasses.Field[None]
 reveal_type(field(default_factory=get_default))  # revealed: dataclasses.Field[str]
 ```
+
+## dataclass_transform field_specifiers
+
+If `field_specifiers` is not specified, it defaults to an empty tuple, meaning no field specifiers
+are supported and `dataclasses.field` and `dataclasses.Field` should not be accepted by default.
+
+```py
+from typing_extensions import dataclass_transform
+from dataclasses import field, dataclass
+from typing import TypeVar
+
+T = TypeVar("T")
+
+@dataclass_transform()
+def create_model(*, init: bool = True):
+    def deco(cls: type[T]) -> type[T]:
+        return cls
+    return deco
+
+@create_model()
+class A:
+    name: str = field(init=False)
+
+# field(init=False) should be ignored for dataclass_transform without explicit field_specifiers
+reveal_type(A.__init__)  # revealed: (self: A, name: str = Unknown) -> None
+
+@dataclass
+class B:
+    name: str = field(init=False)
+
+# Regular @dataclass should respect field(init=False)
+reveal_type(B.__init__)  # revealed: (self: B) -> None
+```
+
+Test constructor calls:
+
+```py
+# This should NOT error because field(init=False) is ignored for A
+A(name="foo")
+
+# This should error because field(init=False) is respected for B
+# error: [unknown-argument]
+B(name="foo")
+```

@@ -23,12 +23,12 @@ from typing_extensions import Self
 
 _T = TypeVar("_T")
 
-DEFAULT_TCP_LOGGING_PORT: Final[int]
-DEFAULT_UDP_LOGGING_PORT: Final[int]
-DEFAULT_HTTP_LOGGING_PORT: Final[int]
-DEFAULT_SOAP_LOGGING_PORT: Final[int]
-SYSLOG_UDP_PORT: Final[int]
-SYSLOG_TCP_PORT: Final[int]
+DEFAULT_TCP_LOGGING_PORT: Final = 9020
+DEFAULT_UDP_LOGGING_PORT: Final = 9021
+DEFAULT_HTTP_LOGGING_PORT: Final = 9022
+DEFAULT_SOAP_LOGGING_PORT: Final = 9023
+SYSLOG_UDP_PORT: Final = 514
+SYSLOG_TCP_PORT: Final = 514
 
 class WatchedFileHandler(FileHandler):
     """

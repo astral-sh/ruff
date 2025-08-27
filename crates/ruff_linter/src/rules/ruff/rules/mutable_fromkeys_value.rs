@@ -102,7 +102,7 @@ fn generate_dict_comprehension(keys: &Expr, value: &Expr, generator: Generator) 
         id: Name::new_static("key"),
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     // Construct `key in keys`.
     let comp = ast::Comprehension {
@@ -110,7 +110,7 @@ fn generate_dict_comprehension(keys: &Expr, value: &Expr, generator: Generator) 
         iter: keys.clone(),
         ifs: vec![],
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         is_async: false,
     };
     // Construct the dict comprehension.
@@ -119,7 +119,7 @@ fn generate_dict_comprehension(keys: &Expr, value: &Expr, generator: Generator) 
         value: Box::new(value.clone()),
         generators: vec![comp],
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     generator.expr(&dict_comp.into())
 }

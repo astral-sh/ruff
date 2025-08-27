@@ -93,12 +93,7 @@ impl NamedCharset {
             name,
             bytes,
             // SAFETY: The named charset is guaranteed to have only ascii bytes.
-            // TODO: replace with `.unwrap()`, when `Option::unwrap` will be stable in `const fn`
-            //  https://github.com/rust-lang/rust/issues/67441
-            ascii_char_set: match AsciiCharSet::from_bytes(bytes) {
-                Some(ascii_char_set) => ascii_char_set,
-                None => unreachable!(),
-            },
+            ascii_char_set: AsciiCharSet::from_bytes(bytes).unwrap(),
         }
     }
 }
