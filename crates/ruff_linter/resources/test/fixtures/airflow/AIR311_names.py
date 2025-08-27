@@ -82,6 +82,7 @@ from airflow.decorators.base import (
     get_unique_task_id,
     task_decorator_factory,
 )
+
 # airflow.decorators.base
 DecoratedMappedOperator()
 DecoratedOperator()
@@ -91,6 +92,7 @@ task_decorator_factory()
 
 
 from airflow.models import Param
+
 # airflow.models
 Param()
 
