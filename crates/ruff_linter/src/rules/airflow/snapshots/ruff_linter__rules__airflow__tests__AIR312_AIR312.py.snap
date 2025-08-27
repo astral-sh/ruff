@@ -259,7 +259,7 @@ help: Install `apache-airflow-providers-standard>=0.0.1` and use `DateTimeSensor
 AIR312 [*] `airflow.operators.python.BranchPythonOperator` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
   --> AIR312.py:44:1
    |
-42 | from airflow.sensors.filesystem import FileSensor
+42 | )
 43 |
 44 | BranchPythonOperator()
    | ^^^^^^^^^^^^^^^^^^^^
@@ -277,9 +277,9 @@ help: Install `apache-airflow-providers-standard>=0.0.1` and use `BranchPythonOp
 30 29 |     PythonVirtualenvOperator,
 31 30 |     ShortCircuitOperator,
 --------------------------------------------------------------------------------
-40 39 |     TimeSensorAsync,
-41 40 | )
-42 41 | from airflow.sensors.filesystem import FileSensor
+40 39 |     TimeSensor,
+41 40 |     TimeSensorAsync,
+42 41 | )
    42 |+from airflow.providers.standard.operators.python import BranchPythonOperator
 43 43 | 
 44 44 | BranchPythonOperator()
@@ -305,9 +305,9 @@ help: Install `apache-airflow-providers-standard>=0.0.1` and use `PythonOperator
 31 30 |     ShortCircuitOperator,
 32 31 | )
 --------------------------------------------------------------------------------
-40 39 |     TimeSensorAsync,
-41 40 | )
-42 41 | from airflow.sensors.filesystem import FileSensor
+40 39 |     TimeSensor,
+41 40 |     TimeSensorAsync,
+42 41 | )
    42 |+from airflow.providers.standard.operators.python import PythonOperator
 43 43 | 
 44 44 | BranchPythonOperator()
@@ -334,9 +334,9 @@ help: Install `apache-airflow-providers-standard>=0.0.1` and use `PythonVirtuale
 32 31 | )
 33 32 | from airflow.sensors.date_time import DateTimeSensorAsync
 --------------------------------------------------------------------------------
-40 39 |     TimeSensorAsync,
-41 40 | )
-42 41 | from airflow.sensors.filesystem import FileSensor
+40 39 |     TimeSensor,
+41 40 |     TimeSensorAsync,
+42 41 | )
    42 |+from airflow.providers.standard.operators.python import PythonVirtualenvOperator
 43 43 | 
 44 44 | BranchPythonOperator()
@@ -363,9 +363,9 @@ help: Install `apache-airflow-providers-standard>=0.0.1` and use `ShortCircuitOp
 33 32 | from airflow.sensors.date_time import DateTimeSensorAsync
 34 33 | from airflow.sensors.external_task import (
 --------------------------------------------------------------------------------
-40 39 |     TimeSensorAsync,
-41 40 | )
-42 41 | from airflow.sensors.filesystem import FileSensor
+40 39 |     TimeSensor,
+41 40 |     TimeSensorAsync,
+42 41 | )
    42 |+from airflow.providers.standard.operators.python import ShortCircuitOperator
 43 43 | 
 44 44 | BranchPythonOperator()
@@ -392,9 +392,9 @@ help: Install `apache-airflow-providers-standard>=0.0.1` and use `DateTimeSensor
 35 34 |     ExternalTaskMarker,
 36 35 |     ExternalTaskSensor,
 --------------------------------------------------------------------------------
-40 39 |     TimeSensorAsync,
-41 40 | )
-42 41 | from airflow.sensors.filesystem import FileSensor
+40 39 |     TimeSensor,
+41 40 |     TimeSensorAsync,
+42 41 | )
    42 |+from airflow.providers.standard.sensors.date_time import DateTimeSensorAsync
 43 43 | 
 44 44 | BranchPythonOperator()
@@ -419,11 +419,11 @@ help: Install `apache-airflow-providers-standard>=0.0.3` and use `ExternalTaskMa
 35    |-    ExternalTaskMarker,
 36 35 |     ExternalTaskSensor,
 37 36 | )
-38 37 | from airflow.sensors.time_sensor import (
+38 37 | from airflow.sensors.filesystem import FileSensor
 --------------------------------------------------------------------------------
-40 39 |     TimeSensorAsync,
-41 40 | )
-42 41 | from airflow.sensors.filesystem import FileSensor
+40 39 |     TimeSensor,
+41 40 |     TimeSensorAsync,
+42 41 | )
    42 |+from airflow.providers.standard.sensors.external_task import ExternalTaskMarker
 43 43 | 
 44 44 | BranchPythonOperator()
@@ -447,11 +447,11 @@ help: Install `apache-airflow-providers-standard>=0.0.3` and use `ExternalTaskSe
 35 35 |     ExternalTaskMarker,
 36    |-    ExternalTaskSensor,
 37 36 | )
-38 37 | from airflow.sensors.time_sensor import (
-39 38 |     TimeSensor,
-40 39 |     TimeSensorAsync,
-41 40 | )
-42 41 | from airflow.sensors.filesystem import FileSensor
+38 37 | from airflow.sensors.filesystem import FileSensor
+39 38 | from airflow.sensors.time_sensor import (
+40 39 |     TimeSensor,
+41 40 |     TimeSensorAsync,
+42 41 | )
    42 |+from airflow.providers.standard.sensors.external_task import ExternalTaskSensor
 43 43 | 
 44 44 | BranchPythonOperator()
@@ -470,10 +470,14 @@ AIR312 [*] `airflow.sensors.filesystem.FileSensor` is deprecated and moved into 
 help: Install `apache-airflow-providers-standard>=0.0.2` and use `FileSensor` from `airflow.providers.standard.sensors.filesystem` instead.
 
 ℹ Unsafe fix
-39 39 |     TimeSensor,
-40 40 |     TimeSensorAsync,
-41 41 | )
-42    |-from airflow.sensors.filesystem import FileSensor
+35 35 |     ExternalTaskMarker,
+36 36 |     ExternalTaskSensor,
+37 37 | )
+38    |-from airflow.sensors.filesystem import FileSensor
+39 38 | from airflow.sensors.time_sensor import (
+40 39 |     TimeSensor,
+41 40 |     TimeSensorAsync,
+42 41 | )
    42 |+from airflow.providers.standard.sensors.filesystem import FileSensor
 43 43 | 
 44 44 | BranchPythonOperator()
@@ -491,13 +495,12 @@ AIR312 [*] `airflow.sensors.time_sensor.TimeSensor` is deprecated and moved into
 help: Install `apache-airflow-providers-standard>=0.0.1` and use `TimeSensor` from `airflow.providers.standard.sensors.time` instead.
 
 ℹ Unsafe fix
-36 36 |     ExternalTaskSensor,
 37 37 | )
-38 38 | from airflow.sensors.time_sensor import (
-39    |-    TimeSensor,
-40 39 |     TimeSensorAsync,
-41 40 | )
-42 41 | from airflow.sensors.filesystem import FileSensor
+38 38 | from airflow.sensors.filesystem import FileSensor
+39 39 | from airflow.sensors.time_sensor import (
+40    |-    TimeSensor,
+41 40 |     TimeSensorAsync,
+42 41 | )
    42 |+from airflow.providers.standard.sensors.time import TimeSensor
 43 43 | 
 44 44 | BranchPythonOperator()
@@ -516,12 +519,11 @@ AIR312 [*] `airflow.sensors.time_sensor.TimeSensorAsync` is deprecated and moved
 help: Install `apache-airflow-providers-standard>=0.0.1` and use `TimeSensorAsync` from `airflow.providers.standard.sensors.time` instead.
 
 ℹ Unsafe fix
-37 37 | )
-38 38 | from airflow.sensors.time_sensor import (
-39 39 |     TimeSensor,
-40    |-    TimeSensorAsync,
-41 40 | )
-42 41 | from airflow.sensors.filesystem import FileSensor
+38 38 | from airflow.sensors.filesystem import FileSensor
+39 39 | from airflow.sensors.time_sensor import (
+40 40 |     TimeSensor,
+41    |-    TimeSensorAsync,
+42 41 | )
    42 |+from airflow.providers.standard.sensors.time import TimeSensorAsync
 43 43 | 
 44 44 | BranchPythonOperator()
@@ -726,6 +728,8 @@ AIR312 [*] `airflow.triggers.temporal.TimeDeltaTrigger` is deprecated and moved 
 76 | DateTimeTrigger()
 77 | TimeDeltaTrigger()
    | ^^^^^^^^^^^^^^^^
+78 |
+79 | from airflow.sensors.bash import BashSensor
    |
 help: Install `apache-airflow-providers-standard>=0.0.3` and use `TimeDeltaTrigger` from `airflow.providers.standard.triggers.temporal` instead.
 
@@ -739,3 +743,44 @@ help: Install `apache-airflow-providers-standard>=0.0.3` and use `TimeDeltaTrigg
 69 69 | 
 70 70 | TimeDeltaSensor()
 71 71 | TimeDeltaSensorAsync()
+
+AIR312 [*] `airflow.sensors.bash.BashSensor` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+  --> AIR312.py:83:1
+   |
+82 | # airflow.sensors
+83 | BashSensor()
+   | ^^^^^^^^^^
+84 | PythonSensor()
+   |
+help: Install `apache-airflow-providers-standard>=0.0.1` and use `BashSensor` from `airflow.providers.standard.sensor.bash` instead.
+
+ℹ Unsafe fix
+76 76 | DateTimeTrigger()
+77 77 | TimeDeltaTrigger()
+78 78 | 
+79    |-from airflow.sensors.bash import BashSensor
+80 79 | from airflow.sensors.python import PythonSensor
+   80 |+from airflow.providers.standard.sensor.bash import BashSensor
+81 81 | 
+82 82 | # airflow.sensors
+83 83 | BashSensor()
+
+AIR312 [*] `airflow.sensors.python.PythonSensor` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+  --> AIR312.py:84:1
+   |
+82 | # airflow.sensors
+83 | BashSensor()
+84 | PythonSensor()
+   | ^^^^^^^^^^^^
+   |
+help: Install `apache-airflow-providers-standard>=0.0.1` and use `PythonSensor` from `airflow.providers.standard.sensors.python` instead.
+
+ℹ Unsafe fix
+77 77 | TimeDeltaTrigger()
+78 78 | 
+79 79 | from airflow.sensors.bash import BashSensor
+80    |-from airflow.sensors.python import PythonSensor
+   80 |+from airflow.providers.standard.sensors.python import PythonSensor
+81 81 | 
+82 82 | # airflow.sensors
+83 83 | BashSensor()

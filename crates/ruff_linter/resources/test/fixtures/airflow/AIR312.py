@@ -35,11 +35,11 @@ from airflow.sensors.external_task import (
     ExternalTaskMarker,
     ExternalTaskSensor,
 )
+from airflow.sensors.filesystem import FileSensor
 from airflow.sensors.time_sensor import (
     TimeSensor,
     TimeSensorAsync,
 )
-from airflow.sensors.filesystem import FileSensor
 
 BranchPythonOperator()
 PythonOperator()
@@ -75,3 +75,10 @@ WorkflowTrigger()
 FileTrigger()
 DateTimeTrigger()
 TimeDeltaTrigger()
+
+from airflow.sensors.bash import BashSensor
+from airflow.sensors.python import PythonSensor
+
+# airflow.sensors
+BashSensor()
+PythonSensor()
