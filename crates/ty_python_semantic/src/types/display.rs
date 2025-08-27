@@ -164,6 +164,22 @@ impl DisplayRepresentation<'_> {
         name_parts.reverse();
         name_parts
     }
+
+    fn write_maybe_qualified_class(
+        &self,
+        f: &mut Formatter<'_>,
+        class: ClassLiteral,
+    ) -> fmt::Result {
+        if !self.settings.qualified {
+            return f.write_str(class.name(self.db));
+        }
+        let parents = self.class_parents(class);
+        if !parents.is_empty() {
+            f.write_str(&parents.join("."))?;
+            f.write_char('.')?;
+        }
+        f.write_str(class.name(self.db))
+    }
 }
 
 impl Display for DisplayRepresentation<'_> {
@@ -184,26 +200,14 @@ impl Display for DisplayRepresentation<'_> {
                         .display_with(self.db, self.settings)
                         .fmt(f),
                     (ClassType::NonGeneric(class), _) => {
-                        if self.settings.qualified {
-                            f.write_fmt(format_args!("{}.{}", self.class_parents(class).join("."), class.name(self.db)))
-                        } else {
-                            f.write_str(class.name(self.db))
-                        }
+                        self.write_maybe_qualified_class(f, class)
                     },
                     (ClassType::Generic(alias), _) => alias.display_with(self.db, self.settings).fmt(f),
                 }
             }
             Type::ProtocolInstance(protocol) => match protocol.inner {
                 Protocol::FromClass(ClassType::NonGeneric(class)) => {
-                    if self.settings.qualified {
-                        f.write_fmt(format_args!(
-                            "{}.{}",
-                            self.class_parents(class).join("."),
-                            class.name(self.db)
-                        ))
-                    } else {
-                        f.write_str(class.name(self.db))
-                    }
+                    self.write_maybe_qualified_class(f, class)
                 }
                 Protocol::FromClass(ClassType::Generic(alias)) => {
                     alias.display_with(self.db, self.settings).fmt(f)
@@ -228,15 +232,9 @@ impl Display for DisplayRepresentation<'_> {
                 write!(f, "<module '{}'>", module.module(self.db).name(self.db))
             }
             Type::ClassLiteral(class) => {
-                if self.settings.qualified {
-                    f.write_fmt(format_args!(
-                        "<class '{}.{}'>",
-                        self.class_parents(class).join("."),
-                        class.name(self.db)
-                    ))
-                } else {
-                    write!(f, "<class '{}'>", class.name(self.db))
-                }
+                write!(f, "<class '")?;
+                self.write_maybe_qualified_class(f, class)?;
+                write!(f, "'>")
             }
             Type::GenericAlias(generic) => write!(
                 f,
@@ -245,15 +243,9 @@ impl Display for DisplayRepresentation<'_> {
             ),
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 SubclassOfInner::Class(ClassType::NonGeneric(class)) => {
-                    if self.settings.qualified {
-                        f.write_fmt(format_args!(
-                            "type[{}.{}]",
-                            self.class_parents(class).join("."),
-                            class.name(self.db)
-                        ))
-                    } else {
-                        write!(f, "type[{}]", class.name(self.db))
-                    }
+                    write!(f, "type[")?;
+                    self.write_maybe_qualified_class(f, class)?;
+                    write!(f, "]")
                 }
                 SubclassOfInner::Class(ClassType::Generic(alias)) => {
                     write!(
@@ -364,23 +356,9 @@ impl Display for DisplayRepresentation<'_> {
                 escape.bytes_repr(TripleQuotes::No).write(f)
             }
             Type::EnumLiteral(enum_literal) => {
-                if self.settings.qualified {
-                    let enum_class = enum_literal.enum_class(self.db);
-                    write!(
-                        f,
-                        "{parents}.{enum_class}.{name}",
-                        parents = self.class_parents(enum_class).join("."),
-                        enum_class = enum_class.name(self.db),
-                        name = enum_literal.name(self.db),
-                    )
-                } else {
-                    write!(
-                        f,
-                        "{enum_class}.{name}",
-                        enum_class = enum_literal.enum_class(self.db).name(self.db),
-                        name = enum_literal.name(self.db),
-                    )
-                }
+                self.write_maybe_qualified_class(f, enum_literal.enum_class(self.db))?;
+                f.write_char('.')?;
+                f.write_str(enum_literal.name(self.db))
             }
             Type::NonInferableTypeVar(bound_typevar) | Type::TypeVar(bound_typevar) => {
                 f.write_str(bound_typevar.typevar(self.db).name(self.db))?;
@@ -416,19 +394,10 @@ impl Display for DisplayRepresentation<'_> {
                 }
                 f.write_str("]")
             }
-            Type::TypedDict(typed_dict) => {
-                if self.settings.qualified {
-                    let defining_class = typed_dict.defining_class();
-                    let (literal, _) = defining_class.class_literal(self.db);
-                    f.write_fmt(format_args!(
-                        "{parents}.{name}",
-                        parents = self.class_parents(literal).join("."),
-                        name = defining_class.name(self.db)
-                    ))
-                } else {
-                    f.write_str(typed_dict.defining_class().name(self.db))
-                }
-            }
+            Type::TypedDict(typed_dict) => self.write_maybe_qualified_class(
+                f,
+                typed_dict.defining_class().class_literal(self.db).0,
+            ),
             Type::TypeAlias(alias) => f.write_str(alias.name(self.db)),
         }
     }
