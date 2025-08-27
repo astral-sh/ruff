@@ -1,10 +1,8 @@
-# Identical display names error messages
-
-<!-- snapshot-diagnostics -->
+# Identical type display names in diagnostics
 
 ty prints the fully qualified name to disambiguate objects with the same name.
 
-## Nested class with identical names
+## Nested class
 
 ```py
 class A:
@@ -18,7 +16,7 @@ class C:
 a: A.B = C.B()  # error: [invalid-assignment] "Object of type `mdtest_snippet.C.B` is not assignable to `mdtest_snippet.A.B`"
 ```
 
-## Class from different modules with identical names
+## Class from different modules
 
 ```py
 import a
@@ -46,7 +44,7 @@ class DataFrame:
     pass
 ```
 
-## Enum from different modules with identical names
+## Enum from different modules
 
 ```py
 import status_a
@@ -76,7 +74,7 @@ class Status(Enum):
     INACTIVE = "inactive"
 ```
 
-## Nested enum with identical names
+## Nested enum
 
 ```py
 from enum import Enum
@@ -93,4 +91,120 @@ class C:
 
 # error: [invalid-assignment] "Object of type `Literal[mdtest_snippet.C.B.ACTIVE]` is not assignable to `mdtest_snippet.A.B`"
 a: A.B = C.B.ACTIVE
+```
+
+## Class literals
+
+```py
+import cls_a
+import cls_b
+
+# error: [invalid-assignment] "Object of type `<class 'cls_b.Config'>` is not assignable to `type[cls_a.Config]`"
+config_class: type[cls_a.Config] = cls_b.Config
+```
+
+`cls_a.py`:
+
+```py
+class Config:
+    pass
+```
+
+`cls_b.py`:
+
+```py
+class Config:
+    pass
+```
+
+## Generic aliases
+
+```py
+import generic_a
+import generic_b
+
+# TODO should be error: [invalid-assignment] "Object of type `<class 'generic_b.Container[int]'>` is not assignable to `type[generic_a.Container[int]]`"
+container: type[generic_a.Container[int]] = generic_b.Container[int]
+```
+
+`generic_a.py`:
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Container(Generic[T]):
+    pass
+```
+
+`generic_b.py`:
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Container(Generic[T]):
+    pass
+```
+
+## Protocols
+
+```py
+from typing import Protocol
+import proto_a
+import proto_b
+
+# TODO should be error: [invalid-assignment] "Object of type `proto_b.Drawable` is not assignable to `proto_a.Drawable`"
+def _(drawable_b: proto_b.Drawable):
+    drawable: proto_a.Drawable = drawable_b
+```
+
+`proto_a.py`:
+
+```py
+from typing import Protocol
+
+class Drawable(Protocol):
+    def draw(self) -> None: ...
+```
+
+`proto_b.py`:
+
+```py
+from typing import Protocol
+
+class Drawable(Protocol):
+    def draw(self) -> int: ...
+```
+
+## TypedDict
+
+```py
+from typing import TypedDict
+import dict_a
+import dict_b
+
+def _(b_person: dict_b.Person):
+    # TODO should be error: [invalid-assignment] "Object of type `dict_b.Person` is not assignable to `dict_a.Person`"
+    person_var: dict_a.Person = b_person
+```
+
+`dict_a.py`:
+
+```py
+from typing import TypedDict
+
+class Person(TypedDict):
+    name: str
+```
+
+`dict_b.py`:
+
+```py
+from typing import TypedDict
+
+class Person(TypedDict):
+    name: bytes
 ```
