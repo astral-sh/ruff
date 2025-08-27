@@ -8,7 +8,7 @@ use serde::ser::SerializeSeq;
 use serde::{Serialize, Serializer};
 use serde_json::json;
 
-use ruff_db::diagnostic::Diagnostic;
+use ruff_db::diagnostic::{Diagnostic, FileResolver};
 
 use crate::fs::relativize_path;
 use crate::message::{Emitter, EmitterContext};
@@ -38,7 +38,7 @@ impl Emitter for GitlabEmitter {
             writer,
             &SerializedMessages {
                 diagnostics,
-                context,
+                resolver: context,
                 project_dir: self.project_dir.as_deref(),
             },
         )?;
@@ -49,7 +49,7 @@ impl Emitter for GitlabEmitter {
 
 struct SerializedMessages<'a> {
     diagnostics: &'a [Diagnostic],
-    context: &'a EmitterContext<'a>,
+    resolver: &'a dyn FileResolver,
     project_dir: Option<&'a str>,
 }
 
@@ -62,9 +62,10 @@ impl Serialize for SerializedMessages<'_> {
         let mut fingerprints = HashSet::<u64>::with_capacity(self.diagnostics.len());
 
         for diagnostic in self.diagnostics {
+            let span = diagnostic.expect_primary_span();
             let filename = diagnostic.expect_ruff_filename();
 
-            let (start_location, end_location) = if self.context.is_notebook(&filename) {
+            let (start_location, end_location) = if self.resolver.is_notebook(span.file()) {
                 // We can't give a reasonable location for the structured formats,
                 // so we show one that's clearly a fallback
                 Default::default()
