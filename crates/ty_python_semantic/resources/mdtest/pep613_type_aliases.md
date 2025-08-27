@@ -109,20 +109,45 @@ f("foo")
 f([1, "foo"])
 ```
 
-### Real-world example
+### Union inside generic
 
-Adapted from <https://github.com/pypa/packaging/blob/main/src/packaging/_parser.py>:
+#### With old-style union
 
 ```py
 from typing import Union, TypeAlias
 
-MarkerAtom: TypeAlias = Union[int, list["MarkerAtom"]]
-MarkerList: TypeAlias = list[Union["MarkerList", MarkerAtom, str]]
+A: TypeAlias = list[Union["A", str]]
 
-def f(marker_list: MarkerList):
-    reveal_type(marker_list)  # revealed: list[MarkerList | MarkerAtom | str]
-    for item in marker_list:
-        reveal_type(item)  # revealed: list[MarkerList | MarkerAtom | str] | int | list[MarkerAtom] | str
+def f(x: A):
+    reveal_type(x)  # revealed: list[A | str]
+    for item in x:
+        reveal_type(item)  # revealed: list[A | str] | str
+```
+
+#### With new-style union
+
+```py
+from typing import TypeAlias
+
+A: TypeAlias = list["A" | str]
+
+def f(x: A):
+    reveal_type(x)  # revealed: list[A | str]
+    for item in x:
+        reveal_type(item)  # revealed: list[A | str] | str
+```
+
+#### With Optional
+
+```py
+from typing import Optional, Union, TypeAlias
+
+A: TypeAlias = list[Optional[Union["A", str]]]
+
+def f(x: A):
+    reveal_type(x)  # revealed: list[A | str | None]
+    for item in x:
+        reveal_type(item)  # revealed: list[A | str | None] | str | None
 ```
 
 ### Invalid examples
