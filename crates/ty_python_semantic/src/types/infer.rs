@@ -5805,8 +5805,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.infer_expression(elt);
         }
 
-        // TODO generic
-        KnownClass::List.to_instance(self.db())
+        KnownClass::List
+            .to_specialized_instance(self.db(), [todo_type!("list literal element type")])
     }
 
     fn infer_set_expression(&mut self, set: &ast::ExprSet) -> Type<'db> {
@@ -5820,8 +5820,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.infer_expression(elt);
         }
 
-        // TODO generic
-        KnownClass::Set.to_instance(self.db())
+        KnownClass::Set.to_specialized_instance(self.db(), [todo_type!("set literal element type")])
     }
 
     fn infer_dict_expression(&mut self, dict: &ast::ExprDict) -> Type<'db> {
@@ -5836,8 +5835,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.infer_expression(&item.value);
         }
 
-        // TODO generic
-        KnownClass::Dict.to_instance(self.db())
+        KnownClass::Dict.to_specialized_instance(
+            self.db(),
+            [
+                todo_type!("dict literal key type"),
+                todo_type!("dict literal value type"),
+            ],
+        )
     }
 
     /// Infer the type of the `iter` expression of the first comprehension.
@@ -5860,7 +5864,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         self.infer_first_comprehension_iter(generators);
 
-        todo_type!("generator type")
+        KnownClass::GeneratorType.to_specialized_instance(
+            self.db(),
+            [
+                todo_type!("generator expression yield type"),
+                todo_type!("generator expression send type"),
+                todo_type!("generator expression return type"),
+            ],
+        )
     }
 
     fn infer_list_comprehension_expression(&mut self, listcomp: &ast::ExprListComp) -> Type<'db> {
@@ -5873,7 +5884,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         self.infer_first_comprehension_iter(generators);
 
-        todo_type!("list comprehension type")
+        KnownClass::List
+            .to_specialized_instance(self.db(), [todo_type!("list comprehension element type")])
     }
 
     fn infer_dict_comprehension_expression(&mut self, dictcomp: &ast::ExprDictComp) -> Type<'db> {
@@ -5887,7 +5899,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         self.infer_first_comprehension_iter(generators);
 
-        todo_type!("dict comprehension type")
+        KnownClass::Dict.to_specialized_instance(
+            self.db(),
+            [
+                todo_type!("dict comprehension key type"),
+                todo_type!("dict comprehension value type"),
+            ],
+        )
     }
 
     fn infer_set_comprehension_expression(&mut self, setcomp: &ast::ExprSetComp) -> Type<'db> {
@@ -5900,7 +5918,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         self.infer_first_comprehension_iter(generators);
 
-        todo_type!("set comprehension type")
+        KnownClass::Set
+            .to_specialized_instance(self.db(), [todo_type!("set comprehension element type")])
     }
 
     fn infer_generator_expression_scope(&mut self, generator: &ast::ExprGenerator) {
