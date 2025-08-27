@@ -362,14 +362,12 @@ impl<'db> ConstraintClause<'db> {
         self.constraints.is_empty()
     }
 
-    /// Returns the intersection of this clause and an atomic constraint. Because atomic
-    /// constraints can be negated, the intersection of the new and existing atomic constraints
-    /// (for the same typevar) might be the union of two atomic constraints.
+    /// Returns the intersection of this clause and an atomic constraint.
     fn intersect_constraint(
         mut self,
         db: &'db dyn Db,
         constraint: AtomicConstraint<'db>,
-    ) -> Simplified<Self> {
+    ) -> Satisfiable<Self> {
         // If the clause does not already contain a constraint for this typevar, we just insert the
         // new constraint into the clause and return.
         let index = match (self.constraints)
@@ -378,7 +376,7 @@ impl<'db> ConstraintClause<'db> {
             Ok(index) => index,
             Err(index) => {
                 self.constraints.insert(index, constraint);
-                return Simplified::One(self);
+                return Satisfiable::Constrained(self);
             }
         };
 
@@ -388,39 +386,28 @@ impl<'db> ConstraintClause<'db> {
             // ... ∩ 0 ∩ ... == 0
             // If the intersected constraint cannot be satisfied, that causes this whole clause to
             // be unsatisfiable too.
-            Simplified::Never => Simplified::Never,
+            Satisfiable::Never => Satisfiable::Never,
 
             // ... ∩ 1 ∩ ... == ...
             // If the intersected result is always satisfied, then the constraint no longer
             // contributes anything to the clause, and can be removed.
-            Simplified::Always => {
+            Satisfiable::Always => {
                 self.constraints.remove(index);
                 if self.constraints.is_empty() {
                     // If there are no further constraints in the clause, the clause is now always
                     // satisfied.
-                    Simplified::Always
+                    Satisfiable::Always
                 } else {
-                    Simplified::One(self)
+                    Satisfiable::Constrained(self)
                 }
             }
 
             // ... ∩ X ∩ ... == ... ∩ X ∩ ...
             // If the intersection is a single constraint, we can reuse the existing constraint's
             // place in the clause's constraint list.
-            Simplified::One(constraint) => {
+            Satisfiable::Constrained(constraint) => {
                 self.constraints[index] = constraint;
-                Simplified::One(self)
-            }
-
-            // ... ∩ (X ∪ Y) ∩ ... == (... ∩ X ∩ ...) ∪ (... ∩ Y ∩ ...)
-            // If the intersection is a union of two constraints, we can reuse the existing
-            // constraint's place in the clause's constraint list for one of the union elements;
-            // and we must create a new clause to hold the second union element.
-            Simplified::Two(first, second) => {
-                let mut extra = self.clone();
-                self.constraints[index] = first;
-                extra.constraints[index] = second;
-                Simplified::Two(self, extra)
+                Satisfiable::Constrained(self)
             }
         }
     }
@@ -435,20 +422,16 @@ impl<'db> ConstraintClause<'db> {
             std::mem::swap(&mut prev, &mut next);
             for clause in prev.clauses.drain(..) {
                 match clause.intersect_constraint(db, *constraint) {
-                    Simplified::Never => {}
-                    Simplified::Always => {
+                    Satisfiable::Never => {}
+                    Satisfiable::Always => {
                         // If any clause becomes always satisfiable, the set as a whole does too,
                         // and we don't have to process any more of the clauses.
                         next.clauses.clear();
                         next.clauses.push(ConstraintClause::always());
                         break;
                     }
-                    Simplified::One(clause) => {
+                    Satisfiable::Constrained(clause) => {
                         next.union_clause(db, clause);
-                    }
-                    Simplified::Two(first, second) => {
-                        next.union_clause(db, first);
-                        next.union_clause(db, second);
                     }
                 }
             }
@@ -854,23 +837,23 @@ impl<'db> AtomicConstraint<'db> {
     /// `self` and `other` is `self`.
     fn subsumes(self, db: &'db dyn Db, other: Self) -> bool {
         debug_assert!(self.typevar == other.typevar);
-        self.intersect(db, other) == Simplified::One(self)
+        self.intersect(db, other) == Satisfiable::Constrained(self)
     }
 
     /// Returns the intersection of this atomic constraint and another.
     ///
     /// Panics if the two constraints have different typevars.
-    fn intersect(self, db: &'db dyn Db, other: Self) -> Simplified<Self> {
+    fn intersect(self, db: &'db dyn Db, other: Self) -> Satisfiable<Self> {
         debug_assert!(self.typevar == other.typevar);
 
         // The result is always `max_lower(s₁,s₂) : min_upper(t₁,t₂)`. (Note that `max_lower` and
         // `min_upper` determine whether the corresponding bound is open or closed.)
-        Simplified::from_one(Self::new(
+        Self::new(
             db,
             self.typevar,
             self.lower.max_lower(db, other.lower),
             self.upper.min_upper(db, other.upper),
-        ))
+        )
     }
 
     /// Returns the union of this atomic constraint and another.
