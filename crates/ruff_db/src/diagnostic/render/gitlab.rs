@@ -72,7 +72,7 @@ impl Serialize for SerializedMessages<'_> {
                         let diagnostic_source = file.diagnostic_source(self.resolver);
                         let source_code = diagnostic_source.as_source_code();
                         span.range()
-                            .map(|range| Position {
+                            .map(|range| Positions {
                                 begin: source_code.line_column(range.start()),
                                 end: source_code.line_column(range.end()),
                             })
@@ -144,11 +144,11 @@ struct Message<'a> {
 #[derive(Default, Serialize)]
 struct Location {
     path: String,
-    positions: Position,
+    positions: Positions,
 }
 
 #[derive(Default, Serialize)]
-struct Position {
+struct Positions {
     begin: LineColumn,
     end: LineColumn,
 }
