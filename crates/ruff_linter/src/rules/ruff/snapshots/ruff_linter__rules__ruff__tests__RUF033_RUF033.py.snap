@@ -483,3 +483,29 @@ help: Use `dataclasses.InitVar` instead
     134 |+    )
     135 |+    def __post_init__(self, x: tuple[int, ...]) -> None:
 135 136 |         self.x = x
+136 137 | 
+137 138 | 
+
+RUF033 [*] `__post_init__` method with argument defaults
+   --> RUF033.py:140:38
+    |
+138 |   @dataclass
+139 |   class D:
+140 |       def __post_init__(self, x: int = """
+    |  ______________________________________^
+141 | |     """) -> None:
+    | |_______^
+142 |           self.x = x
+    |
+help: Use `dataclasses.InitVar` instead
+
+ℹ Unsafe fix
+137 137 | 
+138 138 | @dataclass
+139 139 | class D:
+140     |-    def __post_init__(self, x: int = """
+141     |-    """) -> None:
+    140 |+    x: InitVar[int] = """
+    141 |+    """
+    142 |+    def __post_init__(self, x: int) -> None:
+142 143 |         self.x = x

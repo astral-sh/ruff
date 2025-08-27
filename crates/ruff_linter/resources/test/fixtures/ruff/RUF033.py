@@ -133,3 +133,10 @@ class C:
         2,
     )) -> None:
         self.x = x
+
+
+@dataclass
+class D:
+    def __post_init__(self, x: int = """
+    """) -> None:
+        self.x = x
