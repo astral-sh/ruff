@@ -1,5 +1,7 @@
 # Identical display names error messages
 
+<!-- snapshot-diagnostics -->
+
 ty prints the fully qualified name to disambiguate objects with the same name.
 
 ## Nested class with identical names
@@ -24,8 +26,10 @@ import b
 
 df: a.DataFrame = b.DataFrame()  # error: [invalid-assignment] "Object of type `b.DataFrame` is not assignable to `a.DataFrame`"
 
-# TODO: this should be error: [invalid-assignment] "Object of type `list[b.DataFrame]` is not assignable to `list[a.DataFrame]`
-dataframes: list[a.DataFrame] = [b.DataFrame()]
+def _(dfs: list[b.DataFrame]):
+    # TODO should be"Object of type `list[b.DataFrame]` is not assignable to `list[a.DataFrame]`
+    # error: [invalid-assignment] "Object of type `list[DataFrame]` is not assignable to `list[DataFrame]`"
+    dataframes: list[a.DataFrame] = dfs
 ```
 
 `a.py`:

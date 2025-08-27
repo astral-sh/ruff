@@ -1,0 +1,54 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: same_names.md - Identical display names error messages - Enum from different modules with identical names
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/same_names.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | import status_a
+2 | import status_b
+3 | 
+4 | # error: [invalid-assignment] "Object of type `Literal[status_b.Status.ACTIVE]` is not assignable to `status_a.Status`"
+5 | s: status_a.Status = status_b.Status.ACTIVE
+```
+
+## status_a.py
+
+```
+1 | from enum import Enum
+2 | 
+3 | class Status(Enum):
+4 |     ACTIVE = 1
+5 |     INACTIVE = 2
+```
+
+## status_b.py
+
+```
+1 | from enum import Enum
+2 | 
+3 | class Status(Enum):
+4 |     ACTIVE = "active"
+5 |     INACTIVE = "inactive"
+```
+
+# Diagnostics
+
+```
+error[invalid-assignment]: Object of type `Literal[status_b.Status.ACTIVE]` is not assignable to `status_a.Status`
+ --> src/mdtest_snippet.py:5:1
+  |
+4 | # error: [invalid-assignment] "Object of type `Literal[status_b.Status.ACTIVE]` is not assignable to `status_a.Status`"
+5 | s: status_a.Status = status_b.Status.ACTIVE
+  | ^
+  |
+info: rule `invalid-assignment` is enabled by default
+
+```

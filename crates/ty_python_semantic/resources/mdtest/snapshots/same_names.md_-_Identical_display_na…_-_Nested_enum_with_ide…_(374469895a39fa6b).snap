@@ -1,0 +1,43 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: same_names.md - Identical display names error messages - Nested enum with identical names
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/same_names.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from enum import Enum
+ 2 | 
+ 3 | class A:
+ 4 |     class B(Enum):
+ 5 |         ACTIVE = "active"
+ 6 |         INACTIVE = "inactive"
+ 7 | 
+ 8 | class C:
+ 9 |     class B(Enum):
+10 |         ACTIVE = "active"
+11 |         INACTIVE = "inactive"
+12 | 
+13 | # error: [invalid-assignment] "Object of type `Literal[mdtest_snippet.C.B.ACTIVE]` is not assignable to `mdtest_snippet.A.B`"
+14 | a: A.B = C.B.ACTIVE
+```
+
+# Diagnostics
+
+```
+error[invalid-assignment]: Object of type `Literal[mdtest_snippet.C.B.ACTIVE]` is not assignable to `mdtest_snippet.A.B`
+  --> src/mdtest_snippet.py:14:1
+   |
+13 | # error: [invalid-assignment] "Object of type `Literal[mdtest_snippet.C.B.ACTIVE]` is not assignable to `mdtest_snippet.A.B`"
+14 | a: A.B = C.B.ACTIVE
+   | ^
+   |
+info: rule `invalid-assignment` is enabled by default
+
+```
