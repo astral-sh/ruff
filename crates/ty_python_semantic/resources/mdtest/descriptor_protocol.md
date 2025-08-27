@@ -45,9 +45,9 @@ body, we do not allow these assignments, preventing users from accidentally over
 descriptor, which is what would happen at runtime:
 
 ```py
-# error: [invalid-assignment] "Object of type `Literal[10]` is not assignable to attribute `ten` of type `Ten`"
+# error: [invalid-assignment] "Object of type `Literal[10]` is not assignable to attribute `ten` on type `Ten`"
 C.ten = 10
-# error: [invalid-assignment] "Object of type `Literal[11]` is not assignable to attribute `ten` of type `Ten`"
+# error: [invalid-assignment] "Object of type `Literal[11]` is not assignable to attribute `ten` on type `Ten`"
 C.ten = 11
 ```
 
@@ -213,7 +213,7 @@ reveal_type(C().ten)  # revealed: Ten
 C().ten = Ten()
 
 # The instance attribute is declared as `Ten`, so this is an
-# error: [invalid-assignment] "Object of type `Literal[10]` is not assignable to attribute `ten` of type `Ten`"
+# error: [invalid-assignment] "Object of type `Literal[10]` is not assignable to attribute `ten` on type `Ten`"
 C().ten = 10
 ```
 
@@ -280,7 +280,7 @@ overwrite the data descriptor, but the attribute is declared as `DataDescriptor`
 so we do not allow this:
 
 ```py
-# error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `class_data_descriptor` of type `DataDescriptor`"
+# error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `class_data_descriptor` on type `DataDescriptor`"
 C1.class_data_descriptor = 1
 ```
 
@@ -372,7 +372,7 @@ def _(flag: bool):
     # wrong, but they could be subsumed under a higher-level diagnostic.
 
     # error: [invalid-assignment] "Invalid assignment to data descriptor attribute `meta_data_descriptor1` on type `<class 'C5'>` with custom `__set__` method"
-    # error: [invalid-assignment] "Object of type `None` is not assignable to attribute `meta_data_descriptor1` of type `Literal["value on class"]`"
+    # error: [invalid-assignment] "Object of type `None` is not assignable to attribute `meta_data_descriptor1` on type `Literal["value on class"]`"
     C5.meta_data_descriptor1 = None
 
     # error: [possibly-unbound-attribute]
