@@ -12,19 +12,29 @@
 //! question is: "Under what constraints is this type assignable to another?".
 //!
 //! This module provides the machinery for representing the "under what constraints" part of that
-//! question. An individual constraint restricts the specialization of a single typevar to be within a
-//! particular lower and upper bound. You can then build up more complex constraint sets using
-//! union, intersection, and negation operations (just like types themselves).
+//! question.
 //!
-//! NOTE: This module is currently in a transitional state: we've added a trait that our constraint
-//! set implementations will conform to, and updated all of our type property implementations to
-//! work on any impl of that trait. But the only impl we have right now is `bool`, which means that
-//! we are still not tracking the full detail as promised in the description above. (`bool` is a
-//! perfectly fine impl, but it can generate false positives when you have to break down a
-//! particular assignability check into subchecks: each subcheck might say "yes", but technically
-//! under conflicting constraints, which a single `bool` can't track.) Soon we will add a proper
-//! constraint set implementation, and the `bool` impl of the trait (and possibly the trait itself)
-//! will go away.
+//! An individual constraint restricts the specialization of a single typevar to be within a
+//! particular lower and upper bound: the typevar can only specialize to types that are a supertype
+//! of the lower bound, and a subtype of the upper bound. (Note that lower and upper bounds are
+//! fully static; we take the bottom and top materializations of the bounds to remove any gradual
+//! forms if needed.) Either bound can be "closed" (where the bound is a valid specialization), or
+//! "open" (where it is not).
+//!
+//! You can then build up more complex constraint sets using union, intersection, and negation
+//! operations. We use a distributed normal form (DNF) representation, just like we do for types: a
+//! [constraint set][ConstraintSet] is the union of zero or more [clauses][ConstraintClause], each
+//! of which is the intersection of zero or more [individual constraints][AtomicConstraint]. Note
+//! that the constraint set that contains no clauses is never satisfiable (`⋃ {} = 0`); and the
+//! constraint set that contains a single clause, which contains no constraints, is always
+//! satisfiable (`⋃ {⋂ {}} = 1`).
+//!
+//! NOTE: This module is currently in a transitional state: we've added a [`Constraints`] trait,
+//! and updated all of our type property implementations to work on any impl of that trait. We have
+//! added the DNF [`ConstraintSet`] representation, and updated all of our property checks to build
+//! up a constraint set and then check whether it is ever or always satisfiable, as appropriate. We
+//! are not yet inferring specializations from those constraints, and we will likely remove the
+//! [`Constraints`] trait once everything has stabilized.
 
 use std::fmt::Display;
 
@@ -160,7 +170,11 @@ where
     }
 }
 
-/// A set of constraint clauses, representing the union of those clauses.
+/// A set of constraints under which a type property holds.
+///
+/// We use a DNF representation, so a set contains a list of zero or more
+/// [clauses][ConstraintClause], each of which is an intersection of zero or more
+/// [constraints][AtomicConstraint].
 ///
 /// This is called a "set of constraint sets", and denoted _𝒮_, in [[POPL2015][]].
 ///
@@ -168,20 +182,22 @@ where
 ///
 /// ### Invariants
 ///
-/// - No clause in the set subsumes another. (That is, there is no clause in the set that is a
-///   "subclause" of another.)
+/// - The clauses are simplified as much as possible — there are no two clauses in the set that can
+///   be simplified into a single clause.
 #[derive(Clone, Debug)]
 pub(crate) struct ConstraintSet<'db> {
     clauses: SmallVec<[ConstraintClause<'db>; 2]>,
 }
 
 impl<'db> ConstraintSet<'db> {
+    /// Returns the constraint set that is never satisfiable.
     fn never() -> Self {
         Self {
             clauses: smallvec![],
         }
     }
 
+    /// Returns a constraint set that contains a single clause.
     fn singleton(clause: ConstraintClause<'db>) -> Self {
         Self {
             clauses: smallvec![clause],
@@ -195,55 +211,70 @@ impl<'db> ConstraintSet<'db> {
         constraint: Satisfiable<AtomicConstraint<'db>>,
     ) {
         match constraint {
+            // ... ∪ 0 = ...
             Satisfiable::Never => {}
+            // ... ∪ 1 = 1
             Satisfiable::Always => {
                 self.clauses.clear();
                 self.clauses.push(ConstraintClause::always());
             }
+            // Otherwise wrap the constraint into a singleton clause and use the logic below to add
+            // it.
             Satisfiable::Constrained(constraint) => {
                 self.union_clause(db, ConstraintClause::singleton(constraint));
             }
         }
     }
 
-    /// Updates this set to be the union of itself and a clause.
+    /// Updates this set to be the union of itself and a clause. To maintain the invariants of this
+    /// type, we must simplify this clause against all existing clauses, if possible.
     fn union_clause(&mut self, db: &'db dyn Db, mut clause: ConstraintClause<'db>) {
+        // Naively, we would just append the new clause to the set's list of clauses. But that
+        // doesn't ensure that the clauses are simplified with respect to each other. So instead,
+        // we iterate through the list of existing clauses, and try to simplify the new clause
+        // against each one in turn. (We can assume that the existing clauses are already
+        // simplified with respect to each other, since we can assume that the invariant holds upon
+        // entry to this method.)
         let prev = std::mem::take(&mut self.clauses);
-        let mut clauses = prev.into_iter();
-        while let Some(lc) = clauses.next() {
-            match lc.union_clause(db, clause) {
+        let mut existing_clauses = prev.into_iter();
+        while let Some(existing) = existing_clauses.next() {
+            // Try to simplify the new clause against an existing clause.
+            match existing.union_clause(db, clause) {
                 Simplified::Never => {
-                    // If two clauses cancel out to ∅, that does NOT cause the entire set to become
-                    // ∅.  We need to keep whatever clauses have already been added to the result,
+                    // If two clauses cancel out to 0, that does NOT cause the entire set to become
+                    // 0.  We need to keep whatever clauses have already been added to the result,
                     // and also need to copy over any later clauses that we hadn't processed yet.
-                    self.clauses.extend(clauses);
+                    self.clauses.extend(existing_clauses);
                     return;
                 }
 
                 Simplified::Always => {
-                    // If two clauses cancel out to 1, that makes the entire set 1.
+                    // If two clauses cancel out to 1, that makes the entire set 1, and all
+                    // existing clauses are simplified away.
                     self.clauses.clear();
                     self.clauses.push(ConstraintClause::always());
                     return;
                 }
 
-                Simplified::Two(lc, c) => {
-                    // We couldn't simplify relative to lc, so add lc to the result.  Continue
-                    // trying to simplify clause against the later clauses in the set.
-                    self.clauses.push(lc);
+                Simplified::Two(existing, c) => {
+                    // We couldn't simplify the new clause relative to this existing clause, so add
+                    // the existing clause to the result. Continue trying to simplify the new
+                    // clause against the later existing clauses.
+                    self.clauses.push(existing);
                     clause = c;
                 }
 
                 Simplified::One(c) => {
-                    // We were able to simplify relative to lc.  Don't add it to the result yet;
-                    // instead, try to simplify the result further against later clauses in s.
+                    // We were able to simplify the new clause relative to this existing clause.
+                    // Don't add it to the result yet; instead, try to simplify the result further
+                    // against later existing clauses.
                     clause = c;
                 }
             }
         }
 
-        // If we fall through then we need to add clause to the clause list (either because we
-        // couldn't simplify it with anything, or because we did without it canceling out).
+        // If we fall through then we need to add the new clause to the clause list (either because
+        // we couldn't simplify it with anything, or because we did without it canceling out).
         self.clauses.push(clause);
     }
 
@@ -256,6 +287,8 @@ impl<'db> ConstraintSet<'db> {
 
     /// Updates this set to be the intersection of itself and another set.
     fn intersect_set(&mut self, db: &'db dyn Db, other: &Self) {
+        // This is the distributive law:
+        // (A ∪ B) ∩ (C ∪ D ∪ E) = (A ∩ C) ∪ (A ∩ D) ∪ (A ∩ E) ∪ (B ∩ C) ∪ (B ∩ D) ∪ (B ∩ E)
         let self_clauses = std::mem::take(&mut self.clauses);
         for self_clause in &self_clauses {
             for other_clause in &other.clauses {
@@ -330,7 +363,7 @@ impl<'db> Constraints<'db> for ConstraintSet<'db> {
     }
 }
 
-/// The intersection of a list of atomic constraints.
+/// The intersection of zero or more atomic constraints.
 ///
 /// This is called a "constraint set", and denoted _C_, in [[POPL2015][]].
 ///
@@ -346,18 +379,21 @@ pub(crate) struct ConstraintClause<'db> {
 }
 
 impl<'db> ConstraintClause<'db> {
+    /// Returns the clause that is always satisfiable.
     fn always() -> Self {
         Self {
             constraints: smallvec![],
         }
     }
 
+    /// Returns a clause containing a single constraint.
     fn singleton(constraint: AtomicConstraint<'db>) -> Self {
         Self {
             constraints: smallvec![constraint],
         }
     }
 
+    /// Returns whether this constraint is always satisfiable.
     fn is_always(&self) -> bool {
         self.constraints.is_empty()
     }
