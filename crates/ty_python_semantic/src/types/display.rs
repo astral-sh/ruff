@@ -512,7 +512,6 @@ impl<'db> GenericAlias<'db> {
         DisplayGenericAlias {
             origin: self.origin(db),
             specialization: self.specialization(db),
-            specialization_type: self.specialization(db).specialization_type(db),
             db,
             settings,
         }
@@ -522,7 +521,6 @@ impl<'db> GenericAlias<'db> {
 pub(crate) struct DisplayGenericAlias<'db> {
     origin: ClassLiteral<'db>,
     specialization: Specialization<'db>,
-    specialization_type: Option<MaterializationType>,
     db: &'db dyn Db,
     settings: DisplaySettings,
 }
@@ -532,12 +530,12 @@ impl Display for DisplayGenericAlias<'_> {
         if let Some(tuple) = self.specialization.tuple(self.db) {
             tuple.display_with(self.db, self.settings).fmt(f)
         } else {
-            let prefix = match self.specialization_type {
+            let prefix = match self.specialization.specialization_type(self.db) {
                 None => "",
                 Some(MaterializationType::Top) => "Top[",
                 Some(MaterializationType::Bottom) => "Bottom[",
             };
-            let suffix = match self.specialization_type {
+            let suffix = match self.specialization.specialization_type(self.db) {
                 None => "",
                 Some(_) => "]",
             };

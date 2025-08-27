@@ -444,11 +444,8 @@ fn is_subtype_in_invariant_position<'db, C: Constraints<'db>>(
     let base_top = base_type.top_materialization(db);
     let base_bottom = base_type.bottom_materialization(db);
     match (derived_materialization, base_materialization) {
-        // Top and bottom materializations are fully static, so subtyping and assignability are the same.
-        // One top is a subtype of another if the range of materializations covered by derived
-        // is a subset of the range covered by base.
-        // This is also true for subtyping between None and Top.
-        // And assignability between Top and None.
+        // `Derived` is a subtype of `Base` if the range of materializations covered by `Derived`
+        // is a subset of the range covered by `Base`.
         (MaterializationType::Top, MaterializationType::Top) => C::from_bool(
             db,
             base_bottom.is_subtype_of(db, derived_bottom)
@@ -460,9 +457,10 @@ fn is_subtype_in_invariant_position<'db, C: Constraints<'db>>(
             derived_bottom.is_subtype_of(db, base_bottom)
                 && base_top.is_subtype_of(db, derived_top),
         ),
-        // A bottom materialization is a subtype of top if it's a subtype of some part of the range of materializations
-        // covered by top, i.e. either the top or bottom of derived is between the top and derived of base, or both
-        // materializations of base are between the top and bottom of derived.
+        // The bottom materialization of `Derived` is a subtype of the top materialization
+        // of `Base` if there is some type that is both within the
+        // range of types covered by derived and within the range covered by base, because if such a type
+        // exists, it's a subtype of `Top[base]` and a supertype of `Bottom[derived]`.
         (MaterializationType::Bottom, MaterializationType::Top) => C::from_bool(
             db,
             (base_bottom.is_subtype_of(db, derived_bottom)
@@ -472,8 +470,8 @@ fn is_subtype_in_invariant_position<'db, C: Constraints<'db>>(
                     || (base_top.is_subtype_of(db, derived_top)
                         && derived_bottom.is_subtype_of(db, base_top))),
         ),
-        // A top materialization is a subtype of a bottom materialization only if both are the
-        // same fully static type.
+        // A top materialization is a subtype of a bottom materialization only if both original
+        // un-materialized types are the same fully static type.
         (MaterializationType::Top, MaterializationType::Bottom) => C::from_bool(
             db,
             derived_top.is_subtype_of(db, base_bottom)
@@ -482,8 +480,9 @@ fn is_subtype_in_invariant_position<'db, C: Constraints<'db>>(
     }
 }
 
-/// Whether two types have a relation (subtyping or assignability), taking into account
-/// that `base_type` may come from a top or bottom materialization.
+/// Whether two types encountered in an invariant position
+/// have a relation (subtyping or assignability), taking into account
+/// that the two types may come from a top or bottom materialization.
 fn has_relation_in_invariant_position<'db, C: Constraints<'db>>(
     db: &'db dyn Db,
     derived_type: &Type<'db>,
@@ -723,7 +722,6 @@ impl<'db> Specialization<'db> {
             .into_iter()
             .zip(self.types(db))
             .map(|(bound_typevar, vartype)| {
-                // TODO(jelle): polarity?
                 match bound_typevar.variance(db) {
                     TypeVarVariance::Bivariant => {
                         // With bivariance, all specializations are subtypes of each other,

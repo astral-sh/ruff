@@ -518,7 +518,6 @@ impl<'db> PropertyInstanceType<'db> {
     }
 
     fn materialize(self, db: &'db dyn Db, materialization_type: MaterializationType) -> Self {
-        // TODO(jelle): this seems wrong, should be invariant if there is a setter
         Self::new(
             db,
             self.getter(db)
