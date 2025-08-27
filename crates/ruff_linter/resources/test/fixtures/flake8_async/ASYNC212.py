@@ -62,6 +62,14 @@ async def foo():
     client.anything()  # Ok
 
 
+global_client = httpx.Client()
+
+
+async def foo():
+    global_client.request()  # ASYNC212
+    global_client.anything()  # Ok
+
+
 async def foo():
     async with httpx.AsyncClient() as client:
         await client.get()  # Ok

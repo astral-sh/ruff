@@ -138,3 +138,12 @@ ASYNC212 Async functions should not use blocking httpx clients
    |     ^^^^^^^^^^^^^^
 56 |     client.anything()  # Ok
    |
+
+ASYNC212 Async functions should not use blocking httpx clients
+  --> ASYNC212.py:69:5
+   |
+68 | async def foo():
+69 |     global_client.request()  # ASYNC212
+   |     ^^^^^^^^^^^^^^^^^^^^^
+70 |     global_client.anything()  # Ok
+   |
