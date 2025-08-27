@@ -7,7 +7,7 @@ use std::{
 use ruff_source_file::LineColumn;
 use serde::{Serialize, Serializer, ser::SerializeSeq};
 
-use crate::diagnostic::Diagnostic;
+use crate::diagnostic::{Diagnostic, Severity};
 
 use super::FileResolver;
 
@@ -99,13 +99,20 @@ impl Serialize for SerializedMessages<'_> {
 
             let description = diagnostic.body();
             let check_name = diagnostic.secondary_code_or_id();
+            let severity = match diagnostic.severity() {
+                Severity::Info => "info",
+                Severity::Warning => "minor",
+                Severity::Error => "major",
+                // Another option here is `blocker`
+                Severity::Fatal => "critical",
+            };
 
             let value = Message {
                 check_name,
                 // GitLab doesn't display the separate `check_name` field in a Code Quality report,
                 // so prepend it to the description too.
                 description: format!("{check_name}: {description}"),
-                severity: "major",
+                severity,
                 fingerprint: format!("{:x}", message_fingerprint),
                 location,
             };
