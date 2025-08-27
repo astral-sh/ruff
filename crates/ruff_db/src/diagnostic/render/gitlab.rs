@@ -60,55 +60,62 @@ impl Serialize for SerializedMessages<'_> {
         let mut fingerprints = HashSet::<u64>::with_capacity(self.diagnostics.len());
 
         for diagnostic in self.diagnostics {
-            let span = diagnostic.expect_primary_span();
-            let file = span.file();
-            let filename = diagnostic.expect_ruff_filename();
+            if let Some(span) = diagnostic.primary_span() {
+                let file = span.file();
+                let filename = file.path(self.resolver);
 
-            let (start_location, end_location) = if self.resolver.is_notebook(file) {
-                // We can't give a reasonable location for the structured formats,
-                // so we show one that's clearly a fallback
-                Default::default()
-            } else {
-                (
-                    diagnostic.expect_ruff_start_location(),
-                    diagnostic.expect_ruff_end_location(),
-                )
-            };
+                let (start_location, end_location) = if self.resolver.is_notebook(file) {
+                    // We can't give a reasonable location for the structured formats,
+                    // so we show one that's clearly a fallback
+                    Default::default()
+                } else {
+                    let diagnostic_source = file.diagnostic_source(self.resolver);
+                    let source_code = diagnostic_source.as_source_code();
+                    span.range()
+                        .map(|range| {
+                            (
+                                source_code.line_column(range.start()),
+                                source_code.line_column(range.end()),
+                            )
+                        })
+                        .unwrap_or_default()
+                };
 
-            let path = self.project_dir.as_ref().map_or_else(
-                || file.relative_path(self.resolver).display().to_string(),
-                |project_dir| relativize_path_to(&filename, project_dir),
-            );
+                let path = self.project_dir.as_ref().map_or_else(
+                    || file.relative_path(self.resolver).display().to_string(),
+                    |project_dir| relativize_path_to(filename, project_dir),
+                );
 
-            let mut message_fingerprint = fingerprint(diagnostic, &path, 0);
+                let mut message_fingerprint = fingerprint(diagnostic, &path, 0);
 
-            // Make sure that we do not get a fingerprint that is already in use
-            // by adding in the previously generated one.
-            while fingerprints.contains(&message_fingerprint) {
-                message_fingerprint = fingerprint(diagnostic, &path, message_fingerprint);
-            }
-            fingerprints.insert(message_fingerprint);
+                // Make sure that we do not get a fingerprint that is already in use
+                // by adding in the previously generated one.
+                while fingerprints.contains(&message_fingerprint) {
+                    message_fingerprint = fingerprint(diagnostic, &path, message_fingerprint);
+                }
+                fingerprints.insert(message_fingerprint);
 
-            let description = diagnostic.body();
-            let check_name = diagnostic.secondary_code_or_id();
+                let description = diagnostic.body();
+                let check_name = diagnostic.secondary_code_or_id();
 
-            let value = json!({
-                "check_name": check_name,
-                // GitLab doesn't display the separate `check_name` field in a Code Quality report,
-                // so prepend it to the description too.
-                "description": format!("{check_name}: {description}"),
-                "severity": "major",
-                "fingerprint": format!("{:x}", message_fingerprint),
-                "location": {
-                    "path": path,
-                    "positions": {
-                        "begin": start_location,
-                        "end": end_location,
+                let value = json!({
+                    "check_name": check_name,
+                    // GitLab doesn't display the separate `check_name` field in a Code Quality report,
+                    // so prepend it to the description too.
+                    "description": format!("{check_name}: {description}"),
+                    "severity": "major",
+                    "fingerprint": format!("{:x}", message_fingerprint),
+                    "location": {
+                        "path": path,
+                        "positions": {
+                            "begin": start_location,
+                            "end": end_location,
+                        },
                     },
-                },
-            });
+                });
 
-            s.serialize_element(&value)?;
+                s.serialize_element(&value)?;
+            }
         }
 
         s.end()
