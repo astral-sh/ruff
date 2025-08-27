@@ -455,3 +455,57 @@ help: Use `dataclasses.InitVar` instead
 122 123 |             ,
 123 124 |         ) -> None:
 124 125 |             ...
+
+RUF033 [*] `__post_init__` method with argument defaults
+   --> RUF033.py:131:50
+    |
+129 |   @dataclass
+130 |   class C:
+131 |       def __post_init__(self, x: tuple[int, ...] = (
+    |  __________________________________________________^
+132 | |         1,
+133 | |         2,
+134 | |     )) -> None:
+    | |_____^
+135 |           self.x = x
+    |
+help: Use `dataclasses.InitVar` instead
+
+ℹ Unsafe fix
+128 128 | 
+129 129 | @dataclass
+130 130 | class C:
+131     |-    def __post_init__(self, x: tuple[int, ...] = (
+    131 |+    x: InitVar[tuple[int, ...]] = (
+132 132 |         1,
+133 133 |         2,
+134     |-    )) -> None:
+    134 |+    )
+    135 |+    def __post_init__(self, x: tuple[int, ...]) -> None:
+135 136 |         self.x = x
+136 137 | 
+137 138 | 
+
+RUF033 [*] `__post_init__` method with argument defaults
+   --> RUF033.py:140:38
+    |
+138 |   @dataclass
+139 |   class D:
+140 |       def __post_init__(self, x: int = """
+    |  ______________________________________^
+141 | |     """) -> None:
+    | |_______^
+142 |           self.x = x
+    |
+help: Use `dataclasses.InitVar` instead
+
+ℹ Unsafe fix
+137 137 | 
+138 138 | @dataclass
+139 139 | class D:
+140     |-    def __post_init__(self, x: int = """
+141     |-    """) -> None:
+    140 |+    x: InitVar[int] = """
+    141 |+    """
+    142 |+    def __post_init__(self, x: int) -> None:
+142 143 |         self.x = x
