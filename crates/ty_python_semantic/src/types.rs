@@ -2931,9 +2931,14 @@ impl<'db> Type<'db> {
             }),
             // TODO: Once `to_meta_type` for the synthesized protocol is fully implemented, this handling should be removed.
             Type::ProtocolInstance(ProtocolInstanceType {
-                inner: Protocol::Synthesized(_),
+                inner: Protocol::Synthesized(synthesized),
                 ..
-            }) => self.instance_member(db, &name),
+            }) => synthesized
+                .interface()
+                .member_by_name(db, &name)
+                .and_then(|member| member.meta_get_type())
+                .map(|ty| Place::bound(ty).into())
+                .unwrap_or_default(),
             _ => self
                 .to_meta_type(db)
                 .find_name_in_mro_with_policy(db, name.as_str(), policy)

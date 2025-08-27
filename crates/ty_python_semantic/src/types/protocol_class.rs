@@ -437,15 +437,10 @@ enum ProtocolMemberKind<'db> {
 
 impl<'db> ProtocolMemberKind<'db> {
     fn from_property_instance(property: PropertyInstanceType<'db>, db: &'db dyn Db) -> Self {
-        struct PropertyMember<'db> {
-            get_type: Option<Type<'db>>,
-            set_type: Option<Type<'db>>,
-        }
-
         fn inner<'db>(
             db: &'db dyn Db,
             property: PropertyInstanceType<'db>,
-        ) -> Option<PropertyMember<'db>> {
+        ) -> Option<(Option<Type<'db>>, Option<Type<'db>>)> {
             let get_type = match property.getter(db) {
                 None => None,
                 Some(getter) => Some(
@@ -482,14 +477,11 @@ impl<'db> ProtocolMemberKind<'db> {
                 None
             };
 
-            Some(PropertyMember { get_type, set_type })
+            Some((get_type, set_type))
         }
 
         inner(db, property)
-            .map(|member| ProtocolMemberKind::Property {
-                get_type: member.get_type,
-                set_type: member.set_type,
-            })
+            .map(|(get_type, set_type)| ProtocolMemberKind::Property { get_type, set_type })
             .unwrap_or(ProtocolMemberKind::Attribute(Type::PropertyInstance(
                 property,
             )))
@@ -636,9 +628,9 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
     /// to this member on an instance?
     pub(super) fn instance_set_type(&self) -> Result<Type<'db>, AttributeAssignmentError<'db>> {
         match self.kind {
-            ProtocolMemberKind::Property { set_type, .. } => set_type
-                .map(Ok)
-                .unwrap_or(Err(AttributeAssignmentError::ReadOnlyProperty)),
+            ProtocolMemberKind::Property { set_type, .. } => {
+                set_type.ok_or(AttributeAssignmentError::ReadOnlyProperty)
+            }
             ProtocolMemberKind::Method(_) => Err(AttributeAssignmentError::CannotAssign),
             ProtocolMemberKind::Attribute(ty) => {
                 if self.qualifiers.contains(TypeQualifiers::CLASS_VAR) {
