@@ -1392,10 +1392,16 @@ static_assert(is_subtype_of(XClassVar, HasXProperty))
 static_assert(is_assignable_to(XClassVar, HasXProperty))
 
 class XFinal:
-    x: Final = 42
+    x: Final[int] = 42
 
 static_assert(is_subtype_of(XFinal, HasXProperty))
 static_assert(is_assignable_to(XFinal, HasXProperty))
+
+class XImplicitFinal:
+    x: Final = 42
+
+static_assert(is_subtype_of(XImplicitFinal, HasXProperty))
+static_assert(is_assignable_to(XImplicitFinal, HasXProperty))
 ```
 
 A read-only property on a protocol, unlike a mutable attribute, is covariant: `XSub` in the below
@@ -1451,9 +1457,8 @@ static_assert(is_assignable_to(XReadWriteProperty, HasXProperty))
 class XSub:
     x: MyInt
 
-# TODO: should pass
-static_assert(not is_subtype_of(XSub, HasXProperty))  # error: [static-assert-error]
-static_assert(not is_assignable_to(XSub, HasXProperty))  # error: [static-assert-error]
+static_assert(not is_subtype_of(XSub, XReadWriteProperty))
+static_assert(not is_assignable_to(XSub, XReadWriteProperty))
 ```
 
 A protocol with a read/write property `x` is exactly equivalent to a protocol with a mutable
@@ -1549,7 +1554,7 @@ class Descriptor:
     def __get__(self, instance, owner) -> MyInt:
         return MyInt(0)
 
-    def __set__(self, value: int) -> None: ...
+    def __set__(self, instance, value: int) -> None: ...
 
 class XCustomDescriptor:
     x: Descriptor = Descriptor()
@@ -1595,6 +1600,16 @@ static_assert(is_assignable_to(HasGetAttrAndSetAttr, HasXProperty))
 # TODO: these should pass
 static_assert(is_subtype_of(HasGetAttrAndSetAttr, XAsymmetricProperty))  # error: [static-assert-error]
 static_assert(is_assignable_to(HasGetAttrAndSetAttr, XAsymmetricProperty))  # error: [static-assert-error]
+
+class HasSetAttrWithUnsuitableInput:
+    def __getattr__(self, attr: str) -> int:
+        return 1
+
+    def __setattr__(self, attr: str, value: str) -> None: ...
+
+# TODO: these should pass
+static_assert(not is_subtype_of(HasSetAttrWithUnsuitableInput, HasMutableXProperty))  # error: [static-assert-error]
+static_assert(not is_assignable_to(HasSetAttrWithUnsuitableInput, HasMutableXProperty))  # error: [static-assert-error]
 ```
 
 ## Subtyping of protocols with method members
@@ -1684,11 +1699,12 @@ class Bar:
 f(Bar())  # error: [invalid-argument-type]
 ```
 
-## Equivalence of protocols with method members
+## Equivalence of protocols with method or property members
 
 Two protocols `P1` and `P2`, both with a method member `x`, are considered equivalent if the
 signature of `P1.x` is equivalent to the signature of `P2.x`, even though ty would normally model
-any two function definitions as inhabiting distinct function-literal types.
+any two function definitions as inhabiting distinct function-literal types. The same is also true
+for property members.
 
 ```py
 from typing import Protocol
@@ -1700,7 +1716,26 @@ class P1(Protocol):
 class P2(Protocol):
     def x(self, y: int) -> None: ...
 
+class P3(Protocol):
+    @property
+    def y(self) -> str: ...
+    @property
+    def z(self) -> bytes: ...
+    @z.setter
+    def z(self, value: int) -> None: ...
+
+class P4(Protocol):
+    @property
+    def y(self) -> str: ...
+    @property
+    def z(self) -> bytes: ...
+    @z.setter
+    def z(self, value: int) -> None: ...
+
 static_assert(is_equivalent_to(P1, P2))
+
+# TODO: should pass
+static_assert(is_equivalent_to(P3, P4))  # error: [static-assert-error]
 ```
 
 As with protocols that only have non-method members, this also holds true when they appear in
@@ -1711,6 +1746,9 @@ class A: ...
 class B: ...
 
 static_assert(is_equivalent_to(A | B | P1, P2 | B | A))
+
+# TODO: should pass
+static_assert(is_equivalent_to(A | B | P3, P4 | B | A))  # error: [static-assert-error]
 ```
 
 ## Narrowing of protocols
@@ -2196,6 +2234,69 @@ class Iterator[T](Protocol):
 
 def f(value: Iterator):
     cast(Iterator, value)  # error: [redundant-cast]
+```
+
+### Recursive generic protocols
+
+This snippet caused us to stack overflow on an early version of
+<https://github.com/astral-sh/ruff/pull/19866>:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol, TypeVar
+
+class A: ...
+
+class Foo[T](Protocol):
+    def x(self) -> "T | Foo[T]": ...
+
+y: A | Foo[A]
+
+# The same thing, but using the legacy syntax:
+
+S = TypeVar("S")
+
+class Bar(Protocol[S]):
+    def x(self) -> "S | Bar[S]": ...
+
+z: S | Bar[S]
+```
+
+### Recursive generic protocols with property members
+
+An early version of <https://github.com/astral-sh/ruff/pull/19936> caused stack overflows on this
+snippet:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+
+class Foo[T]: ...
+
+class A(Protocol):
+    @property
+    def _(self: "A") -> Foo: ...
+
+class B(Protocol):
+    @property
+    def b(self) -> Foo[A]: ...
+
+class C(Undefined): ...  # error: "Name `Undefined` used when not defined"
+
+class D:
+    b: Foo[C]
+
+class E[T: B](Protocol): ...
+
+x: E[D]
 ```
 
 ## Meta-protocols
