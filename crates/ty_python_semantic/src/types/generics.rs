@@ -408,6 +408,13 @@ pub struct Specialization<'db> {
     pub(crate) generic_context: GenericContext<'db>,
     #[returns(deref)]
     pub(crate) types: Box<[Type<'db>]>,
+    /// The materialization kind of the specialization. For example, given an invariant
+    /// generic type `A`, `Top[A[Any]]` is a supertype of all materializations of `A[Any]`,
+    /// and is represented here with `Some(MaterializationKind::Top)`. Similarly,
+    /// `Bottom[A[Any]]` is a subtype of all materializations of `A[Any]`, and is represented
+    /// with `Some(MaterializationKind::Bottom)`.
+    /// The `materialization_kind` field may be non-`None` only if the specialization contains
+    /// dynamic types in invariant positions.
     pub(crate) materialization_kind: Option<MaterializationKind>,
 
     /// For specializations of `tuple`, we also store more detailed information about the tuple's
@@ -628,15 +635,11 @@ impl<'db> Specialization<'db> {
         let tuple_inner = self
             .tuple_inner(db)
             .and_then(|tuple| tuple.apply_type_mapping_impl(db, type_mapping, visitor));
-        let new_materialization_kind = match (
-            self.materialization_kind(db),
-            has_dynamic_invariant_typevar,
-            applied_materialization_kind,
-        ) {
-            (existing, false, _) => existing,
-            (Some(existing_mat), true, _) => Some(existing_mat),
-            (None, _, Some(applied_mat)) => Some(applied_mat),
-            (None, true, None) => None,
+        let new_materialization_kind = if has_dynamic_invariant_typevar {
+            self.materialization_kind(db)
+                .or(applied_materialization_kind)
+        } else {
+            None
         };
         Specialization::new(
             db,
