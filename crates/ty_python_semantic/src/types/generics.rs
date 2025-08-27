@@ -48,6 +48,13 @@ fn enclosing_generic_contexts<'db>(
                     .last_definition_signature(db)
                     .generic_context
             }
+            NodeWithScopeKind::TypeAlias(type_alias) => {
+                let definition = dbg!(index.expect_single_definition(type_alias.node(module)));
+                dbg!(binding_type(db, definition))
+                    .into_type_alias()?
+                    .into_pep_695_type_alias()?
+                    .generic_context(db)
+            }
             _ => None,
         })
 }
@@ -74,13 +81,16 @@ pub(crate) fn bind_typevar<'db>(
     typevar_binding_context: Option<Definition<'db>>,
     typevar: TypeVarInstance<'db>,
 ) -> Option<BoundTypeVarInstance<'db>> {
-    enclosing_generic_contexts(db, module, index, containing_scope)
-        .find_map(|enclosing_context| enclosing_context.binds_typevar(db, typevar))
-        .or_else(|| {
-            typevar_binding_context.map(|typevar_binding_context| {
-                typevar.with_binding_context(db, typevar_binding_context)
+    dbg!(typevar);
+    dbg!(
+        enclosing_generic_contexts(db, module, index, containing_scope)
+            .find_map(|enclosing_context| dbg!(dbg!(enclosing_context).binds_typevar(db, typevar)))
+            .or_else(|| {
+                typevar_binding_context.map(|typevar_binding_context| {
+                    typevar.with_binding_context(db, typevar_binding_context)
+                })
             })
-        })
+    )
 }
 
 /// A list of formal type variables for a generic function, class, or type alias.

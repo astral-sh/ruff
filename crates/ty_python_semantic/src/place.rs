@@ -1197,6 +1197,7 @@ fn place_from_declarations_impl<'db>(
     let reachability_constraints = declarations.reachability_constraints;
     let boundness_analysis = declarations.boundness_analysis;
     let mut declarations = declarations.peekable();
+    dbg!(declarations.peek().unwrap().declaration);
 
     let is_non_exported = |declaration: Definition<'db>| {
         requires_explicit_reexport.is_yes() && !is_reexported(db, declaration)

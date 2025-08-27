@@ -8,7 +8,7 @@ version = "0.12.10"
 description = "An extremely fast Python linter and code formatter, written in Rust."
 authors = [{ name = "Astral Software Inc.", email = "hey@astral.sh" }]
 readme = "README.md"
-requires-python = ">=3.7"
+requires-python = ">=3.12"
 license = { file = "LICENSE" }
 keywords = [
     "automation",

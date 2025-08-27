@@ -1032,18 +1032,20 @@ impl<'db> ClassType<'db> {
             return Place::Unbound.into();
         }
 
-        class_literal
-            .instance_member(db, specialization, name)
-            .map_type(|ty| ty.apply_optional_specialization(db, specialization))
+        dbg!(
+            dbg!(class_literal.instance_member(db, specialization, name))
+                .map_type(|ty| ty.apply_optional_specialization(db, specialization))
+        )
     }
 
     /// A helper function for `instance_member` that looks up the `name` attribute only on
     /// this class, not on its superclasses.
     fn own_instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
         let (class_literal, specialization) = self.class_literal(db);
-        class_literal
-            .own_instance_member(db, name)
-            .map_type(|ty| ty.apply_optional_specialization(db, specialization))
+        dbg!(
+            dbg!(class_literal.own_instance_member(db, name))
+                .map_type(|ty| ty.apply_optional_specialization(db, specialization))
+        )
     }
 
     /// Return a callable type (or union of callable types) that represents the callable
@@ -2989,6 +2991,8 @@ impl<'db> ClassLiteral<'db> {
         db: &'db dyn Db,
         name: &str,
     ) -> PlaceAndQualifiers<'db> {
+        dbg!(name);
+
         // TODO: There are many things that are not yet implemented here:
         // - `typing.Final`
         // - Proper diagnostics
@@ -2997,13 +3001,14 @@ impl<'db> ClassLiteral<'db> {
         let table = place_table(db, body_scope);
 
         if let Some(symbol_id) = table.symbol_id(name) {
+            dbg!("X");
             let use_def = use_def_map(db, body_scope);
 
             let declarations = use_def.end_of_scope_symbol_declarations(symbol_id);
             let declared_and_qualifiers =
                 place_from_declarations(db, declarations).ignore_conflicting_declarations();
 
-            match declared_and_qualifiers {
+            match dbg!(declared_and_qualifiers) {
                 PlaceAndQualifiers {
                     place: mut declared @ Place::Type(declared_ty, declaredness),
                     qualifiers,
@@ -3017,9 +3022,14 @@ impl<'db> ClassLiteral<'db> {
                     if qualifiers.contains(TypeQualifiers::INIT_VAR) {
                         // We ignore `InitVar` declarations on the class body, unless that attribute is overwritten
                         // by an implicit assignment in a method
-                        if Self::implicit_attribute(db, body_scope, name, MethodDecorator::None)
-                            .place
-                            .is_unbound()
+                        if dbg!(Self::implicit_attribute(
+                            db,
+                            body_scope,
+                            name,
+                            MethodDecorator::None
+                        ))
+                        .place
+                        .is_unbound()
                         {
                             return Place::Unbound.into();
                         }
@@ -3029,15 +3039,19 @@ impl<'db> ClassLiteral<'db> {
 
                     let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
                     let inferred = place_from_bindings(db, bindings);
-                    let has_binding = !inferred.is_unbound();
+                    let has_binding = dbg!(!inferred.is_unbound());
 
                     if has_binding {
                         // The attribute is declared and bound in the class body.
 
-                        if let Some(implicit_ty) =
-                            Self::implicit_attribute(db, body_scope, name, MethodDecorator::None)
-                                .place
-                                .ignore_possibly_unbound()
+                        if let Some(implicit_ty) = dbg!(Self::implicit_attribute(
+                            db,
+                            body_scope,
+                            name,
+                            MethodDecorator::None
+                        ))
+                        .place
+                        .ignore_possibly_unbound()
                         {
                             if declaredness == Boundness::Bound {
                                 // If a symbol is definitely declared, and we see
@@ -3070,12 +3084,12 @@ impl<'db> ClassLiteral<'db> {
                         if declaredness == Boundness::Bound {
                             declared.with_qualifiers(qualifiers)
                         } else {
-                            if let Some(implicit_ty) = Self::implicit_attribute(
+                            if let Some(implicit_ty) = dbg!(Self::implicit_attribute(
                                 db,
                                 body_scope,
                                 name,
                                 MethodDecorator::None,
-                            )
+                            ))
                             .place
                             .ignore_possibly_unbound()
                             {
@@ -3098,14 +3112,24 @@ impl<'db> ClassLiteral<'db> {
                     // The attribute is not *declared* in the class body. It could still be declared/bound
                     // in a method.
 
-                    Self::implicit_attribute(db, body_scope, name, MethodDecorator::None)
+                    dbg!(Self::implicit_attribute(
+                        db,
+                        body_scope,
+                        name,
+                        MethodDecorator::None
+                    ))
                 }
             }
         } else {
             // This attribute is neither declared nor bound in the class body.
             // It could still be implicitly defined in a method.
 
-            Self::implicit_attribute(db, body_scope, name, MethodDecorator::None)
+            dbg!(Self::implicit_attribute(
+                db,
+                body_scope,
+                name,
+                MethodDecorator::None
+            ))
         }
     }
 

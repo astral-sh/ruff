@@ -889,6 +889,14 @@ impl<'db> Type<'db> {
         }
     }
 
+    pub(crate) const fn into_type_alias(self) -> Option<TypeAliasType<'db>> {
+        match self {
+            Type::TypeAlias(type_alias) => Some(type_alias),
+            Type::KnownInstance(KnownInstanceType::TypeAliasType(type_alias)) => Some(type_alias),
+            _ => None,
+        }
+    }
+
     pub(crate) const fn into_dynamic(self) -> Option<DynamicType> {
         match self {
             Type::Dynamic(dynamic_type) => Some(dynamic_type),
@@ -3544,7 +3552,7 @@ impl<'db> Type<'db> {
             }
 
             Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
-                let class_attr_plain = self.find_name_in_mro_with_policy(db, name_str,policy).expect(
+                let class_attr_plain = self.find_name_in_mro_with_policy(db, name_str, policy).expect(
                     "Calling `find_name_in_mro` on class literals and subclass-of types should always return `Some`",
                 );
 
@@ -5788,7 +5796,7 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(_) => Ok(*self),
 
-            Type::NominalInstance(instance) => match instance.class(db).known(db) {
+            Type::NominalInstance(instance) => match dbg!(instance.class(db).known(db)) {
                 Some(KnownClass::TypeVar) => Ok(todo_type!(
                     "Support for `typing.TypeVar` instances in type expressions"
                 )),
@@ -5807,6 +5815,7 @@ impl<'db> Type<'db> {
                 Some(KnownClass::UnionType) => Ok(todo_type!(
                     "Support for `types.UnionType` instances in type expressions"
                 )),
+                // (0)
                 _ => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec::smallvec_inline![
                         InvalidTypeExpression::InvalidType(*self, scope_id)
@@ -5817,8 +5826,8 @@ impl<'db> Type<'db> {
 
             Type::Intersection(_) => Ok(todo_type!("Type::Intersection.in_type_expression")),
 
-            Type::TypeAlias(alias) => {
-                alias
+            Type::TypeAlias(type_alias) => {
+                type_alias
                     .value_type(db)
                     .in_type_expression(db, scope_id, typevar_binding_context)
             }
@@ -9196,6 +9205,8 @@ pub struct PEP695TypeAliasType<'db> {
     pub name: ast::name::Name,
 
     rhs_scope: ScopeId<'db>,
+
+    specialization: Option<Specialization<'db>>,
 }
 
 // The Salsa heap is tracked separately.
@@ -9225,7 +9236,50 @@ impl<'db> PEP695TypeAliasType<'db> {
         let module = parsed_module(db, scope.file(db)).load(db);
         let type_alias_stmt_node = scope.node(db).expect_type_alias(&module);
         let definition = self.definition(db);
-        definition_expression_type(db, definition, &type_alias_stmt_node.value)
+
+        dbg!(dbg!(definition_expression_type(
+            db,
+            definition,
+            &type_alias_stmt_node.value
+        )))
+        .apply_optional_specialization(db, dbg!(self.specialization(db)))
+    }
+
+    pub(crate) fn apply_specialization(
+        self,
+        db: &'db dyn Db,
+        f: impl FnOnce(GenericContext<'db>) -> Specialization<'db>,
+    ) -> TypeAliasType<'db> {
+        match self.generic_context(db) {
+            None => TypeAliasType::PEP695(self),
+
+            Some(generic_context) => {
+                let specialization = f(generic_context);
+                TypeAliasType::PEP695(PEP695TypeAliasType::new(
+                    db,
+                    self.name(db),
+                    self.rhs_scope(db),
+                    Some(specialization),
+                ))
+            }
+        }
+    }
+
+    #[salsa::tracked(cycle_fn=generic_context_cycle_recover, cycle_initial=generic_context_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
+        let scope = self.rhs_scope(db);
+        let file = scope.file(db);
+        let parsed = parsed_module(db, file).load(db);
+        let type_alias_stmt_node = scope.node(db).expect_type_alias(&parsed);
+
+        type_alias_stmt_node
+            .type_params
+            .as_ref()
+            .map(|type_params| {
+                let index = semantic_index(db, scope.file(db));
+                let definition = index.expect_single_definition(type_alias_stmt_node);
+                GenericContext::from_type_params(db, index, definition, type_params)
+            })
     }
 
     fn normalized_impl(self, _db: &'db dyn Db, _visitor: &NormalizedVisitor<'db>) -> Self {
@@ -9244,6 +9298,22 @@ fn value_type_cycle_recover<'db>(
 
 fn value_type_cycle_initial<'db>(_db: &'db dyn Db, _self: PEP695TypeAliasType<'db>) -> Type<'db> {
     Type::Never
+}
+
+fn generic_context_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &Option<GenericContext<'db>>,
+    _count: u32,
+    _self: PEP695TypeAliasType<'db>,
+) -> salsa::CycleRecoveryAction<Option<GenericContext<'db>>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn generic_context_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _self: PEP695TypeAliasType<'db>,
+) -> Option<GenericContext<'db>> {
+    None
 }
 
 /// A PEP 695 `types.TypeAliasType` created by manually calling the constructor.
@@ -9337,6 +9407,13 @@ impl<'db> TypeAliasType<'db> {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.value_type(db),
             TypeAliasType::ManualPEP695(type_alias) => type_alias.value(db),
+        }
+    }
+
+    pub(crate) fn into_pep_695_type_alias(self) -> Option<PEP695TypeAliasType<'db>> {
+        match self {
+            TypeAliasType::PEP695(type_alias) => Some(type_alias),
+            _ => None,
         }
     }
 }

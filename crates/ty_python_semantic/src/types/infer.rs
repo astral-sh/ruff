@@ -1037,10 +1037,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.infer_class_type_params(class.node(self.module()));
             }
             NodeWithScopeKind::FunctionTypeParameters(function) => {
+                dbg!("START INFERRING FUNCTION TYPE PARAMS");
                 self.infer_function_type_params(function.node(self.module()));
+                dbg!("DONE INFERRING FUNCTION TYPE PARAMS");
             }
             NodeWithScopeKind::TypeAliasTypeParameters(type_alias) => {
+                dbg!("START INFERRING ALIAS TYPE PARAMS");
                 self.infer_type_alias_type_params(type_alias.node(self.module()));
+                dbg!("DONE INFERRING ALIAS TYPE PARAMS");
             }
             NodeWithScopeKind::TypeAlias(type_alias) => {
                 self.infer_type_alias(type_alias.node(self.module()));
@@ -1677,7 +1681,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn infer_region_definition(&mut self, definition: Definition<'db>) {
-        match definition.kind(self.db()) {
+        match dbg!(&definition.kind(self.db())) {
             DefinitionKind::Function(function) => {
                 self.infer_function_definition(function.node(self.module()), definition);
             }
@@ -3173,6 +3177,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.db(),
                 &type_alias.name.as_name_expr().unwrap().id,
                 rhs_scope,
+                None,
             )),
         ));
 
@@ -5579,6 +5584,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn infer_expression_impl(&mut self, expression: &ast::Expr) -> Type<'db> {
+        dbg!(&expression);
         let ty = match expression {
             ast::Expr::NoneLiteral(ast::ExprNoneLiteral {
                 range: _,
@@ -8662,6 +8668,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             slice,
             ctx,
         } = subscript;
+        dbg!(&value);
         let value_ty = self.infer_expression(value);
         let mut constraint_keys = vec![];
 
@@ -8699,16 +8706,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return tuple_generic_alias(self.db(), self.infer_tuple_type_expression(slice));
             }
             if let Some(generic_context) = class.generic_context(self.db()) {
-                return self.infer_explicit_class_specialization(
+                return dbg!(self.infer_explicit_class_specialization(
                     subscript,
                     value_ty,
                     class,
                     generic_context,
-                );
+                ));
             }
         }
         if let Type::SpecialForm(SpecialFormType::Tuple) = value_ty {
             return tuple_generic_alias(self.db(), self.infer_tuple_type_expression(slice));
+        }
+        if let Type::TypeAlias(TypeAliasType::PEP695(type_alias)) = value_ty {
+            if let Some(generic_context) = dbg!(type_alias.generic_context(self.db())) {
+                return dbg!(self.infer_explicit_type_alias_specialization(
+                    subscript,
+                    value_ty,
+                    type_alias,
+                    generic_context,
+                ));
+            }
         }
 
         let slice_ty = self.infer_expression(slice);
@@ -8723,6 +8740,71 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         generic_class: ClassLiteral<'db>,
         generic_context: GenericContext<'db>,
     ) -> Type<'db> {
+        dbg!(&subscript);
+
+        let db = self.db();
+        let specialize = |types: &[Option<Type<'db>>]| {
+            dbg!(types);
+
+            Type::from(generic_class.apply_specialization(db, |_| {
+                generic_context.specialize_partial(db, types.iter().copied())
+            }))
+        };
+
+        return self.infer_explicit_callable_specialization(
+            subscript,
+            value_ty,
+            generic_context,
+            specialize,
+        );
+    }
+
+    fn infer_explicit_type_alias_specialization(
+        &mut self,
+        subscript: &ast::ExprSubscript,
+        value_ty: Type<'db>,
+        generic_type_alias: PEP695TypeAliasType<'db>,
+        generic_context: GenericContext<'db>,
+    ) -> Type<'db> {
+        let db = self.db();
+        let specialize = |types: &[Option<Type<'db>>]| {
+            dbg!(types);
+
+            Type::TypeAlias(generic_type_alias.apply_specialization(db, |_| {
+                generic_context.specialize_partial(db, types.iter().copied())
+            }))
+        };
+
+        return self.infer_explicit_callable_specialization(
+            subscript,
+            value_ty,
+            generic_context,
+            specialize,
+        );
+    }
+
+    fn infer_explicit_callable_specialization(
+        &mut self,
+        subscript: &ast::ExprSubscript,
+        value_ty: Type<'db>,
+        generic_context: GenericContext<'db>,
+        specialize: impl FnOnce(&[Option<Type<'db>>]) -> Type<'db>,
+    ) -> Type<'db> {
+        // We could have
+        // ```
+        // type L[T, U = T] = list[T, U, str]
+        // ```
+        //
+        // Now, we have a use of `L[A, B]`, we don't want to apply the specialization
+        // `[A, B]` to `list`, we want to apply the specialization `[A, B]` to `L`, i.e.
+        // to the expression `list[T, U, str]`.
+        //
+        // This should be the same as:
+        // ```
+        // class X[T, U = T]:
+        //  x: list[T, U, str]
+        // ```
+        // generic_type_alias.value_type(db)
         let slice_node = subscript.slice.as_ref();
         let call_argument_types = match slice_node {
             ast::Expr::Tuple(tuple) => {
@@ -8737,6 +8819,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             _ => CallArguments::positional([self.infer_type_expression(slice_node)]),
         };
+        dbg!(&call_argument_types);
         let binding = Binding::single(value_ty, generic_context.signature(self.db()));
         let bindings = match Bindings::from(binding)
             .match_parameters(&call_argument_types)
@@ -8756,10 +8839,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .matching_overloads()
             .next()
             .expect("valid bindings should have matching overload");
-        Type::from(generic_class.apply_specialization(self.db(), |_| {
-            generic_context
-                .specialize_partial(self.db(), overload.parameter_types().iter().copied())
-        }))
+
+        specialize(overload.parameter_types())
     }
 
     fn infer_subscript_expression_types(
@@ -9730,18 +9811,24 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Infer the type of a type expression without storing the result.
     fn infer_type_expression_no_store(&mut self, expression: &ast::Expr) -> Type<'db> {
         // https://typing.python.org/en/latest/spec/annotations.html#grammar-token-expression-grammar-type_expression
-        match expression {
+        match dbg!(expression) {
             ast::Expr::Name(name) => match name.ctx {
-                ast::ExprContext::Load => self
-                    .infer_name_expression(name)
-                    .in_type_expression(self.db(), self.scope(), self.typevar_binding_context)
+                ast::ExprContext::Load => {
+                    tracing::error!("{name:?}");
+
+                    dbg!(dbg!(self.infer_name_expression(name)).in_type_expression(
+                        self.db(),
+                        self.scope(),
+                        dbg!(self.typevar_binding_context)
+                    ))
                     .unwrap_or_else(|error| {
                         error.into_fallback_type(
                             &self.context,
                             expression,
                             self.is_reachable(expression),
                         )
-                    }),
+                    })
+                }
                 ast::ExprContext::Invalid => Type::unknown(),
                 ast::ExprContext::Store | ast::ExprContext::Del => {
                     todo_type!("Name expression annotation in Store/Del context")
@@ -9749,16 +9836,20 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             },
 
             ast::Expr::Attribute(attribute_expression) => match attribute_expression.ctx {
-                ast::ExprContext::Load => self
-                    .infer_attribute_expression(attribute_expression)
-                    .in_type_expression(self.db(), self.scope(), self.typevar_binding_context)
-                    .unwrap_or_else(|error| {
+                ast::ExprContext::Load => {
+                    let x = self.infer_attribute_expression(attribute_expression);
+                    tracing::error!("{x:?}");
+                    let y =
+                        x.in_type_expression(self.db(), self.scope(), self.typevar_binding_context);
+                    println!("{y:?}");
+                    y.unwrap_or_else(|error| {
                         error.into_fallback_type(
                             &self.context,
                             expression,
                             self.is_reachable(expression),
                         )
-                    }),
+                    })
+                }
                 ast::ExprContext::Invalid => Type::unknown(),
                 ast::ExprContext::Store | ast::ExprContext::Del => {
                     todo_type!("Attribute expression annotation in Store/Del context")
@@ -10422,9 +10513,37 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     self.infer_type_expression(&subscript.slice);
                     todo_type!("TypeVar annotations")
                 }
+                KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(type_alias)) => {
+                    match dbg!(type_alias.generic_context(self.db())) {
+                        Some(generic_context) => {
+                            let specialized_type_alias =
+                                dbg!(self.infer_explicit_type_alias_specialization(
+                                    subscript,
+                                    value_ty,
+                                    type_alias,
+                                    generic_context,
+                                ));
+
+                            dbg!(specialized_type_alias.in_type_expression(
+                                self.db(),
+                                self.scope(),
+                                self.typevar_binding_context,
+                            ))
+                            .unwrap_or(Type::unknown())
+                        }
+                        None => {
+                            // TODO: Once we know that e.g. `list` is generic, emit a diagnostic if you try to
+                            // specialize a non-generic class.
+                            self.infer_type_expression(slice);
+                            todo_type!("specialized non-generic type alias")
+                        }
+                    }
+                }
                 KnownInstanceType::TypeAliasType(_) => {
-                    self.infer_type_expression(&subscript.slice);
-                    todo_type!("Generic PEP-695 type alias")
+                    // TODO: Once we know that e.g. `list` is generic, emit a diagnostic if you try to
+                    // specialize a non-generic class.
+                    self.infer_type_expression(slice);
+                    todo_type!("specialized non-generic type alias")
                 }
             },
             Type::Dynamic(DynamicType::Todo(_)) => {
@@ -10434,19 +10553,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             Type::ClassLiteral(class) => {
                 match class.generic_context(self.db()) {
                     Some(generic_context) => {
-                        let specialized_class = self.infer_explicit_class_specialization(
-                            subscript,
-                            value_ty,
-                            class,
-                            generic_context,
-                        );
-                        specialized_class
-                            .in_type_expression(
-                                self.db(),
-                                self.scope(),
-                                self.typevar_binding_context,
-                            )
-                            .unwrap_or(Type::unknown())
+self.infer_explicit_class_specialization(
+    subscript,
+    value_ty,
+    class,
+    generic_context,
+)
+.in_type_expression(self.db(), self.scope(), self.typevar_binding_context)
+.unwrap_or(Type::unknown());
                     }
                     None => {
                         // TODO: Once we know that e.g. `list` is generic, emit a diagnostic if you try to
