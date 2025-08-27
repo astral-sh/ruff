@@ -660,20 +660,6 @@ impl<'db> ConstraintBound<'db> {
         matches!(self, ConstraintBound::Open(_))
     }
 
-    /// A lower bound is assignable to an upper bound if the underlying types are assignable; and
-    /// if both bounds are open, if the types are not equivalent.
-    fn is_assignable_to(self, db: &'db dyn Db, other: Self) -> bool {
-        let self_type = self.bound_type();
-        let other_type = other.bound_type();
-        if !self_type.is_assignable_to(db, other_type) {
-            return false;
-        }
-        if self.is_open() && other.is_open() {
-            return !self_type.is_equivalent_to(db, other_type);
-        }
-        true
-    }
-
     /// Returns the minimum of two upper bounds.
     ///
     /// We use intersection to combine the types of the bounds (mnemonic: minimum and intersection
@@ -732,7 +718,7 @@ impl<'db> ConstraintBound<'db> {
             (ConstraintBound::Closed(other_bound), ConstraintBound::Open(open_bound))
             | (ConstraintBound::Open(open_bound), ConstraintBound::Closed(other_bound))
                 if open_bound.is_equivalent_to(db, result_bound)
-                    && other_bound.is_assignable_to(db, open_bound)
+                    && other_bound.is_subtype_of(db, open_bound)
                     && !other_bound.is_equivalent_to(db, open_bound) =>
             {
                 ConstraintBound::Open(result_bound)
@@ -779,7 +765,7 @@ impl<'db> ConstraintBound<'db> {
             (ConstraintBound::Closed(other_bound), ConstraintBound::Open(open_bound))
             | (ConstraintBound::Open(open_bound), ConstraintBound::Closed(other_bound))
                 if open_bound.is_equivalent_to(db, result_bound)
-                    && open_bound.is_assignable_to(db, other_bound)
+                    && open_bound.is_subtype_of(db, other_bound)
                     && !open_bound.is_equivalent_to(db, other_bound) =>
             {
                 ConstraintBound::Open(result_bound)
@@ -822,7 +808,7 @@ impl<'db> AtomicConstraint<'db> {
     ) -> Satisfiable<Self> {
         let lower_type = lower.bound_type();
         let upper_type = upper.bound_type();
-        if !lower_type.is_assignable_to(db, upper_type) {
+        if !lower_type.is_subtype_of(db, upper_type) {
             return Satisfiable::Never;
         }
         if (lower.is_open() || upper.is_open()) && lower_type.is_equivalent_to(db, upper_type) {
@@ -899,9 +885,18 @@ impl<'db> AtomicConstraint<'db> {
         //   other:           s₂┠─┨t₂
         //
         //   result:  s₁┠─┨t₁ s₂┠─┨t₂
-        if !self.lower.is_assignable_to(db, other.upper)
-            || !other.lower.is_assignable_to(db, self.upper)
-        {
+        let is_subtype_of = |left: ConstraintBound<'db>, right: ConstraintBound<'db>| {
+            let left_type = left.bound_type();
+            let right_type = right.bound_type();
+            if !left_type.is_subtype_of(db, right_type) {
+                return false;
+            }
+            if left.is_open() && right.is_open() {
+                return !left_type.is_equivalent_to(db, right_type);
+            }
+            true
+        };
+        if !is_subtype_of(self.lower, other.upper) || !is_subtype_of(other.lower, self.upper) {
             return Simplified::Two(self, other);
         }
 
