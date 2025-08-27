@@ -523,18 +523,48 @@ impl<'config> WalkPythonFilesState<'config> {
         let (files, error) = self.merged.into_inner().unwrap();
         error?;
 
-        // Deduplicate files by path to avoid processing the same file multiple times
-        // This can happen when both a directory and specific files within that directory are provided
-        let deduplicated_files: Vec<Result<ResolvedFile, ignore::Error>> = files
-            .into_iter()
-            .unique_by(|result| match result {
-                Ok(resolved_file) => Some(resolved_file.path().to_path_buf()),
-                Err(_) => None,
-            })
-            .collect();
+        let deduplicated_files = deduplicate_files(files);
 
         Ok((deduplicated_files, self.resolver.into_inner().unwrap()))
     }
+}
+
+/// Deduplicate files by path, prioritizing Root files over Nested files.
+///
+/// This ensures that when the same file is found both as a directly specified
+/// input (Root) and discovered through directory traversal (Nested), the Root
+/// version takes precedence. This behavior is important for explicit exclusion
+/// handling, where explicitly passed files should override directory-based
+/// discovery rules.
+fn deduplicate_files(files: ResolvedFiles) -> ResolvedFiles {
+    let mut seen_paths = FxHashSet::default();
+    let mut deduplicated_files = Vec::new();
+
+    for file_result in &files {
+        if let Ok(resolved_file) = file_result {
+            if resolved_file.is_root() {
+                let path = resolved_file.path().to_path_buf();
+                if seen_paths.insert(path) {
+                    deduplicated_files.push(file_result.clone());
+                }
+            }
+        }
+    }
+
+    for file_result in &files {
+        match file_result {
+            Ok(resolved_file) if !resolved_file.is_root() => {
+                let path = resolved_file.path().to_path_buf();
+                if seen_paths.insert(path) {
+                    deduplicated_files.push(file_result.clone());
+                }
+            }
+            Err(_) => deduplicated_files.push(file_result.clone()),
+            _ => {}
+        }
+    }
+
+    deduplicated_files
 }
 
 struct PythonFilesVisitorBuilder<'s, 'config> {
