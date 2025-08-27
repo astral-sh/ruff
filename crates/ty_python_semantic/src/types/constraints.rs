@@ -233,6 +233,8 @@ impl<'db> ConstraintSet<'db> {
         lower: Type<'db>,
         upper: Type<'db>,
     ) -> Self {
+        let lower = lower.bottom_materialization(db);
+        let upper = upper.top_materialization(db);
         match Constraint::range(db, lower, upper) {
             Satisfiable::Never => Self::never(),
             Satisfiable::Always => Self::always(),
