@@ -1,5 +1,6 @@
 use ruff_diagnostics::{Applicability, Edit};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::helpers::Truthiness;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
@@ -102,7 +103,13 @@ pub(crate) fn unnecessary_literal_within_deque_call(checker: &Checker, deque: &a
         }
         Expr::StringLiteral(string) => string.value.is_empty(),
         Expr::BytesLiteral(bytes) => bytes.value.is_empty(),
-        Expr::FString(fstring) => fstring.value.is_empty_literal(),
+        Expr::FString(_) => {
+            Truthiness::from_expr(iterable.value(), |id| {
+                checker.semantic().has_builtin_binding(id)
+            })
+            .into_bool()
+                == Some(false)
+        }
         Expr::TString(tstring) => tstring.value.is_empty_iterable(),
         _ => false,
     };
