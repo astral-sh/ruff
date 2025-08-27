@@ -412,12 +412,9 @@ impl<'db> Constraints<'db> for ConstraintSet<'db> {
         lower: Type<'db>,
         upper: Type<'db>,
     ) -> Self {
-        match AtomicConstraint::new(
-            db,
-            typevar,
-            ConstraintBound::Closed(lower),
-            ConstraintBound::Closed(upper),
-        ) {
+        let lower_bound = ConstraintBound::Closed(lower.bottom_materialization(db));
+        let upper_bound = ConstraintBound::Closed(upper.top_materialization(db));
+        match AtomicConstraint::new(db, typevar, lower_bound, upper_bound) {
             Satisfiable::Never => Self::never(),
             Satisfiable::Always => Self::always(),
             Satisfiable::Constrained(constraint) => {
