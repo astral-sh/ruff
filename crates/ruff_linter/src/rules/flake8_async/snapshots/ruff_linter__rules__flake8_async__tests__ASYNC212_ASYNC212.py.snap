@@ -2,11 +2,139 @@
 source: crates/ruff_linter/src/rules/flake8_async/mod.rs
 ---
 ASYNC212 Async functions should not use blocking httpx clients
-  --> ASYNC212.py:24:14
+  --> ASYNC212.py:27:5
    |
-23 | async def foo():
-24 |     client = httpx.Client()
-   |              ^^^^^^^^^^^^
-25 |     client.close()  # ASYNC212
-26 |     client.delete()  # ASYNC212
+25 | async def foo():
+26 |     client = httpx.Client()
+27 |     client.close()  # ASYNC212
+   |     ^^^^^^^^^^^^
+28 |     client.delete()  # ASYNC212
+29 |     client.get()  # ASYNC212
+   |
+
+ASYNC212 Async functions should not use blocking httpx clients
+  --> ASYNC212.py:28:5
+   |
+26 |     client = httpx.Client()
+27 |     client.close()  # ASYNC212
+28 |     client.delete()  # ASYNC212
+   |     ^^^^^^^^^^^^^
+29 |     client.get()  # ASYNC212
+30 |     client.head()  # ASYNC212
+   |
+
+ASYNC212 Async functions should not use blocking httpx clients
+  --> ASYNC212.py:29:5
+   |
+27 |     client.close()  # ASYNC212
+28 |     client.delete()  # ASYNC212
+29 |     client.get()  # ASYNC212
+   |     ^^^^^^^^^^
+30 |     client.head()  # ASYNC212
+31 |     client.options()  # ASYNC212
+   |
+
+ASYNC212 Async functions should not use blocking httpx clients
+  --> ASYNC212.py:30:5
+   |
+28 |     client.delete()  # ASYNC212
+29 |     client.get()  # ASYNC212
+30 |     client.head()  # ASYNC212
+   |     ^^^^^^^^^^^
+31 |     client.options()  # ASYNC212
+32 |     client.patch()  # ASYNC212
+   |
+
+ASYNC212 Async functions should not use blocking httpx clients
+  --> ASYNC212.py:31:5
+   |
+29 |     client.get()  # ASYNC212
+30 |     client.head()  # ASYNC212
+31 |     client.options()  # ASYNC212
+   |     ^^^^^^^^^^^^^^
+32 |     client.patch()  # ASYNC212
+33 |     client.post()  # ASYNC212
+   |
+
+ASYNC212 Async functions should not use blocking httpx clients
+  --> ASYNC212.py:32:5
+   |
+30 |     client.head()  # ASYNC212
+31 |     client.options()  # ASYNC212
+32 |     client.patch()  # ASYNC212
+   |     ^^^^^^^^^^^^
+33 |     client.post()  # ASYNC212
+34 |     client.put()  # ASYNC212
+   |
+
+ASYNC212 Async functions should not use blocking httpx clients
+  --> ASYNC212.py:33:5
+   |
+31 |     client.options()  # ASYNC212
+32 |     client.patch()  # ASYNC212
+33 |     client.post()  # ASYNC212
+   |     ^^^^^^^^^^^
+34 |     client.put()  # ASYNC212
+35 |     client.request()  # ASYNC212
+   |
+
+ASYNC212 Async functions should not use blocking httpx clients
+  --> ASYNC212.py:34:5
+   |
+32 |     client.patch()  # ASYNC212
+33 |     client.post()  # ASYNC212
+34 |     client.put()  # ASYNC212
+   |     ^^^^^^^^^^
+35 |     client.request()  # ASYNC212
+36 |     client.send()  # ASYNC212
+   |
+
+ASYNC212 Async functions should not use blocking httpx clients
+  --> ASYNC212.py:35:5
+   |
+33 |     client.post()  # ASYNC212
+34 |     client.put()  # ASYNC212
+35 |     client.request()  # ASYNC212
+   |     ^^^^^^^^^^^^^^
+36 |     client.send()  # ASYNC212
+37 |     client.stream()  # ASYNC212
+   |
+
+ASYNC212 Async functions should not use blocking httpx clients
+  --> ASYNC212.py:36:5
+   |
+34 |     client.put()  # ASYNC212
+35 |     client.request()  # ASYNC212
+36 |     client.send()  # ASYNC212
+   |     ^^^^^^^^^^^
+37 |     client.stream()  # ASYNC212
+   |
+
+ASYNC212 Async functions should not use blocking httpx clients
+  --> ASYNC212.py:37:5
+   |
+35 |     client.request()  # ASYNC212
+36 |     client.send()  # ASYNC212
+37 |     client.stream()  # ASYNC212
+   |     ^^^^^^^^^^^^^
+38 |
+39 |     client.anything()  # Ok
+   |
+
+ASYNC212 Async functions should not use blocking httpx clients
+  --> ASYNC212.py:50:5
+   |
+49 | async def foo(client: httpx.Client | None):
+50 |     client.request()  # ASYNC212
+   |     ^^^^^^^^^^^^^^
+51 |     client.anything()  # Ok
+   |
+
+ASYNC212 Async functions should not use blocking httpx clients
+  --> ASYNC212.py:55:5
+   |
+54 | async def foo(client: Optional[httpx.Client]):
+55 |     client.request()  # ASYNC212
+   |     ^^^^^^^^^^^^^^
+56 |     client.anything()  # Ok
    |

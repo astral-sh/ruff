@@ -1,7 +1,7 @@
-use ruff_python_ast::ExprCall;
+use ruff_python_ast::{self as ast, Expr, ExprCall};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::name::QualifiedName;
+use ruff_python_semantic::analyze::typing::{TypeChecker, check_type, traverse_union_and_optional};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -46,20 +46,75 @@ impl Violation for BlockingHttpCallHttpxInAsyncFunction {
     }
 }
 
-fn is_blocking_httpx_client(qualified_name: &QualifiedName) -> bool {
-    matches!(qualified_name.segments(), ["httpx", "Client",])
+struct HttpxClientChecker;
+
+impl TypeChecker for HttpxClientChecker {
+    fn match_annotation(
+        annotation: &ruff_python_ast::Expr,
+        semantic: &ruff_python_semantic::SemanticModel,
+    ) -> bool {
+        let mut found = false;
+        traverse_union_and_optional(
+            &mut |inner_expr, _| {
+                if semantic
+                    .resolve_qualified_name(inner_expr)
+                    .is_some_and(|qualified_name| {
+                        matches!(qualified_name.segments(), ["httpx", "Client"])
+                    })
+                {
+                    found = true;
+                }
+            },
+            semantic,
+            annotation,
+        );
+        found
+    }
+
+    fn match_initializer(
+        initializer: &ruff_python_ast::Expr,
+        semantic: &ruff_python_semantic::SemanticModel,
+    ) -> bool {
+        let Expr::Call(ExprCall { func, .. }) = initializer else {
+            return false;
+        };
+
+        semantic
+            .resolve_qualified_name(func)
+            .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["httpx", "Client"]))
+    }
 }
 
 /// ASYNC212
 pub(crate) fn blocking_http_call_httpx(checker: &Checker, call: &ExprCall) {
-    if checker.semantic().in_async_context() {
-        if checker
-            .semantic()
-            .resolve_qualified_name(call.func.as_ref())
-            .as_ref()
-            .is_some_and(is_blocking_httpx_client)
-        {
-            checker.report_diagnostic(BlockingHttpCallHttpxInAsyncFunction, call.func.range());
+    let semantic = checker.semantic();
+    if semantic.in_async_context() {
+        if let Some(ast::ExprAttribute { value, attr, .. }) = call.func.as_attribute_expr() {
+            if let Some(name) = value.as_name_expr() {
+                if let Some(binding) = semantic.only_binding(name).map(|id| semantic.binding(id)) {
+                    if check_type::<HttpxClientChecker>(binding, semantic) {
+                        if matches!(
+                            attr.id.as_str(),
+                            "close"
+                                | "delete"
+                                | "get"
+                                | "head"
+                                | "options"
+                                | "patch"
+                                | "post"
+                                | "put"
+                                | "request"
+                                | "send"
+                                | "stream"
+                        ) {
+                            checker.report_diagnostic(
+                                BlockingHttpCallHttpxInAsyncFunction,
+                                call.func.range(),
+                            );
+                        }
+                    }
+                }
+            }
         }
     }
 }
