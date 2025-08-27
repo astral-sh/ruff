@@ -4,8 +4,8 @@ use std::{
     path::Path,
 };
 
+use ruff_source_file::LineColumn;
 use serde::{Serialize, Serializer, ser::SerializeSeq};
-use serde_json::json;
 
 use crate::diagnostic::Diagnostic;
 
@@ -98,21 +98,21 @@ impl Serialize for SerializedMessages<'_> {
                 let description = diagnostic.body();
                 let check_name = diagnostic.secondary_code_or_id();
 
-                let value = json!({
-                    "check_name": check_name,
+                let value = Message {
+                    check_name,
                     // GitLab doesn't display the separate `check_name` field in a Code Quality report,
                     // so prepend it to the description too.
-                    "description": format!("{check_name}: {description}"),
-                    "severity": "major",
-                    "fingerprint": format!("{:x}", message_fingerprint),
-                    "location": {
-                        "path": path,
-                        "positions": {
-                            "begin": start_location,
-                            "end": end_location,
+                    description: format!("{check_name}: {description}"),
+                    severity: "major",
+                    fingerprint: format!("{:x}", message_fingerprint),
+                    location: Location {
+                        path,
+                        positions: Position {
+                            begin: start_location,
+                            end: end_location,
                         },
                     },
-                });
+                };
 
                 s.serialize_element(&value)?;
             }
@@ -120,6 +120,27 @@ impl Serialize for SerializedMessages<'_> {
 
         s.end()
     }
+}
+
+#[derive(Serialize)]
+struct Message<'a> {
+    check_name: &'a str,
+    description: String,
+    severity: &'static str,
+    fingerprint: String,
+    location: Location,
+}
+
+#[derive(Serialize)]
+struct Location {
+    path: String,
+    positions: Position,
+}
+
+#[derive(Serialize)]
+struct Position {
+    begin: LineColumn,
+    end: LineColumn,
 }
 
 /// Generate a unique fingerprint to identify a violation.
