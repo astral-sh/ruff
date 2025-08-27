@@ -29,8 +29,8 @@ impl GitlabRenderer<'_> {
     ) -> std::fmt::Result {
         write!(
             f,
-            "{:#}",
-            serde_json::json!(SerializedMessages {
+            "{}",
+            serde_json::to_string_pretty(&SerializedMessages {
                 diagnostics,
                 resolver: self.resolver,
                 #[expect(
@@ -41,6 +41,7 @@ impl GitlabRenderer<'_> {
                 )]
                 project_dir: std::env::var("CI_PROJECT_DIR").ok().as_deref(),
             })
+            .unwrap()
         )
     }
 }

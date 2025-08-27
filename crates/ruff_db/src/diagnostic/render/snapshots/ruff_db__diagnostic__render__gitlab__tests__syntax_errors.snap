@@ -6,39 +6,39 @@ expression: env.render_diagnostics(&diagnostics)
   {
     "check_name": "invalid-syntax",
     "description": "invalid-syntax: Expected one or more symbol names after import",
+    "severity": "major",
     "fingerprint": "<redacted>",
     "location": {
       "path": "syntax_errors.py",
       "positions": {
         "begin": {
-          "column": 15,
-          "line": 1
+          "line": 1,
+          "column": 15
         },
         "end": {
-          "column": 1,
-          "line": 2
+          "line": 2,
+          "column": 1
         }
       }
-    },
-    "severity": "major"
+    }
   },
   {
     "check_name": "invalid-syntax",
     "description": "invalid-syntax: Expected ')', found newline",
+    "severity": "major",
     "fingerprint": "<redacted>",
     "location": {
       "path": "syntax_errors.py",
       "positions": {
         "begin": {
-          "column": 12,
-          "line": 3
+          "line": 3,
+          "column": 12
         },
         "end": {
-          "column": 1,
-          "line": 4
+          "line": 4,
+          "column": 1
         }
       }
-    },
-    "severity": "major"
+    }
   }
 ]
