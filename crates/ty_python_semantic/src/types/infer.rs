@@ -330,34 +330,21 @@ fn single_expression_cycle_initial<'db>(
     Type::Never
 }
 
-/// I tried several attempts of this function:
-/// 1. `infer_expression` similar to `infer_expression_type`. It calls `infer_expression_types`
-///    internally and returns `ExpressionInference`. The problem I faced was that the return type of
-///    this function could not be &`ExpressionInference` because `infer_expression_types` itself is
-///    returning &`ExpressionInference`.
-/// 2. `infer_expression_and_binding`: return both type and `definitely_bound`. In order to overcome
-///    the problem that I cannot have two `salsa::tracked` functions calling each other and both
-///    returning &`ExpressionInference`. It did not help with the cycle because before we get the
-///    type we need to abort if it's not `definitely_bound`.
-/// 3. `infer_expression_if_definitely_bound`: returns `Type::Unknown` if the expression is not `definitely_bound`.
-///    it worked but it did not reduce the number of cycles as much as other way.
-///    This works for the `analyze_cycles_gridout` test case but causes panic for others
-#[salsa::tracked(cycle_fn=single_expression_cycle_recover, cycle_initial=single_expression_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
-pub(crate) fn infer_expression_if_definitely_bound<'db>(
+pub(crate) fn static_expression_truthiness<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
-) -> Type<'db> {
+) -> Truthiness {
     let inference = infer_expression_types(db, expression);
+
+    if !inference.all_places_definitely_bound() {
+        return Truthiness::Ambiguous;
+    }
+
     let file = expression.file(db);
     let module = parsed_module(db, file).load(db);
     let node = expression.node_ref(db, &module);
-    let b = inference.definitely_bound();
 
-    if b {
-        inference.expression_type(node)
-    } else {
-        Type::unknown()
-    }
+    inference.expression_type(node).bool(db)
 }
 
 /// Infer the types for an [`Unpack`] operation.
@@ -681,7 +668,7 @@ struct ExpressionInferenceExtra<'db> {
     /// Falls back to `Type::Never` if an expression is missing.
     cycle_fallback: bool,
 
-    /// `true` if all expressions in this expression are definitely bound
+    /// `true` if all places in this expression are definitely bound
     all_definitely_bound: bool,
 }
 
@@ -726,11 +713,12 @@ impl<'db> ExpressionInference<'db> {
         self.is_cycle_callback().then_some(Type::Never)
     }
 
-    pub(crate) fn definitely_bound(&self) -> bool {
-        match self.extra.as_ref() {
-            Some(e) => e.all_definitely_bound,
-            None => true,
-        }
+    /// Returns true if all places in this expression are definitely bound.
+    pub(crate) fn all_places_definitely_bound(&self) -> bool {
+        self.extra
+            .as_ref()
+            .map(|e| e.all_definitely_bound)
+            .unwrap_or(true)
     }
 }
 
