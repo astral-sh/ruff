@@ -2,6 +2,7 @@ use std::collections::HashSet;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::io::Write;
+use std::path::Path;
 
 use serde::ser::SerializeSeq;
 use serde::{Serialize, Serializer};
@@ -9,7 +10,7 @@ use serde_json::json;
 
 use ruff_db::diagnostic::Diagnostic;
 
-use crate::fs::{relativize_path, relativize_path_to};
+use crate::fs::relativize_path;
 use crate::message::{Emitter, EmitterContext};
 
 /// Generate JSON with violations in GitLab CI format
@@ -123,6 +124,16 @@ fn fingerprint(message: &Diagnostic, project_path: &str, salt: u64) -> u64 {
     project_path.hash(&mut hasher);
 
     hasher.finish()
+}
+
+/// Convert an absolute path to be relative to the specified project root.
+fn relativize_path_to<P: AsRef<Path>, R: AsRef<Path>>(path: P, project_root: R) -> String {
+    format!(
+        "{}",
+        pathdiff::diff_paths(&path, project_root)
+            .expect("Could not diff paths")
+            .display()
+    )
 }
 
 #[cfg(test)]
