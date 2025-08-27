@@ -477,7 +477,7 @@ PTH119 [*] `os.path.basename()` should be replaced by `Path.name`
    |
 help: Replace with `Path(...).name`
 
-ℹ Safe fix
+ℹ Unsafe fix
 1  1  | import os as foo
 2  2  | import os.path as foo_p
    3  |+import pathlib
@@ -506,7 +506,7 @@ PTH120 [*] `os.path.dirname()` should be replaced by `Path.parent`
    |
 help: Replace with `Path(...).parent`
 
-ℹ Safe fix
+ℹ Unsafe fix
 1  1  | import os as foo
 2  2  | import os.path as foo_p
    3  |+import pathlib
