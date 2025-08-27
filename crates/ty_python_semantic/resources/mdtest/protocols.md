@@ -1121,6 +1121,17 @@ from typing import TypeVar
 
 S = TypeVar("S")
 
+class NonGenericProto1(Protocol):
+    x: int
+    y: str
+
+class NonGenericProto2(Protocol):
+    y: str
+    x: int
+
+class Nominal1: ...
+class Nominal2: ...
+
 class GenericProto[T](Protocol):
     x: T
 
@@ -1128,6 +1139,13 @@ class LegacyGenericProto(Protocol[S]):
     x: S
 
 static_assert(is_equivalent_to(GenericProto[int], LegacyGenericProto[int]))
+static_assert(is_equivalent_to(GenericProto[NonGenericProto1], LegacyGenericProto[NonGenericProto2]))
+
+static_assert(
+    is_equivalent_to(
+        GenericProto[NonGenericProto1 | Nominal1 | Nominal2], LegacyGenericProto[Nominal2 | Nominal1 | NonGenericProto2]
+    )
+)
 
 static_assert(not is_equivalent_to(GenericProto[str], GenericProto[int]))
 static_assert(not is_equivalent_to(GenericProto[str], LegacyGenericProto[int]))

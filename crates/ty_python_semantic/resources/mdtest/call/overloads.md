@@ -1073,6 +1073,11 @@ def f(a: Foo, b: list[str], c: list[LiteralString], e):
     # since both overloads match and they have return types that are not equivalent,
     # step (5) of the overload evaluation algorithm says we must evaluate the result of the
     # call as `Unknown`.
+    #
+    # Note: although the spec does not state as such (since intersections in general are not
+    # specified currently), `(str | LiteralString) & Unknown` might also be a reasonable type
+    # here (the union of all overload returns, intersected with `Unknown`) -- here that would
+    # simplify to `str & Unknown`.
     reveal_type(a.join(e))  # revealed: Unknown
 ```
 
