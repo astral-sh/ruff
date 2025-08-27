@@ -348,6 +348,8 @@ impl<'db> ConstraintClause<'db> {
         db: &'db dyn Db,
         constraint: AtomicConstraint<'db>,
     ) -> Simplified<Self> {
+        // If the clause does not already contain a constraint for this typevar, we just insert the
+        // new constraint into the clause and return.
         let index = match (self.constraints)
             .binary_search_by_key(&constraint.typevar, |existing| existing.typevar)
         {
@@ -358,13 +360,17 @@ impl<'db> ConstraintClause<'db> {
             }
         };
 
+        // If the clause already contains a constraint for this typevar, we need to intersect the
+        // existing and new constraints, and simplify the clause accordingly.
         match self.constraints[index].intersect(db, constraint) {
+            // ... ∩ 0 ∩ ... == 0
             // If the intersected constraint cannot be satisfied, that causes this whole clause to
-            // be unsatisfiable too. (X ∩ 0 == 0)
+            // be unsatisfiable too.
             Simplified::Never => Simplified::Never,
 
+            // ... ∩ 1 ∩ ... == ...
             // If the intersected result is always satisfied, then the constraint no longer
-            // contributes anything to the clause, and can be removed. (X ∩ 1 == X)
+            // contributes anything to the clause, and can be removed.
             Simplified::Always => {
                 self.constraints.remove(index);
                 if self.constraints.is_empty() {
@@ -376,6 +382,7 @@ impl<'db> ConstraintClause<'db> {
                 }
             }
 
+            // ... ∩ X ∩ ... == ... ∩ X ∩ ...
             // If the intersection is a single constraint, we can reuse the existing constraint's
             // place in the clause's constraint list.
             Simplified::One(constraint) => {
@@ -383,9 +390,10 @@ impl<'db> ConstraintClause<'db> {
                 Simplified::One(self)
             }
 
+            // ... ∩ (X ∪ Y) ∩ ... == (... ∩ X ∩ ...) ∪ (... ∩ Y ∩ ...)
             // If the intersection is a union of two constraints, we can reuse the existing
             // constraint's place in the clause's constraint list for one of the union elements;
-            // and we must create a new clause to hold the second union eleme
+            // and we must create a new clause to hold the second union element.
             Simplified::Two(first, second) => {
                 let mut extra = self.clone();
                 self.constraints[index] = first;
