@@ -358,6 +358,10 @@ impl<'db> ConstraintClause<'db> {
         }
     }
 
+    fn is_always(&self) -> bool {
+        self.constraints.is_empty()
+    }
+
     /// Returns the intersection of this clause and an atomic constraint. Because atomic
     /// constraints can be negated, the intersection of the new and existing atomic constraints
     /// (for the same typevar) might be the union of two atomic constraints.
@@ -454,6 +458,9 @@ impl<'db> ConstraintClause<'db> {
 
     /// Returns the union of this clause and another.
     fn union_clause(self, db: &'db dyn Db, other: Self) -> Simplified<Self> {
+        if self.is_always() || other.is_always() {
+            return Simplified::One(Self::always());
+        }
         if self.subsumes_via_intersection(db, &other) {
             return Simplified::One(other);
         }
@@ -461,6 +468,9 @@ impl<'db> ConstraintClause<'db> {
             return Simplified::One(self);
         }
         if let Some(simplified) = self.simplifies_via_union(db, &other) {
+            if simplified.is_always() {
+                return Simplified::Always;
+            }
             return Simplified::One(simplified);
         }
         Simplified::Two(self, other)
