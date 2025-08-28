@@ -267,6 +267,7 @@ mod tests {
                     ]),
                     ..pylint::settings::Settings::default()
                 },
+                preview: PreviewMode::Enabled,
                 ..LinterSettings::for_rule(rule_code)
             },
         )?;
