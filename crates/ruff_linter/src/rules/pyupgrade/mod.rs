@@ -340,27 +340,21 @@ mod tests {
           | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
           |
         help: Import from `shlex`
-
-        ℹ Safe fix
-        1   |-from pipes import quote, Template
-          1 |+from pipes import Template
-          2 |+from shlex import quote
+          - from pipes import quote, Template
+        1 + from pipes import Template
+        2 + from shlex import quote
 
         I002 [*] Missing required import: `from __future__ import generator_stop`
         --> <filename>:1:1
         help: Insert required import: `from __future__ import generator_stop`
-
-        ℹ Safe fix
-          1 |+from __future__ import generator_stop
-        1 2 | from pipes import quote, Template
+        1 + from __future__ import generator_stop
+        2 | from pipes import quote, Template
 
         I002 [*] Missing required import: `from collections import Sequence`
         --> <filename>:1:1
         help: Insert required import: `from collections import Sequence`
-
-        ℹ Safe fix
-          1 |+from collections import Sequence
-        1 2 | from pipes import quote, Template
+        1 + from collections import Sequence
+        2 | from pipes import quote, Template
         ");
     }
 }

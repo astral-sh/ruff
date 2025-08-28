@@ -4,7 +4,8 @@ use crate::types::generics::Specialization;
 use crate::types::tuple::TupleType;
 use crate::types::{
     ApplyTypeMappingVisitor, ClassLiteral, ClassType, DynamicType, KnownClass, KnownInstanceType,
-    MroError, MroIterator, NormalizedVisitor, SpecialFormType, Type, TypeMapping, todo_type,
+    MaterializationKind, MroError, MroIterator, NormalizedVisitor, SpecialFormType, Type,
+    TypeMapping, todo_type,
 };
 
 /// Enumeration of the possible kinds of types we allow in class bases.
@@ -286,13 +287,27 @@ impl<'db> ClassBase<'db> {
         specialization: Option<Specialization<'db>>,
     ) -> Self {
         if let Some(specialization) = specialization {
-            self.apply_type_mapping_impl(
+            let new_self = self.apply_type_mapping_impl(
                 db,
                 &TypeMapping::Specialization(specialization),
                 &ApplyTypeMappingVisitor::default(),
-            )
+            );
+            match specialization.materialization_kind(db) {
+                None => new_self,
+                Some(materialization_kind) => new_self.materialize(db, materialization_kind),
+            }
         } else {
             self
+        }
+    }
+
+    fn materialize(self, db: &'db dyn Db, kind: MaterializationKind) -> Self {
+        match self {
+            ClassBase::Class(class) => Self::Class(class.materialize(db, kind)),
+            ClassBase::Dynamic(_)
+            | ClassBase::Generic
+            | ClassBase::Protocol
+            | ClassBase::TypedDict => self,
         }
     }
 

@@ -10,11 +10,9 @@ I001 [*] Import block is un-sorted or un-formatted
   | |__________________________________^
   |
 help: Organize imports
-
-ℹ Safe fix
-1   |-import sys
-2   |-import os
-3 1 | from __future__ import annotations
-  2 |+
-  3 |+import os
-  4 |+import sys
+  - import sys
+  - import os
+1 | from __future__ import annotations
+2 + 
+3 + import os
+4 + import sys
