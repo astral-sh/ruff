@@ -333,11 +333,13 @@ impl<'db> VarianceInferable<'db> for ProtocolInterface<'db> {
                 member
                     .instance_get_type(db)
                     .into_iter()
+                    .chain(member.meta_get_type())
                     .map(|get_type| get_type.variance_of(db, typevar))
                     .chain(
                         member
                             .instance_set_type()
                             .into_iter()
+                            .chain(member.meta_set_type())
                             .map(|set_type| set_type.variance_of(db, typevar).flip()),
                     )
             })
