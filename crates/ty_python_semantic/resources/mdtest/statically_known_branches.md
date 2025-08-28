@@ -1567,8 +1567,7 @@ from module import symbol
 ## Non-definitely bound symbols in conditions
 
 When a non-definitely bound symbol is used as a (part of a) condition, we always infer an ambiguous
-truthiness. If we wouldn't do that, `x` would be considered definitely bound in the following
-example:
+truthiness. If we didn't do that, `x` would be considered definitely bound in the following example:
 
 ```py
 def _(flag: bool):

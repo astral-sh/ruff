@@ -136,7 +136,7 @@ impl<'db> Place<'db> {
         }
     }
 
-    pub(crate) fn is_definitely_bound(&self) -> bool {
+    pub(crate) const fn is_definitely_bound(&self) -> bool {
         matches!(self, Place::Type(_, Boundness::Bound))
     }
 }

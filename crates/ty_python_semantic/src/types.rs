@@ -8624,7 +8624,7 @@ impl TypeRelation {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, get_size2::GetSize)]
 pub enum Truthiness {
     /// For an object `x`, `bool(x)` will always return `True`
     AlwaysTrue,
@@ -8633,8 +8633,6 @@ pub enum Truthiness {
     /// For an object `x`, `bool(x)` could return either `True` or `False`
     Ambiguous,
 }
-
-impl get_size2::GetSize for Truthiness {}
 
 impl Truthiness {
     pub(crate) const fn is_ambiguous(self) -> bool {

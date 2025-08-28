@@ -339,7 +339,7 @@ fn single_expression_cycle_initial<'db>(
 
 /// Returns the statically-known truthiness of a given expression.
 ///
-/// Returns `Truthiness::Ambiguous` in case any non-definitely bound places
+/// Returns [`Truthiness::Ambiguous`] in case any non-definitely bound places
 /// were encountered while inferring the type of the expression.
 #[salsa::tracked(cycle_fn=static_expression_truthiness_cycle_recover, cycle_initial=static_expression_truthiness_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
 pub(crate) fn static_expression_truthiness<'db>(
