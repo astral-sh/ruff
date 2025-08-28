@@ -35,6 +35,42 @@
 //! up a constraint set and then check whether it is ever or always satisfiable, as appropriate. We
 //! are not yet inferring specializations from those constraints, and we will likely remove the
 //! [`Constraints`] trait once everything has stabilized.
+//!
+//! ### Examples
+//!
+//! For instance, in the following Python code:
+//!
+//! ```py
+//! class A: ...
+//! class B(A): ...
+//!
+//! def _[T: B](t: T) -> None: ...
+//! def _[U: (int, str)](u: U) -> None: ...
+//! ```
+//!
+//! The typevar `T` has an upper bound of `B`, which would translate into the constraint
+//! `Never ≤ T ≤ B`. (Every type is a supertype of `Never`, so having `Never` as a closed lower
+//! bound means that there is effectively no lower bound. Similarly, a closed upper bound of
+//! `object` means that there is effectively no upper bound.) The `T ≤ B` part expresses that the
+//! type can specialize to any type that is a subtype of B. The bound is "closed", which means that
+//! this includes `B` itself.
+//!
+//! The typevar `U` is constrained to be either `int` or `str`, which would translate into the
+//! constraint `(int ≤ T ≤ int) ∪ (str ≤ T ≤ str)`. When the lower and upper bounds are the same
+//! (and both closed), the constraint says that the typevar must specialize to that _exact_ type,
+//! not to a subtype or supertype of it.
+//!
+//! Python does not give us an easy way to construct this, but we can also consider a typevar that
+//! can specialize to any type that `T` _cannot_ specialize to — that is, the negation of `T`'s
+//! constraint. Another way to write `Never ≤ V ≤ B` is `Never ≤ V ∩ V ≤ B`; if we negate that, we
+//! get `¬(Never ≤ V) ∪ ¬(V ≤ B)`, or `V < Never ∪ B < V`. Note that the bounds in this constraint
+//! are now open! `B < V` indicates that `V` can specialize to any type that is a supertype of `B`
+//! — but not to `B` itself. (For instance, it _can_ specialize to `A`.) `V < Never` is also open,
+//! and says that `V` can specialize to any type that is a subtype of `Never`, but not to `Never`
+//! itself. There aren't any types that satisfy that constraint (the type would have to somehow
+//! contain a negative number of values). You can think of a constraint that cannot be satisfied as
+//! an empty set (of types), which means we can simplify it out of the union. That gives us a final
+//! constraint of `B < V` for the negation of `T`'s constraint.
 
 use std::fmt::Display;
 
