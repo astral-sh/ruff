@@ -2309,6 +2309,20 @@ reveal_type(Toggle().x)  # revealed: Literal[True]
 reveal_type(Toggle().y)  # revealed:  Unknown | Literal[True]
 ```
 
+Make sure that the growing union of literals `Literal[0, 1, 2, ...]` collapses to `int` during
+fixpoint iteration. This is a regression test for <https://github.com/astral-sh/ty/issues/660>.
+
+```py
+class Counter:
+    def __init__(self: "Counter"):
+        self.count = 0
+
+    def increment(self: "Counter"):
+        self.count = self.count + 1
+
+reveal_type(Counter().count)  # revealed: Unknown | int
+```
+
 ### Builtin types attributes
 
 This test can probably be removed eventually, but we currently include it because we do not yet
