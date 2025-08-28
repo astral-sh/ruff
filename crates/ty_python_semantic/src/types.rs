@@ -6884,8 +6884,9 @@ bitflags! {
         const NOT_REQUIRED = 1 << 4;
         /// `typing_extensions.ReadOnly`
         const READ_ONLY = 1 << 5;
-        /// HACK to determine if a place was not bound but we consider it bound
-        const NOT_BOUND = 1 << 6;
+        /// An implicit instance attribute with it possibly unbound according to
+        /// local control flow within the method it is defined in.
+        const POSSIBLY_UNBOUND_IMPLICIT_ATTRIBUTE = 1 << 6;
     }
 }
 
@@ -8599,6 +8600,8 @@ pub enum Truthiness {
     /// For an object `x`, `bool(x)` could return either `True` or `False`
     Ambiguous,
 }
+
+impl get_size2::GetSize for Truthiness {}
 
 impl Truthiness {
     pub(crate) const fn is_ambiguous(self) -> bool {

@@ -2288,7 +2288,8 @@ class H:
         self.x = other.x or self.x
 ```
 
-An attribute definition can be guarded by a condition involving that attribute:
+An attribute definition can be guarded by a condition involving that attribute. This is a regression
+test for <https://github.com/astral-sh/ty/issues/692>:
 
 ```py
 from typing import Literal

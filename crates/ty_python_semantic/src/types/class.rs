@@ -2731,7 +2731,7 @@ impl<'db> ClassLiteral<'db> {
                     Place::bound(annotation.inner).with_qualifiers(annotation.qualifiers);
 
                 if reachability.is_ambiguous() {
-                    annotation.qualifiers |= TypeQualifiers::NOT_BOUND;
+                    annotation.qualifiers |= TypeQualifiers::POSSIBLY_UNBOUND_IMPLICIT_ATTRIBUTE;
                 }
                 if let Some(all_qualifiers) = annotation.is_bare_final() {
                     if let Some(value) = assignment.value(&module) {
@@ -2812,7 +2812,7 @@ impl<'db> ClassLiteral<'db> {
                     }
                     Truthiness::Ambiguous => {
                         is_attribute_bound = true;
-                        qualifiers |= TypeQualifiers::NOT_BOUND;
+                        qualifiers |= TypeQualifiers::POSSIBLY_UNBOUND_IMPLICIT_ATTRIBUTE;
                     }
                     Truthiness::AlwaysFalse => {
                         continue;

@@ -337,6 +337,11 @@ fn single_expression_cycle_initial<'db>(
     Type::Never
 }
 
+/// Returns the statically-known truthiness of a given expression.
+///
+/// Returns `Truthiness::Ambiguous` in case any non-definitely bound places
+/// were encountered while inferring the type of the expression.
+#[salsa::tracked(cycle_fn=static_expression_truthiness_cycle_recover, cycle_initial=static_expression_truthiness_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
 pub(crate) fn static_expression_truthiness<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
@@ -352,6 +357,23 @@ pub(crate) fn static_expression_truthiness<'db>(
     let node = expression.node_ref(db, &module);
 
     inference.expression_type(node).bool(db)
+}
+
+#[expect(clippy::trivially_copy_pass_by_ref)]
+fn static_expression_truthiness_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &Truthiness,
+    _count: u32,
+    _expression: Expression<'db>,
+) -> salsa::CycleRecoveryAction<Truthiness> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn static_expression_truthiness_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _expression: Expression<'db>,
+) -> Truthiness {
+    Truthiness::Ambiguous
 }
 
 /// Infer the types for an [`Unpack`] operation.
@@ -877,6 +899,7 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// This is used only when constructing a cycle-recovery `TypeInference`.
     cycle_fallback: bool,
 
+    /// `true` if all places in this expression are definitely bound
     all_definitely_bound: bool,
 }
 
@@ -7165,7 +7188,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if !fallback_place.place.is_definitely_bound()
             || fallback_place
                 .qualifiers
-                .contains(TypeQualifiers::NOT_BOUND)
+                .contains(TypeQualifiers::POSSIBLY_UNBOUND_IMPLICIT_ATTRIBUTE)
         {
             self.all_definitely_bound = false;
         }
@@ -8701,8 +8724,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // If `value` is a valid reference, we attempt type narrowing by assignment.
         if !value_ty.is_unknown() {
             if let Some(expr) = PlaceExpr::try_from_expr(subscript) {
-                // TODO: Should we set all_definitely_bound here? Currently it breaks
-                // mdtest/statically_known_branches.md with python2
                 let (place, keys) = self.infer_place_load(
                     PlaceExprRef::from(&expr),
                     ast::ExprRef::Subscript(subscript),
