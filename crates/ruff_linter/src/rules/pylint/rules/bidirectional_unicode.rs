@@ -62,12 +62,11 @@ impl Violation for BidirectionalUnicode {
 
 /// PLE2502
 pub(crate) fn bidirectional_unicode(line: &Line, context: &LintContext) {
-    if line.contains(BIDI_UNICODE) {
-        context.report_diagnostic(BidirectionalUnicode, line.full_range());
-    } else if is_bidi_forbid_arabic_letter_mark_enabled(context.settings())
-        && line.contains(
-            '\u{061C}', //{ARABIC LETTER MARK}
-        )
+    if line.contains(BIDI_UNICODE)
+        || (is_bidi_forbid_arabic_letter_mark_enabled(context.settings())
+            && line.contains(
+                '\u{061C}', //{ARABIC LETTER MARK}
+            ))
     {
         context.report_diagnostic(BidirectionalUnicode, line.full_range());
     }
