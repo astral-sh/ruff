@@ -574,6 +574,9 @@ impl<'db> ConstraintClause<'db> {
         //     # `(T ≤ int ∩ U ≤ str)`
         //     x: A[X1, Y1, Z2] | A[X2, Y2, Z2]
         // ```
+        //
+        // TODO: Consider checking both directions in one pass, possibly via a tri-valued return
+        // value.
         if self.subsumes_via_intersection(db, &other) {
             return Simplifiable::Simplified(other);
         }
