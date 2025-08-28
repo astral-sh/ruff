@@ -71,7 +71,7 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
                     label: comp.inner.name.into(),
                     kind,
                     sort_text: Some(format!("{i:-max_index_len$}")),
-                    detail: comp.inner.ty.display(db).to_string().into(),
+                    detail: comp.inner.ty.map(|ty| ty.display(db).to_string()),
                     documentation: comp
                         .documentation
                         .map(|docstring| Documentation::String(docstring.render_plaintext())),

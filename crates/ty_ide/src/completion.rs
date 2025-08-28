@@ -7,10 +7,10 @@ use ruff_python_parser::{Token, TokenAt, TokenKind};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_python_semantic::{Completion, NameKind, SemanticModel};
 
-use crate::Db;
 use crate::docstring::Docstring;
 use crate::find_node::covering_node;
 use crate::goto::DefinitionsOrTargets;
+use crate::{Db, all_symbols};
 
 pub fn completion(db: &dyn Db, file: File, offset: TextSize) -> Vec<DetailedCompletion<'_>> {
     let parsed = parsed_module(db, file).load(db);
@@ -37,14 +37,27 @@ pub fn completion(db: &dyn Db, file: File, offset: TextSize) -> Vec<DetailedComp
         CompletionTargetAst::Import { .. } | CompletionTargetAst::ImportViaFrom { .. } => {
             model.import_completions()
         }
-        CompletionTargetAst::Scoped { node } => model.scoped_completions(node),
+        CompletionTargetAst::Scoped { node } => {
+            let mut completions = model.scoped_completions(node);
+            for symbol in all_symbols(db, "") {
+                completions.push(Completion {
+                    name: ast::name::Name::new(&symbol.symbol.name),
+                    ty: None,
+                    kind: symbol.symbol.kind.to_completion_kind(),
+                    builtin: false,
+                });
+            }
+            completions
+        }
     };
     completions.sort_by(compare_suggestions);
     completions.dedup_by(|c1, c2| c1.name == c2.name);
     completions
         .into_iter()
         .map(|completion| {
-            let definition = DefinitionsOrTargets::from_ty(db, completion.ty);
+            let definition = completion
+                .ty
+                .and_then(|ty| DefinitionsOrTargets::from_ty(db, ty));
             let documentation = definition.and_then(|def| def.docstring(db));
             DetailedCompletion {
                 inner: completion,
@@ -3040,7 +3053,14 @@ from os.<CURSOR>
         fn completions_without_builtins_with_types(&self) -> String {
             self.completions_if_snapshot(
                 |c| !c.builtin,
-                |c| format!("{} :: {}", c.name, c.ty.display(&self.db)),
+                |c| {
+                    format!(
+                        "{} :: {}",
+                        c.name,
+                        c.ty.map(|ty| ty.display(&self.db).to_string())
+                            .unwrap_or_else(|| "Unavailable".to_string())
+                    )
+                },
             )
         }
 

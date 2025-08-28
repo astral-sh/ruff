@@ -1,6 +1,8 @@
-use crate::symbols::{QueryPattern, SymbolInfo, symbols_for_file_global_only};
 use ruff_db::files::File;
 use ty_project::Db;
+use ty_python_semantic::all_modules;
+
+use crate::symbols::{QueryPattern, SymbolInfo, symbols_for_file_global_only};
 
 /// Get all symbols matching the query string.
 ///
@@ -12,29 +14,29 @@ pub fn all_symbols(db: &dyn Db, query: &str) -> Vec<AllSymbolInfo> {
         return Vec::new();
     }
 
-    let project = db.project();
-
     let query = QueryPattern::new(query);
-    let files = project.files(db);
     let results = std::sync::Mutex::new(Vec::new());
     {
+        let modules = all_modules(db);
         let db = db.dyn_clone();
-        let files = &files;
         let results = &results;
         let query = &query;
 
         rayon::scope(move |s| {
             // For each file, extract symbols and add them to results
-            for file in files.iter() {
+            for module in modules {
                 let db = db.dyn_clone();
+                let Some(file) = module.file(&*db) else {
+                    continue;
+                };
                 s.spawn(move |_| {
-                    for (_, symbol) in symbols_for_file_global_only(&*db, *file).search(query) {
+                    for (_, symbol) in symbols_for_file_global_only(&*db, file).search(query) {
                         // It seems like we could do better here than
                         // locking `results` for every single symbol,
                         // but this works pretty well as it is.
                         results.lock().unwrap().push(AllSymbolInfo {
                             symbol: symbol.to_owned(),
-                            file: *file,
+                            file,
                         });
                     }
                 });
@@ -42,7 +44,13 @@ pub fn all_symbols(db: &dyn Db, query: &str) -> Vec<AllSymbolInfo> {
         });
     }
 
-    results.into_inner().unwrap()
+    let mut results = results.into_inner().unwrap();
+    results.sort_by(|s1, s2| {
+        let key1 = (&s1.symbol.name, s1.file.path(db).as_str());
+        let key2 = (&s2.symbol.name, s2.file.path(db).as_str());
+        key1.cmp(&key2)
+    });
+    results
 }
 
 /// A symbol found in the workspace and dependencies, including the
@@ -97,17 +105,15 @@ ABCDEFGHIJKLMNOP = 'https://api.example.com'
             )
             .build();
 
-        assert_snapshot!(test.all_symbols("ufunc"), @r"
+        assert_snapshot!(test.all_symbols("acegikmo"), @r"
         info[all-symbols]: AllSymbolInfo
-         --> utils.py:2:5
+         --> constants.py:2:1
           |
         2 | ABCDEFGHIJKLMNOP = 'https://api.example.com'
           | ^^^^^^^^^^^^^^^^
           |
-        info: Function utility_function
-        ");
+        info: Constant ABCDEFGHIJKLMNOP
 
-        assert_snapshot!(test.all_symbols("data"), @r"
         info[all-symbols]: AllSymbolInfo
          --> models.py:2:7
           |
@@ -116,11 +122,10 @@ ABCDEFGHIJKLMNOP = 'https://api.example.com'
         3 |     '''A data model class'''
         4 |     def __init__(self):
           |
-        info: Class DataModel
-        ");
+        info: Class Abcdefghijklmnop
 
         info[all-symbols]: AllSymbolInfo
-         --> constants.py:2:1
+         --> utils.py:2:5
           |
         2 | def abcdefghijklmnop():
           |     ^^^^^^^^^^^^^^^^
