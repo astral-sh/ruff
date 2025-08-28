@@ -186,6 +186,9 @@ where
 /// [POPL2015]: https://doi.org/10.1145/2676726.2676991
 #[derive(Clone, Debug)]
 pub(crate) struct ConstraintSet<'db> {
+    // NOTE: We use 2 here because there are a couple of places where we create unions of 2 clauses
+    // as temporary values — in particular when negating a constraint — and this lets us avoid
+    // spilling the temporary value to the heap.
     clauses: SmallVec<[ConstraintClause<'db>; 2]>,
 }
 
@@ -382,6 +385,7 @@ impl<'db> Constraints<'db> for ConstraintSet<'db> {
 /// [POPL2015]: https://doi.org/10.1145/2676726.2676991
 #[derive(Clone, Debug)]
 pub(crate) struct ConstraintClause<'db> {
+    // NOTE: We use 1 here because most clauses only mention a single typevar.
     constraints: SmallVec<[AtomicConstraint<'db>; 1]>,
 }
 
