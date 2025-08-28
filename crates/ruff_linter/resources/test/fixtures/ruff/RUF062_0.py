@@ -364,3 +364,15 @@ def match_with_try_except(value):
                 yield "default try"
             except Exception:
                 yield "default except"
+
+
+# (31) Valid: Multiple yields in for/else with break - only one path executes
+@contextlib.contextmanager
+def for_else_with_break(items):
+    for item in items:
+        if item:
+            break  # Skips else block
+    else:
+        yield  # Only executes if loop completes normally
+        return
+    yield  # Only executes after break
