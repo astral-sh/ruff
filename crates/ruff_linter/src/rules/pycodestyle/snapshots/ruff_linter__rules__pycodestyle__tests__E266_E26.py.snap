@@ -11,16 +11,14 @@ E266 [*] Too many leading `#` before block comment
 20 |     a = 42
    |
 help: Remove leading `#`
-
-ℹ Safe fix
-16 16 | #: E266:3:5 E266:6:5
-17 17 | def how_it_feel(r):
-18 18 | 
-19    |-    ### This is a variable ###
-   19 |+    # This is a variable ###
-20 20 |     a = 42
-21 21 | 
-22 22 |     ### Of course it is unused
+16 | #: E266:3:5 E266:6:5
+17 | def how_it_feel(r):
+18 | 
+   -     ### This is a variable ###
+19 +     # This is a variable ###
+20 |     a = 42
+21 | 
+22 |     ### Of course it is unused
 
 E266 [*] Too many leading `#` before block comment
   --> E26.py:22:5
@@ -33,16 +31,14 @@ E266 [*] Too many leading `#` before block comment
 24 | #: E265:1:1 E266:2:1
    |
 help: Remove leading `#`
-
-ℹ Safe fix
-19 19 |     ### This is a variable ###
-20 20 |     a = 42
-21 21 | 
-22    |-    ### Of course it is unused
-   22 |+    # Of course it is unused
-23 23 |     return
-24 24 | #: E265:1:1 E266:2:1
-25 25 | ##if DEBUG:
+19 |     ### This is a variable ###
+20 |     a = 42
+21 | 
+   -     ### Of course it is unused
+22 +     # Of course it is unused
+23 |     return
+24 | #: E265:1:1 E266:2:1
+25 | ##if DEBUG:
 
 E266 [*] Too many leading `#` before block comment
   --> E26.py:26:1
@@ -55,16 +51,14 @@ E266 [*] Too many leading `#` before block comment
 28 | #########################################
    |
 help: Remove leading `#`
-
-ℹ Safe fix
-23 23 |     return
-24 24 | #: E265:1:1 E266:2:1
-25 25 | ##if DEBUG:
-26    |-##    logging.error()
-   26 |+# logging.error()
-27 27 | #: W291:1:42
-28 28 | #########################################
-29 29 | #:
+23 |     return
+24 | #: E265:1:1 E266:2:1
+25 | ##if DEBUG:
+   - ##    logging.error()
+26 + # logging.error()
+27 | #: W291:1:42
+28 | #########################################
+29 | #:
 
 E266 [*] Too many leading `#` before block comment
   --> E26.py:69:1
@@ -76,16 +70,14 @@ E266 [*] Too many leading `#` before block comment
 71 | # F   Means test is failing (F)
    |
 help: Remove leading `#`
-
-ℹ Safe fix
-66 66 | a = 42  #  (Two spaces)
-67 67 | 
-68 68 | #: E265:5:1
-69    |-### Means test is not done yet
-   69 |+# Means test is not done yet
-70 70 | # E   Means test is giving error (E)
-71 71 | # F   Means test is failing (F)
-72 72 | # EF  Means test is giving error and Failing
+66 | a = 42  #  (Two spaces)
+67 | 
+68 | #: E265:5:1
+   - ### Means test is not done yet
+69 + # Means test is not done yet
+70 | # E   Means test is giving error (E)
+71 | # F   Means test is failing (F)
+72 | # EF  Means test is giving error and Failing
 
 E266 [*] Too many leading `#` before block comment
   --> E26.py:82:1
@@ -98,13 +90,11 @@ E266 [*] Too many leading `#` before block comment
 84 | a = 1  ## Foo
    |
 help: Remove leading `#`
-
-ℹ Safe fix
-79 79 | 
-80 80 | # We should strip the space, but preserve the hashes.
-81 81 | #: E266:1:3
-82    |-##  Foo
-   82 |+# Foo
-83 83 | 
-84 84 | a = 1  ## Foo
-85 85 |
+79 | 
+80 | # We should strip the space, but preserve the hashes.
+81 | #: E266:1:3
+   - ##  Foo
+82 + # Foo
+83 | 
+84 | a = 1  ## Foo
+85 |

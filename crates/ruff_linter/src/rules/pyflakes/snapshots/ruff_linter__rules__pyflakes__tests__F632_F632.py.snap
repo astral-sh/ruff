@@ -9,13 +9,11 @@ F632 [*] Use `==` to compare constant literals
 2 |     pass
   |
 help: Replace `is` with `==`
-
-ℹ Safe fix
-1   |-if x is "abc":
-  1 |+if x == "abc":
-2 2 |     pass
-3 3 | 
-4 4 | if 123 is not y:
+  - if x is "abc":
+1 + if x == "abc":
+2 |     pass
+3 | 
+4 | if 123 is not y:
 
 F632 [*] Use `!=` to compare constant literals
  --> F632.py:4:4
@@ -27,16 +25,14 @@ F632 [*] Use `!=` to compare constant literals
 5 |     pass
   |
 help: Replace `is not` with `!=`
-
-ℹ Safe fix
-1 1 | if x is "abc":
-2 2 |     pass
-3 3 | 
-4   |-if 123 is not y:
-  4 |+if 123 != y:
-5 5 |     pass
-6 6 | 
-7 7 | if 123 is \
+1 | if x is "abc":
+2 |     pass
+3 | 
+  - if 123 is not y:
+4 + if 123 != y:
+5 |     pass
+6 | 
+7 | if 123 is \
 
 F632 [*] Use `!=` to compare constant literals
  --> F632.py:7:4
@@ -50,17 +46,15 @@ F632 [*] Use `!=` to compare constant literals
 9 |       pass
   |
 help: Replace `is not` with `!=`
-
-ℹ Safe fix
-4 4 | if 123 is not y:
-5 5 |     pass
-6 6 | 
-7   |-if 123 is \
-8   |-        not y:
-  7 |+if 123 != y:
-9 8 |     pass
-10 9 | 
-11 10 | if "123" is x < 3:
+4  | if 123 is not y:
+5  |     pass
+6  | 
+   - if 123 is \
+   -         not y:
+7  + if 123 != y:
+8  |     pass
+9  | 
+10 | if "123" is x < 3:
 
 F632 [*] Use `==` to compare constant literals
   --> F632.py:11:4
@@ -72,16 +66,14 @@ F632 [*] Use `==` to compare constant literals
 12 |     pass
    |
 help: Replace `is` with `==`
-
-ℹ Safe fix
-8  8  |         not y:
-9  9  |     pass
-10 10 | 
-11    |-if "123" is x < 3:
-   11 |+if "123" == x < 3:
-12 12 |     pass
-13 13 | 
-14 14 | if "123" != x is 3:
+8  |         not y:
+9  |     pass
+10 | 
+   - if "123" is x < 3:
+11 + if "123" == x < 3:
+12 |     pass
+13 | 
+14 | if "123" != x is 3:
 
 F632 [*] Use `==` to compare constant literals
   --> F632.py:14:4
@@ -93,16 +85,14 @@ F632 [*] Use `==` to compare constant literals
 15 |     pass
    |
 help: Replace `is` with `==`
-
-ℹ Safe fix
-11 11 | if "123" is x < 3:
-12 12 |     pass
-13 13 | 
-14    |-if "123" != x is 3:
-   14 |+if "123" != x == 3:
-15 15 |     pass
-16 16 | 
-17 17 | if ("123" != x) is 3:
+11 | if "123" is x < 3:
+12 |     pass
+13 | 
+   - if "123" != x is 3:
+14 + if "123" != x == 3:
+15 |     pass
+16 | 
+17 | if ("123" != x) is 3:
 
 F632 [*] Use `==` to compare constant literals
   --> F632.py:17:4
@@ -114,16 +104,14 @@ F632 [*] Use `==` to compare constant literals
 18 |     pass
    |
 help: Replace `is` with `==`
-
-ℹ Safe fix
-14 14 | if "123" != x is 3:
-15 15 |     pass
-16 16 | 
-17    |-if ("123" != x) is 3:
-   17 |+if ("123" != x) == 3:
-18 18 |     pass
-19 19 | 
-20 20 | if "123" != (x is 3):
+14 | if "123" != x is 3:
+15 |     pass
+16 | 
+   - if ("123" != x) is 3:
+17 + if ("123" != x) == 3:
+18 |     pass
+19 | 
+20 | if "123" != (x is 3):
 
 F632 [*] Use `==` to compare constant literals
   --> F632.py:20:14
@@ -135,16 +123,14 @@ F632 [*] Use `==` to compare constant literals
 21 |     pass
    |
 help: Replace `is` with `==`
-
-ℹ Safe fix
-17 17 | if ("123" != x) is 3:
-18 18 |     pass
-19 19 | 
-20    |-if "123" != (x is 3):
-   20 |+if "123" != (x == 3):
-21 21 |     pass
-22 22 | 
-23 23 | {2 is
+17 | if ("123" != x) is 3:
+18 |     pass
+19 | 
+   - if "123" != (x is 3):
+20 + if "123" != (x == 3):
+21 |     pass
+22 | 
+23 | {2 is
 
 F632 [*] Use `!=` to compare constant literals
   --> F632.py:23:2
@@ -159,17 +145,15 @@ F632 [*] Use `!=` to compare constant literals
 26 |   {2 is
    |
 help: Replace `is not` with `!=`
-
-ℹ Safe fix
-20 20 | if "123" != (x is 3):
-21 21 |     pass
-22 22 | 
-23    |-{2 is
-24    |-not ''}
-   23 |+{2 != ''}
-25 24 | 
-26 25 | {2 is
-27 26 |  not ''}
+20 | if "123" != (x is 3):
+21 |     pass
+22 | 
+   - {2 is
+   - not ''}
+23 + {2 != ''}
+24 | 
+25 | {2 is
+26 |  not ''}
 
 F632 [*] Use `!=` to compare constant literals
   --> F632.py:26:2
@@ -184,17 +168,15 @@ F632 [*] Use `!=` to compare constant literals
 29 |   # Regression test for
    |
 help: Replace `is not` with `!=`
-
-ℹ Safe fix
-23 23 | {2 is
-24 24 | not ''}
-25 25 | 
-26    |-{2 is
-27    |- not ''}
-   26 |+{2 != ''}
-28 27 | 
-29 28 | # Regression test for
-30 29 | if values[1is not None ] is not '-':
+23 | {2 is
+24 | not ''}
+25 | 
+   - {2 is
+   -  not ''}
+26 + {2 != ''}
+27 | 
+28 | # Regression test for
+29 | if values[1is not None ] is not '-':
 
 F632 [*] Use `!=` to compare constant literals
   --> F632.py:30:4
@@ -205,16 +187,14 @@ F632 [*] Use `!=` to compare constant literals
 31 |     pass
    |
 help: Replace `is not` with `!=`
-
-ℹ Safe fix
-27 27 |  not ''}
-28 28 | 
-29 29 | # Regression test for
-30    |-if values[1is not None ] is not '-':
-   30 |+if values[1is not None ] != '-':
-31 31 |     pass
-32 32 | 
-33 33 | # Regression test for https://github.com/astral-sh/ruff/issues/11736
+27 |  not ''}
+28 | 
+29 | # Regression test for
+   - if values[1is not None ] is not '-':
+30 + if values[1is not None ] != '-':
+31 |     pass
+32 | 
+33 | # Regression test for https://github.com/astral-sh/ruff/issues/11736
 
 F632 [*] Use `!=` to compare constant literals
   --> F632.py:30:11
@@ -225,16 +205,14 @@ F632 [*] Use `!=` to compare constant literals
 31 |     pass
    |
 help: Replace `is not` with `!=`
-
-ℹ Safe fix
-27 27 |  not ''}
-28 28 | 
-29 29 | # Regression test for
-30    |-if values[1is not None ] is not '-':
-   30 |+if values[1!= None ] is not '-':
-31 31 |     pass
-32 32 | 
-33 33 | # Regression test for https://github.com/astral-sh/ruff/issues/11736
+27 |  not ''}
+28 | 
+29 | # Regression test for
+   - if values[1is not None ] is not '-':
+30 + if values[1!= None ] is not '-':
+31 |     pass
+32 | 
+33 | # Regression test for https://github.com/astral-sh/ruff/issues/11736
 
 F632 [*] Use `!=` to compare constant literals
   --> F632.py:34:12
@@ -244,10 +222,8 @@ F632 [*] Use `!=` to compare constant literals
    |            ^^^^^^^^^^^^
    |
 help: Replace `is not` with `!=`
-
-ℹ Safe fix
-31 31 |     pass
-32 32 | 
-33 33 | # Regression test for https://github.com/astral-sh/ruff/issues/11736
-34    |-variable: "123 is not y"
-   34 |+variable: "123 != y"
+31 |     pass
+32 | 
+33 | # Regression test for https://github.com/astral-sh/ruff/issues/11736
+   - variable: "123 is not y"
+34 + variable: "123 != y"
