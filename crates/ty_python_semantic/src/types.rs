@@ -6910,8 +6910,9 @@ bitflags! {
         const NOT_REQUIRED = 1 << 4;
         /// `typing_extensions.ReadOnly`
         const READ_ONLY = 1 << 5;
-        /// An implicit instance attribute with it possibly unbound according to
-        /// local control flow within the method it is defined in.
+        /// An implicit instance attribute which is possibly unbound according
+        /// to local control flow within the method it is defined in. This flag
+        /// overrules the `Boundness` information on `PlaceAndQualifiers`.
         const POSSIBLY_UNBOUND_IMPLICIT_ATTRIBUTE = 1 << 6;
     }
 }
