@@ -5376,10 +5376,14 @@ impl<'db> Type<'db> {
         // If __new__ returns a non-instance type, we should not call __init__.
         let should_call_init = should_invoke_init(new_return_type.as_ref(), instance_ty, db);
 
-        // Construct an instance type that we can use to look up the `__init__` instance method.
-        // When doing generic inference and there's no custom __new__, use the identity-specialized
-        // type (self_type) so that __init__ can infer the type parameters.
-        let init_ty = if generic_origin.is_some() && new_call_outcome.is_none() {
+        // Construct an instance type that we can use to look up the `__init__` instance method.  
+        // For generic type inference to work properly, we need to use the identity-specialized
+        // type when there's no custom __new__ method that would interfere.
+        // Only do this if the class actually has type variables that need inference.
+        let needs_inference = generic_context.is_some() && new_call_outcome.is_none();
+        
+        let init_ty = if needs_inference {
+            // No custom __new__, so use identity-specialized type for inference
             self_type.to_instance(db).unwrap_or(instance_ty)
         } else {
             instance_ty
@@ -6737,11 +6741,21 @@ fn extract_new_return_type_override<'db>(
             // be treated as returning the instance type. This is a quirk of how
             // NamedTuple is implemented in our type system.
             if ret_type.is_none(db) {
-                // Check if the original class being constructed is a NamedTuple
+                // Check if the class or any of its base classes is a NamedTuple
                 if let Type::NominalInstance(inst) = instance_ty {
                     let (class_literal, _) = inst.class(db).class_literal(db);
+                    // Check if this class itself is a NamedTuple
                     if class::CodeGeneratorKind::NamedTuple.matches(db, class_literal) {
                         return None; // Use instance type for NamedTuple
+                    }
+                    // Check if any base class is a NamedTuple
+                    for base_class in class_literal.iter_mro(db, None) {
+                        if let ClassBase::Class(base_type) = base_class {
+                            let (base_literal, _) = base_type.class_literal(db);
+                            if class::CodeGeneratorKind::NamedTuple.matches(db, base_literal) {
+                                return None; // Use instance type for NamedTuple subclass
+                            }
+                        }
                     }
                 }
                 // For other classes, None return type means None
