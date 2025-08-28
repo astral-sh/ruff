@@ -86,6 +86,7 @@ pub(crate) fn os_rename(checker: &Checker, call: &ExprCall, segments: &[&str]) {
         "src",
         "dst",
         is_fix_os_rename_enabled(checker.settings()),
+        &["src", "dst", "src_dir_fd", "dst_dir_fd"],
         OsRename,
     );
 }

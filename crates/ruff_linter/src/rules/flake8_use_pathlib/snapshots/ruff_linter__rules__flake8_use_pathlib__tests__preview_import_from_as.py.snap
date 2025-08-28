@@ -28,7 +28,7 @@ help: Replace with `Path(...).resolve()`
 16 17 | aaa = xmkdir(p)
 17 18 | xmakedirs(p)
 
-PTH101 `os.chmod()` should be replaced by `Path.chmod()`
+PTH101 [*] `os.chmod()` should be replaced by `Path.chmod()`
   --> import_from_as.py:15:6
    |
 14 | a = xabspath(p)
@@ -38,6 +38,22 @@ PTH101 `os.chmod()` should be replaced by `Path.chmod()`
 17 | xmakedirs(p)
    |
 help: Replace with `Path(...).chmod(...)`
+
+ℹ Safe fix
+7  7  | from os.path import isfile as xisfile, islink as xislink, isabs as xisabs
+8  8  | from os.path import join as xjoin, basename as xbasename, dirname as xdirname
+9  9  | from os.path import samefile as xsamefile, splitext as xsplitext
+   10 |+import pathlib
+10 11 | 
+11 12 | p = "/foo"
+12 13 | q = "bar"
+13 14 | 
+14 15 | a = xabspath(p)
+15    |-aa = xchmod(p)
+   16 |+aa = pathlib.Path(p).chmod()
+16 17 | aaa = xmkdir(p)
+17 18 | xmakedirs(p)
+18 19 | xrename(p)
 
 PTH102 [*] `os.mkdir()` should be replaced by `Path.mkdir()`
   --> import_from_as.py:16:7

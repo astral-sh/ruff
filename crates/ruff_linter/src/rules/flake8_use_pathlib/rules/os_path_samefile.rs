@@ -72,6 +72,7 @@ pub(crate) fn os_path_samefile(checker: &Checker, call: &ExprCall, segments: &[&
         "f1",
         "f2",
         is_fix_os_path_samefile_enabled(checker.settings()),
+        &["f1", "f2"],
         OsPathSamefile,
     );
 }

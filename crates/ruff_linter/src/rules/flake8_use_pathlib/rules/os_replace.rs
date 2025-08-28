@@ -89,6 +89,7 @@ pub(crate) fn os_replace(checker: &Checker, call: &ExprCall, segments: &[&str]) 
         "src",
         "dst",
         is_fix_os_replace_enabled(checker.settings()),
+        &["src", "dst", "src_dir_fd", "dst_dir_fd"],
         OsReplace,
     );
 }

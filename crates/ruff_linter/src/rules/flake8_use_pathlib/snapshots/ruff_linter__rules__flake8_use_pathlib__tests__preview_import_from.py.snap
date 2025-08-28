@@ -28,7 +28,7 @@ help: Replace with `Path(...).resolve()`
 11 12 | aaa = mkdir(p)
 12 13 | makedirs(p)
 
-PTH101 `os.chmod()` should be replaced by `Path.chmod()`
+PTH101 [*] `os.chmod()` should be replaced by `Path.chmod()`
   --> import_from.py:10:6
    |
  9 | a = abspath(p)
@@ -38,6 +38,22 @@ PTH101 `os.chmod()` should be replaced by `Path.chmod()`
 12 | makedirs(p)
    |
 help: Replace with `Path(...).chmod(...)`
+
+ℹ Safe fix
+2  2  | from os import remove, unlink, getcwd, readlink, stat
+3  3  | from os.path import abspath, exists, expanduser, isdir, isfile, islink
+4  4  | from os.path import isabs, join, basename, dirname, samefile, splitext
+   5  |+import pathlib
+5  6  | 
+6  7  | p = "/foo"
+7  8  | q = "bar"
+8  9  | 
+9  10 | a = abspath(p)
+10    |-aa = chmod(p)
+   11 |+aa = pathlib.Path(p).chmod()
+11 12 | aaa = mkdir(p)
+12 13 | makedirs(p)
+13 14 | rename(p)
 
 PTH102 [*] `os.mkdir()` should be replaced by `Path.mkdir()`
   --> import_from.py:11:7
