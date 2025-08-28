@@ -1551,6 +1551,7 @@ SIM905 [*] Consider using a list literal instead of `str.split`
 171 | " a b c d ".split(maxsplit=2)  # ["a", "b", "c d "]
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 172 | " a b c d ".rsplit(maxsplit=2)  # [" a b", "c", "d"]
+173 | "a  b".split(maxsplit=1)  # ["a", "b"]
     |
 help: Replace with list literal
 
@@ -1561,6 +1562,7 @@ help: Replace with list literal
 171     |-" a b c d ".split(maxsplit=2)  # ["a", "b", "c d "]
     171 |+["a", "b", "c d "]  # ["a", "b", "c d "]
 172 172 | " a b c d ".rsplit(maxsplit=2)  # [" a b", "c", "d"]
+173 173 | "a  b".split(maxsplit=1)  # ["a", "b"]
 
 SIM905 [*] Consider using a list literal instead of `str.split`
    --> SIM905.py:172:1
@@ -1569,6 +1571,7 @@ SIM905 [*] Consider using a list literal instead of `str.split`
 171 | " a b c d ".split(maxsplit=2)  # ["a", "b", "c d "]
 172 | " a b c d ".rsplit(maxsplit=2)  # [" a b", "c", "d"]
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+173 | "a  b".split(maxsplit=1)  # ["a", "b"]
     |
 help: Replace with list literal
 
@@ -1578,3 +1581,21 @@ help: Replace with list literal
 171 171 | " a b c d ".split(maxsplit=2)  # ["a", "b", "c d "]
 172     |-" a b c d ".rsplit(maxsplit=2)  # [" a b", "c", "d"]
     172 |+[" a b", "c", "d"]  # [" a b", "c", "d"]
+173 173 | "a  b".split(maxsplit=1)  # ["a", "b"]
+
+SIM905 [*] Consider using a list literal instead of `str.split`
+   --> SIM905.py:173:1
+    |
+171 | " a b c d ".split(maxsplit=2)  # ["a", "b", "c d "]
+172 | " a b c d ".rsplit(maxsplit=2)  # [" a b", "c", "d"]
+173 | "a  b".split(maxsplit=1)  # ["a", "b"]
+    | ^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: Replace with list literal
+
+ℹ Safe fix
+170 170 | # leading/trailing whitespace should not count towards maxsplit
+171 171 | " a b c d ".split(maxsplit=2)  # ["a", "b", "c d "]
+172 172 | " a b c d ".rsplit(maxsplit=2)  # [" a b", "c", "d"]
+173     |-"a  b".split(maxsplit=1)  # ["a", "b"]
+    173 |+["a", "b"]  # ["a", "b"]
