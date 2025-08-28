@@ -523,7 +523,7 @@ impl<'config> WalkPythonFilesState<'config> {
         let (files, error) = self.merged.into_inner().unwrap();
         error?;
 
-        let deduplicated_files = deduplicate_files(files);
+        let deduplicated_files = deduplicate_files(&files);
 
         Ok((deduplicated_files, self.resolver.into_inner().unwrap()))
     }
@@ -536,11 +536,11 @@ impl<'config> WalkPythonFilesState<'config> {
 /// version takes precedence. This behavior is important for explicit exclusion
 /// handling, where explicitly passed files should override directory-based
 /// discovery rules.
-fn deduplicate_files(files: ResolvedFiles) -> ResolvedFiles {
+fn deduplicate_files(files: &ResolvedFiles) -> ResolvedFiles {
     let mut seen_paths = FxHashSet::default();
     let mut deduplicated_files = Vec::new();
 
-    for file_result in &files {
+    for file_result in files {
         if let Ok(resolved_file) = file_result {
             if resolved_file.is_root() {
                 let path = resolved_file.path().to_path_buf();
@@ -551,7 +551,7 @@ fn deduplicate_files(files: ResolvedFiles) -> ResolvedFiles {
         }
     }
 
-    for file_result in &files {
+    for file_result in files {
         match file_result {
             Ok(resolved_file) if !resolved_file.is_root() => {
                 let path = resolved_file.path().to_path_buf();
