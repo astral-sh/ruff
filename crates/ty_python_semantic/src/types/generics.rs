@@ -582,9 +582,9 @@ impl<'db> Specialization<'db> {
     /// MRO of `B[int]`.
     pub(crate) fn apply_specialization(self, db: &'db dyn Db, other: Specialization<'db>) -> Self {
         let new_specialization = self.apply_type_mapping(db, &TypeMapping::Specialization(other));
-        let result = match other.specialization_type(db) {
+        let result = match other.materialization_kind(db) {
             None => new_specialization,
-            Some(materialization_type) => new_specialization.materialize(db, materialization_type),
+            Some(materialization_kind) => new_specialization.materialize(db, materialization_kind),
         };
         result
     }
@@ -616,7 +616,7 @@ impl<'db> Specialization<'db> {
             db,
             self.generic_context(db),
             types,
-            self.specialization_type(db),
+            self.materialization_kind(db),
             tuple_inner,
         )
     }

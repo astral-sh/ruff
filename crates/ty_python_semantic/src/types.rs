@@ -5967,9 +5967,9 @@ impl<'db> Type<'db> {
     ) -> Type<'db> {
         let new_specialization =
             self.apply_type_mapping(db, &TypeMapping::Specialization(specialization));
-        match specialization.specialization_type(db) {
+        match specialization.materialization_kind(db) {
             None => new_specialization,
-            Some(materialization_type) => new_specialization.materialize(db, materialization_type),
+            Some(materialization_kind) => new_specialization.materialize(db, materialization_kind),
         }
     }
 
