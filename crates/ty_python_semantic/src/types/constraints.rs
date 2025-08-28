@@ -1033,7 +1033,7 @@ pub(crate) enum Simplifiable<T> {
 }
 
 impl<T> Simplifiable<T> {
-    const fn from_one(constraint: Satisfiable<T>) -> Self {
+    fn from_one(constraint: Satisfiable<T>) -> Self {
         match constraint {
             Satisfiable::Never => Simplifiable::NeverSatisfiable,
             Satisfiable::Always => Simplifiable::AlwaysSatisfiable,
