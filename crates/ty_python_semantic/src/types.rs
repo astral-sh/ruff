@@ -9626,7 +9626,9 @@ impl<'db> IntersectionType<'db> {
         I: IntoIterator<Item = T>,
         T: Into<Type<'db>>,
     {
-        IntersectionBuilder::new(db).positive_elements(elements).build()
+        IntersectionBuilder::new(db)
+            .positive_elements(elements)
+            .build()
     }
 
     /// Return a new `IntersectionType` instance with the positive and negative types sorted
