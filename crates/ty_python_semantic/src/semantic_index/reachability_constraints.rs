@@ -209,6 +209,7 @@ use crate::semantic_index::predicate::{
 };
 use crate::types::{
     IntersectionBuilder, Truthiness, Type, UnionBuilder, UnionType, infer_expression_type,
+    static_expression_truthiness,
 };
 
 /// A ternary formula that defines under what conditions a binding is visible. (A ternary formula
@@ -821,8 +822,7 @@ impl ReachabilityConstraints {
     fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
         match predicate.node {
             PredicateNode::Expression(test_expr) => {
-                let ty = infer_expression_type(db, test_expr);
-                ty.bool(db).negate_if(!predicate.is_positive)
+                static_expression_truthiness(db, test_expr).negate_if(!predicate.is_positive)
             }
             PredicateNode::ReturnsNever(CallableAndCallExpr {
                 callable,

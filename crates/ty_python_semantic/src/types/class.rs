@@ -2736,17 +2736,20 @@ impl<'db> ClassLiteral<'db> {
                 //     self.name: <annotation>
                 //     self.name: <annotation> = …
 
-                if use_def_map(db, method_scope)
-                    .is_declaration_reachable(db, &attribute_declaration)
-                    .is_always_false()
-                {
+                let reachability = use_def_map(db, method_scope)
+                    .declaration_reachability(db, &attribute_declaration);
+
+                if reachability.is_always_false() {
                     continue;
                 }
 
                 let annotation = declaration_type(db, declaration);
-                let annotation =
+                let mut annotation =
                     Place::bound(annotation.inner).with_qualifiers(annotation.qualifiers);
 
+                if reachability.is_ambiguous() {
+                    annotation.qualifiers |= TypeQualifiers::POSSIBLY_UNBOUND_IMPLICIT_ATTRIBUTE;
+                }
                 if let Some(all_qualifiers) = annotation.is_bare_final() {
                     if let Some(value) = assignment.value(&module) {
                         // If we see an annotated assignment with a bare `Final` as in
@@ -2789,7 +2792,7 @@ impl<'db> ClassLiteral<'db> {
                         .all_reachable_symbol_bindings(method_place)
                         .find_map(|bind| {
                             (bind.binding.is_defined_and(|def| def == method))
-                                .then(|| class_map.is_binding_reachable(db, &bind))
+                                .then(|| class_map.binding_reachability(db, &bind))
                         })
                         .unwrap_or(Truthiness::AlwaysFalse)
                 } else {
@@ -2818,11 +2821,15 @@ impl<'db> ClassLiteral<'db> {
                     continue;
                 };
                 match method_map
-                    .is_binding_reachable(db, &attribute_assignment)
+                    .binding_reachability(db, &attribute_assignment)
                     .and(is_method_reachable)
                 {
-                    Truthiness::AlwaysTrue | Truthiness::Ambiguous => {
+                    Truthiness::AlwaysTrue => {
                         is_attribute_bound = true;
+                    }
+                    Truthiness::Ambiguous => {
+                        is_attribute_bound = true;
+                        qualifiers |= TypeQualifiers::POSSIBLY_UNBOUND_IMPLICIT_ATTRIBUTE;
                     }
                     Truthiness::AlwaysFalse => {
                         continue;
@@ -2834,7 +2841,7 @@ impl<'db> ClassLiteral<'db> {
                 // TODO: this is incomplete logic since the attributes bound after termination are considered reachable.
                 let unbound_reachability = unbound_binding
                     .as_ref()
-                    .map(|binding| method_map.is_binding_reachable(db, binding))
+                    .map(|binding| method_map.binding_reachability(db, binding))
                     .unwrap_or(Truthiness::AlwaysFalse);
 
                 if unbound_reachability
