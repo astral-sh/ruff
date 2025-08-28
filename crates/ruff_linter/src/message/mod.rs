@@ -10,7 +10,6 @@ use ruff_db::diagnostic::{
 use ruff_db::files::File;
 
 pub use github::GithubEmitter;
-pub use gitlab::GitlabEmitter;
 pub use grouped::GroupedEmitter;
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::SourceFile;
@@ -22,7 +21,6 @@ use crate::Fix;
 use crate::registry::Rule;
 
 mod github;
-mod gitlab;
 mod grouped;
 mod sarif;
 mod text;

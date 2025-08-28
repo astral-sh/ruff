@@ -11,10 +11,8 @@ E302 [*] Expected 2 blank lines, found 1
 4 |     pass
   |
 help: Add missing blank line(s)
-
-ℹ Safe fix
-1 1 | """Test where the error is after the module's docstring."""
-2 2 | 
-  3 |+
-3 4 | def fn():
-4 5 |     pass
+1 | """Test where the error is after the module's docstring."""
+2 | 
+3 + 
+4 | def fn():
+5 |     pass

@@ -10,9 +10,7 @@ W391 [*] Extra newline at end of file
    | ^
    |
 help: Remove trailing newline
-
-ℹ Safe fix
-11 11 | if __name__ == '__main__':
-12 12 |     foo()
-13 13 |     bar()
-14    |-
+11 | if __name__ == '__main__':
+12 |     foo()
+13 |     bar()
+   -
