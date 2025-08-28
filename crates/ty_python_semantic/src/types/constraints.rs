@@ -415,7 +415,8 @@ impl<'db> ConstraintClause<'db> {
         self.constraints.is_empty()
     }
 
-    /// Returns the intersection of this clause and an atomic constraint.
+    /// Updates this clause to be the intersection of itself and an atomic constraint. Returns a
+    /// flag indicating whether the updated clause is never, always, or sometimes satisfied.
     fn intersect_constraint(
         &mut self,
         db: &'db dyn Db,
