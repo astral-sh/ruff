@@ -666,12 +666,17 @@ impl<'db> ConstraintClause<'db> {
 /// specialize to. The lower and upper bounds can each be either _closed_ (the bound itself is
 /// included) or _open_ (the bound itself is not included).
 ///
-/// We render constraints using an interval notation: `[s, t]`, `(s, t)`, `[s, t)`, or `(s, t]`,
-/// where a square bracket indicates that bound is closed, and a parenthesis indicates that it is
-/// open.
+/// In our documentation, we will show constraints using a few different notations:
 ///
-/// We will also sometimes render them graphically: `s┠──┨t`, `s╟──╢t`, `s┠──╢t`, or `s╟──┨t`,
-/// where a solid bar indicates a closed bound, and a double bar indicates an open  bound.
+/// - "Interval" notation: `[s, t]`, `(s, t)`, `[s, t)`, or `(s, t]`, where a square bracket
+///   indicates that bound is closed, and a parenthesis indicates that it is open.
+///
+/// - ASCII art: `s┠──┨t`, `s╟──╢t`, `s┠──╢t`, or `s╟──┨t`, where a solid bar indicates a closed
+///   bound, and a double bar indicates an open bound.
+///
+/// - "Comparison" notation: `s ≤ T ≤ t`, `s < T < t`, `s ≤ T < t`, or `s < T ≤ T`, where `≤`
+///   indicates a closed bound, and `<` indicates an open bound. Note that this is the only
+///   notation that includes the typevar being constrained.
 ///
 /// ### Invariants
 ///
