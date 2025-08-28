@@ -26,9 +26,9 @@ use crate::types::Truthiness;
 use crate::types::class::{ClassType, KnownClass};
 use crate::types::constraints::{Constraints, IteratorConstraintsExtension};
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, HasRelationToVisitor, IsDisjointVisitor,
-    IsEquivalentVisitor, MaterializationKind, NormalizedVisitor, Type, TypeMapping, TypeRelation,
-    UnionBuilder, UnionType,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
+    IsDisjointVisitor, IsEquivalentVisitor, MaterializationKind, NormalizedVisitor, Type,
+    TypeMapping, TypeRelation, UnionBuilder, UnionType,
 };
 use crate::util::subscript::{Nth, OutOfBoundsError, PyIndex, PySlice, StepSizeZeroError};
 use crate::{Db, FxOrderSet, Program};
@@ -250,14 +250,15 @@ impl<'db> TupleType<'db> {
         )
     }
 
-    pub(crate) fn find_legacy_typevars(
+    pub(crate) fn find_legacy_typevars_impl(
         self,
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+        visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         self.tuple(db)
-            .find_legacy_typevars(db, binding_context, typevars);
+            .find_legacy_typevars_impl(db, binding_context, typevars, visitor);
     }
 
     pub(crate) fn has_relation_to_impl<C: Constraints<'db>>(
@@ -414,14 +415,15 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         )
     }
 
-    fn find_legacy_typevars(
+    fn find_legacy_typevars_impl(
         &self,
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+        visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         for ty in &self.0 {
-            ty.find_legacy_typevars(db, binding_context, typevars);
+            ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
         }
     }
 
@@ -745,19 +747,20 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         )
     }
 
-    fn find_legacy_typevars(
+    fn find_legacy_typevars_impl(
         &self,
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+        visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         for ty in &self.prefix {
-            ty.find_legacy_typevars(db, binding_context, typevars);
+            ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
         }
         self.variable
-            .find_legacy_typevars(db, binding_context, typevars);
+            .find_legacy_typevars_impl(db, binding_context, typevars, visitor);
         for ty in &self.suffix {
-            ty.find_legacy_typevars(db, binding_context, typevars);
+            ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
         }
     }
 
@@ -1099,15 +1102,20 @@ impl<'db> Tuple<Type<'db>> {
         }
     }
 
-    fn find_legacy_typevars(
+    fn find_legacy_typevars_impl(
         &self,
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+        visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         match self {
-            Tuple::Fixed(tuple) => tuple.find_legacy_typevars(db, binding_context, typevars),
-            Tuple::Variable(tuple) => tuple.find_legacy_typevars(db, binding_context, typevars),
+            Tuple::Fixed(tuple) => {
+                tuple.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+            }
+            Tuple::Variable(tuple) => {
+                tuple.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+            }
         }
     }
 

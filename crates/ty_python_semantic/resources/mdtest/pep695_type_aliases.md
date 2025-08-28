@@ -217,6 +217,26 @@ def f(x: IntOr, y: OrInt):
         reveal_type(y)  # revealed: Never
 ```
 
+### With legacy generic
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+type Alias = list["Alias"] | int
+
+class A(Generic[T]):
+    attr: T
+
+class B(A[Alias]):
+    pass
+
+def f(b: B):
+    reveal_type(b)  # revealed: B
+    reveal_type(b.attr)  # revealed: list[Alias] | int
+```
+
 ### Mutually recursive
 
 ```py
