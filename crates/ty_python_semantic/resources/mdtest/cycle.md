@@ -31,3 +31,16 @@ p = Point()
 reveal_type(p.x)  # revealed: Unknown | int
 reveal_type(p.y)  # revealed: Unknown | int
 ```
+
+## Too Many Cycles
+
+A variable or attribute may reference its current value as part of an assignment.
+
+```python
+class C:
+    def __init__(self):
+        self.a = 0
+
+    def incr(self):
+        self.a = self.a + 1
+```
