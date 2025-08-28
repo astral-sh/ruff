@@ -140,18 +140,20 @@ pub(crate) fn os_chmod(checker: &Checker, call: &ExprCall, segments: &[&str]) {
             ArgOrKeyword::Keyword(keyword) => locator.slice(&keyword.value),
         };
 
+        let follow_symlinks_is_false = |arg: &ArgOrKeyword| {
+            let expr = match arg {
+                ArgOrKeyword::Arg(e) => e,
+                ArgOrKeyword::Keyword(k) => &k.value,
+            };
+            expr.as_boolean_literal_expr().is_some_and(|bl| !bl.value)
+        };
+
         let chmod_args = match (mode, follow_symlinks) {
-            (None, None) => "".to_string(),
-            (Some(mode), None) | (None, Some(mode)) => args(&mode).to_string(),
-            (Some(mode), Some(follow)) => {
-                let mode_arg = args(&mode);
-                let follow_symlinks_value = args(&follow);
-                if follow_symlinks_value == "False" {
-                    format!("{mode_arg}, follow_symlinks=False")
-                } else {
-                    mode_arg.to_string()
-                }
+            (Some(m), Some(f)) if follow_symlinks_is_false(&f) => {
+                format!("{}, follow_symlinks=False", args(&m))
             }
+            (Some(arg), _) | (_, Some(arg)) => args(&arg).to_string(),
+            _ => String::new(),
         };
 
         let replacement = if is_pathlib_path_call(checker, path) {

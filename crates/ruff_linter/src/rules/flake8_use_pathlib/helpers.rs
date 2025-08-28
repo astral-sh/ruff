@@ -158,7 +158,7 @@ pub(crate) fn check_os_pathlib_two_arg_calls(
     let path_code = checker.locator().slice(path_expr.range());
     let second_code = checker.locator().slice(second_expr.range());
 
-    if has_unknown_keywords_or_starred_expr(&call.arguments, &allowed) {
+    if has_unknown_keywords_or_starred_expr(&call.arguments, allowed) {
         return;
     }
 
