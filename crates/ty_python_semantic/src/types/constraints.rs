@@ -524,6 +524,24 @@ impl<'db> ConstraintClause<'db> {
         // Saturation
         //
         // If either clause is always satisfiable, the union is too. (`1 ∪ C₂ = 1`, `C₁ ∪ 1 = 1`)
+        //
+        // ```py
+        // class A[T]: ...
+        //
+        // class C1[U]:
+        //     # T can specialize to any type, so this is "always satisfiable", or `1`
+        //     x: A[U]
+        //
+        // class C2[V: int]:
+        //     # `T ≤ int`
+        //     x: A[V]
+        //
+        // class Saturation[U, V: int]:
+        //     # `1 ∪ (T ≤ int)`
+        //     # simplifies via saturation to
+        //     # `T ≤ int`
+        //     x: A[U] | A[V]
+        // ```
         if self.is_always() || other.is_always() {
             return Simplifiable::Simplified(Self::always());
         }
@@ -538,6 +556,24 @@ impl<'db> ConstraintClause<'db> {
         //
         // (Note that possibly counterintuitively, "bigger" here means _fewer_ constraints in the
         // intersection, since intersecting more things can only make the result smaller.)
+        //
+        // ```py
+        // class A[T, U, V]: ...
+        //
+        // class C1[X: int, Y: str, Z]:
+        //     # `(T ≤ int ∩ U ≤ str)`
+        //     x: A[X, Y, Z]
+        //
+        // class C2[X: int, Y: str, Z: bytes]:
+        //     # `(T ≤ int ∩ U ≤ str ∩ V ≤ bytes)`
+        //     x: A[X, Y, Z]
+        //
+        // class Subsumption[X1: int, Y1: str, Z2, X2: int, Y2: str, Z2: bytes]:
+        //     # `(T ≤ int ∩ U ≤ str) ∪ (T ≤ int ∩ U ≤ str ∩ V ≤ bytes)`
+        //     # simplifies via subsumption to
+        //     # `(T ≤ int ∩ U ≤ str)`
+        //     x: A[X1, Y1, Z2] | A[X2, Y2, Z2]
+        // ```
         if self.subsumes_via_intersection(db, &other) {
             return Simplifiable::Simplified(other);
         }
@@ -551,6 +587,26 @@ impl<'db> ConstraintClause<'db> {
         // that out:
         //
         // (A₁ ∩ B ∩ C) ∪ (A₂ ∩ B ∩ C) = (A₁ ∪ A₂) ∩ B ∩ C
+        //
+        // ```py
+        // class A[T, U, V]: ...
+        //
+        // class C1[X: int, Y: str, Z: bytes]:
+        //     # `(T ≤ int ∩ U ≤ str ∩ V ≤ bytes)`
+        //     x: A[X, Y, Z]
+        //
+        // class C2[X: bool, Y: str, Z: bytes]:
+        //     # `(T ≤ bool ∩ U ≤ str ∩ V ≤ bytes)`
+        //     x: A[X, Y, Z]
+        //
+        // class Distribution[X1: int, Y1: str, Z2: bytes, X2: bool, Y2: str, Z2: bytes]:
+        //     # `(T ≤ int ∩ U ≤ str ∩ V ≤ bytes) ∪ (T ≤ bool ∩ U ≤ str ∩ V ≤ bytes)`
+        //     # simplifies via distribution to
+        //     # `(T ≤ int ∪ T ≤ bool) ∩ U ≤ str ∩ V ≤ bytes)`
+        //     # which (because `bool ≤ int`) is equivalent to
+        //     # `(T ≤ int ∩ U ≤ str ∩ V ≤ bytes)`
+        //     x: A[X1, Y1, Z2] | A[X2, Y2, Z2]
+        // ```
         if let Some(simplified) = self.simplifies_via_distribution(db, &other) {
             if simplified.is_always() {
                 return Simplifiable::AlwaysSatisfiable;
@@ -565,6 +621,9 @@ impl<'db> ConstraintClause<'db> {
     /// Returns whether this clause subsumes `other` via intersection — that is, if the
     /// intersection of `self` and `other` is `self`.
     fn subsumes_via_intersection(&self, db: &'db dyn Db, other: &Self) -> bool {
+        // See the notes in `simplify_clauses` for more details on subsumption, including Python
+        // examples that cause it to fire.
+
         if self.constraints.len() != other.constraints.len() {
             return false;
         }
@@ -598,6 +657,9 @@ impl<'db> ConstraintClause<'db> {
     /// constraints for exactly one typevar simplifies to a single constraint, and (c) the
     /// constraints for all other typevars are identical. Otherwise returns `None`.
     fn simplifies_via_distribution(&self, db: &'db dyn Db, other: &Self) -> Option<Self> {
+        // See the notes in `simplify_clauses` for more details on distribution, including Python
+        // examples that cause it to fire.
+
         if self.constraints.len() != other.constraints.len() {
             return None;
         }
