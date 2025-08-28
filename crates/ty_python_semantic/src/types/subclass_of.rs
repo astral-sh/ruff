@@ -3,9 +3,10 @@ use crate::semantic_index::definition::Definition;
 use crate::types::constraints::Constraints;
 use crate::types::variance::VarianceInferable;
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, DynamicType, HasRelationToVisitor,
-    IsDisjointVisitor, KnownClass, MaterializationKind, MemberLookupPolicy, NormalizedVisitor,
-    SpecialFormType, Type, TypeMapping, TypeRelation,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, DynamicType,
+    FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, KnownClass,
+    MaterializationKind, MemberLookupPolicy, NormalizedVisitor, SpecialFormType, Type, TypeMapping,
+    TypeRelation,
 };
 use crate::{Db, FxOrderSet};
 
@@ -111,15 +112,16 @@ impl<'db> SubclassOfType<'db> {
         }
     }
 
-    pub(super) fn find_legacy_typevars(
+    pub(super) fn find_legacy_typevars_impl(
         self,
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+        visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         match self.subclass_of {
             SubclassOfInner::Class(class) => {
-                class.find_legacy_typevars(db, binding_context, typevars);
+                class.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
             }
             SubclassOfInner::Dynamic(_) => {}
         }
