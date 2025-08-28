@@ -9,6 +9,7 @@ use rustc_hash::FxHashMap;
 use super::TypeVarVariance;
 use crate::semantic_index::place::ScopedPlaceId;
 use crate::semantic_index::{SemanticIndex, place_table};
+use crate::types::ClassType;
 use crate::types::context::InferContext;
 use crate::types::diagnostic::report_undeclared_protocol_member;
 use crate::{
@@ -17,8 +18,9 @@ use crate::{
     semantic_index::{definition::Definition, use_def_map},
     types::{
         BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, HasRelationToVisitor,
-        IsDisjointVisitor, KnownFunction, NormalizedVisitor, PropertyInstanceType, Signature, Type,
-        TypeMapping, TypeQualifiers, TypeRelation, VarianceInferable,
+        IsDisjointVisitor, KnownFunction, MaterializationKind, NormalizedVisitor,
+        PropertyInstanceType, Signature, Type, TypeMapping, TypeQualifiers, TypeRelation,
+        VarianceInferable,
         constraints::{Constraints, IteratorConstraintsExtension},
         signatures::{Parameter, Parameters},
     },
@@ -26,16 +28,24 @@ use crate::{
 
 impl<'db> ClassLiteral<'db> {
     /// Returns `Some` if this is a protocol class, `None` otherwise.
-    pub(super) fn into_protocol_class(self, db: &'db dyn Db) -> Option<ProtocolClassLiteral<'db>> {
-        self.is_protocol(db).then_some(ProtocolClassLiteral(self))
+    pub(super) fn into_protocol_class(self, db: &'db dyn Db) -> Option<ProtocolClass<'db>> {
+        self.is_protocol(db)
+            .then_some(ProtocolClass(ClassType::NonGeneric(self)))
+    }
+}
+
+impl<'db> ClassType<'db> {
+    /// Returns `Some` if this is a protocol class, `None` otherwise.
+    pub(super) fn into_protocol_class(self, db: &'db dyn Db) -> Option<ProtocolClass<'db>> {
+        self.is_protocol(db).then_some(ProtocolClass(self))
     }
 }
 
 /// Representation of a single `Protocol` class definition.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub(super) struct ProtocolClassLiteral<'db>(ClassLiteral<'db>);
+pub(super) struct ProtocolClass<'db>(ClassType<'db>);
 
-impl<'db> ProtocolClassLiteral<'db> {
+impl<'db> ProtocolClass<'db> {
     /// Returns the protocol members of this class.
     ///
     /// A protocol's members define the interface declared by the protocol.
@@ -56,7 +66,9 @@ impl<'db> ProtocolClassLiteral<'db> {
     }
 
     pub(super) fn is_runtime_checkable(self, db: &'db dyn Db) -> bool {
-        self.known_function_decorators(db)
+        self.class_literal(db)
+            .0
+            .known_function_decorators(db)
             .contains(&KnownFunction::RuntimeCheckable)
     }
 
@@ -66,10 +78,11 @@ impl<'db> ProtocolClassLiteral<'db> {
     pub(super) fn validate_members(self, context: &InferContext, index: &SemanticIndex<'db>) {
         let db = context.db();
         let interface = self.interface(db);
-        let class_place_table = index.place_table(self.body_scope(db).file_scope_id(db));
+        let body_scope = self.class_literal(db).0.body_scope(db);
+        let class_place_table = index.place_table(body_scope.file_scope_id(db));
 
         for (symbol_id, mut bindings_iterator) in
-            use_def_map(db, self.body_scope(db)).all_end_of_scope_symbol_bindings()
+            use_def_map(db, body_scope).all_end_of_scope_symbol_bindings()
         {
             let symbol_name = class_place_table.symbol(symbol_id).name();
 
@@ -77,27 +90,27 @@ impl<'db> ProtocolClassLiteral<'db> {
                 continue;
             }
 
-            let has_declaration = self
-                .iter_mro(db, None)
-                .filter_map(ClassBase::into_class)
-                .any(|superclass| {
-                    let superclass_scope = superclass.class_literal(db).0.body_scope(db);
-                    let Some(scoped_symbol_id) =
-                        place_table(db, superclass_scope).symbol_id(symbol_name)
-                    else {
-                        return false;
-                    };
-                    !place_from_declarations(
-                        db,
-                        index
-                            .use_def_map(superclass_scope.file_scope_id(db))
-                            .end_of_scope_declarations(ScopedPlaceId::Symbol(scoped_symbol_id)),
-                    )
-                    .into_place_and_conflicting_declarations()
-                    .0
-                    .place
-                    .is_unbound()
-                });
+            let has_declaration =
+                self.iter_mro(db)
+                    .filter_map(ClassBase::into_class)
+                    .any(|superclass| {
+                        let superclass_scope = superclass.class_literal(db).0.body_scope(db);
+                        let Some(scoped_symbol_id) =
+                            place_table(db, superclass_scope).symbol_id(symbol_name)
+                        else {
+                            return false;
+                        };
+                        !place_from_declarations(
+                            db,
+                            index
+                                .use_def_map(superclass_scope.file_scope_id(db))
+                                .end_of_scope_declarations(ScopedPlaceId::Symbol(scoped_symbol_id)),
+                        )
+                        .into_place_and_conflicting_declarations()
+                        .0
+                        .place
+                        .is_unbound()
+                    });
 
             if has_declaration {
                 continue;
@@ -114,8 +127,8 @@ impl<'db> ProtocolClassLiteral<'db> {
     }
 }
 
-impl<'db> Deref for ProtocolClassLiteral<'db> {
-    type Target = ClassLiteral<'db>;
+impl<'db> Deref for ProtocolClass<'db> {
+    type Target = ClassType<'db>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -243,12 +256,16 @@ impl<'db> ProtocolInterface<'db> {
         )
     }
 
-    pub(super) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+    pub(super) fn materialize(
+        self,
+        db: &'db dyn Db,
+        materialization_kind: MaterializationKind,
+    ) -> Self {
         Self::new(
             db,
             self.inner(db)
                 .iter()
-                .map(|(name, data)| (name.clone(), data.materialize(db, variance)))
+                .map(|(name, data)| (name.clone(), data.materialize(db, materialization_kind)))
                 .collect::<BTreeMap<_, _>>(),
         )
     }
@@ -353,9 +370,9 @@ impl<'db> ProtocolMemberData<'db> {
             .find_legacy_typevars(db, binding_context, typevars);
     }
 
-    fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+    fn materialize(&self, db: &'db dyn Db, materialization_kind: MaterializationKind) -> Self {
         Self {
-            kind: self.kind.materialize(db, variance),
+            kind: self.kind.materialize(db, materialization_kind),
             qualifiers: self.qualifiers,
         }
     }
@@ -458,16 +475,16 @@ impl<'db> ProtocolMemberKind<'db> {
         }
     }
 
-    fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+    fn materialize(self, db: &'db dyn Db, materialization_kind: MaterializationKind) -> Self {
         match self {
             ProtocolMemberKind::Method(callable) => {
-                ProtocolMemberKind::Method(callable.materialize(db, variance))
+                ProtocolMemberKind::Method(callable.materialize(db, materialization_kind))
             }
             ProtocolMemberKind::Property(property) => {
-                ProtocolMemberKind::Property(property.materialize(db, variance))
+                ProtocolMemberKind::Property(property.materialize(db, materialization_kind))
             }
             ProtocolMemberKind::Other(ty) => {
-                ProtocolMemberKind::Other(ty.materialize(db, variance))
+                ProtocolMemberKind::Other(ty.materialize(db, materialization_kind))
             }
         }
     }
@@ -622,16 +639,19 @@ impl BoundOnClass {
 #[salsa::tracked(cycle_fn=proto_interface_cycle_recover, cycle_initial=proto_interface_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
 fn cached_protocol_interface<'db>(
     db: &'db dyn Db,
-    class: ClassLiteral<'db>,
+    class: ClassType<'db>,
 ) -> ProtocolInterface<'db> {
     let mut members = BTreeMap::default();
 
-    for parent_protocol in class
-        .iter_mro(db, None)
+    for (parent_protocol, specialization) in class
+        .iter_mro(db)
         .filter_map(ClassBase::into_class)
-        .filter_map(|class| class.class_literal(db).0.into_protocol_class(db))
+        .filter_map(|class| {
+            let (class, specialization) = class.class_literal(db);
+            Some((class.into_protocol_class(db)?, specialization))
+        })
     {
-        let parent_scope = parent_protocol.body_scope(db);
+        let parent_scope = parent_protocol.class_literal(db).0.body_scope(db);
         let use_def_map = use_def_map(db, parent_scope);
         let place_table = place_table(db, parent_scope);
         let mut direct_members = FxHashMap::default();
@@ -676,6 +696,8 @@ fn cached_protocol_interface<'db>(
                 continue;
             }
 
+            let ty = ty.apply_optional_specialization(db, specialization);
+
             let member = match ty {
                 Type::PropertyInstance(property) => ProtocolMemberKind::Property(property),
                 Type::Callable(callable)
@@ -702,19 +724,21 @@ fn cached_protocol_interface<'db>(
     ProtocolInterface::new(db, members)
 }
 
+// If we use `expect(clippy::trivially_copy_pass_by_ref)` here,
+// the lint expectation is unfulfilled on WASM
 #[allow(clippy::trivially_copy_pass_by_ref)]
 fn proto_interface_cycle_recover<'db>(
     _db: &dyn Db,
     _value: &ProtocolInterface<'db>,
     _count: u32,
-    _class: ClassLiteral<'db>,
+    _class: ClassType<'db>,
 ) -> salsa::CycleRecoveryAction<ProtocolInterface<'db>> {
     salsa::CycleRecoveryAction::Iterate
 }
 
 fn proto_interface_cycle_initial<'db>(
     db: &'db dyn Db,
-    _class: ClassLiteral<'db>,
+    _class: ClassType<'db>,
 ) -> ProtocolInterface<'db> {
     ProtocolInterface::empty(db)
 }

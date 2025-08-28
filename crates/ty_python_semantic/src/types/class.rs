@@ -31,10 +31,10 @@ use crate::types::typed_dict::typed_dict_params_from_class_def;
 use crate::types::{
     ApplyTypeMappingVisitor, Binding, BoundSuperError, BoundSuperType, CallableType,
     DataclassParams, DeprecatedInstance, HasRelationToVisitor, IsEquivalentVisitor,
-    KnownInstanceType, ManualPEP695TypeAliasType, NormalizedVisitor, PropertyInstanceType,
-    StringLiteralType, TypeAliasType, TypeMapping, TypeRelation, TypeVarBoundOrConstraints,
-    TypeVarInstance, TypeVarKind, TypedDictParams, VarianceInferable, declaration_type,
-    infer_definition_types, todo_type,
+    KnownInstanceType, ManualPEP695TypeAliasType, MaterializationKind, NormalizedVisitor,
+    PropertyInstanceType, StringLiteralType, TypeAliasType, TypeMapping, TypeRelation,
+    TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, TypedDictParams, VarianceInferable,
+    declaration_type, infer_definition_types, todo_type,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet, Program,
@@ -272,11 +272,16 @@ impl<'db> GenericAlias<'db> {
         )
     }
 
-    pub(super) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+    pub(super) fn materialize(
+        self,
+        db: &'db dyn Db,
+        materialization_kind: MaterializationKind,
+    ) -> Self {
         Self::new(
             db,
             self.origin(db),
-            self.specialization(db).materialize(db, variance),
+            self.specialization(db)
+                .materialize(db, materialization_kind),
         )
     }
 
@@ -404,10 +409,14 @@ impl<'db> ClassType<'db> {
         }
     }
 
-    pub(super) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+    pub(super) fn materialize(
+        self,
+        db: &'db dyn Db,
+        materialization_kind: MaterializationKind,
+    ) -> Self {
         match self {
             Self::NonGeneric(_) => self,
-            Self::Generic(generic) => Self::Generic(generic.materialize(db, variance)),
+            Self::Generic(generic) => Self::Generic(generic.materialize(db, materialization_kind)),
         }
     }
 
@@ -1197,6 +1206,14 @@ impl<'db> ClassType<'db> {
                 }
             }
         }
+    }
+
+    pub(super) fn is_protocol(self, db: &'db dyn Db) -> bool {
+        self.class_literal(db).0.is_protocol(db)
+    }
+
+    pub(super) fn header_span(self, db: &'db dyn Db) -> Span {
+        self.class_literal(db).0.header_span(db)
     }
 }
 
