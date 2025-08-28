@@ -399,7 +399,6 @@ impl Display for DisplayRepresentation<'_> {
 }
 
 impl<'db> BoundTypeVarInstance<'db> {
-    #[allow(dead_code)]
     pub(crate) fn display(self, db: &'db dyn Db) -> impl Display {
         DisplayBoundTypeVarInstance {
             bound_typevar: self,
