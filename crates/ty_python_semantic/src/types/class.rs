@@ -514,7 +514,7 @@ impl<'db> ClassType<'db> {
         match self {
             Self::NonGeneric(_) => {}
             Self::Generic(generic) => {
-                generic.find_legacy_typevars_impl(db, binding_context, typevars, visitor)
+                generic.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
             }
         }
     }

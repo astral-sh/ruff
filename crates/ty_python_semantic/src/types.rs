@@ -6168,7 +6168,7 @@ impl<'db> Type<'db> {
             binding_context,
             typevars,
             &FindLegacyTypeVarsVisitor::default(),
-        )
+        );
     }
 
     pub(crate) fn find_legacy_typevars_impl(

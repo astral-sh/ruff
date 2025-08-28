@@ -1111,10 +1111,10 @@ impl<'db> Tuple<Type<'db>> {
     ) {
         match self {
             Tuple::Fixed(tuple) => {
-                tuple.find_legacy_typevars_impl(db, binding_context, typevars, visitor)
+                tuple.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
             }
             Tuple::Variable(tuple) => {
-                tuple.find_legacy_typevars_impl(db, binding_context, typevars, visitor)
+                tuple.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
             }
         }
     }
