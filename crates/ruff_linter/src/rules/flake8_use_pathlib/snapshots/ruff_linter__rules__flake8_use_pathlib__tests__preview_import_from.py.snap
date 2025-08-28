@@ -650,3 +650,68 @@ help: Replace with `Path(...).rename(...)`
 64 + pathlib.Path(file).rename("file_2.py")
 65 | 
 66 | rename(file, "file_2.py", src_dir_fd=1)
+67 | 
+
+PTH104 `os.rename()` should be replaced by `Path.rename()`
+  --> import_from.py:69:5
+   |
+67 | try:
+68 |     # Extra arguments to ensure autofix is suppressed
+69 |     rename(file, "file_3.py", None, None, 1, *[1], **{"x": 1}, foo=1)
+   |     ^^^^^^
+70 | except Exception:
+71 |     pass
+   |
+help: Replace with `Path(...).rename(...)`
+
+PTH101 [*] `os.chmod()` should be replaced by `Path.chmod()`
+  --> import_from.py:75:5
+   |
+73 | try:
+74 |     # Ensure chmod fix preserves follow_symlinks if present
+75 |     chmod("pth1_link", 0o600, follow_symlinks=False)
+   |     ^^^^^
+76 | except Exception:
+77 |     pass
+   |
+help: Replace with `Path(...).chmod(...)`
+2  | from os import remove, unlink, getcwd, readlink, stat
+3  | from os.path import abspath, exists, expanduser, isdir, isfile, islink
+4  | from os.path import isabs, join, basename, dirname, samefile, splitext
+5  + import pathlib
+6  | 
+7  | p = "/foo"
+8  | q = "bar"
+--------------------------------------------------------------------------------
+73 | 
+74 | try:
+75 |     # Ensure chmod fix preserves follow_symlinks if present
+   -     chmod("pth1_link", 0o600, follow_symlinks=False)
+76 +     pathlib.Path("pth1_link").chmod(0o600, follow_symlinks=False)
+77 | except Exception:
+78 |     pass
+79 | 
+
+PTH105 `os.replace()` should be replaced by `Path.replace()`
+  --> import_from.py:81:5
+   |
+79 | try:
+80 |     # Extra arguments for replace should suppress fix
+81 |     replace(file, "file_4.py", None, None, 1, *[1], **{"x": 1}, foo=1)
+   |     ^^^^^^^
+82 | except Exception:
+83 |     pass
+   |
+help: Replace with `Path(...).replace(...)`
+
+PTH121 `os.path.samefile()` should be replaced by `Path.samefile()`
+  --> import_from.py:87:5
+   |
+85 | try:
+86 |     # Extra arguments for samefile should suppress fix
+87 |     samefile(file, "file_5.py", 1, *[1], **{"x": 1}, foo=1)
+   |     ^^^^^^^^
+88 | except Exception:
+89 |     pass
+   |
+help: Replace with `Path(...).samefile()`

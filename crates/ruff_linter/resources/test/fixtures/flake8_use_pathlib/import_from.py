@@ -63,3 +63,27 @@ rename(
 rename(file, "file_2.py", src_dir_fd=None, dst_dir_fd=None)
 
 rename(file, "file_2.py", src_dir_fd=1)
+
+try:
+    # Extra arguments to ensure autofix is suppressed
+    rename(file, "file_3.py", None, None, 1, *[1], **{"x": 1}, foo=1)
+except Exception:
+    pass
+
+try:
+    # Ensure chmod fix preserves follow_symlinks if present
+    chmod("pth1_link", 0o600, follow_symlinks=False)
+except Exception:
+    pass
+
+try:
+    # Extra arguments for replace should suppress fix
+    replace(file, "file_4.py", None, None, 1, *[1], **{"x": 1}, foo=1)
+except Exception:
+    pass
+
+try:
+    # Extra arguments for samefile should suppress fix
+    samefile(file, "file_5.py", 1, *[1], **{"x": 1}, foo=1)
+except Exception:
+    pass
