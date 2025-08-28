@@ -202,7 +202,10 @@ enum ReduceResult<'db> {
 
 // TODO increase this once we extend `UnionElement` throughout all union/intersection
 // representations, so that we can make large unions of literals fast in all operations.
-const MAX_UNION_LITERALS: usize = 200;
+//
+// For now (until we solve https://github.com/astral-sh/ty/issues/957), keep this number
+// below 200, which is the salsa fixpoint iteration limit.
+const MAX_UNION_LITERALS: usize = 199;
 
 pub(crate) struct UnionBuilder<'db> {
     elements: Vec<UnionElement<'db>>,
