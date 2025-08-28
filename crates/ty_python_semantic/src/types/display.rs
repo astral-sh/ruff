@@ -16,8 +16,8 @@ use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::tuple::TupleSpec;
 use crate::types::{
-    CallableType, IntersectionType, KnownClass, MethodWrapperKind, Protocol, StringLiteralType,
-    SubclassOfInner, Type, UnionType, WrapperDescriptorKind,
+    CallableType, IntersectionType, KnownClass, MaterializationKind, MethodWrapperKind, Protocol,
+    StringLiteralType, SubclassOfInner, Type, UnionType, WrapperDescriptorKind,
 };
 use ruff_db::parsed::parsed_module;
 
@@ -614,14 +614,25 @@ impl Display for DisplayGenericAlias<'_> {
         if let Some(tuple) = self.specialization.tuple(self.db) {
             tuple.display_with(self.db, self.settings).fmt(f)
         } else {
+            let prefix = match self.specialization.materialization_kind(self.db) {
+                None => "",
+                Some(MaterializationKind::Top) => "Top[",
+                Some(MaterializationKind::Bottom) => "Bottom[",
+            };
+            let suffix = match self.specialization.materialization_kind(self.db) {
+                None => "",
+                Some(_) => "]",
+            };
             write!(
                 f,
-                "{origin}{specialization}",
+                "{prefix}{origin}{specialization}{suffix}",
+                prefix = prefix,
                 origin = self.origin.name(self.db),
                 specialization = self.specialization.display_short(
                     self.db,
                     TupleSpecialization::from_class(self.db, self.origin)
                 ),
+                suffix = suffix,
             )
         }
     }
