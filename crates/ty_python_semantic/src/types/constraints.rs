@@ -22,7 +22,7 @@
 //! "open" (where it is not).
 //!
 //! You can then build up more complex constraint sets using union, intersection, and negation
-//! operations. We use a distributed normal form (DNF) representation, just like we do for types: a
+//! operations. We use a disjunctive normal form (DNF) representation, just like we do for types: a
 //! [constraint set][ConstraintSet] is the union of zero or more [clauses][ConstraintClause], each
 //! of which is the intersection of zero or more [individual constraints][AtomicConstraint]. Note
 //! that the constraint set that contains no clauses is never satisfiable (`⋃ {} = 0`); and the
@@ -389,7 +389,7 @@ impl<'db> Constraints<'db> for ConstraintSet<'db> {
     }
 
     fn is_always_satisfied(&self, _db: &'db dyn Db) -> bool {
-        self.clauses.len() == 1 && self.clauses[0].constraints.is_empty()
+        self.clauses.len() == 1 && self.clauses[0].is_always()
     }
 
     fn union(&mut self, db: &'db dyn Db, other: Self) -> &Self {
