@@ -240,7 +240,7 @@ impl<'db> ConstraintSet<'db> {
         while let Some(existing) = existing_clauses.next() {
             // Try to simplify the new clause against an existing clause.
             match existing.simplify_clauses(db, clause) {
-                Simplified::Never => {
+                Simplified::NeverSatisfiable => {
                     // If two clauses cancel out to 0, that does NOT cause the entire set to become
                     // 0.  We need to keep whatever clauses have already been added to the result,
                     // and also need to copy over any later clauses that we hadn't processed yet.
@@ -248,7 +248,7 @@ impl<'db> ConstraintSet<'db> {
                     return;
                 }
 
-                Simplified::Always => {
+                Simplified::AlwaysSatisfiable => {
                     // If two clauses cancel out to 1, that makes the entire set 1, and all
                     // existing clauses are simplified away.
                     self.clauses.clear();
@@ -256,7 +256,7 @@ impl<'db> ConstraintSet<'db> {
                     return;
                 }
 
-                Simplified::Two(existing, c) => {
+                Simplified::NotSimplifiable(existing, c) => {
                     // We couldn't simplify the new clause relative to this existing clause, so add
                     // the existing clause to the result. Continue trying to simplify the new
                     // clause against the later existing clauses.
@@ -264,7 +264,7 @@ impl<'db> ConstraintSet<'db> {
                     clause = c;
                 }
 
-                Simplified::One(c) => {
+                Simplified::Simplified(c) => {
                     // We were able to simplify the new clause relative to this existing clause.
                     // Don't add it to the result yet; instead, try to simplify the result further
                     // against later existing clauses.
@@ -479,7 +479,7 @@ impl<'db> ConstraintClause<'db> {
         //
         // If either clause is always satisfiable, the union is too. (`1 ∪ C₂ = 1`, `C₁ ∪ 1 = 1`)
         if self.is_always() || other.is_always() {
-            return Simplified::One(Self::always());
+            return Simplified::Simplified(Self::always());
         }
 
         // Subsumption
@@ -493,10 +493,10 @@ impl<'db> ConstraintClause<'db> {
         // (Note that possibly counterintuitively, "bigger" here means _fewer_ constraints in the
         // intersection, since intersecting more things can only make the result smaller.)
         if self.subsumes_via_intersection(db, &other) {
-            return Simplified::One(other);
+            return Simplified::Simplified(other);
         }
         if other.subsumes_via_intersection(db, &self) {
-            return Simplified::One(self);
+            return Simplified::Simplified(self);
         }
 
         // Distribution
@@ -507,13 +507,13 @@ impl<'db> ConstraintClause<'db> {
         // (A₁ ∩ B ∩ C) ∪ (A₂ ∩ B ∩ C) = (A₁ ∪ A₂) ∩ B ∩ C
         if let Some(simplified) = self.simplifies_via_distribution(db, &other) {
             if simplified.is_always() {
-                return Simplified::Always;
+                return Simplified::AlwaysSatisfiable;
             }
-            return Simplified::One(simplified);
+            return Simplified::Simplified(simplified);
         }
 
         // Can't be simplified
-        Simplified::Two(self, other)
+        Simplified::NotSimplifiable(self, other)
     }
 
     /// Returns whether this clause subsumes `other` via intersection — that is, if the
@@ -573,14 +573,14 @@ impl<'db> ConstraintClause<'db> {
                         continue;
                     }
                     let union_constraint = match self_constraint.union(db, *other_constraint) {
-                        Simplified::Two(_, _) => {
+                        Simplified::NotSimplifiable(_, _) => {
                             // The constraints for this typevar are not identical, nor do they
                             // simplify.
                             return None;
                         }
-                        Simplified::One(union_constraint) => Some(union_constraint),
-                        Simplified::Always => None,
-                        Simplified::Never => {
+                        Simplified::Simplified(union_constraint) => Some(union_constraint),
+                        Simplified::AlwaysSatisfiable => None,
+                        Simplified::NeverSatisfiable => {
                             panic!("unioning two non-never constraints should not be never")
                         }
                     };
@@ -968,7 +968,7 @@ impl<'db> AtomicConstraint<'db> {
             true
         };
         if !is_subtype_of(self.lower, other.upper) || !is_subtype_of(other.lower, self.upper) {
-            return Simplified::Two(self, other);
+            return Simplified::NotSimplifiable(self, other);
         }
 
         // Otherwise the result is `min_lower(s₁,s₂) : max_upper(t₁,t₂)`. (See the documentation of
@@ -1013,6 +1013,8 @@ impl<'db> AtomicConstraint<'db> {
     }
 }
 
+/// Wraps a constraint (or clause, or set), while using distinct variants to represent when the
+/// constraint is never satisfiable or always satisfiable.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum Satisfiable<T> {
     Never,
@@ -1020,20 +1022,23 @@ enum Satisfiable<T> {
     Constrained(T),
 }
 
+/// The result of trying to simplify two constraints (or clauses, or sets). Like [`Satisfiable`],
+/// we use distinct variants to represent when the simplification is never satisfiable or always
+/// satisfiable.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum Simplified<T> {
-    Never,
-    Always,
-    One(T),
-    Two(T, T),
+    NeverSatisfiable,
+    AlwaysSatisfiable,
+    Simplified(T),
+    NotSimplifiable(T, T),
 }
 
 impl<T> Simplified<T> {
     fn from_one(constraint: Satisfiable<T>) -> Self {
         match constraint {
-            Satisfiable::Never => Simplified::Never,
-            Satisfiable::Always => Simplified::Always,
-            Satisfiable::Constrained(constraint) => Simplified::One(constraint),
+            Satisfiable::Never => Simplified::NeverSatisfiable,
+            Satisfiable::Always => Simplified::AlwaysSatisfiable,
+            Satisfiable::Constrained(constraint) => Simplified::Simplified(constraint),
         }
     }
 }
