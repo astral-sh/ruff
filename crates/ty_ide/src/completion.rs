@@ -5,12 +5,13 @@ use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast as ast;
 use ruff_python_parser::{Token, TokenAt, TokenKind};
 use ruff_text_size::{Ranged, TextRange, TextSize};
+use ty_python_semantic::types::Type;
 use ty_python_semantic::{Completion, NameKind, SemanticModel};
 
-use crate::Db;
 use crate::docstring::Docstring;
 use crate::find_node::covering_node;
 use crate::goto::DefinitionsOrTargets;
+use crate::{Db, all_symbols};
 
 pub fn completion(db: &dyn Db, file: File, offset: TextSize) -> Vec<DetailedCompletion<'_>> {
     let parsed = parsed_module(db, file).load(db);
@@ -37,7 +38,17 @@ pub fn completion(db: &dyn Db, file: File, offset: TextSize) -> Vec<DetailedComp
         CompletionTargetAst::Import { .. } | CompletionTargetAst::ImportViaFrom { .. } => {
             model.import_completions()
         }
-        CompletionTargetAst::Scoped { node } => model.scoped_completions(node),
+        CompletionTargetAst::Scoped { node } => {
+            let mut completions = model.scoped_completions(node);
+            for symbol in all_symbols(db, "") {
+                completions.push(Completion {
+                    name: ast::name::Name::new(&symbol.symbol.name),
+                    ty: Type::unknown(),
+                    builtin: false,
+                });
+            }
+            completions
+        }
     };
     completions.sort_by(compare_suggestions);
     completions.dedup_by(|c1, c2| c1.name == c2.name);

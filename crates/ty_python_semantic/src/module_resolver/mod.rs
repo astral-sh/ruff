@@ -1,6 +1,6 @@
 use std::iter::FusedIterator;
 
-pub use list::list_modules;
+pub use list::{all_modules, list_modules};
 pub(crate) use module::KnownModule;
 pub use module::Module;
 pub use path::{SearchPath, SearchPathValidationError};
