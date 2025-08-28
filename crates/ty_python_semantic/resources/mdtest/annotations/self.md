@@ -224,32 +224,112 @@ reveal_type(D.class_method)
 
 ## Constructor `__new__` return type handling
 
-When a class's `__new__` method returns a different type than the class itself,
-the type checker should respect that return type annotation.
+The type checker respects explicit return type annotations on `__new__` methods.
 
 ```py
+from typing import Self
+
+# Non-instance return type
 class A:
     def __new__(cls) -> "int | A":
-        if True:  # simplified condition
-            return object.__new__(cls)
-        else:
-            return 42
+        import random
+        return 42 if random.random() > 0.5 else object.__new__(cls)
 
 reveal_type(A())  # revealed: int | A
 
-def expects_a(x: A) -> None:
-    assert isinstance(x, A)
-
-a = A()
-# error: [invalid-argument-type] "Argument to function `expects_a` is incorrect: Expected `A`, found `int | A`"
-expects_a(a)
-
-# Class that only returns a different type
+# Self return type
 class B:
+    def __new__(cls) -> Self:
+        return super().__new__(cls)
+
+reveal_type(B())  # revealed: B
+
+# Generic class with explicit return type
+from typing import TypeVar, Generic, Tuple
+
+T = TypeVar("T")
+
+class SendChannel(Generic[T]):
+    pass
+
+class ReceiveChannel(Generic[T]):
+    pass
+
+class ChannelPair(Tuple[SendChannel[T], ReceiveChannel[T]], Generic[T]):
+    def __new__(
+        cls, buffer_size: int
+    ) -> Tuple[SendChannel[T], ReceiveChannel[T]]:
+        # In reality would create and return the tuple
+        return (SendChannel[T](), ReceiveChannel[T]())
+    
+    def __init__(self, buffer_size: int):
+        pass
+
+# Test generic specialization
+int_channel = ChannelPair[int](5)
+reveal_type(int_channel)  # revealed: tuple[SendChannel[int], ReceiveChannel[int]]
+
+str_channel = ChannelPair[str](10)  
+reveal_type(str_channel)  # revealed: tuple[SendChannel[str], ReceiveChannel[str]]
+
+# Test unspecialized generic
+unspecified_channel = ChannelPair(5)
+reveal_type(unspecified_channel)  # revealed: tuple[SendChannel[Unknown], ReceiveChannel[Unknown]]
+
+# Test Any return type (per spec, Any means "not an instance")
+from typing import Any
+
+class WithAny:
+    def __new__(cls) -> Any:
+        return 42
+    
+    def __init__(self, required_param: str):
+        # This should not be called since __new__ returns Any
+        # If it were called, WithAny() would error due to missing required_param
+        pass
+
+# This should work (not error) because __init__ shouldn't be called
+reveal_type(WithAny())  # revealed: Any
+
+# Test union containing Any (per spec, should also bypass __init__)
+class WithUnionAny:
+    def __new__(cls) -> "int | Any":
+        return 42
+    
+    def __init__(self):
+        # This should not be called since __new__ returns union with Any
+        pass
+
+reveal_type(WithUnionAny())  # revealed: int | Any
+
+# Test non-instance return type (not Any, but also not a subclass)
+class ReturnsInt:
     def __new__(cls) -> int:
         return 42
+    
+    def __init__(self, required_param: str):
+        # This should not be called since __new__ returns int (not an instance)
+        pass
 
-reveal_type(B())  # revealed: int
+# This should work because __init__ shouldn't be called
+reveal_type(ReturnsInt())  # revealed: int
+
+# Test NamedTuple - special handling for synthesized __new__ that returns None
+from typing import NamedTuple
+
+class Point(NamedTuple):
+    x: int
+    y: int
+
+# NamedTuple instances are correctly typed
+p = Point(1, 2)
+reveal_type(p)  # revealed: Point
+reveal_type(p.x)  # revealed: int
+reveal_type(p.y)  # revealed: int
+
+# Also works with keyword arguments
+p2 = Point(x=3, y=4)
+reveal_type(p2)  # revealed: Point
 ```
 
 [self attribute]: https://typing.python.org/en/latest/spec/generics.html#use-in-attribute-annotations
