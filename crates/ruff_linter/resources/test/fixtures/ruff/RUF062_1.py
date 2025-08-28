@@ -224,3 +224,18 @@ def returning_match_case(variable):
             yield # valid
             return
     yield # valid
+
+# (21) Invalid: preceeding yields makes all match yields illegal
+@contextlib.contextmanager
+def fully_illegal_match(variable):
+    yield # valid
+    match variable:
+        case "a":
+            yield # invalid
+            return
+        case "b":
+            yield # invalid
+
+
+
+

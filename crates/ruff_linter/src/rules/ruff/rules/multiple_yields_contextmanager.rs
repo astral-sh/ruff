@@ -131,9 +131,9 @@ impl<'a, 'b> YieldTracker<'a, 'b> {
         }
     }
 
-    fn emit_multiple_violations(&mut self, yields: &[&'a Expr]) {
+    fn emit_multiple_violations<'e>(&mut self, yields: impl IntoIterator<Item = &'e &'e Expr>) {
         // The first yield conforms to the protocol
-        for &yield_expr in yields.iter().skip(1) {
+        for yield_expr in yields.into_iter().skip(1) {
             self.emit_violation(yield_expr);
         }
     }
@@ -203,10 +203,6 @@ impl<'a, 'b> YieldTracker<'a, 'b> {
             .pop_scope()
             .expect("Missing try block scope in try-statement");
 
-        self.emit_multiple_violations(&try_yields);
-        self.emit_multiple_violations(&else_yields);
-        self.emit_multiple_violations(&finally_yields);
-
         let path = TryExceptPath {
             try_yields,
             try_returns,
@@ -245,7 +241,6 @@ impl<'a, 'b> YieldTracker<'a, 'b> {
     }
 
     fn handle_exclusive_branches(&mut self, branch_count: usize) {
-        let mut returning_branches = Vec::new();
         let mut continuing_branches = Vec::new();
 
         for _ in 0..branch_count {
@@ -254,17 +249,13 @@ impl<'a, 'b> YieldTracker<'a, 'b> {
                 .expect("Missing branch scope in if/match statement");
             self.emit_multiple_violations(&branch_yields);
 
-            if branch_returns {
-                returning_branches.push(branch_yields);
-            } else {
+            if !branch_returns {
                 continuing_branches.push(branch_yields);
             }
         }
 
-        let max_returning = Self::max_yields(&returning_branches);
         let max_continuing = Self::max_yields(&continuing_branches);
 
-        self.emit_multiple_violations(&max_returning);
         self.propagate_yields(&max_continuing);
     }
 
@@ -330,7 +321,7 @@ impl<'a, 'b> YieldTracker<'a, 'b> {
             self.emit_multiple_violations(&try_path);
             self.propagate_yields(exception_no_return);
         } else if path.else_returns {
-            self.emit_multiple_violations(&normal_path);
+            self.emit_multiple_violations(normal_path);
             self.propagate_yields(exception_no_return);
         } else {
             let max_yield_path = if normal_path.len() > exception_no_return.len() {
