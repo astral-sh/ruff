@@ -129,7 +129,7 @@ specialization. Thus, the typevar is a subtype of itself and of `object`, but no
 (including other typevars).
 
 ```py
-from ty_extensions import is_assignable_to, is_subtype_of, static_assert
+from ty_extensions import is_subtype_of, reveal_when_assignable_to, static_assert
 
 class Super: ...
 class Base(Super): ...
@@ -137,14 +137,14 @@ class Sub(Base): ...
 class Unrelated: ...
 
 def unbounded_unconstrained[T, U](t: T, u: U) -> None:
-    static_assert(is_assignable_to(T, T))
-    static_assert(is_assignable_to(T, object))
-    static_assert(not is_assignable_to(T, Super))
-    static_assert(is_assignable_to(U, U))
-    static_assert(is_assignable_to(U, object))
-    static_assert(not is_assignable_to(U, Super))
-    static_assert(not is_assignable_to(T, U))
-    static_assert(not is_assignable_to(U, T))
+    reveal_when_assignable_to(T, T)  # revealed: always
+    reveal_when_assignable_to(T, object)  # revealed: always
+    reveal_when_assignable_to(T, Super)  # revealed: never
+    reveal_when_assignable_to(U, U)  # revealed: always
+    reveal_when_assignable_to(U, object)  # revealed: always
+    reveal_when_assignable_to(U, Super)  # revealed: never
+    reveal_when_assignable_to(T, U)  # revealed: never
+    reveal_when_assignable_to(U, T)  # revealed: never
 
     static_assert(is_subtype_of(T, T))
     static_assert(is_subtype_of(T, object))
@@ -167,10 +167,10 @@ from typing import Any
 from typing_extensions import final
 
 def bounded[T: Super](t: T) -> None:
-    static_assert(is_assignable_to(T, Super))
-    static_assert(not is_assignable_to(T, Sub))
-    static_assert(not is_assignable_to(Super, T))
-    static_assert(not is_assignable_to(Sub, T))
+    reveal_when_assignable_to(T, Super)  # revealed: always
+    reveal_when_assignable_to(T, Sub)  # revealed: never
+    reveal_when_assignable_to(Super, T)  # revealed: never
+    reveal_when_assignable_to(Sub, T)  # revealed: never
 
     static_assert(is_subtype_of(T, Super))
     static_assert(not is_subtype_of(T, Sub))
@@ -178,12 +178,12 @@ def bounded[T: Super](t: T) -> None:
     static_assert(not is_subtype_of(Sub, T))
 
 def bounded_by_gradual[T: Any](t: T) -> None:
-    static_assert(is_assignable_to(T, Any))
-    static_assert(is_assignable_to(Any, T))
-    static_assert(is_assignable_to(T, Super))
-    static_assert(not is_assignable_to(Super, T))
-    static_assert(is_assignable_to(T, Sub))
-    static_assert(not is_assignable_to(Sub, T))
+    reveal_when_assignable_to(T, Any)  # revealed: always
+    reveal_when_assignable_to(Any, T)  # revealed: always
+    reveal_when_assignable_to(T, Super)  # revealed: always
+    reveal_when_assignable_to(Super, T)  # revealed: never
+    reveal_when_assignable_to(T, Sub)  # revealed: always
+    reveal_when_assignable_to(Sub, T)  # revealed: never
 
     static_assert(not is_subtype_of(T, Any))
     static_assert(not is_subtype_of(Any, T))
@@ -196,8 +196,8 @@ def bounded_by_gradual[T: Any](t: T) -> None:
 class FinalClass: ...
 
 def bounded_final[T: FinalClass](t: T) -> None:
-    static_assert(is_assignable_to(T, FinalClass))
-    static_assert(not is_assignable_to(FinalClass, T))
+    reveal_when_assignable_to(T, FinalClass)  # revealed: always
+    reveal_when_assignable_to(FinalClass, T)  # revealed: never
 
     static_assert(is_subtype_of(T, FinalClass))
     static_assert(not is_subtype_of(FinalClass, T))
@@ -210,15 +210,15 @@ typevars to `Never` in addition to that final class.
 
 ```py
 def two_bounded[T: Super, U: Super](t: T, u: U) -> None:
-    static_assert(not is_assignable_to(T, U))
-    static_assert(not is_assignable_to(U, T))
+    reveal_when_assignable_to(T, U)  # revealed: never
+    reveal_when_assignable_to(U, T)  # revealed: never
 
     static_assert(not is_subtype_of(T, U))
     static_assert(not is_subtype_of(U, T))
 
 def two_final_bounded[T: FinalClass, U: FinalClass](t: T, u: U) -> None:
-    static_assert(not is_assignable_to(T, U))
-    static_assert(not is_assignable_to(U, T))
+    reveal_when_assignable_to(T, U)  # revealed: never
+    reveal_when_assignable_to(U, T)  # revealed: never
 
     static_assert(not is_subtype_of(T, U))
     static_assert(not is_subtype_of(U, T))
@@ -232,17 +232,17 @@ intersection of all of its constraints is a subtype of the typevar.
 from ty_extensions import Intersection
 
 def constrained[T: (Base, Unrelated)](t: T) -> None:
-    static_assert(not is_assignable_to(T, Super))
-    static_assert(not is_assignable_to(T, Base))
-    static_assert(not is_assignable_to(T, Sub))
-    static_assert(not is_assignable_to(T, Unrelated))
-    static_assert(is_assignable_to(T, Super | Unrelated))
-    static_assert(is_assignable_to(T, Base | Unrelated))
-    static_assert(not is_assignable_to(T, Sub | Unrelated))
-    static_assert(not is_assignable_to(Super, T))
-    static_assert(not is_assignable_to(Unrelated, T))
-    static_assert(not is_assignable_to(Super | Unrelated, T))
-    static_assert(is_assignable_to(Intersection[Base, Unrelated], T))
+    reveal_when_assignable_to(T, Super)  # revealed: never
+    reveal_when_assignable_to(T, Base)  # revealed: never
+    reveal_when_assignable_to(T, Sub)  # revealed: never
+    reveal_when_assignable_to(T, Unrelated)  # revealed: never
+    reveal_when_assignable_to(T, Super | Unrelated)  # revealed: always
+    reveal_when_assignable_to(T, Base | Unrelated)  # revealed: always
+    reveal_when_assignable_to(T, Sub | Unrelated)  # revealed: never
+    reveal_when_assignable_to(Super, T)  # revealed: never
+    reveal_when_assignable_to(Unrelated, T)  # revealed: never
+    reveal_when_assignable_to(Super | Unrelated, T)  # revealed: never
+    reveal_when_assignable_to(Intersection[Base, Unrelated], T)  # revealed: always
 
     static_assert(not is_subtype_of(T, Super))
     static_assert(not is_subtype_of(T, Base))
@@ -257,22 +257,22 @@ def constrained[T: (Base, Unrelated)](t: T) -> None:
     static_assert(is_subtype_of(Intersection[Base, Unrelated], T))
 
 def constrained_by_gradual[T: (Base, Any)](t: T) -> None:
-    static_assert(is_assignable_to(T, Super))
-    static_assert(is_assignable_to(T, Base))
-    static_assert(not is_assignable_to(T, Sub))
-    static_assert(not is_assignable_to(T, Unrelated))
-    static_assert(is_assignable_to(T, Any))
-    static_assert(is_assignable_to(T, Super | Any))
-    static_assert(is_assignable_to(T, Super | Unrelated))
-    static_assert(not is_assignable_to(Super, T))
-    static_assert(is_assignable_to(Base, T))
-    static_assert(not is_assignable_to(Unrelated, T))
-    static_assert(is_assignable_to(Any, T))
-    static_assert(not is_assignable_to(Super | Any, T))
-    static_assert(is_assignable_to(Base | Any, T))
-    static_assert(not is_assignable_to(Super | Unrelated, T))
-    static_assert(is_assignable_to(Intersection[Base, Unrelated], T))
-    static_assert(is_assignable_to(Intersection[Base, Any], T))
+    reveal_when_assignable_to(T, Super)  # revealed: always
+    reveal_when_assignable_to(T, Base)  # revealed: always
+    reveal_when_assignable_to(T, Sub)  # revealed: never
+    reveal_when_assignable_to(T, Unrelated)  # revealed: never
+    reveal_when_assignable_to(T, Any)  # revealed: always
+    reveal_when_assignable_to(T, Super | Any)  # revealed: always
+    reveal_when_assignable_to(T, Super | Unrelated)  # revealed: always
+    reveal_when_assignable_to(Super, T)  # revealed: never
+    reveal_when_assignable_to(Base, T)  # revealed: always
+    reveal_when_assignable_to(Unrelated, T)  # revealed: never
+    reveal_when_assignable_to(Any, T)  # revealed: always
+    reveal_when_assignable_to(Super | Any, T)  # revealed: never
+    reveal_when_assignable_to(Base | Any, T)  # revealed: always
+    reveal_when_assignable_to(Super | Unrelated, T)  # revealed: never
+    reveal_when_assignable_to(Intersection[Base, Unrelated], T)  # revealed: always
+    reveal_when_assignable_to(Intersection[Base, Any], T)  # revealed: always
 
     static_assert(not is_subtype_of(T, Super))
     static_assert(not is_subtype_of(T, Base))
@@ -299,8 +299,8 @@ the same type.
 
 ```py
 def two_constrained[T: (int, str), U: (int, str)](t: T, u: U) -> None:
-    static_assert(not is_assignable_to(T, U))
-    static_assert(not is_assignable_to(U, T))
+    reveal_when_assignable_to(T, U)  # revealed: never
+    reveal_when_assignable_to(U, T)  # revealed: never
 
     static_assert(not is_subtype_of(T, U))
     static_assert(not is_subtype_of(U, T))
@@ -309,8 +309,8 @@ def two_constrained[T: (int, str), U: (int, str)](t: T, u: U) -> None:
 class AnotherFinalClass: ...
 
 def two_final_constrained[T: (FinalClass, AnotherFinalClass), U: (FinalClass, AnotherFinalClass)](t: T, u: U) -> None:
-    static_assert(not is_assignable_to(T, U))
-    static_assert(not is_assignable_to(U, T))
+    reveal_when_assignable_to(T, U)  # revealed: never
+    reveal_when_assignable_to(U, T)  # revealed: never
 
     static_assert(not is_subtype_of(T, U))
     static_assert(not is_subtype_of(U, T))
@@ -320,8 +320,8 @@ A bound or constrained typevar is a subtype of itself in a union:
 
 ```py
 def union[T: Base, U: (Base, Unrelated)](t: T, u: U) -> None:
-    static_assert(is_assignable_to(T, T | None))
-    static_assert(is_assignable_to(U, U | None))
+    reveal_when_assignable_to(T, T | None)  # revealed: always
+    reveal_when_assignable_to(U, U | None)  # revealed: always
 
     static_assert(is_subtype_of(T, T | None))
     static_assert(is_subtype_of(U, U | None))
@@ -331,8 +331,8 @@ A bound or constrained typevar in a union with a dynamic type is assignable to t
 
 ```py
 def union_with_dynamic[T: Base, U: (Base, Unrelated)](t: T, u: U) -> None:
-    static_assert(is_assignable_to(T | Any, T))
-    static_assert(is_assignable_to(U | Any, U))
+    reveal_when_assignable_to(T | Any, T)  # revealed: always
+    reveal_when_assignable_to(U | Any, U)  # revealed: always
 
     static_assert(not is_subtype_of(T | Any, T))
     static_assert(not is_subtype_of(U | Any, U))
@@ -346,10 +346,10 @@ from ty_extensions import Intersection, Not, is_disjoint_from
 class A: ...
 
 def inter[T: Base, U: (Base, Unrelated)](t: T, u: U) -> None:
-    static_assert(is_assignable_to(Intersection[T, Unrelated], T))
+    reveal_when_assignable_to(Intersection[T, Unrelated], T)  # revealed: always
     static_assert(is_subtype_of(Intersection[T, Unrelated], T))
 
-    static_assert(is_assignable_to(Intersection[U, A], U))
+    reveal_when_assignable_to(Intersection[U, A], U)  # revealed: always
     static_assert(is_subtype_of(Intersection[U, A], U))
 
     static_assert(is_disjoint_from(Not[T], T))
@@ -647,11 +647,11 @@ The intersection of a typevar with any other type is assignable to (and if fully
 of) itself.
 
 ```py
-from ty_extensions import is_assignable_to, is_subtype_of, static_assert, Not
+from ty_extensions import is_subtype_of, reveal_when_assignable_to, static_assert, Not
 
 def intersection_is_assignable[T](t: T) -> None:
-    static_assert(is_assignable_to(Intersection[T, None], T))
-    static_assert(is_assignable_to(Intersection[T, Not[None]], T))
+    reveal_when_assignable_to(Intersection[T, None], T)  # revealed: always
+    reveal_when_assignable_to(Intersection[T, Not[None]], T)  # revealed: always
 
     static_assert(is_subtype_of(Intersection[T, None], T))
     static_assert(is_subtype_of(Intersection[T, Not[None]], T))

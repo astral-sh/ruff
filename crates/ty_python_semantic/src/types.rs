@@ -4158,6 +4158,22 @@ impl<'db> Type<'db> {
                 )
                 .into(),
 
+                Some(KnownFunction::RevealWhenAssignableTo) => Binding::single(
+                    self,
+                    Signature::new(
+                        Parameters::new([
+                            Parameter::positional_only(Some(Name::new_static("a")))
+                                .type_form()
+                                .with_annotated_type(Type::any()),
+                            Parameter::positional_only(Some(Name::new_static("b")))
+                                .type_form()
+                                .with_annotated_type(Type::any()),
+                        ]),
+                        Some(KnownClass::NoneType.to_instance(db)),
+                    ),
+                )
+                .into(),
+
                 Some(KnownFunction::IsSingleton | KnownFunction::IsSingleValued) => {
                     Binding::single(
                         self,

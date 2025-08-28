@@ -326,6 +326,13 @@ impl Matcher {
                         return true;
                     }
 
+                    // reveal_when_assignable_to
+                    if primary_message == "Assignability holds"
+                        && primary_annotation == *expected_type
+                    {
+                        return true;
+                    }
+
                     false
                 };
 
