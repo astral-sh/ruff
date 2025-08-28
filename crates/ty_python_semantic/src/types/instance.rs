@@ -12,9 +12,9 @@ use crate::types::enums::is_single_member_enum;
 use crate::types::protocol_class::walk_protocol_interface;
 use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
-    ApplyTypeMappingVisitor, ClassBase, HasRelationToVisitor, IsDisjointVisitor,
-    IsEquivalentVisitor, MaterializationKind, NormalizedVisitor, TypeMapping, TypeRelation,
-    VarianceInferable,
+    ApplyTypeMappingVisitor, ClassBase, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
+    IsDisjointVisitor, IsEquivalentVisitor, MaterializationKind, NormalizedVisitor, TypeMapping,
+    TypeRelation, VarianceInferable,
 };
 use crate::{Db, FxOrderSet};
 
@@ -380,18 +380,19 @@ impl<'db> NominalInstanceType<'db> {
         }
     }
 
-    pub(super) fn find_legacy_typevars(
+    pub(super) fn find_legacy_typevars_impl(
         self,
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+        visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => {
-                tuple.find_legacy_typevars(db, binding_context, typevars);
+                tuple.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
             }
             NominalInstanceInner::NonTuple(class) => {
-                class.find_legacy_typevars(db, binding_context, typevars);
+                class.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
             }
         }
     }
@@ -614,18 +615,19 @@ impl<'db> ProtocolInstanceType<'db> {
         }
     }
 
-    pub(super) fn find_legacy_typevars(
+    pub(super) fn find_legacy_typevars_impl(
         self,
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+        visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         match self.inner {
             Protocol::FromClass(class) => {
-                class.find_legacy_typevars(db, binding_context, typevars);
+                class.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
             }
             Protocol::Synthesized(synthesized) => {
-                synthesized.find_legacy_typevars(db, binding_context, typevars);
+                synthesized.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
             }
         }
     }
@@ -679,8 +681,8 @@ mod synthesized_protocol {
     use crate::semantic_index::definition::Definition;
     use crate::types::protocol_class::ProtocolInterface;
     use crate::types::{
-        ApplyTypeMappingVisitor, BoundTypeVarInstance, MaterializationKind, NormalizedVisitor,
-        TypeMapping, TypeVarVariance, VarianceInferable,
+        ApplyTypeMappingVisitor, BoundTypeVarInstance, FindLegacyTypeVarsVisitor,
+        MaterializationKind, NormalizedVisitor, TypeMapping, TypeVarVariance, VarianceInferable,
     };
     use crate::{Db, FxOrderSet};
 
@@ -724,13 +726,15 @@ mod synthesized_protocol {
             Self(self.0.specialized_and_normalized(db, type_mapping))
         }
 
-        pub(super) fn find_legacy_typevars(
+        pub(super) fn find_legacy_typevars_impl(
             self,
             db: &'db dyn Db,
             binding_context: Option<Definition<'db>>,
             typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+            visitor: &FindLegacyTypeVarsVisitor<'db>,
         ) {
-            self.0.find_legacy_typevars(db, binding_context, typevars);
+            self.0
+                .find_legacy_typevars_impl(db, binding_context, typevars, visitor);
         }
 
         pub(in crate::types) fn interface(self) -> ProtocolInterface<'db> {
