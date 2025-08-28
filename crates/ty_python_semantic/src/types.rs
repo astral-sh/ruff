@@ -5377,8 +5377,13 @@ impl<'db> Type<'db> {
         let should_call_init = should_invoke_init(new_return_type.as_ref(), instance_ty, db);
 
         // Construct an instance type that we can use to look up the `__init__` instance method.
-        // Always use instance_ty, not new_return_type, since __init__ is called on the instance
-        let init_ty = instance_ty;
+        // When doing generic inference and there's no custom __new__, use the identity-specialized
+        // type (self_type) so that __init__ can infer the type parameters.
+        let init_ty = if generic_origin.is_some() && new_call_outcome.is_none() {
+            self_type.to_instance(db).unwrap_or(instance_ty)
+        } else {
+            instance_ty
+        };
 
         let init_call_outcome = if should_call_init
             && (new_call_outcome.is_none()
