@@ -1038,6 +1038,49 @@ def _(int_str: tuple[int, str], int_any: tuple[int, Any], any_any: tuple[Any, An
     reveal_type(f(*(any_any,)))  # revealed: Unknown
 ```
 
+### `Unknown` passed into an overloaded function annotated with protocols
+
+`Foo.join()` here has similar annotations to `str.join()` in typeshed:
+
+`module.pyi`:
+
+```pyi
+from typing_extensions import Iterable, overload, LiteralString, Protocol
+from ty_extensions import Unknown, is_assignable_to
+
+class Foo:
+    @overload
+    def join(self, iterable: Iterable[LiteralString], /) -> LiteralString: ...
+    @overload
+    def join(self, iterable: Iterable[str], /) -> str: ...
+```
+
+`main.py`:
+
+```py
+from module import Foo
+from typing_extensions import LiteralString
+
+def f(a: Foo, b: list[str], c: list[LiteralString], e):
+    reveal_type(e)  # revealed: Unknown
+
+    # TODO: we should select the second overload here and reveal `str`
+    # (the incorrect result is due to missing logic in protocol subtyping/assignability)
+    reveal_type(a.join(b))  # revealed: LiteralString
+
+    reveal_type(a.join(c))  # revealed: LiteralString
+
+    # since both overloads match and they have return types that are not equivalent,
+    # step (5) of the overload evaluation algorithm says we must evaluate the result of the
+    # call as `Unknown`.
+    #
+    # Note: although the spec does not state as such (since intersections in general are not
+    # specified currently), `(str | LiteralString) & Unknown` might also be a reasonable type
+    # here (the union of all overload returns, intersected with `Unknown`) -- here that would
+    # simplify to `str & Unknown`.
+    reveal_type(a.join(e))  # revealed: Unknown
+```
+
 ### Multiple arguments
 
 `overloaded.pyi`:

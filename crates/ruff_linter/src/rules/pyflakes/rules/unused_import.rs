@@ -334,7 +334,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
             .allowed_unused_imports
             .iter()
             .any(|allowed_unused_import| {
-                let allowed_unused_import = QualifiedName::from_dotted_name(allowed_unused_import);
+                let allowed_unused_import = QualifiedName::user_defined(allowed_unused_import);
                 import.qualified_name().starts_with(&allowed_unused_import)
             })
         {
