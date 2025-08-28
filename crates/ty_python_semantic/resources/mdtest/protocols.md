@@ -2339,6 +2339,28 @@ class Bar(Protocol[S]):
 z: S | Bar[S]
 ```
 
+### Recursive legacy generic protocol
+
+```py
+from typing import Generic, TypeVar, Protocol
+
+T = TypeVar("T")
+
+class P(Protocol[T]):
+    attr: "P[T] | T"
+
+class A(Generic[T]):
+    attr: T
+
+class B(A[P[int]]):
+    pass
+
+def f(b: B):
+    reveal_type(b)  # revealed: B
+    reveal_type(b.attr)  # revealed: P[int]
+    reveal_type(b.attr.attr)  # revealed: P[int] | int
+```
+
 ### Recursive generic protocols with property members
 
 An early version of <https://github.com/astral-sh/ruff/pull/19936> caused stack overflows on this
@@ -2450,30 +2472,6 @@ from ty_extensions import reveal_protocol_interface
 
 # error: [revealed-type] "Revealed protocol interface: `{"x": AttributeMember(`int`; ClassVar)}`"
 reveal_protocol_interface(Foo)
-```
-
-## Cycles
-
-### Cyclic legacy-generic protocol
-
-```py
-from typing import Generic, TypeVar, Protocol
-
-T = TypeVar("T")
-
-class P(Protocol[T]):
-    attr: "P[T] | T"
-
-class A(Generic[T]):
-    attr: T
-
-class B(A[P[int]]):
-    pass
-
-def f(b: B):
-    reveal_type(b)  # revealed: B
-    reveal_type(b.attr)  # revealed: P[int]
-    reveal_type(b.attr.attr)  # revealed: P[int] | int
 ```
 
 ## TODO
