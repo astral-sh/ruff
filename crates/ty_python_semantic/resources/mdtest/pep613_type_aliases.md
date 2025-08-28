@@ -109,6 +109,22 @@ f("foo")
 f([1, "foo"])
 ```
 
+### Generic
+
+```py
+from typing import TypeAlias, Generic, TypeVar, Union
+
+T = TypeVar("T")
+
+Alias: TypeAlias = Union[list["Alias"], int]
+
+class A(Generic[T]):
+    pass
+
+class B(A[Alias]):
+    pass
+```
+
 ### Union inside generic
 
 #### With old-style union
