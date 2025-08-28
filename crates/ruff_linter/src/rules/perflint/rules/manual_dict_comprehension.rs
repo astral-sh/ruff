@@ -362,7 +362,7 @@ fn convert_to_dict_comprehension(
     {
         if elts.len() != 1 {
             return None;
-        };
+        }
         if *parenthesized {
             locator.slice(key).to_string()
         } else {
