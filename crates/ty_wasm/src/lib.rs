@@ -425,7 +425,10 @@ impl Workspace {
                 documentation: completion
                     .documentation
                     .map(|documentation| documentation.render_plaintext()),
-                detail: completion.inner.ty.display(&self.db).to_string().into(),
+                detail: completion
+                    .inner
+                    .ty
+                    .map(|ty| ty.display(&self.db).to_string()),
             })
             .collect())
     }
