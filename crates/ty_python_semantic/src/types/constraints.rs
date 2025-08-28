@@ -409,7 +409,7 @@ impl<'db> ConstraintClause<'db> {
     fn intersect_constraint(
         &mut self,
         db: &'db dyn Db,
-        constraint: AtomicConstraint<'db>,
+        constraint: &AtomicConstraint<'db>,
     ) -> Satisfiable<()> {
         // If the clause does not already contain a constraint for this typevar, we just insert the
         // new constraint into the clause and return.
@@ -418,7 +418,7 @@ impl<'db> ConstraintClause<'db> {
         {
             Ok(index) => index,
             Err(index) => {
-                self.constraints.insert(index, constraint);
+                self.constraints.insert(index, constraint.clone());
                 return Satisfiable::Constrained(());
             }
         };
@@ -460,7 +460,7 @@ impl<'db> ConstraintClause<'db> {
         // Add each `other` constraint in turn. Short-circuit if the result ever becomes 0.
         let mut result = self.clone();
         for constraint in &other.constraints {
-            match result.intersect_constraint(db, *constraint) {
+            match result.intersect_constraint(db, constraint) {
                 Satisfiable::Never => return Satisfiable::Never,
                 Satisfiable::Always | Satisfiable::Constrained(()) => {}
             }
@@ -537,7 +537,7 @@ impl<'db> ConstraintClause<'db> {
                 // Both clauses contain a constraint with this typevar; verify that the constraint
                 // in `self` is smaller.
                 EitherOrBoth::Both(self_constraint, other_constraint) => {
-                    if !self_constraint.subsumes(db, *other_constraint) {
+                    if !self_constraint.subsumes(db, other_constraint) {
                         return false;
                     }
                 }
@@ -571,7 +571,7 @@ impl<'db> ConstraintClause<'db> {
                     if self_constraint == other_constraint {
                         continue;
                     }
-                    let union_constraint = match self_constraint.union(db, *other_constraint) {
+                    let union_constraint = match self_constraint.union(db, other_constraint) {
                         Simplifiable::NotSimplified(_, _) => {
                             // The constraints for this typevar are not identical, nor do they
                             // simplify.
@@ -669,7 +669,7 @@ impl<'db> ConstraintClause<'db> {
 /// - The bounds must actually constrain the typevar. If the typevar can be specialized to any
 ///   type, or if there is no valid type that it can be specialized to, then we don't create an
 ///   `AtomicConstraint` for the typevar.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct AtomicConstraint<'db> {
     typevar: BoundTypeVarInstance<'db>,
     lower: ConstraintBound<'db>,
@@ -896,7 +896,7 @@ impl<'db> AtomicConstraint<'db> {
     /// ```text
     /// ¬(s ≤ T ≤ t) ⇒ ¬(s ≤ T ∧ T ≤ t) ⇒ (s > T) ∨ (T > t)
     /// ```
-    fn negate(self, db: &'db dyn Db) -> ConstraintSet<'db> {
+    fn negate(&self, db: &'db dyn Db) -> ConstraintSet<'db> {
         let mut result = ConstraintSet::never();
         result.union_constraint(
             db,
@@ -921,15 +921,18 @@ impl<'db> AtomicConstraint<'db> {
 
     /// Returns whether `self` has tighter bounds than `other` — that is, if the intersection of
     /// `self` and `other` is `self`.
-    fn subsumes(self, db: &'db dyn Db, other: Self) -> bool {
+    fn subsumes(&self, db: &'db dyn Db, other: &Self) -> bool {
         debug_assert_eq!(self.typevar, other.typevar);
-        self.intersect(db, other) == Satisfiable::Constrained(self)
+        match self.intersect(db, other) {
+            Satisfiable::Constrained(intersection) => intersection == *self,
+            _ => false,
+        }
     }
 
     /// Returns the intersection of this atomic constraint and another.
     ///
     /// Panics if the two constraints have different typevars.
-    fn intersect(self, db: &'db dyn Db, other: Self) -> Satisfiable<Self> {
+    fn intersect(&self, db: &'db dyn Db, other: &Self) -> Satisfiable<Self> {
         debug_assert_eq!(self.typevar, other.typevar);
 
         // The result is always `max_lower(s₁,s₂) : min_upper(t₁,t₂)`. (See the documentation of
@@ -946,7 +949,7 @@ impl<'db> AtomicConstraint<'db> {
     /// Returns the union of this atomic constraint and another.
     ///
     /// Panics if the two constraints have different typevars.
-    fn union(self, db: &'db dyn Db, other: Self) -> Simplifiable<Self> {
+    fn union(&self, db: &'db dyn Db, other: &Self) -> Simplifiable<Self> {
         debug_assert_eq!(self.typevar, other.typevar);
 
         // When the two constraints are disjoint, then they cannot be simplified.
@@ -967,7 +970,7 @@ impl<'db> AtomicConstraint<'db> {
             true
         };
         if !is_subtype_of(self.lower, other.upper) || !is_subtype_of(other.lower, self.upper) {
-            return Simplifiable::NotSimplified(self, other);
+            return Simplifiable::NotSimplified(self.clone(), other.clone());
         }
 
         // Otherwise the result is `min_lower(s₁,s₂) : max_upper(t₁,t₂)`. (See the documentation of
@@ -981,13 +984,13 @@ impl<'db> AtomicConstraint<'db> {
         ))
     }
 
-    fn display(self, db: &'db dyn Db) -> impl Display {
-        struct DisplayAtomicConstraint<'db> {
-            constraint: AtomicConstraint<'db>,
+    fn display(&self, db: &'db dyn Db) -> impl Display {
+        struct DisplayAtomicConstraint<'a, 'db> {
+            constraint: &'a AtomicConstraint<'db>,
             db: &'db dyn Db,
         }
 
-        impl Display for DisplayAtomicConstraint<'_> {
+        impl Display for DisplayAtomicConstraint<'_, '_> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 f.write_str("(")?;
                 match self.constraint.lower {
