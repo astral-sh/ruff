@@ -47,9 +47,9 @@ def f(x: Iterable[int], y: list[str], z: Never, aa: list[Never]):
 reveal_type(tuple((1, 2)))  # revealed: tuple[Literal[1], Literal[2]]
 
 # TODO: should be `tuple[Literal[1], ...]`
-reveal_type(tuple([1]))  # revealed: tuple[Unknown, ...]
+reveal_type(tuple([1]))  # revealed: tuple[@Todo(list literal element type), ...]
 
-# error: [invalid-argument-type] "Argument is incorrect: Expected `tuple[int]`, found `list[Unknown]`"
+# error: [invalid-argument-type]
 reveal_type(tuple[int]([1]))  # revealed: tuple[int]
 
 # error: [invalid-argument-type] "Argument is incorrect: Expected `tuple[int, str]`, found `tuple[Literal[1]]`"

@@ -20,8 +20,9 @@ use crate::semantic_index::definition::Definition;
 use crate::types::constraints::{Constraints, IteratorConstraintsExtension};
 use crate::types::generics::{GenericContext, walk_generic_context};
 use crate::types::{
-    BindingContext, BoundTypeVarInstance, HasRelationToVisitor, IsEquivalentVisitor, KnownClass,
-    NormalizedVisitor, TypeMapping, TypeRelation, VarianceInferable, todo_type,
+    BindingContext, BoundTypeVarInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
+    IsEquivalentVisitor, KnownClass, MaterializationKind, NormalizedVisitor, TypeMapping,
+    TypeRelation, VarianceInferable, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -57,11 +58,15 @@ impl<'db> CallableSignature<'db> {
         self.overloads.iter()
     }
 
-    pub(super) fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+    pub(super) fn materialize(
+        &self,
+        db: &'db dyn Db,
+        materialization_kind: MaterializationKind,
+    ) -> Self {
         Self::from_overloads(
             self.overloads
                 .iter()
-                .map(|signature| signature.materialize(db, variance)),
+                .map(|signature| signature.materialize(db, materialization_kind)),
         )
     }
 
@@ -89,14 +94,15 @@ impl<'db> CallableSignature<'db> {
         )
     }
 
-    pub(crate) fn find_legacy_typevars(
+    pub(crate) fn find_legacy_typevars_impl(
         &self,
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+        visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         for signature in &self.overloads {
-            signature.find_legacy_typevars(db, binding_context, typevars);
+            signature.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
         }
     }
 
@@ -405,17 +411,17 @@ impl<'db> Signature<'db> {
         self
     }
 
-    fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+    fn materialize(&self, db: &'db dyn Db, materialization_kind: MaterializationKind) -> Self {
         Self {
             generic_context: self.generic_context,
             inherited_generic_context: self.inherited_generic_context,
             definition: self.definition,
             // Parameters are at contravariant position, so the variance is flipped.
-            parameters: self.parameters.materialize(db, variance.flip()),
+            parameters: self.parameters.materialize(db, materialization_kind.flip()),
             return_ty: Some(
                 self.return_ty
                     .unwrap_or(Type::unknown())
-                    .materialize(db, variance),
+                    .materialize(db, materialization_kind),
             ),
         }
     }
@@ -462,22 +468,23 @@ impl<'db> Signature<'db> {
         }
     }
 
-    pub(crate) fn find_legacy_typevars(
+    pub(crate) fn find_legacy_typevars_impl(
         &self,
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+        visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         for param in &self.parameters {
             if let Some(ty) = param.annotated_type() {
-                ty.find_legacy_typevars(db, binding_context, typevars);
+                ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
             }
             if let Some(ty) = param.default_type() {
-                ty.find_legacy_typevars(db, binding_context, typevars);
+                ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
             }
         }
         if let Some(ty) = self.return_ty {
-            ty.find_legacy_typevars(db, binding_context, typevars);
+            ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
         }
     }
 
@@ -1063,13 +1070,13 @@ impl<'db> Parameters<'db> {
         }
     }
 
-    fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+    fn materialize(&self, db: &'db dyn Db, materialization_kind: MaterializationKind) -> Self {
         if self.is_gradual {
             Parameters::object(db)
         } else {
             Parameters::new(
                 self.iter()
-                    .map(|parameter| parameter.materialize(db, variance)),
+                    .map(|parameter| parameter.materialize(db, materialization_kind)),
             )
         }
     }
@@ -1395,12 +1402,12 @@ impl<'db> Parameter<'db> {
         self
     }
 
-    fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+    fn materialize(&self, db: &'db dyn Db, materialization_kind: MaterializationKind) -> Self {
         Self {
             annotated_type: Some(
                 self.annotated_type
                     .unwrap_or(Type::unknown())
-                    .materialize(db, variance),
+                    .materialize(db, materialization_kind),
             ),
             kind: self.kind.clone(),
             form: self.form,

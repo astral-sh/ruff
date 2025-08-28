@@ -12,16 +12,14 @@ E252 [*] Missing whitespace around parameter equals
 48 | #: Okay
    |
 help: Add missing whitespace
-
-ℹ Safe fix
-43 43 | async  def add(a: int = 0, b: int = 0) -> int:
-44 44 |     return a + b
-45 45 | #: E252:1:15 E252:1:16 E252:1:27 E252:1:36
-46    |-def add(a: int=0, b: int =0, c: int= 0) -> int:
-   46 |+def add(a: int =0, b: int =0, c: int= 0) -> int:
-47 47 |     return a + b + c
-48 48 | #: Okay
-49 49 | def add(a: int = _default(name='f')):
+43 | async  def add(a: int = 0, b: int = 0) -> int:
+44 |     return a + b
+45 | #: E252:1:15 E252:1:16 E252:1:27 E252:1:36
+   - def add(a: int=0, b: int =0, c: int= 0) -> int:
+46 + def add(a: int =0, b: int =0, c: int= 0) -> int:
+47 |     return a + b + c
+48 | #: Okay
+49 | def add(a: int = _default(name='f')):
 
 E252 [*] Missing whitespace around parameter equals
   --> E25.py:46:15
@@ -34,16 +32,14 @@ E252 [*] Missing whitespace around parameter equals
 48 | #: Okay
    |
 help: Add missing whitespace
-
-ℹ Safe fix
-43 43 | async  def add(a: int = 0, b: int = 0) -> int:
-44 44 |     return a + b
-45 45 | #: E252:1:15 E252:1:16 E252:1:27 E252:1:36
-46    |-def add(a: int=0, b: int =0, c: int= 0) -> int:
-   46 |+def add(a: int= 0, b: int =0, c: int= 0) -> int:
-47 47 |     return a + b + c
-48 48 | #: Okay
-49 49 | def add(a: int = _default(name='f')):
+43 | async  def add(a: int = 0, b: int = 0) -> int:
+44 |     return a + b
+45 | #: E252:1:15 E252:1:16 E252:1:27 E252:1:36
+   - def add(a: int=0, b: int =0, c: int= 0) -> int:
+46 + def add(a: int= 0, b: int =0, c: int= 0) -> int:
+47 |     return a + b + c
+48 | #: Okay
+49 | def add(a: int = _default(name='f')):
 
 E252 [*] Missing whitespace around parameter equals
   --> E25.py:46:26
@@ -56,16 +52,14 @@ E252 [*] Missing whitespace around parameter equals
 48 | #: Okay
    |
 help: Add missing whitespace
-
-ℹ Safe fix
-43 43 | async  def add(a: int = 0, b: int = 0) -> int:
-44 44 |     return a + b
-45 45 | #: E252:1:15 E252:1:16 E252:1:27 E252:1:36
-46    |-def add(a: int=0, b: int =0, c: int= 0) -> int:
-   46 |+def add(a: int=0, b: int = 0, c: int= 0) -> int:
-47 47 |     return a + b + c
-48 48 | #: Okay
-49 49 | def add(a: int = _default(name='f')):
+43 | async  def add(a: int = 0, b: int = 0) -> int:
+44 |     return a + b
+45 | #: E252:1:15 E252:1:16 E252:1:27 E252:1:36
+   - def add(a: int=0, b: int =0, c: int= 0) -> int:
+46 + def add(a: int=0, b: int = 0, c: int= 0) -> int:
+47 |     return a + b + c
+48 | #: Okay
+49 | def add(a: int = _default(name='f')):
 
 E252 [*] Missing whitespace around parameter equals
   --> E25.py:46:36
@@ -78,16 +72,14 @@ E252 [*] Missing whitespace around parameter equals
 48 | #: Okay
    |
 help: Add missing whitespace
-
-ℹ Safe fix
-43 43 | async  def add(a: int = 0, b: int = 0) -> int:
-44 44 |     return a + b
-45 45 | #: E252:1:15 E252:1:16 E252:1:27 E252:1:36
-46    |-def add(a: int=0, b: int =0, c: int= 0) -> int:
-   46 |+def add(a: int=0, b: int =0, c: int = 0) -> int:
-47 47 |     return a + b + c
-48 48 | #: Okay
-49 49 | def add(a: int = _default(name='f')):
+43 | async  def add(a: int = 0, b: int = 0) -> int:
+44 |     return a + b
+45 | #: E252:1:15 E252:1:16 E252:1:27 E252:1:36
+   - def add(a: int=0, b: int =0, c: int= 0) -> int:
+46 + def add(a: int=0, b: int =0, c: int = 0) -> int:
+47 |     return a + b + c
+48 | #: Okay
+49 | def add(a: int = _default(name='f')):
 
 E252 [*] Missing whitespace around parameter equals
   --> E25.py:64:18
@@ -98,16 +90,14 @@ E252 [*] Missing whitespace around parameter equals
 65 |     pass
    |
 help: Add missing whitespace
-
-ℹ Safe fix
-61 61 | print(f"{foo(a = 1)}")
-62 62 | 
-63 63 | # There should be at least one E251 diagnostic for each type parameter here:
-64    |-def pep_696_bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]():
-   64 |+def pep_696_bad[A =int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]():
-65 65 |     pass
-66 66 | 
-67 67 | class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
+61 | print(f"{foo(a = 1)}")
+62 | 
+63 | # There should be at least one E251 diagnostic for each type parameter here:
+   - def pep_696_bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]():
+64 + def pep_696_bad[A =int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]():
+65 |     pass
+66 | 
+67 | class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
 
 E252 [*] Missing whitespace around parameter equals
   --> E25.py:64:18
@@ -118,16 +108,14 @@ E252 [*] Missing whitespace around parameter equals
 65 |     pass
    |
 help: Add missing whitespace
-
-ℹ Safe fix
-61 61 | print(f"{foo(a = 1)}")
-62 62 | 
-63 63 | # There should be at least one E251 diagnostic for each type parameter here:
-64    |-def pep_696_bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]():
-   64 |+def pep_696_bad[A= int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]():
-65 65 |     pass
-66 66 | 
-67 67 | class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
+61 | print(f"{foo(a = 1)}")
+62 | 
+63 | # There should be at least one E251 diagnostic for each type parameter here:
+   - def pep_696_bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]():
+64 + def pep_696_bad[A= int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]():
+65 |     pass
+66 | 
+67 | class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
 
 E252 [*] Missing whitespace around parameter equals
   --> E25.py:64:26
@@ -138,16 +126,14 @@ E252 [*] Missing whitespace around parameter equals
 65 |     pass
    |
 help: Add missing whitespace
-
-ℹ Safe fix
-61 61 | print(f"{foo(a = 1)}")
-62 62 | 
-63 63 | # There should be at least one E251 diagnostic for each type parameter here:
-64    |-def pep_696_bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]():
-   64 |+def pep_696_bad[A=int, B = str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]():
-65 65 |     pass
-66 66 | 
-67 67 | class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
+61 | print(f"{foo(a = 1)}")
+62 | 
+63 | # There should be at least one E251 diagnostic for each type parameter here:
+   - def pep_696_bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]():
+64 + def pep_696_bad[A=int, B = str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]():
+65 |     pass
+66 | 
+67 | class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
 
 E252 [*] Missing whitespace around parameter equals
   --> E25.py:64:33
@@ -158,16 +144,14 @@ E252 [*] Missing whitespace around parameter equals
 65 |     pass
    |
 help: Add missing whitespace
-
-ℹ Safe fix
-61 61 | print(f"{foo(a = 1)}")
-62 62 | 
-63 63 | # There should be at least one E251 diagnostic for each type parameter here:
-64    |-def pep_696_bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]():
-   64 |+def pep_696_bad[A=int, B =str, C = bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]():
-65 65 |     pass
-66 66 | 
-67 67 | class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
+61 | print(f"{foo(a = 1)}")
+62 | 
+63 | # There should be at least one E251 diagnostic for each type parameter here:
+   - def pep_696_bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]():
+64 + def pep_696_bad[A=int, B =str, C = bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]():
+65 |     pass
+66 | 
+67 | class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
 
 E252 [*] Missing whitespace around parameter equals
   --> E25.py:64:49
@@ -178,16 +162,14 @@ E252 [*] Missing whitespace around parameter equals
 65 |     pass
    |
 help: Add missing whitespace
-
-ℹ Safe fix
-61 61 | print(f"{foo(a = 1)}")
-62 62 | 
-63 63 | # There should be at least one E251 diagnostic for each type parameter here:
-64    |-def pep_696_bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]():
-   64 |+def pep_696_bad[A=int, B =str, C= bool, D:object =int, E: object=str, F: object =bool, G: object= bytes]():
-65 65 |     pass
-66 66 | 
-67 67 | class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
+61 | print(f"{foo(a = 1)}")
+62 | 
+63 | # There should be at least one E251 diagnostic for each type parameter here:
+   - def pep_696_bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]():
+64 + def pep_696_bad[A=int, B =str, C= bool, D:object =int, E: object=str, F: object =bool, G: object= bytes]():
+65 |     pass
+66 | 
+67 | class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
 
 E252 [*] Missing whitespace around parameter equals
   --> E25.py:64:49
@@ -198,16 +180,14 @@ E252 [*] Missing whitespace around parameter equals
 65 |     pass
    |
 help: Add missing whitespace
-
-ℹ Safe fix
-61 61 | print(f"{foo(a = 1)}")
-62 62 | 
-63 63 | # There should be at least one E251 diagnostic for each type parameter here:
-64    |-def pep_696_bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]():
-   64 |+def pep_696_bad[A=int, B =str, C= bool, D:object= int, E: object=str, F: object =bool, G: object= bytes]():
-65 65 |     pass
-66 66 | 
-67 67 | class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
+61 | print(f"{foo(a = 1)}")
+62 | 
+63 | # There should be at least one E251 diagnostic for each type parameter here:
+   - def pep_696_bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]():
+64 + def pep_696_bad[A=int, B =str, C= bool, D:object= int, E: object=str, F: object =bool, G: object= bytes]():
+65 |     pass
+66 | 
+67 | class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
 
 E252 [*] Missing whitespace around parameter equals
   --> E25.py:64:64
@@ -218,16 +198,14 @@ E252 [*] Missing whitespace around parameter equals
 65 |     pass
    |
 help: Add missing whitespace
-
-ℹ Safe fix
-61 61 | print(f"{foo(a = 1)}")
-62 62 | 
-63 63 | # There should be at least one E251 diagnostic for each type parameter here:
-64    |-def pep_696_bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]():
-   64 |+def pep_696_bad[A=int, B =str, C= bool, D:object=int, E: object =str, F: object =bool, G: object= bytes]():
-65 65 |     pass
-66 66 | 
-67 67 | class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
+61 | print(f"{foo(a = 1)}")
+62 | 
+63 | # There should be at least one E251 diagnostic for each type parameter here:
+   - def pep_696_bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]():
+64 + def pep_696_bad[A=int, B =str, C= bool, D:object=int, E: object =str, F: object =bool, G: object= bytes]():
+65 |     pass
+66 | 
+67 | class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
 
 E252 [*] Missing whitespace around parameter equals
   --> E25.py:64:64
@@ -238,16 +216,14 @@ E252 [*] Missing whitespace around parameter equals
 65 |     pass
    |
 help: Add missing whitespace
-
-ℹ Safe fix
-61 61 | print(f"{foo(a = 1)}")
-62 62 | 
-63 63 | # There should be at least one E251 diagnostic for each type parameter here:
-64    |-def pep_696_bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]():
-   64 |+def pep_696_bad[A=int, B =str, C= bool, D:object=int, E: object= str, F: object =bool, G: object= bytes]():
-65 65 |     pass
-66 66 | 
-67 67 | class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
+61 | print(f"{foo(a = 1)}")
+62 | 
+63 | # There should be at least one E251 diagnostic for each type parameter here:
+   - def pep_696_bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]():
+64 + def pep_696_bad[A=int, B =str, C= bool, D:object=int, E: object= str, F: object =bool, G: object= bytes]():
+65 |     pass
+66 | 
+67 | class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
 
 E252 [*] Missing whitespace around parameter equals
   --> E25.py:64:80
@@ -258,16 +234,14 @@ E252 [*] Missing whitespace around parameter equals
 65 |     pass
    |
 help: Add missing whitespace
-
-ℹ Safe fix
-61 61 | print(f"{foo(a = 1)}")
-62 62 | 
-63 63 | # There should be at least one E251 diagnostic for each type parameter here:
-64    |-def pep_696_bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]():
-   64 |+def pep_696_bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object = bool, G: object= bytes]():
-65 65 |     pass
-66 66 | 
-67 67 | class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
+61 | print(f"{foo(a = 1)}")
+62 | 
+63 | # There should be at least one E251 diagnostic for each type parameter here:
+   - def pep_696_bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]():
+64 + def pep_696_bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object = bool, G: object= bytes]():
+65 |     pass
+66 | 
+67 | class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
 
 E252 [*] Missing whitespace around parameter equals
   --> E25.py:64:96
@@ -278,16 +252,14 @@ E252 [*] Missing whitespace around parameter equals
 65 |     pass
    |
 help: Add missing whitespace
-
-ℹ Safe fix
-61 61 | print(f"{foo(a = 1)}")
-62 62 | 
-63 63 | # There should be at least one E251 diagnostic for each type parameter here:
-64    |-def pep_696_bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]():
-   64 |+def pep_696_bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object = bytes]():
-65 65 |     pass
-66 66 | 
-67 67 | class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
+61 | print(f"{foo(a = 1)}")
+62 | 
+63 | # There should be at least one E251 diagnostic for each type parameter here:
+   - def pep_696_bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]():
+64 + def pep_696_bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object = bytes]():
+65 |     pass
+66 | 
+67 | class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
 
 E252 [*] Missing whitespace around parameter equals
   --> E25.py:67:18
@@ -299,16 +271,14 @@ E252 [*] Missing whitespace around parameter equals
 68 |     pass
    |
 help: Add missing whitespace
-
-ℹ Safe fix
-64 64 | def pep_696_bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]():
-65 65 |     pass
-66 66 | 
-67    |-class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
-   67 |+class PEP696Bad[A =int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
-68 68 |     pass
-69 69 | 
-70 70 | # The last of these should cause us to emit E231,
+64 | def pep_696_bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]():
+65 |     pass
+66 | 
+   - class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
+67 + class PEP696Bad[A =int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
+68 |     pass
+69 | 
+70 | # The last of these should cause us to emit E231,
 
 E252 [*] Missing whitespace around parameter equals
   --> E25.py:67:18
@@ -320,16 +290,14 @@ E252 [*] Missing whitespace around parameter equals
 68 |     pass
    |
 help: Add missing whitespace
-
-ℹ Safe fix
-64 64 | def pep_696_bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]():
-65 65 |     pass
-66 66 | 
-67    |-class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
-   67 |+class PEP696Bad[A= int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
-68 68 |     pass
-69 69 | 
-70 70 | # The last of these should cause us to emit E231,
+64 | def pep_696_bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]():
+65 |     pass
+66 | 
+   - class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
+67 + class PEP696Bad[A= int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
+68 |     pass
+69 | 
+70 | # The last of these should cause us to emit E231,
 
 E252 [*] Missing whitespace around parameter equals
   --> E25.py:67:26
@@ -341,16 +309,14 @@ E252 [*] Missing whitespace around parameter equals
 68 |     pass
    |
 help: Add missing whitespace
-
-ℹ Safe fix
-64 64 | def pep_696_bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]():
-65 65 |     pass
-66 66 | 
-67    |-class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
-   67 |+class PEP696Bad[A=int, B = str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
-68 68 |     pass
-69 69 | 
-70 70 | # The last of these should cause us to emit E231,
+64 | def pep_696_bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]():
+65 |     pass
+66 | 
+   - class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
+67 + class PEP696Bad[A=int, B = str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
+68 |     pass
+69 | 
+70 | # The last of these should cause us to emit E231,
 
 E252 [*] Missing whitespace around parameter equals
   --> E25.py:67:33
@@ -362,16 +328,14 @@ E252 [*] Missing whitespace around parameter equals
 68 |     pass
    |
 help: Add missing whitespace
-
-ℹ Safe fix
-64 64 | def pep_696_bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]():
-65 65 |     pass
-66 66 | 
-67    |-class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
-   67 |+class PEP696Bad[A=int, B =str, C = bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
-68 68 |     pass
-69 69 | 
-70 70 | # The last of these should cause us to emit E231,
+64 | def pep_696_bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]():
+65 |     pass
+66 | 
+   - class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
+67 + class PEP696Bad[A=int, B =str, C = bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
+68 |     pass
+69 | 
+70 | # The last of these should cause us to emit E231,
 
 E252 [*] Missing whitespace around parameter equals
   --> E25.py:67:49
@@ -383,16 +347,14 @@ E252 [*] Missing whitespace around parameter equals
 68 |     pass
    |
 help: Add missing whitespace
-
-ℹ Safe fix
-64 64 | def pep_696_bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]():
-65 65 |     pass
-66 66 | 
-67    |-class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
-   67 |+class PEP696Bad[A=int, B =str, C= bool, D:object =int, E: object=str, F: object =bool, G: object= bytes]:
-68 68 |     pass
-69 69 | 
-70 70 | # The last of these should cause us to emit E231,
+64 | def pep_696_bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]():
+65 |     pass
+66 | 
+   - class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
+67 + class PEP696Bad[A=int, B =str, C= bool, D:object =int, E: object=str, F: object =bool, G: object= bytes]:
+68 |     pass
+69 | 
+70 | # The last of these should cause us to emit E231,
 
 E252 [*] Missing whitespace around parameter equals
   --> E25.py:67:49
@@ -404,16 +366,14 @@ E252 [*] Missing whitespace around parameter equals
 68 |     pass
    |
 help: Add missing whitespace
-
-ℹ Safe fix
-64 64 | def pep_696_bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]():
-65 65 |     pass
-66 66 | 
-67    |-class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
-   67 |+class PEP696Bad[A=int, B =str, C= bool, D:object= int, E: object=str, F: object =bool, G: object= bytes]:
-68 68 |     pass
-69 69 | 
-70 70 | # The last of these should cause us to emit E231,
+64 | def pep_696_bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]():
+65 |     pass
+66 | 
+   - class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
+67 + class PEP696Bad[A=int, B =str, C= bool, D:object= int, E: object=str, F: object =bool, G: object= bytes]:
+68 |     pass
+69 | 
+70 | # The last of these should cause us to emit E231,
 
 E252 [*] Missing whitespace around parameter equals
   --> E25.py:67:64
@@ -425,16 +385,14 @@ E252 [*] Missing whitespace around parameter equals
 68 |     pass
    |
 help: Add missing whitespace
-
-ℹ Safe fix
-64 64 | def pep_696_bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]():
-65 65 |     pass
-66 66 | 
-67    |-class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
-   67 |+class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object =str, F: object =bool, G: object= bytes]:
-68 68 |     pass
-69 69 | 
-70 70 | # The last of these should cause us to emit E231,
+64 | def pep_696_bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]():
+65 |     pass
+66 | 
+   - class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
+67 + class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object =str, F: object =bool, G: object= bytes]:
+68 |     pass
+69 | 
+70 | # The last of these should cause us to emit E231,
 
 E252 [*] Missing whitespace around parameter equals
   --> E25.py:67:64
@@ -446,16 +404,14 @@ E252 [*] Missing whitespace around parameter equals
 68 |     pass
    |
 help: Add missing whitespace
-
-ℹ Safe fix
-64 64 | def pep_696_bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]():
-65 65 |     pass
-66 66 | 
-67    |-class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
-   67 |+class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object= str, F: object =bool, G: object= bytes]:
-68 68 |     pass
-69 69 | 
-70 70 | # The last of these should cause us to emit E231,
+64 | def pep_696_bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]():
+65 |     pass
+66 | 
+   - class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
+67 + class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object= str, F: object =bool, G: object= bytes]:
+68 |     pass
+69 | 
+70 | # The last of these should cause us to emit E231,
 
 E252 [*] Missing whitespace around parameter equals
   --> E25.py:67:80
@@ -467,16 +423,14 @@ E252 [*] Missing whitespace around parameter equals
 68 |     pass
    |
 help: Add missing whitespace
-
-ℹ Safe fix
-64 64 | def pep_696_bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]():
-65 65 |     pass
-66 66 | 
-67    |-class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
-   67 |+class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object = bool, G: object= bytes]:
-68 68 |     pass
-69 69 | 
-70 70 | # The last of these should cause us to emit E231,
+64 | def pep_696_bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]():
+65 |     pass
+66 | 
+   - class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
+67 + class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object = bool, G: object= bytes]:
+68 |     pass
+69 | 
+70 | # The last of these should cause us to emit E231,
 
 E252 [*] Missing whitespace around parameter equals
   --> E25.py:67:96
@@ -488,13 +442,11 @@ E252 [*] Missing whitespace around parameter equals
 68 |     pass
    |
 help: Add missing whitespace
-
-ℹ Safe fix
-64 64 | def pep_696_bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]():
-65 65 |     pass
-66 66 | 
-67    |-class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
-   67 |+class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object = bytes]:
-68 68 |     pass
-69 69 | 
-70 70 | # The last of these should cause us to emit E231,
+64 | def pep_696_bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]():
+65 |     pass
+66 | 
+   - class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object= bytes]:
+67 + class PEP696Bad[A=int, B =str, C= bool, D:object=int, E: object=str, F: object =bool, G: object = bytes]:
+68 |     pass
+69 | 
+70 | # The last of these should cause us to emit E231,

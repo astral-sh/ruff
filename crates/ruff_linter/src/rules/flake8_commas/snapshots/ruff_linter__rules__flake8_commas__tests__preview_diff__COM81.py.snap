@@ -20,16 +20,14 @@ COM812 [*] Trailing comma missing
 657 | def f[
     |
 help: Add trailing comma
-
-ℹ Safe fix
-652 652 | }"""
-653 653 | 
-654 654 | type X[
-655     |-    T
-    655 |+    T,
-656 656 | ] = T
-657 657 | def f[
-658 658 |     T
+652 | }"""
+653 | 
+654 | type X[
+    -     T
+655 +     T,
+656 | ] = T
+657 | def f[
+658 |     T
 
 
 COM812 [*] Trailing comma missing
@@ -43,16 +41,14 @@ COM812 [*] Trailing comma missing
 660 | class C[
     |
 help: Add trailing comma
-
-ℹ Safe fix
-655 655 |     T
-656 656 | ] = T
-657 657 | def f[
-658     |-    T
-    658 |+    T,
-659 659 | ](): pass
-660 660 | class C[
-661 661 |     T
+655 |     T
+656 | ] = T
+657 | def f[
+    -     T
+658 +     T,
+659 | ](): pass
+660 | class C[
+661 |     T
 
 
 COM812 [*] Trailing comma missing
@@ -65,16 +61,14 @@ COM812 [*] Trailing comma missing
 662 | ]: pass
     |
 help: Add trailing comma
-
-ℹ Safe fix
-658 658 |     T
-659 659 | ](): pass
-660 660 | class C[
-661     |-    T
-    661 |+    T,
-662 662 | ]: pass
-663 663 | 
-664 664 | type X[T,] = T
+658 |     T
+659 | ](): pass
+660 | class C[
+    -     T
+661 +     T,
+662 | ]: pass
+663 | 
+664 | type X[T,] = T
 
 
 COM819 [*] Trailing comma prohibited
@@ -88,15 +82,13 @@ COM819 [*] Trailing comma prohibited
 666 | class C[T,]: pass
     |
 help: Remove trailing comma
-
-ℹ Safe fix
-661 661 |     T
-662 662 | ]: pass
-663 663 | 
-664     |-type X[T,] = T
-    664 |+type X[T] = T
-665 665 | def f[T,](): pass
-666 666 | class C[T,]: pass
+661 |     T
+662 | ]: pass
+663 | 
+    - type X[T,] = T
+664 + type X[T] = T
+665 | def f[T,](): pass
+666 | class C[T,]: pass
 
 
 COM819 [*] Trailing comma prohibited
@@ -108,14 +100,12 @@ COM819 [*] Trailing comma prohibited
 666 | class C[T,]: pass
     |
 help: Remove trailing comma
-
-ℹ Safe fix
-662 662 | ]: pass
-663 663 | 
-664 664 | type X[T,] = T
-665     |-def f[T,](): pass
-    665 |+def f[T](): pass
-666 666 | class C[T,]: pass
+662 | ]: pass
+663 | 
+664 | type X[T,] = T
+    - def f[T,](): pass
+665 + def f[T](): pass
+666 | class C[T,]: pass
 
 
 COM819 [*] Trailing comma prohibited
@@ -127,10 +117,8 @@ COM819 [*] Trailing comma prohibited
     |          ^
     |
 help: Remove trailing comma
-
-ℹ Safe fix
-663 663 | 
-664 664 | type X[T,] = T
-665 665 | def f[T,](): pass
-666     |-class C[T,]: pass
-    666 |+class C[T]: pass
+663 | 
+664 | type X[T,] = T
+665 | def f[T,](): pass
+    - class C[T,]: pass
+666 + class C[T]: pass

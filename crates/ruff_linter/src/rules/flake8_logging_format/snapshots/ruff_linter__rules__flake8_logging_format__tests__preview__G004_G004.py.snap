@@ -10,16 +10,14 @@ G004 [*] Logging statement uses f-string
 5 | logging.log(logging.INFO, f"Hello {name}")
   |
 help: Convert to lazy `%` formatting
-
-ℹ Safe fix
-1 1 | import logging
-2 2 | 
-3 3 | name = "world"
-4   |-logging.info(f"Hello {name}")
-  4 |+logging.info("Hello %s", name)
-5 5 | logging.log(logging.INFO, f"Hello {name}")
-6 6 | 
-7 7 | _LOGGER = logging.getLogger()
+1 | import logging
+2 | 
+3 | name = "world"
+  - logging.info(f"Hello {name}")
+4 + logging.info("Hello %s", name)
+5 | logging.log(logging.INFO, f"Hello {name}")
+6 | 
+7 | _LOGGER = logging.getLogger()
 
 G004 [*] Logging statement uses f-string
  --> G004.py:5:27
@@ -32,16 +30,14 @@ G004 [*] Logging statement uses f-string
 7 | _LOGGER = logging.getLogger()
   |
 help: Convert to lazy `%` formatting
-
-ℹ Safe fix
-2 2 | 
-3 3 | name = "world"
-4 4 | logging.info(f"Hello {name}")
-5   |-logging.log(logging.INFO, f"Hello {name}")
-  5 |+logging.log(logging.INFO, "Hello %s", name)
-6 6 | 
-7 7 | _LOGGER = logging.getLogger()
-8 8 | _LOGGER.info(f"{__name__}")
+2 | 
+3 | name = "world"
+4 | logging.info(f"Hello {name}")
+  - logging.log(logging.INFO, f"Hello {name}")
+5 + logging.log(logging.INFO, "Hello %s", name)
+6 | 
+7 | _LOGGER = logging.getLogger()
+8 | _LOGGER.info(f"{__name__}")
 
 G004 [*] Logging statement uses f-string
   --> G004.py:8:14
@@ -53,16 +49,14 @@ G004 [*] Logging statement uses f-string
 10 | logging.getLogger().info(f"{name}")
    |
 help: Convert to lazy `%` formatting
-
-ℹ Safe fix
-5 5 | logging.log(logging.INFO, f"Hello {name}")
-6 6 | 
-7 7 | _LOGGER = logging.getLogger()
-8   |-_LOGGER.info(f"{__name__}")
-  8 |+_LOGGER.info("%s", __name__)
-9 9 | 
-10 10 | logging.getLogger().info(f"{name}")
-11 11 | 
+5  | logging.log(logging.INFO, f"Hello {name}")
+6  | 
+7  | _LOGGER = logging.getLogger()
+   - _LOGGER.info(f"{__name__}")
+8  + _LOGGER.info("%s", __name__)
+9  | 
+10 | logging.getLogger().info(f"{name}")
+11 | 
 
 G004 [*] Logging statement uses f-string
   --> G004.py:10:26
@@ -75,16 +69,14 @@ G004 [*] Logging statement uses f-string
 12 | from logging import info
    |
 help: Convert to lazy `%` formatting
-
-ℹ Safe fix
-7  7  | _LOGGER = logging.getLogger()
-8  8  | _LOGGER.info(f"{__name__}")
-9  9  | 
-10    |-logging.getLogger().info(f"{name}")
-   10 |+logging.getLogger().info("%s", name)
-11 11 | 
-12 12 | from logging import info
-13 13 | 
+7  | _LOGGER = logging.getLogger()
+8  | _LOGGER.info(f"{__name__}")
+9  | 
+   - logging.getLogger().info(f"{name}")
+10 + logging.getLogger().info("%s", name)
+11 | 
+12 | from logging import info
+13 | 
 
 G004 [*] Logging statement uses f-string
   --> G004.py:14:6
@@ -96,16 +88,14 @@ G004 [*] Logging statement uses f-string
 15 | info(f"{__name__}")
    |
 help: Convert to lazy `%` formatting
-
-ℹ Safe fix
-11 11 | 
-12 12 | from logging import info
-13 13 | 
-14    |-info(f"{name}")
-   14 |+info("%s", name)
-15 15 | info(f"{__name__}")
-16 16 | 
-17 17 | # Don't trigger for t-strings
+11 | 
+12 | from logging import info
+13 | 
+   - info(f"{name}")
+14 + info("%s", name)
+15 | info(f"{__name__}")
+16 | 
+17 | # Don't trigger for t-strings
 
 G004 [*] Logging statement uses f-string
   --> G004.py:15:6
@@ -117,16 +107,14 @@ G004 [*] Logging statement uses f-string
 17 | # Don't trigger for t-strings
    |
 help: Convert to lazy `%` formatting
-
-ℹ Safe fix
-12 12 | from logging import info
-13 13 | 
-14 14 | info(f"{name}")
-15    |-info(f"{__name__}")
-   15 |+info("%s", __name__)
-16 16 | 
-17 17 | # Don't trigger for t-strings
-18 18 | info(t"{name}")
+12 | from logging import info
+13 | 
+14 | info(f"{name}")
+   - info(f"{__name__}")
+15 + info("%s", __name__)
+16 | 
+17 | # Don't trigger for t-strings
+18 | info(t"{name}")
 
 G004 [*] Logging statement uses f-string
   --> G004.py:24:14
@@ -137,16 +125,14 @@ G004 [*] Logging statement uses f-string
    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
 help: Convert to lazy `%` formatting
-
-ℹ Safe fix
-21 21 | count = 5
-22 22 | total = 9
-23 23 | directory_path = "/home/hamir/ruff/crates/ruff_linter/resources/test/"
-24    |-logging.info(f"{count} out of {total} files in {directory_path} checked")
-   24 |+logging.info("%s out of %s files in %s checked", count, total, directory_path)
-25 25 | 
-26 26 | 
-27 27 | 
+21 | count = 5
+22 | total = 9
+23 | directory_path = "/home/hamir/ruff/crates/ruff_linter/resources/test/"
+   - logging.info(f"{count} out of {total} files in {directory_path} checked")
+24 + logging.info("%s out of %s files in %s checked", count, total, directory_path)
+25 | 
+26 | 
+27 | 
 
 G004 Logging statement uses f-string
   --> G004.py:30:13

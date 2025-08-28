@@ -11,13 +11,11 @@ UP037 [*] Remove quotes from type annotation
 10 |     print(x)
    |
 help: Remove quotes
-
-ℹ Safe fix
-6  6  | 
-7  7  | def foo():
-8  8  |     # UP037
-9     |-    x: "Tuple[int, int]" = (0, 0)
-   9  |+    x: Tuple[int, int] = (0, 0)
-10 10 |     print(x)
-11 11 | 
-12 12 |
+6  | 
+7  | def foo():
+8  |     # UP037
+   -     x: "Tuple[int, int]" = (0, 0)
+9  +     x: Tuple[int, int] = (0, 0)
+10 |     print(x)
+11 | 
+12 |

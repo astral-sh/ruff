@@ -78,9 +78,9 @@ use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::any_over_type;
 use crate::types::{
     BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, ClassType,
-    DeprecatedInstance, DynamicType, HasRelationToVisitor, IsEquivalentVisitor, KnownClass,
-    NormalizedVisitor, SpecialFormType, Truthiness, Type, TypeMapping, TypeRelation, UnionBuilder,
-    all_members, walk_type_mapping,
+    DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
+    IsEquivalentVisitor, KnownClass, NormalizedVisitor, SpecialFormType, Truthiness, Type,
+    TypeMapping, TypeRelation, UnionBuilder, all_members, walk_type_mapping,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -915,15 +915,16 @@ impl<'db> FunctionType<'db> {
         self_signature.is_equivalent_to_impl(db, other_signature, visitor)
     }
 
-    pub(crate) fn find_legacy_typevars(
+    pub(crate) fn find_legacy_typevars_impl(
         self,
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+        visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         let signatures = self.signature(db);
         for signature in &signatures.overloads {
-            signature.find_legacy_typevars(db, binding_context, typevars);
+            signature.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
         }
     }
 
@@ -1433,7 +1434,7 @@ impl KnownFunction {
                     return;
                 };
                 let Some(protocol_class) = param_type
-                    .into_class_literal()
+                    .to_class_type(db)
                     .and_then(|class| class.into_protocol_class(db))
                 else {
                     report_bad_argument_to_protocol_interface(

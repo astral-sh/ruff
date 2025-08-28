@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.12.11
+
+### Preview features
+
+- \[`airflow`\] Extend `AIR311` and `AIR312` rules ([#20082](https://github.com/astral-sh/ruff/pull/20082))
+- \[`airflow`\] Replace wrong path `airflow.io.storage` with `airflow.io.store` (`AIR311`) ([#20081](https://github.com/astral-sh/ruff/pull/20081))
+- \[`flake8-async`\] Implement `blocking-http-call-httpx-in-async-function` (`ASYNC212`) ([#20091](https://github.com/astral-sh/ruff/pull/20091))
+- \[`flake8-logging-format`\] Add auto-fix for f-string logging calls (`G004`) ([#19303](https://github.com/astral-sh/ruff/pull/19303))
+- \[`flake8-use-pathlib`\] Add autofix for `PTH211` ([#20009](https://github.com/astral-sh/ruff/pull/20009))
+- \[`flake8-use-pathlib`\] Make `PTH100` fix unsafe because it can change behavior ([#20100](https://github.com/astral-sh/ruff/pull/20100))
+
+### Bug fixes
+
+- \[`pyflakes`, `pylint`\] Fix false positives caused by `__class__` cell handling (`F841`, `PLE0117`) ([#20048](https://github.com/astral-sh/ruff/pull/20048))
+- \[`pyflakes`\] Fix `allowed-unused-imports` matching for top-level modules (`F401`) ([#20115](https://github.com/astral-sh/ruff/pull/20115))
+- \[`ruff`\] Fix false positive for t-strings in `default-factory-kwarg` (`RUF026`) ([#20032](https://github.com/astral-sh/ruff/pull/20032))
+- \[`ruff`\] Preserve relative whitespace in multi-line expressions (`RUF033`) ([#19647](https://github.com/astral-sh/ruff/pull/19647))
+
+### Rule changes
+
+- \[`ruff`\] Handle empty t-strings in `unnecessary-empty-iterable-within-deque-call` (`RUF037`) ([#20045](https://github.com/astral-sh/ruff/pull/20045))
+
+### Documentation
+
+- Fix incorrect `D413` links in docstrings convention FAQ ([#20089](https://github.com/astral-sh/ruff/pull/20089))
+- \[`flake8-use-pathlib`\] Update links to the table showing the correspondence between `os` and `pathlib` ([#20103](https://github.com/astral-sh/ruff/pull/20103))
+
 ## 0.12.10
 
 ### Preview features

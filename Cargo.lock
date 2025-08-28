@@ -2743,7 +2743,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.12.10"
+version = "0.12.11"
 dependencies = [
  "anyhow",
  "argfile",
@@ -2870,6 +2870,7 @@ dependencies = [
  "insta",
  "matchit",
  "path-slash",
+ "pathdiff",
  "quick-junit",
  "ruff_annotate_snippets",
  "ruff_cache",
@@ -2998,7 +2999,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_linter"
-version = "0.12.10"
+version = "0.12.11"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -3020,7 +3021,6 @@ dependencies = [
  "memchr",
  "natord",
  "path-absolutize",
- "pathdiff",
  "pep440_rs",
  "pyproject-toml",
  "regex",
@@ -3337,7 +3337,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_wasm"
-version = "0.12.10"
+version = "0.12.11"
 dependencies = [
  "console_error_panic_hook",
  "console_log",
