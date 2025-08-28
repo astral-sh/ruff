@@ -66,18 +66,8 @@ impl Violation for MultipleYieldsInContextManager {
 /// RUF062
 pub(crate) fn multiple_yields_in_contextmanager(checker: &Checker, function_def: &StmtFunctionDef) {
     if let Some(context_manager_name) = get_contextmanager_decorator(function_def, checker) {
-        let mut violations = Vec::new();
-        {
-            let mut yield_tracker = YieldTracker::new(&mut violations);
-            source_order::walk_body(&mut yield_tracker, &function_def.body);
-        }
-
-        for range in violations {
-            checker.report_diagnostic(
-                MultipleYieldsInContextManager::new(context_manager_name),
-                range,
-            );
-        }
+        let mut yield_tracker = YieldTracker::new(checker, context_manager_name);
+        source_order::walk_body(&mut yield_tracker, &function_def.body);
     }
 }
 
@@ -107,16 +97,18 @@ fn get_contextmanager_decorator(
 // Within a scope we evaluate all control flow paths and propagate the yields along the
 // maximum path to the outer scope.
 // Return exits the contextmanager decorated function and we stop accumulating yields along that path.
-struct YieldTracker<'a> {
-    violations: &'a mut Vec<TextRange>,
+struct YieldTracker<'a, 'b> {
+    checker: &'a Checker<'b>,
+    name: &'static str,
     scopes: Vec<YieldScope<'a>>,
     reported_ranges: FxHashSet<TextRange>,
 }
 
-impl<'a> YieldTracker<'a> {
-    fn new(violations: &'a mut Vec<TextRange>) -> Self {
+impl<'a, 'b> YieldTracker<'a, 'b> {
+    fn new(checker: &'a Checker<'b>, name: &'static str) -> Self {
         Self {
-            violations,
+            checker,
+            name,
             scopes: vec![YieldScope::new()],
             reported_ranges: FxHashSet::default(),
         }
@@ -124,17 +116,18 @@ impl<'a> YieldTracker<'a> {
 
     fn add_yield(&mut self, expr: &'a Expr) {
         if let Some(scope) = self.scopes.last_mut() {
-            scope.add_yield(expr);
+            scope.yield_expressions.push(expr);
             if scope.yields_excessively() {
                 self.emit_violation(expr);
             }
         }
     }
 
-    fn emit_violation(&mut self, expr: &'a Expr) {
+    fn emit_violation(&mut self, expr: &Expr) {
         let range = expr.range();
         if self.reported_ranges.insert(range) {
-            self.violations.push(range);
+            self.checker
+                .report_diagnostic(MultipleYieldsInContextManager::new(self.name), range);
         }
     }
 
@@ -145,30 +138,14 @@ impl<'a> YieldTracker<'a> {
         }
     }
 
-    fn report_excess(&mut self, yields: &[&'a Expr]) {
-        if yields.len() > 1 {
-            self.emit_multiple_violations(yields);
-        }
-    }
-
     fn propagate_yields(&mut self, yields: &[&'a Expr]) {
-        self.report_excess(yields);
-        let scope = self
-            .scopes
-            .last_mut()
-            .expect("Missing current scope for yield propagation");
         for &yield_expr in yields {
-            scope.add_yield(yield_expr);
-        }
-        let yields_excessive = scope.yields_excessively();
-        let yield_exprs_clone = scope.yield_expressions.clone();
-        if yields_excessive {
-            self.emit_multiple_violations(&yield_exprs_clone);
+            self.add_yield(yield_expr);
         }
     }
 
-    fn push_scope(&mut self, scope: YieldScope<'a>) {
-        self.scopes.push(scope);
+    fn push_scope(&mut self) {
+        self.scopes.push(YieldScope::new());
     }
 
     fn pop_scope(&mut self) -> Option<(Vec<&'a Expr>, bool)> {
@@ -193,7 +170,7 @@ impl<'a> YieldTracker<'a> {
 
     fn handle_loop(&mut self, body: &'a [ast::Stmt], orelse: &'a [ast::Stmt]) {
         self.visit_body(body);
-        self.push_scope(YieldScope::new());
+        self.push_scope();
         self.visit_body(orelse);
     }
 
@@ -213,7 +190,7 @@ impl<'a> YieldTracker<'a> {
             let (except_yields, except_returns) = self
                 .pop_scope()
                 .expect("Missing except handler scope in try-statement");
-            self.report_excess(&except_yields);
+            self.emit_multiple_violations(&except_yields);
 
             if except_returns {
                 returning_except_branches.push(except_yields);
@@ -226,9 +203,9 @@ impl<'a> YieldTracker<'a> {
             .pop_scope()
             .expect("Missing try block scope in try-statement");
 
-        self.report_excess(&try_yields);
-        self.report_excess(&else_yields);
-        self.report_excess(&finally_yields);
+        self.emit_multiple_violations(&try_yields);
+        self.emit_multiple_violations(&else_yields);
+        self.emit_multiple_violations(&finally_yields);
 
         let path = TryExceptPath {
             try_yields,
@@ -253,14 +230,14 @@ impl<'a> YieldTracker<'a> {
         let base_path = Self::build_pre_finally_path(path, &except_yields);
         let max_path = Self::append_finally(&base_path, &path.finally_yields);
 
-        self.report_excess(&max_path);
+        self.emit_multiple_violations(&max_path);
     }
 
     // Finally doesn't return - execution continues, handle all paths
     fn handle_continuing_paths(&mut self, path: &TryExceptPath<'a>) {
         let (exception_return, exception_no_return) = Self::build_except_paths(path);
 
-        self.report_excess(&exception_return);
+        self.emit_multiple_violations(&exception_return);
 
         let normal_path = Self::build_try_else_path(path);
 
@@ -275,7 +252,7 @@ impl<'a> YieldTracker<'a> {
             let (branch_yields, branch_returns) = self
                 .pop_scope()
                 .expect("Missing branch scope in if/match statement");
-            self.report_excess(&branch_yields);
+            self.emit_multiple_violations(&branch_yields);
 
             if branch_returns {
                 returning_branches.push(branch_yields);
@@ -287,7 +264,7 @@ impl<'a> YieldTracker<'a> {
         let max_returning = Self::max_yields(&returning_branches);
         let max_continuing = Self::max_yields(&continuing_branches);
 
-        self.report_excess(&max_returning);
+        self.emit_multiple_violations(&max_returning);
         self.propagate_yields(&max_continuing);
     }
 
@@ -350,10 +327,10 @@ impl<'a> YieldTracker<'a> {
     ) {
         if path.try_returns {
             let try_path = Self::append_finally(&path.try_yields, &path.finally_yields);
-            self.report_excess(&try_path);
+            self.emit_multiple_violations(&try_path);
             self.propagate_yields(exception_no_return);
         } else if path.else_returns {
-            self.report_excess(normal_path);
+            self.emit_multiple_violations(&normal_path);
             self.propagate_yields(exception_no_return);
         } else {
             let max_yield_path = if normal_path.len() > exception_no_return.len() {
@@ -389,24 +366,12 @@ impl<'a> YieldScope<'a> {
         }
     }
 
-    fn clear(&mut self) {
-        self.yield_expressions.clear();
-    }
-
     fn yields_excessively(&self) -> bool {
         self.yield_expressions.len() > 1
     }
-
-    fn add_yield(&mut self, expr: &'a Expr) {
-        self.yield_expressions.push(expr);
-    }
-
-    fn set_does_return(&mut self, value: bool) {
-        self.does_return = value;
-    }
 }
 
-impl<'a> source_order::SourceOrderVisitor<'a> for YieldTracker<'a> {
+impl<'a, 'b> source_order::SourceOrderVisitor<'a> for YieldTracker<'a, 'b> {
     fn enter_node(&mut self, node: AnyNodeRef<'a>) -> source_order::TraversalSignal {
         match node {
             AnyNodeRef::StmtFor(_)
@@ -418,7 +383,7 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldTracker<'a> {
                 // Track for primary control flow structures
                 // Optional branches like else/finally clauses are handled in leave_node
                 // Except is handled in leave node to maintain logical locality
-                self.push_scope(YieldScope::new());
+                self.push_scope();
             }
             _ => {}
         }
@@ -456,10 +421,7 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldTracker<'a> {
                     // If the loop exits irregularly (break) else isn't executed
                     // Subsequent yields may be valid
                     // We should not count return guarded yields in else
-                    self.scopes
-                        .last_mut()
-                        .expect("Missing current scope for clearing yields")
-                        .clear();
+                    self.scopes.last_mut().unwrap().yield_expressions.clear();
                 }
             }
             _ => {}
@@ -479,7 +441,7 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldTracker<'a> {
         match stmt {
             ast::Stmt::Return(_) => {
                 if let Some(scope) = self.scopes.last_mut() {
-                    scope.set_does_return(true);
+                    scope.does_return = true;
                 }
             }
             ast::Stmt::FunctionDef(nested) => {
@@ -510,7 +472,7 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldTracker<'a> {
                 if self.enter_node(node).is_traverse() {
                     self.visit_body(body);
                     for clause in elif_else_clauses {
-                        self.push_scope(YieldScope::new());
+                        self.push_scope();
                         self.visit_elif_else_clause(clause);
                     }
                     self.leave_node(node);
@@ -529,13 +491,13 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldTracker<'a> {
                 if self.enter_node(node).is_traverse() {
                     self.visit_body(body);
                     for handler in handlers {
-                        self.push_scope(YieldScope::new());
+                        self.push_scope();
                         self.visit_except_handler(handler);
                     }
 
-                    self.push_scope(YieldScope::new());
+                    self.push_scope();
                     self.visit_body(orelse);
-                    self.push_scope(YieldScope::new());
+                    self.push_scope();
                     self.visit_body(finalbody);
                     self.leave_node(node);
                 }
