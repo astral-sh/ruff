@@ -703,7 +703,7 @@ impl<'db> ConstraintBound<'db> {
     }
 
     /// Returns the minimum of two upper bounds. (This produces the upper bound of the
-    /// [intersection][AtomicConstraint::intersection] of two constraints.)
+    /// [intersection][AtomicConstraint::intersect] of two constraints.)
     ///
     /// We use intersection to combine the types of the bounds (mnemonic: minimum and intersection
     /// both make the result smaller).
@@ -821,7 +821,7 @@ impl<'db> ConstraintBound<'db> {
     }
 
     /// Returns the maximum of two lower bounds. (This produces the lower bound of the
-    /// [intersection][AtomicConstraint::intersection] of two constraints.)
+    /// [intersection][AtomicConstraint::intersect] of two constraints.)
     ///
     /// We use union to combine the types of the bounds (mnemonic: maximum and union both make the
     /// result larger).
