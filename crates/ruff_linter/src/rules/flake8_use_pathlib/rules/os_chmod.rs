@@ -144,16 +144,14 @@ pub(crate) fn os_chmod(checker: &Checker, call: &ExprCall, segments: &[&str]) {
 
         let chmod_args = match (mode, follow_symlinks) {
             (None, None) => "".to_string(),
-
             (Some(mode), None) | (None, Some(mode)) => args(&mode).to_string(),
-
             (Some(mode), Some(follow)) => {
-                let mode_str = args(&mode);
-                let follow_val = args(&follow);
-                if follow_val == "False" {
-                    format!("{}, follow_symlinks=False", mode_str)
+                let mode_arg = args(&mode);
+                let follow_symlinks_value = args(&follow);
+                if follow_symlinks_value == "False" {
+                    format!("{}, follow_symlinks=False", mode_arg)
                 } else {
-                    mode_str.to_string()
+                    mode_arg.to_string()
                 }
             }
         };
