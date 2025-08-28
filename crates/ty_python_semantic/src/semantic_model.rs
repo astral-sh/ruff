@@ -173,19 +173,10 @@ impl<'db> SemanticModel<'db> {
         let builtin = module.is_known(self.db, KnownModule::Builtins);
 
         let mut completions = vec![];
-        for submodule_basename in module.all_submodules(self.db) {
-            let Some(basename) = ModuleName::new(submodule_basename.as_str()) else {
-                continue;
-            };
-            let mut submodule_name = module.name(self.db).clone();
-            submodule_name.extend(&basename);
-
-            let Some(submodule) = resolve_module(self.db, &submodule_name) else {
-                continue;
-            };
-            let ty = Type::module_literal(self.db, self.file, submodule);
+        for submodule in module.all_submodules(self.db) {
+            let ty = Type::module_literal(self.db, self.file, *submodule);
             completions.push(Completion {
-                name: submodule_basename.clone(),
+                name: Name::new(submodule.name(self.db).as_str()),
                 ty,
                 builtin,
             });
