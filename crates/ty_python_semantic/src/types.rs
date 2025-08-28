@@ -6254,9 +6254,7 @@ impl<'db> Type<'db> {
             }
 
             Type::ProtocolInstance(instance) => {
-                visitor.visit(self, || {
-                    instance.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
-                });
+                instance.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
             }
 
             Type::SubclassOf(subclass_of) => {
