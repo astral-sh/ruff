@@ -171,4 +171,26 @@ RUF062 Function decorated with `contextlib.contextmanager` may yield more than o
 180 |         return
 181 |     yield
     |     ^^^^^
+182 |
+183 | # (18) Invalid: No returning except accumulates yields
+    |
+
+RUF062 Function decorated with `contextlib.contextmanager` may yield more than once
+   --> RUF062_1.py:193:9
+    |
+191 |     except ZeroDivisionError:
+192 |         yield # valid
+193 |         yield # invalid
+    |         ^^^^^
+194 |         return
+195 |     except IndexError:
+    |
+
+RUF062 Function decorated with `contextlib.contextmanager` may yield more than once
+   --> RUF062_1.py:198:5
+    |
+196 |         yield # valid
+197 |         pass
+198 |     yield # invalid because of IndexError branch
+    |     ^^^^^
     |

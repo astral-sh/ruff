@@ -376,3 +376,19 @@ def for_else_with_break(items):
         yield  # Only executes if loop completes normally
         return
     yield  # Only executes after break
+
+# (32) Valid: The returns in except branches guard multiple yields
+@contextlib.contextmanager
+def multiple_returning_excepts():
+    try:
+        pass
+    except RuntimeError:
+        yield
+        return
+    except ZeroDivisionError:
+        yield
+        return
+    finally:
+        pass
+    yield
+

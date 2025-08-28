@@ -179,3 +179,21 @@ def no_return_guarding_yield():
     except:
         return
     yield
+
+# (18) Invalid: No returning except accumulates yields
+@contextlib.contextmanager
+def multiple_yields_in_return_guarded_except():
+    try:
+        pass
+    except RuntimeError:
+        yield # valid
+        return
+    except ZeroDivisionError:
+        yield # valid
+        yield # invalid
+        return
+    except IndexError:
+        yield # valid
+        pass
+    yield # invalid because of IndexError branch
+
