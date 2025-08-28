@@ -7952,14 +7952,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         if let Some(diagnostic_builder) =
                             builder.context.report_lint(&UNSUPPORTED_OPERATOR, range)
                         {
-                            let error_left_display = error.left_ty.display(builder.db());
-                            let error_right_display = error.right_ty.display(builder.db());
+                            let error_left_ty_display = error.left_ty.display(builder.db());
+                            let error_right_ty_display = error.right_ty.display(builder.db());
                             // Handle unsupported operators (diagnostic, `bool`/`Unknown` outcome)
                             let mut diagnostic = diagnostic_builder.into_diagnostic(format_args!(
-                                "Operator `{}` is not supported for types `{}` and `{}`{}",
+                                "Operator `{}` is not supported for types `{error_left_ty_display}` and `{error_right_ty_display}`{}",
                                 error.op,
-                                error_left_display,
-                                error_right_display,
                                 if (left_ty, right_ty) == (error.left_ty, error.right_ty) {
                                     String::new()
                                 } else {
@@ -7977,28 +7975,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         match call_error_kind {
                                             CallErrorKind::NotCallable => {
                                                 diagnostic.info(format_args!(
-                                                    "Operator '{}' is not callable",
-                                                    op
+                                                    "Operator '{}' is not callable on object of type '{error_left_ty_display}'",
+                                                    error.op
                                                 ));
                                             }
                                             CallErrorKind::BindingError => {
                                                 diagnostic.info(format_args!(
-                                                    "Operator '{}' on object of type '{}' cannot be used with object of type '{}'",
-                                                    op,
-                                                    error_left_display,
-                                                    error_right_display
+                                                    "Operator '{}' on object of type '{error_left_ty_display}' cannot be used with object of type '{error_right_ty_display}'",
+                                                    error.op,
                                                 ));
                                             }
                                             CallErrorKind::PossiblyNotCallable => {
                                                 diagnostic.info(format_args!(
-                                                    "Operator '{}' is possibly not callable",
-                                                    op
+                                                    "Operator '{}' is possibly not callable on object of type '{error_left_ty_display}'",
+                                                    error.op,
                                                 ));
                                             }
                                         }
                                     }
                                     CallDunderError::PossiblyUnbound(_) => diagnostic.info(
-                                        format_args!("Operator '{}' is possibly unbound", op),
+                                        format_args!("Operator '{}' is possibly unbound on object of type '{error_left_ty_display}'", error.op),
                                     ),
                                     CallDunderError::MethodNotAvailable => {}
                                 }

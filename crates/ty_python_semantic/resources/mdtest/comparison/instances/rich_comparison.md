@@ -408,17 +408,17 @@ class A:
     __ge__: None = None
 
 # error: [unsupported-operator]
-A() == A()
+reveal_type(A() == A())  # revealed: Unknown
 # error: [unsupported-operator]
-A() != A()
+reveal_type(A() != A())  # revealed: Unknown
 # error: [unsupported-operator]
-A() < A()
+reveal_type(A() < A())  # revealed: Unknown
 # error: [unsupported-operator]
-A() > A()
+reveal_type(A() > A())  # revealed: Unknown
 # error: [unsupported-operator]
-A() <= A()
+reveal_type(A() <= A())  # revealed: Unknown
 # error: [unsupported-operator]
-A() >= A()
+reveal_type(A() >= A())  # revealed: Unknown
 
 # Fine
 A() == 1
@@ -439,17 +439,17 @@ class A:
     __ge__ = None
 
 # error: [unsupported-operator]
-A() == A()
+reveal_type(A() == A())  # revealed: Unknown
 # error: [unsupported-operator]
-A() != A()
+reveal_type(A() != A())  # revealed: Unknown
 # error: [unsupported-operator]
-A() < A()
+reveal_type(A() < A())  # revealed: Unknown
 # error: [unsupported-operator]
-A() > A()
+reveal_type(A() > A())  # revealed: Unknown
 # error: [unsupported-operator]
-A() <= A()
+reveal_type(A() <= A())  # revealed: Unknown
 # error: [unsupported-operator]
-A() >= A()
+reveal_type(A() >= A())  # revealed: Unknown
 
 # Fine
 A() == 1
@@ -483,17 +483,17 @@ def _(flag: bool):
                 return NotImplemented
 
     # error: [unsupported-operator]
-    A() == A()
+    reveal_type(A() == A())  # revealed: Unknown
     # error: [unsupported-operator]
-    A() != A()
+    reveal_type(A() != A())  # revealed: Unknown
     # error: [unsupported-operator]
-    A() < A()
+    reveal_type(A() < A())  # revealed: Unknown
     # error: [unsupported-operator]
-    A() > A()
+    reveal_type(A() > A())  # revealed: Unknown
     # error: [unsupported-operator]
-    A() <= A()
+    reveal_type(A() <= A())  # revealed: Unknown
     # error: [unsupported-operator]
-    A() >= A()
+    reveal_type(A() >= A())  # revealed: Unknown
 ```
 
 ### Invalid arguments to dunder comparison methods
@@ -521,15 +521,15 @@ class A:
         return NotImplemented
 
 # error: [unsupported-operator]
-A() == A()
+reveal_type(A() == A())  # revealed: Unknown
 # error: [unsupported-operator]
-A() != A()
+reveal_type(A() != A())  # revealed: Unknown
 # error: [unsupported-operator]
-A() < A()
+reveal_type(A() < A())  # revealed: Unknown
 # error: [unsupported-operator]
-A() > A()
+reveal_type(A() > A())  # revealed: Unknown
 # error: [unsupported-operator]
-A() <= A()
+reveal_type(A() <= A())  # revealed: Unknown
 # error: [unsupported-operator]
-A() >= A()
+reveal_type(A() >= A())  # revealed: Unknown
 ```
