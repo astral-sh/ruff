@@ -611,7 +611,8 @@ impl<'db> ConstraintClause<'db> {
         Some(Self { constraints })
     }
 
-    /// Returns the negation of this clause.
+    /// Returns the negation of this clause. The result is a set since negating an intersection
+    /// produces a union.
     fn negate(&self, db: &'db dyn Db) -> ConstraintSet<'db> {
         let mut result = ConstraintSet::never();
         for constraint in &self.constraints {
@@ -656,16 +657,17 @@ impl<'db> ConstraintClause<'db> {
 /// specialize to. The lower and upper bounds can each be either _closed_ (the bound itself is
 /// included) or _open_ (the bound itself is not included).
 ///
-/// We render constraints using a normal interval notation: `[s, t]`, `(s, t)`, `[s, t)`, or
-/// `(s, t]`, where a square bracket indicates that bound is closed, and a parenthesis indicates
-/// that it is open.
+/// We render constraints using an interval notation: `[s, t]`, `(s, t)`, `[s, t)`, or `(s, t]`,
+/// where a square bracket indicates that bound is closed, and a parenthesis indicates that it is
+/// open.
 ///
 /// We will also sometimes render them graphically: `s┠──┨t`, `s╟──╢t`, `s┠──╢t`, or `s╟──┨t`,
 /// where a solid bar indicates a closed bound, and a double bar indicates an open  bound.
 ///
 /// ### Invariants
 ///
-/// - The bounds must actually constraint the typevar. If the typevar can be specialized to any
+/// - The bounds must be fully static.
+/// - The bounds must actually constrain the typevar. If the typevar can be specialized to any
 ///   type, or if there is no valid type that it can be specialized to, then we don't create an
 ///   `AtomicConstraint` for the typevar.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -700,7 +702,8 @@ impl<'db> ConstraintBound<'db> {
         matches!(self, ConstraintBound::Open(_))
     }
 
-    /// Returns the minimum of two upper bounds.
+    /// Returns the minimum of two upper bounds. (This produces the upper bound of the
+    /// [intersection][AtomicConstraint::intersection] of two constraints.)
     ///
     /// We use intersection to combine the types of the bounds (mnemonic: minimum and intersection
     /// both make the result smaller).
@@ -723,7 +726,8 @@ impl<'db> ConstraintBound<'db> {
         }
     }
 
-    /// Returns the maximum of two upper bounds.
+    /// Returns the maximum of two upper bounds. (This produces the upper bound of the
+    /// [union][AtomicConstraint::union] of two constraints.)
     ///
     /// We use union to combine the types of the bounds (mnemonic: maximum and union both make the
     /// result larger).
@@ -768,7 +772,8 @@ impl<'db> ConstraintBound<'db> {
         }
     }
 
-    /// Returns the minimum of two lower bounds.
+    /// Returns the minimum of two lower bounds. (This produces the lower bound of the
+    /// [union][AtomicConstraint::union] of two constraints.)
     ///
     /// We use intersection to combine the types of the bounds (mnemonic: minimum and intersection
     /// both make the result smaller).
@@ -815,7 +820,8 @@ impl<'db> ConstraintBound<'db> {
         }
     }
 
-    /// Returns the maximum of two lower bounds.
+    /// Returns the maximum of two lower bounds. (This produces the lower bound of the
+    /// [intersection][AtomicConstraint::intersection] of two constraints.)
     ///
     /// We use union to combine the types of the bounds (mnemonic: maximum and union both make the
     /// result larger).
@@ -839,7 +845,9 @@ impl<'db> ConstraintBound<'db> {
 }
 
 impl<'db> AtomicConstraint<'db> {
-    /// Returns a new atomic constraint, ensuring that all invariants are held.
+    /// Returns a new atomic constraint.
+    ///
+    /// Panics of `lower` and `upper` are not both fully static.
     fn new(
         db: &'db dyn Db,
         typevar: BoundTypeVarInstance<'db>,
@@ -848,17 +856,32 @@ impl<'db> AtomicConstraint<'db> {
     ) -> Satisfiable<Self> {
         let lower_type = lower.bound_type();
         let upper_type = upper.bound_type();
+        debug_assert!(lower_type == lower_type.bottom_materialization(db));
+        debug_assert!(upper_type == upper_type.top_materialization(db));
+
+        // If `lower > upper`, then the constraint cannot be satisfied, since there is no type that
+        // is both greater than `lower`, and less than `upper`. (This is true regardless of whether
+        // the upper and lower bounds are open are closed.)
         if !lower_type.is_subtype_of(db, upper_type) {
             return Satisfiable::Never;
         }
+
+        // If both bounds are open, then `lower` must be _strictly_ less than `upper`. (If they
+        // are equivalent, then there is no type that is both strictly greater than that type, and
+        // strictly less than it.)
         if (lower.is_open() || upper.is_open()) && lower_type.is_equivalent_to(db, upper_type) {
             return Satisfiable::Never;
         }
+
+        // If the requested constraint is `Never ≤ T ≤ object`, then the typevar can be specialized
+        // to _any_ type, and the constraint does nothing. (Note that both bounds have to be closed
+        // for this to hold.)
         if let (ConstraintBound::Closed(lower), ConstraintBound::Closed(upper)) = (lower, upper) {
             if lower.is_never() && upper.is_object(db) {
                 return Satisfiable::Always;
             }
         }
+
         Satisfiable::Constrained(Self {
             typevar,
             lower,
@@ -867,6 +890,13 @@ impl<'db> AtomicConstraint<'db> {
     }
 
     /// Returns the negation of this atomic constraint.
+    ///
+    /// Because a constraint has both a lower bound and an upper bound, it is technically the
+    /// intersection of two subtyping checks; the result is therefore a union:
+    ///
+    /// ```text
+    /// ¬(s ≤ T ≤ t) ⇒ ¬(s ≤ T ∧ T ≤ t) ⇒ (s > T) ∨ (T > t)
+    /// ```
     fn negate(self, db: &'db dyn Db) -> ConstraintSet<'db> {
         let mut result = ConstraintSet::never();
         result.union_constraint(
@@ -903,8 +933,9 @@ impl<'db> AtomicConstraint<'db> {
     fn intersect(self, db: &'db dyn Db, other: Self) -> Satisfiable<Self> {
         debug_assert!(self.typevar == other.typevar);
 
-        // The result is always `max_lower(s₁,s₂) : min_upper(t₁,t₂)`. (Note that `max_lower` and
-        // `min_upper` determine whether the corresponding bound is open or closed.)
+        // The result is always `max_lower(s₁,s₂) : min_upper(t₁,t₂)`. (See the documentation of
+        // `max_lower` and `min_upper` for details on how we determine whether the corresponding
+        // bound is open or closed.)
         Self::new(
             db,
             self.typevar,
@@ -940,8 +971,9 @@ impl<'db> AtomicConstraint<'db> {
             return Simplified::Two(self, other);
         }
 
-        // Otherwise the result is `min_lower(s₁,s₂) : max_upper(t₁,t₂)`. (Note that `min_lower`
-        // and `max_upper` determine whether the corresponding bound is open or closed.)
+        // Otherwise the result is `min_lower(s₁,s₂) : max_upper(t₁,t₂)`. (See the documentation of
+        // `min_lower` and `max_upper` for details on how we determine whether the corresponding
+        // bound is open or closed.)
         Simplified::from_one(Self::new(
             db,
             self.typevar,
