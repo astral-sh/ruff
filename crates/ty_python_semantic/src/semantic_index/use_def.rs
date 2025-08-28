@@ -598,18 +598,6 @@ impl<'db> UseDefMap<'db> {
             .is_always_false()
     }
 
-    pub(crate) fn declaration_reachability(
-        &self,
-        db: &dyn crate::Db,
-        declaration: &DeclarationWithConstraint<'db>,
-    ) -> Truthiness {
-        self.reachability_constraints.evaluate(
-            db,
-            &self.predicates,
-            declaration.reachability_constraint,
-        )
-    }
-
     pub(crate) fn binding_reachability(
         &self,
         db: &dyn crate::Db,

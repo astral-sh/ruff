@@ -571,8 +571,8 @@ class C:
         if (2 + 3) < 4:
             self.x: str = "a"
 
-# error: [unresolved-attribute]
-reveal_type(C().x)  # revealed: Unknown
+# TODO: this would ideally raise an `unresolved-attribute` error
+reveal_type(C().x)  # revealed: str
 ```
 
 ```py
@@ -600,9 +600,10 @@ class C:
         def set_e(self, e: str) -> None:
             self.e = e
 
-reveal_type(C(True).a)  # revealed: Unknown | Literal[1]
-# error: [unresolved-attribute]
-reveal_type(C(True).b)  # revealed: Unknown
+# TODO: this would ideally be `Unknown | Literal[1]`
+reveal_type(C(True).a)  # revealed: Unknown | Literal[1, "a"]
+# TODO: this would ideally raise an `unresolved-attribute` error
+reveal_type(C(True).b)  # revealed: Unknown | Literal[2]
 reveal_type(C(True).c)  # revealed: Unknown | Literal[3] | str
 # Ideally, this would just be `Unknown | Literal[5]`, but we currently do not
 # attempt to analyze control flow within methods more closely. All reachable

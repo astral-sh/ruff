@@ -820,6 +820,8 @@ impl ReachabilityConstraints {
     }
 
     fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
+        let _span = tracing::trace_span!("analyze_single", ?predicate).entered();
+
         match predicate.node {
             PredicateNode::Expression(test_expr) => {
                 static_expression_truthiness(db, test_expr).negate_if(!predicate.is_positive)

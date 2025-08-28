@@ -7199,10 +7199,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
         let fallback_place = value_type.member(db, &attr.id);
+        // Exclude non-definitely-bound places for purposes of reachability
+        // analysis. We currently do not perform boundness analysis for implicit
+        // instance attributes, so we exclude them here as well.
         if !fallback_place.place.is_definitely_bound()
             || fallback_place
                 .qualifiers
-                .contains(TypeQualifiers::POSSIBLY_UNBOUND_IMPLICIT_ATTRIBUTE)
+                .contains(TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE)
         {
             self.all_definitely_bound = false;
         }
