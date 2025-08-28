@@ -134,6 +134,7 @@ pub(crate) fn is_file_descriptor(expr: &Expr, semantic: &SemanticModel) -> bool 
     typing::is_int(binding, semantic)
 }
 
+#[expect(clippy::too_many_arguments)]
 pub(crate) fn check_os_pathlib_two_arg_calls(
     checker: &Checker,
     call: &ExprCall,
