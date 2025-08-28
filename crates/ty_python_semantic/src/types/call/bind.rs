@@ -2199,6 +2199,12 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     argument_type.apply_specialization(self.db, inherited_specialization);
                 expected_ty = expected_ty.apply_specialization(self.db, inherited_specialization);
             }
+            // This is one of the few places where we want to check if there's _any_ specialization
+            // of the parameter and argument types where assignability holds; normally we want to
+            // check that assignability holds for _all_ specializations.
+            // TODO: Soon we will go further, and build the actual specializations from the
+            // constraint set that we get from this assignability check, instead of inferring and
+            // building them in an earlier separate step.
             if argument_type
                 .when_assignable_to::<ConstraintSet>(self.db, expected_ty)
                 .is_never_satisfied(self.db)
