@@ -252,12 +252,13 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(
-        Rule::BidirectionalUnicode,
-        Path::new("bidirectional_unicode_preview.py")
-    )]
+    #[test_case(Rule::BidirectionalUnicode, Path::new("bidirectional_unicode.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let snapshot = format!(
+            "preview__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
         let diagnostics = test_path(
             Path::new("pylint").join(path).as_path(),
             &LinterSettings {
