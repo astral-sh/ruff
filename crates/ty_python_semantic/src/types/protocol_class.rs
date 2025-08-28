@@ -560,7 +560,8 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                 db,
                 matches!(
                     other.to_meta_type(db).member(db, self.name).place,
-                    Place::Type(_, Boundness::Bound)
+                    Place::Type(ty, Boundness::Bound)
+                    if ty.is_assignable_to(db, CallableType::single(db, Signature::dynamic(Type::any())))
                 ),
             ),
             // TODO: consider the types of the attribute on `other` for property members
