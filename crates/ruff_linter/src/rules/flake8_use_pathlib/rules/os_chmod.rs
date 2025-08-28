@@ -109,12 +109,10 @@ pub(crate) fn os_chmod(checker: &Checker, call: &ExprCall, segments: &[&str]) {
         return;
     }
 
-    let follow_symlinks_arg = call.arguments.find_argument_value("follow_symlinks", 3);
-
-    if let Some(expr) = &follow_symlinks_arg {
-        if expr.as_boolean_literal_expr().is_none() {
-            return;
-        }
+    if let Some(expr) = call.arguments.find_argument_value("follow_symlinks", 3)
+        && expr.as_boolean_literal_expr().is_none()
+    {
+        return;
     }
 
     diagnostic.try_set_fix(|| {
