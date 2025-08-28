@@ -204,4 +204,17 @@ RUF062 Function decorated with `contextlib.contextmanager` may yield more than o
 210 |     finally:
 211 |         yield # invalid, runs after ZeroDivisionError except
     |         ^^^^^
+212 |
+213 | # (20) Invalid: multiple yields in match arm
+    |
+
+RUF062 Function decorated with `contextlib.contextmanager` may yield more than once
+   --> RUF062_1.py:219:13
+    |
+217 |         case "a":
+218 |             yield # valid
+219 |             yield # invalid
+    |             ^^^^^
+220 |             return
+221 |         case "b":
     |

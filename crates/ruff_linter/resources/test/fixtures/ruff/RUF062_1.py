@@ -210,4 +210,17 @@ def multiple_yields_in_returning_except():
     finally:
         yield # invalid, runs after ZeroDivisionError except
 
-
+# (20) Invalid: multiple yields in match arm
+@contextlib.contextmanager
+def returning_match_case(variable):
+    match variable:
+        case "a":
+            yield # valid
+            yield # invalid
+            return
+        case "b":
+            pass
+        case _:
+            yield # valid
+            return
+    yield # valid
