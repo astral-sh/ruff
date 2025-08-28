@@ -15,7 +15,7 @@
 //! question.
 //!
 //! An individual constraint restricts the specialization of a single typevar to be within a
-//! particular lower and upper bound: the typevar can only specialize to types that are a supertype
+//! particular lower and upper bound: the typevar can only specialize to a type that is a supertype
 //! of the lower bound, and a subtype of the upper bound. (Note that lower and upper bounds are
 //! fully static; we take the bottom and top materializations of the bounds to remove any gradual
 //! forms if needed.) Either bound can be "closed" (where the bound is a valid specialization), or
@@ -26,8 +26,8 @@
 //! [constraint set][ConstraintSet] is the union of zero or more [clauses][ConstraintClause], each
 //! of which is the intersection of zero or more [individual constraints][AtomicConstraint]. Note
 //! that the constraint set that contains no clauses is never satisfiable (`⋃ {} = 0`); and the
-//! constraint set that contains a single clause, which contains no constraints, is always
-//! satisfiable (`⋃ {⋂ {}} = 1`).
+//! constraint set that contains a single clause, where that clause contains no constraints,
+//! is always satisfiable (`⋃ {⋂ {}} = 1`).
 //!
 //! NOTE: This module is currently in a transitional state: we've added a [`Constraints`] trait,
 //! and updated all of our type property implementations to work on any impl of that trait. We have
@@ -178,12 +178,12 @@ where
 ///
 /// This is called a "set of constraint sets", and denoted _𝒮_, in [[POPL2015][]].
 ///
-/// [POPL2015]: https://doi.org/10.1145/2676726.2676991
-///
 /// ### Invariants
 ///
 /// - The clauses are simplified as much as possible — there are no two clauses in the set that can
 ///   be simplified into a single clause.
+///
+/// [POPL2015]: https://doi.org/10.1145/2676726.2676991
 #[derive(Clone, Debug)]
 pub(crate) struct ConstraintSet<'db> {
     clauses: SmallVec<[ConstraintClause<'db>; 2]>,
@@ -235,9 +235,8 @@ impl<'db> ConstraintSet<'db> {
         // against each one in turn. (We can assume that the existing clauses are already
         // simplified with respect to each other, since we can assume that the invariant holds upon
         // entry to this method.)
-        let prev = std::mem::take(&mut self.clauses);
-        let mut existing_clauses = prev.into_iter();
-        while let Some(existing) = existing_clauses.next() {
+        let mut existing_clauses = std::mem::take(&mut self.clauses).into_iter();
+        for existing in existing_clauses.by_ref() {
             // Try to simplify the new clause against an existing clause.
             match existing.simplify_clauses(db, clause) {
                 Simplifiable::NeverSatisfiable => {
@@ -375,12 +374,12 @@ impl<'db> Constraints<'db> for ConstraintSet<'db> {
 ///
 /// This is called a "constraint set", and denoted _C_, in [[POPL2015][]].
 ///
-/// [POPL2015]: https://doi.org/10.1145/2676726.2676991
-///
 /// ### Invariants
 ///
 /// - No two constraints in the clause will constrain the same typevar.
 /// - The constraints are sorted by typevar.
+///
+/// [POPL2015]: https://doi.org/10.1145/2676726.2676991
 #[derive(Clone, Debug)]
 pub(crate) struct ConstraintClause<'db> {
     constraints: SmallVec<[AtomicConstraint<'db>; 1]>,
@@ -684,21 +683,21 @@ pub(crate) enum ConstraintBound<'db> {
 }
 
 impl<'db> ConstraintBound<'db> {
-    fn flip(self) -> Self {
+    const fn flip(self) -> Self {
         match self {
             ConstraintBound::Open(bound) => ConstraintBound::Closed(bound),
             ConstraintBound::Closed(bound) => ConstraintBound::Open(bound),
         }
     }
 
-    fn bound_type(self) -> Type<'db> {
+    const fn bound_type(self) -> Type<'db> {
         match self {
             ConstraintBound::Open(bound) => bound,
             ConstraintBound::Closed(bound) => bound,
         }
     }
 
-    fn is_open(self) -> bool {
+    const fn is_open(self) -> bool {
         matches!(self, ConstraintBound::Open(_))
     }
 
@@ -847,7 +846,7 @@ impl<'db> ConstraintBound<'db> {
 impl<'db> AtomicConstraint<'db> {
     /// Returns a new atomic constraint.
     ///
-    /// Panics of `lower` and `upper` are not both fully static.
+    /// Panics if `lower` and `upper` are not both fully static.
     fn new(
         db: &'db dyn Db,
         typevar: BoundTypeVarInstance<'db>,
@@ -856,8 +855,8 @@ impl<'db> AtomicConstraint<'db> {
     ) -> Satisfiable<Self> {
         let lower_type = lower.bound_type();
         let upper_type = upper.bound_type();
-        debug_assert!(lower_type == lower_type.bottom_materialization(db));
-        debug_assert!(upper_type == upper_type.top_materialization(db));
+        debug_assert_eq!(lower_type, lower_type.bottom_materialization(db));
+        debug_assert_eq!(upper_type, upper_type.top_materialization(db));
 
         // If `lower > upper`, then the constraint cannot be satisfied, since there is no type that
         // is both greater than `lower`, and less than `upper`. (This is true regardless of whether
@@ -923,7 +922,7 @@ impl<'db> AtomicConstraint<'db> {
     /// Returns whether `self` has tighter bounds than `other` — that is, if the intersection of
     /// `self` and `other` is `self`.
     fn subsumes(self, db: &'db dyn Db, other: Self) -> bool {
-        debug_assert!(self.typevar == other.typevar);
+        debug_assert_eq!(self.typevar, other.typevar);
         self.intersect(db, other) == Satisfiable::Constrained(self)
     }
 
@@ -931,7 +930,7 @@ impl<'db> AtomicConstraint<'db> {
     ///
     /// Panics if the two constraints have different typevars.
     fn intersect(self, db: &'db dyn Db, other: Self) -> Satisfiable<Self> {
-        debug_assert!(self.typevar == other.typevar);
+        debug_assert_eq!(self.typevar, other.typevar);
 
         // The result is always `max_lower(s₁,s₂) : min_upper(t₁,t₂)`. (See the documentation of
         // `max_lower` and `min_upper` for details on how we determine whether the corresponding
@@ -948,7 +947,7 @@ impl<'db> AtomicConstraint<'db> {
     ///
     /// Panics if the two constraints have different typevars.
     fn union(self, db: &'db dyn Db, other: Self) -> Simplifiable<Self> {
-        debug_assert!(self.typevar == other.typevar);
+        debug_assert_eq!(self.typevar, other.typevar);
 
         // When the two constraints are disjoint, then they cannot be simplified.
         //
@@ -1034,7 +1033,7 @@ pub(crate) enum Simplifiable<T> {
 }
 
 impl<T> Simplifiable<T> {
-    fn from_one(constraint: Satisfiable<T>) -> Self {
+    const fn from_one(constraint: Satisfiable<T>) -> Self {
         match constraint {
             Satisfiable::Never => Simplifiable::NeverSatisfiable,
             Satisfiable::Always => Simplifiable::AlwaysSatisfiable,
