@@ -9,14 +9,12 @@ UP001 [*] `__metaclass__ = type` is implied
   |     ^^^^^^^^^^^^^^^^^^^^
   |
 help: Remove `__metaclass__ = type`
-
-ℹ Safe fix
-1 1 | class A:
-2   |-    __metaclass__ = type
-  2 |+    pass
-3 3 | 
-4 4 | 
-5 5 | class B:
+1 | class A:
+  -     __metaclass__ = type
+2 +     pass
+3 | 
+4 | 
+5 | class B:
 
 UP001 [*] `__metaclass__ = type` is implied
  --> UP001.py:6:5
@@ -28,12 +26,10 @@ UP001 [*] `__metaclass__ = type` is implied
 8 |     def __init__(self) -> None:
   |
 help: Remove `__metaclass__ = type`
-
-ℹ Safe fix
-3 3 | 
-4 4 | 
-5 5 | class B:
-6   |-    __metaclass__ = type
-7 6 | 
-8 7 |     def __init__(self) -> None:
-9 8 |         pass
+3 | 
+4 | 
+5 | class B:
+  -     __metaclass__ = type
+6 | 
+7 |     def __init__(self) -> None:
+8 |         pass

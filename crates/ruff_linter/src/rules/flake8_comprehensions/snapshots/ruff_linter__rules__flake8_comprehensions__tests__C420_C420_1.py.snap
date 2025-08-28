@@ -8,10 +8,8 @@ C420 [*] Unnecessary dict comprehension for iterable; use `dict.fromkeys` instea
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   |
 help: Replace with `dict.fromkeys(iterable)`)
-
-ℹ Safe fix
-1   |-{x: NotImplemented for x in "XY"}
-  1 |+dict.fromkeys("XY", NotImplemented)
-2 2 | 
-3 3 | 
-4 4 | # Builtin bindings are placed at top of file, but should not count as
+  - {x: NotImplemented for x in "XY"}
+1 + dict.fromkeys("XY", NotImplemented)
+2 | 
+3 | 
+4 | # Builtin bindings are placed at top of file, but should not count as

@@ -11,16 +11,14 @@ LOG009 [*] Use of undocumented `logging.WARN` constant
 5 |     logging.WARNING  # OK
   |
 help: Replace `logging.WARN` with `logging.WARNING`
-
-ℹ Safe fix
-1 1 | def func():
-2 2 |     import logging
-3 3 | 
-4   |-    logging.WARN  # LOG009
-  4 |+    logging.WARNING  # LOG009
-5 5 |     logging.WARNING  # OK
-6 6 | 
-7 7 | 
+1 | def func():
+2 |     import logging
+3 | 
+  -     logging.WARN  # LOG009
+4 +     logging.WARNING  # LOG009
+5 |     logging.WARNING  # OK
+6 | 
+7 | 
 
 LOG009 [*] Use of undocumented `logging.WARN` constant
   --> LOG009.py:11:5
@@ -32,11 +30,9 @@ LOG009 [*] Use of undocumented `logging.WARN` constant
 12 |     WARNING  # OK
    |
 help: Replace `logging.WARN` with `logging.WARNING`
-
-ℹ Safe fix
-8  8  | def func():
-9  9  |     from logging import WARN, WARNING
-10 10 | 
-11    |-    WARN  # LOG009
-   11 |+    WARNING  # LOG009
-12 12 |     WARNING  # OK
+8  | def func():
+9  |     from logging import WARN, WARNING
+10 | 
+   -     WARN  # LOG009
+11 +     WARNING  # LOG009
+12 |     WARNING  # OK

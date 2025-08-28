@@ -10,9 +10,7 @@ F401 [*] `os` imported but unused
 3 | print("hello world")
   |
 help: Remove unused import: `os`
-
-ℹ Safe fix
-   ::: cell 3
-1   |-import os
-2 1 | 
-3 2 | print("hello world")
+ ::: cell 3
+  - import os
+1 | 
+2 | print("hello world")
