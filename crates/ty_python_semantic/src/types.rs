@@ -24,7 +24,7 @@ pub use self::diagnostic::TypeCheckDiagnostics;
 pub(crate) use self::diagnostic::register_lints;
 pub(crate) use self::infer::{
     infer_deferred_types, infer_definition_types, infer_expression_type, infer_expression_types,
-    infer_scope_types,
+    infer_scope_types, static_expression_truthiness,
 };
 pub(crate) use self::signatures::{CallableSignature, Signature};
 pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
@@ -6910,6 +6910,10 @@ bitflags! {
         const NOT_REQUIRED = 1 << 4;
         /// `typing_extensions.ReadOnly`
         const READ_ONLY = 1 << 5;
+        /// An implicit instance attribute which is possibly unbound according
+        /// to local control flow within the method it is defined in. This flag
+        /// overrules the `Boundness` information on `PlaceAndQualifiers`.
+        const POSSIBLY_UNBOUND_IMPLICIT_ATTRIBUTE = 1 << 6;
     }
 }
 
@@ -8620,7 +8624,7 @@ impl TypeRelation {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, get_size2::GetSize)]
 pub enum Truthiness {
     /// For an object `x`, `bool(x)` will always return `True`
     AlwaysTrue,
