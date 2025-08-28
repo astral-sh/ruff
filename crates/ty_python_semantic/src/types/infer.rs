@@ -8439,24 +8439,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (Type::EnumLiteral(literal_1), Type::EnumLiteral(literal_2))
                 if op == ast::CmpOp::Eq =>
             {
-                Some(Ok(match try_dunder(self, MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK) {
-                    Ok(ty) => ty,
-                    Err(_) => Type::BooleanLiteral(literal_1 == literal_2),
-                }))
+                Some(Ok(
+                    match try_dunder(self, MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK) {
+                        Ok(ty) => ty,
+                        Err(_) => Type::BooleanLiteral(literal_1 == literal_2),
+                    },
+                ))
             }
             (Type::EnumLiteral(literal_1), Type::EnumLiteral(literal_2))
                 if op == ast::CmpOp::NotEq =>
             {
-                Some(Ok(match try_dunder(self, MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK) {
-                    Ok(ty) => ty,
-                    Err(_) => Type::BooleanLiteral(literal_1 != literal_2),
-                }))
+                Some(Ok(
+                    match try_dunder(self, MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK) {
+                        Ok(ty) => ty,
+                        Err(_) => Type::BooleanLiteral(literal_1 != literal_2),
+                    },
+                ))
             }
 
-            (
-                Type::NominalInstance(nominal1),
-                Type::NominalInstance(nominal2),
-            ) => nominal1.tuple_spec(self.db())
+            (Type::NominalInstance(nominal1), Type::NominalInstance(nominal2)) => nominal1
+                .tuple_spec(self.db())
                 .and_then(|lhs_tuple| Some((lhs_tuple, nominal2.tuple_spec(self.db())?)))
                 .map(|(lhs_tuple, rhs_tuple)| {
                     let mut tuple_rich_comparison =
@@ -8475,11 +8477,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                             for ty in rhs_tuple.all_elements().copied() {
                                 let eq_result = self.infer_binary_type_comparison(
-                                left,
-                                ast::CmpOp::Eq,
-                                ty,
-                                range,
-                            ).expect("infer_binary_type_comparison should never return None for `CmpOp::Eq`");
+                                    left,
+                                    ast::CmpOp::Eq,
+                                    ty,
+                                    range,
+                                )?;
 
                                 match eq_result {
                                     todo @ Type::Dynamic(DynamicType::Todo(_)) => return Ok(todo),
@@ -8505,9 +8507,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ast::CmpOp::Is | ast::CmpOp::IsNot => {
                             // - `[ast::CmpOp::Is]`: returns `false` if the elements are definitely unequal, otherwise `bool`
                             // - `[ast::CmpOp::IsNot]`: returns `true` if the elements are definitely unequal, otherwise `bool`
-                            let eq_result = tuple_rich_comparison(RichCompareOperator::Eq).expect(
-                            "infer_binary_type_comparison should never return None for `CmpOp::Eq`",
-                        );
+                            let eq_result = tuple_rich_comparison(RichCompareOperator::Eq)?;
 
                             Ok(match eq_result {
                                 todo @ Type::Dynamic(DynamicType::Todo(_)) => todo,
@@ -8521,8 +8521,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             })
                         }
                     }
-                }
-            ),
+                }),
 
             _ => None,
         };
@@ -8682,9 +8681,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut builder = UnionBuilder::new(self.db());
 
         for (l_ty, r_ty) in left_iter.zip(right_iter) {
-            let pairwise_eq_result = self
-                .infer_binary_type_comparison(l_ty, ast::CmpOp::Eq, r_ty, range)
-                .expect("infer_binary_type_comparison should never return None for `CmpOp::Eq`");
+            let pairwise_eq_result =
+                self.infer_binary_type_comparison(l_ty, ast::CmpOp::Eq, r_ty, range)?;
 
             match pairwise_eq_result
                 .try_bool(self.db())
