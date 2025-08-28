@@ -298,8 +298,10 @@ class A:
     def __ne__(self, other: int) -> A:
         return A()
 
-reveal_type(A() == A())  # revealed: bool
-reveal_type(A() != A())  # revealed: bool
+# error: [unsupported-operator] "Operator `==` is not supported for types `A` and `A`"
+reveal_type(A() == A())  # revealed: Unknown
+# error: [unsupported-operator] "Operator `!=` is not supported for types `A` and `A`"
+reveal_type(A() != A())  # revealed: Unknown
 ```
 
 ## Object Comparisons with Typeshed
@@ -388,4 +390,146 @@ class A:
 reveal_type(A() == A())  # revealed: Literal[True]
 reveal_type(A() < A())  # revealed: Literal[True]
 reveal_type(A() > A())  # revealed: Literal[True]
+```
+
+## Invalid comparisions
+
+### Not callable dunder comparison methods
+
+<!-- snapshot-diagnostics -->
+
+```py
+class A:
+    __eq__: None = None
+    __ne__: None = None
+    __lt__: None = None
+    __gt__: None = None
+    __le__: None = None
+    __ge__: None = None
+
+# error: [unsupported-operator]
+A() == A()
+# error: [unsupported-operator]
+A() != A()
+# error: [unsupported-operator]
+A() < A()
+# error: [unsupported-operator]
+A() > A()
+# error: [unsupported-operator]
+A() <= A()
+# error: [unsupported-operator]
+A() >= A()
+
+# Fine
+A() == 1
+A() != 1
+```
+
+### Possibly not callable dunder comparison methods
+
+<!-- snapshot-diagnostics -->
+
+```py
+class A:
+    __eq__ = None
+    __ne__ = None
+    __lt__ = None
+    __gt__ = None
+    __le__ = None
+    __ge__ = None
+
+# error: [unsupported-operator]
+A() == A()
+# error: [unsupported-operator]
+A() != A()
+# error: [unsupported-operator]
+A() < A()
+# error: [unsupported-operator]
+A() > A()
+# error: [unsupported-operator]
+A() <= A()
+# error: [unsupported-operator]
+A() >= A()
+
+# Fine
+A() == 1
+A() != 1
+```
+
+### Possibly unbound dunder comparison methods
+
+<!-- snapshot-diagnostics -->
+
+```py
+def _(flag: bool):
+    class A:
+        if flag:
+            def __eq__(self, other) -> bool:
+                return NotImplemented
+
+            def __ne__(self, other) -> bool:
+                return NotImplemented
+
+            def __lt__(self, other) -> bool:
+                return NotImplemented
+
+            def __gt__(self, other) -> bool:
+                return NotImplemented
+
+            def __le__(self, other) -> bool:
+                return NotImplemented
+
+            def __ge__(self, other) -> bool:
+                return NotImplemented
+
+    # error: [unsupported-operator]
+    A() == A()
+    # error: [unsupported-operator]
+    A() != A()
+    # error: [unsupported-operator]
+    A() < A()
+    # error: [unsupported-operator]
+    A() > A()
+    # error: [unsupported-operator]
+    A() <= A()
+    # error: [unsupported-operator]
+    A() >= A()
+```
+
+### Invalid arguments to dunder comparison methods
+
+<!-- snapshot-diagnostics -->
+
+```py
+class A:
+    def __eq__(self, other: str) -> bool:
+        return NotImplemented
+
+    def __ne__(self, other: str) -> bool:
+        return NotImplemented
+
+    def __lt__(self, other: str) -> bool:
+        return NotImplemented
+
+    def __gt__(self, other: str) -> bool:
+        return NotImplemented
+
+    def __le__(self, other: str) -> bool:
+        return NotImplemented
+
+    def __ge__(self, other: str) -> bool:
+        return NotImplemented
+
+# error: [unsupported-operator]
+A() == A()
+# error: [unsupported-operator]
+A() != A()
+# error: [unsupported-operator]
+A() < A()
+# error: [unsupported-operator]
+A() > A()
+# error: [unsupported-operator]
+A() <= A()
+# error: [unsupported-operator]
+A() >= A()
 ```

@@ -7952,12 +7952,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         if let Some(diagnostic_builder) =
                             builder.context.report_lint(&UNSUPPORTED_OPERATOR, range)
                         {
+                            let error_left_display = error.left_ty.display(builder.db());
+                            let error_right_display = error.right_ty.display(builder.db());
                             // Handle unsupported operators (diagnostic, `bool`/`Unknown` outcome)
-                            diagnostic_builder.into_diagnostic(format_args!(
+                            let mut diagnostic = diagnostic_builder.into_diagnostic(format_args!(
                                 "Operator `{}` is not supported for types `{}` and `{}`{}",
                                 error.op,
-                                error.left_ty.display(builder.db()),
-                                error.right_ty.display(builder.db()),
+                                error_left_display,
+                                error_right_display,
                                 if (left_ty, right_ty) == (error.left_ty, error.right_ty) {
                                     String::new()
                                 } else {
@@ -7968,6 +7970,39 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     )
                                 }
                             ));
+
+                            if let Some(call_dunder_error) = error.call_dunder_error {
+                                match call_dunder_error {
+                                    CallDunderError::CallError(call_error_kind, _) => {
+                                        match call_error_kind {
+                                            CallErrorKind::NotCallable => {
+                                                diagnostic.info(format_args!(
+                                                    "Operator '{}' is not callable",
+                                                    op
+                                                ));
+                                            }
+                                            CallErrorKind::BindingError => {
+                                                diagnostic.info(format_args!(
+                                                    "Operator '{}' on object of type '{}' cannot be used with object of type '{}'",
+                                                    op,
+                                                    error_left_display,
+                                                    error_right_display
+                                                ));
+                                            }
+                                            CallErrorKind::PossiblyNotCallable => {
+                                                diagnostic.info(format_args!(
+                                                    "Operator '{}' is possibly not callable",
+                                                    op
+                                                ));
+                                            }
+                                        }
+                                    }
+                                    CallDunderError::PossiblyUnbound(_) => diagnostic.info(
+                                        format_args!("Operator '{}' is possibly unbound", op),
+                                    ),
+                                    CallDunderError::MethodNotAvailable => {}
+                                }
+                            }
                         }
 
                         match op {
@@ -8258,6 +8293,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     op,
                     left_ty: left,
                     right_ty: right,
+                    call_dunder_error: None,
                 }),
             }),
             (Type::IntLiteral(_), Type::NominalInstance(_)) => {
@@ -8522,36 +8558,50 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 db,
                 op.dunder(),
                 &mut CallArguments::positional([right]),
-                policy,
+                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
             )
             .map(|outcome| outcome.return_type(db))
-            .ok()
         };
 
         // The reflected dunder has priority if the right-hand side is a strict subclass of the left-hand side.
         if left != right && right.is_subtype_of(db, left) {
-            call_dunder(op.reflect(), right, left).or_else(|| call_dunder(op, left, right))
+            let first_call = call_dunder(op.reflect(), right, left);
+            match first_call {
+                Ok(ty) => Ok(ty),
+                Err(e) => match call_dunder(op, left, right) {
+                    Ok(ty) => Ok(ty),
+                    Err(_) => Err(e),
+                },
+            }
         } else {
-            call_dunder(op, left, right).or_else(|| call_dunder(op.reflect(), right, left))
+            let first_call = call_dunder(op, left, right);
+            match first_call {
+                Ok(ty) => Ok(ty),
+                Err(e) => match call_dunder(op.reflect(), right, left) {
+                    Ok(ty) => Ok(ty),
+                    Err(_) => Err(e),
+                },
+            }
         }
-        .or_else(|| {
+        .or_else(|e| {
             // When no appropriate method returns any value other than NotImplemented,
             // the `==` and `!=` operators will fall back to `is` and `is not`, respectively.
             // refer to `<https://docs.python.org/3/reference/datamodel.html#object.__eq__>`
             if matches!(op, RichCompareOperator::Eq | RichCompareOperator::Ne)
                 // This branch implements specific behavior of the `__eq__` and `__ne__` methods
                 // on `object`, so it does not apply if we skip looking up attributes on `object`.
-                && !policy.mro_no_object_fallback()
+                && !policy.mro_no_object_fallback() && matches!(e, CallDunderError::MethodNotAvailable)
             {
-                Some(KnownClass::Bool.to_instance(db))
+                Ok(KnownClass::Bool.to_instance(db))
             } else {
-                None
+                Err(e)
             }
         })
-        .ok_or_else(|| CompareUnsupportedError {
+        .map_err(|e| CompareUnsupportedError {
             op: op.into(),
             left_ty: left,
             right_ty: right,
+            call_dunder_error: Some(e),
         })
     }
 
@@ -8606,6 +8656,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 op: op.into(),
                 left_ty: left,
                 right_ty: right,
+                call_dunder_error: None,
             })
     }
 
@@ -11388,11 +11439,12 @@ impl From<MembershipTestCompareOperator> for ast::CmpOp {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug)]
 struct CompareUnsupportedError<'db> {
     op: ast::CmpOp,
     left_ty: Type<'db>,
     right_ty: Type<'db>,
+    call_dunder_error: Option<CallDunderError<'db>>,
 }
 
 fn format_import_from_module(level: u32, module: Option<&str>) -> String {

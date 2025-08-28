@@ -1,0 +1,136 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: rich_comparison.md - Comparison: Rich Comparison - Invalid comparisions - Invalid arguments to dunder comparison methods
+mdtest path: crates/ty_python_semantic/resources/mdtest/comparison/instances/rich_comparison.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | class A:
+ 2 |     def __eq__(self, other: str) -> bool:
+ 3 |         return NotImplemented
+ 4 |     def __ne__(self, other: str) -> bool:
+ 5 |         return NotImplemented
+ 6 |     def __lt__(self, other: str) -> bool:
+ 7 |         return NotImplemented
+ 8 |     def __gt__(self, other: str) -> bool:
+ 9 |         return NotImplemented
+10 |     def __le__(self, other: str) -> bool:
+11 |         return NotImplemented
+12 |     def __ge__(self, other: str) -> bool:
+13 |         return NotImplemented
+14 | 
+15 | # error: [unsupported-operator]
+16 | A() == A()
+17 | # error: [unsupported-operator]
+18 | A() != A()
+19 | # error: [unsupported-operator]
+20 | A() < A()
+21 | # error: [unsupported-operator]
+22 | A() > A()
+23 | # error: [unsupported-operator]
+24 | A() <= A()
+25 | # error: [unsupported-operator]
+26 | A() >= A()
+```
+
+# Diagnostics
+
+```
+error[unsupported-operator]: Operator `==` is not supported for types `A` and `A`
+  --> src/mdtest_snippet.py:16:1
+   |
+15 | # error: [unsupported-operator]
+16 | A() == A()
+   | ^^^^^^^^^^
+17 | # error: [unsupported-operator]
+18 | A() != A()
+   |
+info: Operator '==' on object of type 'A' cannot be used with object of type 'A'
+info: rule `unsupported-operator` is enabled by default
+
+```
+
+```
+error[unsupported-operator]: Operator `!=` is not supported for types `A` and `A`
+  --> src/mdtest_snippet.py:18:1
+   |
+16 | A() == A()
+17 | # error: [unsupported-operator]
+18 | A() != A()
+   | ^^^^^^^^^^
+19 | # error: [unsupported-operator]
+20 | A() < A()
+   |
+info: Operator '!=' on object of type 'A' cannot be used with object of type 'A'
+info: rule `unsupported-operator` is enabled by default
+
+```
+
+```
+error[unsupported-operator]: Operator `<` is not supported for types `A` and `A`
+  --> src/mdtest_snippet.py:20:1
+   |
+18 | A() != A()
+19 | # error: [unsupported-operator]
+20 | A() < A()
+   | ^^^^^^^^^
+21 | # error: [unsupported-operator]
+22 | A() > A()
+   |
+info: Operator '<' on object of type 'A' cannot be used with object of type 'A'
+info: rule `unsupported-operator` is enabled by default
+
+```
+
+```
+error[unsupported-operator]: Operator `>` is not supported for types `A` and `A`
+  --> src/mdtest_snippet.py:22:1
+   |
+20 | A() < A()
+21 | # error: [unsupported-operator]
+22 | A() > A()
+   | ^^^^^^^^^
+23 | # error: [unsupported-operator]
+24 | A() <= A()
+   |
+info: Operator '>' on object of type 'A' cannot be used with object of type 'A'
+info: rule `unsupported-operator` is enabled by default
+
+```
+
+```
+error[unsupported-operator]: Operator `<=` is not supported for types `A` and `A`
+  --> src/mdtest_snippet.py:24:1
+   |
+22 | A() > A()
+23 | # error: [unsupported-operator]
+24 | A() <= A()
+   | ^^^^^^^^^^
+25 | # error: [unsupported-operator]
+26 | A() >= A()
+   |
+info: Operator '<=' on object of type 'A' cannot be used with object of type 'A'
+info: rule `unsupported-operator` is enabled by default
+
+```
+
+```
+error[unsupported-operator]: Operator `>=` is not supported for types `A` and `A`
+  --> src/mdtest_snippet.py:26:1
+   |
+24 | A() <= A()
+25 | # error: [unsupported-operator]
+26 | A() >= A()
+   | ^^^^^^^^^^
+   |
+info: Operator '>=' on object of type 'A' cannot be used with object of type 'A'
+info: rule `unsupported-operator` is enabled by default
+
+```

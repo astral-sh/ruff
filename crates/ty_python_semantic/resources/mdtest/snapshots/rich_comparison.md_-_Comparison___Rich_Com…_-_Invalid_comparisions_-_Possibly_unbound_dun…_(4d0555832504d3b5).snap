@@ -1,0 +1,138 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: rich_comparison.md - Comparison: Rich Comparison - Invalid comparisions - Possibly unbound dunder comparison methods
+mdtest path: crates/ty_python_semantic/resources/mdtest/comparison/instances/rich_comparison.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | def _(flag: bool):
+ 2 |     class A:
+ 3 |         if flag:
+ 4 |             def __eq__(self, other) -> bool:
+ 5 |                 return NotImplemented
+ 6 |             def __ne__(self, other) -> bool:
+ 7 |                 return NotImplemented
+ 8 |             def __lt__(self, other) -> bool:
+ 9 |                 return NotImplemented
+10 |             def __gt__(self, other) -> bool:
+11 |                 return NotImplemented
+12 |             def __le__(self, other) -> bool:
+13 |                 return NotImplemented
+14 |             def __ge__(self, other) -> bool:
+15 |                 return NotImplemented
+16 | 
+17 |     # error: [unsupported-operator]
+18 |     A() == A()
+19 |     # error: [unsupported-operator]
+20 |     A() != A()
+21 |     # error: [unsupported-operator]
+22 |     A() < A()
+23 |     # error: [unsupported-operator]
+24 |     A() > A()
+25 |     # error: [unsupported-operator]
+26 |     A() <= A()
+27 |     # error: [unsupported-operator]
+28 |     A() >= A()
+```
+
+# Diagnostics
+
+```
+error[unsupported-operator]: Operator `==` is not supported for types `A` and `A`
+  --> src/mdtest_snippet.py:18:5
+   |
+17 |     # error: [unsupported-operator]
+18 |     A() == A()
+   |     ^^^^^^^^^^
+19 |     # error: [unsupported-operator]
+20 |     A() != A()
+   |
+info: Operator '==' is possibly unbound
+info: rule `unsupported-operator` is enabled by default
+
+```
+
+```
+error[unsupported-operator]: Operator `!=` is not supported for types `A` and `A`
+  --> src/mdtest_snippet.py:20:5
+   |
+18 |     A() == A()
+19 |     # error: [unsupported-operator]
+20 |     A() != A()
+   |     ^^^^^^^^^^
+21 |     # error: [unsupported-operator]
+22 |     A() < A()
+   |
+info: Operator '!=' is possibly unbound
+info: rule `unsupported-operator` is enabled by default
+
+```
+
+```
+error[unsupported-operator]: Operator `<` is not supported for types `A` and `A`
+  --> src/mdtest_snippet.py:22:5
+   |
+20 |     A() != A()
+21 |     # error: [unsupported-operator]
+22 |     A() < A()
+   |     ^^^^^^^^^
+23 |     # error: [unsupported-operator]
+24 |     A() > A()
+   |
+info: Operator '<' is possibly unbound
+info: rule `unsupported-operator` is enabled by default
+
+```
+
+```
+error[unsupported-operator]: Operator `>` is not supported for types `A` and `A`
+  --> src/mdtest_snippet.py:24:5
+   |
+22 |     A() < A()
+23 |     # error: [unsupported-operator]
+24 |     A() > A()
+   |     ^^^^^^^^^
+25 |     # error: [unsupported-operator]
+26 |     A() <= A()
+   |
+info: Operator '>' is possibly unbound
+info: rule `unsupported-operator` is enabled by default
+
+```
+
+```
+error[unsupported-operator]: Operator `<=` is not supported for types `A` and `A`
+  --> src/mdtest_snippet.py:26:5
+   |
+24 |     A() > A()
+25 |     # error: [unsupported-operator]
+26 |     A() <= A()
+   |     ^^^^^^^^^^
+27 |     # error: [unsupported-operator]
+28 |     A() >= A()
+   |
+info: Operator '<=' is possibly unbound
+info: rule `unsupported-operator` is enabled by default
+
+```
+
+```
+error[unsupported-operator]: Operator `>=` is not supported for types `A` and `A`
+  --> src/mdtest_snippet.py:28:5
+   |
+26 |     A() <= A()
+27 |     # error: [unsupported-operator]
+28 |     A() >= A()
+   |     ^^^^^^^^^^
+   |
+info: Operator '>=' is possibly unbound
+info: rule `unsupported-operator` is enabled by default
+
+```
