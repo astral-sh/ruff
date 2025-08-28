@@ -197,3 +197,17 @@ def multiple_yields_in_return_guarded_except():
         pass
     yield # invalid because of IndexError branch
 
+# (19) Invalid: yield in finally runs after except despite return
+@contextlib.contextmanager
+def multiple_yields_in_returning_except():
+    try:
+        pass
+    except RuntimeError:
+        pass
+    except ZeroDivisionError:
+        yield
+        return
+    finally:
+        yield # invalid, runs after ZeroDivisionError except
+
+
