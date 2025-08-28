@@ -598,6 +598,11 @@ impl<'db> Specialization<'db> {
         type_mapping: &TypeMapping<'a, 'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
+        // TODO it seems like this should be possible to do in a much simpler way in
+        // `Self::apply_specialization`; just apply the type mapping to create the new
+        // specialization, then materialize the new specialization appropriately, if the type
+        // mapping is a materialization. But this doesn't work; see discussion in
+        // https://github.com/astral-sh/ruff/pull/20076
         let applied_materialization_kind = type_mapping.materialization_kind(db);
         let mut has_dynamic_invariant_typevar = false;
         let types: Box<[_]> = self
