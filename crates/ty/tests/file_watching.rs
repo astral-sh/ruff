@@ -240,7 +240,7 @@ impl TestCase {
             .module(parent_module_name)
             .all_submodules(self.db())
             .iter()
-            .map(|name| name.as_str().to_string())
+            .map(|submodule| submodule.name(self.db()).to_string())
             .collect::<Vec<String>>();
         names.sort();
         names
