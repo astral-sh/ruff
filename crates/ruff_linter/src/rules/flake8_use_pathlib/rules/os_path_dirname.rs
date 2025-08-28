@@ -41,6 +41,7 @@ use crate::{FixAvailability, Violation};
 ///
 /// - Collapses consecutive slashes (e.g., `"a//b"` → `"a/b"`).
 /// - Removes trailing slashes (e.g., `"a/b/"` → `"a/b"`).
+/// - Eliminates `"."` (e.g., `"a/./b"` → `"a/b"`).
 ///
 /// As a result, code relying on the exact string returned by `os.path.dirname`
 /// may behave differently after the fix.
