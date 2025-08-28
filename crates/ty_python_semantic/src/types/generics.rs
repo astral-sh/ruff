@@ -1119,9 +1119,9 @@ impl<'db> SpecializationBuilder<'db> {
 
                 // Extract formal_alias if this is a generic class
                 let formal_alias = match formal {
-                    Type::NominalInstance(formal_nominal) => {
-                        formal_nominal.class(self.db).into_generic_alias()
-                    }
+                    Type::NominalInstance(formal_nominal) => formal_nominal
+                        .class_if_not_newtype(self.db)
+                        .and_then(ClassType::into_generic_alias),
                     // TODO: This will only handle classes that explicit implement a generic protocol
                     // by listing it as a base class. To handle classes that implicitly implement a
                     // generic protocol, we will need to check the types of the protocol members to be
@@ -1135,7 +1135,10 @@ impl<'db> SpecializationBuilder<'db> {
 
                 if let Some(formal_alias) = formal_alias {
                     let formal_origin = formal_alias.origin(self.db);
-                    for base in actual_nominal.class(self.db).iter_mro(self.db) {
+                    for base in actual_nominal
+                        .class_ignoring_newtype(self.db)
+                        .iter_mro(self.db)
+                    {
                         let ClassBase::Class(ClassType::Generic(base_alias)) = base else {
                             continue;
                         };

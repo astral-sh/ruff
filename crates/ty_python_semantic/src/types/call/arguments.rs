@@ -260,7 +260,9 @@ impl<'a, 'db> FromIterator<(Argument<'a>, Option<Type<'db>>)> for CallArguments<
 pub(crate) fn is_expandable_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     match ty {
         Type::NominalInstance(instance) => {
-            let class = instance.class(db);
+            let Some(class) = instance.class_if_not_newtype(db) else {
+                return false;
+            };
             class.is_known(db, KnownClass::Bool)
                 || instance.tuple_spec(db).is_some_and(|spec| match &*spec {
                     Tuple::Fixed(fixed_length_tuple) => fixed_length_tuple
@@ -282,7 +284,7 @@ fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
     // NOTE: Update `is_expandable_type` if this logic changes accordingly.
     match ty {
         Type::NominalInstance(instance) => {
-            let class = instance.class(db);
+            let class = instance.class_if_not_newtype(db)?;
 
             if class.is_known(db, KnownClass::Bool) {
                 return Some(vec![

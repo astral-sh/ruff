@@ -953,7 +953,7 @@ fn is_instance_truthiness<'db>(
     let is_instance = |ty: &Type<'_>| {
         if let Type::NominalInstance(instance) = ty {
             if instance
-                .class(db)
+                .class_ignoring_newtype(db)
                 .iter_mro(db)
                 .filter_map(ClassBase::into_class)
                 .any(|c| match c {

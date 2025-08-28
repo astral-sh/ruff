@@ -61,6 +61,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_GENERIC_CLASS);
     registry.register_lint(&INVALID_LEGACY_TYPE_VARIABLE);
     registry.register_lint(&INVALID_TYPE_ALIAS_TYPE);
+    registry.register_lint(&INVALID_NEWTYPE);
     registry.register_lint(&INVALID_METACLASS);
     registry.register_lint(&INVALID_OVERLOAD);
     registry.register_lint(&INVALID_PARAMETER_DEFAULT);
@@ -881,6 +882,27 @@ declare_lint! {
     /// ```
     pub(crate) static INVALID_TYPE_ALIAS_TYPE = {
         summary: "detects invalid TypeAliasType definitions",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for the creation of invalid `NewType`s
+    ///
+    /// ## Why is this bad?
+    /// There are several requirements that you must follow when creating a `NewType`.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from typing import NewType
+    ///
+    /// Foo = NewType("Foo", int)  # okay
+    /// Bar = NewType(get_name(), int)        # error: NewType name must be a string literal
+    /// ```
+    pub(crate) static INVALID_NEWTYPE = {
+        summary: "detects invalid NewType definitions",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
@@ -1976,7 +1998,8 @@ pub(super) fn report_invalid_assignment(
 fn type_to_class_literal<'db>(ty: Type<'db>, db: &'db dyn crate::Db) -> Option<ClassLiteral<'db>> {
     match ty {
         Type::ClassLiteral(class) => Some(class),
-        Type::NominalInstance(instance) => match instance.class(db) {
+        // TODO: How should we handle NewTypes here?
+        Type::NominalInstance(instance) => match instance.class_ignoring_newtype(db) {
             crate::types::class::ClassType::NonGeneric(class) => Some(class),
             crate::types::class::ClassType::Generic(alias) => Some(alias.origin(db)),
         },
@@ -2591,7 +2614,13 @@ pub(crate) fn report_undeclared_protocol_member(
                 SubclassOfInner::Dynamic(DynamicType::Any) => return true,
                 SubclassOfInner::Dynamic(_) => return false,
             },
-            Type::NominalInstance(instance) => instance.class(db),
+            Type::NominalInstance(instance) => {
+                if let Some(class) = instance.class_if_not_newtype(db) {
+                    class
+                } else {
+                    return false;
+                }
+            }
             _ => return false,
         };
 

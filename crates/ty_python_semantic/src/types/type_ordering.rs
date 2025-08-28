@@ -131,7 +131,15 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (_, Type::TypeIs(_)) => Ordering::Greater,
 
         (Type::NominalInstance(left), Type::NominalInstance(right)) => {
-            left.class(db).cmp(&right.class(db))
+            let (left_class, left_newtype) = left.class_and_newtype(db);
+            let (right_class, right_newtype) = right.class_and_newtype(db);
+            // NewTypes order after regular classes.
+            match (left_newtype, right_newtype) {
+                (None, None) => left_class.cmp(&right_class),
+                (Some(_), None) => Ordering::Greater,
+                (None, Some(_)) => Ordering::Less,
+                (Some(left_newtype), Some(right_newtype)) => left_newtype.cmp(&right_newtype),
+            }
         }
         (Type::NominalInstance(_), _) => Ordering::Less,
         (_, Type::NominalInstance(_)) => Ordering::Greater,
@@ -180,7 +188,17 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 (SuperOwnerKind::Class(_), _) => Ordering::Less,
                 (_, SuperOwnerKind::Class(_)) => Ordering::Greater,
                 (SuperOwnerKind::Instance(left), SuperOwnerKind::Instance(right)) => {
-                    left.class(db).cmp(&right.class(db))
+                    let (left_class, left_newtype) = left.class_and_newtype(db);
+                    let (right_class, right_newtype) = right.class_and_newtype(db);
+                    // NewTypes order after regular classes.
+                    match (left_newtype, right_newtype) {
+                        (None, None) => left_class.cmp(&right_class),
+                        (Some(_), None) => Ordering::Greater,
+                        (None, Some(_)) => Ordering::Less,
+                        (Some(left_newtype), Some(right_newtype)) => {
+                            left_newtype.cmp(&right_newtype)
+                        }
+                    }
                 }
                 (SuperOwnerKind::Instance(_), _) => Ordering::Less,
                 (_, SuperOwnerKind::Instance(_)) => Ordering::Greater,
