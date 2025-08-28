@@ -233,6 +233,7 @@ from typing import Self
 class A:
     def __new__(cls) -> "int | A":
         import random
+
         return 42 if random.random() > 0.5 else object.__new__(cls)
 
 reveal_type(A())  # revealed: int | A
@@ -256,12 +257,10 @@ class ReceiveChannel(Generic[T]):
     pass
 
 class ChannelPair(Tuple[SendChannel[T], ReceiveChannel[T]], Generic[T]):
-    def __new__(
-        cls, buffer_size: int
-    ) -> Tuple[SendChannel[T], ReceiveChannel[T]]:
+    def __new__(cls, buffer_size: int) -> Tuple[SendChannel[T], ReceiveChannel[T]]:
         # In reality would create and return the tuple
         return (SendChannel[T](), ReceiveChannel[T]())
-    
+
     def __init__(self, buffer_size: int):
         pass
 
@@ -269,7 +268,7 @@ class ChannelPair(Tuple[SendChannel[T], ReceiveChannel[T]], Generic[T]):
 int_channel = ChannelPair[int](5)
 reveal_type(int_channel)  # revealed: tuple[SendChannel[int], ReceiveChannel[int]]
 
-str_channel = ChannelPair[str](10)  
+str_channel = ChannelPair[str](10)
 reveal_type(str_channel)  # revealed: tuple[SendChannel[str], ReceiveChannel[str]]
 
 # Test unspecialized generic
@@ -282,7 +281,7 @@ from typing import Any
 class WithAny:
     def __new__(cls) -> Any:
         return 42
-    
+
     def __init__(self, required_param: str):
         # This should not be called since __new__ returns Any
         # If it were called, WithAny() would error due to missing required_param
@@ -295,7 +294,7 @@ reveal_type(WithAny())  # revealed: Any
 class WithUnionAny:
     def __new__(cls) -> "int | Any":
         return 42
-    
+
     def __init__(self):
         # This should not be called since __new__ returns union with Any
         pass
@@ -306,7 +305,7 @@ reveal_type(WithUnionAny())  # revealed: int | Any
 class ReturnsInt:
     def __new__(cls) -> int:
         return 42
-    
+
     def __init__(self, required_param: str):
         # This should not be called since __new__ returns int (not an instance)
         pass
