@@ -90,6 +90,10 @@ pub(crate) fn os_chmod(checker: &Checker, call: &ExprCall, segments: &[&str]) {
     let range = call.range();
     let mut diagnostic = checker.report_diagnostic(OsChmod, call.func.range());
 
+    if call.arguments.len() < 2 {
+        return;
+    }
+
     let Some(path) = call.arguments.find_argument_value("path", 0) else {
         return;
     };

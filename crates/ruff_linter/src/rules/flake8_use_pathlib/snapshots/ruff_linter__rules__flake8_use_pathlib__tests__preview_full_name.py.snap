@@ -27,7 +27,7 @@ help: Replace with `Path(...).resolve()`
 9 10 | aaa = os.mkdir(p)
 10 11 | os.makedirs(p)
 
-PTH101 [*] `os.chmod()` should be replaced by `Path.chmod()`
+PTH101 `os.chmod()` should be replaced by `Path.chmod()`
   --> full_name.py:8:6
    |
  7 | a = os.path.abspath(p)
@@ -37,21 +37,6 @@ PTH101 [*] `os.chmod()` should be replaced by `Path.chmod()`
 10 | os.makedirs(p)
    |
 help: Replace with `Path(...).chmod(...)`
-
-ℹ Safe fix
-1  1  | import os
-2  2  | import os.path
-   3  |+import pathlib
-3  4  | 
-4  5  | p = "/foo"
-5  6  | q = "bar"
-6  7  | 
-7  8  | a = os.path.abspath(p)
-8     |-aa = os.chmod(p)
-   9  |+aa = pathlib.Path(p).chmod()
-9  10 | aaa = os.mkdir(p)
-10 11 | os.makedirs(p)
-11 12 | os.rename(p)
 
 PTH102 [*] `os.mkdir()` should be replaced by `Path.mkdir()`
   --> full_name.py:9:7
