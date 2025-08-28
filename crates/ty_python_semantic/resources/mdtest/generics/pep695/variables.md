@@ -129,7 +129,7 @@ specialization. Thus, the typevar is a subtype of itself and of `object`, but no
 (including other typevars).
 
 ```py
-from ty_extensions import is_assignable_to, is_subtype_of, static_assert
+from ty_extensions import is_subtype_of, reveal_when_assignable_to, static_assert
 
 class Super: ...
 class Base(Super): ...
@@ -137,14 +137,14 @@ class Sub(Base): ...
 class Unrelated: ...
 
 def unbounded_unconstrained[T, U](t: T, u: U) -> None:
-    static_assert(is_assignable_to(T, T))
-    static_assert(is_assignable_to(T, object))
-    static_assert(not is_assignable_to(T, Super))
-    static_assert(is_assignable_to(U, U))
-    static_assert(is_assignable_to(U, object))
-    static_assert(not is_assignable_to(U, Super))
-    static_assert(not is_assignable_to(T, U))
-    static_assert(not is_assignable_to(U, T))
+    reveal_when_assignable_to(T, T)  # revealed: always
+    reveal_when_assignable_to(T, object)  # revealed: always
+    reveal_when_assignable_to(T, Super)  # revealed: never
+    reveal_when_assignable_to(U, U)  # revealed: always
+    reveal_when_assignable_to(U, object)  # revealed: always
+    reveal_when_assignable_to(U, Super)  # revealed: never
+    reveal_when_assignable_to(T, U)  # revealed: never
+    reveal_when_assignable_to(U, T)  # revealed: never
 
     static_assert(is_subtype_of(T, T))
     static_assert(is_subtype_of(T, object))
@@ -167,10 +167,10 @@ from typing import Any
 from typing_extensions import final
 
 def bounded[T: Super](t: T) -> None:
-    static_assert(is_assignable_to(T, Super))
-    static_assert(not is_assignable_to(T, Sub))
-    static_assert(not is_assignable_to(Super, T))
-    static_assert(not is_assignable_to(Sub, T))
+    reveal_when_assignable_to(T, Super)  # revealed: always
+    reveal_when_assignable_to(T, Sub)  # revealed: never
+    reveal_when_assignable_to(Super, T)  # revealed: never
+    reveal_when_assignable_to(Sub, T)  # revealed: never
 
     static_assert(is_subtype_of(T, Super))
     static_assert(not is_subtype_of(T, Sub))
@@ -178,12 +178,12 @@ def bounded[T: Super](t: T) -> None:
     static_assert(not is_subtype_of(Sub, T))
 
 def bounded_by_gradual[T: Any](t: T) -> None:
-    static_assert(is_assignable_to(T, Any))
-    static_assert(is_assignable_to(Any, T))
-    static_assert(is_assignable_to(T, Super))
-    static_assert(not is_assignable_to(Super, T))
-    static_assert(is_assignable_to(T, Sub))
-    static_assert(not is_assignable_to(Sub, T))
+    reveal_when_assignable_to(T, Any)  # revealed: always
+    reveal_when_assignable_to(Any, T)  # revealed: always
+    reveal_when_assignable_to(T, Super)  # revealed: always
+    reveal_when_assignable_to(Super, T)  # revealed: never
+    reveal_when_assignable_to(T, Sub)  # revealed: always
+    reveal_when_assignable_to(Sub, T)  # revealed: never
 
     static_assert(not is_subtype_of(T, Any))
     static_assert(not is_subtype_of(Any, T))
