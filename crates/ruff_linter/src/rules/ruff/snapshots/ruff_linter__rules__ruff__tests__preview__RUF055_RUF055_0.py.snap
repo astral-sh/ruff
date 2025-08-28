@@ -125,7 +125,7 @@ help: Replace with `s.replace("abc", "")`
 72 | 
 73 | # A diagnostic should not be emitted for `sub` replacements with backreferences or
 74 | # most other ASCII escapes
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF055 [*] Plain string pattern passed to `re` function
   --> RUF055_0.py:89:1

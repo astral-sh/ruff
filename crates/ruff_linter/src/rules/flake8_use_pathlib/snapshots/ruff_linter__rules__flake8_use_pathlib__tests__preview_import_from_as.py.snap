@@ -25,7 +25,7 @@ help: Replace with `Path(...).resolve()`
 16 | aa = xchmod(p)
 17 | aaa = xmkdir(p)
 18 | xmakedirs(p)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PTH101 `os.chmod()` should be replaced by `Path.chmod()`
   --> import_from_as.py:15:6

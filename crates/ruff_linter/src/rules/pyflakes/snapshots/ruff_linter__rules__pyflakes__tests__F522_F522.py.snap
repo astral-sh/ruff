@@ -94,7 +94,7 @@ help: Remove extra named arguments: greeting
 11 | 
 12 | # The fix here is safe because the unused argument has no side effect,
 13 | # even though the used argument has a side effect
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F522 [*] `.format` call has unused named argument(s): greeting
   --> F522.py:14:1

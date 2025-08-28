@@ -18,7 +18,7 @@ help: Use `pytest.deprecated_call()` as a context-manager
 18 | 
 19 | 
 20 | def test_error_assign():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF061 [*] Use context-manager form of `pytest.deprecated_call()`
   --> RUF061_deprecated_call.py:20:9
@@ -38,7 +38,7 @@ help: Use `pytest.deprecated_call()` as a context-manager
 22 |     print(s)
 23 | 
 24 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF061 [*] Use context-manager form of `pytest.deprecated_call()`
   --> RUF061_deprecated_call.py:25:5
@@ -54,4 +54,4 @@ help: Use `pytest.deprecated_call()` as a context-manager
    -     pytest.deprecated_call(lambda: warnings.warn("", DeprecationWarning))
 25 +     with pytest.deprecated_call():
 26 +         (lambda: warnings.warn("", DeprecationWarning))()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

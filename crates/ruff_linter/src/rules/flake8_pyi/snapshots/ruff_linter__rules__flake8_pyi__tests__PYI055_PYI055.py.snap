@@ -63,7 +63,7 @@ help: Combine multiple `type` members
 37 | 
 38 | 
 39 | def func():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[requests_mock.Mocker, httpretty, str]]`.
   --> PYI055.py:45:8

@@ -15,7 +15,7 @@ help: Remove docstring
 2 | 
 3 | def foo():
 4 |     """foo"""  # ERROR PYI021
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PYI021 [*] Docstrings should not be included in stubs
  --> PYI021.pyi:4:5
@@ -35,7 +35,7 @@ help: Remove docstring
 5 | 
 6 | class Bar:
 7 |     """bar"""  # ERROR PYI021
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PYI021 [*] Docstrings should not be included in stubs
  --> PYI021.pyi:7:5
@@ -55,7 +55,7 @@ help: Remove docstring
 8  | 
 9  | class Qux:
 10 |     """qux"""  # ERROR PYI021
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PYI021 [*] Docstrings should not be included in stubs
   --> PYI021.pyi:10:5
@@ -75,7 +75,7 @@ help: Remove docstring
 11 | 
 12 |     def __init__(self) -> None: ...
 13 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PYI021 [*] Docstrings should not be included in stubs
   --> PYI021.pyi:15:5
@@ -101,4 +101,4 @@ help: Remove docstring
 16 | 
 17 |     def __init__(self) -> None: ...
 18 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

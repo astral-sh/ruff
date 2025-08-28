@@ -20,4 +20,4 @@ help: Move into type-checking block
 10 | 
 11 | 
 12 | @dataclass
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

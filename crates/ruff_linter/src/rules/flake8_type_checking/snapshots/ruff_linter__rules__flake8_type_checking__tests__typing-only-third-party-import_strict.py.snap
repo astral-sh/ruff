@@ -28,7 +28,7 @@ help: Move into type-checking block
 58 | 
 59 |     def test(value: A):
 60 |         return pkg.B()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `pkg` into a type-checking block
   --> strict.py:91:12
@@ -56,4 +56,4 @@ help: Move into type-checking block
 95 |     import pkgfoo.bar as B
 96 | 
 97 |     def test(value: pkg.A):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

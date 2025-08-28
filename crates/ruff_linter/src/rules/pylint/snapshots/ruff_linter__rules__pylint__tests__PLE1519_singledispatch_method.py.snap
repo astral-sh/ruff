@@ -19,7 +19,7 @@ help: Replace with `@singledispatchmethod`
 11 |     @classmethod
 12 |     def convert_position(cls, position):
 13 |         pass
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLE1519 [*] `@singledispatch` decorator should not be used on methods
   --> singledispatch_method.py:15:5
@@ -40,7 +40,7 @@ help: Replace with `@singledispatchmethod`
 16 |     def move(self, position):
 17 |         pass
 18 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLE1519 [*] `@singledispatch` decorator should not be used on methods
   --> singledispatch_method.py:23:5
@@ -61,4 +61,4 @@ help: Replace with `@singledispatchmethod`
 24 |     @staticmethod
 25 |     def do(position):
 26 |         pass
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

@@ -23,7 +23,7 @@ help: Install `apache-airflow-providers-celery>=3.3.0` and use `DEFAULT_CELERY_C
 8  | 
 9  | DEFAULT_CELERY_CONFIG
 10 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.executors.celery_executor.app` is moved into `celery` provider in Airflow 3.0;
   --> AIR302_celery.py:11:1
@@ -44,7 +44,7 @@ help: Install `apache-airflow-providers-celery>=3.3.0` and use `app` from `airfl
 8  | 
 9  | DEFAULT_CELERY_CONFIG
 10 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.executors.celery_executor.CeleryExecutor` is moved into `celery` provider in Airflow 3.0;
   --> AIR302_celery.py:12:1
@@ -64,4 +64,4 @@ help: Install `apache-airflow-providers-celery>=3.3.0` and use `CeleryExecutor` 
 8  | 
 9  | DEFAULT_CELERY_CONFIG
 10 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

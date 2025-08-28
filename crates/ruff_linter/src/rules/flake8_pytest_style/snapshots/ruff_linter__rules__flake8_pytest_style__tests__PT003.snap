@@ -18,7 +18,7 @@ help: Remove implied `scope` argument
 15 | def error():
 16 |     ...
 17 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PT003 [*] `scope='function'` is implied in `@pytest.fixture()`
   --> PT003.py:19:17
@@ -37,7 +37,7 @@ help: Remove implied `scope` argument
 20 | def error_multiple_args():
 21 |     ...
 22 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PT003 [*] `scope='function'` is implied in `@pytest.fixture()`
   --> PT003.py:24:36
@@ -56,7 +56,7 @@ help: Remove implied `scope` argument
 25 | def error_multiple_args():
 26 |     ...
 27 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PT003 [*] `scope='function'` is implied in `@pytest.fixture()`
   --> PT003.py:29:36
@@ -75,7 +75,7 @@ help: Remove implied `scope` argument
 30 | def error_second_arg():
 31 |     ...
 32 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PT003 [*] `scope='function'` is implied in `@pytest.fixture()`
   --> PT003.py:37:31
@@ -96,7 +96,7 @@ help: Remove implied `scope` argument
 38 | def error_arg():
 39 |     ...
 40 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PT003 [*] `scope='function'` is implied in `@pytest.fixture()`
   --> PT003.py:43:5
@@ -115,7 +115,7 @@ help: Remove implied `scope` argument
 43 |     name="my_fixture",
 44 | )
 45 | def error_multiple_args():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PT003 [*] `scope='function'` is implied in `@pytest.fixture()`
   --> PT003.py:52:5
@@ -135,7 +135,7 @@ help: Remove implied `scope` argument
 52 | )
 53 | def error_multiple_args():
 54 |     ...
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PT003 [*] `scope='function'` is implied in `@pytest.fixture()`
   --> PT003.py:66:5
@@ -158,4 +158,4 @@ help: Remove implied `scope` argument
 66 |     name2=name, name3="my_fixture", **kwargs
 67 | )
 68 | def error_multiple_args():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

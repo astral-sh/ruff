@@ -18,7 +18,7 @@ help: Assign to variable; remove string literal
 7 | 
 8 | 
 9 | def f_a_short():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 EM101 [*] Exception must not use a string literal, assign to variable first
  --> EM.py:9:24
@@ -37,7 +37,7 @@ help: Assign to variable; remove string literal
 11 | 
 12 | 
 13 | def f_a_empty():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 EM101 [*] Exception must not use a string literal, assign to variable first
   --> EM.py:13:24
@@ -56,7 +56,7 @@ help: Assign to variable; remove string literal
 15 | 
 16 | 
 17 | def f_b():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 EM102 [*] Exception must not use an f-string literal, assign to variable first
   --> EM.py:18:24
@@ -76,7 +76,7 @@ help: Assign to variable; remove f-string literal
 20 | 
 21 | 
 22 | def f_c():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 EM103 [*] Exception must not use a `.format()` string directly, assign to variable first
   --> EM.py:22:24
@@ -95,7 +95,7 @@ help: Assign to variable; remove `.format()` string
 24 | 
 25 | 
 26 | def f_ok():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 EM101 [*] Exception must not use a string literal, assign to variable first
   --> EM.py:32:24
@@ -115,7 +115,7 @@ help: Assign to variable; remove string literal
 34 | 
 35 | 
 36 | def f_msg_in_nested_scope():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 EM101 [*] Exception must not use a string literal, assign to variable first
   --> EM.py:39:24
@@ -135,7 +135,7 @@ help: Assign to variable; remove string literal
 41 | 
 42 | 
 43 | def f_msg_in_parent_scope():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 EM101 [*] Exception must not use a string literal, assign to variable first
   --> EM.py:46:28
@@ -154,7 +154,7 @@ help: Assign to variable; remove string literal
 48 | 
 49 | 
 50 | def f_fix_indentation_check(foo):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 EM101 [*] Exception must not use a string literal, assign to variable first
   --> EM.py:51:28
@@ -176,7 +176,7 @@ help: Assign to variable; remove string literal
 53 |     else:
 54 |         if foo == "foo":
 55 |             raise RuntimeError(f"This is an exception: {foo}")
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 EM102 [*] Exception must not use an f-string literal, assign to variable first
   --> EM.py:54:32
@@ -197,7 +197,7 @@ help: Assign to variable; remove f-string literal
 56 |     raise RuntimeError("This is an exception: {}".format(foo))
 57 | 
 58 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 EM103 [*] Exception must not use a `.format()` string directly, assign to variable first
   --> EM.py:55:24
@@ -217,7 +217,7 @@ help: Assign to variable; remove `.format()` string
 57 | 
 58 | 
 59 | # Report these, but don't fix them
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 EM101 Exception must not use a string literal, assign to variable first
   --> EM.py:59:28
@@ -256,7 +256,7 @@ help: Assign to variable; remove f-string literal
 66 | 
 67 | 
 68 | def f_multi_line_string():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 EM101 [*] Exception must not use a string literal, assign to variable first
   --> EM.py:69:9
@@ -283,7 +283,7 @@ help: Assign to variable; remove string literal
 75 | 
 76 | 
 77 | def f_multi_line_string2():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 EM103 [*] Exception must not use a `.format()` string directly, assign to variable first
   --> EM.py:76:9
@@ -312,7 +312,7 @@ help: Assign to variable; remove `.format()` string
 83 | 
 84 | 
 85 | def f_multi_line_string2():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 EM103 [*] Exception must not use a `.format()` string directly, assign to variable first
   --> EM.py:84:9
@@ -347,4 +347,4 @@ help: Assign to variable; remove `.format()` string
 94 | 
 95 | 
 96 | def raise_typing_cast_exception():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

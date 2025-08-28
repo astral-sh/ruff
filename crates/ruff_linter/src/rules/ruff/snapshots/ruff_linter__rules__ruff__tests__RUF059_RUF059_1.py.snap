@@ -15,7 +15,7 @@ help: Prefix it with an underscore or any other dummy variable pattern
 3 | 
 4 | 
 5 | def f():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `y` is never used
  --> RUF059_1.py:2:8
@@ -31,7 +31,7 @@ help: Prefix it with an underscore or any other dummy variable pattern
 3 | 
 4 | 
 5 | def f():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `y` is never used
   --> RUF059_1.py:10:9
@@ -51,7 +51,7 @@ help: Prefix it with an underscore or any other dummy variable pattern
 11 |     if x > 1:
 12 |         print(coords)
 13 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `x` is never used
   --> RUF059_1.py:16:6
@@ -69,7 +69,7 @@ help: Prefix it with an underscore or any other dummy variable pattern
 17 | 
 18 | 
 19 | def f():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `y` is never used
   --> RUF059_1.py:16:9
@@ -87,7 +87,7 @@ help: Prefix it with an underscore or any other dummy variable pattern
 17 | 
 18 | 
 19 | def f():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `x` is never used
   --> RUF059_1.py:20:15
@@ -105,7 +105,7 @@ help: Prefix it with an underscore or any other dummy variable pattern
 21 | 
 22 | 
 23 | def f():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `y` is never used
   --> RUF059_1.py:20:18
@@ -123,4 +123,4 @@ help: Prefix it with an underscore or any other dummy variable pattern
 21 | 
 22 | 
 23 | def f():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

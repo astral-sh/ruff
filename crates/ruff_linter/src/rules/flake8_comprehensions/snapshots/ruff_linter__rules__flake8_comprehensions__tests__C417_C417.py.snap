@@ -19,7 +19,7 @@ help: Replace `map()` with a generator expression
 4 | map(lambda x: str(x), nums)
 5 | list(map(lambda x: x * 2, nums))
 6 | set(map(lambda x: x % 2 == 0, nums))
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C417 [*] Unnecessary `map()` usage (rewrite using a generator expression)
  --> C417.py:4:1
@@ -40,7 +40,7 @@ help: Replace `map()` with a generator expression
 5 | list(map(lambda x: x * 2, nums))
 6 | set(map(lambda x: x % 2 == 0, nums))
 7 | dict(map(lambda v: (v, v**2), nums))
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C417 [*] Unnecessary `map()` usage (rewrite using a list comprehension)
  --> C417.py:5:1
@@ -61,7 +61,7 @@ help: Replace `map()` with a list comprehension
 6 | set(map(lambda x: x % 2 == 0, nums))
 7 | dict(map(lambda v: (v, v**2), nums))
 8 | dict(map(lambda v: [v, v**2], nums))
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C417 [*] Unnecessary `map()` usage (rewrite using a set comprehension)
  --> C417.py:6:1
@@ -82,7 +82,7 @@ help: Replace `map()` with a set comprehension
 7 | dict(map(lambda v: (v, v**2), nums))
 8 | dict(map(lambda v: [v, v**2], nums))
 9 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C417 [*] Unnecessary `map()` usage (rewrite using a dict comprehension)
  --> C417.py:7:1
@@ -102,7 +102,7 @@ help: Replace `map()` with a dict comprehension
 8  | dict(map(lambda v: [v, v**2], nums))
 9  | 
 10 | map(lambda _: 3.0, nums)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C417 [*] Unnecessary `map()` usage (rewrite using a dict comprehension)
   --> C417.py:8:1
@@ -123,7 +123,7 @@ help: Replace `map()` with a dict comprehension
 9  | 
 10 | map(lambda _: 3.0, nums)
 11 | _ = "".join(map(lambda x: x in nums and "1" or "0", range(123)))
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C417 [*] Unnecessary `map()` usage (rewrite using a generator expression)
   --> C417.py:10:1
@@ -144,7 +144,7 @@ help: Replace `map()` with a generator expression
 11 | _ = "".join(map(lambda x: x in nums and "1" or "0", range(123)))
 12 | all(map(lambda v: isinstance(v, dict), nums))
 13 | filter(func, map(lambda v: v, nums))
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C417 [*] Unnecessary `map()` usage (rewrite using a generator expression)
   --> C417.py:11:13
@@ -164,7 +164,7 @@ help: Replace `map()` with a generator expression
 12 | all(map(lambda v: isinstance(v, dict), nums))
 13 | filter(func, map(lambda v: v, nums))
 14 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C417 [*] Unnecessary `map()` usage (rewrite using a generator expression)
   --> C417.py:12:5
@@ -184,7 +184,7 @@ help: Replace `map()` with a generator expression
 13 | filter(func, map(lambda v: v, nums))
 14 | 
 15 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C417 [*] Unnecessary `map()` usage (rewrite using a generator expression)
   --> C417.py:13:14
@@ -203,7 +203,7 @@ help: Replace `map()` with a generator expression
 14 | 
 15 | 
 16 | # When inside f-string, then the fix should be surrounded by whitespace
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C417 [*] Unnecessary `map()` usage (rewrite using a set comprehension)
   --> C417.py:17:8
@@ -222,7 +222,7 @@ help: Replace `map()` with a set comprehension
 18 | _ = f"{dict(map(lambda v: (v, v**2), nums))}"
 19 | 
 20 | # False negatives.
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C417 [*] Unnecessary `map()` usage (rewrite using a dict comprehension)
   --> C417.py:18:8
@@ -243,7 +243,7 @@ help: Replace `map()` with a dict comprehension
 19 | 
 20 | # False negatives.
 21 | map(lambda x=2, y=1: x + y, nums, nums)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C417 [*] Unnecessary `map()` usage (rewrite using a generator expression)
   --> C417.py:36:1
@@ -263,7 +263,7 @@ help: Replace `map()` with a generator expression
 37 | 
 38 | # Ok because of the default parameters, and variadic arguments.
 39 | map(lambda x=1: x, nums)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C417 [*] Unnecessary `map()` usage (rewrite using a generator expression)
   --> C417.py:47:1
@@ -283,7 +283,7 @@ help: Replace `map()` with a generator expression
 48 | map(lambda x: x, (y if y else z))
 49 | map(lambda x: x, (x, y, z))
 50 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C417 [*] Unnecessary `map()` usage (rewrite using a generator expression)
   --> C417.py:48:1
@@ -303,7 +303,7 @@ help: Replace `map()` with a generator expression
 49 | map(lambda x: x, (x, y, z))
 50 | 
 51 | # See https://github.com/astral-sh/ruff/issues/14808
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C417 [*] Unnecessary `map()` usage (rewrite using a generator expression)
   --> C417.py:49:1
@@ -324,7 +324,7 @@ help: Replace `map()` with a generator expression
 50 | 
 51 | # See https://github.com/astral-sh/ruff/issues/14808
 52 | # The following should be Ok since
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C417 [*] Unnecessary `map()` usage (rewrite using a set comprehension)
   --> C417.py:75:8
@@ -342,7 +342,7 @@ help: Replace `map()` with a set comprehension
 75 + _ = t"{ {x % 2 == 0 for x in nums} }"
 76 | _ = t"{dict(map(lambda v: (v, v**2), nums))}"
 77 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C417 [*] Unnecessary `map()` usage (rewrite using a dict comprehension)
   --> C417.py:76:8
@@ -359,4 +359,4 @@ help: Replace `map()` with a dict comprehension
    - _ = t"{dict(map(lambda v: (v, v**2), nums))}"
 76 + _ = t"{ {v: v**2 for v in nums} }"
 77 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

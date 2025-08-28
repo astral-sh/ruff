@@ -123,4 +123,4 @@ help: Convert `X` to class syntax
 36 + class X(NamedTuple):
 37 +     some_config: int
 38 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

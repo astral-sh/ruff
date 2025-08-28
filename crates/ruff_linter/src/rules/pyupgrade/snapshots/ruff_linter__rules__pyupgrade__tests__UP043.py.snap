@@ -125,4 +125,4 @@ help: Remove default type arguments
    - ]:
 55 + async def func() -> AsyncGenerator[str]:
 56 |     yield "hello"
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

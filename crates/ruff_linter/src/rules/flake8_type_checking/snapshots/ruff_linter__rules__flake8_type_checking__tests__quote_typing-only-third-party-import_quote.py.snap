@@ -23,7 +23,7 @@ help: Move into type-checking block
 8  |         ...
 9  | 
 10 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
   --> quote.py:9:24
@@ -53,7 +53,7 @@ help: Move into type-checking block
 15 |         ...
 16 | 
 17 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `pandas` into a type-checking block
   --> quote.py:16:22
@@ -83,7 +83,7 @@ help: Move into type-checking block
 22 |         ...
 23 | 
 24 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `pandas` into a type-checking block
   --> quote.py:23:22
@@ -113,7 +113,7 @@ help: Move into type-checking block
 29 |         ...
 30 | 
 31 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `pandas` into a type-checking block
   --> quote.py:30:22
@@ -143,7 +143,7 @@ help: Move into type-checking block
 36 |         ...
 37 | 
 38 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
   --> quote.py:38:24
@@ -173,7 +173,7 @@ help: Move into type-checking block
 44 |         ...
 45 | 
 46 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
   --> quote.py:47:24
@@ -204,7 +204,7 @@ help: Move into type-checking block
 53 |         ...
 54 | 
 55 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
   --> quote.py:64:24
@@ -234,7 +234,7 @@ help: Move into type-checking block
 70 |         ...
 71 | 
 72 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `pandas.Series` into a type-checking block
   --> quote.py:64:35
@@ -264,7 +264,7 @@ help: Move into type-checking block
 70 |         ...
 71 | 
 72 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
   --> quote.py:71:24
@@ -307,7 +307,7 @@ help: Move into type-checking block
 85 |         ...
 86 | 
 87 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `pandas.Series` into a type-checking block
   --> quote.py:71:35
@@ -350,7 +350,7 @@ help: Move into type-checking block
 85 |         ...
 86 | 
 87 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
   --> quote.py:89:24
@@ -380,7 +380,7 @@ help: Move into type-checking block
 95 |         pass
 96 | 
 97 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `pandas.Series` into a type-checking block
   --> quote.py:89:35
@@ -410,4 +410,4 @@ help: Move into type-checking block
 95 |         pass
 96 | 
 97 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

@@ -24,7 +24,7 @@ help: Move into type-checking block
 11 | 
 12 | 
 13 | @dataclass
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TC003 [*] Move standard library import `pathlib.Path` into a type-checking block
  --> init_var.py:6:21
@@ -45,4 +45,4 @@ help: Move into type-checking block
 10 | 
 11 | 
 12 | @dataclass
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

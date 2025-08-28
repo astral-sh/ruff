@@ -19,7 +19,7 @@ help: Add explicit `encoding` argument
 9  | io.TextIOWrapper(io.FileIO("test.txt"))
 10 | hugo.TextIOWrapper(hugo.FileIO("test.txt"))
 11 | tempfile.NamedTemporaryFile("w")
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLW1514 [*] `io.TextIOWrapper` without explicit `encoding` argument
   --> unspecified_encoding.py:9:1
@@ -40,7 +40,7 @@ help: Add explicit `encoding` argument
 10 | hugo.TextIOWrapper(hugo.FileIO("test.txt"))
 11 | tempfile.NamedTemporaryFile("w")
 12 | tempfile.TemporaryFile("w")
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLW1514 [*] `io.TextIOWrapper` without explicit `encoding` argument
   --> unspecified_encoding.py:10:1
@@ -61,7 +61,7 @@ help: Add explicit `encoding` argument
 11 | tempfile.NamedTemporaryFile("w")
 12 | tempfile.TemporaryFile("w")
 13 | codecs.open("test.txt")
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLW1514 [*] `tempfile.NamedTemporaryFile` in text mode without explicit `encoding` argument
   --> unspecified_encoding.py:11:1
@@ -82,7 +82,7 @@ help: Add explicit `encoding` argument
 12 | tempfile.TemporaryFile("w")
 13 | codecs.open("test.txt")
 14 | tempfile.SpooledTemporaryFile(0, "w")
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLW1514 [*] `tempfile.TemporaryFile` in text mode without explicit `encoding` argument
   --> unspecified_encoding.py:12:1
@@ -103,7 +103,7 @@ help: Add explicit `encoding` argument
 13 | codecs.open("test.txt")
 14 | tempfile.SpooledTemporaryFile(0, "w")
 15 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLW1514 [*] `codecs.open` in text mode without explicit `encoding` argument
   --> unspecified_encoding.py:13:1
@@ -123,7 +123,7 @@ help: Add explicit `encoding` argument
 14 | tempfile.SpooledTemporaryFile(0, "w")
 15 | 
 16 | # Non-errors.
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLW1514 [*] `tempfile.SpooledTemporaryFile` in text mode without explicit `encoding` argument
   --> unspecified_encoding.py:14:1
@@ -144,7 +144,7 @@ help: Add explicit `encoding` argument
 15 | 
 16 | # Non-errors.
 17 | open("test.txt", encoding="utf-8")
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLW1514 [*] `open` in text mode without explicit `encoding` argument
   --> unspecified_encoding.py:46:1
@@ -165,7 +165,7 @@ help: Add explicit `encoding` argument
 47 | open()
 48 | open(
 49 |     "test.txt",  # comment
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLW1514 [*] `open` in text mode without explicit `encoding` argument
   --> unspecified_encoding.py:47:1
@@ -185,7 +185,7 @@ help: Add explicit `encoding` argument
 48 | open(
 49 |     "test.txt",  # comment
 50 | )
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLW1514 [*] `open` in text mode without explicit `encoding` argument
   --> unspecified_encoding.py:48:1
@@ -206,7 +206,7 @@ help: Add explicit `encoding` argument
 50 | )
 51 | open(
 52 |     "test.txt",
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLW1514 [*] `open` in text mode without explicit `encoding` argument
   --> unspecified_encoding.py:51:1
@@ -227,7 +227,7 @@ help: Add explicit `encoding` argument
 53 |     # comment
 54 | )
 55 | open(("test.txt"),)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLW1514 [*] `open` in text mode without explicit `encoding` argument
   --> unspecified_encoding.py:55:1
@@ -248,7 +248,7 @@ help: Add explicit `encoding` argument
 56 | open(
 57 |     ("test.txt"),  # comment
 58 | )
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLW1514 [*] `open` in text mode without explicit `encoding` argument
   --> unspecified_encoding.py:56:1
@@ -269,7 +269,7 @@ help: Add explicit `encoding` argument
 58 | )
 59 | open(
 60 |     ("test.txt"),
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLW1514 [*] `open` in text mode without explicit `encoding` argument
   --> unspecified_encoding.py:59:1
@@ -290,7 +290,7 @@ help: Add explicit `encoding` argument
 61 |     # comment
 62 | )
 63 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLW1514 [*] `open` in text mode without explicit `encoding` argument
   --> unspecified_encoding.py:64:1
@@ -311,7 +311,7 @@ help: Add explicit `encoding` argument
 65 | open(
 66 |     (("test.txt")),  # comment
 67 | )
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLW1514 [*] `open` in text mode without explicit `encoding` argument
   --> unspecified_encoding.py:65:1
@@ -331,7 +331,7 @@ help: Add explicit `encoding` argument
 67 | )
 68 | open(
 69 |     (("test.txt")),
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLW1514 [*] `open` in text mode without explicit `encoding` argument
   --> unspecified_encoding.py:68:1
@@ -352,7 +352,7 @@ help: Add explicit `encoding` argument
 70 |     # comment
 71 | )
 72 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLW1514 [*] `pathlib.Path(...).open` in text mode without explicit `encoding` argument
   --> unspecified_encoding.py:77:1
@@ -372,7 +372,7 @@ help: Add explicit `encoding` argument
 78 | Path("foo.txt").open("w")
 79 | text = Path("foo.txt").read_text()
 80 | Path("foo.txt").write_text(text)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLW1514 [*] `pathlib.Path(...).open` in text mode without explicit `encoding` argument
   --> unspecified_encoding.py:78:1
@@ -393,7 +393,7 @@ help: Add explicit `encoding` argument
 79 | text = Path("foo.txt").read_text()
 80 | Path("foo.txt").write_text(text)
 81 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLW1514 [*] `pathlib.Path(...).read_text` without explicit `encoding` argument
   --> unspecified_encoding.py:79:8
@@ -413,7 +413,7 @@ help: Add explicit `encoding` argument
 80 | Path("foo.txt").write_text(text)
 81 | 
 82 | # Non-errors.
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLW1514 [*] `pathlib.Path(...).write_text` without explicit `encoding` argument
   --> unspecified_encoding.py:80:1
@@ -434,7 +434,7 @@ help: Add explicit `encoding` argument
 81 | 
 82 | # Non-errors.
 83 | Path("foo.txt").open(encoding="utf-8")
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLW1514 [*] `pathlib.Path(...).open` in text mode without explicit `encoding` argument
   --> unspecified_encoding.py:96:1
@@ -455,7 +455,7 @@ help: Add explicit `encoding` argument
 97 | 
 98 | # https://github.com/astral-sh/ruff/issues/18107
 99 | codecs.open("plw1514.py", "r", "utf-8").close() # this is fine
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLW1514 [*] `pathlib.Path(...).open` in text mode without explicit `encoding` argument
    --> unspecified_encoding.py:105:10
@@ -472,4 +472,4 @@ help: Add explicit `encoding` argument
     -     with file.open() as f:
 105 +     with file.open(encoding="utf-8") as f:
 106 |         contents = f.read()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

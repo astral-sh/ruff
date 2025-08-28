@@ -14,7 +14,7 @@ help: Remove trailing whitespace
 2 | inside a multiline string'''
 3 | 
 4 | f'''trailing whitespace 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 W291 [*] Trailing whitespace
  --> W291.py:4:24
@@ -34,7 +34,7 @@ help: Remove trailing whitespace
 5 | inside a multiline f-string'''
 6 | 
 7 | # Trailing whitespace after `{`
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 W291 [*] Trailing whitespace
   --> W291.py:8:8

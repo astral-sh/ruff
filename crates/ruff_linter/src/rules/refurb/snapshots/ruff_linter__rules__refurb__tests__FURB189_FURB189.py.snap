@@ -26,7 +26,7 @@ help: Replace with `collections.UserDict`
 18 |     pass
 19 | 
 20 | class L(list):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB189 [*] Subclassing `list` can be error prone, use `collections.UserList` instead
   --> FURB189.py:20:9
@@ -46,7 +46,7 @@ help: Replace with `collections.UserList`
 21 |     pass
 22 | 
 23 | class S(str):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB189 [*] Subclassing `str` can be error prone, use `collections.UserString` instead
   --> FURB189.py:23:9
@@ -74,7 +74,7 @@ help: Replace with `collections.UserString`
 24 |     pass
 25 | 
 26 | class SubscriptDict(dict[str, str]):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB189 [*] Subclassing `dict` can be error prone, use `collections.UserDict` instead
   --> FURB189.py:26:21
@@ -102,7 +102,7 @@ help: Replace with `collections.UserDict`
 27 |     pass
 28 | 
 29 | class SubscriptList(list[str]):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB189 [*] Subclassing `list` can be error prone, use `collections.UserList` instead
   --> FURB189.py:29:21
@@ -122,4 +122,4 @@ help: Replace with `collections.UserList`
 30 |     pass
 31 | 
 32 | # currently not detected
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

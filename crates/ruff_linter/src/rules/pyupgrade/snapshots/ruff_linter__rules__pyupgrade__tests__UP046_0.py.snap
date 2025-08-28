@@ -18,7 +18,7 @@ help: Use type parameters
 12 |     # Comments in a class body are preserved
 13 |     var: T
 14 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP046 [*] Generic class `B` uses `Generic` subclass instead of type parameters
   --> UP046_0.py:16:9
@@ -36,7 +36,7 @@ help: Use type parameters
 17 |     var: tuple[*Ts]
 18 | 
 19 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP046 [*] Generic class `C` uses `Generic` subclass instead of type parameters
   --> UP046_0.py:20:9
@@ -54,7 +54,7 @@ help: Use type parameters
 21 |     var: P
 22 | 
 23 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP046 [*] Generic class `Constrained` uses `Generic` subclass instead of type parameters
   --> UP046_0.py:24:19
@@ -72,7 +72,7 @@ help: Use type parameters
 25 |     var: S
 26 | 
 27 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP046 Generic class `ExternalType` uses `Generic` subclass instead of type parameters
   --> UP046_0.py:30:20
@@ -104,7 +104,7 @@ help: Use type parameters
 38 |     s: AnyStr
 39 | 
 40 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP046 [*] Generic class `MultipleGenerics` uses `Generic` subclass instead of type parameters
   --> UP046_0.py:41:24
@@ -123,7 +123,7 @@ help: Use type parameters
 42 |     var: S
 43 |     typ: T
 44 |     tup: tuple[*Ts]
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP046 [*] Generic class `MultipleBaseClasses` uses `Generic` subclass instead of type parameters
   --> UP046_0.py:48:33
@@ -141,7 +141,7 @@ help: Use type parameters
 49 |     var: T
 50 | 
 51 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP046 [*] Generic class `MoreBaseClasses` uses `Generic` subclass instead of type parameters
   --> UP046_0.py:62:44
@@ -159,7 +159,7 @@ help: Use type parameters
 63 |     var: T
 64 | 
 65 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP046 [*] Generic class `MultipleBaseAndGenerics` uses `Generic` subclass instead of type parameters
   --> UP046_0.py:66:52
@@ -178,7 +178,7 @@ help: Use type parameters
 67 |     var: S
 68 |     typ: T
 69 |     tup: tuple[*Ts]
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP046 [*] Generic class `A` uses `Generic` subclass instead of type parameters
   --> UP046_0.py:73:9
@@ -195,7 +195,7 @@ help: Use type parameters
 74 | 
 75 | 
 76 | class B(A[S], Generic[S]):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP046 [*] Generic class `B` uses `Generic` subclass instead of type parameters
   --> UP046_0.py:76:15
@@ -213,7 +213,7 @@ help: Use type parameters
 77 |     var: S
 78 | 
 79 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP046 [*] Generic class `C` uses `Generic` subclass instead of type parameters
   --> UP046_0.py:80:15
@@ -231,7 +231,7 @@ help: Use type parameters
 81 |     var: tuple[S, T]
 82 | 
 83 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP046 [*] Generic class `D` uses `Generic` subclass instead of type parameters
   --> UP046_0.py:84:17
@@ -249,7 +249,7 @@ help: Use type parameters
 85 |     var: T
 86 | 
 87 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP046 Generic class `NotLast` uses `Generic` subclass instead of type parameters
   --> UP046_0.py:88:15

@@ -15,7 +15,7 @@ help: Replace with `a if a else b`
 2 | 
 3 | c = b + c if not a else a  # SIM212
 4 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM212 [*] Use `a if a else b + c` instead of `b + c if not a else a`
  --> SIM212.py:3:5
@@ -35,4 +35,4 @@ help: Replace with `a if a else b + c`
 4 | 
 5 | c = b if not x else a  # OK
 6 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

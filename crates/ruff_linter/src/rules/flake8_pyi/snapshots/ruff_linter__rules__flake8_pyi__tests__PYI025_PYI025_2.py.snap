@@ -31,4 +31,4 @@ help: Alias `Set` to `AbstractSet`
 13 | if not False:
    -     __all__ += ["Se" 't']
 14 +     __all__ += ["AbstractSet"]
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

@@ -17,7 +17,7 @@ help: Add return type annotation: `None`
 25 |     pass
 26 | 
 27 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 ANN001 Missing type annotation for function argument `b`
   --> ignore_fully_untyped.py:24:37
@@ -51,7 +51,7 @@ help: Add return type annotation: `None`
 33 |     pass
 34 | 
 35 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 ANN201 [*] Missing return type annotation for public function `error_typed_self`
   --> ignore_fully_untyped.py:43:9
@@ -69,4 +69,4 @@ help: Add return type annotation: `None`
    -     def error_typed_self(self: X):
 43 +     def error_typed_self(self: X) -> None:
 44 |         pass
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

@@ -268,7 +268,7 @@ help: Replace with `.update()`
 45 | 
 46 | 
 47 | # False negative
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB142 [*] Use of `set.discard()` in a for loop
   --> FURB142.py:83:1

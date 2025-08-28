@@ -20,7 +20,7 @@ help: Move out of type-checking block
 13 |     from array import array  # TC004
 14 | 
 15 |     import pandas  # TC004
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TC004 [*] Move import `array.array` out of type-checking block. Import is used for more than type hinting.
   --> runtime_evaluated_decorators_1.py:13:23
@@ -44,7 +44,7 @@ help: Move out of type-checking block
 14 | 
 15 |     import pandas  # TC004
 16 |     import pyproj
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TC004 [*] Move import `pandas` out of type-checking block. Import is used for more than type hinting.
   --> runtime_evaluated_decorators_1.py:15:12
@@ -69,4 +69,4 @@ help: Move out of type-checking block
 16 |     import pyproj
 17 | 
 18 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

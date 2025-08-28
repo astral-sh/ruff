@@ -19,7 +19,7 @@ help: Install `apache-airflow-providers-smtp>=1.0.0` and use `EmailOperator` fro
 4 | 
 5 | EmailOperator()
 6 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.email.EmailOperator` is moved into `smtp` provider in Airflow 3.0;
  --> AIR302_smtp.py:9:1
@@ -37,4 +37,4 @@ help: Install `apache-airflow-providers-smtp>=1.0.0` and use `EmailOperator` fro
 7 + from airflow.providers.smtp.operators.smtp import EmailOperator
 8 | 
 9 | EmailOperator()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

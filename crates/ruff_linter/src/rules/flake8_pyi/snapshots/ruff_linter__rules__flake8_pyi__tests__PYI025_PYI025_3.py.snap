@@ -15,4 +15,4 @@ help: Alias `Set` to `AbstractSet`
 5 | 
   - from collections.abc import Set as Set  # PYI025 triggered but fix is not marked as safe
 6 + from collections.abc import Set as AbstractSet  # PYI025 triggered but fix is not marked as safe
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

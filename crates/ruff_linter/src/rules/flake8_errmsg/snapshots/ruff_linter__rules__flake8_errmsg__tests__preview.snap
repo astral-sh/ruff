@@ -16,7 +16,7 @@ help: Assign to variable; remove string literal
 4 | 
 5 | 
 6 | def f_byte_empty():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 EM101 [*] Exception must not use a string literal, assign to variable first
  --> EM101_byte_string.py:6:24
@@ -32,4 +32,4 @@ help: Assign to variable; remove string literal
   -     raise RuntimeError(b"")
 6 +     msg = b""
 7 +     raise RuntimeError(msg)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

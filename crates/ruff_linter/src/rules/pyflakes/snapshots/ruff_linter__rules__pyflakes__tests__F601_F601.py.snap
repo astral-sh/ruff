@@ -101,7 +101,7 @@ help: Remove repeated key literal `"a"`
 18 | }
 19 | 
 20 | x = {
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F601 Dictionary key literal `"a"` repeated
   --> F601.py:23:5
@@ -145,7 +145,7 @@ help: Remove repeated key literal `"a"`
 25 |     "a": 4,
 26 | }
 27 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F601 Dictionary key literal `"a"` repeated
   --> F601.py:26:5
@@ -176,7 +176,7 @@ help: Remove repeated key literal `"a"`
 31 |     "a": 2,
 32 |     "a": 3,
 33 |     "a": 4,
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F601 Dictionary key literal `"a"` repeated
   --> F601.py:32:5
@@ -255,7 +255,7 @@ help: Remove repeated key literal `"a"`
 45 |     a: 4,
 46 | }
 47 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F601 [*] Dictionary key literal `"a"` repeated
   --> F601.py:49:14
@@ -275,7 +275,7 @@ help: Remove repeated key literal `"a"`
 50 | x = {"a": 1, "b": 2, "a": 1}
 51 | 
 52 | x = {
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F601 [*] Dictionary key literal `"a"` repeated
   --> F601.py:50:22
@@ -295,7 +295,7 @@ help: Remove repeated key literal `"a"`
 51 | 
 52 | x = {
 53 |     ('a', 'b'): 'asdf',
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F601 Dictionary key literal `('a', 'b')` repeated
   --> F601.py:54:5
@@ -326,7 +326,7 @@ help: Remove repeated key literal `"x"`
 59 | 
 60 | t={"x":("test123"), "x":"test123"}
 61 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F601 [*] Dictionary key literal `"x"` repeated
   --> F601.py:60:21
@@ -347,7 +347,7 @@ help: Remove repeated key literal `"x"`
 61 | 
 62 | # Regression test for: https://github.com/astral-sh/ruff/issues/12772
 63 | x = {
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F601 Dictionary key literal `1` repeated
   --> F601.py:65:5

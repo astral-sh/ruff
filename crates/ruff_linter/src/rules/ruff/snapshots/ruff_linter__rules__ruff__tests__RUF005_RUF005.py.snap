@@ -63,7 +63,7 @@ help: Replace with `[1, 2, 3, *foo]`
 40 | zoob = tuple(bar)
 41 | quux = (7, 8, 9) + zoob
 42 | spam = quux + (10, 11, 12)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF005 [*] Consider `(7, 8, 9, *zoob)` instead of concatenation
   --> RUF005.py:41:8
@@ -84,7 +84,7 @@ help: Replace with `(7, 8, 9, *zoob)`
 42 | spam = quux + (10, 11, 12)
 43 | spom = list(spam)
 44 | eggs = spom + [13, 14, 15]
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF005 [*] Consider `(*quux, 10, 11, 12)` instead of concatenation
   --> RUF005.py:42:8
@@ -105,7 +105,7 @@ help: Replace with `(*quux, 10, 11, 12)`
 43 | spom = list(spam)
 44 | eggs = spom + [13, 14, 15]
 45 | elatement = ("we all say",) + yay()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF005 [*] Consider `[*spom, 13, 14, 15]` instead of concatenation
   --> RUF005.py:44:8
@@ -126,7 +126,7 @@ help: Replace with `[*spom, 13, 14, 15]`
 45 | elatement = ("we all say",) + yay()
 46 | excitement = ("we all think",) + Fun().yay()
 47 | astonishment = ("we all feel",) + Fun.words
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF005 [*] Consider `("we all say", *yay())` instead of concatenation
   --> RUF005.py:45:13
@@ -147,7 +147,7 @@ help: Replace with `("we all say", *yay())`
 46 | excitement = ("we all think",) + Fun().yay()
 47 | astonishment = ("we all feel",) + Fun.words
 48 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF005 [*] Consider `("we all think", *Fun().yay())` instead of concatenation
   --> RUF005.py:46:14
@@ -167,7 +167,7 @@ help: Replace with `("we all think", *Fun().yay())`
 47 | astonishment = ("we all feel",) + Fun.words
 48 | 
 49 | chain = ["a", "b", "c"] + eggs + list(("yes", "no", "pants") + zoob)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF005 [*] Consider `("we all feel", *Fun.words)` instead of concatenation
   --> RUF005.py:47:16
@@ -188,7 +188,7 @@ help: Replace with `("we all feel", *Fun.words)`
 48 | 
 49 | chain = ["a", "b", "c"] + eggs + list(("yes", "no", "pants") + zoob)
 50 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF005 [*] Consider iterable unpacking instead of concatenation
   --> RUF005.py:49:9
@@ -209,7 +209,7 @@ help: Replace with iterable unpacking
 50 | 
 51 | baz = () + zoob
 52 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF005 [*] Consider `("yes", "no", "pants", *zoob)` instead of concatenation
   --> RUF005.py:49:39
@@ -230,7 +230,7 @@ help: Replace with `("yes", "no", "pants", *zoob)`
 50 | 
 51 | baz = () + zoob
 52 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF005 [*] Consider `(*zoob,)` instead of concatenation
   --> RUF005.py:51:7
@@ -251,7 +251,7 @@ help: Replace with `(*zoob,)`
 52 | 
 53 | [] + foo + [
 54 | ]
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF005 [*] Consider `[*foo]` instead of concatenation
   --> RUF005.py:53:1
@@ -274,7 +274,7 @@ help: Replace with `[*foo]`
 54 | 
 55 | pylint_call = [sys.executable, "-m", "pylint"] + args + [path]
 56 | pylint_call_tuple = (sys.executable, "-m", "pylint") + args + (path, path2)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF005 [*] Consider `[sys.executable, "-m", "pylint", *args, path]` instead of concatenation
   --> RUF005.py:56:15
@@ -295,7 +295,7 @@ help: Replace with `[sys.executable, "-m", "pylint", *args, path]`
 57 | pylint_call_tuple = (sys.executable, "-m", "pylint") + args + (path, path2)
 58 | b = a + [2, 3] + [4]
 59 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF005 [*] Consider iterable unpacking instead of concatenation
   --> RUF005.py:57:21
@@ -314,7 +314,7 @@ help: Replace with iterable unpacking
 58 | b = a + [2, 3] + [4]
 59 | 
 60 | # Uses the non-preferred quote style, which should be retained.
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF005 [*] Consider `[*a, 2, 3, 4]` instead of concatenation
   --> RUF005.py:58:5
@@ -335,7 +335,7 @@ help: Replace with `[*a, 2, 3, 4]`
 59 | 
 60 | # Uses the non-preferred quote style, which should be retained.
 61 | f"{a() + ['b']}"
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF005 [*] Consider `[*a(), 'b']` instead of concatenation
   --> RUF005.py:61:4
@@ -355,4 +355,4 @@ help: Replace with `[*a(), 'b']`
 62 | 
 63 | ###
 64 | # Non-errors.
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

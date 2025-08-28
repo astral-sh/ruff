@@ -17,7 +17,7 @@ help: Convert to `*` for unpacking
 7 |     pass
 8 | 
 9 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP044 [*] Use `*` for unpacking
   --> UP044.py:10:17
@@ -35,7 +35,7 @@ help: Convert to `*` for unpacking
 11 |     pass
 12 | 
 13 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP044 [*] Use `*` for unpacking
   --> UP044.py:14:14
@@ -53,7 +53,7 @@ help: Convert to `*` for unpacking
 15 |     pass
 16 | 
 17 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP044 [*] Use `*` for unpacking
   --> UP044.py:18:14
@@ -71,7 +71,7 @@ help: Convert to `*` for unpacking
 19 |     pass
 20 | 
 21 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP044 [*] Use `*` for unpacking
   --> UP044.py:22:27
@@ -89,4 +89,4 @@ help: Convert to `*` for unpacking
 23 |     pass
 24 | 
 25 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

@@ -14,4 +14,4 @@ help: Remove unused import: `os`
 1 | 
 2 | print(__path__)
 3 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

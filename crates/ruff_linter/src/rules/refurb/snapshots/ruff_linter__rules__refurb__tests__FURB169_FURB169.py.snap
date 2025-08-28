@@ -288,7 +288,7 @@ help: Replace with `is not None`
 32 | 
 33 | type(
 34 |     a := 1
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB169 [*] When checking against `None`, use `is` instead of comparison with `type(None)`
   --> FURB169.py:37:1

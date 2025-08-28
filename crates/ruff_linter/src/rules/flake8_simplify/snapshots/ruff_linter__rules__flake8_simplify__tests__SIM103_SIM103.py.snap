@@ -23,7 +23,7 @@ help: Replace with `return bool(a)`
 4 | 
 5 | 
 6 | def f():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM103 [*] Return the condition `a == b` directly
   --> SIM103.py:11:5
@@ -48,7 +48,7 @@ help: Replace with `return a == b`
 12 | 
 13 | 
 14 | def f():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM103 [*] Return the condition `bool(b)` directly
   --> SIM103.py:21:5
@@ -73,7 +73,7 @@ help: Replace with `return bool(b)`
 22 | 
 23 | 
 24 | def f():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM103 [*] Return the condition `bool(b)` directly
   --> SIM103.py:32:9
@@ -98,7 +98,7 @@ help: Replace with `return bool(b)`
 33 | 
 34 | 
 35 | def f():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM103 [*] Return the condition `not a` directly
   --> SIM103.py:57:5
@@ -123,7 +123,7 @@ help: Replace with `return not a`
 58 | 
 59 | 
 60 | def f():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM103 Return the condition directly
   --> SIM103.py:83:5
@@ -161,7 +161,7 @@ help: Replace with `return not (keys is not None and notice.key not in keys)`
 92 | 
 93 | 
 94 | ###
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM103 [*] Return the condition `bool(a)` directly
    --> SIM103.py:104:5
@@ -184,7 +184,7 @@ help: Replace with `return bool(a)`
 105 | 
 106 | 
 107 | def f():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM103 [*] Return the condition `not a` directly
    --> SIM103.py:111:5
@@ -207,7 +207,7 @@ help: Replace with `return not a`
 112 | 
 113 | 
 114 | def f():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM103 [*] Return the condition `10 < a` directly
    --> SIM103.py:117:5
@@ -229,7 +229,7 @@ help: Replace with `return 10 < a`
 118 | 
 119 | 
 120 | def f():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM103 [*] Return the condition `not 10 < a` directly
    --> SIM103.py:123:5
@@ -251,7 +251,7 @@ help: Replace with `return not 10 < a`
 124 | 
 125 | 
 126 | def f():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM103 [*] Return the condition `10 not in a` directly
    --> SIM103.py:129:5
@@ -273,7 +273,7 @@ help: Replace with `return 10 not in a`
 130 | 
 131 | 
 132 | def f():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM103 [*] Return the condition `10 in a` directly
    --> SIM103.py:135:5
@@ -295,7 +295,7 @@ help: Replace with `return 10 in a`
 136 | 
 137 | 
 138 | def f():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM103 [*] Return the condition `a is not 10` directly
    --> SIM103.py:141:5
@@ -317,7 +317,7 @@ help: Replace with `return a is not 10`
 142 | 
 143 | 
 144 | def f():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM103 [*] Return the condition `a is 10` directly
    --> SIM103.py:147:5
@@ -339,7 +339,7 @@ help: Replace with `return a is 10`
 148 | 
 149 | 
 150 | def f():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM103 [*] Return the condition `a != 10` directly
    --> SIM103.py:153:5
@@ -361,7 +361,7 @@ help: Replace with `return a != 10`
 154 | 
 155 | 
 156 | def f():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM103 [*] Return the condition `a == 10` directly
    --> SIM103.py:159:5
@@ -380,4 +380,4 @@ help: Replace with `return a == 10`
     -         return False
     -     return True
 159 +     return a == 10
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

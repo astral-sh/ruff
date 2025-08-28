@@ -17,7 +17,7 @@ help: Replace with `cond is None`
 3 |     pass
 4 | #: E711
 5 | if res != None:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 E711 [*] Comparison to `None` should be `cond is not None`
  --> E711.py:5:11
@@ -38,7 +38,7 @@ help: Replace with `cond is not None`
 6 |     pass
 7 | #: E711
 8 | if None == res:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 E711 [*] Comparison to `None` should be `cond is None`
   --> E711.py:8:4
@@ -59,7 +59,7 @@ help: Replace with `cond is None`
 9  |     pass
 10 | #: E711
 11 | if None != res:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 E711 [*] Comparison to `None` should be `cond is not None`
   --> E711.py:11:4
@@ -80,7 +80,7 @@ help: Replace with `cond is not None`
 12 |     pass
 13 | #: E711
 14 | if res[1] == None:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 E711 [*] Comparison to `None` should be `cond is None`
   --> E711.py:14:14
@@ -101,7 +101,7 @@ help: Replace with `cond is None`
 15 |     pass
 16 | #: E711
 17 | if res[1] != None:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 E711 [*] Comparison to `None` should be `cond is not None`
   --> E711.py:17:14
@@ -122,7 +122,7 @@ help: Replace with `cond is not None`
 18 |     pass
 19 | #: E711
 20 | if None != res[1]:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 E711 [*] Comparison to `None` should be `cond is not None`
   --> E711.py:20:4
@@ -143,7 +143,7 @@ help: Replace with `cond is not None`
 21 |     pass
 22 | #: E711
 23 | if None == res[1]:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 E711 [*] Comparison to `None` should be `cond is None`
   --> E711.py:23:4
@@ -163,7 +163,7 @@ help: Replace with `cond is None`
 24 |     pass
 25 | 
 26 | if x == None != None:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 E711 [*] Comparison to `None` should be `cond is None`
   --> E711.py:26:9
@@ -183,7 +183,7 @@ help: Replace with `cond is None`
 27 |     pass
 28 | 
 29 | #: Okay
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 E711 [*] Comparison to `None` should be `cond is not None`
   --> E711.py:26:17
@@ -203,4 +203,4 @@ help: Replace with `cond is not None`
 27 |     pass
 28 | 
 29 | #: Okay
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

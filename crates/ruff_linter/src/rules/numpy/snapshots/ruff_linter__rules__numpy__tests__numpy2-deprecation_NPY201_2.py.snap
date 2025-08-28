@@ -403,7 +403,7 @@ help: Replace with `numpy.trapezoid` (requires NumPy 2.0 or greater)
 51 | 
 52 |     np.in1d([1, 2], [1, 3, 5])
 53 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 NPY201 [*] `np.in1d` will be removed in NumPy 2.0. Use `numpy.isin` instead.
   --> NPY201_2.py:52:5

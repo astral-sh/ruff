@@ -20,7 +20,7 @@ help: Remove unused import
 9  | 
 10 | if sys.version_info > (3, 9):
 11 |     from . import also_exported
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F401 [*] `.renamed` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
   --> __init__.py:8:44
@@ -41,4 +41,4 @@ help: Remove unused import
 9  | 
 10 | if sys.version_info > (3, 9):
 11 |     from . import also_exported
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

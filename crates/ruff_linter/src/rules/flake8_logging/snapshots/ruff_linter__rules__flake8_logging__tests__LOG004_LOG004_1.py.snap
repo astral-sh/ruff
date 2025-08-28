@@ -13,4 +13,4 @@ help: Replace with `.error()`
 3 | 
   - logger.exception("")
 4 + logger.error("")
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

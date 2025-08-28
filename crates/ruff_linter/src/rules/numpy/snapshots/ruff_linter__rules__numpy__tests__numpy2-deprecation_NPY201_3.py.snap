@@ -69,7 +69,7 @@ help: Replace with `numpy.exceptions.RankWarning` (requires NumPy 2.0 or greater
 10 | 
 11 |     np.TooHardError
 12 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 NPY201 [*] `np.TooHardError` will be removed in NumPy 2.0. Use `numpy.exceptions.TooHardError` instead.
   --> NPY201_3.py:10:5

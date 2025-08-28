@@ -372,7 +372,7 @@ help: Replace with a single `Literal`
 64 | 
 65 | # Should handle multiple unions with multiple members
 66 | field21: Literal[1, 2] | Literal[3, 4]  # Error
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2, 3, 4]`
   --> PYI030.py:71:10
@@ -550,7 +550,7 @@ help: Replace with a single `Literal`
 99  | )
 100 | field27: (
 101 |     Literal["a", "b"]  # First comment
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal["a", "b", "c", "d"]`
    --> PYI030.py:103:5
@@ -570,4 +570,4 @@ help: Replace with a single `Literal`
     -     | Literal["c", "d"]  # Second comment
 103 +     Literal["a", "b", "c", "d"]  # Second comment
 104 | )
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

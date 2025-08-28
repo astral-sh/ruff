@@ -16,4 +16,4 @@ help: Install `apache-airflow-providers-sqlite>=1.0.0` and use `SqliteHook` from
 3 + from airflow.providers.sqlite.hooks.sqlite import SqliteHook
 4 | 
 5 | SqliteHook()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

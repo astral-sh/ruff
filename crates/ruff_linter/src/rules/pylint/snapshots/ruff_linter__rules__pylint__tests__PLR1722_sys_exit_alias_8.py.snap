@@ -14,4 +14,4 @@ help: Replace `exit` with `sys.exit()`
 2 | 
 3 | 
 4 | def main():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

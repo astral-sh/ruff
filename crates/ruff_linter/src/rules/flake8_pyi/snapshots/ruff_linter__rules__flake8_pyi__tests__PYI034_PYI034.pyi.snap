@@ -20,7 +20,7 @@ help: Use `Self` as return type
 23 |     def __repr__(
 24 |         self,
 25 |     ) -> str: ...  # Y029 Defining __repr__ or __str__ in a stub is almost always redundant
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PYI034 [*] `__enter__` methods in classes like `Bad` usually return `self` at runtime
   --> PYI034.pyi:35:9
@@ -41,7 +41,7 @@ help: Use `Self` as return type
 38 |     async def __aenter__(
 39 |         self,
 40 |     ) -> Bad: ...  # Y034 "__aenter__" methods in classes like "Bad" usually return "self" at runtime. Consider using "typing_extensions.Self" in "Bad.__aenter__", e.g. "async def __aenter__(self) -> Self: ..."
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PYI034 [*] `__aenter__` methods in classes like `Bad` usually return `self` at runtime
   --> PYI034.pyi:38:15
@@ -62,7 +62,7 @@ help: Use `Self` as return type
 41 |     def __iadd__(
 42 |         self, other: Bad
 43 |     ) -> Bad: ...  # Y034 "__iadd__" methods in classes like "Bad" usually return "self" at runtime. Consider using "typing_extensions.Self" in "Bad.__iadd__", e.g. "def __iadd__(self, other: Bad) -> Self: ..."
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PYI034 [*] `__iadd__` methods in classes like `Bad` usually return `self` at runtime
   --> PYI034.pyi:41:9
@@ -83,7 +83,7 @@ help: Use `Self` as return type
 44 | 
 45 | class AlsoBad(
 46 |     int, builtins.object
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PYI034 [*] `__iter__` methods in classes like `BadIterator1` usually return `self` at runtime
    --> PYI034.pyi:104:9
@@ -105,7 +105,7 @@ help: Use `Self` as return type
 107 | 
 108 | class BadIterator2(
 109 |     typing.Iterator[int]
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PYI034 [*] `__iter__` methods in classes like `BadIterator2` usually return `self` at runtime
    --> PYI034.pyi:113:9
@@ -128,7 +128,7 @@ help: Use `Self` as return type
 116 | 
 117 | class BadIterator3(
 118 |     typing.Iterator[int]
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PYI034 [*] `__iter__` methods in classes like `BadIterator3` usually return `self` at runtime
    --> PYI034.pyi:122:9
@@ -151,7 +151,7 @@ help: Use `Self` as return type
 125 | 
 126 | class BadIterator4(Iterator[int]):
 127 |     # Note: *Iterable*, not *Iterator*, returned!
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PYI034 [*] `__iter__` methods in classes like `BadIterator4` usually return `self` at runtime
    --> PYI034.pyi:130:9
@@ -174,7 +174,7 @@ help: Use `Self` as return type
 133 | 
 134 | class IteratorReturningIterable:
 135 |     def __iter__(
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PYI034 [*] `__aiter__` methods in classes like `BadAsyncIterator` usually return `self` at runtime
    --> PYI034.pyi:144:9
@@ -196,7 +196,7 @@ help: Use `Self` as return type
 147 | 
 148 | class AsyncIteratorReturningAsyncIterable:
 149 |     def __aiter__(
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PYI034 [*] `__new__` methods in classes like `NonGeneric1` usually return `self` at runtime
    --> PYI034.pyi:221:9
@@ -215,7 +215,7 @@ help: Use `Self` as return type
 222 |     def __enter__(self: NonGeneric1) -> NonGeneric1: ...
 223 | 
 224 | class NonGeneric2(tuple):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PYI034 [*] `__enter__` methods in classes like `NonGeneric1` usually return `self` at runtime
    --> PYI034.pyi:222:9
@@ -236,7 +236,7 @@ help: Use `Self` as return type
 223 | 
 224 | class NonGeneric2(tuple):
 225 |     def __new__(cls: Type[NonGeneric2]) -> NonGeneric2: ...
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PYI034 [*] `__new__` methods in classes like `NonGeneric2` usually return `self` at runtime
    --> PYI034.pyi:225:9
@@ -256,7 +256,7 @@ help: Use `Self` as return type
 226 | 
 227 | class Generic1[T](list):
 228 |     def __new__(cls: type[Generic1]) -> Generic1: ...
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PYI034 `__new__` methods in classes like `Generic1` usually return `self` at runtime
    --> PYI034.pyi:228:9

@@ -22,7 +22,7 @@ help: Remove outdated version block
 4 | 
 5 | if sys.version_info < (3,):
 6 |     2
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP036 [*] Version block is outdated for minimum Python version
   --> UP036_1.py:8:4
@@ -46,7 +46,7 @@ help: Remove outdated version block
 9  | 
 10 | if sys.version_info < (3,0):
 11 |     2
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP036 [*] Version block is outdated for minimum Python version
   --> UP036_1.py:13:4
@@ -70,7 +70,7 @@ help: Remove outdated version block
 14 | 
 15 | if sys.version_info == 3:
 16 |     3
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP036 [*] Version block is outdated for minimum Python version
   --> UP036_1.py:18:4
@@ -94,7 +94,7 @@ help: Remove outdated version block
 19 | 
 20 | if sys.version_info > (3,):
 21 |     3
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP036 [*] Version block is outdated for minimum Python version
   --> UP036_1.py:23:4
@@ -118,7 +118,7 @@ help: Remove outdated version block
 24 | 
 25 | if sys.version_info >= (3,):
 26 |     3
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP036 [*] Version block is outdated for minimum Python version
   --> UP036_1.py:28:4
@@ -142,7 +142,7 @@ help: Remove outdated version block
 29 | 
 30 | from sys import version_info
 31 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP036 [*] Version block is outdated for minimum Python version
   --> UP036_1.py:35:4
@@ -166,7 +166,7 @@ help: Remove outdated version block
 36 | 
 37 | if True:
 38 |     print(1)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP036 [*] Version block is outdated for minimum Python version
   --> UP036_1.py:42:6
@@ -187,7 +187,7 @@ help: Remove outdated version block
 42 | else:
 43 |     print(3)
 44 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP036 [*] Version block is outdated for minimum Python version
   --> UP036_1.py:49:6
@@ -211,7 +211,7 @@ help: Remove outdated version block
 51 | 
 52 | if True:
 53 |     print(1)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP036 [*] Version block is outdated for minimum Python version
   --> UP036_1.py:56:6
@@ -231,7 +231,7 @@ help: Remove outdated version block
 57 |     print(3)
 58 | 
 59 | def f():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP036 [*] Version block is outdated for minimum Python version
   --> UP036_1.py:62:10
@@ -251,7 +251,7 @@ help: Remove outdated version block
 63 |         print(3)
 64 | 
 65 | if True:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP036 [*] Version block is outdated for minimum Python version
   --> UP036_1.py:67:6
@@ -272,7 +272,7 @@ help: Remove outdated version block
 67 | else:
 68 |     print(3)
 69 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP036 [*] Version block is outdated for minimum Python version
   --> UP036_1.py:75:10
@@ -290,4 +290,4 @@ help: Remove outdated version block
    -     elif sys.version_info > (3,):
 75 +     else:
 76 |         print(3)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

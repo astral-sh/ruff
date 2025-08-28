@@ -29,4 +29,4 @@ help: Move into type-checking block
 24 | 
 25 |     x: TYP001
 26 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

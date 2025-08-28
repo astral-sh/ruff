@@ -79,4 +79,4 @@ help: Add explicit `check=False`
 11 | 
 12 | # Non-errors.
 13 | subprocess.run("ls", check=True)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

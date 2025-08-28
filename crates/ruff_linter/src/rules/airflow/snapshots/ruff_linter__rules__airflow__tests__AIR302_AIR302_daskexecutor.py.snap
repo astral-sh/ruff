@@ -16,4 +16,4 @@ help: Install `apache-airflow-providers-daskexecutor>=1.0.0` and use `DaskExecut
 3 + from airflow.providers.daskexecutor.executors.dask_executor import DaskExecutor
 4 | 
 5 | DaskExecutor()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

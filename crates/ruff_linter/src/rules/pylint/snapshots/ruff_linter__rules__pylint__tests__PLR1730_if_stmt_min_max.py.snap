@@ -352,7 +352,7 @@ help: Replace with `A2 = max(A2, A1)`
 120 | 
 121 | if A2 <= A1:  # [max-instead-of-if]
 122 |     A2 = A1
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR1730 [*] Replace `if` statement with `A2 = max(A1, A2)`
    --> if_stmt_min_max.py:122:1
@@ -375,7 +375,7 @@ help: Replace with `A2 = max(A1, A2)`
 123 | 
 124 | if A2 > A1:  # [min-instead-of-if]
 125 |     A2 = A1
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR1730 [*] Replace `if` statement with `A2 = min(A2, A1)`
    --> if_stmt_min_max.py:125:1
@@ -398,7 +398,7 @@ help: Replace with `A2 = min(A2, A1)`
 126 | 
 127 | if A2 >= A1:  # [min-instead-of-if]
 128 |     A2 = A1
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR1730 [*] Replace `if` statement with `A2 = min(A1, A2)`
    --> if_stmt_min_max.py:128:1
@@ -421,7 +421,7 @@ help: Replace with `A2 = min(A1, A2)`
 129 | 
 130 | # Negative
 131 | if value < 10:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR1730 [*] Replace `if` statement with `min` call
    --> if_stmt_min_max.py:191:1
@@ -731,7 +731,7 @@ help: Replace with `a = min(b, a)`
 246 | 
 247 | # fix marked safe as preserve comments
 248 | if a >= b:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR1730 [*] Replace `if` statement with `a = min(b, a)`
    --> if_stmt_min_max.py:250:1

@@ -18,7 +18,7 @@ help: Remove duplicate test case
 5 | def test_error_literal(x):
 6 |     ...
 7 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PT014 [*] Duplicate of test case at index 0 in `pytest.mark.parametrize`
   --> PT014.py:14:35
@@ -37,7 +37,7 @@ help: Remove duplicate test case
 15 | def test_error_expr_simple(x):
 16 |     ...
 17 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PT014 [*] Duplicate of test case at index 2 in `pytest.mark.parametrize`
   --> PT014.py:14:41
@@ -56,7 +56,7 @@ help: Remove duplicate test case
 15 | def test_error_expr_simple(x):
 16 |     ...
 17 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PT014 [*] Duplicate of test case at index 2 in `pytest.mark.parametrize`
   --> PT014.py:14:44
@@ -75,7 +75,7 @@ help: Remove duplicate test case
 15 | def test_error_expr_simple(x):
 16 |     ...
 17 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PT014 Duplicate of test case at index 0 in `pytest.mark.parametrize`
   --> PT014.py:24:9
@@ -106,7 +106,7 @@ help: Remove duplicate test case
 33 | def test_error_parentheses(x):
 34 |     ...
 35 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PT014 [*] Duplicate of test case at index 0 in `pytest.mark.parametrize`
   --> PT014.py:32:48
@@ -125,7 +125,7 @@ help: Remove duplicate test case
 33 | def test_error_parentheses(x):
 34 |     ...
 35 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PT014 [*] Duplicate of test case at index 0 in `pytest.mark.parametrize`
   --> PT014.py:42:10
@@ -145,7 +145,7 @@ help: Remove duplicate test case
 42 |         c,
 43 |         ((a)),
 44 |     ],
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PT014 [*] Duplicate of test case at index 0 in `pytest.mark.parametrize`
   --> PT014.py:44:11
@@ -165,7 +165,7 @@ help: Remove duplicate test case
 44 |     ],
 45 | )
 46 | def test_error_parentheses_trailing_comma(x):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PT014 [*] Duplicate of test case at index 0 in `pytest.mark.parametrize`
   --> PT014.py:56:53
@@ -183,4 +183,4 @@ help: Remove duplicate test case
 56 + @pytest.mark.parametrize('data, spec', [(1.0, 1.0)])
 57 | def test_numbers(data, spec):
 58 |     ...
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

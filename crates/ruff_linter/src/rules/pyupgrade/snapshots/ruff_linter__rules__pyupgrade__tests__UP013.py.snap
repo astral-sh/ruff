@@ -268,4 +268,4 @@ help: Convert `X` to class syntax
 48 | 
 49 | # Private names should not be reported (OK)
 50 | WithPrivate = TypedDict("WithPrivate", {"__x": int})
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

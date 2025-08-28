@@ -138,7 +138,7 @@ help: Replace with `Optional[Literal[...]]`
 25 |     ...
 26 | 
 27 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PYI061 [*] Use `None` rather than `Literal[None]`
   --> PYI061.py:33:5
@@ -160,7 +160,7 @@ help: Replace with `None`
 33 |     ...
 34 | 
 35 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PYI061 Use `None` rather than `Literal[None]`
   --> PYI061.py:38:25

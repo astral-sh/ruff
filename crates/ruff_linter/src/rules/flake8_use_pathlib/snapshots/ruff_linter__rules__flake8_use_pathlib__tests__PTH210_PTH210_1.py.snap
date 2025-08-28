@@ -32,7 +32,7 @@ help: Add a leading dot
 15 |     p.with_suffix(r"s")
 16 |     p.with_suffix(u'' "json")
 17 |     p.with_suffix(suffix="js")
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
   --> PTH210_1.py:15:5
@@ -53,7 +53,7 @@ help: Add a leading dot
 16 |     p.with_suffix(u'' "json")
 17 |     p.with_suffix(suffix="js")
 18 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
   --> PTH210_1.py:16:5
@@ -73,7 +73,7 @@ help: Add a leading dot
 17 |     p.with_suffix(suffix="js")
 18 | 
 19 |     ## No errors
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
   --> PTH210_1.py:17:5
@@ -94,7 +94,7 @@ help: Add a leading dot
 18 | 
 19 |     ## No errors
 20 |     p.with_suffix()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PTH210 Invalid suffix passed to `.with_suffix()`
   --> PTH210_1.py:31:5
@@ -127,7 +127,7 @@ help: Add a leading dot
 33 |     p.with_suffix(r"s")
 34 |     p.with_suffix(u'' "json")
 35 |     p.with_suffix(suffix="js")
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
   --> PTH210_1.py:33:5
@@ -148,7 +148,7 @@ help: Add a leading dot
 34 |     p.with_suffix(u'' "json")
 35 |     p.with_suffix(suffix="js")
 36 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
   --> PTH210_1.py:34:5
@@ -168,7 +168,7 @@ help: Add a leading dot
 35 |     p.with_suffix(suffix="js")
 36 | 
 37 |     ## No errors
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
   --> PTH210_1.py:35:5
@@ -189,7 +189,7 @@ help: Add a leading dot
 36 | 
 37 |     ## No errors
 38 |     p.with_suffix()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PTH210 Invalid suffix passed to `.with_suffix()`
   --> PTH210_1.py:49:5
@@ -222,7 +222,7 @@ help: Add a leading dot
 51 |     p.with_suffix(r"s")
 52 |     p.with_suffix(u'' "json")
 53 |     p.with_suffix(suffix="js")
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
   --> PTH210_1.py:51:5
@@ -243,7 +243,7 @@ help: Add a leading dot
 52 |     p.with_suffix(u'' "json")
 53 |     p.with_suffix(suffix="js")
 54 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
   --> PTH210_1.py:52:5
@@ -263,7 +263,7 @@ help: Add a leading dot
 53 |     p.with_suffix(suffix="js")
 54 | 
 55 |     ## No errors
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
   --> PTH210_1.py:53:5
@@ -284,7 +284,7 @@ help: Add a leading dot
 54 | 
 55 |     ## No errors
 56 |     p.with_suffix()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PTH210 Invalid suffix passed to `.with_suffix()`
   --> PTH210_1.py:67:5
@@ -317,7 +317,7 @@ help: Add a leading dot
 69 |     p.with_suffix(r"s")
 70 |     p.with_suffix(u'' "json")
 71 |     p.with_suffix(suffix="js")
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
   --> PTH210_1.py:69:5
@@ -338,7 +338,7 @@ help: Add a leading dot
 70 |     p.with_suffix(u'' "json")
 71 |     p.with_suffix(suffix="js")
 72 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
   --> PTH210_1.py:70:5
@@ -358,7 +358,7 @@ help: Add a leading dot
 71 |     p.with_suffix(suffix="js")
 72 | 
 73 |     ## No errors
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
   --> PTH210_1.py:71:5
@@ -379,7 +379,7 @@ help: Add a leading dot
 72 | 
 73 |     ## No errors
 74 |     p.with_suffix()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PTH210 Invalid suffix passed to `.with_suffix()`
   --> PTH210_1.py:85:5
@@ -412,7 +412,7 @@ help: Add a leading dot
 87 |     p.with_suffix(r"s")
 88 |     p.with_suffix(u'' "json")
 89 |     p.with_suffix(suffix="js")
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
   --> PTH210_1.py:87:5
@@ -433,7 +433,7 @@ help: Add a leading dot
 88 |     p.with_suffix(u'' "json")
 89 |     p.with_suffix(suffix="js")
 90 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
   --> PTH210_1.py:88:5
@@ -453,7 +453,7 @@ help: Add a leading dot
 89 |     p.with_suffix(suffix="js")
 90 | 
 91 |     ## No errors
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
   --> PTH210_1.py:89:5
@@ -474,7 +474,7 @@ help: Add a leading dot
 90 | 
 91 |     ## No errors
 92 |     p.with_suffix()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PTH210 Invalid suffix passed to `.with_suffix()`
    --> PTH210_1.py:103:5
@@ -507,7 +507,7 @@ help: Add a leading dot
 105 |     p.with_suffix(r"s")
 106 |     p.with_suffix(u'' "json")
 107 |     p.with_suffix(suffix="js")
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
    --> PTH210_1.py:105:5
@@ -528,7 +528,7 @@ help: Add a leading dot
 106 |     p.with_suffix(u'' "json")
 107 |     p.with_suffix(suffix="js")
 108 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
    --> PTH210_1.py:106:5
@@ -548,7 +548,7 @@ help: Add a leading dot
 107 |     p.with_suffix(suffix="js")
 108 | 
 109 |     ## No errors
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
    --> PTH210_1.py:107:5
@@ -569,4 +569,4 @@ help: Add a leading dot
 108 | 
 109 |     ## No errors
 110 |     p.with_suffix()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

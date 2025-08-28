@@ -14,4 +14,4 @@ help: Replace with raw string
 2 | 
   - re.compile("\N{Partial Differential}")  # with unsafe fix if python target is 3.8 or higher, else without fix
 3 + re.compile(r"\N{Partial Differential}")  # with unsafe fix if python target is 3.8 or higher, else without fix
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

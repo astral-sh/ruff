@@ -269,7 +269,7 @@ help: Apply an isort-style sorting to `__all__`
 38 | )
 39 | 
 40 | __all__ = [
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF022 [*] `__all__` is not sorted
   --> RUF022.py:40:11
@@ -304,7 +304,7 @@ help: Apply an isort-style sorting to `__all__`
 46 | ]
 47 | 
 48 | # we implement an "isort-style sort":
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF022 [*] `__all__` is not sorted
   --> RUF022.py:54:11
@@ -429,7 +429,7 @@ help: Apply an isort-style sorting to `__all__`
 100 |     # comment5
 101 | )  # comment6
 102 | # comment7
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF022 [*] `__all__` is not sorted
    --> RUF022.py:101:11
@@ -463,7 +463,7 @@ help: Apply an isort-style sorting to `__all__`
 108 |     # comment4
 109 |     # comment5
 110 |     # comment6
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF022 [*] `__all__` is not sorted
    --> RUF022.py:110:11
@@ -591,7 +591,7 @@ help: Apply an isort-style sorting to `__all__`
 132 | )
 133 | 
 134 | # we use natural sort for `__all__`,
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF022 [*] `__all__` is not sorted
    --> RUF022.py:138:11
@@ -655,7 +655,7 @@ help: Apply an isort-style sorting to `__all__`
 150 |     # comment1
 151 | ))  # comment2
 152 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF022 [*] `__all__` is not sorted
    --> RUF022.py:155:5
@@ -686,7 +686,7 @@ help: Apply an isort-style sorting to `__all__`
 160 |         # comment3
 161 |     )  # comment4
 162 | )  # comment2
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF022 [*] `__all__` is not sorted
    --> RUF022.py:164:16
@@ -719,7 +719,7 @@ help: Apply an isort-style sorting to `__all__`
 169 |     # comment1
 170 | ])  # comment2
 171 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF022 [*] `__all__` is not sorted
    --> RUF022.py:174:5
@@ -750,7 +750,7 @@ help: Apply an isort-style sorting to `__all__`
 179 |         # comment3
 180 |     ]  # comment4
 181 | )  # comment2
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF022 [*] `__all__` is not sorted
    --> RUF022.py:183:11
@@ -782,7 +782,7 @@ help: Apply an isort-style sorting to `__all__`
 189 | ]
 190 | 
 191 | __all__ = ["Awaitable", "Coroutine",
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF022 [*] `__all__` is not sorted
    --> RUF022.py:188:11
@@ -1007,7 +1007,7 @@ help: Apply an isort-style sorting to `__all__`
 248 |     # strange comment 2
 249 |     ,
 250 | )
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF022 [*] `__all__` is not sorted
    --> RUF022.py:253:11
@@ -1056,4 +1056,4 @@ help: Apply an isort-style sorting to `__all__`
 263 |     # strange multiline comment comment 2a
 264 |     # strange multiline comment 2b
 265 |     ,
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

@@ -25,4 +25,4 @@ help: Move into type-checking block
    -     import flask
 18 | 
 19 |     x: flask
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

@@ -23,4 +23,4 @@ help: Move into type-checking block
 10 |     import os
 11 | 
 12 | def f(x: pd.DataFrame):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

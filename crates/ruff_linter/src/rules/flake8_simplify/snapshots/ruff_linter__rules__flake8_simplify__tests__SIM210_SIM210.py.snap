@@ -15,7 +15,7 @@ help: Replace with `bool(...)
 2 | 
 3 | a = True if b != c else False  # SIM210
 4 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM210 [*] Remove unnecessary `True if ... else False`
  --> SIM210.py:3:5
@@ -35,7 +35,7 @@ help: Remove unnecessary `True if ... else False`
 4 | 
 5 | a = True if b + c else False  # SIM210
 6 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM210 [*] Use `bool(...)` instead of `True if ... else False`
  --> SIM210.py:5:5
@@ -56,7 +56,7 @@ help: Replace with `bool(...)
 6 | 
 7 | a = False if b else True  # OK
 8 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM210 Use `bool(...)` instead of `True if ... else False`
   --> SIM210.py:15:9
@@ -85,4 +85,4 @@ help: Remove unnecessary `True if ... else False`
    -                                    psl.privatesuffix(src.netloc)) else False
 19 + samesld = (psl.privatesuffix(urlparse(response.url).netloc) ==
 20 +                                    psl.privatesuffix(src.netloc))
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

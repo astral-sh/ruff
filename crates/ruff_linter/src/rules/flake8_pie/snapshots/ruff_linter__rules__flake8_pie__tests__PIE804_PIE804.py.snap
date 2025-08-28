@@ -252,4 +252,4 @@ help: Remove unnecessary kwargs
    -     }
 36 +     x=1.0, y=2.0
 37 | )
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

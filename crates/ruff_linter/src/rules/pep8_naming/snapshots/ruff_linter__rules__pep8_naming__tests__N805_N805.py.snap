@@ -18,7 +18,7 @@ help: Rename `this` to `self`
 8  |         pass
 9  | 
 10 |     if False:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 N805 [*] First argument of a method should be named `self`
   --> N805.py:11:30
@@ -37,7 +37,7 @@ help: Rename `this` to `self`
 12 |             pass
 13 | 
 14 |     def good_method(self):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 N805 [*] First argument of a method should be named `self`
   --> N805.py:30:15
@@ -56,7 +56,7 @@ help: Rename `cls` to `self`
 31 |         pass
 32 | 
 33 |     @pydantic.validator("my_field")
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 N805 [*] First argument of a method should be named `self`
   --> N805.py:34:15
@@ -75,7 +75,7 @@ help: Rename `cls` to `self`
 35 |         pass
 36 | 
 37 |     def __init__(self):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 N805 [*] First argument of a method should be named `self`
   --> N805.py:63:29
@@ -95,7 +95,7 @@ help: Rename `this` to `self`
 64 |         pass
 65 | 
 66 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 N805 [*] First argument of a method should be named `self`
   --> N805.py:69:13
@@ -115,7 +115,7 @@ help: Rename `cls` to `self`
 70 |         pass
 71 | 
 72 |     @bad.expression
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 N805 [*] First argument of a method should be named `self`
   --> N805.py:77:13
@@ -134,7 +134,7 @@ help: Rename `cls` to `self`
 78 |         pass
 79 | 
 80 |     @hybrid_property
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 N805 [*] First argument of a method should be named `self`
   --> N805.py:85:14
@@ -153,7 +153,7 @@ help: Rename `cls` to `self`
 86 |         pass
 87 | 
 88 |     @good.wtf
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 N805 [*] First argument of a method should be named `self`
   --> N805.py:93:19
@@ -172,7 +172,7 @@ help: Rename `foo` to `self`
 94 |         pass
 95 | 
 96 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 N805 First argument of a method should be named `self`
   --> N805.py:98:26
@@ -250,7 +250,7 @@ help: Rename `this` to `self`
 118 | 
 119 |     def bad_method(this):
 120 |         self = this
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 N805 First argument of a method should be named `self`
    --> N805.py:119:20
@@ -282,7 +282,7 @@ help: Rename `household` to `self`
 126 | 
 127 | 
 128 | from typing import Protocol
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 N805 First argument of a method should be named `self`
    --> N805.py:141:11

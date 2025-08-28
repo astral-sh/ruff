@@ -17,7 +17,7 @@ help: Replace with `yield from`
 3 | 
 4 | 
 5 | def g():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP028 [*] Replace `yield` over `for` loop with `yield from`
  --> UP028_0.py:7:5
@@ -37,7 +37,7 @@ help: Replace with `yield from`
 8  | 
 9  | 
 10 | def h():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP028 [*] Replace `yield` over `for` loop with `yield from`
   --> UP028_0.py:12:5
@@ -57,7 +57,7 @@ help: Replace with `yield from`
 13 | 
 14 | 
 15 | def i():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP028 [*] Replace `yield` over `for` loop with `yield from`
   --> UP028_0.py:17:5
@@ -77,7 +77,7 @@ help: Replace with `yield from`
 18 | 
 19 | 
 20 | def j():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP028 [*] Replace `yield` over `for` loop with `yield from`
   --> UP028_0.py:22:5
@@ -97,7 +97,7 @@ help: Replace with `yield from`
 23 | 
 24 | 
 25 | def k():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP028 [*] Replace `yield` over `for` loop with `yield from`
   --> UP028_0.py:27:5
@@ -117,7 +117,7 @@ help: Replace with `yield from`
 28 | 
 29 | 
 30 | def f():  # Comment one\n'
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP028 [*] Replace `yield` over `for` loop with `yield from`
   --> UP028_0.py:33:5
@@ -150,7 +150,7 @@ help: Replace with `yield from`
 38 |         # Comment ten',
 39 | 
 40 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP028 [*] Replace `yield` over `for` loop with `yield from`
   --> UP028_0.py:44:5
@@ -170,7 +170,7 @@ help: Replace with `yield from`
 45 | 
 46 | 
 47 | def f():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP028 [*] Replace `yield` over `for` loop with `yield from`
   --> UP028_0.py:49:5
@@ -192,7 +192,7 @@ help: Replace with `yield from`
 50 | 
 51 | def f():
 52 |     def func():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP028 [*] Replace `yield` over `for` loop with `yield from`
   --> UP028_0.py:55:9
@@ -217,7 +217,7 @@ help: Replace with `yield from`
 56 |             # Comment four\n'
 57 | # Comment\n'
 58 | def g():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP028 [*] Replace `yield` over `for` loop with `yield from`
   --> UP028_0.py:67:5
@@ -238,7 +238,7 @@ help: Replace with `yield from`
 68 | 
 69 | 
 70 | def f():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP028 [*] Replace `yield` over `for` loop with `yield from`
   --> UP028_0.py:72:5
@@ -259,7 +259,7 @@ help: Replace with `yield from`
 73 |     x = 1
 74 | 
 75 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP028 [*] Replace `yield` over `for` loop with `yield from`
   --> UP028_0.py:79:5
@@ -287,7 +287,7 @@ help: Replace with `yield from`
 83 | 
 84 | 
 85 | # UP028: The later loop variable is not a reference to the earlier loop variable
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP028 [*] Replace `yield` over `for` loop with `yield from`
    --> UP028_0.py:97:5
@@ -310,7 +310,7 @@ help: Replace with `yield from`
 98  |     # Shadowing with an `except`
 99  |     try:
 100 |         pass
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP028 [*] Replace `yield` over `for` loop with `yield from`
    --> UP028_0.py:108:5
@@ -333,7 +333,7 @@ help: Replace with `yield from`
 109 |     # Shadowing with `with`
 110 |     with contextlib.nullcontext() as x:
 111 |         pass
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP028 [*] Replace `yield` over `for` loop with `yield from`
    --> UP028_0.py:118:5
@@ -356,7 +356,7 @@ help: Replace with `yield from`
 119 |     # Shadowing with a type annotation
 120 |     x: int
 121 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP028 [*] Replace `yield` over `for` loop with `yield from`
    --> UP028_0.py:134:5
@@ -379,7 +379,7 @@ help: Replace with `yield from`
 135 |     # Shadowing with multiple `except` blocks
 136 |     try:
 137 |         pass
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP028 [*] Replace `yield` over `for` loop with `yield from`
    --> UP028_0.py:170:5
@@ -400,7 +400,7 @@ help: Replace with `yield from`
 171 | 
 172 | 
 173 | SOME_GLOBAL = None
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP028 Replace `yield` over `for` loop with `yield from`
    --> UP028_0.py:179:5

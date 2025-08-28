@@ -16,7 +16,7 @@ help: Add period
 3 |     ...
 4 | 
 5 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 D400 [*] First line should end with a period
  --> D400.py:7:5
@@ -35,7 +35,7 @@ help: Add period
 8  |     ...
 9  | 
 10 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 D400 [*] First line should end with a period
   --> D400.py:12:5
@@ -57,7 +57,7 @@ help: Add period
 15 |     """
 16 |     ...
 17 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 D400 [*] First line should end with a period
   --> D400.py:20:5
@@ -76,7 +76,7 @@ help: Add period
 21 |     ...
 22 | 
 23 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 D400 [*] First line should end with a period
   --> D400.py:25:5
@@ -97,7 +97,7 @@ help: Add period
 28 |     ...
 29 | 
 30 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 D400 [*] First line should end with a period
   --> D400.py:32:5
@@ -118,7 +118,7 @@ help: Add period
 35 |     ...
 36 | 
 37 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 D400 [*] First line should end with a period
   --> D400.py:39:5
@@ -137,7 +137,7 @@ help: Add period
 40 |     ...
 41 | 
 42 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 D400 [*] First line should end with a period
   --> D400.py:44:5
@@ -156,7 +156,7 @@ help: Add period
 45 |     ...
 46 | 
 47 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 D400 [*] First line should end with a period
   --> D400.py:49:5
@@ -178,7 +178,7 @@ help: Add period
 52 |     """
 53 |     ...
 54 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 D400 [*] First line should end with a period
   --> D400.py:57:5
@@ -197,7 +197,7 @@ help: Add period
 58 |     ...
 59 | 
 60 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 D400 [*] First line should end with a period
   --> D400.py:62:5
@@ -218,7 +218,7 @@ help: Add period
 65 |     ...
 66 | 
 67 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 D400 [*] First line should end with a period
   --> D400.py:69:5
@@ -239,7 +239,7 @@ help: Add period
 72 |     ...
 73 | 
 74 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 D400 [*] First line should end with a period
    --> D400.py:97:5
@@ -262,4 +262,4 @@ help: Add period
 99  |     ==========
 100 | 
 101 |     My example explanation
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

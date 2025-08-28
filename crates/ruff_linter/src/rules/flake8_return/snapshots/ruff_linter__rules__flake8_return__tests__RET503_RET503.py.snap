@@ -19,7 +19,7 @@ help: Add explicit `return` statement
 24 |     # error
 25 | 
 26 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
   --> RET503.py:26:1
@@ -39,7 +39,7 @@ help: Add explicit `return` statement
 32 | 
 33 | 
 34 | def x(y):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
   --> RET503.py:33:1
@@ -59,7 +59,7 @@ help: Add explicit `return` statement
 39 | 
 40 | 
 41 | # for
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
   --> RET503.py:41:1
@@ -80,7 +80,7 @@ help: Add explicit `return` statement
 46 |     # error
 47 | 
 48 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
   --> RET503.py:48:1
@@ -101,7 +101,7 @@ help: Add explicit `return` statement
 55 | 
 56 | 
 57 | # A nonexistent function
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
   --> RET503.py:57:1
@@ -121,7 +121,7 @@ help: Add explicit `return` statement
 62 | 
 63 | 
 64 | # A function that does return the control
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
   --> RET503.py:64:1
@@ -141,7 +141,7 @@ help: Add explicit `return` statement
 69 | 
 70 | 
 71 | ###
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
   --> RET503.py:82:1
@@ -162,7 +162,7 @@ help: Add explicit `return` statement
 88 | 
 89 | 
 90 | # exclude empty functions
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
    --> RET503.py:113:1
@@ -183,7 +183,7 @@ help: Add explicit `return` statement
 119 | 
 120 | 
 121 | def bar3(x, y, z):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
    --> RET503.py:120:1
@@ -206,7 +206,7 @@ help: Add explicit `return` statement
 129 | 
 130 | 
 131 | def bar1(x, y, z):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
    --> RET503.py:130:1
@@ -226,7 +226,7 @@ help: Add explicit `return` statement
 136 | 
 137 | 
 138 | def bar3(x, y, z):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
    --> RET503.py:137:1
@@ -249,7 +249,7 @@ help: Add explicit `return` statement
 146 | 
 147 | 
 148 | def prompts(self, foo):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
    --> RET503.py:271:1
@@ -270,7 +270,7 @@ help: Add explicit `return` statement
 278 | 
 279 | 
 280 | def while_true():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
    --> RET503.py:287:1
@@ -292,7 +292,7 @@ help: Add explicit `return` statement
 294 | 
 295 | 
 296 | def foo(baz: str) -> str:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
    --> RET503.py:300:5
@@ -311,7 +311,7 @@ help: Add explicit `return` statement
 304 | 
 305 | 
 306 |     def example():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
    --> RET503.py:305:5
@@ -329,7 +329,7 @@ help: Add explicit `return` statement
 309 | 
 310 | 
 311 |     def example():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
    --> RET503.py:310:5
@@ -347,7 +347,7 @@ help: Add explicit `return` statement
 314 | 
 315 | 
 316 |     def example():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
    --> RET503.py:315:5
@@ -365,7 +365,7 @@ help: Add explicit `return` statement
 319 | 
 320 | 
 321 |     def example():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
    --> RET503.py:320:5
@@ -384,7 +384,7 @@ help: Add explicit `return` statement
 325 | 
 326 | 
 327 | def end_of_file():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
    --> RET503.py:326:1
@@ -403,7 +403,7 @@ help: Add explicit `return` statement
 332 | 
 333 | 
 334 | # function return type annotation NoReturn
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
    --> RET503.py:398:1
@@ -424,7 +424,7 @@ help: Add explicit `return` statement
 405 | 
 406 | 
 407 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
    --> RET503.py:413:1
@@ -446,4 +446,4 @@ help: Add explicit `return` statement
     -     bar()
 418 +     bar()
 419 +     return None
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

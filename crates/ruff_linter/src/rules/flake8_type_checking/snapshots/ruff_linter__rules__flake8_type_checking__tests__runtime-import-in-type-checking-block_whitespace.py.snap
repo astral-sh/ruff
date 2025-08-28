@@ -19,4 +19,4 @@ help: Move out of type-checking block
   - if TYPE_CHECKING: import builtins
 5 + if TYPE_CHECKING: pass
 6 | builtins.print("!")
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

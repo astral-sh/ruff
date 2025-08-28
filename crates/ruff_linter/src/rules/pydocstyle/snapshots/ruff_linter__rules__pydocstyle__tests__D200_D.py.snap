@@ -22,7 +22,7 @@ help: Reformat to one line
 130 | 
 131 | 
 132 | @expect('D201: No blank lines allowed before function docstring (found 1)')
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 D200 [*] One-line docstring should fit on one line
    --> D.py:597:5
@@ -45,7 +45,7 @@ help: Reformat to one line
 598 | 
 599 | 
 600 | @expect('D200: One-line docstring should fit on one line with quotes '
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 D200 [*] One-line docstring should fit on one line
    --> D.py:606:5
@@ -68,7 +68,7 @@ help: Reformat to one line
 607 | 
 608 | 
 609 | @expect('D200: One-line docstring should fit on one line with quotes '
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 D200 One-line docstring should fit on one line
    --> D.py:615:5

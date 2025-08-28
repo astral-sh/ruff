@@ -22,4 +22,4 @@ help: Replace with `contextlib.suppress(ValueError)`
 7 |     math.sqrt(-1)
   - except ValueError:
   -     pass
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

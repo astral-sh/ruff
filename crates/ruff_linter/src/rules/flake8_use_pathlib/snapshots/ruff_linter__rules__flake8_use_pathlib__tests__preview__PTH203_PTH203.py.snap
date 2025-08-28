@@ -194,7 +194,7 @@ help: Replace with `Path.stat(...).st_atime`
 22 | 
 23 | os.path.getatime("file" + "name")
 24 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PTH203 [*] `os.path.getatime` should be replaced by `Path.stat().st_atime`
   --> PTH203.py:29:1

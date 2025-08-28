@@ -147,7 +147,7 @@ help: Replace with flattened `Literal`
 13 | 
 14 | # Ensure issue is only raised once, even on nested literals
 15 | MyType = Literal["foo", Literal[True, False, True], "bar"]
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF041 [*] Unnecessary nested `Literal`
   --> RUF041.py:20:10

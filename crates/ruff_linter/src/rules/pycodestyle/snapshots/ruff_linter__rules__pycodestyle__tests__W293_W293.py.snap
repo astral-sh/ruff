@@ -19,7 +19,7 @@ help: Remove whitespace from blank line
 5 |     """\
 6 | 
 7 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 W293 [*] Blank line contains whitespace
   --> W293.py:10:1
@@ -77,4 +77,4 @@ help: Remove whitespace from blank line
    -  
 18 + 
 19 | inside a multiline string'''
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

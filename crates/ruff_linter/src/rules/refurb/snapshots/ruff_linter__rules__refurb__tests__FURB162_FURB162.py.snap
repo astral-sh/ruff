@@ -19,7 +19,7 @@ help: Remove `.replace()` call
 9  | datetime.fromisoformat(date.replace("Z", "-00:" "00"))
 10 | 
 11 | datetime.fromisoformat(date[:-1] + "-00")
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB162 [*] Unnecessary timezone replacement with zero offset
   --> FURB162.py:9:24
@@ -39,7 +39,7 @@ help: Remove `.replace()` call
 10 | 
 11 | datetime.fromisoformat(date[:-1] + "-00")
 12 | datetime.fromisoformat(date[:-1:] + "-0000")
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB162 [*] Unnecessary timezone replacement with zero offset
   --> FURB162.py:11:24
@@ -59,7 +59,7 @@ help: Remove `.replace()` call
 12 | datetime.fromisoformat(date[:-1:] + "-0000")
 13 | 
 14 | datetime.fromisoformat(date.strip("Z") + """+0"""
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB162 [*] Unnecessary timezone replacement with zero offset
   --> FURB162.py:12:24
@@ -79,7 +79,7 @@ help: Remove `.replace()` call
 13 | 
 14 | datetime.fromisoformat(date.strip("Z") + """+0"""
 15 |                                          """0""")
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB162 [*] Unnecessary timezone replacement with zero offset
   --> FURB162.py:14:24
@@ -102,7 +102,7 @@ help: Remove `.replace()` call
 15 | datetime.fromisoformat(date.rstrip("Z") + "+\x30\60" '\u0030\N{DIGIT ZERO}')
 16 | 
 17 | datetime.fromisoformat(
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB162 [*] Unnecessary timezone replacement with zero offset
   --> FURB162.py:16:24
@@ -123,7 +123,7 @@ help: Remove `.replace()` call
 17 | 
 18 | datetime.fromisoformat(
 19 |     # Preserved
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB162 [*] Unnecessary timezone replacement with zero offset
   --> FURB162.py:20:5
@@ -145,7 +145,7 @@ help: Remove `.replace()` call
 23 | )
 24 | 
 25 | datetime.fromisoformat(
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB162 [*] Unnecessary timezone replacement with zero offset
   --> FURB162.py:26:5
@@ -174,7 +174,7 @@ help: Remove `.replace()` call
 29 | )
 30 | 
 31 | datetime.fromisoformat(
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB162 [*] Unnecessary timezone replacement with zero offset
   --> FURB162.py:36:5
@@ -195,7 +195,7 @@ help: Remove `.replace()` call
 39 | )
 40 | 
 41 | datetime.fromisoformat(
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB162 [*] Unnecessary timezone replacement with zero offset
   --> FURB162.py:42:5
@@ -220,7 +220,7 @@ help: Remove `.replace()` call
 45 | )
 46 | 
 47 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB162 [*] Unnecessary timezone replacement with zero offset
   --> FURB162.py:52:24
@@ -238,4 +238,4 @@ help: Remove `.replace()` call
 53 | 
 54 | 
 55 | ### No errors
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

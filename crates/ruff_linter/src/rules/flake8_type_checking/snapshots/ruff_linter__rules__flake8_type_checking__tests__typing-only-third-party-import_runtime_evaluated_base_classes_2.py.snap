@@ -27,7 +27,7 @@ help: Move into type-checking block
 12 | 
 13 | 
 14 | class A(BaseModel):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `pyproj` into a type-checking block
  --> runtime_evaluated_base_classes_2.py:5:8
@@ -53,4 +53,4 @@ help: Move into type-checking block
 12 | 
 13 | 
 14 | class A(BaseModel):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

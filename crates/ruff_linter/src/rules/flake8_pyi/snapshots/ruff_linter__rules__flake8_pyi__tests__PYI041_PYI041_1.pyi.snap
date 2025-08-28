@@ -105,7 +105,7 @@ help: Remove redundant type
 37 |     ) -> None: ...  # PYI041
 38 | 
 39 | def f6(
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PYI041 [*] Use `complex` instead of `int | float | complex`
   --> PYI041_1.pyi:43:9
@@ -128,7 +128,7 @@ help: Remove redundant type
 43 |         complex
 44 |     )    
 45 |     ) -> None: ... # PYI041
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PYI041 [*] Use `float` instead of `int | float`
   --> PYI041_1.pyi:49:26

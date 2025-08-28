@@ -50,7 +50,7 @@ help: Add missing colon
 19 | 
 20 | # PGH004
 21 | x = 2  # noqa X100, X200
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PGH004 [*] Use a colon when specifying `noqa` rule codes
   --> PGH004_0.py:21:8
@@ -70,4 +70,4 @@ help: Add missing colon
 22 | 
 23 | # PGH004
 24 | x = 2  # noqa : X300
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

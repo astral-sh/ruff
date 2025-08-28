@@ -23,7 +23,7 @@ help: Move into type-checking block
 10 | 
 11 | 
 12 | def f(x: first_party.foo): ...
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `elsewhere.third_party` into a type-checking block
  --> TC001-3_future.py:3:23
@@ -49,7 +49,7 @@ help: Move into type-checking block
 10 | 
 11 | 
 12 | def f(x: first_party.foo): ...
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TC001 [*] Move application import `.first_party` into a type-checking block
  --> TC001-3_future.py:5:15
@@ -73,4 +73,4 @@ help: Move into type-checking block
 10 | 
 11 | 
 12 | def f(x: first_party.foo): ...
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

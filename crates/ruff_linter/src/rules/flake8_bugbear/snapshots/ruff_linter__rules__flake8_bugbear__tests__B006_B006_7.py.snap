@@ -20,4 +20,4 @@ help: Replace with `None`; initialize within function
 5 +     import os
 6 +     if bar is None:
 7 +         bar = {}
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

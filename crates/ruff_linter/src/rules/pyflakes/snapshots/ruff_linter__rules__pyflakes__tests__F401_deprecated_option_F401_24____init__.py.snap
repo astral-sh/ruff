@@ -15,7 +15,7 @@ help: Remove unused import: `sys`
 19 | 
 20 | 
 21 | # first-party
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F401 [*] `.unused` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
   --> __init__.py:33:15
@@ -31,7 +31,7 @@ help: Remove unused import: `.unused`
 33 | 
 34 | 
 35 | from . import renamed as bees  # F401: no fix
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F401 [*] `.renamed` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
   --> __init__.py:36:26
@@ -44,4 +44,4 @@ help: Remove unused import: `.renamed`
 34 | 
 35 | 
    - from . import renamed as bees  # F401: no fix
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

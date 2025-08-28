@@ -17,7 +17,7 @@ help: Inherit from `enum.StrEnum`
 5 | 
 6 | 
 7 | class B(Enum, str): ...
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP042 [*] Class B inherits from both `str` and `enum.Enum`
  --> UP042.py:7:7
@@ -38,7 +38,7 @@ help: Inherit from `enum.StrEnum`
 8  | 
 9  | 
 10 | class D(int, str, Enum): ...
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP042 Class D inherits from both `str` and `enum.Enum`
   --> UP042.py:10:7

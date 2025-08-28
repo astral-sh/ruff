@@ -15,7 +15,7 @@ help: Rewrite as a tuple literal
 2 | t2 = tuple([1, 2])
 3 | t3 = tuple((1, 2))
 4 | t4 = tuple([
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C409 [*] Unnecessary list literal passed to `tuple()` (rewrite as a tuple literal)
  --> C409.py:2:6
@@ -33,7 +33,7 @@ help: Rewrite as a tuple literal
 3 | t3 = tuple((1, 2))
 4 | t4 = tuple([
 5 |     1,
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C409 [*] Unnecessary tuple literal passed to `tuple()` (remove the outer call to `tuple()`)
  --> C409.py:3:6
@@ -53,7 +53,7 @@ help: Remove the outer call to `tuple()`
 4 | t4 = tuple([
 5 |     1,
 6 |     2
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C409 [*] Unnecessary list literal passed to `tuple()` (rewrite as a tuple literal)
  --> C409.py:4:6
@@ -82,7 +82,7 @@ help: Rewrite as a tuple literal
 8  | t5 = tuple(
 9  |     (1, 2)
 10 | )
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C409 [*] Unnecessary tuple literal passed to `tuple()` (remove the outer call to `tuple()`)
   --> C409.py:8:6
@@ -108,7 +108,7 @@ help: Remove the outer call to `tuple()`
 9  | 
 10 | tuple(  # comment
 11 |     [1, 2]
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C409 [*] Unnecessary list literal passed to `tuple()` (rewrite as a tuple literal)
   --> C409.py:12:1
@@ -133,7 +133,7 @@ help: Rewrite as a tuple literal
 13 | 
 14 | tuple([  # comment
 15 |     1, 2
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C409 [*] Unnecessary list literal passed to `tuple()` (rewrite as a tuple literal)
   --> C409.py:16:1
@@ -159,7 +159,7 @@ help: Rewrite as a tuple literal
 19 | 
 20 | tuple((
 21 |     1,
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C409 [*] Unnecessary tuple literal passed to `tuple()` (remove the outer call to `tuple()`)
   --> C409.py:20:1
@@ -185,7 +185,7 @@ help: Remove the outer call to `tuple()`
 23 | 
 24 | t6 = tuple([1])
 25 | t7 = tuple((1,))
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C409 [*] Unnecessary list literal passed to `tuple()` (rewrite as a tuple literal)
   --> C409.py:24:6
@@ -206,7 +206,7 @@ help: Rewrite as a tuple literal
 25 | t7 = tuple((1,))
 26 | t8 = tuple([1,])
 27 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C409 [*] Unnecessary tuple literal passed to `tuple()` (remove the outer call to `tuple()`)
   --> C409.py:25:6
@@ -225,7 +225,7 @@ help: Remove the outer call to `tuple()`
 26 | t8 = tuple([1,])
 27 | 
 28 | tuple([x for x in range(5)])
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C409 [*] Unnecessary list literal passed to `tuple()` (rewrite as a tuple literal)
   --> C409.py:26:6
@@ -246,4 +246,4 @@ help: Rewrite as a tuple literal
 27 | 
 28 | tuple([x for x in range(5)])
 29 | tuple({x for x in range(10)})
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

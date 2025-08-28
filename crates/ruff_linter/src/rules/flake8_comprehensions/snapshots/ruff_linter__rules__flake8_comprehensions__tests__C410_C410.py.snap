@@ -15,7 +15,7 @@ help: Remove outer `list()` call
 2 | l2 = list((1, 2))
 3 | l3 = list([])
 4 | l4 = list(())
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C410 [*] Unnecessary tuple literal passed to `list()` (rewrite as a single list literal)
  --> C410.py:2:6
@@ -33,7 +33,7 @@ help: Rewrite as a single list literal
 3 | l3 = list([])
 4 | l4 = list(())
 5 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C410 [*] Unnecessary list literal passed to `list()` (remove the outer call to `list()`)
  --> C410.py:3:6
@@ -52,7 +52,7 @@ help: Remove outer `list()` call
 4 | l4 = list(())
 5 | 
 6 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C410 [*] Unnecessary tuple literal passed to `list()` (rewrite as a single list literal)
  --> C410.py:4:6
@@ -71,7 +71,7 @@ help: Rewrite as a single list literal
 5 | 
 6 | 
 7 | list(  # comment
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C410 [*] Unnecessary list literal passed to `list()` (remove the outer call to `list()`)
   --> C410.py:7:1
@@ -94,7 +94,7 @@ help: Remove outer `list()` call
 8  | 
 9  | list([  # comment
 10 |     1, 2
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C410 [*] Unnecessary list literal passed to `list()` (remove the outer call to `list()`)
   --> C410.py:11:1
@@ -120,4 +120,4 @@ help: Remove outer `list()` call
 14 | 
 15 | # Skip when too many positional arguments
 16 | # See https://github.com/astral-sh/ruff/issues/15810
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

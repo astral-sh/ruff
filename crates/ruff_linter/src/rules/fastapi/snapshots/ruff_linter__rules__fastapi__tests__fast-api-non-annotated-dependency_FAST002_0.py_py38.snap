@@ -28,7 +28,7 @@ help: Replace with `typing_extensions.Annotated`
 26 |     some_security_param: str = Security(get_oauth2_user),
 27 | ):
 28 |     pass
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FAST002 [*] FastAPI dependency without `Annotated`
   --> FAST002_0.py:25:5
@@ -57,7 +57,7 @@ help: Replace with `typing_extensions.Annotated`
 27 | ):
 28 |     pass
 29 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FAST002 [*] FastAPI dependency without `Annotated`
   --> FAST002_0.py:32:5
@@ -86,7 +86,7 @@ help: Replace with `typing_extensions.Annotated`
 34 |     some_cookie_param: str = Cookie(),
 35 |     some_file_param: UploadFile = File(),
 36 |     some_form_param: str = Form(),
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FAST002 [*] FastAPI dependency without `Annotated`
   --> FAST002_0.py:33:5
@@ -115,7 +115,7 @@ help: Replace with `typing_extensions.Annotated`
 35 |     some_file_param: UploadFile = File(),
 36 |     some_form_param: str = Form(),
 37 |     some_query_param: str | None = Query(default=None),
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FAST002 [*] FastAPI dependency without `Annotated`
   --> FAST002_0.py:34:5
@@ -144,7 +144,7 @@ help: Replace with `typing_extensions.Annotated`
 36 |     some_form_param: str = Form(),
 37 |     some_query_param: str | None = Query(default=None),
 38 |     some_body_param: str = Body("foo"),
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FAST002 [*] FastAPI dependency without `Annotated`
   --> FAST002_0.py:35:5
@@ -173,7 +173,7 @@ help: Replace with `typing_extensions.Annotated`
 37 |     some_query_param: str | None = Query(default=None),
 38 |     some_body_param: str = Body("foo"),
 39 |     some_header_param: int = Header(default=5),
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FAST002 [*] FastAPI dependency without `Annotated`
   --> FAST002_0.py:36:5
@@ -202,7 +202,7 @@ help: Replace with `typing_extensions.Annotated`
 38 |     some_body_param: str = Body("foo"),
 39 |     some_header_param: int = Header(default=5),
 40 | ):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FAST002 [*] FastAPI dependency without `Annotated`
   --> FAST002_0.py:37:5
@@ -231,7 +231,7 @@ help: Replace with `typing_extensions.Annotated`
 39 |     some_header_param: int = Header(default=5),
 40 | ):
 41 |     # do stuff
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FAST002 [*] FastAPI dependency without `Annotated`
   --> FAST002_0.py:38:5
@@ -260,7 +260,7 @@ help: Replace with `typing_extensions.Annotated`
 40 | ):
 41 |     # do stuff
 42 |     pass
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FAST002 [*] FastAPI dependency without `Annotated`
   --> FAST002_0.py:47:5
@@ -289,7 +289,7 @@ help: Replace with `typing_extensions.Annotated`
 49 | ):
 50 |     pass
 51 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FAST002 [*] FastAPI dependency without `Annotated`
   --> FAST002_0.py:53:5
@@ -318,7 +318,7 @@ help: Replace with `typing_extensions.Annotated`
 55 |     skip: int = 0,
 56 |     limit: int = 10,
 57 | ):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FAST002 [*] FastAPI dependency without `Annotated`
   --> FAST002_0.py:61:25
@@ -345,7 +345,7 @@ help: Replace with `typing_extensions.Annotated`
 63 |     pass
 64 | 
 65 | # Non fixable errors
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FAST002 FastAPI dependency without `Annotated`
   --> FAST002_0.py:70:5

@@ -17,7 +17,7 @@ help: Replace with `res`
 3 |     pass
 4 | #: E712
 5 | if res != False:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 E712 [*] Avoid inequality comparisons to `False`; use `res:` for truth checks
  --> E712.py:5:4
@@ -38,7 +38,7 @@ help: Replace with `res`
 6 |     pass
 7 | #: E712
 8 | if True != res:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 E712 [*] Avoid inequality comparisons to `True`; use `not res:` for false checks
   --> E712.py:8:4
@@ -59,7 +59,7 @@ help: Replace with `not res`
 9  |     pass
 10 | #: E712
 11 | if False == res:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 E712 [*] Avoid equality comparisons to `False`; use `not res:` for false checks
   --> E712.py:11:4
@@ -80,7 +80,7 @@ help: Replace with `not res`
 12 |     pass
 13 | #: E712
 14 | if res[1] == True:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 E712 [*] Avoid equality comparisons to `True`; use `res[1]:` for truth checks
   --> E712.py:14:4
@@ -101,7 +101,7 @@ help: Replace with `res[1]`
 15 |     pass
 16 | #: E712
 17 | if res[1] != False:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 E712 [*] Avoid inequality comparisons to `False`; use `res[1]:` for truth checks
   --> E712.py:17:4
@@ -122,7 +122,7 @@ help: Replace with `res[1]`
 18 |     pass
 19 | #: E712
 20 | var = 1 if cond == True else -1 if cond == False else cond
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 E712 [*] Avoid equality comparisons to `True`; use `cond:` for truth checks
   --> E712.py:20:12
@@ -143,7 +143,7 @@ help: Replace with `cond`
 21 | #: E712
 22 | if (True) == TrueElement or x == TrueElement:
 23 |     pass
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 E712 [*] Avoid equality comparisons to `False`; use `not cond:` for false checks
   --> E712.py:20:36
@@ -164,7 +164,7 @@ help: Replace with `not cond`
 21 | #: E712
 22 | if (True) == TrueElement or x == TrueElement:
 23 |     pass
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 E712 [*] Avoid equality comparisons to `True`; use `TrueElement:` for truth checks
   --> E712.py:22:4
@@ -184,7 +184,7 @@ help: Replace with `TrueElement`
 23 |     pass
 24 | 
 25 | if res == True != False:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 E712 [*] Avoid equality comparisons to `True` or `False`
   --> E712.py:25:4
@@ -204,7 +204,7 @@ help: Replace comparison
 26 |     pass
 27 | 
 28 | if(True) == TrueElement or x == TrueElement:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 E712 [*] Avoid equality comparisons to `True` or `False`
   --> E712.py:25:4
@@ -224,7 +224,7 @@ help: Replace comparison
 26 |     pass
 27 | 
 28 | if(True) == TrueElement or x == TrueElement:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 E712 [*] Avoid equality comparisons to `True`; use `TrueElement:` for truth checks
   --> E712.py:28:3
@@ -244,7 +244,7 @@ help: Replace with `TrueElement`
 29 |     pass
 30 | 
 31 | if (yield i) == True:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 E712 [*] Avoid equality comparisons to `True`; use `yield i:` for truth checks
   --> E712.py:31:4
@@ -264,7 +264,7 @@ help: Replace with `yield i`
 32 |       print("even")
 33 | 
 34 | #: Okay
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 E712 [*] Avoid equality comparisons to `True`; use `True:` for truth checks
   --> E712.py:58:4
@@ -281,4 +281,4 @@ help: Replace with `True`
    - if True == True: # No duplicated diagnostic
 58 + if True: # No duplicated diagnostic
 59 |     pass
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

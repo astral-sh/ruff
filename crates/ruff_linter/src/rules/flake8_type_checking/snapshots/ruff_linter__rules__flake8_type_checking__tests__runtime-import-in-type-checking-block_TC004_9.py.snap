@@ -20,7 +20,7 @@ help: Move out of type-checking block
 6 | 
 7 | x: Tuple
 8 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TC004 [*] Move import `typing.List` out of type-checking block. Import is used for more than type hinting.
  --> TC004_9.py:4:31
@@ -41,4 +41,4 @@ help: Move out of type-checking block
 6 | 
 7 | x: Tuple
 8 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

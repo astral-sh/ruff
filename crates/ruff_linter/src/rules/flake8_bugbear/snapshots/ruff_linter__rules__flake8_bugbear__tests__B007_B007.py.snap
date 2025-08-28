@@ -30,7 +30,7 @@ help: Rename unused `k` to `_k`
 19 |             print(i + j)
 20 | 
 21 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 B007 Loop control variable `i` not used within loop body
   --> B007.py:30:5
@@ -57,7 +57,7 @@ help: Rename unused `k` to `_k`
 31 |     print(j, l)
 32 | 
 33 | FMT = "{foo} {bar}"
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 B007 Loop control variable `bar` may not be used within loop body
   --> B007.py:34:10
@@ -124,7 +124,7 @@ help: Rename unused `bar` to `_bar`
 53 |         if foo or baz:
 54 |             break
 55 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 B007 Loop control variable `bar` not used within loop body
   --> B007.py:59:14
@@ -157,7 +157,7 @@ help: Rename unused `bar` to `_bar`
 69 |         if foo or baz:
 70 |             break
 71 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 B007 Loop control variable `bar` not used within loop body
   --> B007.py:77:14

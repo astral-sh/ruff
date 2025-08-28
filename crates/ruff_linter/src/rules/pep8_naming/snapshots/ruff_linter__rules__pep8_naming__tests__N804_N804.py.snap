@@ -19,7 +19,7 @@ help: Rename `self` to `cls`
 31 |         ...
 32 | 
 33 |     @classmethod
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 N804 [*] First argument of a class method should be named `cls`
   --> N804.py:38:56
@@ -38,7 +38,7 @@ help: Rename `self` to `cls`
 39 |         ...
 40 | 
 41 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 N804 [*] First argument of a class method should be named `cls`
   --> N804.py:43:20
@@ -57,7 +57,7 @@ help: Rename `self` to `cls`
 44 |         pass
 45 | 
 46 |     def good_method(cls):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 N804 First argument of a class method should be named `cls`
   --> N804.py:54:25
@@ -135,7 +135,7 @@ help: Rename `this` to `cls`
 73 | 
 74 |     def bad_method(this):
 75 |         self = this
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 N804 [*] First argument of a class method should be named `cls`
   --> N804.py:74:20
@@ -157,7 +157,7 @@ help: Rename `this` to `cls`
 76 | 
 77 | def func(x):
 78 |     return x
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 N804 First argument of a class method should be named `cls`
   --> N804.py:88:18

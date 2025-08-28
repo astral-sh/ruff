@@ -604,7 +604,7 @@ help: Pass `maxsplit=1` into `str.split()`
 59 | 
 60 | 
 61 | # OK
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLC0207 [*] Replace with `split(..., maxsplit=1)`.
    --> missing_maxsplit_arg.py:179:1
@@ -625,7 +625,7 @@ help: Pass `maxsplit=1` into `str.split()`
 180 | # OK
 181 | kwargs_with_maxsplit = {"maxsplit": 1}
 182 | "1,2,3".split(",", **kwargs_with_maxsplit)[0]  # TODO: false positive
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLC0207 [*] Replace with `split(..., maxsplit=1)`.
    --> missing_maxsplit_arg.py:182:1
@@ -646,7 +646,7 @@ help: Pass `maxsplit=1` into `str.split()`
 183 | kwargs_with_maxsplit = {"sep": ",", "maxsplit": 1}
 184 | "1,2,3".split(**kwargs_with_maxsplit)[0]  # TODO: false positive
 185 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLC0207 [*] Replace with `split(..., maxsplit=1)`.
    --> missing_maxsplit_arg.py:184:1
@@ -665,7 +665,7 @@ help: Pass `maxsplit=1` into `str.split()`
 185 | 
 186 | 
 187 | ## Test unpacked list literal args (starred expressions)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLC0207 [*] Replace with `split(..., maxsplit=1)`.
    --> missing_maxsplit_arg.py:189:1
@@ -686,7 +686,7 @@ help: Pass `maxsplit=1` into `str.split()`
 190 | 
 191 | ## Test unpacked list variable args
 192 | # Errors
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLC0207 [*] Replace with `split(..., maxsplit=1)`.
    --> missing_maxsplit_arg.py:194:1
@@ -702,4 +702,4 @@ help: Pass `maxsplit=1` into `str.split()`
 193 | args_list = [-1]
     - "1,2,3".split(",", *args_list)[0]
 194 + "1,2,3".split(",", *args_list, maxsplit=1)[0]
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

@@ -21,7 +21,7 @@ help: Move into type-checking block
 7 | 
 8 |     def f(x: first_party.foo): ...
 9 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TC001 [*] Move application import `.foo` into a type-checking block
   --> TC001_future.py:57:19
@@ -53,4 +53,4 @@ help: Move into type-checking block
 61 | 
 62 |     def f(x: Union[foo.Ty, int]): ...
 63 |     def g(x: foo.Ty | int): ...
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

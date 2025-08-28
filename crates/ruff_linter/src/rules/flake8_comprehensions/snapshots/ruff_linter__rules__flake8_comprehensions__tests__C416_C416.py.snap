@@ -20,7 +20,7 @@ help: Rewrite using `list()`
 7 | {i for i in x}
 8 | {k: v for k, v in y}
 9 | {k: v for k, v in d.items()}
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C416 [*] Unnecessary set comprehension (rewrite using `set()`)
  --> C416.py:7:1
@@ -40,7 +40,7 @@ help: Rewrite using `set()`
 8  | {k: v for k, v in y}
 9  | {k: v for k, v in d.items()}
 10 | [(k, v) for k, v in d.items()]
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C416 [*] Unnecessary dict comprehension (rewrite using `dict()`)
   --> C416.py:8:1
@@ -61,7 +61,7 @@ help: Rewrite using `dict()`
 9  | {k: v for k, v in d.items()}
 10 | [(k, v) for k, v in d.items()]
 11 | [(k, v) for [k, v] in d.items()]
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C416 [*] Unnecessary dict comprehension (rewrite using `dict()`)
   --> C416.py:9:1
@@ -82,7 +82,7 @@ help: Rewrite using `dict()`
 10 | [(k, v) for k, v in d.items()]
 11 | [(k, v) for [k, v] in d.items()]
 12 | {k: (a, b) for k, (a, b) in d.items()}
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C416 [*] Unnecessary list comprehension (rewrite using `list()`)
   --> C416.py:10:1
@@ -103,7 +103,7 @@ help: Rewrite using `list()`
 11 | [(k, v) for [k, v] in d.items()]
 12 | {k: (a, b) for k, (a, b) in d.items()}
 13 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C416 [*] Unnecessary list comprehension (rewrite using `list()`)
   --> C416.py:11:1
@@ -123,7 +123,7 @@ help: Rewrite using `list()`
 12 | {k: (a, b) for k, (a, b) in d.items()}
 13 | 
 14 | [i for i, in z]
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C416 [*] Unnecessary list comprehension (rewrite using `list()`)
   --> C416.py:25:70
@@ -143,4 +143,4 @@ help: Rewrite using `list()`
 26 | 
 27 | zz = [[1], [2], [3]]
 28 | [(i,) for (i,) in zz]  # != list(zz)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

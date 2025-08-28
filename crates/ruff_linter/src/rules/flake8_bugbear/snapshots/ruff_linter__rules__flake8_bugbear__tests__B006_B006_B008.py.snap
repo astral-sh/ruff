@@ -17,7 +17,7 @@ help: Replace with `None`; initialize within function
 64 |     ...
 65 | 
 66 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
   --> B006_B008.py:67:30
@@ -35,7 +35,7 @@ help: Replace with `None`; initialize within function
 68 |     ...
 69 | 
 70 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
   --> B006_B008.py:73:52
@@ -55,7 +55,7 @@ help: Replace with `None`; initialize within function
 74 |         pass
 75 | 
 76 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
   --> B006_B008.py:77:31
@@ -78,7 +78,7 @@ help: Replace with `None`; initialize within function
 78 |     ...
 79 | 
 80 | def single_line_func_wrong(value = {}): ...
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 B006 Do not use mutable data structures for argument defaults
   --> B006_B008.py:82:36
@@ -106,7 +106,7 @@ help: Replace with `None`; initialize within function
 86 |     ...
 87 | 
 88 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
   --> B006_B008.py:89:20
@@ -124,7 +124,7 @@ help: Replace with `None`; initialize within function
 90 |     ...
 91 | 
 92 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
   --> B006_B008.py:93:32
@@ -142,7 +142,7 @@ help: Replace with `None`; initialize within function
 94 |     ...
 95 | 
 96 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
   --> B006_B008.py:97:26
@@ -160,7 +160,7 @@ help: Replace with `None`; initialize within function
 98  |     ...
 99  | 
 100 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
    --> B006_B008.py:102:46
@@ -179,7 +179,7 @@ help: Replace with `None`; initialize within function
 103 |     pass
 104 | 
 105 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
    --> B006_B008.py:106:46
@@ -197,7 +197,7 @@ help: Replace with `None`; initialize within function
 107 |     pass
 108 | 
 109 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
    --> B006_B008.py:110:45
@@ -215,7 +215,7 @@ help: Replace with `None`; initialize within function
 111 |     pass
 112 | 
 113 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
    --> B006_B008.py:114:33
@@ -233,7 +233,7 @@ help: Replace with `None`; initialize within function
 115 |     ...
 116 | 
 117 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
    --> B006_B008.py:239:20
@@ -253,7 +253,7 @@ help: Replace with `None`; initialize within function
 240 |     pass
 241 | 
 242 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
    --> B006_B008.py:276:27
@@ -273,7 +273,7 @@ help: Replace with `None`; initialize within function
 277 |     b: Optional[Dict[int, int]] = {},
 278 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
 279 |     d: typing_extensions.Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
    --> B006_B008.py:277:35
@@ -294,7 +294,7 @@ help: Replace with `None`; initialize within function
 278 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
 279 |     d: typing_extensions.Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
 280 | ):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
    --> B006_B008.py:278:62
@@ -315,7 +315,7 @@ help: Replace with `None`; initialize within function
 279 |     d: typing_extensions.Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
 280 | ):
 281 |     pass
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
    --> B006_B008.py:279:80
@@ -336,7 +336,7 @@ help: Replace with `None`; initialize within function
 280 | ):
 281 |     pass
 282 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
    --> B006_B008.py:284:52
@@ -354,7 +354,7 @@ help: Replace with `None`; initialize within function
 285 |     """Docstring"""
 286 | 
 287 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
    --> B006_B008.py:288:52
@@ -373,7 +373,7 @@ help: Replace with `None`; initialize within function
 289 |     """Docstring"""
 290 |     ...
 291 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
    --> B006_B008.py:293:52
@@ -391,7 +391,7 @@ help: Replace with `None`; initialize within function
 294 |     """Docstring"""; ...
 295 | 
 296 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
    --> B006_B008.py:297:52
@@ -410,7 +410,7 @@ help: Replace with `None`; initialize within function
 298 |     """Docstring"""; \
 299 |         ...
 300 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
    --> B006_B008.py:302:52
@@ -433,7 +433,7 @@ help: Replace with `None`; initialize within function
 303 |     """Docstring"""
 304 | 
 305 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 B006 Do not use mutable data structures for argument defaults
    --> B006_B008.py:308:52
@@ -459,4 +459,4 @@ help: Replace with `None`; initialize within function
     - def single_line_func_wrong(value: dict[str, str] = {}):
 313 + def single_line_func_wrong(value: dict[str, str] = None):
 314 |     """Docstring without newline"""
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

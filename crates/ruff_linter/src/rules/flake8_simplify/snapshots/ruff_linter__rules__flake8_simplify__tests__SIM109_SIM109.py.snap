@@ -16,7 +16,7 @@ help: Replace with `a in (b, c)`
 3 |     d
 4 | 
 5 | # SIM109
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM109 [*] Use `a in (b, c)` instead of multiple equality comparisons
  --> SIM109.py:6:5
@@ -35,7 +35,7 @@ help: Replace with `a in (b, c)`
 7 |     d
 8 | 
 9 | # SIM109
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM109 [*] Use `a in (b, c)` instead of multiple equality comparisons
   --> SIM109.py:10:4
@@ -54,7 +54,7 @@ help: Replace with `a in (b, c)`
 11 |     d
 12 | 
 13 | # SIM109
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM109 [*] Use `a in (b, c)` instead of multiple equality comparisons
   --> SIM109.py:14:4
@@ -73,4 +73,4 @@ help: Replace with `a in (b, c)`
 15 |     d
 16 | 
 17 | # OK
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

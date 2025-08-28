@@ -20,7 +20,7 @@ help: Assign to variable; remove `inplace` arg
 6 | 
 7 | x.y.drop(["a"], axis=1, inplace=True)
 8 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PD002 [*] `inplace=True` should be avoided; it has inconsistent behavior
  --> PD002.py:7:25
@@ -41,7 +41,7 @@ help: Assign to variable; remove `inplace` arg
 8  | 
 9  | x["y"].drop(["a"], axis=1, inplace=True)
 10 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PD002 [*] `inplace=True` should be avoided; it has inconsistent behavior
   --> PD002.py:9:28
@@ -62,7 +62,7 @@ help: Assign to variable; remove `inplace` arg
 10 | 
 11 | x.drop(
 12 |     inplace=True,
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PD002 [*] `inplace=True` should be avoided; it has inconsistent behavior
   --> PD002.py:12:5
@@ -83,7 +83,7 @@ help: Assign to variable; remove `inplace` arg
 12 |     columns=["a"],
 13 |     axis=1,
 14 | )
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PD002 [*] `inplace=True` should be avoided; it has inconsistent behavior
   --> PD002.py:19:9
@@ -105,7 +105,7 @@ help: Assign to variable; remove `inplace` arg
 19 |         columns=["a"],
 20 |         axis=1,
 21 |     )
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PD002 [*] `inplace=True` should be avoided; it has inconsistent behavior
   --> PD002.py:24:33
@@ -126,7 +126,7 @@ help: Assign to variable; remove `inplace` arg
 25 | x.drop(["a"], axis=1, inplace=True, **kwargs)
 26 | f(x.drop(["a"], axis=1, inplace=True))
 27 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PD002 `inplace=True` should be avoided; it has inconsistent behavior
   --> PD002.py:25:23
@@ -180,4 +180,4 @@ help: Assign to variable; remove `inplace` arg
 34 | 
 35 | # This method doesn't take exist in Pandas, so ignore it.
 36 | x.rotate_z(45, inplace=True)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

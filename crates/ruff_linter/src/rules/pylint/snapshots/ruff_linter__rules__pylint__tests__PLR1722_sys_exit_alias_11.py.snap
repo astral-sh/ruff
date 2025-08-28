@@ -15,4 +15,4 @@ help: Replace `exit` with `sys.exit()`
 3 | 
   - exit(0)
 4 + sys.exit(0)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

@@ -14,7 +14,7 @@ help: Replace with `False`
 2 |     pass
 3 | 
 4 | if (a and not a) and b:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM220 [*] Use `False` instead of `a and not a`
  --> SIM220.py:4:5
@@ -34,7 +34,7 @@ help: Replace with `False`
 5 |     pass
 6 | 
 7 | if (a and not a) or b:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM220 [*] Use `False` instead of `a and not a`
  --> SIM220.py:7:5
@@ -54,4 +54,4 @@ help: Replace with `False`
 8  |     pass
 9  | 
 10 | if a:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

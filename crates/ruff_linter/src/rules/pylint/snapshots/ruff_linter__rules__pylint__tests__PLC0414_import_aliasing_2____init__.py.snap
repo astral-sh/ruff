@@ -15,4 +15,4 @@ help: Remove import alias
 2 | from collections import OrderedDict as OrderedDict
 3 | from . import foo as foo
 4 | from .foo import bar as bar
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

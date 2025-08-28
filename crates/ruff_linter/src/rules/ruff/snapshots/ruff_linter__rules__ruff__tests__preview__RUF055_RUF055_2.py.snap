@@ -132,7 +132,7 @@ help: Replace with `s != "a really really really really long string"`
 34 | ):
 35 |     pass
 36 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF055 [*] Plain string pattern passed to `re` function
   --> RUF055_2.py:46:5

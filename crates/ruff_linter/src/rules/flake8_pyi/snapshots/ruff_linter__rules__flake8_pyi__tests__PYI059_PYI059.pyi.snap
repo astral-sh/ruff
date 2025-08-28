@@ -20,7 +20,7 @@ help: Move `Generic[]` to the end
 9  |     def __init__(self) -> None: ...
 10 |     def push(self, item: T) -> None: ...
 11 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PYI059 [*] `Generic[]` should always be the last base class
   --> PYI059.pyi:12:16
@@ -47,7 +47,7 @@ help: Move `Generic[]` to the end
 15 | ):
 16 |     ...
 17 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PYI059 [*] `Generic[]` should always be the last base class
   --> PYI059.pyi:22:10
@@ -66,7 +66,7 @@ help: Move `Generic[]` to the end
 23 | 
 24 | 
 25 | class Foo(  # comment about the bracket
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PYI059 [*] `Generic[]` should always be the last base class
   --> PYI059.pyi:25:10
@@ -101,7 +101,7 @@ help: Move `Generic[]` to the end
 32 |     # yet another comment?
 33 | ):  # and another one for good measure
 34 |     ...
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PYI059 `Generic[]` should always be the last base class
   --> PYI059.pyi:40:8

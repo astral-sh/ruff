@@ -18,7 +18,7 @@ help: Rename `this` to `self`
 8  |         pass
 9  | 
 10 |     def stillBad(this):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 N805 [*] First argument of a method should be named `self`
   --> N805.py:10:18
@@ -38,7 +38,7 @@ help: Rename `this` to `self`
 11 |         pass
 12 | 
 13 |     if False:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 N805 [*] First argument of a method should be named `self`
   --> N805.py:15:24
@@ -58,7 +58,7 @@ help: Rename `this` to `self`
 16 |             pass
 17 | 
 18 |         def stillBad(this):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 N805 [*] First argument of a method should be named `self`
   --> N805.py:18:22
@@ -78,7 +78,7 @@ help: Rename `this` to `self`
 19 |             pass
 20 | 
 21 |     @pydantic.validator
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 N805 [*] First argument of a method should be named `self`
   --> N805.py:22:20
@@ -97,7 +97,7 @@ help: Rename `cls` to `self`
 23 |         pass
 24 | 
 25 |     @pydantic.validator
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 N805 [*] First argument of a method should be named `self`
   --> N805.py:26:18
@@ -116,7 +116,7 @@ help: Rename `cls` to `self`
 27 |         pass
 28 | 
 29 |     @pydantic.validator("my_field")
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 N805 [*] First argument of a method should be named `self`
   --> N805.py:30:20
@@ -135,7 +135,7 @@ help: Rename `cls` to `self`
 31 |         pass
 32 | 
 33 |     @pydantic.validator("my_field")
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 N805 [*] First argument of a method should be named `self`
   --> N805.py:34:18
@@ -154,7 +154,7 @@ help: Rename `cls` to `self`
 35 |         pass
 36 | 
 37 |     @classmethod
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 N805 First argument of a method should be named `self`
   --> N805.py:55:20

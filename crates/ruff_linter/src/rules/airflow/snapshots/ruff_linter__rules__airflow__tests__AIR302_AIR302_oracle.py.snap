@@ -16,4 +16,4 @@ help: Install `apache-airflow-providers-oracle>=1.0.0` and use `OracleHook` from
 3 + from airflow.providers.oracle.hooks.oracle import OracleHook
 4 | 
 5 | OracleHook()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

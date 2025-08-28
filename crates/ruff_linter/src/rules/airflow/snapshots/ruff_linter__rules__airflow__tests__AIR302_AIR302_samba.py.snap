@@ -16,4 +16,4 @@ help: Install `apache-airflow-providers-samba>=1.0.0` and use `SambaHook` from `
 3 + from airflow.providers.samba.hooks.samba import SambaHook
 4 | 
 5 | SambaHook()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

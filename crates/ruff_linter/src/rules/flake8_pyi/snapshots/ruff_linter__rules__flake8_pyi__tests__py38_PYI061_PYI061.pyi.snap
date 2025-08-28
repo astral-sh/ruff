@@ -120,7 +120,7 @@ help: Replace with `Literal[...] | None`
 20 | 
 21 | 
 22 | def func7(arg1: Literal[
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PYI061 [*] Use `None` rather than `Literal[None]`
   --> PYI061.pyi:27:5
@@ -141,7 +141,7 @@ help: Replace with `None`
 27 | 
 28 | 
 29 | def func8(arg1: Literal[None] | None):...
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PYI061 Use `None` rather than `Literal[None]`
   --> PYI061.pyi:31:25

@@ -19,7 +19,7 @@ help: Remove outdated version block
 5 | 
 6 | 
 7 | if True:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP036 [*] Version block is outdated for minimum Python version
   --> UP036_4.py:11:10
@@ -40,7 +40,7 @@ help: Remove outdated version block
 12 | 
 13 | if True:
 14 |     if foo:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP036 [*] Version block is outdated for minimum Python version
   --> UP036_4.py:17:10
@@ -61,7 +61,7 @@ help: Remove outdated version block
 17 |     elif foo:
 18 |         cmd = [sys.executable, "-m", "test", "-j0"]
 19 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP036 [*] Version block is outdated for minimum Python version
   --> UP036_4.py:24:10
@@ -82,7 +82,7 @@ help: Remove outdated version block
 25 | 
 26 |     if sys.version_info < (3, 3):
 27 |         cmd = [sys.executable, "-m", "test.regrtest"]
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP036 [*] Version block is outdated for minimum Python version
   --> UP036_4.py:27:8
@@ -102,7 +102,7 @@ help: Remove outdated version block
 27 | 
 28 |     if foo:
 29 |         print()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP036 [*] Version block is outdated for minimum Python version
   --> UP036_4.py:32:10
@@ -123,7 +123,7 @@ help: Remove outdated version block
 32 |     else:
 33 |         cmd = [sys.executable, "-m", "test", "-j0"]
 34 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP036 [*] Version block is outdated for minimum Python version
   --> UP036_4.py:37:8
@@ -147,7 +147,7 @@ help: Remove outdated version block
 38 | 
 39 |     if sys.version_info < (3, 3):
 40 |         cmd = [sys.executable, "-m", "test.regrtest"]
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP036 [*] Version block is outdated for minimum Python version
   --> UP036_4.py:42:8
@@ -168,4 +168,4 @@ help: Remove outdated version block
    -     elif foo:
 42 +     if foo:
 43 |         cmd = [sys.executable, "-m", "test", "-j0"]
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

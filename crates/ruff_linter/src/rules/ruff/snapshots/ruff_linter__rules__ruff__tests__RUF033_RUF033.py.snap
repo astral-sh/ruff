@@ -39,7 +39,7 @@ help: Use `dataclasses.InitVar` instead
 27 | 
 28 | 
 29 | # OK
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF033 [*] `__post_init__` method with argument defaults
   --> RUF033.py:25:45
@@ -59,7 +59,7 @@ help: Use `dataclasses.InitVar` instead
 27 | 
 28 | 
 29 | # OK
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF033 [*] `__post_init__` method with argument defaults
   --> RUF033.py:46:40
@@ -79,7 +79,7 @@ help: Use `dataclasses.InitVar` instead
 48 | 
 49 | 
 50 | # RUF033
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF033 [*] `__post_init__` method with argument defaults
   --> RUF033.py:46:78
@@ -99,7 +99,7 @@ help: Use `dataclasses.InitVar` instead
 48 | 
 49 | 
 50 | # RUF033
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF033 [*] `__post_init__` method with argument defaults
   --> RUF033.py:59:40
@@ -119,7 +119,7 @@ help: Use `dataclasses.InitVar` instead
 61 | 
 62 | 
 63 | # RUF033
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF033 [*] `__post_init__` method with argument defaults
   --> RUF033.py:59:55
@@ -139,7 +139,7 @@ help: Use `dataclasses.InitVar` instead
 61 | 
 62 | 
 63 | # RUF033
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF033 `__post_init__` method with argument defaults
   --> RUF033.py:67:40
@@ -180,7 +180,7 @@ help: Use `dataclasses.InitVar` instead
 75 |         pass
 76 | 
 77 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF033 [*] `__post_init__` method with argument defaults
   --> RUF033.py:81:21
@@ -204,7 +204,7 @@ help: Use `dataclasses.InitVar` instead
 83 |         ,
 84 |         baz: int = (y := 2),  # comment
 85 |         foo = (a := 1)  #  comment
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF033 [*] `__post_init__` method with argument defaults
   --> RUF033.py:83:21
@@ -230,7 +230,7 @@ help: Use `dataclasses.InitVar` instead
 85 |         foo = (a := 1)  #  comment
 86 |         ,
 87 |         faz = (b := 2),  # comment
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF033 [*] `__post_init__` method with argument defaults
   --> RUF033.py:84:16
@@ -257,7 +257,7 @@ help: Use `dataclasses.InitVar` instead
 86 |         ,
 87 |         faz = (b := 2),  # comment
 88 |     ) -> None:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF033 [*] `__post_init__` method with argument defaults
   --> RUF033.py:86:16
@@ -286,7 +286,7 @@ help: Use `dataclasses.InitVar` instead
 88 |     ) -> None:
 89 |         pass
 90 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF033 [*] `__post_init__` method with argument defaults
   --> RUF033.py:95:20
@@ -310,7 +310,7 @@ help: Use `dataclasses.InitVar` instead
 97 |         baz: int = 2,  # comment
 98 |     ) -> None:
 99 |         pass
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF033 [*] `__post_init__` method with argument defaults
   --> RUF033.py:96:20
@@ -335,7 +335,7 @@ help: Use `dataclasses.InitVar` instead
 98  |     ) -> None:
 99  |         pass
 100 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF033 [*] `__post_init__` method with argument defaults
    --> RUF033.py:105:22
@@ -359,7 +359,7 @@ help: Use `dataclasses.InitVar` instead
 107 |         ,
 108 |         arg2: int = ((1))  # comment
 109 |         ,
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF033 [*] `__post_init__` method with argument defaults
    --> RUF033.py:107:23
@@ -385,7 +385,7 @@ help: Use `dataclasses.InitVar` instead
 109 |         ,
 110 |         arg2: int = (i for i in range(10))  # comment
 111 |         ,
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF033 [*] `__post_init__` method with argument defaults
    --> RUF033.py:109:21
@@ -413,7 +413,7 @@ help: Use `dataclasses.InitVar` instead
 111 |         ,
 112 |     ) -> None:
 113 |         pass
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF033 [*] `__post_init__` method with argument defaults
    --> RUF033.py:121:27
@@ -437,7 +437,7 @@ help: Use `dataclasses.InitVar` instead
 123 |             ,
 124 |         ) -> None:
 125 |             ...
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF033 [*] `__post_init__` method with argument defaults
    --> RUF033.py:131:50
@@ -466,7 +466,7 @@ help: Use `dataclasses.InitVar` instead
 136 |         self.x = x
 137 | 
 138 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF033 [*] `__post_init__` method with argument defaults
    --> RUF033.py:140:38
@@ -489,4 +489,4 @@ help: Use `dataclasses.InitVar` instead
 141 +     """
 142 +     def __post_init__(self, x: int) -> None:
 143 |         self.x = x
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

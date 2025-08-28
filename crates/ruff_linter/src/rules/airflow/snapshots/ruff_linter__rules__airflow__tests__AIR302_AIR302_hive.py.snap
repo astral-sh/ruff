@@ -27,7 +27,7 @@ help: Install `apache-airflow-providers-apache-hive>=1.0.0` and use `HIVE_QUEUE_
 17 | 
 18 | HIVE_QUEUE_PRIORITIES
 19 | HiveCliHook()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.hooks.hive_hooks.HiveCliHook` is moved into `apache-hive` provider in Airflow 3.0;
   --> AIR302_hive.py:19:1
@@ -54,7 +54,7 @@ help: Install `apache-airflow-providers-apache-hive>=1.0.0` and use `HiveCliHook
 17 | 
 18 | HIVE_QUEUE_PRIORITIES
 19 | HiveCliHook()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.hooks.hive_hooks.HiveMetastoreHook` is moved into `apache-hive` provider in Airflow 3.0;
   --> AIR302_hive.py:20:1
@@ -81,7 +81,7 @@ help: Install `apache-airflow-providers-apache-hive>=1.0.0` and use `HiveMetasto
 17 | 
 18 | HIVE_QUEUE_PRIORITIES
 19 | HiveCliHook()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.hooks.hive_hooks.HiveServer2Hook` is moved into `apache-hive` provider in Airflow 3.0;
   --> AIR302_hive.py:21:1
@@ -109,7 +109,7 @@ help: Install `apache-airflow-providers-apache-hive>=1.0.0` and use `HiveServer2
 17 | 
 18 | HIVE_QUEUE_PRIORITIES
 19 | HiveCliHook()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.macros.hive.closest_ds_partition` is moved into `apache-hive` provider in Airflow 3.0;
   --> AIR302_hive.py:23:1
@@ -135,7 +135,7 @@ help: Install `apache-airflow-providers-apache-hive>=5.1.0` and use `closest_ds_
 17 | 
 18 | HIVE_QUEUE_PRIORITIES
 19 | HiveCliHook()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.macros.hive.max_partition` is moved into `apache-hive` provider in Airflow 3.0;
   --> AIR302_hive.py:24:1
@@ -160,7 +160,7 @@ help: Install `apache-airflow-providers-apache-hive>=5.1.0` and use `max_partiti
 17 | 
 18 | HIVE_QUEUE_PRIORITIES
 19 | HiveCliHook()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.hive_operator.HiveOperator` is moved into `apache-hive` provider in Airflow 3.0;
   --> AIR302_hive.py:26:1
@@ -184,7 +184,7 @@ help: Install `apache-airflow-providers-apache-hive>=1.0.0` and use `HiveOperato
 17 | 
 18 | HIVE_QUEUE_PRIORITIES
 19 | HiveCliHook()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.hive_stats_operator.HiveStatsCollectionOperator` is moved into `apache-hive` provider in Airflow 3.0;
   --> AIR302_hive.py:27:1
@@ -206,7 +206,7 @@ help: Install `apache-airflow-providers-apache-hive>=1.0.0` and use `HiveStatsCo
 17 | 
 18 | HIVE_QUEUE_PRIORITIES
 19 | HiveCliHook()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.hive_to_mysql.HiveToMySqlOperator` is moved into `apache-hive` provider in Airflow 3.0;
   --> AIR302_hive.py:28:1
@@ -227,7 +227,7 @@ help: Install `apache-airflow-providers-apache-hive>=1.0.0` and use `HiveToMySql
 17 | 
 18 | HIVE_QUEUE_PRIORITIES
 19 | HiveCliHook()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.hive_to_samba_operator.HiveToSambaOperator` is moved into `apache-hive` provider in Airflow 3.0;
   --> AIR302_hive.py:29:1
@@ -246,7 +246,7 @@ help: Install `apache-airflow-providers-apache-hive>=1.0.0` and use `HiveToSamba
 17 | 
 18 | HIVE_QUEUE_PRIORITIES
 19 | HiveCliHook()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.hive_to_mysql.HiveToMySqlTransfer` is moved into `apache-hive` provider in Airflow 3.0;
   --> AIR302_hive.py:34:1
@@ -266,7 +266,7 @@ help: Install `apache-airflow-providers-apache-hive>=1.0.0` and use `HiveToMySql
 34 | 
 35 | HiveToMySqlTransfer()
 36 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.mysql_to_hive.MySqlToHiveOperator` is moved into `apache-hive` provider in Airflow 3.0;
   --> AIR302_hive.py:38:1
@@ -287,7 +287,7 @@ help: Install `apache-airflow-providers-apache-hive>=1.0.0` and use `MySqlToHive
 37 | 
 38 | MySqlToHiveOperator()
 39 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.mysql_to_hive.MySqlToHiveTransfer` is moved into `apache-hive` provider in Airflow 3.0;
   --> AIR302_hive.py:42:1
@@ -307,7 +307,7 @@ help: Install `apache-airflow-providers-apache-hive>=1.0.0` and use `MySqlToHive
 42 | 
 43 | MySqlToHiveTransfer()
 44 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.mssql_to_hive.MsSqlToHiveOperator` is moved into `apache-hive` provider in Airflow 3.0;
   --> AIR302_hive.py:46:1
@@ -328,7 +328,7 @@ help: Install `apache-airflow-providers-apache-hive>=1.0.0` and use `MsSqlToHive
 45 | 
 46 | MsSqlToHiveOperator()
 47 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.mssql_to_hive.MsSqlToHiveTransfer` is moved into `apache-hive` provider in Airflow 3.0;
   --> AIR302_hive.py:50:1
@@ -348,7 +348,7 @@ help: Install `apache-airflow-providers-apache-hive>=1.0.0` and use `MsSqlToHive
 50 | 
 51 | MsSqlToHiveTransfer()
 52 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.s3_to_hive_operator.S3ToHiveOperator` is moved into `apache-hive` provider in Airflow 3.0;
   --> AIR302_hive.py:54:1
@@ -369,7 +369,7 @@ help: Install `apache-airflow-providers-apache-hive>=1.0.0` and use `S3ToHiveOpe
 53 | 
 54 | S3ToHiveOperator()
 55 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.s3_to_hive_operator.S3ToHiveTransfer` is moved into `apache-hive` provider in Airflow 3.0;
   --> AIR302_hive.py:58:1
@@ -389,7 +389,7 @@ help: Install `apache-airflow-providers-apache-hive>=1.0.0` and use `S3ToHiveOpe
 58 | 
 59 | S3ToHiveTransfer()
 60 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.sensors.hive_partition_sensor.HivePartitionSensor` is moved into `apache-hive` provider in Airflow 3.0;
   --> AIR302_hive.py:62:1
@@ -410,7 +410,7 @@ help: Install `apache-airflow-providers-apache-hive>=1.0.0` and use `HivePartiti
 61 | 
 62 | HivePartitionSensor()
 63 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.sensors.metastore_partition_sensor.MetastorePartitionSensor` is moved into `apache-hive` provider in Airflow 3.0;
   --> AIR302_hive.py:66:1
@@ -431,7 +431,7 @@ help: Install `apache-airflow-providers-apache-hive>=1.0.0` and use `MetastorePa
 65 | 
 66 | MetastorePartitionSensor()
 67 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.sensors.named_hive_partition_sensor.NamedHivePartitionSensor` is moved into `apache-hive` provider in Airflow 3.0;
   --> AIR302_hive.py:70:1
@@ -449,4 +449,4 @@ help: Install `apache-airflow-providers-apache-hive>=1.0.0` and use `NamedHivePa
 68 + from airflow.providers.apache.hive.sensors.named_hive_partition import NamedHivePartitionSensor
 69 | 
 70 | NamedHivePartitionSensor()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

@@ -19,7 +19,7 @@ help: Quote references
 60 |         ...
 61 | 
 62 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TC004 [*] Move import `pandas.DataFrame` out of type-checking block. Import is used for more than type hinting.
    --> quote.py:110:28
@@ -43,4 +43,4 @@ help: Move out of type-checking block
 111 +         pass
 112 | 
 113 |     x: TypeAlias = DataFrame | None
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

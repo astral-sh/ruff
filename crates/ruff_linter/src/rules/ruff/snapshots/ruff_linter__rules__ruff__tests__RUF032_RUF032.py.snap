@@ -20,7 +20,7 @@ help: Replace with string literal
 7 | 
 8 | decimal.Decimal("0.0")
 9 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF032 [*] `Decimal()` called with float literal argument
   --> RUF032.py:12:17
@@ -41,7 +41,7 @@ help: Replace with string literal
 13 | 
 14 | decimal.Decimal("10.0")
 15 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF032 [*] `Decimal()` called with float literal argument
   --> RUF032.py:18:17
@@ -62,7 +62,7 @@ help: Replace with string literal
 19 | 
 20 | decimal.Decimal("-10.0")
 21 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF032 [*] `Decimal()` called with float literal argument
   --> RUF032.py:33:15
@@ -83,7 +83,7 @@ help: Replace with string literal
 34 | 
 35 | val = Decimal("0.0")
 36 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF032 [*] `Decimal()` called with float literal argument
   --> RUF032.py:39:15
@@ -104,7 +104,7 @@ help: Replace with string literal
 40 | 
 41 | val = Decimal("10.0")
 42 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF032 [*] `Decimal()` called with float literal argument
   --> RUF032.py:45:15
@@ -125,7 +125,7 @@ help: Replace with string literal
 46 | 
 47 | val = Decimal("-10.0")
 48 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF032 [*] `Decimal()` called with float literal argument
   --> RUF032.py:56:15
@@ -146,7 +146,7 @@ help: Replace with string literal
 57 | 
 58 | val = Decimal(-+--++--4.0) # Suggest `Decimal("-4.0")` 
 59 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF032 [*] `Decimal()` called with float literal argument
   --> RUF032.py:58:15
@@ -165,7 +165,7 @@ help: Replace with string literal
 59 | 
 60 | 
 61 | # Tests with shadowed name
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF032 [*] `Decimal()` called with float literal argument
   --> RUF032.py:88:23
@@ -186,7 +186,7 @@ help: Replace with string literal
 89 | 
 90 | val = decimal.Decimal("0.0")
 91 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF032 [*] `Decimal()` called with float literal argument
   --> RUF032.py:92:23
@@ -207,7 +207,7 @@ help: Replace with string literal
 93 | 
 94 | val = decimal.Decimal("10.0")
 95 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF032 [*] `Decimal()` called with float literal argument
   --> RUF032.py:96:23
@@ -228,4 +228,4 @@ help: Replace with string literal
 97 | 
 98 | val = decimal.Decimal("-10.0")
 99 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

@@ -264,4 +264,4 @@ help: Replace with `trio.lowlevel.checkpoint()`
     -     )
 175 +     trio.lowlevel.checkpoint()
 176 |     )
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

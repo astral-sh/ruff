@@ -18,4 +18,4 @@ help: Replace with `list`
 35 |     y = List[int]()
 36 |     y.append(x)
 37 |     return y
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

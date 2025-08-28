@@ -26,7 +26,7 @@ help: Replace with `contextlib.suppress(ValueError)`
 9  | 
 10 | 
 11 | # SIM105
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM105 [*] Use `contextlib.suppress(ValueError, OSError)` instead of `try`-`except`-`pass`
   --> SIM105_0.py:13:1
@@ -57,7 +57,7 @@ help: Replace with `contextlib.suppress(ValueError, OSError)`
 16 | 
 17 | # SIM105
 18 | try:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM105 [*] Use `contextlib.suppress(ValueError, OSError)` instead of `try`-`except`-`pass`
   --> SIM105_0.py:19:1
@@ -88,7 +88,7 @@ help: Replace with `contextlib.suppress(ValueError, OSError)`
 22 | 
 23 | # SIM105
 24 | try:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM105 [*] Use `contextlib.suppress(BaseException)` instead of `try`-`except`-`pass`
   --> SIM105_0.py:25:1
@@ -120,7 +120,7 @@ help: Replace with `contextlib.suppress(BaseException)`
 29 | 
 30 | # SIM105
 31 | try:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM105 [*] Use `contextlib.suppress(a.Error, b.Error)` instead of `try`-`except`-`pass`
   --> SIM105_0.py:31:1
@@ -151,7 +151,7 @@ help: Replace with `contextlib.suppress(a.Error, b.Error)`
 34 | 
 35 | # OK
 36 | try:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM105 [*] Use `contextlib.suppress(ValueError)` instead of `try`-`except`-`pass`
   --> SIM105_0.py:85:5
@@ -181,7 +181,7 @@ help: Replace with `contextlib.suppress(ValueError)`
 88 | 
 89 | 
 90 | def with_ellipsis_and_return():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM105 Use `contextlib.suppress(ValueError, OSError)` instead of `try`-`except`-`pass`
    --> SIM105_0.py:100:5
@@ -227,7 +227,7 @@ help: Replace with `contextlib.suppress(OSError)`
 120 | 
 121 |     try: os.makedirs(model_dir);
 122 |     except OSError:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM105 [*] Use `contextlib.suppress(OSError)` instead of `try`-`except`-`pass`
    --> SIM105_0.py:122:5
@@ -257,7 +257,7 @@ help: Replace with `contextlib.suppress(OSError)`
 124 | 
 125 |     try: os.makedirs(model_dir);
 126 |     except OSError:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM105 [*] Use `contextlib.suppress(OSError)` instead of `try`-`except`-`pass`
    --> SIM105_0.py:126:5
@@ -287,7 +287,7 @@ help: Replace with `contextlib.suppress(OSError)`
 128 |             \
 129 |             #
 130 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM105 [*] Use `contextlib.suppress()` instead of `try`-`except`-`pass`
    --> SIM105_0.py:133:1
@@ -316,7 +316,7 @@ help: Replace with `contextlib.suppress()`
 136 | 
 137 | 
 138 | BaseException = ValueError
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM105 [*] Use `contextlib.suppress(BaseException)` instead of `try`-`except`-`pass`
    --> SIM105_0.py:140:1
@@ -342,4 +342,4 @@ help: Replace with `contextlib.suppress(BaseException)`
 142 |     int("a")
     - except BaseException:
     -     pass
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

@@ -233,7 +233,7 @@ impl std::fmt::Display for Diff<'_> {
                     "{note}: {msg}",
                     note = fmt_styled("note", self.stylesheet.warning),
                     msg = fmt_styled(
-                        "This is an unsafe fix and may remove comments or change runtime behavior",
+                        "This is an unsafe fix and may change runtime behavior",
                         self.stylesheet.emphasis
                     )
                 )?;
@@ -741,7 +741,7 @@ print()
         3 |     print()
           -     x = 1
         4 | 
-        note: This is an unsafe fix and may remove comments or change runtime behavior
+        note: This is an unsafe fix and may change runtime behavior
         ");
     }
 
@@ -783,7 +783,7 @@ print()
         3 |     print()
           -     x = 1
         4 | 
-        note: This is an unsafe fix and may remove comments or change runtime behavior
+        note: This is an unsafe fix and may change runtime behavior
         ");
     }
 
@@ -955,7 +955,7 @@ line 10
         8  | line 8
         9  | line 9
         10 | line 10
-        note: This is an unsafe fix and may remove comments or change runtime behavior
+        note: This is an unsafe fix and may change runtime behavior
         ");
     }
 }

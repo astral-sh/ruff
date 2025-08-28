@@ -23,4 +23,4 @@ help: Move into type-checking block
 8  |     from types import TracebackType
 9  | 
 10 | def foo(tb: TracebackType) -> pathlib.Path: ...
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

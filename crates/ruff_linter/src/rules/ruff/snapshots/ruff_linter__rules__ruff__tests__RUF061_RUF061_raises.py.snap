@@ -18,7 +18,7 @@ help: Use `pytest.raises()` as a context-manager
 21 | 
 22 | 
 23 | def test_error_match():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF061 [*] Use context-manager form of `pytest.raises()`
   --> RUF061_raises.py:23:5
@@ -37,7 +37,7 @@ help: Use `pytest.raises()` as a context-manager
 25 | 
 26 | 
 27 | def test_error_assign():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF061 [*] Use context-manager form of `pytest.raises()`
   --> RUF061_raises.py:27:15
@@ -56,7 +56,7 @@ help: Use `pytest.raises()` as a context-manager
 29 | 
 30 | 
 31 | def test_error_kwargs():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF061 [*] Use context-manager form of `pytest.raises()`
   --> RUF061_raises.py:31:5
@@ -75,7 +75,7 @@ help: Use `pytest.raises()` as a context-manager
 33 | 
 34 | 
 35 | def test_error_multi_statement():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF061 [*] Use context-manager form of `pytest.raises()`
   --> RUF061_raises.py:35:15
@@ -95,7 +95,7 @@ help: Use `pytest.raises()` as a context-manager
 37 |     assert excinfo.match("^invalid literal")
 38 | 
 39 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF061 [*] Use context-manager form of `pytest.raises()`
   --> RUF061_raises.py:40:5
@@ -111,4 +111,4 @@ help: Use `pytest.raises()` as a context-manager
    -     pytest.raises(ZeroDivisionError, lambda: 1 / 0)
 40 +     with pytest.raises(ZeroDivisionError):
 41 +         (lambda: 1 / 0)()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

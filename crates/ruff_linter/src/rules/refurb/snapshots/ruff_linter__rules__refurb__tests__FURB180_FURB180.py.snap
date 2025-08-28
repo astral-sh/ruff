@@ -56,7 +56,7 @@ help: Replace with `abc.ABC`
 27 |     @abstractmethod
 28 |     def foo(self): pass
 29 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
   --> FURB180.py:31:34
@@ -74,4 +74,4 @@ help: Replace with `abc.ABC`
 32 |     pass
 33 | 
 34 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

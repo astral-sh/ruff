@@ -17,7 +17,7 @@ help: Rewrite as a set comprehension
 3 | odd_nums = set(
 4 |     2 * x + 1 for x in range(3)
 5 | )
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C401 [*] Unnecessary generator (rewrite as a set comprehension)
  --> C401.py:3:12
@@ -42,7 +42,7 @@ help: Rewrite as a set comprehension
 6 | small_nums = f"{set(a if a < 6 else 0 for a in range(3))}"
 7 | 
 8 | def f(x):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C401 [*] Unnecessary generator (rewrite as a set comprehension)
  --> C401.py:6:17
@@ -63,7 +63,7 @@ help: Rewrite as a set comprehension
 7 | 
 8 | def f(x):
 9 |     return x
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C401 [*] Unnecessary generator (rewrite as a set comprehension)
   --> C401.py:11:16
@@ -83,7 +83,7 @@ help: Rewrite as a set comprehension
 12 | print(f"Hello { set(f(a) for a in 'abc') } World")
 13 | 
 14 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C401 [*] Unnecessary generator (rewrite as a set comprehension)
   --> C401.py:12:17
@@ -101,7 +101,7 @@ help: Rewrite as a set comprehension
 13 | 
 14 | 
 15 | # Short-circuit case, combine with C416 and should produce x = set(range(3))
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C401 [*] Unnecessary generator (rewrite using `set()`)
   --> C401.py:16:5
@@ -121,7 +121,7 @@ help: Rewrite using `set()`
 17 | x = set(
 18 |     x for x in range(3)
 19 | )
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C401 [*] Unnecessary generator (rewrite using `set()`)
   --> C401.py:17:5
@@ -147,7 +147,7 @@ help: Rewrite using `set()`
 18 | print(f"Hello {set(a for a in range(3))} World")
 19 | print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
 20 | print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C401 [*] Unnecessary generator (rewrite using `set()`)
   --> C401.py:20:16
@@ -168,7 +168,7 @@ help: Rewrite using `set()`
 21 | print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
 22 | print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
 23 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C401 [*] Unnecessary generator (rewrite using `set()`)
   --> C401.py:21:10
@@ -188,7 +188,7 @@ help: Rewrite using `set()`
 22 | print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
 23 | 
 24 | # Strip parentheses from inner generators.
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C401 [*] Unnecessary generator (rewrite using `set()`)
   --> C401.py:21:34
@@ -208,7 +208,7 @@ help: Rewrite using `set()`
 22 | print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
 23 | 
 24 | # Strip parentheses from inner generators.
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C401 [*] Unnecessary generator (rewrite using `set()`)
   --> C401.py:22:11
@@ -229,7 +229,7 @@ help: Rewrite using `set()`
 23 | 
 24 | # Strip parentheses from inner generators.
 25 | set((2 * x for x in range(3)))
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C401 [*] Unnecessary generator (rewrite using `set()`)
   --> C401.py:22:35
@@ -250,7 +250,7 @@ help: Rewrite using `set()`
 23 | 
 24 | # Strip parentheses from inner generators.
 25 | set((2 * x for x in range(3)))
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C401 [*] Unnecessary generator (rewrite as a set comprehension)
   --> C401.py:25:1
@@ -270,7 +270,7 @@ help: Rewrite as a set comprehension
 26 | set(((2 * x for x in range(3))))
 27 | set((((2 * x for x in range(3)))))
 28 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C401 [*] Unnecessary generator (rewrite as a set comprehension)
   --> C401.py:26:1
@@ -290,7 +290,7 @@ help: Rewrite as a set comprehension
 27 | set((((2 * x for x in range(3)))))
 28 | 
 29 | # Account for trailing comma in fix
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C401 [*] Unnecessary generator (rewrite as a set comprehension)
   --> C401.py:27:1
@@ -311,7 +311,7 @@ help: Rewrite as a set comprehension
 28 | 
 29 | # Account for trailing comma in fix
 30 | # See https://github.com/astral-sh/ruff/issues/15852
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C401 [*] Unnecessary generator (rewrite as a set comprehension)
   --> C401.py:31:1
@@ -332,7 +332,7 @@ help: Rewrite as a set comprehension
 32 | set(
 33 |     (0 for _ in [])
 34 |     # some comments
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C401 [*] Unnecessary generator (rewrite as a set comprehension)
   --> C401.py:32:1
@@ -365,7 +365,7 @@ help: Rewrite as a set comprehension
 36 | 
 37 | # t-strings
 38 | print(t"Hello {set(f(a) for a in 'abc')} World")
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C401 [*] Unnecessary generator (rewrite as a set comprehension)
   --> C401.py:40:16
@@ -385,7 +385,7 @@ help: Rewrite as a set comprehension
 41 | print(t"Hello { set(f(a) for a in 'abc') } World")
 42 | small_nums = t"{set(a if a < 6 else 0 for a in range(3))}"
 43 | print(t"Hello {set(a for a in range(3))} World")
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C401 [*] Unnecessary generator (rewrite as a set comprehension)
   --> C401.py:41:17
@@ -406,7 +406,7 @@ help: Rewrite as a set comprehension
 42 | small_nums = t"{set(a if a < 6 else 0 for a in range(3))}"
 43 | print(t"Hello {set(a for a in range(3))} World")
 44 | print(t"{set(a for a in 'abc') - set(a for a in 'ab')}")
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C401 [*] Unnecessary generator (rewrite as a set comprehension)
   --> C401.py:42:17
@@ -427,7 +427,7 @@ help: Rewrite as a set comprehension
 43 | print(t"Hello {set(a for a in range(3))} World")
 44 | print(t"{set(a for a in 'abc') - set(a for a in 'ab')}")
 45 | print(t"{ set(a for a in 'abc') - set(a for a in 'ab') }")
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C401 [*] Unnecessary generator (rewrite using `set()`)
   --> C401.py:43:16
@@ -448,7 +448,7 @@ help: Rewrite using `set()`
 44 | print(t"{set(a for a in 'abc') - set(a for a in 'ab')}")
 45 | print(t"{ set(a for a in 'abc') - set(a for a in 'ab') }")
 46 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C401 [*] Unnecessary generator (rewrite using `set()`)
   --> C401.py:44:10
@@ -468,7 +468,7 @@ help: Rewrite using `set()`
 45 | print(t"{ set(a for a in 'abc') - set(a for a in 'ab') }")
 46 | 
 47 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C401 [*] Unnecessary generator (rewrite using `set()`)
   --> C401.py:44:34
@@ -488,7 +488,7 @@ help: Rewrite using `set()`
 45 | print(t"{ set(a for a in 'abc') - set(a for a in 'ab') }")
 46 | 
 47 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C401 [*] Unnecessary generator (rewrite using `set()`)
   --> C401.py:45:11
@@ -507,7 +507,7 @@ help: Rewrite using `set()`
 46 | 
 47 | 
 48 | # Not built-in set.
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C401 [*] Unnecessary generator (rewrite using `set()`)
   --> C401.py:45:35
@@ -526,4 +526,4 @@ help: Rewrite using `set()`
 46 | 
 47 | 
 48 | # Not built-in set.
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

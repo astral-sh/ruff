@@ -19,7 +19,7 @@ help: Add `thing_id` to function signature
 11 |     return {"query": query}
 12 | 
 13 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FAST003 [*] Parameter `isbn` appears in route path, but not in `read_thing` signature
   --> FAST003.py:14:23
@@ -38,7 +38,7 @@ help: Add `isbn` to function signature
 16 |     ...
 17 | 
 18 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing` signature
   --> FAST003.py:19:19
@@ -57,7 +57,7 @@ help: Add `thing_id` to function signature
 21 |     return {"query": query}
 22 | 
 23 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing` signature
   --> FAST003.py:24:19
@@ -76,7 +76,7 @@ help: Add `thing_id` to function signature
 26 |     return {"query": query}
 27 | 
 28 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FAST003 [*] Parameter `title` appears in route path, but not in `read_thing` signature
   --> FAST003.py:29:27
@@ -95,7 +95,7 @@ help: Add `title` to function signature
 31 |     return {"author": author}
 32 | 
 33 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FAST003 [*] Parameter `author_name` appears in route path, but not in `read_thing` signature
   --> FAST003.py:34:18
@@ -114,7 +114,7 @@ help: Add `author_name` to function signature
 36 |     ...
 37 | 
 38 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FAST003 [*] Parameter `title` appears in route path, but not in `read_thing` signature
   --> FAST003.py:34:32
@@ -133,7 +133,7 @@ help: Add `title` to function signature
 36 |     ...
 37 | 
 38 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FAST003 Parameter `author` appears in route path, but only as a positional-only argument in `read_thing` signature
   --> FAST003.py:39:18
@@ -170,7 +170,7 @@ help: Add `title` to function signature
 48 | ): ...
 49 | 
 50 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FAST003 [*] Parameter `page` appears in route path, but not in `read_thing` signature
   --> FAST003.py:44:35
@@ -189,7 +189,7 @@ help: Add `page` to function signature
 48 | ): ...
 49 | 
 50 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FAST003 [*] Parameter `author` appears in route path, but not in `read_thing` signature
   --> FAST003.py:51:18
@@ -208,7 +208,7 @@ help: Add `author` to function signature
 53 |     ...
 54 | 
 55 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FAST003 [*] Parameter `title` appears in route path, but not in `read_thing` signature
   --> FAST003.py:51:27
@@ -227,7 +227,7 @@ help: Add `title` to function signature
 53 |     ...
 54 | 
 55 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FAST003 [*] Parameter `title` appears in route path, but not in `read_thing` signature
   --> FAST003.py:56:27
@@ -246,7 +246,7 @@ help: Add `title` to function signature
 58 |     ...
 59 | 
 60 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FAST003 [*] Parameter `title` appears in route path, but not in `read_thing` signature
   --> FAST003.py:61:27
@@ -265,7 +265,7 @@ help: Add `title` to function signature
 63 |     ...
 64 | 
 65 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing` signature
   --> FAST003.py:66:19
@@ -284,7 +284,7 @@ help: Add `thing_id` to function signature
 69 | ):
 70 |     return {"query": query}
 71 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing` signature
   --> FAST003.py:73:19
@@ -303,7 +303,7 @@ help: Add `thing_id` to function signature
 76 | ):
 77 |     return {"query": query}
 78 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing` signature
   --> FAST003.py:80:19
@@ -322,7 +322,7 @@ help: Add `thing_id` to function signature
 83 | ):
 84 |     return {"query": query}
 85 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FAST003 [*] Parameter `name` appears in route path, but not in `read_thing` signature
   --> FAST003.py:87:18
@@ -341,7 +341,7 @@ help: Add `name` to function signature
 89 |     return {"author": author, "title": title}
 90 | 
 91 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FAST003 [*] Parameter `thing_id` appears in route path, but not in `single` signature
    --> FAST003.py:158:19
@@ -361,7 +361,7 @@ help: Add `thing_id` to function signature
 160 | @app.get("/things/{thing_id}")
 161 | async def default(other: str = Depends(something_else)): ...
 162 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FAST003 [*] Parameter `thing_id` appears in route path, but not in `default` signature
    --> FAST003.py:160:19
@@ -381,7 +381,7 @@ help: Add `thing_id` to function signature
 162 | 
 163 | 
 164 | ### No errors
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FAST003 [*] Parameter `id` appears in route path, but not in `get_id_pydantic_full` signature
    --> FAST003.py:197:12
@@ -401,7 +401,7 @@ help: Add `id` to function signature
 200 | ): ...
 201 | @app.get("/{id}")
 202 | async def get_id_pydantic_short(params: Annotated[PydanticParams, Depends()]): ...
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FAST003 [*] Parameter `id` appears in route path, but not in `get_id_pydantic_short` signature
    --> FAST003.py:201:12
@@ -422,7 +422,7 @@ help: Add `id` to function signature
 203 | @app.get("/{id}")
 204 | async def get_id_init_not_annotated(params = Depends(InitParams)): ...
 205 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FAST003 [*] Parameter `id` appears in route path, but not in `get_id_init_not_annotated` signature
    --> FAST003.py:203:12
@@ -442,4 +442,4 @@ help: Add `id` to function signature
 205 | 
 206 | 
 207 | # No errors
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

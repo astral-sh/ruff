@@ -20,7 +20,7 @@ help: Combine `if` statements using `and`
 4 | 
 5 | # SIM102
 6 | if a:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM102 [*] Use a single `if` statement instead of nested `if` statements
   --> SIM102.py:7:1
@@ -46,7 +46,7 @@ help: Combine `if` statements using `and`
 10 | 
 11 | # SIM102
 12 | if a:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM102 [*] Use a single `if` statement instead of nested `if` statements
   --> SIM102.py:8:5
@@ -70,7 +70,7 @@ help: Combine `if` statements using `and`
 10 | 
 11 | # SIM102
 12 | if a:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM102 [*] Use a single `if` statement instead of nested `if` statements
   --> SIM102.py:15:1
@@ -94,7 +94,7 @@ help: Combine `if` statements using `and`
 17 | 
 18 | # SIM102
 19 | if a:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM102 Use a single `if` statement instead of nested `if` statements
   --> SIM102.py:20:1
@@ -132,7 +132,7 @@ help: Combine `if` statements using `and`
 29 | 
 30 | # OK
 31 | if a:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM102 [*] Use a single `if` statement instead of nested `if` statements
   --> SIM102.py:51:5
@@ -169,7 +169,7 @@ help: Combine `if` statements using `and`
 62 | "this for some reason")
 63 | 
 64 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM102 [*] Use a single `if` statement instead of nested `if` statements
   --> SIM102.py:67:1
@@ -205,7 +205,7 @@ help: Combine `if` statements using `and`
 78 | "this for some reason")
 79 | 
 80 | while x > 0:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM102 [*] Use a single `if` statement instead of nested `if` statements
   --> SIM102.py:83:5
@@ -235,7 +235,7 @@ help: Combine `if` statements using `and`
 87 | 
 88 | # SIM102 (auto-fixable)
 89 | if node.module012345678:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM102 [*] Use a single `if` statement instead of nested `if` statements
   --> SIM102.py:90:1
@@ -264,7 +264,7 @@ help: Combine `if` statements using `and`
 94 | 
 95 | # SIM102 (not auto-fixable)
 96 | if node.module0123456789:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM102 Use a single `if` statement instead of nested `if` statements
    --> SIM102.py:97:1
@@ -302,7 +302,7 @@ help: Combine `if` statements using `and`
 108 | elif d:
 109 |     print("elif")
 110 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM102 [*] Use a single `if` statement instead of nested `if` statements
    --> SIM102.py:132:5
@@ -327,7 +327,7 @@ help: Combine `if` statements using `and`
 134 | else:
 135 |     print("bar")
 136 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM102 [*] Use a single `if` statement instead of nested `if` statements
    --> SIM102.py:165:5
@@ -348,4 +348,4 @@ help: Combine `if` statements using `and`
     -             d
 165 +     elif b and c:
 166 +         d
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

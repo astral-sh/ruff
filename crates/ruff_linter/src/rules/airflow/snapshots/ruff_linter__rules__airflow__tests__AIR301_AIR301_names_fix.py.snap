@@ -327,7 +327,7 @@ help: Use `get_current_context` from `airflow.sdk` instead.
 46 | 
 47 | get_current_context()
 48 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR301 [*] `airflow.providers.mysql.datasets.mysql.sanitize_uri` is removed in Airflow 3.0
   --> AIR301_names_fix.py:52:1
@@ -348,7 +348,7 @@ help: Use `sanitize_uri` from `airflow.providers.mysql.assets.mysql` instead.
 51 | 
 52 | sanitize_uri
 53 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR301 [*] `airflow.providers.postgres.datasets.postgres.sanitize_uri` is removed in Airflow 3.0
   --> AIR301_names_fix.py:57:1
@@ -369,7 +369,7 @@ help: Use `sanitize_uri` from `airflow.providers.postgres.assets.postgres` inste
 56 | 
 57 | sanitize_uri
 58 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR301 [*] `airflow.providers.trino.datasets.trino.sanitize_uri` is removed in Airflow 3.0
   --> AIR301_names_fix.py:62:1
@@ -390,7 +390,7 @@ help: Use `sanitize_uri` from `airflow.providers.trino.assets.trino` instead.
 61 | 
 62 | sanitize_uri
 63 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR301 [*] `airflow.notifications.basenotifier.BaseNotifier` is removed in Airflow 3.0
   --> AIR301_names_fix.py:67:1
@@ -411,7 +411,7 @@ help: Use `BaseNotifier` from `airflow.sdk.bases.notifier` instead.
 66 | 
 67 | BaseNotifier()
 68 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR301 [*] `airflow.auth.managers.base_auth_manager.BaseAuthManager` is removed in Airflow 3.0
   --> AIR301_names_fix.py:72:1
@@ -430,7 +430,7 @@ help: Use `BaseAuthManager` from `airflow.api_fastapi.auth.managers.base_auth_ma
 71 | 
 72 | BaseAuthManager()
 73 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR301 [*] `airflow.configuration.get` is removed in Airflow 3.0
   --> AIR301_names_fix.py:87:1
@@ -626,7 +626,7 @@ help: Use `BaseHook` from `airflow.hooks.base` instead.
 89 | 
 90 | # airflow.hooks
 91 | BaseHook()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR301 [*] `airflow.sensors.base_sensor_operator.BaseSensorOperator` is removed in Airflow 3.0
   --> AIR301_names_fix.py:96:1
@@ -645,7 +645,7 @@ help: Use `BaseSensorOperator` from `airflow.sdk.bases.sensor` instead.
 94 | 
 95 | # airflow.sensors.base_sensor_operator
 96 | BaseSensorOperator()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR301 [*] `airflow.hooks.base_hook.BaseHook` is removed in Airflow 3.0
   --> AIR301_names_fix.py:97:1
@@ -671,7 +671,7 @@ help: Use `BaseHook` from `airflow.hooks.base` instead.
 94 | 
 95 | # airflow.sensors.base_sensor_operator
 96 | BaseSensorOperator()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR301 [*] `airflow.utils.helpers.chain` is removed in Airflow 3.0
    --> AIR301_names_fix.py:103:1
@@ -737,7 +737,7 @@ help: Use `TemporaryDirectory` from `tempfile` instead.
 108 | 
 109 | TemporaryDirectory()
 110 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR301 [*] `airflow.utils.log.secrets_masker` is removed in Airflow 3.0
    --> AIR301_names_fix.py:114:1
@@ -755,4 +755,4 @@ help: Use `secrets_masker` from `airflow.sdk.execution_time` instead.
 112 | 
 113 | #  airflow.utils.log
 114 | secrets_masker
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

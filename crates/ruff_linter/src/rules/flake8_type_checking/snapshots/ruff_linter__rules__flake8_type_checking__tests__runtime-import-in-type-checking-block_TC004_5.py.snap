@@ -18,7 +18,7 @@ help: Move out of type-checking block
 6 | 
 7 | 
 8 | def example(a: List[int], /, b: Sequence[int], *, c: Set[int]):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TC004 [*] Move import `typing.Sequence` out of type-checking block. Import is used for more than type hinting.
  --> TC004_5.py:4:30
@@ -37,7 +37,7 @@ help: Move out of type-checking block
 6 | 
 7 | 
 8 | def example(a: List[int], /, b: Sequence[int], *, c: Set[int]):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TC004 [*] Move import `typing.Set` out of type-checking block. Import is used for more than type hinting.
  --> TC004_5.py:4:40
@@ -56,4 +56,4 @@ help: Move out of type-checking block
 6 | 
 7 | 
 8 | def example(a: List[int], /, b: Sequence[int], *, c: Set[int]):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

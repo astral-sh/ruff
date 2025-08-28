@@ -22,7 +22,7 @@ help: Move into type-checking block
 9  + 
 10 | def f(x: os, y: sys):
 11 |     pass
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TC003 [*] Move standard library import `sys` into a type-checking block
  --> <filename>:6:12
@@ -45,4 +45,4 @@ help: Move into type-checking block
 9  + 
 10 | def f(x: os, y: sys):
 11 |     pass
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

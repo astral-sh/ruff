@@ -39,7 +39,7 @@ help: Replace with raw string
 7 | re.finditer("dou\ble")
 8 | re.fullmatch('''t\riple single''')
 9 | re.match("""\triple double""")
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF039 First argument to `re.finditer()` is not raw string
  --> RUF039.py:7:13
@@ -72,7 +72,7 @@ help: Replace with raw string
 9  | re.match("""\triple double""")
 10 | re.search('two', 'args')
 11 | re.split("raw", r'second')
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF039 [*] First argument to `re.match()` is not raw string
   --> RUF039.py:9:10
@@ -93,7 +93,7 @@ help: Replace with raw string
 10 | re.search('two', 'args')
 11 | re.split("raw", r'second')
 12 | re.sub(u'''nicode''', u"f(?i)rst")
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF039 [*] First argument to `re.search()` is not raw string
   --> RUF039.py:10:11
@@ -204,7 +204,7 @@ help: Replace with raw string
 17 | regex.finditer("dou\ble")
 18 | regex.fullmatch('''t\riple single''')
 19 | regex.match("""\triple double""")
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF039 First argument to `regex.finditer()` is not raw string
   --> RUF039.py:17:16
@@ -237,7 +237,7 @@ help: Replace with raw string
 19 | regex.match("""\triple double""")
 20 | regex.search('two', 'args')
 21 | regex.split("raw", r'second')
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF039 [*] First argument to `regex.match()` is not raw string
   --> RUF039.py:19:13
@@ -258,7 +258,7 @@ help: Replace with raw string
 20 | regex.search('two', 'args')
 21 | regex.split("raw", r'second')
 22 | regex.sub(u'''nicode''', u"f(?i)rst")
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF039 [*] First argument to `regex.search()` is not raw string
   --> RUF039.py:20:14
@@ -372,7 +372,7 @@ help: Replace with raw string
 60 | re.compile("\b")  # without fix
 61 | re.compile("\"")  # without fix
 62 | re.compile("\'")  # without fix
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF039 First argument to `re.compile()` is not raw string
   --> RUF039.py:60:12

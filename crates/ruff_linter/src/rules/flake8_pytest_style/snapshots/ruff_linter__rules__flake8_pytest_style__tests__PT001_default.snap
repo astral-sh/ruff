@@ -144,7 +144,7 @@ help: Remove parentheses
 82 | def my_fixture(): ...
 83 | 
 84 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
   --> PT001.py:88:1

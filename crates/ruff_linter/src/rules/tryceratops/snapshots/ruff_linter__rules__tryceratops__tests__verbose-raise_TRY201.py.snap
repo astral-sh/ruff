@@ -18,7 +18,7 @@ help: Remove exception name
 21 | 
 22 | 
 23 | def good():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TRY201 [*] Use `raise` without specifying exception name
   --> TRY201.py:63:19
@@ -37,7 +37,7 @@ help: Remove exception name
 64 | 
 65 | 
 66 | def bad_that_needs_recursion_2():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TRY201 [*] Use `raise` without specifying exception name
   --> TRY201.py:74:23
@@ -52,4 +52,4 @@ help: Remove exception name
 73 |             def foo():
    -                 raise e
 74 +                 raise
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

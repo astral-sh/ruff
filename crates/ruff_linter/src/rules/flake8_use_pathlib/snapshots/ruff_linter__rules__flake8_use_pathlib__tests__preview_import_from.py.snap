@@ -25,7 +25,7 @@ help: Replace with `Path(...).resolve()`
 11 | aa = chmod(p)
 12 | aaa = mkdir(p)
 13 | makedirs(p)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PTH101 `os.chmod()` should be replaced by `Path.chmod()`
   --> import_from.py:10:6
@@ -622,7 +622,7 @@ help: Replace with `Path(...).rename(...)`
 57 | 
 58 | rename(file, "file_2.py", src_dir_fd=None, dst_dir_fd=None)
 59 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PTH104 [*] `os.rename()` should be replaced by `Path.rename()`
   --> import_from.py:63:1

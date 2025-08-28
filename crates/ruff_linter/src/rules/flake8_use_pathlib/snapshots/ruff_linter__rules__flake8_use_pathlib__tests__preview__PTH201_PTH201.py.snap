@@ -138,7 +138,7 @@ help: Remove the current directory argument
 18 | 
 19 | Path(
 20 |     '',  # EOL comment
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PTH201 [*] Do not pass the current directory explicitly to `Path`
   --> PTH201.py:22:5
@@ -159,7 +159,7 @@ help: Remove the current directory argument
 22 | 
 23 | Path(
 24 |     ''  # Comment in the middle of implicitly concatenated string
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PTH201 [*] Do not pass the current directory explicitly to `Path`
   --> PTH201.py:26:5
@@ -182,7 +182,7 @@ help: Remove the current directory argument
 26 | 
 27 | Path(
 28 |     ''  # Comment before comma
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PTH201 [*] Do not pass the current directory explicitly to `Path`
   --> PTH201.py:31:5
@@ -205,7 +205,7 @@ help: Remove the current directory argument
 31 | 
 32 | Path(
 33 |     '',
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PTH201 [*] Do not pass the current directory explicitly to `Path`
   --> PTH201.py:36:5
@@ -246,7 +246,7 @@ help: Remove the current directory argument
 42 | 
 43 | Path(
 44 |     '',  # EOL comment
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PTH201 [*] Do not pass the current directory explicitly to `Path`
   --> PTH201.py:44:5
@@ -267,7 +267,7 @@ help: Remove the current directory argument
 46 | 
 47 | (  Path(
 48 |     ''  # Comment in the middle of implicitly concatenated string
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PTH201 [*] Do not pass the current directory explicitly to `Path`
   --> PTH201.py:48:5
@@ -294,7 +294,7 @@ help: Remove the current directory argument
 51 | )
 52 | 
 53 | Path(
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PTH201 [*] Do not pass the current directory explicitly to `Path`
   --> PTH201.py:55:5
@@ -317,7 +317,7 @@ help: Remove the current directory argument
 58 |     "frag"  # Comment
 59 |     'ment'
 60 | )
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PTH201 [*] Do not pass the current directory explicitly to `Path`
   --> PTH201.py:74:15

@@ -15,4 +15,4 @@ help: Assign to variable; remove `inplace` arg
 3 | x = pd.DataFrame()
   - x.drop(["a"], axis=1, inplace=True)
 4 + x = x.drop(["a"], axis=1)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

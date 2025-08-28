@@ -26,7 +26,7 @@ help: Install `apache-airflow-providers-standard>=0.0.1` and use `BashOperator` 
 19 | 
 20 | BashOperator()
 21 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.dagrun_operator.TriggerDagRunLink` is moved into `standard` provider in Airflow 3.0;
   --> AIR302_standard.py:22:1
@@ -53,7 +53,7 @@ help: Install `apache-airflow-providers-standard>=0.0.2` and use `TriggerDagRunL
 19 | 
 20 | BashOperator()
 21 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.dagrun_operator.TriggerDagRunOperator` is moved into `standard` provider in Airflow 3.0;
   --> AIR302_standard.py:23:1
@@ -80,7 +80,7 @@ help: Install `apache-airflow-providers-standard>=0.0.2` and use `TriggerDagRunO
 19 | 
 20 | BashOperator()
 21 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.latest_only_operator.LatestOnlyOperator` is moved into `standard` provider in Airflow 3.0;
   --> AIR302_standard.py:25:1
@@ -108,7 +108,7 @@ help: Install `apache-airflow-providers-standard>=0.0.3` and use `LatestOnlyOper
 19 | 
 20 | BashOperator()
 21 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.python_operator.BranchPythonOperator` is moved into `standard` provider in Airflow 3.0;
   --> AIR302_standard.py:27:1
@@ -136,7 +136,7 @@ help: Install `apache-airflow-providers-standard>=0.0.1` and use `BranchPythonOp
 19 | 
 20 | BashOperator()
 21 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.python_operator.PythonOperator` is moved into `standard` provider in Airflow 3.0;
   --> AIR302_standard.py:28:1
@@ -163,7 +163,7 @@ help: Install `apache-airflow-providers-standard>=0.0.1` and use `PythonOperator
 19 | 
 20 | BashOperator()
 21 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.python_operator.PythonVirtualenvOperator` is moved into `standard` provider in Airflow 3.0;
   --> AIR302_standard.py:29:1
@@ -189,7 +189,7 @@ help: Install `apache-airflow-providers-standard>=0.0.1` and use `PythonVirtuale
 19 | 
 20 | BashOperator()
 21 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.python_operator.ShortCircuitOperator` is moved into `standard` provider in Airflow 3.0;
   --> AIR302_standard.py:30:1
@@ -215,7 +215,7 @@ help: Install `apache-airflow-providers-standard>=0.0.1` and use `ShortCircuitOp
 19 | 
 20 | BashOperator()
 21 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.sensors.external_task_sensor.ExternalTaskMarker` is moved into `standard` provider in Airflow 3.0;
   --> AIR302_standard.py:32:1
@@ -237,7 +237,7 @@ help: Install `apache-airflow-providers-standard>=0.0.3` and use `ExternalTaskMa
 19 | 
 20 | BashOperator()
 21 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.sensors.external_task_sensor.ExternalTaskSensor` is moved into `standard` provider in Airflow 3.0;
   --> AIR302_standard.py:33:1
@@ -256,7 +256,7 @@ help: Install `apache-airflow-providers-standard>=0.0.3` and use `ExternalTaskSe
 19 | 
 20 | BashOperator()
 21 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.hooks.subprocess.SubprocessResult` is moved into `standard` provider in Airflow 3.0;
   --> AIR302_standard.py:38:1
@@ -277,7 +277,7 @@ help: Install `apache-airflow-providers-standard>=0.0.3` and use `SubprocessResu
 37 | 
 38 | SubprocessResult()
 39 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.hooks.subprocess.working_directory` is moved into `standard` provider in Airflow 3.0;
   --> AIR302_standard.py:42:1
@@ -298,7 +298,7 @@ help: Install `apache-airflow-providers-standard>=0.0.3` and use `working_direct
 41 | 
 42 | working_directory()
 43 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.datetime.target_times_as_dates` is moved into `standard` provider in Airflow 3.0;
   --> AIR302_standard.py:46:1
@@ -319,7 +319,7 @@ help: Install `apache-airflow-providers-standard>=0.0.1` and use `target_times_a
 45 | 
 46 | target_times_as_dates()
 47 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.trigger_dagrun.TriggerDagRunLink` is moved into `standard` provider in Airflow 3.0;
   --> AIR302_standard.py:50:1
@@ -340,7 +340,7 @@ help: Install `apache-airflow-providers-standard>=0.0.2` and use `TriggerDagRunL
 49 | 
 50 | TriggerDagRunLink()
 51 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.sensors.external_task.ExternalTaskSensorLink` is moved into `standard` provider in Airflow 3.0;
   --> AIR302_standard.py:54:1
@@ -383,7 +383,7 @@ help: Install `apache-airflow-providers-standard>=0.0.1` and use `WaitSensor` fr
 57 | 
 58 | WaitSensor()
 59 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.dummy.DummyOperator` is moved into `standard` provider in Airflow 3.0;
   --> AIR302_standard.py:62:1
@@ -426,7 +426,7 @@ help: Install `apache-airflow-providers-standard>=0.0.2` and use `EmptyOperator`
 65 | 
 66 | EmptyOperator()
 67 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.dummy_operator.DummyOperator` is moved into `standard` provider in Airflow 3.0;
   --> AIR302_standard.py:70:1
@@ -446,7 +446,7 @@ help: Install `apache-airflow-providers-standard>=0.0.2` and use `EmptyOperator`
 70 | 
 71 | DummyOperator()
 72 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.dummy_operator.EmptyOperator` is moved into `standard` provider in Airflow 3.0;
   --> AIR302_standard.py:74:1
@@ -467,7 +467,7 @@ help: Install `apache-airflow-providers-standard>=0.0.2` and use `EmptyOperator`
 73 | 
 74 | EmptyOperator()
 75 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.sensors.external_task_sensor.ExternalTaskSensorLink` is moved into `standard` provider in Airflow 3.0;
   --> AIR302_standard.py:78:1

@@ -19,4 +19,4 @@ help: Replace with `None`; initialize within function
 9  +          a = []
 10 |         print(a)
 11 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

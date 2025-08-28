@@ -15,7 +15,7 @@ help: Add `r` prefix
 3 | 
 4 | 
 5 | def double_quotes_backslash_raw():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 D301 Use `r"""` if any backslashes in a docstring
   --> D301.py:37:5
@@ -44,7 +44,7 @@ help: Add `r` prefix
 94 |     This is single quote escape \".
 95 |     """
 96 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 D301 [*] Use `r"""` if any backslashes in a docstring
    --> D301.py:99:5
@@ -63,4 +63,4 @@ help: Add `r` prefix
 99  +     r'''
 100 |     This is single quote escape \'.
 101 |     '''
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

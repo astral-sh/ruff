@@ -75,7 +75,7 @@ help: Convert to equality test
 13 |     print("Single-element string")
 14 | 
 15 | if 1 not in (1,):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB171 [*] Membership test against single-item container
   --> FURB171_0.py:15:4
@@ -140,7 +140,7 @@ help: Convert to equality test
 53 | 
 54 | _ = a in (  # Foo1
 55 |     (  # Foo2
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB171 [*] Membership test against single-item container
   --> FURB171_0.py:57:5
@@ -192,7 +192,7 @@ help: Convert to equality test
 62 | 
 63 | foo = (
 64 |     lorem()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB171 [*] Membership test against single-item container
   --> FURB171_0.py:77:28
@@ -221,7 +221,7 @@ help: Convert to equality test
 78 | )
 79 | 
 80 | foo = (
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB171 [*] Membership test against single-item container
   --> FURB171_0.py:87:28
@@ -255,7 +255,7 @@ help: Convert to equality test
 92 | )
 93 | 
 94 | foo = lorem() \
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB171 [*] Membership test against single-item container
    --> FURB171_0.py:98:24
@@ -285,7 +285,7 @@ help: Convert to equality test
 99  | 
 100 | def _():
 101 |     if foo not \
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB171 [*] Membership test against single-item container
    --> FURB171_0.py:105:8
@@ -316,7 +316,7 @@ help: Convert to inequality test
 106 | 
 107 | def _():
 108 |     if foo not \
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB171 [*] Membership test against single-item container
    --> FURB171_0.py:113:8
@@ -344,4 +344,4 @@ help: Convert to inequality test
     -     ] and \
 113 +     if foo != bar and \
 114 |         0 < 1: ...
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

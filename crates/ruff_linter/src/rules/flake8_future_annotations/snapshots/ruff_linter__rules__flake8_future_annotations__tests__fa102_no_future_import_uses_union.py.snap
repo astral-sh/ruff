@@ -13,7 +13,7 @@ help: Add `from __future__ import annotations`
 2 | def main() -> None:
 3 |     a_list: list[str] | None = []
 4 |     a_list.append("hello")
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FA102 [*] Missing `from __future__ import annotations`, but uses PEP 604 union
  --> no_future_import_uses_union.py:6:14
@@ -27,4 +27,4 @@ help: Add `from __future__ import annotations`
 2 | def main() -> None:
 3 |     a_list: list[str] | None = []
 4 |     a_list.append("hello")
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

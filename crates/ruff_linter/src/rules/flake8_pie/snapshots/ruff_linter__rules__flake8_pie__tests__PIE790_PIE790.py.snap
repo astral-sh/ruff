@@ -657,7 +657,7 @@ help: Remove unnecessary `pass`
 241 |     """
 242 |     Lorem ipsum dolor sit amet.
 243 |     """
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PIE790 [*] Unnecessary `...` literal
    --> PIE790.py:248:5
@@ -673,4 +673,4 @@ help: Remove unnecessary `...`
 247 | class PotentialDocstring2:
     -     ...
 248 |     'Lorem ipsum dolor sit amet.'
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

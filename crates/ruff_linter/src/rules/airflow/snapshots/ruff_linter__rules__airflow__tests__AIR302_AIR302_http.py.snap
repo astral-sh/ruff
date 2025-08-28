@@ -21,7 +21,7 @@ help: Install `apache-airflow-providers-http>=1.0.0` and use `HttpHook` from `ai
 6 | 
 7 | HttpHook()
 8 | SimpleHttpOperator()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.http_operator.SimpleHttpOperator` is moved into `http` provider in Airflow 3.0;
  --> AIR302_http.py:8:1
@@ -59,4 +59,4 @@ help: Install `apache-airflow-providers-http>=1.0.0` and use `HttpSensor` from `
 6 | 
 7 | HttpHook()
 8 | SimpleHttpOperator()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

@@ -155,7 +155,7 @@ help: Use `Metadata` from `airflow.sdk` instead.
 18 | 
 19 | # airflow
 20 | DatasetFromRoot()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.datasets.expand_alias_to_datasets` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
   --> AIR311_names.py:28:1
@@ -207,7 +207,7 @@ help: Use `dag` from `airflow.sdk` instead.
 18 | 
 19 | # airflow
 20 | DatasetFromRoot()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.decorators.task` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
   --> AIR311_names.py:32:1
@@ -230,7 +230,7 @@ help: Use `task` from `airflow.sdk` instead.
 18 | 
 19 | # airflow
 20 | DatasetFromRoot()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.decorators.task_group` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
   --> AIR311_names.py:33:1
@@ -252,7 +252,7 @@ help: Use `task_group` from `airflow.sdk` instead.
 18 | 
 19 | # airflow
 20 | DatasetFromRoot()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.decorators.setup` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
   --> AIR311_names.py:34:1
@@ -276,7 +276,7 @@ help: Use `setup` from `airflow.sdk` instead.
 18 | 
 19 | # airflow
 20 | DatasetFromRoot()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.decorators.teardown` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
   --> AIR311_names.py:48:1
@@ -303,7 +303,7 @@ help: Use `teardown` from `airflow.sdk` instead.
 46 | 
 47 | # airflow.decorators
 48 | teardown()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.io.path.ObjectStoragePath` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
   --> AIR311_names.py:51:1
@@ -329,7 +329,7 @@ help: Use `ObjectStoragePath` from `airflow.sdk` instead.
 46 | 
 47 | # airflow.decorators
 48 | teardown()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.io.store.attach` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
   --> AIR311_names.py:52:1
@@ -357,7 +357,7 @@ help: Use `attach` from `airflow.sdk.io` instead.
 46 | 
 47 | # airflow.decorators
 48 | teardown()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.models.Connection` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
   --> AIR311_names.py:55:1
@@ -382,7 +382,7 @@ help: Use `Connection` from `airflow.sdk` instead.
 46 | 
 47 | # airflow.decorators
 48 | teardown()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.models.DAG` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
   --> AIR311_names.py:56:1
@@ -434,7 +434,7 @@ help: Use `Variable` from `airflow.sdk` instead.
 46 | 
 47 | # airflow.decorators
 48 | teardown()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.models.baseoperator.chain` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
   --> AIR311_names.py:60:1
@@ -457,7 +457,7 @@ help: Use `chain` from `airflow.sdk` instead.
 47 | 
 48 | # airflow.decorators
 49 | teardown()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.models.baseoperator.chain_linear` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
   --> AIR311_names.py:61:1
@@ -480,7 +480,7 @@ help: Use `chain_linear` from `airflow.sdk` instead.
 47 | 
 48 | # airflow.decorators
 49 | teardown()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.models.baseoperator.cross_downstream` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
   --> AIR311_names.py:62:1
@@ -504,7 +504,7 @@ help: Use `cross_downstream` from `airflow.sdk` instead.
 47 | 
 48 | # airflow.decorators
 49 | teardown()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.models.baseoperatorlink.BaseOperatorLink` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
   --> AIR311_names.py:65:1
@@ -525,7 +525,7 @@ help: Use `BaseOperatorLink` from `airflow.sdk` instead.
 46 | 
 47 | # airflow.decorators
 48 | teardown()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.models.dag.DAG` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
   --> AIR311_names.py:68:1
@@ -594,7 +594,7 @@ help: Use `get_parsing_context` from `airflow.sdk` instead.
 71 | 
 72 | # airflow.timetables.datasets
 73 | DatasetOrTimeSchedule()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.decorators.base.DecoratedMappedOperator` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
   --> AIR311_names.py:87:1
@@ -619,7 +619,7 @@ help: Use `DecoratedMappedOperator` from `airflow.sdk.bases.decorator` instead.
 85 | 
 86 | # airflow.decorators.base
 87 | DecoratedMappedOperator()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.decorators.base.DecoratedOperator` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
   --> AIR311_names.py:88:1
@@ -644,7 +644,7 @@ help: Use `DecoratedOperator` from `airflow.sdk.bases.decorator` instead.
 85 | 
 86 | # airflow.decorators.base
 87 | DecoratedMappedOperator()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.decorators.base.TaskDecorator` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
   --> AIR311_names.py:89:1
@@ -668,7 +668,7 @@ help: Use `TaskDecorator` from `airflow.sdk.bases.decorator` instead.
 85 | 
 86 | # airflow.decorators.base
 87 | DecoratedMappedOperator()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.decorators.base.get_unique_task_id` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
   --> AIR311_names.py:90:1
@@ -690,7 +690,7 @@ help: Use `get_unique_task_id` from `airflow.sdk.bases.decorator` instead.
 85 | 
 86 | # airflow.decorators.base
 87 | DecoratedMappedOperator()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.decorators.base.task_decorator_factory` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
   --> AIR311_names.py:91:1
@@ -710,7 +710,7 @@ help: Use `task_decorator_factory` from `airflow.sdk.bases.decorator` instead.
 85 | 
 86 | # airflow.decorators.base
 87 | DecoratedMappedOperator()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.models.Param` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
   --> AIR311_names.py:97:1
@@ -728,7 +728,7 @@ help: Use `Param` from `airflow.sdk.definitions.param` instead.
 95 | 
 96 | # airflow.models
 97 | Param()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.sensors.base.BaseSensorOperator` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    --> AIR311_names.py:107:1
@@ -751,7 +751,7 @@ help: Use `BaseSensorOperator` from `airflow.sdk` instead.
 105 | 
 106 | # airflow.sensors.base
 107 | BaseSensorOperator()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.sensors.base.PokeReturnValue` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    --> AIR311_names.py:108:1
@@ -773,7 +773,7 @@ help: Use `PokeReturnValue` from `airflow.sdk` instead.
 105 | 
 106 | # airflow.sensors.base
 107 | BaseSensorOperator()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.sensors.base.poke_mode_only` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    --> AIR311_names.py:109:1
@@ -793,4 +793,4 @@ help: Use `poke_mode_only` from `airflow.sdk` instead.
 105 | 
 106 | # airflow.sensors.base
 107 | BaseSensorOperator()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

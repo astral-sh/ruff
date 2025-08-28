@@ -91,7 +91,7 @@ help: Replace with `numpy.lib.array_utils.byte_bounds` (requires NumPy 2.0 or gr
 14 | 
 15 |     np.cast
 16 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 NPY201 `np.cast` will be removed in NumPy 2.0. Use `np.asarray(arr, dtype=dtype)` instead.
   --> NPY201.py:14:5

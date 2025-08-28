@@ -19,7 +19,7 @@ help: Remove unnecessary assignment
 6 | 
 7 | 
 8 | # Can be refactored false positives
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RET504 [*] Unnecessary assignment to `formatted` before `return` statement
   --> RET504.py:23:12
@@ -39,7 +39,7 @@ help: Remove unnecessary assignment
 23 | 
 24 | 
 25 | # https://github.com/afonasev/flake8-return/issues/47#issue-641117366
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RET504 [*] Unnecessary assignment to `queryset` before `return` statement
    --> RET504.py:246:12
@@ -59,7 +59,7 @@ help: Remove unnecessary assignment
 246 | 
 247 | 
 248 | def get_queryset():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RET504 [*] Unnecessary assignment to `queryset` before `return` statement
    --> RET504.py:251:12
@@ -79,7 +79,7 @@ help: Remove unnecessary assignment
 251 | 
 252 | 
 253 | # Function arguments
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RET504 [*] Unnecessary assignment to `val` before `return` statement
    --> RET504.py:269:12
@@ -99,7 +99,7 @@ help: Remove unnecessary assignment
 269 | 
 270 | 
 271 | def str_to_bool(val):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RET504 [*] Unnecessary assignment to `x` before `return` statement
    --> RET504.py:321:12
@@ -119,7 +119,7 @@ help: Remove unnecessary assignment
 321 | 
 322 | 
 323 | def foo():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RET504 [*] Unnecessary assignment to `b` before `return` statement
    --> RET504.py:342:12
@@ -139,7 +139,7 @@ help: Remove unnecessary assignment
 342 | 
 343 | 
 344 | def foo():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RET504 [*] Unnecessary assignment to `b` before `return` statement
    --> RET504.py:348:12
@@ -159,7 +159,7 @@ help: Remove unnecessary assignment
 348 | 
 349 | 
 350 | def foo():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RET504 [*] Unnecessary assignment to `b` before `return` statement
    --> RET504.py:354:12
@@ -179,7 +179,7 @@ help: Remove unnecessary assignment
 354 | 
 355 | 
 356 | def foo():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RET504 [*] Unnecessary assignment to `a` before `return` statement
    --> RET504.py:359:12
@@ -199,7 +199,7 @@ help: Remove unnecessary assignment
 359 | 
 360 | 
 361 | # Regression test for: https://github.com/astral-sh/ruff/issues/7098
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RET504 [*] Unnecessary assignment to `D` before `return` statement
    --> RET504.py:365:12
@@ -219,7 +219,7 @@ help: Remove unnecessary assignment
 365 | 
 366 | 
 367 | # contextlib suppress in with statement
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RET504 [*] Unnecessary assignment to `y` before `return` statement
    --> RET504.py:400:12
@@ -239,7 +239,7 @@ help: Remove unnecessary assignment
 400 | 
 401 | 
 402 | def foo():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RET504 [*] Unnecessary assignment to `services` before `return` statement
    --> RET504.py:423:16
@@ -259,7 +259,7 @@ help: Remove unnecessary assignment
 423 | 
 424 | 
 425 | # See: https://github.com/astral-sh/ruff/issues/14052
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RET504 [*] Unnecessary assignment to `x` before `return` statement
    --> RET504.py:458:12
@@ -282,7 +282,7 @@ help: Remove unnecessary assignment
 457 | 
 458 | def f():
 459 |     x = (1
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RET504 [*] Unnecessary assignment to `x` before `return` statement
    --> RET504.py:463:12
@@ -300,4 +300,4 @@ help: Remove unnecessary assignment
 461 +     return (1
 462 |               )
     -     return x
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

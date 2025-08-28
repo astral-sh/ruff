@@ -23,7 +23,7 @@ help: Remove outdated version block
 5 | 
 6 | if version_info > (3, 5):
 7 |     3+6
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP036 [*] Version block is outdated for minimum Python version
   --> UP036_2.py:9:4
@@ -47,7 +47,7 @@ help: Remove outdated version block
 10 | 
 11 | if sys.version_info >= (3,6):
 12 |     3+6
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP036 [*] Version block is outdated for minimum Python version
   --> UP036_2.py:14:4
@@ -71,7 +71,7 @@ help: Remove outdated version block
 15 | 
 16 | if version_info >= (3,6):
 17 |     3+6
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP036 [*] Version block is outdated for minimum Python version
   --> UP036_2.py:19:4
@@ -95,7 +95,7 @@ help: Remove outdated version block
 20 | 
 21 | if sys.version_info < (3,6):
 22 |     3-5
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP036 [*] Version block is outdated for minimum Python version
   --> UP036_2.py:24:4
@@ -119,7 +119,7 @@ help: Remove outdated version block
 25 | 
 26 | if sys.version_info <= (3,5):
 27 |     3-5
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP036 [*] Version block is outdated for minimum Python version
   --> UP036_2.py:29:4
@@ -143,7 +143,7 @@ help: Remove outdated version block
 30 | 
 31 | if sys.version_info <= (3, 5):
 32 |     3-5
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP036 [*] Version block is outdated for minimum Python version
   --> UP036_2.py:34:4
@@ -167,7 +167,7 @@ help: Remove outdated version block
 35 | 
 36 | if sys.version_info >= (3, 5):
 37 |     pass
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP036 [*] Version block is outdated for minimum Python version
   --> UP036_2.py:39:4
@@ -188,7 +188,7 @@ help: Remove outdated version block
 40 | 
 41 | if sys.version_info < (3,0):
 42 |     pass
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP036 [*] Version block is outdated for minimum Python version
   --> UP036_2.py:42:4
@@ -208,7 +208,7 @@ help: Remove outdated version block
 42 | 
 43 | if True:
 44 |     if sys.version_info < (3,0):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP036 [*] Version block is outdated for minimum Python version
   --> UP036_2.py:46:8
@@ -228,7 +228,7 @@ help: Remove outdated version block
 47 | 
 48 | if sys.version_info < (3,0):
 49 |     pass
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP036 [*] Version block is outdated for minimum Python version
   --> UP036_2.py:49:4
@@ -251,7 +251,7 @@ help: Remove outdated version block
 50 |     pass
 51 | 
 52 | if sys.version_info > (3,):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP036 [*] Version block is outdated for minimum Python version
   --> UP036_2.py:54:4
@@ -275,4 +275,4 @@ help: Remove outdated version block
 55 | 
 56 | if sys.version_info[0] > "2":
 57 |     3
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

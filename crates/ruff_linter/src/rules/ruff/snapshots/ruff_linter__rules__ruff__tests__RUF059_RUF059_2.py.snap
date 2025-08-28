@@ -19,7 +19,7 @@ help: Prefix it with an underscore or any other dummy variable pattern
 9  |         pass
 10 | 
 11 |     with (foo() as x3, foo() as y3, foo() as z3):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `y2` is never used
  --> RUF059_2.py:8:24
@@ -39,7 +39,7 @@ help: Prefix it with an underscore or any other dummy variable pattern
 9  |         pass
 10 | 
 11 |     with (foo() as x3, foo() as y3, foo() as z3):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `x2` is never used
   --> RUF059_2.py:17:6
@@ -59,7 +59,7 @@ help: Prefix it with an underscore or any other dummy variable pattern
 18 |     coords3 = (x3, y3) = (1, 2)
 19 | 
 20 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `y2` is never used
   --> RUF059_2.py:17:10
@@ -79,7 +79,7 @@ help: Prefix it with an underscore or any other dummy variable pattern
 18 |     coords3 = (x3, y3) = (1, 2)
 19 | 
 20 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `x3` is never used
   --> RUF059_2.py:18:16
@@ -98,7 +98,7 @@ help: Prefix it with an underscore or any other dummy variable pattern
 19 | 
 20 | 
 21 | def f():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `y3` is never used
   --> RUF059_2.py:18:20
@@ -117,7 +117,7 @@ help: Prefix it with an underscore or any other dummy variable pattern
 19 | 
 20 | 
 21 | def f():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `x` is never used
   --> RUF059_2.py:22:24
@@ -136,7 +136,7 @@ help: Prefix it with an underscore or any other dummy variable pattern
 23 |         pass
 24 | 
 25 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `y` is never used
   --> RUF059_2.py:22:27
@@ -155,7 +155,7 @@ help: Prefix it with an underscore or any other dummy variable pattern
 23 |         pass
 24 | 
 25 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `a` is never used
   --> RUF059_2.py:27:17
@@ -173,7 +173,7 @@ help: Prefix it with an underscore or any other dummy variable pattern
 28 | 
 29 | 
 30 | def f():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `b` is never used
   --> RUF059_2.py:27:20
@@ -191,7 +191,7 @@ help: Prefix it with an underscore or any other dummy variable pattern
 28 | 
 29 | 
 30 | def f():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `a` is never used
   --> RUF059_2.py:31:6
@@ -206,7 +206,7 @@ help: Prefix it with an underscore or any other dummy variable pattern
 30 | def f():
    -     (a, b) = toplevel = lexer.get_token()
 31 +     (_a, b) = toplevel = lexer.get_token()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `b` is never used
   --> RUF059_2.py:31:9
@@ -221,4 +221,4 @@ help: Prefix it with an underscore or any other dummy variable pattern
 30 | def f():
    -     (a, b) = toplevel = lexer.get_token()
 31 +     (a, _b) = toplevel = lexer.get_token()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

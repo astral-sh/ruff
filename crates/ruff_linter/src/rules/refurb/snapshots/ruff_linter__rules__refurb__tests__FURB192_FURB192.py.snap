@@ -139,7 +139,7 @@ help: Replace with `min`
 18 | 
 19 | sorted(l, reverse=True)[0]
 20 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB192 [*] Prefer `max` over `sorted()` to compute the maximum value in a sequence
   --> FURB192.py:19:1
@@ -160,7 +160,7 @@ help: Replace with `max`
 20 | 
 21 | sorted(l, reverse=True)[-1]
 22 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB192 [*] Prefer `min` over `sorted()` to compute the minimum value in a sequence
   --> FURB192.py:21:1
@@ -181,4 +181,4 @@ help: Replace with `min`
 22 | 
 23 | # Non-errors
 24 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

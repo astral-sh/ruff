@@ -18,7 +18,7 @@ help: Replace with `__name__`
 12 | logging.getLogger(name=__file__)
 13 | 
 14 | logging.getLogger(__cached__)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 LOG002 [*] Use `__name__` with `logging.getLogger()`
   --> LOG002.py:12:24
@@ -39,7 +39,7 @@ help: Replace with `__name__`
 13 | 
 14 | logging.getLogger(__cached__)
 15 | getLogger(name=__cached__)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 LOG002 [*] Use `__name__` with `logging.getLogger()`
   --> LOG002.py:14:19
@@ -59,7 +59,7 @@ help: Replace with `__name__`
 15 | getLogger(name=__cached__)
 16 | 
 17 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 LOG002 [*] Use `__name__` with `logging.getLogger()`
   --> LOG002.py:15:16
@@ -77,4 +77,4 @@ help: Replace with `__name__`
 16 | 
 17 | 
 18 | # Override `logging.getLogger`
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

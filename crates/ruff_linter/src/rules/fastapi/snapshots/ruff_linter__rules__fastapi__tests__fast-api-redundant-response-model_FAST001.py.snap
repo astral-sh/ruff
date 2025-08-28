@@ -18,7 +18,7 @@ help: Remove argument
 18 | async def create_item(item: Item) -> Item:
 19 |     return item
 20 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FAST001 [*] FastAPI route with redundant `response_model` argument
   --> FAST001.py:22:22
@@ -37,7 +37,7 @@ help: Remove argument
 23 | async def create_item(item: Item) -> list[Item]:
 24 |     return item
 25 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FAST001 [*] FastAPI route with redundant `response_model` argument
   --> FAST001.py:27:22
@@ -56,7 +56,7 @@ help: Remove argument
 28 | async def create_item(item: Item) -> List[Item]:
 29 |     return item
 30 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FAST001 [*] FastAPI route with redundant `response_model` argument
   --> FAST001.py:32:22
@@ -75,7 +75,7 @@ help: Remove argument
 33 | async def create_item(item: Item) -> Dict[str, Item]:
 34 |     return item
 35 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FAST001 [*] FastAPI route with redundant `response_model` argument
   --> FAST001.py:37:22
@@ -94,7 +94,7 @@ help: Remove argument
 38 | async def create_item(item: Item) -> str:
 39 |     return item
 40 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FAST001 [*] FastAPI route with redundant `response_model` argument
   --> FAST001.py:42:21
@@ -113,7 +113,7 @@ help: Remove argument
 43 | async def create_item(item: Item) -> Item:
 44 |     return item
 45 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FAST001 [*] FastAPI route with redundant `response_model` argument
   --> FAST001.py:47:21
@@ -132,7 +132,7 @@ help: Remove argument
 48 | @app.post("/items/", response_model=Item)
 49 | async def create_item(item: Item) -> Item:
 50 |     return item
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FAST001 [*] FastAPI route with redundant `response_model` argument
   --> FAST001.py:48:22
@@ -152,7 +152,7 @@ help: Remove argument
 49 | async def create_item(item: Item) -> Item:
 50 |     return item
 51 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FAST001 [*] FastAPI route with redundant `response_model` argument
   --> FAST001.py:53:24
@@ -171,7 +171,7 @@ help: Remove argument
 54 | async def create_item(item: Item) -> Item:
 55 |     return item
 56 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FAST001 [*] FastAPI route with redundant `response_model` argument
    --> FAST001.py:118:23
@@ -192,4 +192,4 @@ help: Remove argument
 119 |     async def get_root() -> str:
 120 |         return "Hello World!"
 121 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

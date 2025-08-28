@@ -28,7 +28,7 @@ help: Move into type-checking block
 31 | 
 32 |     def test(value: A):
 33 |         return pkg.B()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `pkg.A` into a type-checking block
   --> strict.py:35:21
@@ -58,7 +58,7 @@ help: Move into type-checking block
 40 | 
 41 |     def test(value: A):
 42 |         return B()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `pkg.bar.A` into a type-checking block
   --> strict.py:54:25
@@ -87,7 +87,7 @@ help: Move into type-checking block
 58 | 
 59 |     def test(value: A):
 60 |         return pkg.B()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `pkg` into a type-checking block
   --> strict.py:62:12
@@ -115,7 +115,7 @@ help: Move into type-checking block
 66 |     import pkg.bar as B
 67 | 
 68 |     def test(value: pkg.A):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `pkg.foo` into a type-checking block
   --> strict.py:71:23
@@ -143,7 +143,7 @@ help: Move into type-checking block
 75 |     import pkg.foo.bar as B
 76 | 
 77 |     def test(value: F.Foo):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `pkg` into a type-checking block
   --> strict.py:80:12
@@ -171,7 +171,7 @@ help: Move into type-checking block
 84 |     import pkg.foo.bar as B
 85 | 
 86 |     def test(value: pkg.A):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `pkg` into a type-checking block
   --> strict.py:91:12
@@ -199,7 +199,7 @@ help: Move into type-checking block
 95 |     import pkgfoo.bar as B
 96 | 
 97 |     def test(value: pkg.A):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `pkg.foo` into a type-checking block
    --> strict.py:101:23
@@ -228,4 +228,4 @@ help: Move into type-checking block
 105 | 
 106 |     def test(value: F.Foo):
 107 |         return B.Bar()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

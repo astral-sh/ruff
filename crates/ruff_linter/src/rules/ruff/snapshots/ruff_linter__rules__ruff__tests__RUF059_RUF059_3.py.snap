@@ -18,7 +18,7 @@ help: Prefix it with an underscore or any other dummy variable pattern
 14 | 
 15 | 
 16 | def baz():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `c` is never used
   --> RUF059_3.py:13:8
@@ -37,4 +37,4 @@ help: Prefix it with an underscore or any other dummy variable pattern
 14 | 
 15 | 
 16 | def baz():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

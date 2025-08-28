@@ -18,4 +18,4 @@ help: Add `r` prefix
 334 | 
 335 | 
 336 | @expect('D301: Use r""" if any backslashes in a docstring')
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

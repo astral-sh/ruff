@@ -20,4 +20,4 @@ help: Replace with `contextlib.suppress(ValueError)`
 11 |     foo()
    - except ValueError:
    -     pass
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

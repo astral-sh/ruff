@@ -14,7 +14,7 @@ help: Merge `isinstance` calls for `a`
 2 |     pass
 3 | 
 4 | if isinstance(a, (int, float)) or isinstance(a, bool):  # SIM101
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
  --> SIM101.py:4:4
@@ -34,7 +34,7 @@ help: Merge `isinstance` calls for `a`
 5 |     pass
 6 | 
 7 | if isinstance(a, int) or isinstance(a, float) or isinstance(b, bool):  # SIM101
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
  --> SIM101.py:7:4
@@ -54,7 +54,7 @@ help: Merge `isinstance` calls for `a`
 8  |     pass
 9  | 
 10 | if isinstance(b, bool) or isinstance(a, int) or isinstance(a, float):  # SIM101
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
   --> SIM101.py:10:4
@@ -74,7 +74,7 @@ help: Merge `isinstance` calls for `a`
 11 |     pass
 12 | 
 13 | if isinstance(a, int) or isinstance(b, bool) or isinstance(a, float):  # SIM101
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
   --> SIM101.py:16:5
@@ -94,7 +94,7 @@ help: Merge `isinstance` calls for `a`
 17 |     pass
 18 | 
 19 | if isinstance(a.b, int) or isinstance(a.b, float):  # SIM101
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM101 [*] Multiple `isinstance` calls for expression, merge into a single call
   --> SIM101.py:19:4
@@ -114,7 +114,7 @@ help: Merge `isinstance` calls
 20 |     pass
 21 | 
 22 | if isinstance(a(), int) or isinstance(a(), float):  # SIM101
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM101 Multiple `isinstance` calls for expression, merge into a single call
   --> SIM101.py:22:4
@@ -145,7 +145,7 @@ help: Merge `isinstance` calls for `a`
 39 |     pass
 40 | 
 41 | if x or y or isinstance(a, int) or isinstance(a, float) or z:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
   --> SIM101.py:41:4
@@ -165,7 +165,7 @@ help: Merge `isinstance` calls for `a`
 42 |     pass
 43 | 
 44 | def f():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
   --> SIM101.py:53:3
@@ -182,4 +182,4 @@ help: Merge `isinstance` calls for `a`
    - if(isinstance(a, int)) or (isinstance(a, float)):
 53 + if isinstance(a, (int, float)):
 54 |     pass
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

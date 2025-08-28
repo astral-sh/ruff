@@ -22,7 +22,7 @@ help: Convert to `T | None`
 22 |     pass
 23 | 
 24 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF013 [*] PEP 484 prohibits implicit `Optional`
   --> RUF013_0.py:24:12
@@ -45,7 +45,7 @@ help: Convert to `T | None`
 26 |     pass
 27 | 
 28 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF013 [*] PEP 484 prohibits implicit `Optional`
   --> RUF013_0.py:28:12
@@ -68,7 +68,7 @@ help: Convert to `T | None`
 30 |     pass
 31 | 
 32 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF013 [*] PEP 484 prohibits implicit `Optional`
   --> RUF013_0.py:58:12
@@ -91,7 +91,7 @@ help: Convert to `T | None`
 60 |     pass
 61 | 
 62 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF013 [*] PEP 484 prohibits implicit `Optional`
   --> RUF013_0.py:62:12
@@ -114,7 +114,7 @@ help: Convert to `T | None`
 64 |     pass
 65 | 
 66 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF013 [*] PEP 484 prohibits implicit `Optional`
   --> RUF013_0.py:66:12
@@ -137,7 +137,7 @@ help: Convert to `T | None`
 68 |     pass
 69 | 
 70 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF013 [*] PEP 484 prohibits implicit `Optional`
   --> RUF013_0.py:85:12
@@ -160,7 +160,7 @@ help: Convert to `T | None`
 87 |     pass
 88 | 
 89 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF013 [*] PEP 484 prohibits implicit `Optional`
   --> RUF013_0.py:89:12
@@ -183,7 +183,7 @@ help: Convert to `T | None`
 91 |     pass
 92 | 
 93 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF013 [*] PEP 484 prohibits implicit `Optional`
    --> RUF013_0.py:108:12
@@ -206,7 +206,7 @@ help: Convert to `T | None`
 110 |     pass
 111 | 
 112 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF013 [*] PEP 484 prohibits implicit `Optional`
    --> RUF013_0.py:112:12
@@ -229,7 +229,7 @@ help: Convert to `T | None`
 114 |     pass
 115 | 
 116 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF013 [*] PEP 484 prohibits implicit `Optional`
    --> RUF013_0.py:131:22
@@ -252,7 +252,7 @@ help: Convert to `T | None`
 133 |     pass
 134 | 
 135 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF013 [*] PEP 484 prohibits implicit `Optional`
    --> RUF013_0.py:135:32
@@ -275,7 +275,7 @@ help: Convert to `T | None`
 137 |     pass
 138 | 
 139 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF013 [*] PEP 484 prohibits implicit `Optional`
    --> RUF013_0.py:151:11
@@ -300,7 +300,7 @@ help: Convert to `T | None`
 153 |     arg2: Union[int, float] = None,  # RUF013
 154 |     arg3: Literal[1, 2, 3] = None,  # RUF013
 155 | ):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF013 [*] PEP 484 prohibits implicit `Optional`
    --> RUF013_0.py:152:11
@@ -326,7 +326,7 @@ help: Convert to `T | None`
 154 |     arg3: Literal[1, 2, 3] = None,  # RUF013
 155 | ):
 156 |     pass
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF013 [*] PEP 484 prohibits implicit `Optional`
    --> RUF013_0.py:153:11
@@ -352,7 +352,7 @@ help: Convert to `T | None`
 155 | ):
 156 |     pass
 157 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF013 [*] PEP 484 prohibits implicit `Optional`
    --> RUF013_0.py:181:12
@@ -375,7 +375,7 @@ help: Convert to `T | None`
 183 |     pass
 184 | 
 185 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF013 [*] PEP 484 prohibits implicit `Optional`
    --> RUF013_0.py:188:13
@@ -393,7 +393,7 @@ help: Convert to `Optional[T]`
 189 |     pass
 190 | 
 191 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF013 [*] PEP 484 prohibits implicit `Optional`
    --> RUF013_0.py:192:13
@@ -411,7 +411,7 @@ help: Convert to `Optional[T]`
 193 |     pass
 194 | 
 195 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF013 PEP 484 prohibits implicit `Optional`
    --> RUF013_0.py:196:12
@@ -443,4 +443,4 @@ help: Convert to `T | None`
 206 |     pass
 207 | 
 208 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

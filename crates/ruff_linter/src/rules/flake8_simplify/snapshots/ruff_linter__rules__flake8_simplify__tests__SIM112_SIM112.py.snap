@@ -19,7 +19,7 @@ help: Replace `foo` with `FOO`
 5 | 
 6 | os.environ.get('foo')
 7 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM112 Use capitalized environment variable `FOO` instead of `foo`
  --> SIM112.py:6:16
@@ -88,7 +88,7 @@ help: Replace `foo` with `FOO`
 15 | 
 16 | if env := os.environ.get('foo'):
 17 |     pass
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM112 Use capitalized environment variable `FOO` instead of `foo`
   --> SIM112.py:16:26
@@ -119,4 +119,4 @@ help: Replace `foo` with `FOO`
 20 |     pass
 21 | 
 22 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

@@ -20,7 +20,7 @@ help: Replace with augmented assignment
 17 | index = index - 1
 18 | a_list = a_list + ["to concat"]
 19 | some_set = some_set | {"to concat"}
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `-=` to perform an augmented assignment directly
   --> non_augmented_assignment.py:17:1
@@ -40,7 +40,7 @@ help: Replace with augmented assignment
 18 | a_list = a_list + ["to concat"]
 19 | some_set = some_set | {"to concat"}
 20 | to_multiply = to_multiply * 5
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `+=` to perform an augmented assignment directly
   --> non_augmented_assignment.py:18:1
@@ -61,7 +61,7 @@ help: Replace with augmented assignment
 19 | some_set = some_set | {"to concat"}
 20 | to_multiply = to_multiply * 5
 21 | to_multiply = 5 * to_multiply
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `|=` to perform an augmented assignment directly
   --> non_augmented_assignment.py:19:1
@@ -82,7 +82,7 @@ help: Replace with augmented assignment
 20 | to_multiply = to_multiply * 5
 21 | to_multiply = 5 * to_multiply
 22 | to_multiply = to_multiply * to_multiply
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `*=` to perform an augmented assignment directly
   --> non_augmented_assignment.py:20:1
@@ -103,7 +103,7 @@ help: Replace with augmented assignment
 21 | to_multiply = 5 * to_multiply
 22 | to_multiply = to_multiply * to_multiply
 23 | to_divide = to_divide / 5
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `*=` to perform an augmented assignment directly
   --> non_augmented_assignment.py:21:1
@@ -124,7 +124,7 @@ help: Replace with augmented assignment
 22 | to_multiply = to_multiply * to_multiply
 23 | to_divide = to_divide / 5
 24 | to_divide = to_divide // 5
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `*=` to perform an augmented assignment directly
   --> non_augmented_assignment.py:22:1
@@ -145,7 +145,7 @@ help: Replace with augmented assignment
 23 | to_divide = to_divide / 5
 24 | to_divide = to_divide // 5
 25 | to_cube = to_cube**3
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `/=` to perform an augmented assignment directly
   --> non_augmented_assignment.py:23:1
@@ -166,7 +166,7 @@ help: Replace with augmented assignment
 24 | to_divide = to_divide // 5
 25 | to_cube = to_cube**3
 26 | to_cube = 3**to_cube
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `//=` to perform an augmented assignment directly
   --> non_augmented_assignment.py:24:1
@@ -187,7 +187,7 @@ help: Replace with augmented assignment
 25 | to_cube = to_cube**3
 26 | to_cube = 3**to_cube
 27 | to_cube = to_cube**to_cube
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `**=` to perform an augmented assignment directly
   --> non_augmented_assignment.py:25:1
@@ -208,7 +208,7 @@ help: Replace with augmented assignment
 26 | to_cube = 3**to_cube
 27 | to_cube = to_cube**to_cube
 28 | timeDiffSeconds = timeDiffSeconds % 60
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `**=` to perform an augmented assignment directly
   --> non_augmented_assignment.py:27:1
@@ -229,7 +229,7 @@ help: Replace with augmented assignment
 28 | timeDiffSeconds = timeDiffSeconds % 60
 29 | flags = flags & 0x1
 30 | flags = flags | 0x1
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `%=` to perform an augmented assignment directly
   --> non_augmented_assignment.py:28:1
@@ -250,7 +250,7 @@ help: Replace with augmented assignment
 29 | flags = flags & 0x1
 30 | flags = flags | 0x1
 31 | flags = flags ^ 0x1
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `&=` to perform an augmented assignment directly
   --> non_augmented_assignment.py:29:1
@@ -271,7 +271,7 @@ help: Replace with augmented assignment
 30 | flags = flags | 0x1
 31 | flags = flags ^ 0x1
 32 | flags = flags << 1
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `|=` to perform an augmented assignment directly
   --> non_augmented_assignment.py:30:1
@@ -292,7 +292,7 @@ help: Replace with augmented assignment
 31 | flags = flags ^ 0x1
 32 | flags = flags << 1
 33 | flags = flags >> 1
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `^=` to perform an augmented assignment directly
   --> non_augmented_assignment.py:31:1
@@ -313,7 +313,7 @@ help: Replace with augmented assignment
 32 | flags = flags << 1
 33 | flags = flags >> 1
 34 | mat1 = mat1 @ mat2
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `<<=` to perform an augmented assignment directly
   --> non_augmented_assignment.py:32:1
@@ -334,7 +334,7 @@ help: Replace with augmented assignment
 33 | flags = flags >> 1
 34 | mat1 = mat1 @ mat2
 35 | a_list[1] = a_list[1] + 1
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `>>=` to perform an augmented assignment directly
   --> non_augmented_assignment.py:33:1
@@ -355,7 +355,7 @@ help: Replace with augmented assignment
 34 | mat1 = mat1 @ mat2
 35 | a_list[1] = a_list[1] + 1
 36 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `@=` to perform an augmented assignment directly
   --> non_augmented_assignment.py:34:1
@@ -375,7 +375,7 @@ help: Replace with augmented assignment
 35 | a_list[1] = a_list[1] + 1
 36 | 
 37 | a_list[0:2] = a_list[0:2] * 3
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `+=` to perform an augmented assignment directly
   --> non_augmented_assignment.py:35:1
@@ -396,7 +396,7 @@ help: Replace with augmented assignment
 36 | 
 37 | a_list[0:2] = a_list[0:2] * 3
 38 | a_list[:2] = a_list[:2] * 3
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `*=` to perform an augmented assignment directly
   --> non_augmented_assignment.py:37:1
@@ -417,7 +417,7 @@ help: Replace with augmented assignment
 38 | a_list[:2] = a_list[:2] * 3
 39 | a_list[1:] = a_list[1:] * 3
 40 | a_list[:] = a_list[:] * 3
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `*=` to perform an augmented assignment directly
   --> non_augmented_assignment.py:38:1
@@ -437,7 +437,7 @@ help: Replace with augmented assignment
 39 | a_list[1:] = a_list[1:] * 3
 40 | a_list[:] = a_list[:] * 3
 41 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `*=` to perform an augmented assignment directly
   --> non_augmented_assignment.py:39:1
@@ -457,7 +457,7 @@ help: Replace with augmented assignment
 40 | a_list[:] = a_list[:] * 3
 41 | 
 42 | index = index * (index + 10)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `*=` to perform an augmented assignment directly
   --> non_augmented_assignment.py:40:1
@@ -478,7 +478,7 @@ help: Replace with augmented assignment
 41 | 
 42 | index = index * (index + 10)
 43 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `*=` to perform an augmented assignment directly
   --> non_augmented_assignment.py:42:1
@@ -497,7 +497,7 @@ help: Replace with augmented assignment
 43 | 
 44 | 
 45 | class T:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `+=` to perform an augmented assignment directly
   --> non_augmented_assignment.py:47:9
@@ -516,7 +516,7 @@ help: Replace with augmented assignment
 48 | 
 49 | 
 50 | obj = T()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `+=` to perform an augmented assignment directly
   --> non_augmented_assignment.py:51:1
@@ -534,7 +534,7 @@ help: Replace with augmented assignment
 52 | 
 53 | 
 54 | a = a+-1
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `+=` to perform an augmented assignment directly
   --> non_augmented_assignment.py:54:1
@@ -553,7 +553,7 @@ help: Replace with augmented assignment
 55 | 
 56 | # Regression tests for https://github.com/astral-sh/ruff/issues/11672
 57 | test = 0x5
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `+=` to perform an augmented assignment directly
   --> non_augmented_assignment.py:58:1
@@ -574,7 +574,7 @@ help: Replace with augmented assignment
 59 | 
 60 | test2 = b""
 61 | test2 = test2 + b"\000"
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `+=` to perform an augmented assignment directly
   --> non_augmented_assignment.py:61:1
@@ -594,7 +594,7 @@ help: Replace with augmented assignment
 62 | 
 63 | test3 = ""
 64 | test3 = test3 + (   a := R""
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `+=` to perform an augmented assignment directly
   --> non_augmented_assignment.py:64:1
@@ -615,7 +615,7 @@ help: Replace with augmented assignment
 65 |                          f"oo"   )
 66 | 
 67 | test4 = []
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `+=` to perform an augmented assignment directly
   --> non_augmented_assignment.py:68:1
@@ -638,7 +638,7 @@ help: Replace with augmented assignment
 69 |                   for e in
 70 |                   range(10)
 71 |                   )
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `+=` to perform an augmented assignment directly
   --> non_augmented_assignment.py:73:1
@@ -663,7 +663,7 @@ help: Replace with augmented assignment
 74 |     4
 75 |     *
 76 |     10
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `+=` to perform an augmented assignment directly
   --> non_augmented_assignment.py:79:1
@@ -690,7 +690,7 @@ help: Replace with augmented assignment
 80 |             4
 81 |             *
 82 |             10
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `+=` to perform an augmented assignment directly
   --> non_augmented_assignment.py:86:1
@@ -715,7 +715,7 @@ help: Replace with augmented assignment
 87 | 
 88 | test8 = \
 89 |     886 \
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `+=` to perform an augmented assignment directly
   --> non_augmented_assignment.py:90:1
@@ -742,4 +742,4 @@ help: Replace with augmented assignment
 91 | 
 92 | 
 93 | # OK
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

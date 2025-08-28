@@ -18,7 +18,7 @@ help: Replace with `os.environ.copy()`
 5 | 
 6 | 
 7 | # Test case where the proposed fix is wrong, i.e., unsafe fix
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLW1507 [*] Shallow copy of `os.environ` via `copy.copy(os.environ)`
   --> shallow_copy_environ.py:11:7
@@ -35,4 +35,4 @@ help: Replace with `os.environ.copy()`
    - env = copy.copy(os.environ)
 11 + env = os.environ.copy()
 12 | os.environ["X"] = "1"
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

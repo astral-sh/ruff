@@ -17,7 +17,7 @@ help: Replace with `defaultdict(default_factory=int)`
 12 | 
 13 | 
 14 | def func():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
   --> RUF026.py:15:5
@@ -35,7 +35,7 @@ help: Replace with `defaultdict(default_factory=float)`
 16 | 
 17 | 
 18 | def func():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
   --> RUF026.py:19:5
@@ -53,7 +53,7 @@ help: Replace with `defaultdict(default_factory=dict)`
 20 | 
 21 | 
 22 | def func():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
   --> RUF026.py:23:5
@@ -71,7 +71,7 @@ help: Replace with `defaultdict(default_factory=list)`
 24 | 
 25 | 
 26 | def func():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
   --> RUF026.py:27:5
@@ -89,7 +89,7 @@ help: Replace with `defaultdict(default_factory=tuple)`
 28 | 
 29 | 
 30 | def func():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
   --> RUF026.py:34:5
@@ -108,7 +108,7 @@ help: Replace with `defaultdict(default_factory=foo)`
 35 | 
 36 | 
 37 | def func():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
   --> RUF026.py:38:5
@@ -126,7 +126,7 @@ help: Replace with `defaultdict(default_factory=lambda: 1)`
 39 | 
 40 | 
 41 | def func():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
   --> RUF026.py:44:5
@@ -145,7 +145,7 @@ help: Replace with `defaultdict(default_factory=deque)`
 45 | 
 46 | 
 47 | def func():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
   --> RUF026.py:52:5
@@ -164,7 +164,7 @@ help: Replace with `defaultdict(default_factory=MyCallable())`
 53 | 
 54 | 
 55 | def func():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
   --> RUF026.py:56:5
@@ -182,7 +182,7 @@ help: Replace with `defaultdict(default_factory=tuple)`
 57 | 
 58 | 
 59 | def func():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
   --> RUF026.py:60:5
@@ -200,7 +200,7 @@ help: Replace with `defaultdict(default_factory=tuple)`
 61 | 
 62 | 
 63 | def func():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
   --> RUF026.py:64:5
@@ -218,7 +218,7 @@ help: Replace with `defaultdict(default_factory=tuple)`
 65 | 
 66 | 
 67 | def func():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
   --> RUF026.py:68:5
@@ -240,7 +240,7 @@ help: Replace with `defaultdict(default_factory=tuple)`
 70 |     )  # RUF026
 71 | 
 72 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
   --> RUF026.py:75:5
@@ -262,4 +262,4 @@ help: Replace with `defaultdict(default_factory=tuple)`
 77 |     )  # RUF026
 78 | 
 79 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

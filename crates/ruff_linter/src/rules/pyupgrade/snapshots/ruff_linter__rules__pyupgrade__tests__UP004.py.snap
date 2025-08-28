@@ -60,7 +60,7 @@ help: Remove `object` inheritance
 16 |     ...
 17 | 
 18 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP004 [*] Class `A` inherits from `object`
   --> UP004.py:24:5
@@ -84,7 +84,7 @@ help: Remove `object` inheritance
 23 |     ...
 24 | 
 25 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP004 [*] Class `A` inherits from `object`
   --> UP004.py:31:5
@@ -108,7 +108,7 @@ help: Remove `object` inheritance
 30 |     ...
 31 | 
 32 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP004 [*] Class `A` inherits from `object`
   --> UP004.py:37:5
@@ -131,7 +131,7 @@ help: Remove `object` inheritance
 37 |     ...
 38 | 
 39 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP004 [*] Class `A` inherits from `object`
   --> UP004.py:45:5
@@ -156,7 +156,7 @@ help: Remove `object` inheritance
 44 |     ...
 45 | 
 46 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP004 [*] Class `A` inherits from `object`
   --> UP004.py:53:5
@@ -181,7 +181,7 @@ help: Remove `object` inheritance
 52 |     ...
 53 | 
 54 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP004 [*] Class `A` inherits from `object`
   --> UP004.py:61:5
@@ -206,7 +206,7 @@ help: Remove `object` inheritance
 60 |     ...
 61 | 
 62 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP004 [*] Class `A` inherits from `object`
   --> UP004.py:69:5
@@ -231,7 +231,7 @@ help: Remove `object` inheritance
 68 |     ...
 69 | 
 70 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP004 [*] Class `B` inherits from `object`
   --> UP004.py:75:12
@@ -321,7 +321,7 @@ help: Remove `object` inheritance
 98  |     # Comment on A.
 99  |     A,
 100 | ):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP004 [*] Class `B` inherits from `object`
    --> UP004.py:108:5
@@ -383,7 +383,7 @@ help: Remove `object` inheritance
 125 |     ...
 126 | 
 127 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP004 [*] Class `A` inherits from `object`
    --> UP004.py:131:5
@@ -406,7 +406,7 @@ help: Remove `object` inheritance
 131 |     ...
 132 | 
 133 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP004 [*] Class `A` inherits from `object`
    --> UP004.py:137:9

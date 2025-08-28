@@ -20,7 +20,7 @@ help: Remove `print`
 7 | 
 8 | # Concatenated string literals
 9 | # Expects:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF030 [*] `print()` call in `assert` statement is likely unintentional
   --> RUF030.py:11:14
@@ -41,7 +41,7 @@ help: Remove `print`
 12 | 
 13 | # Positional arguments, string literals
 14 | # Expects:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF030 [*] `print()` call in `assert` statement is likely unintentional
   --> RUF030.py:16:14
@@ -62,7 +62,7 @@ help: Remove `print`
 17 | 
 18 | # Concatenated string literals combined with Positional arguments
 19 | # Expects:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF030 [*] `print()` call in `assert` statement is likely unintentional
   --> RUF030.py:21:14
@@ -83,7 +83,7 @@ help: Remove `print`
 22 | 
 23 | # Positional arguments, string literals with a variable
 24 | # Expects:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF030 [*] `print()` call in `assert` statement is likely unintentional
   --> RUF030.py:26:14
@@ -104,7 +104,7 @@ help: Remove `print`
 27 | 
 28 | # Mixed brackets string literals
 29 | # Expects:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF030 [*] `print()` call in `assert` statement is likely unintentional
   --> RUF030.py:31:14
@@ -125,7 +125,7 @@ help: Remove `print`
 32 | 
 33 | # Mixed brackets with other brackets inside
 34 | # Expects:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF030 [*] `print()` call in `assert` statement is likely unintentional
   --> RUF030.py:36:14
@@ -146,7 +146,7 @@ help: Remove `print`
 37 | 
 38 | # Positional arguments, string literals with a separator
 39 | # Expects:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF030 [*] `print()` call in `assert` statement is likely unintentional
   --> RUF030.py:41:14
@@ -167,7 +167,7 @@ help: Remove `print`
 42 | 
 43 | # Positional arguments, string literals with None as separator
 44 | # Expects:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF030 [*] `print()` call in `assert` statement is likely unintentional
   --> RUF030.py:46:14
@@ -188,7 +188,7 @@ help: Remove `print`
 47 | 
 48 | # Positional arguments, string literals with variable as separator, needs f-string
 49 | # Expects:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF030 [*] `print()` call in `assert` statement is likely unintentional
   --> RUF030.py:51:14
@@ -209,7 +209,7 @@ help: Remove `print`
 52 | 
 53 | # Unnecessary f-string
 54 | # Expects:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF030 [*] `print()` call in `assert` statement is likely unintentional
   --> RUF030.py:56:14
@@ -230,7 +230,7 @@ help: Remove `print`
 57 | 
 58 | # Positional arguments, string literals and f-strings
 59 | # Expects:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF030 [*] `print()` call in `assert` statement is likely unintentional
   --> RUF030.py:61:14
@@ -251,7 +251,7 @@ help: Remove `print`
 62 | 
 63 | # Positional arguments, string literals and f-strings with a separator
 64 | # Expects:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF030 [*] `print()` call in `assert` statement is likely unintentional
   --> RUF030.py:66:14
@@ -272,7 +272,7 @@ help: Remove `print`
 67 | 
 68 | # A single f-string
 69 | # Expects:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF030 [*] `print()` call in `assert` statement is likely unintentional
   --> RUF030.py:71:14
@@ -293,7 +293,7 @@ help: Remove `print`
 72 | 
 73 | # A single f-string with a redundant separator
 74 | # Expects:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF030 [*] `print()` call in `assert` statement is likely unintentional
   --> RUF030.py:76:14
@@ -314,7 +314,7 @@ help: Remove `print`
 77 | 
 78 | # Complex f-string with variable as separator
 79 | # Expects:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF030 [*] `print()` call in `assert` statement is likely unintentional
   --> RUF030.py:83:14
@@ -335,7 +335,7 @@ help: Remove `print`
 84 | 
 85 | # Empty print
 86 | # Expects:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF030 [*] `print()` call in `assert` statement is likely unintentional
   --> RUF030.py:88:14
@@ -356,7 +356,7 @@ help: Remove `print`
 89 | 
 90 | # Empty print with separator
 91 | # Expects:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF030 [*] `print()` call in `assert` statement is likely unintentional
   --> RUF030.py:93:14
@@ -377,7 +377,7 @@ help: Remove `print`
 94 | 
 95 | # Custom print function that actually returns a string
 96 | # Expects:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF030 [*] `print()` call in `assert` statement is likely unintentional
    --> RUF030.py:108:14
@@ -393,4 +393,4 @@ help: Remove `print`
 107 | # - single StringLiteral
     - assert True, builtins.print("This print should be removed.")
 108 + assert True, "This print should be removed."
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

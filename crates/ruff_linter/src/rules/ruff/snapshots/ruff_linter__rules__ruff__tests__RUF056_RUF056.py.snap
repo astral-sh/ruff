@@ -348,7 +348,7 @@ help: Remove falsy fallback from `dict.get()`
 154 |                      ) # [RUF056]
 155 | 
 156 | # regression tests for https://github.com/astral-sh/ruff/issues/18628
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF056 Avoid providing a falsy fallback to `dict.get()` in boolean test positions. The default fallback `None` is already falsy.
    --> RUF056.py:163:24

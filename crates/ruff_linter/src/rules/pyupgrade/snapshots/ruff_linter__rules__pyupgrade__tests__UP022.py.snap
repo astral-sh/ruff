@@ -20,7 +20,7 @@ help: Replace with `capture_output` keyword argument
 5 | 
 6 | output = subprocess.run(["foo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 7 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP022 [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
  --> UP022.py:6:10
@@ -41,7 +41,7 @@ help: Replace with `capture_output` keyword argument
 7 | 
 8 | output = subprocess.run(stdout=subprocess.PIPE, args=["foo"],  stderr=subprocess.PIPE)
 9 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP022 [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
   --> UP022.py:8:10
@@ -62,7 +62,7 @@ help: Replace with `capture_output` keyword argument
 9  | 
 10 | output = subprocess.run(
 11 |     ["foo"], stdout=subprocess.PIPE, check=True, stderr=subprocess.PIPE
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP022 [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
   --> UP022.py:10:10
@@ -86,7 +86,7 @@ help: Replace with `capture_output` keyword argument
 12 | )
 13 | 
 14 | output = subprocess.run(
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP022 [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
   --> UP022.py:14:10
@@ -110,7 +110,7 @@ help: Replace with `capture_output` keyword argument
 16 | )
 17 | 
 18 | output = subprocess.run(
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP022 [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
   --> UP022.py:18:10
@@ -142,7 +142,7 @@ help: Replace with `capture_output` keyword argument
 22 |     text=True,
 23 |     encoding="utf-8",
 24 |     close_fds=True,
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP022 [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
   --> UP022.py:29:14
@@ -172,7 +172,7 @@ help: Replace with `capture_output` keyword argument
 33 |         text=True,
 34 |         encoding="utf-8",
 35 |     )
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP022 Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
   --> UP022.py:38:10

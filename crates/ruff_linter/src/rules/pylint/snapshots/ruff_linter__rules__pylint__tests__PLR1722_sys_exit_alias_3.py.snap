@@ -17,7 +17,7 @@ help: Replace `quit` with `sys.exit()`
 5 | 
 6 | 
 7 | def main():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR1722 [*] Use `sys.exit()` instead of `quit`
  --> sys_exit_alias_3.py:9:5
@@ -36,7 +36,7 @@ help: Replace `quit` with `sys.exit()`
 10 | 
 11 | 
 12 | def main():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR1722 Use `sys.exit()` instead of `quit`
   --> sys_exit_alias_3.py:16:5

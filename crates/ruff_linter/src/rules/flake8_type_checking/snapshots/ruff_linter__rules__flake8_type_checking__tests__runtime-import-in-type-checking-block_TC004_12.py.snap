@@ -21,4 +21,4 @@ help: Move out of type-checking block
 7 +     pass
 8 | 
 9 | AnyCallable: TypeAlias = Callable[..., Any]
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

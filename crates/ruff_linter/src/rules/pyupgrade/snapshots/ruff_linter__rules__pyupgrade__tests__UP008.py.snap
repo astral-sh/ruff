@@ -19,7 +19,7 @@ help: Remove `super()` parameters
 18 |         super(Child, self).method  # wrong
 19 |         super(
 20 |             Child,
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
   --> UP008.py:18:14
@@ -40,7 +40,7 @@ help: Remove `super()` parameters
 19 |         super(
 20 |             Child,
 21 |             self,
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
   --> UP008.py:19:14
@@ -66,7 +66,7 @@ help: Remove `super()` parameters
 20 | 
 21 | 
 22 | class BaseClass:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
   --> UP008.py:36:14
@@ -86,7 +86,7 @@ help: Remove `super()` parameters
 37 |         super().f()
 38 | 
 39 |     def different_argument(self, other):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
   --> UP008.py:50:18
@@ -105,7 +105,7 @@ help: Remove `super()` parameters
 51 |             super().f()
 52 | 
 53 |         outer_argument()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
   --> UP008.py:74:14
@@ -125,7 +125,7 @@ help: Remove `super()` parameters
 75 |         super().f()  # OK
 76 | 
 77 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
   --> UP008.py:92:14
@@ -144,7 +144,7 @@ help: Remove `super()` parameters
 93 | 
 94 | 
 95 | # see: https://github.com/astral-sh/ruff/issues/18684
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
    --> UP008.py:107:23
@@ -163,7 +163,7 @@ help: Remove `super()` parameters
 108 | 
 109 | 
 110 | # see: https://github.com/astral-sh/ruff/issues/18533
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
    --> UP008.py:113:14
@@ -193,7 +193,7 @@ help: Remove `super()` parameters
 114 |         super(
 115 |             ClassForCommentEnthusiasts,
 116 |             # even more helpful comment
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
    --> UP008.py:118:14
@@ -223,7 +223,7 @@ help: Remove `super()` parameters
 119 |         super(
 120 |             ClassForCommentEnthusiasts,
 121 |             self
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
    --> UP008.py:123:14
@@ -251,7 +251,7 @@ help: Remove `super()` parameters
 124 | 
 125 | 
 126 | # Issue #19096: super calls with keyword arguments should emit diagnostic but not be fixed
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP008 Use `super()` instead of `super(__class__, self)`
    --> UP008.py:133:21
@@ -301,4 +301,4 @@ help: Remove `super()` parameters
 142 |     def method3(self):
     -         super(ExampleWithKeywords, self).some_method()  # Should be fixed - no keywords
 143 +         super().some_method()  # Should be fixed - no keywords
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

@@ -19,7 +19,7 @@ help: Prefix it with an underscore or any other dummy variable pattern
 25 | 
 26 |     (x, y) = baz = bar
 27 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `d` is never used
   --> RUF059_0.py:24:9
@@ -39,7 +39,7 @@ help: Prefix it with an underscore or any other dummy variable pattern
 25 | 
 26 |     (x, y) = baz = bar
 27 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `x` is never used
   --> RUF059_0.py:26:6
@@ -58,7 +58,7 @@ help: Prefix it with an underscore or any other dummy variable pattern
 27 | 
 28 | 
 29 | def f():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `y` is never used
   --> RUF059_0.py:26:9
@@ -77,7 +77,7 @@ help: Prefix it with an underscore or any other dummy variable pattern
 27 | 
 28 | 
 29 | def f():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `connection` is never used
   --> RUF059_0.py:66:24
@@ -97,7 +97,7 @@ help: Prefix it with an underscore or any other dummy variable pattern
 67 |         cursor.execute("SELECT * FROM users")
 68 | 
 69 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `connection` is never used
   --> RUF059_0.py:74:24
@@ -117,7 +117,7 @@ help: Prefix it with an underscore or any other dummy variable pattern
 75 |         cursor.execute("SELECT * FROM users")
 76 | 
 77 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `this` is never used
   --> RUF059_0.py:79:49
@@ -136,7 +136,7 @@ help: Prefix it with an underscore or any other dummy variable pattern
 80 |         print("hello")
 81 | 
 82 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `that` is never used
   --> RUF059_0.py:79:55
@@ -155,7 +155,7 @@ help: Prefix it with an underscore or any other dummy variable pattern
 80 |         print("hello")
 81 | 
 82 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `this` is never used
   --> RUF059_0.py:86:23
@@ -176,7 +176,7 @@ help: Prefix it with an underscore or any other dummy variable pattern
 87 |     ):
 88 |         print("hello")
 89 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `that` is never used
   --> RUF059_0.py:86:29
@@ -197,7 +197,7 @@ help: Prefix it with an underscore or any other dummy variable pattern
 87 |     ):
 88 |         print("hello")
 89 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF059 Unpacked variable `x` is never used
    --> RUF059_0.py:101:5

@@ -14,7 +14,7 @@ help: Inline function call
 2 | _ = lambda x, y: min(x, y) # [unnecessary-lambda]
 3 | 
 4 | _ = lambda *args: f(*args) # [unnecessary-lambda]
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLW0108 [*] Lambda may be unnecessary; consider inlining inner function
  --> unnecessary_lambda.py:2:5
@@ -32,7 +32,7 @@ help: Inline function call
 3 | 
 4 | _ = lambda *args: f(*args) # [unnecessary-lambda]
 5 | _ = lambda **kwargs: f(**kwargs) # [unnecessary-lambda]
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLW0108 [*] Lambda may be unnecessary; consider inlining inner function
  --> unnecessary_lambda.py:4:5
@@ -53,7 +53,7 @@ help: Inline function call
 5 | _ = lambda **kwargs: f(**kwargs) # [unnecessary-lambda]
 6 | _ = lambda *args, **kwargs: f(*args, **kwargs) # [unnecessary-lambda]
 7 | _ = lambda x, y, z, *args, **kwargs: f(x, y, z, *args, **kwargs) # [unnecessary-lambda]
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLW0108 [*] Lambda may be unnecessary; consider inlining inner function
  --> unnecessary_lambda.py:5:5
@@ -73,7 +73,7 @@ help: Inline function call
 6 | _ = lambda *args, **kwargs: f(*args, **kwargs) # [unnecessary-lambda]
 7 | _ = lambda x, y, z, *args, **kwargs: f(x, y, z, *args, **kwargs) # [unnecessary-lambda]
 8 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLW0108 [*] Lambda may be unnecessary; consider inlining inner function
  --> unnecessary_lambda.py:6:5
@@ -93,7 +93,7 @@ help: Inline function call
 7 | _ = lambda x, y, z, *args, **kwargs: f(x, y, z, *args, **kwargs) # [unnecessary-lambda]
 8 | 
 9 | _ = lambda x: f(lambda x: x)(x) # [unnecessary-lambda]
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLW0108 [*] Lambda may be unnecessary; consider inlining inner function
  --> unnecessary_lambda.py:7:5
@@ -114,7 +114,7 @@ help: Inline function call
 8  | 
 9  | _ = lambda x: f(lambda x: x)(x) # [unnecessary-lambda]
 10 | _ = lambda x, y: f(lambda x, y: x + y)(x, y) # [unnecessary-lambda]
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLW0108 [*] Lambda may be unnecessary; consider inlining inner function
   --> unnecessary_lambda.py:9:5
@@ -134,7 +134,7 @@ help: Inline function call
 10 | _ = lambda x, y: f(lambda x, y: x + y)(x, y) # [unnecessary-lambda]
 11 | 
 12 | # default value in lambda parameters
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLW0108 [*] Lambda may be unnecessary; consider inlining inner function
   --> unnecessary_lambda.py:10:5
@@ -154,7 +154,7 @@ help: Inline function call
 11 | 
 12 | # default value in lambda parameters
 13 | _ = lambda x=42: print(x)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLW0108 [*] Lambda may be unnecessary; consider inlining inner function
   --> unnecessary_lambda.py:62:5
@@ -171,7 +171,7 @@ help: Inline function call
    - _ = lambda x: (string := str)(x)
 62 + _ = (string := str)
 63 | _ = lambda x: ((x := 1) and str)(x)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLW0108 Lambda may be unnecessary; consider inlining inner function
   --> unnecessary_lambda.py:63:5

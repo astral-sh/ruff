@@ -17,7 +17,7 @@ help: Merge multiple comparisons
 3 | 
 4 | foo != "a" and foo != "b"
 5 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR1714 [*] Consider merging multiple comparisons: `foo not in {"a", "b"}`.
  --> repeated_equality_comparison.py:4:1
@@ -38,7 +38,7 @@ help: Merge multiple comparisons
 5 | 
 6 | foo == "a" or foo == "b" or foo == "c"
 7 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR1714 [*] Consider merging multiple comparisons: `foo in {"a", "b", "c"}`.
  --> repeated_equality_comparison.py:6:1
@@ -59,7 +59,7 @@ help: Merge multiple comparisons
 7 | 
 8 | foo != "a" and foo != "b" and foo != "c"
 9 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR1714 [*] Consider merging multiple comparisons: `foo not in {"a", "b", "c"}`.
   --> repeated_equality_comparison.py:8:1
@@ -80,7 +80,7 @@ help: Merge multiple comparisons
 9  | 
 10 | foo == a or foo == "b" or foo == 3  # Mixed types.
 11 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR1714 [*] Consider merging multiple comparisons: `foo in (a, "b", 3)`. Use a `set` if the elements are hashable.
   --> repeated_equality_comparison.py:10:1
@@ -101,7 +101,7 @@ help: Merge multiple comparisons
 11 | 
 12 | "a" == foo or "b" == foo or "c" == foo
 13 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR1714 [*] Consider merging multiple comparisons: `foo in {"a", "b", "c"}`.
   --> repeated_equality_comparison.py:12:1
@@ -122,7 +122,7 @@ help: Merge multiple comparisons
 13 | 
 14 | "a" != foo and "b" != foo and "c" != foo
 15 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR1714 [*] Consider merging multiple comparisons: `foo not in {"a", "b", "c"}`.
   --> repeated_equality_comparison.py:14:1
@@ -143,7 +143,7 @@ help: Merge multiple comparisons
 15 | 
 16 | "a" == foo or foo == "b" or "c" == foo
 17 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR1714 [*] Consider merging multiple comparisons: `foo in {"a", "b", "c"}`.
   --> repeated_equality_comparison.py:16:1
@@ -164,7 +164,7 @@ help: Merge multiple comparisons
 17 | 
 18 | foo == bar or baz == foo or qux == foo
 19 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR1714 [*] Consider merging multiple comparisons: `foo in (bar, baz, qux)`. Use a `set` if the elements are hashable.
   --> repeated_equality_comparison.py:18:1
@@ -185,7 +185,7 @@ help: Merge multiple comparisons
 19 | 
 20 | foo == "a" or "b" == foo or foo == "c"
 21 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR1714 [*] Consider merging multiple comparisons: `foo in {"a", "b", "c"}`.
   --> repeated_equality_comparison.py:20:1
@@ -206,7 +206,7 @@ help: Merge multiple comparisons
 21 | 
 22 | foo != "a" and "b" != foo and foo != "c"
 23 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR1714 [*] Consider merging multiple comparisons: `foo not in {"a", "b", "c"}`.
   --> repeated_equality_comparison.py:22:1
@@ -227,7 +227,7 @@ help: Merge multiple comparisons
 23 | 
 24 | foo == "a" or foo == "b" or "c" == bar or "d" == bar  # Multiple targets
 25 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR1714 [*] Consider merging multiple comparisons: `foo in {"a", "b"}`.
   --> repeated_equality_comparison.py:24:1
@@ -248,7 +248,7 @@ help: Merge multiple comparisons
 25 | 
 26 | foo.bar == "a" or foo.bar == "b"  # Attributes.
 27 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR1714 [*] Consider merging multiple comparisons: `bar in {"c", "d"}`.
   --> repeated_equality_comparison.py:24:1
@@ -269,7 +269,7 @@ help: Merge multiple comparisons
 25 | 
 26 | foo.bar == "a" or foo.bar == "b"  # Attributes.
 27 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR1714 [*] Consider merging multiple comparisons: `foo.bar in {"a", "b"}`.
   --> repeated_equality_comparison.py:26:1
@@ -290,7 +290,7 @@ help: Merge multiple comparisons
 27 | 
 28 | # OK
 29 | foo == "a" and foo == "b" and foo == "c"  # `and` mixed with `==`.
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR1714 [*] Consider merging multiple comparisons: `bar in {"c", "d"}`.
   --> repeated_equality_comparison.py:61:16
@@ -311,7 +311,7 @@ help: Merge multiple comparisons
 62 | 
 63 | foo == "a" or foo == "b" or "c" != bar and "d" != bar  # Multiple targets
 64 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR1714 [*] Consider merging multiple comparisons: `foo in {"a", "b"}`.
   --> repeated_equality_comparison.py:63:1
@@ -332,7 +332,7 @@ help: Merge multiple comparisons
 64 | 
 65 | foo == "a" or ("c" != bar and "d" != bar) or foo == "b"  # Multiple targets
 66 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR1714 [*] Consider merging multiple comparisons: `bar not in {"c", "d"}`.
   --> repeated_equality_comparison.py:63:29
@@ -353,7 +353,7 @@ help: Merge multiple comparisons
 64 | 
 65 | foo == "a" or ("c" != bar and "d" != bar) or foo == "b"  # Multiple targets
 66 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR1714 [*] Consider merging multiple comparisons: `bar not in {"c", "d"}`.
   --> repeated_equality_comparison.py:65:16
@@ -374,7 +374,7 @@ help: Merge multiple comparisons
 66 | 
 67 | foo == "a" and "c" != bar or foo == "b" and "d" != bar  # Multiple targets
 68 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR1714 [*] Consider merging multiple comparisons: `foo in {1, True}`.
   --> repeated_equality_comparison.py:69:1
@@ -395,7 +395,7 @@ help: Merge multiple comparisons
 70 | 
 71 | foo == 1 or foo == 1.0 # Different types, same hashed value
 72 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR1714 [*] Consider merging multiple comparisons: `foo in {1, 1.0}`.
   --> repeated_equality_comparison.py:71:1
@@ -416,7 +416,7 @@ help: Merge multiple comparisons
 72 | 
 73 | foo == False or foo == 0 # Different types, same hashed value
 74 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR1714 [*] Consider merging multiple comparisons: `foo in {False, 0}`.
   --> repeated_equality_comparison.py:73:1
@@ -436,7 +436,7 @@ help: Merge multiple comparisons
 73 + foo in {False, 0} # Different types, same hashed value
 74 | 
 75 | foo == 0.0 or foo == 0j # Different types, same hashed value
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR1714 [*] Consider merging multiple comparisons: `foo in {0.0, 0j}`.
   --> repeated_equality_comparison.py:75:1
@@ -452,4 +452,4 @@ help: Merge multiple comparisons
 74 | 
    - foo == 0.0 or foo == 0j # Different types, same hashed value
 75 + foo in {0.0, 0j} # Different types, same hashed value
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

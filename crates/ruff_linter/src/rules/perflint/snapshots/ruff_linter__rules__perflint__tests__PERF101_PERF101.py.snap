@@ -171,7 +171,7 @@ help: Remove `list()` cast
 35 |     pass
 36 | 
 37 | for i in list(foo_dict):  # OK
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PERF101 [*] Do not cast an iterable to `list` before iterating over it
   --> PERF101.py:57:10
@@ -279,4 +279,4 @@ help: Remove `list()` cast
    - ):
 96 + for i in items:
 97 |     print(i)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

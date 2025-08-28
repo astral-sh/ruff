@@ -24,4 +24,4 @@ help: Move into type-checking block
 9  | 
 10 | 
 11 | class Foo:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

@@ -14,7 +14,7 @@ help: Replace with `None`; initialize within function
 2 |     raise NotImplementedError("")
 3 | 
 4 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
  --> B006_8.py:5:19
@@ -33,7 +33,7 @@ help: Replace with `None`; initialize within function
 6 |     """ This one also has a docstring"""
 7 |     raise NotImplementedError("and has some text in here")
 8 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
   --> B006_8.py:10:19
@@ -55,7 +55,7 @@ help: Replace with `None`; initialize within function
 14 |     raise IndexError()
 15 | 
 16 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
   --> B006_8.py:15:19
@@ -73,7 +73,7 @@ help: Replace with `None`; initialize within function
 16 |     raise NotImplementedError
 17 | 
 18 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
   --> B006_8.py:19:20
@@ -89,4 +89,4 @@ help: Replace with `None`; initialize within function
    - def quux(a: list = []):
 19 + def quux(a: list = None):
 20 |     raise NotImplemented
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

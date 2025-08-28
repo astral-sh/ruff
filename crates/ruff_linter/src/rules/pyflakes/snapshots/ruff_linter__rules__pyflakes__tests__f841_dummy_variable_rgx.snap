@@ -35,7 +35,7 @@ help: Remove assignment to unused variable `foo`
 20 |     (a, b) = (1, 2)
 21 | 
 22 |     bar = (1, 2)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F841 Local variable `a` is assigned to but never used
   --> F841_0.py:21:6
@@ -78,7 +78,7 @@ help: Remove assignment to unused variable `baz`
 27 | 
 28 | 
 29 | def f():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `_` is assigned to but never used
   --> F841_0.py:35:5
@@ -97,7 +97,7 @@ help: Remove assignment to unused variable `_`
 35 |     __ = 1
 36 |     _discarded = 1
 37 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `__` is assigned to but never used
   --> F841_0.py:36:5
@@ -116,7 +116,7 @@ help: Remove assignment to unused variable `__`
 36 |     _discarded = 1
 37 | 
 38 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `_discarded` is assigned to but never used
   --> F841_0.py:37:5
@@ -134,7 +134,7 @@ help: Remove assignment to unused variable `_discarded`
 37 | 
 38 | 
 39 | a = 1
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `b` is assigned to but never used
   --> F841_0.py:51:9
@@ -155,7 +155,7 @@ help: Remove assignment to unused variable `b`
 52 | 
 53 |     def d():
 54 |         nonlocal b
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `my_file` is assigned to but never used
   --> F841_0.py:79:26
@@ -174,7 +174,7 @@ help: Remove assignment to unused variable `my_file`
 80 |         print("hello")
 81 | 
 82 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `my_file` is assigned to but never used
   --> F841_0.py:85:25
@@ -195,7 +195,7 @@ help: Remove assignment to unused variable `my_file`
 86 |         open("") as ((this, that)),
 87 |     ):
 88 |         print("hello")
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `msg3` is assigned to but never used
    --> F841_0.py:102:5
@@ -215,7 +215,7 @@ help: Remove assignment to unused variable `msg3`
 102 |     match x:
 103 |         case 1:
 104 |             print(msg1)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `Baz` is assigned to but never used
    --> F841_0.py:115:5
@@ -236,7 +236,7 @@ help: Remove assignment to unused variable `Baz`
 116 | 
 117 |     match x:
 118 |         case (Foo.A):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F841 Local variable `y` is assigned to but never used
    --> F841_0.py:122:14
@@ -295,7 +295,7 @@ help: Remove assignment to unused variable `__class__`
 169 | 
 170 | 
 171 | class A:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `__class__` is assigned to but never used
    --> F841_0.py:174:13
@@ -314,7 +314,7 @@ help: Remove assignment to unused variable `__class__`
 175 | 
 176 | 
 177 | class A:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `__class__` is assigned to but never used
    --> F841_0.py:182:17
@@ -333,4 +333,4 @@ help: Remove assignment to unused variable `__class__`
 183 | 
 184 | 
 185 | # OK, the `__class__` cell is nonlocal and declared as such.
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

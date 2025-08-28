@@ -18,7 +18,7 @@ help: Use the `type` keyword
 6 | x: TypeAlias = int
 7 | 
 8 | # UP040 simple generic
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
  --> UP040.py:6:1
@@ -39,7 +39,7 @@ help: Use the `type` keyword
 7 | 
 8 | # UP040 simple generic
 9 | T = typing.TypeVar["T"]
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
   --> UP040.py:10:1
@@ -60,7 +60,7 @@ help: Use the `type` keyword
 11 | 
 12 | # UP040 call style generic
 13 | T = typing.TypeVar("T")
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
   --> UP040.py:14:1
@@ -81,7 +81,7 @@ help: Use the `type` keyword
 15 | 
 16 | # UP040 bounded generic
 17 | T = typing.TypeVar("T", bound=int)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
   --> UP040.py:18:1
@@ -102,7 +102,7 @@ help: Use the `type` keyword
 19 | 
 20 | # UP040 constrained generic
 21 | T = typing.TypeVar("T", int, str)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
   --> UP040.py:22:1
@@ -123,7 +123,7 @@ help: Use the `type` keyword
 23 | 
 24 | # UP040 contravariant generic
 25 | T = typing.TypeVar("T", contravariant=True)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
   --> UP040.py:26:1
@@ -144,7 +144,7 @@ help: Use the `type` keyword
 27 | 
 28 | # UP040 covariant generic
 29 | T = typing.TypeVar("T", covariant=True)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
   --> UP040.py:30:1
@@ -165,7 +165,7 @@ help: Use the `type` keyword
 31 | 
 32 | # UP040 in class scope
 33 | T = typing.TypeVar["T"]
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
   --> UP040.py:36:5
@@ -186,7 +186,7 @@ help: Use the `type` keyword
 37 | 
 38 |     # reference to class variable
 39 |     TCLS = typing.TypeVar["TCLS"]
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP040 [*] Type alias `y` uses `TypeAlias` annotation instead of the `type` keyword
   --> UP040.py:40:5
@@ -207,7 +207,7 @@ help: Use the `type` keyword
 41 | 
 42 | # UP040 won't add generics in fix
 43 | T = typing.TypeVar(*args)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
   --> UP040.py:44:1
@@ -228,7 +228,7 @@ help: Use the `type` keyword
 45 | 
 46 | # `default` should be skipped for now, added in Python 3.13
 47 | T = typing.TypeVar("T", default=Any)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP040 [*] Type alias `Decorator` uses `TypeAlias` annotation instead of the `type` keyword
   --> UP040.py:57:1
@@ -247,7 +247,7 @@ help: Use the `type` keyword
 58 | 
 59 | 
 60 | from typing import TypeVar, Annotated, TypeAliasType
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP040 [*] Type alias `PositiveList` uses `TypeAliasType` assignment instead of the `type` keyword
   --> UP040.py:67:1
@@ -378,7 +378,7 @@ help: Use the `type` keyword
 100 | 
 101 | T = TypeVar("T")
 102 | PositiveList = TypeAliasType(
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP040 [*] Type alias `PositiveList` uses `TypeAliasType` assignment instead of the `type` keyword
    --> UP040.py:104:1
@@ -452,7 +452,7 @@ help: Use the `type` keyword
 118 |     int
 119 |     | str
 120 | )
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP040 [*] Type alias `T` uses `TypeAlias` annotation instead of the `type` keyword
    --> UP040.py:122:1
@@ -479,4 +479,4 @@ help: Use the `type` keyword
 123 |     # comment1
 124 |     int  # comment2
 125 |     # comment3
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

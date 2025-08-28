@@ -13,4 +13,4 @@ help: Remove `exc_info=`
 3 | 
   - logger.info("", exc_info=True)
 4 + logger.info("")
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

@@ -12,4 +12,4 @@ help: Replace with `functools.reduce`
 1 + import functools
 2 + import operator
 3 + functools.reduce(operator.iadd, (factor.dims for factor in bases), [])
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

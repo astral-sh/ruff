@@ -501,7 +501,7 @@ help: Replace TypeVar `S` with `Self`
 131 | 
 132 |     def comment_outside_fix_range[T, S](
 133 |         self: S,
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PYI019 [*] Use `Self` instead of custom TypeVar `S`
    --> PYI019_0.pyi:134:34

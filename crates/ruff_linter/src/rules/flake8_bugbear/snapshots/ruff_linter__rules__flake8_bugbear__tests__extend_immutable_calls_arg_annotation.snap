@@ -15,4 +15,4 @@ help: Replace with `None`; initialize within function
    - def error_due_to_missing_import(foo: ImmutableTypeA = []):
 17 + def error_due_to_missing_import(foo: ImmutableTypeA = None):
 18 |     ...
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

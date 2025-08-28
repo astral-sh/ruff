@@ -16,4 +16,4 @@ help: Install `apache-airflow-providers-zendesk>=1.0.0` and use `ZendeskHook` fr
 3 + from airflow.providers.zendesk.hooks.zendesk import ZendeskHook
 4 | 
 5 | ZendeskHook()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

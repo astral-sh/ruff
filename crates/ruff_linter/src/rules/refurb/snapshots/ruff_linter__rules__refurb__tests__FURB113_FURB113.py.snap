@@ -20,7 +20,7 @@ help: Replace with `nums.extend((1, 2))`
 24 | pass
 25 | 
 26 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB113 [*] Use `nums3.extend((1, 2))` instead of repeatedly calling `nums3.append()`
   --> FURB113.py:29:1
@@ -41,7 +41,7 @@ help: Replace with `nums3.extend((1, 2))`
 30 | pass
 31 | 
 32 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB113 [*] Use `nums4.extend((1, 2))` instead of repeatedly calling `nums4.append()`
   --> FURB113.py:35:1
@@ -62,7 +62,7 @@ help: Replace with `nums4.extend((1, 2))`
 36 | pass
 37 | 
 38 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB113 Use `nums.extend((1, 2, 3))` instead of repeatedly calling `nums.append()`
   --> FURB113.py:41:1
@@ -130,7 +130,7 @@ help: Replace with `nums4.extend((1, 2))`
 57 | nums3.append(2)
 58 | pass
 59 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB113 [*] Use `nums.extend((1, 2, 3))` instead of repeatedly calling `nums.append()`
   --> FURB113.py:62:1
@@ -152,7 +152,7 @@ help: Replace with `nums.extend((1, 2, 3))`
 63 | 
 64 | 
 65 | if True:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB113 [*] Use `nums.extend((1, 2))` instead of repeatedly calling `nums.append()`
   --> FURB113.py:69:5
@@ -173,7 +173,7 @@ help: Replace with `nums.extend((1, 2))`
 70 | 
 71 | 
 72 | if True:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB113 [*] Use `nums.extend((1, 2))` instead of repeatedly calling `nums.append()`
   --> FURB113.py:75:5
@@ -195,7 +195,7 @@ help: Replace with `nums.extend((1, 2))`
 76 |     pass
 77 | 
 78 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB113 Use `nums.extend((1, 2, 3))` instead of repeatedly calling `nums.append()`
   --> FURB113.py:82:5
@@ -229,7 +229,7 @@ help: Replace with `x.extend((1, 2))`
 91 | 
 92 | 
 93 | def yes_two(x: List[int]):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB113 [*] Use `x.extend((1, 2))` instead of repeatedly calling `x.append()`
   --> FURB113.py:96:5
@@ -250,7 +250,7 @@ help: Replace with `x.extend((1, 2))`
 97 | 
 98 | 
 99 | def yes_three(*, x: list[int]):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB113 [*] Use `x.extend((1, 2))` instead of repeatedly calling `x.append()`
    --> FURB113.py:102:5
@@ -271,7 +271,7 @@ help: Replace with `x.extend((1, 2))`
 103 | 
 104 | 
 105 | def yes_four(x: list[int], /):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB113 [*] Use `x.extend((1, 2))` instead of repeatedly calling `x.append()`
    --> FURB113.py:108:5
@@ -292,7 +292,7 @@ help: Replace with `x.extend((1, 2))`
 109 | 
 110 | 
 111 | def yes_five(x: list[int], y: list[int]):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB113 Use `x.extend((1, 2, 3))` instead of repeatedly calling `x.append()`
    --> FURB113.py:114:5
@@ -326,7 +326,7 @@ help: Replace with `x.extend((1, 2))`
 123 | 
 124 | 
 125 | if True:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB113 Use `nums.extend((1, 2, 3))` instead of repeatedly calling `nums.append()`
    --> FURB113.py:128:5

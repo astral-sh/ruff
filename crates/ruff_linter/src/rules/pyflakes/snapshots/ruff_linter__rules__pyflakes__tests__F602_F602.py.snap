@@ -54,7 +54,7 @@ help: Remove repeated key `a`
 13 | }
 14 | 
 15 | x = {
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F602 Dictionary key `a` repeated
   --> F602.py:18:5
@@ -98,7 +98,7 @@ help: Remove repeated key `a`
 20 |     a: 4,
 21 | }
 22 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F602 Dictionary key `a` repeated
   --> F602.py:21:5
@@ -129,7 +129,7 @@ help: Remove repeated key `a`
 26 |     a: 2,
 27 |     a: 3,
 28 |     a: 4,
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F602 Dictionary key `a` repeated
   --> F602.py:27:5
@@ -184,7 +184,7 @@ help: Remove repeated key `a`
 35 |     "a": 2,
 36 |     a: 2,
 37 |     "a": 3,
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F602 Dictionary key `a` repeated
   --> F602.py:37:5
@@ -237,7 +237,7 @@ help: Remove repeated key `a`
    - x = {a: 1, a: 1}
 44 + x = {a: 1}
 45 | x = {a: 1, b: 2, a: 1}
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F602 [*] Dictionary key `a` repeated
   --> F602.py:45:18
@@ -252,4 +252,4 @@ help: Remove repeated key `a`
 44 | x = {a: 1, a: 1}
    - x = {a: 1, b: 2, a: 1}
 45 + x = {a: 1, b: 2}
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

@@ -19,7 +19,7 @@ help: Install `apache-airflow-providers-apache-pig>=1.0.0` and use `PigCliHook` 
 5 | 
 6 | PigCliHook()
 7 | PigOperator()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.pig_operator.PigOperator` is moved into `apache-pig` provider in Airflow 3.0;
  --> AIR302_pig.py:7:1
@@ -37,4 +37,4 @@ help: Install `apache-airflow-providers-apache-pig>=1.0.0` and use `PigOperator`
 5 | 
 6 | PigCliHook()
 7 | PigOperator()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

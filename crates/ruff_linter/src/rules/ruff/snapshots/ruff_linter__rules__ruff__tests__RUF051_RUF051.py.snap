@@ -20,7 +20,7 @@ help: Replace `if` statement with `.pop(..., None)`
 8  | 
 9  | if '' in d:                         # String
 10 |     del d[""]                       # Different quotes
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
   --> RUF051.py:11:5
@@ -41,7 +41,7 @@ help: Replace `if` statement with `.pop(..., None)`
 11 | 
 12 | if b"" in d:                        # Bytes
 13 |     del d[                          # Multiline slice
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
   --> RUF051.py:14:5
@@ -66,7 +66,7 @@ help: Replace `if` statement with `.pop(..., None)`
 14 | 
 15 | if 0 in d: del d[0]                 # Single-line statement
 16 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
   --> RUF051.py:18:12
@@ -107,7 +107,7 @@ help: Replace `if` statement with `.pop(..., None)`
 21 | 
 22 | if 0.1234 in d:                     # Float
 23 |     del d[.1_2_3_4]                 # Number separators and shorthand syntax
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
   --> RUF051.py:24:5
@@ -128,7 +128,7 @@ help: Replace `if` statement with `.pop(..., None)`
 24 | 
 25 | if True in d:                       # True
 26 |     del d[True]
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
   --> RUF051.py:27:5
@@ -149,7 +149,7 @@ help: Replace `if` statement with `.pop(..., None)`
 27 | 
 28 | if False in d:                      # False
 29 |     del d[False]
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
   --> RUF051.py:30:5
@@ -170,7 +170,7 @@ help: Replace `if` statement with `.pop(..., None)`
 30 | 
 31 | if None in d:                       # None
 32 |     del d[
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
   --> RUF051.py:33:5
@@ -197,7 +197,7 @@ help: Replace `if` statement with `.pop(..., None)`
 33 | 
 34 | if ... in d:                        # Ellipsis
 35 |     del d[
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
   --> RUF051.py:39:5
@@ -222,7 +222,7 @@ help: Replace `if` statement with `.pop(..., None)`
 39 | 
 40 | if "a" "bc" in d:                   # String concatenation
 41 |     del d['abc']
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
   --> RUF051.py:44:5
@@ -243,7 +243,7 @@ help: Replace `if` statement with `.pop(..., None)`
 44 | 
 45 | if r"\foo" in d:                    # Raw string
 46 |     del d['\\foo']
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
   --> RUF051.py:47:5
@@ -264,7 +264,7 @@ help: Replace `if` statement with `.pop(..., None)`
 47 | 
 48 | if b'yt' b'es' in d:                # Bytes concatenation
 49 |     del d[rb"""ytes"""]             # Raw bytes
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
   --> RUF051.py:50:5
@@ -285,7 +285,7 @@ help: Replace `if` statement with `.pop(..., None)`
 50 | 
 51 | if k in d:
 52 |     # comment that gets dropped
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
   --> RUF051.py:54:5
@@ -308,7 +308,7 @@ help: Replace `if` statement with `.pop(..., None)`
 53 | 
 54 | ### Safely fixable
 55 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
   --> RUF051.py:59:5

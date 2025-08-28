@@ -20,4 +20,4 @@ help: Move out of type-checking block
 8  | 
 9  | 
 10 | def example() -> DataFrame:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

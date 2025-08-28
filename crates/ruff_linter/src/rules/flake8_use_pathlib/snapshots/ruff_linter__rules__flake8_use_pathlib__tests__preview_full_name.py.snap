@@ -24,7 +24,7 @@ help: Replace with `Path(...).resolve()`
 9  | aa = os.chmod(p)
 10 | aaa = os.mkdir(p)
 11 | os.makedirs(p)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PTH101 `os.chmod()` should be replaced by `Path.chmod()`
   --> full_name.py:8:6
@@ -735,7 +735,7 @@ help: Replace with `Path(...).mkdir()`
 115 | 
 116 | os.mkdir("directory", mode=0o777, dir_fd=1)
 117 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PTH103 [*] `os.makedirs()` should be replaced by `Path.mkdir(parents=True)`
    --> full_name.py:121:1

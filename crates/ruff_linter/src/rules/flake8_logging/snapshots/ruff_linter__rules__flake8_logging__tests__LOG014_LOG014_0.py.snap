@@ -19,7 +19,7 @@ help: Remove `exc_info=`
 13 | logger.info("", exc_info=True)
 14 | 
 15 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 LOG014 [*] `exc_info=` outside exception handlers
   --> LOG014_0.py:13:17
@@ -37,7 +37,7 @@ help: Remove `exc_info=`
 14 | 
 15 | 
 16 | logging.info("", exc_info=1)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 LOG014 [*] `exc_info=` outside exception handlers
   --> LOG014_0.py:16:18
@@ -55,7 +55,7 @@ help: Remove `exc_info=`
 17 | logger.info("", exc_info=1)
 18 | 
 19 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 LOG014 [*] `exc_info=` outside exception handlers
   --> LOG014_0.py:17:17
@@ -73,7 +73,7 @@ help: Remove `exc_info=`
 18 | 
 19 | 
 20 | def _():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 LOG014 [*] `exc_info=` outside exception handlers
   --> LOG014_0.py:21:22
@@ -92,7 +92,7 @@ help: Remove `exc_info=`
 22 |     logger.info("", exc_info=True)
 23 | 
 24 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 LOG014 [*] `exc_info=` outside exception handlers
   --> LOG014_0.py:22:21
@@ -111,7 +111,7 @@ help: Remove `exc_info=`
 23 | 
 24 | 
 25 | try:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 LOG014 [*] `exc_info=` outside exception handlers
   --> LOG014_0.py:29:26
@@ -131,7 +131,7 @@ help: Remove `exc_info=`
 30 |         logger.info("", exc_info=True)
 31 | 
 32 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 LOG014 [*] `exc_info=` outside exception handlers
   --> LOG014_0.py:30:25
@@ -150,4 +150,4 @@ help: Remove `exc_info=`
 31 | 
 32 | 
 33 | ### No errors
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

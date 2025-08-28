@@ -19,7 +19,7 @@ help: Replace with `s.discard("x")`
 13 | 
 14 | 
 15 | # FURB132
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB132 [*] Use `s3.discard("x")` instead of check and `remove`
   --> FURB132.py:22:1
@@ -39,7 +39,7 @@ help: Replace with `s3.discard("x")`
 23 | 
 24 | 
 25 | var = "y"
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB132 [*] Use `s.discard(var)` instead of check and `remove`
   --> FURB132.py:28:1
@@ -60,7 +60,7 @@ help: Replace with `s.discard(var)`
 29 | 
 30 | 
 31 | if f"{var}:{var}" in s:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB132 [*] Use `s.discard(f"{var}:{var}")` instead of check and `remove`
   --> FURB132.py:32:1
@@ -79,4 +79,4 @@ help: Replace with `s.discard(f"{var}:{var}")`
 33 | 
 34 | 
 35 | def identity(x):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

@@ -26,4 +26,4 @@ help: Remove assignment to unused variable `x`
 4 | def f():
   -     x = 1
 5 +     pass
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

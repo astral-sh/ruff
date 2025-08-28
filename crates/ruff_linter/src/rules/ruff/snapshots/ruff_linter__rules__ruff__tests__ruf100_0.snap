@@ -150,7 +150,7 @@ help: Remove assignment to unused variable `d`
 32 |     # fmt: on
 33 | 
 34 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF100 [*] Unused `noqa` directive (unused: `E501`)
   --> RUF100_0.py:32:12
@@ -307,7 +307,7 @@ help: Remove assignment to unused variable `e`
 108 | 
 109 | 
 110 | def f():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF100 [*] Unused `noqa` directive (unknown: `E50`)
    --> RUF100_0.py:108:12

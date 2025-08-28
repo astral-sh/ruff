@@ -20,7 +20,7 @@ help: Replace `exit` with `sys.exit()`
 5 |         1,  # 2
 6 |     )  # 3
 7 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR1722 [*] Use `sys.exit()` instead of `exit`
   --> sys_exit_alias_16.py:10:5
@@ -48,7 +48,7 @@ help: Replace `exit` with `sys.exit()`
 13 |     )  # 3
 14 | 
 15 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR1722 Use `sys.exit()` instead of `exit`
   --> sys_exit_alias_16.py:17:5
@@ -79,4 +79,4 @@ help: Replace `exit` with `sys.exit()`
 23 |     codes = [1]
    -     exit(*codes)
 24 +     sys.exit(*codes)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

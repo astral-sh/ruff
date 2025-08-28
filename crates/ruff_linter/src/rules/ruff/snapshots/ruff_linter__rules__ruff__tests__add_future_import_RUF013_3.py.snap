@@ -18,7 +18,7 @@ help: Convert to `T | None`
 6 |     pass
 7 | 
 8 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF013 [*] PEP 484 prohibits implicit `Optional`
   --> RUF013_3.py:22:12
@@ -41,7 +41,7 @@ help: Convert to `T | None`
 24 |     pass
 25 | 
 26 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF013 [*] PEP 484 prohibits implicit `Optional`
   --> RUF013_3.py:29:12
@@ -62,4 +62,4 @@ help: Convert to `T | None`
    - def f(arg: typing.Literal[1, "foo", True] = None):  # RUF013
 30 + def f(arg: typing.Literal[1, "foo", True] | None = None):  # RUF013
 31 |     pass
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

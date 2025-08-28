@@ -18,7 +18,7 @@ help: Add a call to `.items()`
 14 |     pass
 15 | 
 16 | for k, v in d_tuple_incorrect_tuple:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLE1141 [*] Unpacking a dictionary in iteration without calling `.items()`
   --> dict_iter_missing_items.py:16:13
@@ -38,4 +38,4 @@ help: Add a call to `.items()`
 17 |     pass
 18 | 
 19 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

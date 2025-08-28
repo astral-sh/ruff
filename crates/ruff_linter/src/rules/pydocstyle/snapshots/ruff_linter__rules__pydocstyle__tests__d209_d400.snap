@@ -29,4 +29,4 @@ help: Add period
 2 |     """lorem ipsum dolor sit amet consectetur adipiscing elit
   -     sed do eiusmod tempor incididunt ut labore et dolore magna aliqua"""
 3 +     sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."""
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

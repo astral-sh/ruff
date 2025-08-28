@@ -36,7 +36,7 @@ help: Use `list` of `tuple` for parameter values
 3 + @pytest.mark.parametrize(("param",), [(1,), [2]])
 4 | def test_PT006_and_PT007_do_not_conflict(param):
 5 |     ...
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `list` of `tuple`
  --> PT006_and_PT007.py:3:44
@@ -55,4 +55,4 @@ help: Use `list` of `tuple` for parameter values
 3 + @pytest.mark.parametrize(("param",), [[1], (2,)])
 4 | def test_PT006_and_PT007_do_not_conflict(param):
 5 |     ...
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

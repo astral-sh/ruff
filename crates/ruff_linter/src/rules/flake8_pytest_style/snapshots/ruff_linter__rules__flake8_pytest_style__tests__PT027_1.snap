@@ -18,7 +18,7 @@ help: Replace `assertRaises` with `pytest.raises`
 12 |             raise ValueError
 13 | 
 14 |     def test_rewrite_references(self):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PT027 [*] Use `pytest.raises` instead of unittest-style `assertRaises`
   --> PT027_1.py:15:14
@@ -42,7 +42,7 @@ help: Replace `assertRaises` with `pytest.raises`
 20 | 
 21 |     def test_rewrite_references_multiple_items(self):
 22 |         with self.assertRaises(ValueError) as e1, \
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PT027 [*] Use `pytest.raises` instead of unittest-style `assertRaises`
   --> PT027_1.py:22:14
@@ -68,7 +68,7 @@ help: Replace `assertRaises` with `pytest.raises`
 28 | 
 29 |         print(e2.foo)
 30 |         print(e2.exception)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PT027 [*] Use `pytest.raises` instead of unittest-style `assertRaises`
   --> PT027_1.py:23:13
@@ -96,7 +96,7 @@ help: Replace `assertRaises` with `pytest.raises`
 31 | 
 32 |     def test_rewrite_references_multiple_items_nested(self):
 33 |         with self.assertRaises(ValueError) as e1, \
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PT027 [*] Use `pytest.raises` instead of unittest-style `assertRaises`
   --> PT027_1.py:33:14
@@ -122,7 +122,7 @@ help: Replace `assertRaises` with `pytest.raises`
 39 | 
 40 |         print(e2.foo)
 41 |         print(e2.exception)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PT027 [*] Use `pytest.raises` instead of unittest-style `assertRaises`
   --> PT027_1.py:34:17
@@ -142,4 +142,4 @@ help: Replace `assertRaises` with `pytest.raises`
 35 |             raise ValueError
 36 | 
 37 |         print(e1.foo)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

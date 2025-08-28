@@ -17,4 +17,4 @@ help: Replace with `None`; initialize within function
 4 + def foobar(foor, bar=None):    
 5 |     """
 6 |     """
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

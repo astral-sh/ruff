@@ -278,7 +278,7 @@ help: Remove `.keys()`
 35 | 
 36 | (key) in (obj or {}).keys()  # SIM118
 37 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
   --> SIM118.py:36:1
@@ -299,7 +299,7 @@ help: Remove `.keys()`
 37 | 
 38 | from typing import KeysView
 39 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
   --> SIM118.py:50:1
@@ -381,7 +381,7 @@ help: Remove `.keys()`
 59 | ):
 60 |     continue
 61 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
   --> SIM118.py:65:1

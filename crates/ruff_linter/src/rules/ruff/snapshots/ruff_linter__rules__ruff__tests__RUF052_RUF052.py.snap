@@ -21,7 +21,7 @@ help: Remove leading underscores
 94 | 
 95 | def fun(_var): # parameters are ignored
 96 |     return _var
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF052 [*] Local dummy variable `_list` is accessed
    --> RUF052.py:99:5
@@ -42,7 +42,7 @@ help: Prefer using trailing underscores to avoid shadowing a built-in
 101 | 
 102 | x = "global"
 103 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF052 [*] Local dummy variable `_x` is accessed
    --> RUF052.py:106:5
@@ -64,7 +64,7 @@ help: Prefer using trailing underscores to avoid shadowing a variable
 108 | 
 109 | def foo():
 110 |   x = "outer"
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF052 [*] Local dummy variable `_x` is accessed
    --> RUF052.py:113:5
@@ -87,7 +87,7 @@ help: Prefer using trailing underscores to avoid shadowing a variable
 115 |   bar()
 116 |   return x
 117 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF052 [*] Local dummy variable `_x` is accessed
    --> RUF052.py:120:5
@@ -109,7 +109,7 @@ help: Prefer using trailing underscores to avoid shadowing a variable
 122 | 
 123 | 
 124 | GLOBAL_1 = "global 1"
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF052 Local dummy variable `_GLOBAL_1` is accessed
    --> RUF052.py:128:5
@@ -181,7 +181,7 @@ help: Remove leading underscores
 163 | 
 164 | # Do not emit diagnostic if parameter is private
 165 | # even if it is later shadowed in the body of the function
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF052 [*] Local dummy variable `_T` is accessed
    --> RUF052.py:154:5
@@ -210,7 +210,7 @@ help: Remove leading underscores
 163 | 
 164 | # Do not emit diagnostic if parameter is private
 165 | # even if it is later shadowed in the body of the function
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF052 [*] Local dummy variable `_NT` is accessed
    --> RUF052.py:155:5
@@ -239,7 +239,7 @@ help: Remove leading underscores
 163 | 
 164 | # Do not emit diagnostic if parameter is private
 165 | # even if it is later shadowed in the body of the function
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF052 [*] Local dummy variable `_E` is accessed
    --> RUF052.py:156:5
@@ -267,7 +267,7 @@ help: Remove leading underscores
 163 | 
 164 | # Do not emit diagnostic if parameter is private
 165 | # even if it is later shadowed in the body of the function
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF052 [*] Local dummy variable `_NT2` is accessed
    --> RUF052.py:157:5
@@ -294,7 +294,7 @@ help: Remove leading underscores
 163 | 
 164 | # Do not emit diagnostic if parameter is private
 165 | # even if it is later shadowed in the body of the function
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF052 [*] Local dummy variable `_NT3` is accessed
    --> RUF052.py:158:5
@@ -320,7 +320,7 @@ help: Remove leading underscores
 163 | 
 164 | # Do not emit diagnostic if parameter is private
 165 | # even if it is later shadowed in the body of the function
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF052 [*] Local dummy variable `_DynamicClass` is accessed
    --> RUF052.py:159:5
@@ -344,7 +344,7 @@ help: Remove leading underscores
 163 | 
 164 | # Do not emit diagnostic if parameter is private
 165 | # even if it is later shadowed in the body of the function
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF052 [*] Local dummy variable `_NotADynamicClass` is accessed
    --> RUF052.py:160:5
@@ -368,7 +368,7 @@ help: Remove leading underscores
 163 | 
 164 | # Do not emit diagnostic if parameter is private
 165 | # even if it is later shadowed in the body of the function
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF052 [*] Local dummy variable `_dummy_var` is accessed
    --> RUF052.py:182:5
@@ -393,7 +393,7 @@ help: Prefer using trailing underscores to avoid shadowing a variable
 187 | 
 188 | 
 189 | def foo():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF052 Local dummy variable `_dummy_var` is accessed
    --> RUF052.py:192:5

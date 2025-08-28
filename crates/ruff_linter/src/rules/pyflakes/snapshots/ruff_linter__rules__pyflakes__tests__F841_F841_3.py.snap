@@ -17,7 +17,7 @@ help: Remove assignment to unused variable `x`
 5 |     y = 2
 6 | 
 7 |     z = 3
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `y` is assigned to but never used
  --> F841_3.py:6:5
@@ -37,7 +37,7 @@ help: Remove assignment to unused variable `y`
 6 | 
 7 |     z = 3
 8 |     print(z)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `x` is assigned to but never used
   --> F841_3.py:13:5
@@ -55,7 +55,7 @@ help: Remove assignment to unused variable `x`
 13 |     y: int = 2
 14 | 
 15 |     z: int = 3
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `y` is assigned to but never used
   --> F841_3.py:14:5
@@ -75,7 +75,7 @@ help: Remove assignment to unused variable `y`
 14 | 
 15 |     z: int = 3
 16 |     print(z)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `x1` is assigned to but never used
   --> F841_3.py:21:19
@@ -94,7 +94,7 @@ help: Remove assignment to unused variable `x1`
 22 |         pass
 23 | 
 24 |     with foo() as (x2, y2):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `x3` is assigned to but never used
   --> F841_3.py:27:20
@@ -114,7 +114,7 @@ help: Remove assignment to unused variable `x3`
 28 |         pass
 29 | 
 30 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `y3` is assigned to but never used
   --> F841_3.py:27:33
@@ -134,7 +134,7 @@ help: Remove assignment to unused variable `y3`
 28 |         pass
 29 | 
 30 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `z3` is assigned to but never used
   --> F841_3.py:27:46
@@ -154,7 +154,7 @@ help: Remove assignment to unused variable `z3`
 28 |         pass
 29 | 
 30 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `x1` is assigned to but never used
   --> F841_3.py:32:6
@@ -174,7 +174,7 @@ help: Remove assignment to unused variable `x1`
 33 |     (x2, y2) = coords2 = (1, 2)
 34 |     coords3 = (x3, y3) = (1, 2)
 35 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `y1` is assigned to but never used
   --> F841_3.py:32:10
@@ -194,7 +194,7 @@ help: Remove assignment to unused variable `y1`
 33 |     (x2, y2) = coords2 = (1, 2)
 34 |     coords3 = (x3, y3) = (1, 2)
 35 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `coords2` is assigned to but never used
   --> F841_3.py:33:16
@@ -214,7 +214,7 @@ help: Remove assignment to unused variable `coords2`
 34 |     coords3 = (x3, y3) = (1, 2)
 35 | 
 36 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `coords3` is assigned to but never used
   --> F841_3.py:34:5
@@ -233,7 +233,7 @@ help: Remove assignment to unused variable `coords3`
 35 | 
 36 | 
 37 | def f():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `x1` is assigned to but never used
   --> F841_3.py:40:26
@@ -291,7 +291,7 @@ help: Remove assignment to unused variable `x`
 51 |         a()
 52 |         if a is not None
 53 |         else b
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `y` is assigned to but never used
   --> F841_3.py:56:5
@@ -312,7 +312,7 @@ help: Remove assignment to unused variable `y`
 57 | 
 58 | 
 59 | def f(a, b):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `x` is assigned to but never used
   --> F841_3.py:61:5
@@ -335,7 +335,7 @@ help: Remove assignment to unused variable `x`
 61 | 
 62 |     y = \
 63 |         a if a is not None else b
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `y` is assigned to but never used
   --> F841_3.py:67:5
@@ -355,7 +355,7 @@ help: Remove assignment to unused variable `y`
 67 | 
 68 | 
 69 | def f():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `cm` is assigned to but never used
   --> F841_3.py:72:24
@@ -374,7 +374,7 @@ help: Remove assignment to unused variable `cm`
 73 |         pass
 74 | 
 75 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `cm` is assigned to but never used
   --> F841_3.py:77:25
@@ -393,7 +393,7 @@ help: Remove assignment to unused variable `cm`
 78 |         pass
 79 | 
 80 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `cm` is assigned to but never used
   --> F841_3.py:87:26
@@ -412,7 +412,7 @@ help: Remove assignment to unused variable `cm`
 88 |         pass
 89 | 
 90 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `toplevel` is assigned to but never used
   --> F841_3.py:92:5
@@ -432,7 +432,7 @@ help: Remove assignment to unused variable `toplevel`
 93 |     if not tt:
 94 |         break
 95 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `toplevel` is assigned to but never used
   --> F841_3.py:98:5
@@ -450,7 +450,7 @@ help: Remove assignment to unused variable `toplevel`
 99  | 
 100 | 
 101 | def f():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `tt` is assigned to but never used
   --> F841_3.py:98:16
@@ -468,7 +468,7 @@ help: Remove assignment to unused variable `tt`
 99  | 
 100 | 
 101 | def f():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `toplevel` is assigned to but never used
    --> F841_3.py:102:5
@@ -486,7 +486,7 @@ help: Remove assignment to unused variable `toplevel`
 103 | 
 104 | 
 105 | def f():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `toplevel` is assigned to but never used
    --> F841_3.py:106:14
@@ -504,7 +504,7 @@ help: Remove assignment to unused variable `toplevel`
 107 | 
 108 | 
 109 | def f():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `toplevel` is assigned to but never used
    --> F841_3.py:110:5
@@ -522,7 +522,7 @@ help: Remove assignment to unused variable `toplevel`
 111 | 
 112 | 
 113 | def f(provided: int) -> int:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `tt` is assigned to but never used
    --> F841_3.py:110:16
@@ -540,7 +540,7 @@ help: Remove assignment to unused variable `tt`
 111 | 
 112 | 
 113 | def f(provided: int) -> int:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F841 Local variable `x` is assigned to but never used
    --> F841_3.py:115:19
@@ -643,7 +643,7 @@ help: Remove assignment to unused variable `x`
 160 |     y = 2
 161 | 
 162 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `y` is assigned to but never used
    --> F841_3.py:161:5
@@ -661,7 +661,7 @@ help: Remove assignment to unused variable `y`
 161 | 
 162 | 
 163 | def f():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `x` is assigned to but never used
    --> F841_3.py:165:5
@@ -680,7 +680,7 @@ help: Remove assignment to unused variable `x`
 165 | 
 166 |     y = 2
 167 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `y` is assigned to but never used
    --> F841_3.py:167:5
@@ -698,7 +698,7 @@ help: Remove assignment to unused variable `y`
 167 | 
 168 | 
 169 | def f():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `x` is assigned to but never used
    --> F841_3.py:173:6
@@ -714,4 +714,4 @@ help: Remove assignment to unused variable `x`
 172 |     ((x)) = foo()
     -     (x) = (y.z) = foo()
 173 +     (y.z) = foo()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

@@ -18,7 +18,7 @@ help: Add `f` prefix
 6 | 
 7 | 
 8 | def simple_cases():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF027 [*] Possible f-string without an `f` prefix
   --> RUF027_0.py:10:9
@@ -38,7 +38,7 @@ help: Add `f` prefix
 11 |     c = "{a} {b} f'{val}' "  # RUF027
 12 | 
 13 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF027 [*] Possible f-string without an `f` prefix
   --> RUF027_0.py:11:9
@@ -57,7 +57,7 @@ help: Add `f` prefix
 12 | 
 13 | 
 14 | def escaped_string():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF027 [*] Possible f-string without an `f` prefix
   --> RUF027_0.py:21:9
@@ -77,7 +77,7 @@ help: Add `f` prefix
 22 |     c = r"raw string with \backslashes\ and \"escaped quotes\": {a}"  # RUF027
 23 | 
 24 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF027 [*] Possible f-string without an `f` prefix
   --> RUF027_0.py:22:9
@@ -96,7 +96,7 @@ help: Add `f` prefix
 23 | 
 24 | 
 25 | def print_name(name: str):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF027 [*] Possible f-string without an `f` prefix
   --> RUF027_0.py:27:11
@@ -116,7 +116,7 @@ help: Add `f` prefix
 28 |     print("The test value we're using today is {a}")  # RUF027
 29 | 
 30 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF027 [*] Possible f-string without an `f` prefix
   --> RUF027_0.py:28:11
@@ -135,7 +135,7 @@ help: Add `f` prefix
 29 | 
 30 | 
 31 | def nested_funcs():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF027 [*] Possible f-string without an `f` prefix
   --> RUF027_0.py:33:33
@@ -154,7 +154,7 @@ help: Add `f` prefix
 34 | 
 35 | 
 36 | def tripled_quoted():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF027 [*] Possible f-string without an `f` prefix
   --> RUF027_0.py:39:19
@@ -175,7 +175,7 @@ help: Add `f` prefix
 40 |     # RUF027
 41 |     multi_line = a = """b { # comment
 42 |     c}  d
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF027 [*] Possible f-string without an `f` prefix
   --> RUF027_0.py:41:22
@@ -197,7 +197,7 @@ help: Add `f` prefix
 42 |     c}  d
 43 |     """
 44 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF027 [*] Possible f-string without an `f` prefix
   --> RUF027_0.py:49:9
@@ -219,7 +219,7 @@ help: Add `f` prefix
 50 |     a} \
 51 |     "
 52 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF027 [*] Possible f-string without an `f` prefix
   --> RUF027_0.py:56:9
@@ -239,7 +239,7 @@ help: Add `f` prefix
 57 |     print(f"{a}" "{a}" f"{b}")  # RUF027
 58 | 
 59 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF027 [*] Possible f-string without an `f` prefix
   --> RUF027_0.py:57:18
@@ -258,7 +258,7 @@ help: Add `f` prefix
 58 | 
 59 | 
 60 | def escaped_chars():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF027 [*] Possible f-string without an `f` prefix
   --> RUF027_0.py:62:9
@@ -277,7 +277,7 @@ help: Add `f` prefix
 63 | 
 64 | 
 65 | def method_calls():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF027 [*] Possible f-string without an `f` prefix
   --> RUF027_0.py:70:18
@@ -298,7 +298,7 @@ help: Add `f` prefix
 71 | 
 72 | def format_specifiers():
 73 |     a = 4
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF027 [*] Possible f-string without an `f` prefix
   --> RUF027_0.py:74:9
@@ -319,4 +319,4 @@ help: Add `f` prefix
 75 | 
 76 | # fstrings are never correct as type definitions
 77 | # so we should always skip those
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

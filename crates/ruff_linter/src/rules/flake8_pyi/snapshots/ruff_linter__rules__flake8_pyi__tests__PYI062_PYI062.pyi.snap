@@ -283,7 +283,7 @@ help: Remove duplicates
 18 | 
 19 | # Ensure issue is only raised once, even on nested literals
 20 | MyType = Literal["foo", Literal[True, False, True], "bar"]  # PYI062
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PYI062 [*] Duplicate literal member `True`
   --> PYI062.pyi:25:46

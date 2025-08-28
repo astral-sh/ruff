@@ -20,7 +20,7 @@ help: Replace with octal literal
 7 | os.chmod("foo", 0o444)  # OK
 8 | os.chmod("foo", 7777)  # Error
 9 | os.chmod("foo", 10000)  # Error
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF064 Non-octal mode
   --> RUF064.py:8:17
@@ -75,7 +75,7 @@ help: Replace with octal literal
 13 | os.umask(0o777)  # OK
 14 | 
 15 | os.fchmod(0, 400)  # Error
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF064 [*] Non-octal mode
   --> RUF064.py:15:14
@@ -95,7 +95,7 @@ help: Replace with octal literal
 16 | os.fchmod(0, 0o400)  # OK
 17 | 
 18 | os.lchmod("foo", 755)  # Error
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF064 [*] Non-octal mode
   --> RUF064.py:18:18
@@ -115,7 +115,7 @@ help: Replace with octal literal
 19 | os.lchmod("foo", 0o755)  # OK
 20 | 
 21 | os.mkdir("foo", 600)  # Error
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF064 [*] Non-octal mode
   --> RUF064.py:21:17
@@ -135,7 +135,7 @@ help: Replace with octal literal
 22 | os.mkdir("foo", 0o600)  # OK
 23 | 
 24 | os.makedirs("foo", 644)  # Error
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF064 [*] Non-octal mode
   --> RUF064.py:24:20
@@ -155,7 +155,7 @@ help: Replace with octal literal
 25 | os.makedirs("foo", 0o644)  # OK
 26 | 
 27 | os.mkfifo("foo", 640)  # Error
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF064 [*] Non-octal mode
   --> RUF064.py:27:18
@@ -175,7 +175,7 @@ help: Replace with octal literal
 28 | os.mkfifo("foo", 0o640)  # OK
 29 | 
 30 | os.mknod("foo", 660)  # Error
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF064 [*] Non-octal mode
   --> RUF064.py:30:17
@@ -195,7 +195,7 @@ help: Replace with octal literal
 31 | os.mknod("foo", 0o660)  # OK
 32 | 
 33 | os.open("foo", os.O_CREAT, 644)  # Error
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF064 [*] Non-octal mode
   --> RUF064.py:33:28
@@ -215,7 +215,7 @@ help: Replace with octal literal
 34 | os.open("foo", os.O_CREAT, 0o644)  # OK
 35 | 
 36 | Path("bar").chmod(755)  # Error
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF064 [*] Non-octal mode
   --> RUF064.py:36:19
@@ -235,7 +235,7 @@ help: Replace with octal literal
 37 | Path("bar").chmod(0o755)  # OK
 38 | 
 39 | path = Path("bar")
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF064 [*] Non-octal mode
   --> RUF064.py:40:12
@@ -254,7 +254,7 @@ help: Replace with octal literal
 41 | path.chmod(0o755)  # OK
 42 | 
 43 | dbm.open("db", "r", 600)  # Error
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF064 [*] Non-octal mode
   --> RUF064.py:43:21
@@ -274,7 +274,7 @@ help: Replace with octal literal
 44 | dbm.open("db", "r", 0o600)  # OK
 45 | 
 46 | dbm.gnu.open("db", "r", 600)  # Error
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF064 [*] Non-octal mode
   --> RUF064.py:46:25
@@ -294,7 +294,7 @@ help: Replace with octal literal
 47 | dbm.gnu.open("db", "r", 0o600)  # OK
 48 | 
 49 | dbm.ndbm.open("db", "r", 600)  # Error
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF064 [*] Non-octal mode
   --> RUF064.py:49:26
@@ -314,7 +314,7 @@ help: Replace with octal literal
 50 | dbm.ndbm.open("db", "r", 0o600)  # OK
 51 | 
 52 | os.fchmod(0, 256)  # 0o400
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF064 [*] Non-octal mode
   --> RUF064.py:52:14
@@ -334,7 +334,7 @@ help: Replace with octal literal
 53 | os.fchmod(0, 493)  # 0o755
 54 | 
 55 | # https://github.com/astral-sh/ruff/issues/19010
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF064 [*] Non-octal mode
   --> RUF064.py:53:14
@@ -354,7 +354,7 @@ help: Replace with octal literal
 54 | 
 55 | # https://github.com/astral-sh/ruff/issues/19010
 56 | os.chmod("foo", 000)  # Error
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF064 [*] Non-octal mode
   --> RUF064.py:56:17

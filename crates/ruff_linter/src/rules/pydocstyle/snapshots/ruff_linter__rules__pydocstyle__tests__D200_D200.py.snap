@@ -29,7 +29,7 @@ help: Reformat to one line
 8  | 
 9  | 
 10 | def func():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 D200 One-line docstring should fit on one line
   --> D200.py:12:5

@@ -112,4 +112,4 @@ help: Replace with `callable()`
    -     # comment 5
    - )
 35 + callable(obj)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

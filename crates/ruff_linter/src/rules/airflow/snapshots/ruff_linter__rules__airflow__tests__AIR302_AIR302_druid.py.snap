@@ -25,7 +25,7 @@ help: Install `apache-airflow-providers-apache-druid>=1.0.0` and use `DruidDbApi
 11 | 
 12 | DruidDbApiHook()
 13 | DruidHook()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.hooks.druid_hook.DruidHook` is moved into `apache-druid` provider in Airflow 3.0;
   --> AIR302_druid.py:13:1
@@ -50,7 +50,7 @@ help: Install `apache-airflow-providers-apache-druid>=1.0.0` and use `DruidHook`
 11 | 
 12 | DruidDbApiHook()
 13 | DruidHook()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.hive_to_druid.HiveToDruidOperator` is moved into `apache-druid` provider in Airflow 3.0;
   --> AIR302_druid.py:15:1
@@ -72,7 +72,7 @@ help: Install `apache-airflow-providers-apache-druid>=1.0.0` and use `HiveToDrui
 11 | 
 12 | DruidDbApiHook()
 13 | DruidHook()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 AIR302 [*] `airflow.operators.hive_to_druid.HiveToDruidTransfer` is moved into `apache-druid` provider in Airflow 3.0;
   --> AIR302_druid.py:16:1
@@ -92,4 +92,4 @@ help: Install `apache-airflow-providers-apache-druid>=1.0.0` and use `HiveToDrui
 11 | 
 12 | DruidDbApiHook()
 13 | DruidHook()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

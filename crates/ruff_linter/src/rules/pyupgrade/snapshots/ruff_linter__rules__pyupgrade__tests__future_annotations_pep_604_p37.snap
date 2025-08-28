@@ -17,4 +17,4 @@ help: Convert to `X | None`
 40 + x: int | None = None
 41 | 
 42 | MyList: TypeAlias = Union[List[int], List[str]]
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

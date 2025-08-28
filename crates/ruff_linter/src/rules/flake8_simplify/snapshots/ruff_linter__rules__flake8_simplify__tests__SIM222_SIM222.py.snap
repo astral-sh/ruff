@@ -14,7 +14,7 @@ help: Replace with `True`
 2 |     pass
 3 | 
 4 | if (a or b) or True:  # SIM222
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM222 [*] Use `True` instead of `... or True`
  --> SIM222.py:4:4
@@ -34,7 +34,7 @@ help: Replace with `True`
 5 |     pass
 6 | 
 7 | if a or (b or True):  # SIM222
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM222 [*] Use `True` instead of `... or True`
  --> SIM222.py:7:10
@@ -54,7 +54,7 @@ help: Replace with `True`
 8  |     pass
 9  | 
 10 | if a and True:  # OK
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM222 [*] Use `True` instead of `True or ...`
   --> SIM222.py:24:16
@@ -74,7 +74,7 @@ help: Replace with `True`
 25 |     pass
 26 | 
 27 | if True or f() or a or g() or b:  # SIM222
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM222 [*] Use `True` instead of `True or ...`
   --> SIM222.py:27:4
@@ -94,7 +94,7 @@ help: Replace with `True`
 28 |     pass
 29 | 
 30 | if a or True or f() or b or g():  # SIM222
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM222 [*] Use `True` instead of `... or True or ...`
   --> SIM222.py:30:4
@@ -114,7 +114,7 @@ help: Replace with `True`
 31 |     pass
 32 | 
 33 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM222 [*] Use `True` instead of `... or True`
   --> SIM222.py:47:6
@@ -133,7 +133,7 @@ help: Replace with `True`
 48 | 
 49 | a or "foo" or True or "bar"  # SIM222
 50 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM222 [*] Use `"foo"` instead of `"foo" or ...`
   --> SIM222.py:49:6
@@ -154,7 +154,7 @@ help: Replace with `"foo"`
 50 | 
 51 | a or 0 or True  # SIM222
 52 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM222 [*] Use `True` instead of `... or True`
   --> SIM222.py:51:6
@@ -175,7 +175,7 @@ help: Replace with `True`
 52 | 
 53 | a or 1 or True or 2  # SIM222
 54 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM222 [*] Use `1` instead of `1 or ...`
   --> SIM222.py:53:6
@@ -196,7 +196,7 @@ help: Replace with `1`
 54 | 
 55 | a or 0.0 or True  # SIM222
 56 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM222 [*] Use `True` instead of `... or True`
   --> SIM222.py:55:6
@@ -217,7 +217,7 @@ help: Replace with `True`
 56 | 
 57 | a or 0.1 or True or 0.2  # SIM222
 58 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM222 [*] Use `0.1` instead of `0.1 or ...`
   --> SIM222.py:57:6
@@ -238,7 +238,7 @@ help: Replace with `0.1`
 58 | 
 59 | a or [] or True  # SIM222
 60 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM222 [*] Use `True` instead of `... or True`
   --> SIM222.py:59:6
@@ -259,7 +259,7 @@ help: Replace with `True`
 60 | 
 61 | a or list([]) or True  # SIM222
 62 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM222 [*] Use `True` instead of `... or True`
   --> SIM222.py:61:6
@@ -280,7 +280,7 @@ help: Replace with `True`
 62 | 
 63 | a or [1] or True or [2]  # SIM222
 64 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM222 [*] Use `[1]` instead of `[1] or ...`
   --> SIM222.py:63:6
@@ -301,7 +301,7 @@ help: Replace with `[1]`
 64 | 
 65 | a or list([1]) or True or list([2])  # SIM222
 66 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM222 [*] Use `list([1])` instead of `list([1]) or ...`
   --> SIM222.py:65:6
@@ -322,7 +322,7 @@ help: Replace with `list([1])`
 66 | 
 67 | a or {} or True  # SIM222
 68 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM222 [*] Use `True` instead of `... or True`
   --> SIM222.py:67:6
@@ -343,7 +343,7 @@ help: Replace with `True`
 68 | 
 69 | a or dict() or True  # SIM222
 70 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM222 [*] Use `True` instead of `... or True`
   --> SIM222.py:69:6
@@ -364,7 +364,7 @@ help: Replace with `True`
 70 | 
 71 | a or {1: 1} or True or {2: 2}  # SIM222
 72 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM222 [*] Use `{1: 1}` instead of `{1: 1} or ...`
   --> SIM222.py:71:6
@@ -385,7 +385,7 @@ help: Replace with `{1: 1}`
 72 | 
 73 | a or dict({1: 1}) or True or dict({2: 2})  # SIM222
 74 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM222 [*] Use `dict({1: 1})` instead of `dict({1: 1}) or ...`
   --> SIM222.py:73:6
@@ -406,7 +406,7 @@ help: Replace with `dict({1: 1})`
 74 | 
 75 | a or set() or True  # SIM222
 76 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM222 [*] Use `True` instead of `... or True`
   --> SIM222.py:75:6
@@ -427,7 +427,7 @@ help: Replace with `True`
 76 | 
 77 | a or set(set()) or True  # SIM222
 78 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM222 [*] Use `True` instead of `... or True`
   --> SIM222.py:77:6
@@ -448,7 +448,7 @@ help: Replace with `True`
 78 | 
 79 | a or {1} or True or {2}  # SIM222
 80 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM222 [*] Use `{1}` instead of `{1} or ...`
   --> SIM222.py:79:6
@@ -469,7 +469,7 @@ help: Replace with `{1}`
 80 | 
 81 | a or set({1}) or True or set({2})  # SIM222
 82 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM222 [*] Use `set({1})` instead of `set({1}) or ...`
   --> SIM222.py:81:6
@@ -490,7 +490,7 @@ help: Replace with `set({1})`
 82 | 
 83 | a or () or True  # SIM222
 84 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM222 [*] Use `True` instead of `... or True`
   --> SIM222.py:83:6
@@ -511,7 +511,7 @@ help: Replace with `True`
 84 | 
 85 | a or tuple(()) or True  # SIM222
 86 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM222 [*] Use `True` instead of `... or True`
   --> SIM222.py:85:6
@@ -532,7 +532,7 @@ help: Replace with `True`
 86 | 
 87 | a or (1,) or True or (2,)  # SIM222
 88 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM222 [*] Use `(1,)` instead of `(1,) or ...`
   --> SIM222.py:87:6
@@ -553,7 +553,7 @@ help: Replace with `(1,)`
 88 | 
 89 | a or tuple((1,)) or True or tuple((2,))  # SIM222
 90 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM222 [*] Use `tuple((1,))` instead of `tuple((1,)) or ...`
   --> SIM222.py:89:6
@@ -574,7 +574,7 @@ help: Replace with `tuple((1,))`
 90 | 
 91 | a or frozenset() or True  # SIM222
 92 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM222 [*] Use `True` instead of `... or True`
   --> SIM222.py:91:6
@@ -595,7 +595,7 @@ help: Replace with `True`
 92 | 
 93 | a or frozenset(frozenset()) or True  # SIM222
 94 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM222 [*] Use `True` instead of `... or True`
   --> SIM222.py:93:6
@@ -616,7 +616,7 @@ help: Replace with `True`
 94 | 
 95 | a or frozenset({1}) or True or frozenset({2})  # SIM222
 96 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM222 [*] Use `frozenset({1})` instead of `frozenset({1}) or ...`
   --> SIM222.py:95:6
@@ -637,7 +637,7 @@ help: Replace with `frozenset({1})`
 96 | 
 97 | a or frozenset(frozenset({1})) or True or frozenset(frozenset({2}))  # SIM222
 98 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM222 [*] Use `frozenset(frozenset({1}))` instead of `frozenset(frozenset({1})) or ...`
   --> SIM222.py:97:6
@@ -656,7 +656,7 @@ help: Replace with `frozenset(frozenset({1}))`
 98  | 
 99  | 
 100 | # Inside test `a` is simplified.
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM222 [*] Use `True` instead of `... or True or ...`
    --> SIM222.py:102:6
@@ -677,7 +677,7 @@ help: Replace with `True`
 103 | 
 104 | assert a or [1] or True or [2]  # SIM222
 105 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM222 [*] Use `True` instead of `... or True or ...`
    --> SIM222.py:104:8
@@ -698,7 +698,7 @@ help: Replace with `True`
 105 | 
 106 | if (a or [1] or True or [2]) and (a or [1] or True or [2]):  # SIM222
 107 |     pass
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM222 [*] Use `True` instead of `... or True or ...`
    --> SIM222.py:106:5
@@ -718,7 +718,7 @@ help: Replace with `True`
 107 |     pass
 108 | 
 109 | 0 if a or [1] or True or [2] else 1  # SIM222
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM222 [*] Use `True` instead of `... or True or ...`
    --> SIM222.py:106:35
@@ -738,7 +738,7 @@ help: Replace with `True`
 107 |     pass
 108 | 
 109 | 0 if a or [1] or True or [2] else 1  # SIM222
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM222 [*] Use `True` instead of `... or True or ...`
    --> SIM222.py:109:6
@@ -759,7 +759,7 @@ help: Replace with `True`
 110 | 
 111 | while a or [1] or True or [2]:  # SIM222
 112 |     pass
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM222 [*] Use `True` instead of `... or True or ...`
    --> SIM222.py:111:7
@@ -779,7 +779,7 @@ help: Replace with `True`
 112 |     pass
 113 | 
 114 | [
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM222 [*] Use `True` instead of `... or True or ...`
    --> SIM222.py:118:8
@@ -800,7 +800,7 @@ help: Replace with `True`
 119 |     if b or [1] or True or [2]  # SIM222
 120 | ]
 121 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM222 [*] Use `True` instead of `... or True or ...`
    --> SIM222.py:119:8
@@ -820,7 +820,7 @@ help: Replace with `True`
 120 | ]
 121 | 
 122 | {
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM222 [*] Use `True` instead of `... or True or ...`
    --> SIM222.py:126:8
@@ -841,7 +841,7 @@ help: Replace with `True`
 127 |     if b or [1] or True or [2]  # SIM222
 128 | }
 129 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM222 [*] Use `True` instead of `... or True or ...`
    --> SIM222.py:127:8
@@ -861,7 +861,7 @@ help: Replace with `True`
 128 | }
 129 | 
 130 | {
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM222 [*] Use `True` instead of `... or True or ...`
    --> SIM222.py:134:8
@@ -882,7 +882,7 @@ help: Replace with `True`
 135 |     if b or [1] or True or [2]  # SIM222
 136 | }
 137 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM222 [*] Use `True` instead of `... or True or ...`
    --> SIM222.py:135:8
@@ -902,7 +902,7 @@ help: Replace with `True`
 136 | }
 137 | 
 138 | (
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM222 [*] Use `True` instead of `... or True or ...`
    --> SIM222.py:142:8
@@ -923,7 +923,7 @@ help: Replace with `True`
 143 |     if b or [1] or True or [2]  # SIM222
 144 | )
 145 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM222 [*] Use `True` instead of `... or True or ...`
    --> SIM222.py:143:8
@@ -943,7 +943,7 @@ help: Replace with `True`
 144 | )
 145 | 
 146 | # Outside test `a` is not simplified.
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM222 [*] Use `[1]` instead of `[1] or ...`
    --> SIM222.py:148:6
@@ -964,7 +964,7 @@ help: Replace with `[1]`
 149 | 
 150 | if (a or [1] or True or [2]) == (a or [1]):  # SIM222
 151 |     pass
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM222 [*] Use `[1]` instead of `[1] or ...`
    --> SIM222.py:150:10
@@ -984,7 +984,7 @@ help: Replace with `[1]`
 151 |     pass
 152 | 
 153 | if f(a or [1] or True or [2]):  # SIM222
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM222 [*] Use `[1]` instead of `[1] or ...`
    --> SIM222.py:153:11
@@ -1004,7 +1004,7 @@ help: Replace with `[1]`
 154 |     pass
 155 | 
 156 | # Regression test for: https://github.com/astral-sh/ruff/issues/7099
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM222 [*] Use `(int, int, int)` instead of `(int, int, int) or ...`
    --> SIM222.py:157:30
@@ -1023,7 +1023,7 @@ help: Replace with `(int, int, int)`
 158 |     m, s = divmod(s0, 60)
 159 | 
 160 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM222 [*] Use `(int, int, int)` instead of `(int, int, int) or ...`
    --> SIM222.py:161:31
@@ -1041,7 +1041,7 @@ help: Replace with `(int, int, int)`
 162 |     m, s = divmod(s0, 60)
 163 | 
 164 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM222 [*] Use `"bar"` instead of `... or "bar"`
    --> SIM222.py:168:7
@@ -1061,4 +1061,4 @@ help: Replace with `"bar"`
 169 | print(f"{1}{''}" or "bar")
 170 | 
 171 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

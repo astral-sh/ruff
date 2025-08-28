@@ -189,4 +189,4 @@ help: Remove unnecessary `__future__` import
 13 |     from __future__ import generator_stop
 14 |     from __future__ import invalid_module, generators
    -     from __future__ import generators  # comment
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

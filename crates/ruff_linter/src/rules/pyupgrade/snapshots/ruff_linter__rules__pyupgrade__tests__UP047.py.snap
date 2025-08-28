@@ -17,7 +17,7 @@ help: Use type parameters
 13 |     return t
 14 | 
 15 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP047 [*] Generic function `g` should use type parameters
   --> UP047.py:16:5
@@ -35,7 +35,7 @@ help: Use type parameters
 17 |     return ts
 18 | 
 19 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP047 [*] Generic function `h` should use type parameters
   --> UP047.py:20:5
@@ -59,7 +59,7 @@ help: Use type parameters
 21 |     p: Callable[P, T],
 22 |     # Comment in the middle of a parameter list should be preserved
 23 |     another_param,
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP047 [*] Generic function `i` should use type parameters
   --> UP047.py:29:5
@@ -77,7 +77,7 @@ help: Use type parameters
 30 |     return s
 31 | 
 32 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP047 [*] Generic function `broken_fix` should use type parameters
   --> UP047.py:39:5
@@ -97,7 +97,7 @@ help: Use type parameters
 40 |     return (okay, bad)
 41 | 
 42 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP047 [*] Generic function `any_str_param` should use type parameters
   --> UP047.py:43:5
@@ -115,4 +115,4 @@ help: Use type parameters
 44 |     return s
 45 | 
 46 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

@@ -15,7 +15,7 @@ help: Rewrite as a dict literal
 2 | d2 = dict(((1, 2),))
 3 | d3 = dict([])
 4 | d4 = dict(())
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C406 [*] Unnecessary tuple literal (rewrite as a dict literal)
  --> C406.py:2:6
@@ -33,7 +33,7 @@ help: Rewrite as a dict literal
 3 | d3 = dict([])
 4 | d4 = dict(())
 5 | d5 = dict()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C406 [*] Unnecessary list literal (rewrite as a dict literal)
  --> C406.py:3:6
@@ -52,7 +52,7 @@ help: Rewrite as a dict literal
 3 + d3 = {}
 4 | d4 = dict(())
 5 | d5 = dict()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C406 [*] Unnecessary tuple literal (rewrite as a dict literal)
  --> C406.py:4:6
@@ -70,4 +70,4 @@ help: Rewrite as a dict literal
   - d4 = dict(())
 4 + d4 = {}
 5 | d5 = dict()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

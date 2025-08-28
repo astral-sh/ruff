@@ -221,4 +221,4 @@ help: Replace with `dict.fromkeys(iterable, value)`)
    - iterable # 8
    - } # 9
 95 + dict.fromkeys(iterable) # 9
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

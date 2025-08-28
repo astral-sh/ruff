@@ -24,7 +24,7 @@ help: Replace with `typing.Annotated`
 12 |     return echo
 13 | 
 14 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FAST002 [*] FastAPI dependency without `Annotated`
   --> FAST002_1.py:15:14
@@ -51,7 +51,7 @@ help: Replace with `typing.Annotated`
 17 |     return echo
 18 | 
 19 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FAST002 [*] FastAPI dependency without `Annotated`
   --> FAST002_1.py:20:14
@@ -76,4 +76,4 @@ help: Replace with `typing.Annotated`
    - def handler3(echo: str = Query("123", min_length=3, max_length=50)):
 21 + def handler3(echo: Annotated[str, Query(min_length=3, max_length=50)] = "123"):
 22 |     return echo
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

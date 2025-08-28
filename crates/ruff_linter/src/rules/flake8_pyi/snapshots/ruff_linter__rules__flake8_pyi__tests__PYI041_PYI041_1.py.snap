@@ -177,7 +177,7 @@ help: Remove redundant type
 61 |     ) -> None: 
 62 |     ...
 63 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PYI041 [*] Use `complex` instead of `int | float | complex`
   --> PYI041_1.py:68:9
@@ -200,7 +200,7 @@ help: Remove redundant type
 68 |         complex
 69 |     )    
 70 |     ) -> None: 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PYI041 [*] Use `complex` instead of `int | float | complex`
   --> PYI041_1.py:80:24

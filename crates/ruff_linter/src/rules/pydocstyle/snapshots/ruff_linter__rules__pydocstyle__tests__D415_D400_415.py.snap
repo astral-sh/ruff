@@ -36,4 +36,4 @@ help: Add closing punctuation
    -     """Here's a line ending with a whitespace  """
 19 +     """Here's a line ending with a whitespace.  """
 20 |     ...
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

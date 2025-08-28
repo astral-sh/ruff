@@ -16,4 +16,4 @@ help: Install `apache-airflow-providers-papermill>=1.0.0` and use `PapermillOper
 3 + from airflow.providers.papermill.operators.papermill import PapermillOperator
 4 | 
 5 | PapermillOperator()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

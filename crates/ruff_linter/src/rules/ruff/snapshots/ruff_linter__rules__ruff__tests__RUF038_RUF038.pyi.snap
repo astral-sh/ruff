@@ -18,7 +18,7 @@ help: Replace with `bool`
 5 | 
 6 | def func2(arg1: Literal[True, False, True]): ...
 7 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF038 [*] `Literal[True, False]` can be replaced with `bool`
  --> RUF038.pyi:6:17
@@ -39,7 +39,7 @@ help: Replace with `bool`
 7 | 
 8 | def func3() -> Literal[True, False]: ...
 9 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF038 [*] `Literal[True, False]` can be replaced with `bool`
   --> RUF038.pyi:8:16
@@ -60,7 +60,7 @@ help: Replace with `bool`
 9  | 
 10 | def func4(arg1: Literal[True, False] | bool): ...
 11 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF038 [*] `Literal[True, False]` can be replaced with `bool`
   --> RUF038.pyi:10:17
@@ -81,7 +81,7 @@ help: Replace with `bool`
 11 | 
 12 | def func5(arg1: Literal[False, True]): ...
 13 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF038 [*] `Literal[True, False]` can be replaced with `bool`
   --> RUF038.pyi:12:17
@@ -102,7 +102,7 @@ help: Replace with `bool`
 13 | 
 14 | def func6(arg1: Literal[True, False, "hello", "world"]): ...
 15 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF038 `Literal[True, False, ...]` can be replaced with `Literal[...] | bool`
   --> RUF038.pyi:14:17

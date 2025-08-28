@@ -57,7 +57,7 @@ help: Replace with `exception`
 28 | 
 29 |         if True:
 30 |             logger.error("Context message here")
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TRY400 [*] Use `logging.exception` instead of `logging.error`
   --> TRY400.py:30:13
@@ -75,7 +75,7 @@ help: Replace with `exception`
 31 | 
 32 | 
 33 | def bad():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TRY400 [*] Use `logging.exception` instead of `logging.error`
   --> TRY400.py:37:9
@@ -96,7 +96,7 @@ help: Replace with `exception`
 38 | 
 39 |         if True:
 40 |             log.error("Context message here")
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TRY400 [*] Use `logging.exception` instead of `logging.error`
   --> TRY400.py:40:13
@@ -114,7 +114,7 @@ help: Replace with `exception`
 41 | 
 42 | 
 43 | def bad():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TRY400 [*] Use `logging.exception` instead of `logging.error`
   --> TRY400.py:47:9
@@ -135,7 +135,7 @@ help: Replace with `exception`
 48 | 
 49 |         if True:
 50 |             self.logger.error("Context message here")
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TRY400 [*] Use `logging.exception` instead of `logging.error`
   --> TRY400.py:50:13
@@ -153,7 +153,7 @@ help: Replace with `exception`
 51 | 
 52 | 
 53 | def good():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TRY400 [*] Use `logging.exception` instead of `logging.error`
    --> TRY400.py:100:9

@@ -17,7 +17,7 @@ help: Replace with `clear()`
 12 | 
 13 | 
 14 | # FURB131
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB131 [*] Prefer `clear` over deleting a full slice
   --> FURB131.py:15:1
@@ -35,7 +35,7 @@ help: Replace with `clear()`
 16 | 
 17 | 
 18 | # FURB131
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB131 Prefer `clear` over deleting a full slice
   --> FURB131.py:19:1
@@ -72,7 +72,7 @@ help: Replace with `clear()`
 29 | 
 30 | 
 31 | def yes_two(x: dict[int, str]):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB131 [*] Prefer `clear` over deleting a full slice
   --> FURB131.py:33:5
@@ -91,7 +91,7 @@ help: Replace with `clear()`
 34 | 
 35 | 
 36 | def yes_three(x: List[int]):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB131 [*] Prefer `clear` over deleting a full slice
   --> FURB131.py:38:5
@@ -110,7 +110,7 @@ help: Replace with `clear()`
 39 | 
 40 | 
 41 | def yes_four(x: Dict[int, str]):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB131 [*] Prefer `clear` over deleting a full slice
   --> FURB131.py:43:5
@@ -129,7 +129,7 @@ help: Replace with `clear()`
 44 | 
 45 | 
 46 | def yes_five(x: Dict[int, str]):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB131 [*] Prefer `clear` over deleting a full slice
   --> FURB131.py:48:5
@@ -150,7 +150,7 @@ help: Replace with `clear()`
 49 | 
 50 |     x = 1
 51 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB131 [*] Prefer `clear` over deleting a full slice
   --> FURB131.py:58:1
@@ -171,4 +171,4 @@ help: Replace with `clear()`
 59 | 
 60 | # these should not
 61 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

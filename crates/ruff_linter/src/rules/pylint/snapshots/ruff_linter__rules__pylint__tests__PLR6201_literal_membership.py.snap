@@ -17,7 +17,7 @@ help: Convert to `set`
 3 | 1 in (1, 2, 3)
 4 | 1 in (
 5 |     1, 2, 3
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR6201 [*] Use a set literal when testing for membership
  --> literal_membership.py:3:6
@@ -37,7 +37,7 @@ help: Convert to `set`
 4 | 1 in (
 5 |     1, 2, 3
 6 | )
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR6201 [*] Use a set literal when testing for membership
  --> literal_membership.py:4:6
@@ -64,7 +64,7 @@ help: Convert to `set`
 7 | fruits = ["cherry", "grapes"]
 8 | "cherry" in fruits
 9 | _ = {key: value for key, value in {"a": 1, "b": 2}.items() if key in ("a", "b")}
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLR6201 [*] Use a set literal when testing for membership
   --> literal_membership.py:9:70
@@ -85,4 +85,4 @@ help: Convert to `set`
 10 | 
 11 | # OK
 12 | fruits in [[1, 2, 3], [4, 5, 6]]
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

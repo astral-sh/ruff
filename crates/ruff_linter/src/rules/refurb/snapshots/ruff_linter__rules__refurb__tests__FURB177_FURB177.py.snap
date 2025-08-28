@@ -18,7 +18,7 @@ help: Replace `Path().resolve()` with `Path.cwd()`
 6 | _ = pathlib.Path().resolve()
 7 | 
 8 | _ = Path("").resolve()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB177 [*] Prefer `Path.cwd()` over `Path().resolve()` for current-directory lookups
  --> FURB177.py:6:5
@@ -39,7 +39,7 @@ help: Replace `Path().resolve()` with `Path.cwd()`
 7 | 
 8 | _ = Path("").resolve()
 9 | _ = pathlib.Path("").resolve()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB177 [*] Prefer `Path.cwd()` over `Path().resolve()` for current-directory lookups
  --> FURB177.py:8:5
@@ -59,7 +59,7 @@ help: Replace `Path().resolve()` with `Path.cwd()`
 9  | _ = pathlib.Path("").resolve()
 10 | 
 11 | _ = Path(".").resolve()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB177 [*] Prefer `Path.cwd()` over `Path().resolve()` for current-directory lookups
   --> FURB177.py:9:5
@@ -79,7 +79,7 @@ help: Replace `Path().resolve()` with `Path.cwd()`
 10 | 
 11 | _ = Path(".").resolve()
 12 | _ = pathlib.Path(".").resolve()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB177 [*] Prefer `Path.cwd()` over `Path().resolve()` for current-directory lookups
   --> FURB177.py:11:5
@@ -99,7 +99,7 @@ help: Replace `Path().resolve()` with `Path.cwd()`
 12 | _ = pathlib.Path(".").resolve()
 13 | 
 14 | _ = Path("", **kwargs).resolve()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB177 [*] Prefer `Path.cwd()` over `Path().resolve()` for current-directory lookups
   --> FURB177.py:12:5
@@ -119,7 +119,7 @@ help: Replace `Path().resolve()` with `Path.cwd()`
 13 | 
 14 | _ = Path("", **kwargs).resolve()
 15 | _ = pathlib.Path("", **kwargs).resolve()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB177 [*] Prefer `Path.cwd()` over `Path().resolve()` for current-directory lookups
   --> FURB177.py:14:5
@@ -139,7 +139,7 @@ help: Replace `Path().resolve()` with `Path.cwd()`
 15 | _ = pathlib.Path("", **kwargs).resolve()
 16 | 
 17 | _ = Path(".", **kwargs).resolve()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB177 [*] Prefer `Path.cwd()` over `Path().resolve()` for current-directory lookups
   --> FURB177.py:15:5
@@ -159,7 +159,7 @@ help: Replace `Path().resolve()` with `Path.cwd()`
 16 | 
 17 | _ = Path(".", **kwargs).resolve()
 18 | _ = pathlib.Path(".", **kwargs).resolve()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB177 [*] Prefer `Path.cwd()` over `Path().resolve()` for current-directory lookups
   --> FURB177.py:17:5
@@ -179,7 +179,7 @@ help: Replace `Path().resolve()` with `Path.cwd()`
 18 | _ = pathlib.Path(".", **kwargs).resolve()
 19 | 
 20 | # OK
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB177 [*] Prefer `Path.cwd()` over `Path().resolve()` for current-directory lookups
   --> FURB177.py:18:5
@@ -199,4 +199,4 @@ help: Replace `Path().resolve()` with `Path.cwd()`
 19 | 
 20 | # OK
 21 | _ = Path.cwd()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

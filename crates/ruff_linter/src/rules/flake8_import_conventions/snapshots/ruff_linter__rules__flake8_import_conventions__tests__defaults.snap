@@ -19,7 +19,7 @@ help: Alias `altair` to `alt`
 7 |     import matplotlib.pyplot
 8 |     import numpy
 9 |     import pandas
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 ICN001 `matplotlib.pyplot` should be imported as `plt`
  --> defaults.py:7:12
@@ -52,7 +52,7 @@ help: Alias `numpy` to `np`
 9  |     import pandas
 10 |     import seaborn
 11 |     import tkinter
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 ICN001 [*] `pandas` should be imported as `pd`
   --> defaults.py:9:12
@@ -73,7 +73,7 @@ help: Alias `pandas` to `pd`
 10 |     import seaborn
 11 |     import tkinter
 12 |     import networkx
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 ICN001 [*] `seaborn` should be imported as `sns`
   --> defaults.py:10:12
@@ -94,7 +94,7 @@ help: Alias `seaborn` to `sns`
 11 |     import tkinter
 12 |     import networkx
 13 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 ICN001 [*] `tkinter` should be imported as `tk`
   --> defaults.py:11:12
@@ -114,7 +114,7 @@ help: Alias `tkinter` to `tk`
 12 |     import networkx
 13 | 
 14 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 ICN001 [*] `networkx` should be imported as `nx`
   --> defaults.py:12:12
@@ -133,7 +133,7 @@ help: Alias `networkx` to `nx`
 13 | 
 14 | 
 15 | def unconventional_aliases():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 ICN001 [*] `altair` should be imported as `alt`
   --> defaults.py:16:22
@@ -153,7 +153,7 @@ help: Alias `altair` to `alt`
 17 |     import matplotlib.pyplot as plot
 18 |     import numpy as nmp
 19 |     import pandas as pdas
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 ICN001 [*] `matplotlib.pyplot` should be imported as `plt`
   --> defaults.py:17:33
@@ -174,7 +174,7 @@ help: Alias `matplotlib.pyplot` to `plt`
 18 |     import numpy as nmp
 19 |     import pandas as pdas
 20 |     import seaborn as sbrn
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 ICN001 [*] `numpy` should be imported as `np`
   --> defaults.py:18:21
@@ -195,7 +195,7 @@ help: Alias `numpy` to `np`
 19 |     import pandas as pdas
 20 |     import seaborn as sbrn
 21 |     import tkinter as tkr
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 ICN001 [*] `pandas` should be imported as `pd`
   --> defaults.py:19:22
@@ -216,7 +216,7 @@ help: Alias `pandas` to `pd`
 20 |     import seaborn as sbrn
 21 |     import tkinter as tkr
 22 |     import networkx as nxy
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 ICN001 [*] `seaborn` should be imported as `sns`
   --> defaults.py:20:23
@@ -237,7 +237,7 @@ help: Alias `seaborn` to `sns`
 21 |     import tkinter as tkr
 22 |     import networkx as nxy
 23 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 ICN001 [*] `tkinter` should be imported as `tk`
   --> defaults.py:21:23
@@ -257,7 +257,7 @@ help: Alias `tkinter` to `tk`
 22 |     import networkx as nxy
 23 | 
 24 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 ICN001 [*] `networkx` should be imported as `nx`
   --> defaults.py:22:24
@@ -276,4 +276,4 @@ help: Alias `networkx` to `nx`
 23 | 
 24 | 
 25 | def conventional_aliases():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

@@ -132,7 +132,7 @@ help: Remove unnecessary `round` call
 43 | round(inferred_int, None)                         # Error (unsafe)
 44 | round(inferred_int, 2)                            # Error (unsafe)
 45 | round(inferred_int, -2)                           # No error
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF057 [*] Value being rounded is already an integer
   --> RUF057.py:43:1
@@ -152,7 +152,7 @@ help: Remove unnecessary `round` call
 44 | round(inferred_int, 2)                            # Error (unsafe)
 45 | round(inferred_int, -2)                           # No error
 46 | round(inferred_int, inferred_int)                 # No error
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF057 [*] Value being rounded is already an integer
   --> RUF057.py:44:1
@@ -173,7 +173,7 @@ help: Remove unnecessary `round` call
 45 | round(inferred_int, -2)                           # No error
 46 | round(inferred_int, inferred_int)                 # No error
 47 | round(inferred_int, 3 + 4)                        # No error
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF057 [*] Value being rounded is already an integer
   --> RUF057.py:71:1
@@ -242,7 +242,7 @@ help: Remove unnecessary `round` call
 79 | round(
 80 |     17 # a comment
 81 | )
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF057 [*] Value being rounded is already an integer
   --> RUF057.py:81:1
@@ -262,4 +262,4 @@ help: Remove unnecessary `round` call
    -     17 # a comment
    - )
 81 + 17
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

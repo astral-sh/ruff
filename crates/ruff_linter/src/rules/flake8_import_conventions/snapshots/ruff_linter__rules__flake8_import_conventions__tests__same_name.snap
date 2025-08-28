@@ -14,4 +14,4 @@ help: Alias `django.conf.settings` to `settings`
 9  | def unconventional_alias():
    -     from django.conf import settings as s
 10 +     from django.conf import settings as settings
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

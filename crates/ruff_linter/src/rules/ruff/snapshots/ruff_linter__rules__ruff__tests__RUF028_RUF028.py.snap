@@ -18,7 +18,7 @@ help: Remove this comment
 3 |         1,
 4 |         2,
 5 |         3,
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF028 [*] This suppression comment is invalid because it cannot be on its own line
   --> RUF028.py:12:5
@@ -37,7 +37,7 @@ help: Remove this comment
 12 |     pass  # fmt: skip
 13 | 
 14 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF028 [*] This suppression comment is invalid because it cannot be after a decorator
   --> RUF028.py:17:1
@@ -56,7 +56,7 @@ help: Remove this comment
 17 | @fmt_off_between_lists
 18 | def fmt_off_between_decorators():
 19 |     pass
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF028 [*] This suppression comment is invalid because it cannot be after a decorator
   --> RUF028.py:24:1
@@ -75,7 +75,7 @@ help: Remove this comment
 24 | class FmtOffBetweenClassDecorators:
 25 |     ...
 26 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF028 [*] This suppression comment is invalid because it cannot be directly above an alternate body
   --> RUF028.py:33:5
@@ -95,7 +95,7 @@ help: Remove this comment
 33 |     else:
 34 |         print("done")
 35 |     while False:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF028 [*] This suppression comment is invalid because it cannot be directly above an alternate body
   --> RUF028.py:39:5
@@ -115,7 +115,7 @@ help: Remove this comment
 39 |     else:
 40 |         print("done")
 41 |     if len(x) > 3:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF028 [*] This suppression comment is invalid because it cannot be directly above an alternate body
   --> RUF028.py:45:5
@@ -135,7 +135,7 @@ help: Remove this comment
 45 |     else:
 46 |         print("expected")
 47 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF028 [*] This suppression comment is invalid because it cannot be after a decorator
   --> RUF028.py:52:5
@@ -155,7 +155,7 @@ help: Remove this comment
 52 |     def cls_method_a(
 53 |         # fmt: off
 54 |         cls,
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF028 [*] This suppression comment is invalid because it cannot be in an expression, pattern, argument list, or other non-statement
   --> RUF028.py:54:9
@@ -175,7 +175,7 @@ help: Remove this comment
 54 |         cls,
 55 |     ) -> None: # noqa: test # fmt: skip
 56 |         pass
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF028 [*] This suppression comment is invalid because it cannot be at the end of a line
   --> RUF028.py:62:13
@@ -195,7 +195,7 @@ help: Remove this comment
 63 |     pass # fmt: on
 64 | 
 65 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF028 [*] This suppression comment is invalid because it cannot be at the end of a line
   --> RUF028.py:63:10
@@ -214,4 +214,4 @@ help: Remove this comment
 64 | 
 65 | 
 66 | # all of these should be fine
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

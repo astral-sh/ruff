@@ -166,4 +166,4 @@ help: Remove duplicate base
 75 + class Bar(Foo  # 2
 76 | ):
 77 |     pass
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

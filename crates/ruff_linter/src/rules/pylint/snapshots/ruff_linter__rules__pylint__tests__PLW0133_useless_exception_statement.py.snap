@@ -18,7 +18,7 @@ help: Add `raise` keyword
 8  | 
 9  | 
 10 | # Test case 2: Useless exception statement in try-except block
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLW0133 [*] Missing `raise` statement on exception
   --> useless_exception_statement.py:13:9
@@ -39,7 +39,7 @@ help: Add `raise` keyword
 14 |     except Exception as err:
 15 |         pass
 16 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLW0133 [*] Missing `raise` statement on exception
   --> useless_exception_statement.py:21:9
@@ -58,7 +58,7 @@ help: Add `raise` keyword
 22 | 
 23 | 
 24 | # Test case 4: Useless exception statement in class
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLW0133 [*] Missing `raise` statement on exception
   --> useless_exception_statement.py:28:13
@@ -77,7 +77,7 @@ help: Add `raise` keyword
 29 | 
 30 | 
 31 | # Test case 5: Useless exception statement in function
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLW0133 [*] Missing `raise` statement on exception
   --> useless_exception_statement.py:34:9
@@ -98,7 +98,7 @@ help: Add `raise` keyword
 35 | 
 36 |     inner()
 37 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLW0133 [*] Missing `raise` statement on exception
   --> useless_exception_statement.py:42:9
@@ -117,7 +117,7 @@ help: Add `raise` keyword
 43 | 
 44 | 
 45 | # Test case 7: Useless exception statement in abstract class
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLW0133 [*] Missing `raise` statement on exception
   --> useless_exception_statement.py:50:13
@@ -136,7 +136,7 @@ help: Add `raise` keyword
 51 | 
 52 | 
 53 | # Test case 8: Useless exception statement inside context manager
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLW0133 [*] Missing `raise` statement on exception
   --> useless_exception_statement.py:56:9
@@ -155,7 +155,7 @@ help: Add `raise` keyword
 57 | 
 58 | 
 59 | # Test case 9: Useless exception statement in parentheses
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLW0133 [*] Missing `raise` statement on exception
   --> useless_exception_statement.py:61:5
@@ -174,7 +174,7 @@ help: Add `raise` keyword
 62 | 
 63 | 
 64 | # Test case 10: Useless exception statement in continuation
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLW0133 [*] Missing `raise` statement on exception
   --> useless_exception_statement.py:66:12
@@ -193,7 +193,7 @@ help: Add `raise` keyword
 67 | 
 68 | 
 69 | # Test case 11: Useless warning statement
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLW0133 [*] Missing `raise` statement on exception
   --> useless_exception_statement.py:71:5
@@ -212,7 +212,7 @@ help: Add `raise` keyword
 72 | 
 73 | 
 74 | # Non-violation test cases: PLW0133
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLW0133 [*] Missing `raise` statement on exception
    --> useless_exception_statement.py:126:1
@@ -232,7 +232,7 @@ help: Add `raise` keyword
 126 + raise builtins.TypeError("still an exception even though it's an Attribute")
 127 | 
 128 | PythonFinalizationError("Added in Python 3.13")
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PLW0133 [*] Missing `raise` statement on exception
    --> useless_exception_statement.py:128:1
@@ -248,4 +248,4 @@ help: Add `raise` keyword
 127 | 
     - PythonFinalizationError("Added in Python 3.13")
 128 + raise PythonFinalizationError("Added in Python 3.13")
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

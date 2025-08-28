@@ -18,7 +18,7 @@ help: Replace with `l.reverse()`
 7 | 
 8 | 
 9 | def b():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB187 [*] Use of assignment of `reversed` on list `l`
   --> FURB187.py:11:5
@@ -37,7 +37,7 @@ help: Replace with `l.reverse()`
 12 | 
 13 | 
 14 | def c():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB187 [*] Use of assignment of `reversed` on list `l`
   --> FURB187.py:16:5
@@ -56,4 +56,4 @@ help: Replace with `l.reverse()`
 17 | 
 18 | 
 19 | # False negative
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

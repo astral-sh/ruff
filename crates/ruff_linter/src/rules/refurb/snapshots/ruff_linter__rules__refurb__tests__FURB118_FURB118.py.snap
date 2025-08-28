@@ -18,7 +18,7 @@ help: Replace with `operator.invert`
 4 | op_not = lambda x: not x
 5 | op_pos = lambda x: +x
 6 | op_neg = lambda x: -x
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.not_` instead of defining a lambda
  --> FURB118.py:3:10
@@ -39,7 +39,7 @@ help: Replace with `operator.not_`
 5 | op_pos = lambda x: +x
 6 | op_neg = lambda x: -x
 7 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.pos` instead of defining a lambda
  --> FURB118.py:4:10
@@ -60,7 +60,7 @@ help: Replace with `operator.pos`
 6 | op_neg = lambda x: -x
 7 | 
 8 | op_add = lambda x, y: x + y
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.neg` instead of defining a lambda
  --> FURB118.py:5:10
@@ -83,7 +83,7 @@ help: Replace with `operator.neg`
 7 | 
 8 | op_add = lambda x, y: x + y
 9 | op_sub = lambda x, y: x - y
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.add` instead of defining a lambda
  --> FURB118.py:7:10
@@ -108,7 +108,7 @@ help: Replace with `operator.add`
 9  | op_sub = lambda x, y: x - y
 10 | op_mult = lambda x, y: x * y
 11 | op_matmutl = lambda x, y: x @ y
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.sub` instead of defining a lambda
   --> FURB118.py:8:10
@@ -133,7 +133,7 @@ help: Replace with `operator.sub`
 10 | op_mult = lambda x, y: x * y
 11 | op_matmutl = lambda x, y: x @ y
 12 | op_truediv = lambda x, y: x / y
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.mul` instead of defining a lambda
   --> FURB118.py:9:11
@@ -160,7 +160,7 @@ help: Replace with `operator.mul`
 11 | op_matmutl = lambda x, y: x @ y
 12 | op_truediv = lambda x, y: x / y
 13 | op_mod = lambda x, y: x % y
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.matmul` instead of defining a lambda
   --> FURB118.py:10:14
@@ -187,7 +187,7 @@ help: Replace with `operator.matmul`
 12 | op_truediv = lambda x, y: x / y
 13 | op_mod = lambda x, y: x % y
 14 | op_pow = lambda x, y: x ** y
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.truediv` instead of defining a lambda
   --> FURB118.py:11:14
@@ -214,7 +214,7 @@ help: Replace with `operator.truediv`
 13 | op_mod = lambda x, y: x % y
 14 | op_pow = lambda x, y: x ** y
 15 | op_lshift = lambda x, y: x << y
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.mod` instead of defining a lambda
   --> FURB118.py:12:10
@@ -241,7 +241,7 @@ help: Replace with `operator.mod`
 14 | op_pow = lambda x, y: x ** y
 15 | op_lshift = lambda x, y: x << y
 16 | op_rshift = lambda x, y: x >> y
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.pow` instead of defining a lambda
   --> FURB118.py:13:10
@@ -268,7 +268,7 @@ help: Replace with `operator.pow`
 15 | op_lshift = lambda x, y: x << y
 16 | op_rshift = lambda x, y: x >> y
 17 | op_bitor = lambda x, y: x | y
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.lshift` instead of defining a lambda
   --> FURB118.py:14:13
@@ -295,7 +295,7 @@ help: Replace with `operator.lshift`
 16 | op_rshift = lambda x, y: x >> y
 17 | op_bitor = lambda x, y: x | y
 18 | op_xor = lambda x, y: x ^ y
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.rshift` instead of defining a lambda
   --> FURB118.py:15:13
@@ -322,7 +322,7 @@ help: Replace with `operator.rshift`
 17 | op_bitor = lambda x, y: x | y
 18 | op_xor = lambda x, y: x ^ y
 19 | op_bitand = lambda x, y: x & y
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.or_` instead of defining a lambda
   --> FURB118.py:16:12
@@ -349,7 +349,7 @@ help: Replace with `operator.or_`
 18 | op_xor = lambda x, y: x ^ y
 19 | op_bitand = lambda x, y: x & y
 20 | op_floordiv = lambda x, y: x // y
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.xor` instead of defining a lambda
   --> FURB118.py:17:10
@@ -376,7 +376,7 @@ help: Replace with `operator.xor`
 19 | op_bitand = lambda x, y: x & y
 20 | op_floordiv = lambda x, y: x // y
 21 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.and_` instead of defining a lambda
   --> FURB118.py:18:13
@@ -402,7 +402,7 @@ help: Replace with `operator.and_`
 20 | op_floordiv = lambda x, y: x // y
 21 | 
 22 | op_eq = lambda x, y: x == y
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.floordiv` instead of defining a lambda
   --> FURB118.py:19:15
@@ -429,7 +429,7 @@ help: Replace with `operator.floordiv`
 21 | 
 22 | op_eq = lambda x, y: x == y
 23 | op_ne = lambda x, y: x != y
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.eq` instead of defining a lambda
   --> FURB118.py:21:9
@@ -456,7 +456,7 @@ help: Replace with `operator.eq`
 23 | op_ne = lambda x, y: x != y
 24 | op_lt = lambda x, y: x < y
 25 | op_lte = lambda x, y: x <= y
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.ne` instead of defining a lambda
   --> FURB118.py:22:9
@@ -482,7 +482,7 @@ help: Replace with `operator.ne`
 24 | op_lt = lambda x, y: x < y
 25 | op_lte = lambda x, y: x <= y
 26 | op_gt = lambda x, y: x > y
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.lt` instead of defining a lambda
   --> FURB118.py:23:9
@@ -509,7 +509,7 @@ help: Replace with `operator.lt`
 25 | op_lte = lambda x, y: x <= y
 26 | op_gt = lambda x, y: x > y
 27 | op_gte = lambda x, y: x >= y
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.le` instead of defining a lambda
   --> FURB118.py:24:10
@@ -536,7 +536,7 @@ help: Replace with `operator.le`
 26 | op_gt = lambda x, y: x > y
 27 | op_gte = lambda x, y: x >= y
 28 | op_is = lambda x, y: x is y
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.gt` instead of defining a lambda
   --> FURB118.py:25:9
@@ -563,7 +563,7 @@ help: Replace with `operator.gt`
 27 | op_gte = lambda x, y: x >= y
 28 | op_is = lambda x, y: x is y
 29 | op_isnot = lambda x, y: x is not y
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.ge` instead of defining a lambda
   --> FURB118.py:26:10
@@ -590,7 +590,7 @@ help: Replace with `operator.ge`
 28 | op_is = lambda x, y: x is y
 29 | op_isnot = lambda x, y: x is not y
 30 | op_in = lambda x, y: y in x
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.is_` instead of defining a lambda
   --> FURB118.py:27:9
@@ -617,7 +617,7 @@ help: Replace with `operator.is_`
 29 | op_isnot = lambda x, y: x is not y
 30 | op_in = lambda x, y: y in x
 31 | op_itemgetter = lambda x: x[0]
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.is_not` instead of defining a lambda
   --> FURB118.py:28:12
@@ -644,7 +644,7 @@ help: Replace with `operator.is_not`
 30 | op_in = lambda x, y: y in x
 31 | op_itemgetter = lambda x: x[0]
 32 | op_itemgetter = lambda x: (x[0], x[1], x[2])
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.contains` instead of defining a lambda
   --> FURB118.py:29:9
@@ -671,7 +671,7 @@ help: Replace with `operator.contains`
 31 | op_itemgetter = lambda x: x[0]
 32 | op_itemgetter = lambda x: (x[0], x[1], x[2])
 33 | op_itemgetter = lambda x: (x[1:], x[2])
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.itemgetter(0)` instead of defining a lambda
   --> FURB118.py:30:17
@@ -698,7 +698,7 @@ help: Replace with `operator.itemgetter(0)`
 32 | op_itemgetter = lambda x: (x[0], x[1], x[2])
 33 | op_itemgetter = lambda x: (x[1:], x[2])
 34 | op_itemgetter = lambda x: x[:]
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.itemgetter(0, 1, 2)` instead of defining a lambda
   --> FURB118.py:31:17
@@ -725,7 +725,7 @@ help: Replace with `operator.itemgetter(0, 1, 2)`
 33 | op_itemgetter = lambda x: (x[1:], x[2])
 34 | op_itemgetter = lambda x: x[:]
 35 | op_itemgetter = lambda x: x[0, 1]
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.itemgetter(slice(1, None), 2)` instead of defining a lambda
   --> FURB118.py:32:17
@@ -752,7 +752,7 @@ help: Replace with `operator.itemgetter(slice(1, None), 2)`
 34 | op_itemgetter = lambda x: x[:]
 35 | op_itemgetter = lambda x: x[0, 1]
 36 | op_itemgetter = lambda x: x[(0, 1)]
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.itemgetter(slice(None))` instead of defining a lambda
   --> FURB118.py:33:17
@@ -779,7 +779,7 @@ help: Replace with `operator.itemgetter(slice(None))`
 35 | op_itemgetter = lambda x: x[0, 1]
 36 | op_itemgetter = lambda x: x[(0, 1)]
 37 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.itemgetter((0, 1))` instead of defining a lambda
   --> FURB118.py:34:17
@@ -805,7 +805,7 @@ help: Replace with `operator.itemgetter((0, 1))`
 36 | op_itemgetter = lambda x: x[(0, 1)]
 37 | 
 38 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.itemgetter((0, 1))` instead of defining a lambda
   --> FURB118.py:35:17
@@ -830,7 +830,7 @@ help: Replace with `operator.itemgetter((0, 1))`
 37 | 
 38 | 
 39 | def op_not2(x):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB118 Use `operator.not_` instead of defining a function
   --> FURB118.py:38:5
@@ -873,7 +873,7 @@ help: Replace with `operator.itemgetter((slice(None), 1))`
 90 | op_itemgetter = lambda x: x[1, :]
 91 | 
 92 | # With a slice, trivia is dropped
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.itemgetter((1, slice(None)))` instead of defining a lambda
   --> FURB118.py:89:17
@@ -900,7 +900,7 @@ help: Replace with `operator.itemgetter((1, slice(None)))`
 91 | 
 92 | # With a slice, trivia is dropped
 93 | op_itemgetter = lambda x: x[1,          :]
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.itemgetter((1, slice(None)))` instead of defining a lambda
   --> FURB118.py:92:17
@@ -926,7 +926,7 @@ help: Replace with `operator.itemgetter((1, slice(None)))`
 94 | 
 95 | # Without a slice, trivia is retained
 96 | op_itemgetter = lambda x: x[1,          2]
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.itemgetter((1,          2))` instead of defining a lambda
   --> FURB118.py:95:17
@@ -950,7 +950,7 @@ help: Replace with `operator.itemgetter((1,          2))`
 97 | 
 98 | 
 99 | # All methods in classes are ignored, even those defined using lambdas:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.itemgetter(slice(-2, None))` instead of defining a lambda
    --> FURB118.py:129:14
@@ -979,7 +979,7 @@ help: Replace with `operator.itemgetter(slice(-2, None))`
 131 |             (lambda x: x[-5:-3], "bar"),
 132 |         ],
 133 |     )
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.itemgetter(slice(-5, -3))` instead of defining a lambda
    --> FURB118.py:130:14
@@ -1008,4 +1008,4 @@ help: Replace with `operator.itemgetter(slice(-5, -3))`
 132 |         ],
 133 |     )
 134 |     def test_inlet_asset_alias_extra_slice(self, slicer, expected):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

@@ -129,7 +129,7 @@ help: Add quotes
 60 |         3.0
 61 |     )
 62 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TC006 [*] Add quotes to type expression in `typing.cast()`
   --> TC006.py:68:17

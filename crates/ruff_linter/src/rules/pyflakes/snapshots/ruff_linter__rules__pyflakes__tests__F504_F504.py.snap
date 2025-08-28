@@ -113,4 +113,4 @@ help: Remove extra named arguments: greeting
 19 | # https://github.com/astral-sh/ruff/issues/18806
    - "Hello, %(name)s" % {"greeting": print(1), "name": "World"}
 20 + "Hello, %(name)s" % {"name": "World"}
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

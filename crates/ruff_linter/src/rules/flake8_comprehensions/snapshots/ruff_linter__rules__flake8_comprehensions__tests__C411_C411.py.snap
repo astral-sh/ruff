@@ -17,4 +17,4 @@ help: Remove outer `list()` call
 3 | 
 4 | # Skip when too many positional arguments
 5 | # or keyword argument present.
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

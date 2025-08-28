@@ -739,7 +739,7 @@ help: Remove unnecessary `int` call
 63 | int(math.floor())
 64 | int(math.trunc())
 65 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF046 [*] Value being cast to `int` is already an integer
   --> RUF046.py:63:1
@@ -758,7 +758,7 @@ help: Remove unnecessary `int` call
 64 | int(math.trunc())
 65 | 
 66 | int(round(inferred_int, 0))
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF046 [*] Value being cast to `int` is already an integer
   --> RUF046.py:64:1
@@ -779,7 +779,7 @@ help: Remove unnecessary `int` call
 65 | 
 66 | int(round(inferred_int, 0))
 67 | int(round(inferred_int, 10))
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF046 [*] Value being cast to `int` is already an integer
   --> RUF046.py:66:1
@@ -799,7 +799,7 @@ help: Remove unnecessary `int` call
 67 | int(round(inferred_int, 10))
 68 | 
 69 | int(round(inferred_int))
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF046 [*] Value being cast to `int` is already an integer
   --> RUF046.py:67:1
@@ -819,7 +819,7 @@ help: Remove unnecessary `int` call
 68 | 
 69 | int(round(inferred_int))
 70 | int(round(inferred_int, None))
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF046 [*] Value being cast to `int` is already an integer
   --> RUF046.py:69:1
@@ -839,7 +839,7 @@ help: Remove unnecessary `int` call
 70 | int(round(inferred_int, None))
 71 | 
 72 | int(round(inferred_float))
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF046 [*] Value being cast to `int` is already an integer
   --> RUF046.py:70:1
@@ -859,7 +859,7 @@ help: Remove unnecessary `int` call
 71 | 
 72 | int(round(inferred_float))
 73 | int(round(inferred_float, None))
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF046 [*] Value being cast to `int` is already an integer
   --> RUF046.py:72:1
@@ -879,7 +879,7 @@ help: Remove unnecessary `int` call
 73 | int(round(inferred_float, None))
 74 | 
 75 | int(round(unknown))
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF046 [*] Value being cast to `int` is already an integer
   --> RUF046.py:73:1
@@ -899,7 +899,7 @@ help: Remove unnecessary `int` call
 74 | 
 75 | int(round(unknown))
 76 | int(round(unknown, None))
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF046 [*] Value being cast to `int` is already an integer
   --> RUF046.py:75:1
@@ -919,7 +919,7 @@ help: Remove unnecessary `int` call
 76 | int(round(unknown, None))
 77 | 
 78 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF046 [*] Value being cast to `int` is already an integer
   --> RUF046.py:76:1
@@ -937,7 +937,7 @@ help: Remove unnecessary `int` call
 77 | 
 78 | 
 79 | ### No errors
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF046 [*] Value being cast to `int` is already an integer
    --> RUF046.py:158:1
@@ -1153,7 +1153,7 @@ help: Remove unnecessary `int` call
 194 | 
 195 | int(
 196 |     round(
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF046 [*] Value being cast to `int` is already an integer
    --> RUF046.py:197:1
@@ -1183,7 +1183,7 @@ help: Remove unnecessary `int` call
 200 | 
 201 | int(
 202 |     round(
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF046 [*] Value being cast to `int` is already an integer
    --> RUF046.py:203:1
@@ -1210,4 +1210,4 @@ help: Remove unnecessary `int` call
     - # unsafe fix because of this comment
     - )
 205 +     )
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

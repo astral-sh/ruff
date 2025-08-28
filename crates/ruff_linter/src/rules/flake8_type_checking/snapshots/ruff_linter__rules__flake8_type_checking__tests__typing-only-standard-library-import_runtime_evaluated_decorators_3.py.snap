@@ -28,4 +28,4 @@ help: Move into type-checking block
 15 | 
 16 | 
 17 | @attrs.define(auto_attribs=True)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

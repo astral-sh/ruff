@@ -22,7 +22,7 @@ help: Replace with `functools.reduce`
 8  | sum([x, y], [])
 9  | sum([[1, 2, 3], [4, 5, 6]], start=[])
 10 | sum([[1, 2, 3], [4, 5, 6]], [])
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF017 [*] Avoid quadratic list summation
  --> RUF017_0.py:6:1
@@ -47,7 +47,7 @@ help: Replace with `functools.reduce`
 9  | sum([[1, 2, 3], [4, 5, 6]], start=[])
 10 | sum([[1, 2, 3], [4, 5, 6]], [])
 11 | sum([[1, 2, 3], [4, 5, 6]],
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF017 [*] Avoid quadratic list summation
  --> RUF017_0.py:7:1
@@ -73,7 +73,7 @@ help: Replace with `functools.reduce`
 10 | sum([[1, 2, 3], [4, 5, 6]], [])
 11 | sum([[1, 2, 3], [4, 5, 6]],
 12 |     [])
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF017 [*] Avoid quadratic list summation
   --> RUF017_0.py:8:1
@@ -100,7 +100,7 @@ help: Replace with `functools.reduce`
 11 | sum([[1, 2, 3], [4, 5, 6]],
 12 |     [])
 13 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF017 [*] Avoid quadratic list summation
   --> RUF017_0.py:9:1
@@ -129,7 +129,7 @@ help: Replace with `functools.reduce`
 12 | 
 13 | # OK
 14 | sum([x, y])
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF017 [*] Avoid quadratic list summation
   --> RUF017_0.py:21:5
@@ -148,7 +148,7 @@ help: Replace with `functools.reduce`
 22 | 
 23 | 
 24 | # Regression test for: https://github.com/astral-sh/ruff/issues/7718
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF017 [*] Avoid quadratic list summation
   --> RUF017_0.py:26:5
@@ -170,4 +170,4 @@ help: Replace with `functools.reduce`
 27 | def func():
    -     sum((factor.dims for factor in bases), [])
 28 +     functools.reduce(operator.iadd, (factor.dims for factor in bases), [])
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

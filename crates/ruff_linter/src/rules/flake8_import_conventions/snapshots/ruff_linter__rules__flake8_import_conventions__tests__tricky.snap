@@ -21,4 +21,4 @@ help: Alias `pandas` to `pd`
 7 +         import pandas as pd
 8 |     except ImportError:
 9 |         return False
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

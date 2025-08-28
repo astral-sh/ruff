@@ -26,4 +26,4 @@ help: Move into type-checking block
 12 | 
 13 | 
 14 | class A(pydantic.BaseModel):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

@@ -18,7 +18,7 @@ help: Use a string of comma-separated values for the first argument
 25 | def test_tuple(param1, param2):
 26 |     ...
 27 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
   --> PT006.py:29:26
@@ -55,7 +55,7 @@ help: Use a string of comma-separated values for the first argument
 35 | def test_list(param1, param2):
 36 |     ...
 37 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
   --> PT006.py:39:26
@@ -176,7 +176,7 @@ help: Use a string for the first argument
 105 | )
 106 | def test_comment_in_argnames(param):
 107 |     ...
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
    --> PT006.py:114:5
@@ -205,7 +205,7 @@ help: Use a string for the first argument
 118 |     ],
 119 | )
 120 | def test_comment_in_argvalues(param):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
    --> PT006.py:129:5

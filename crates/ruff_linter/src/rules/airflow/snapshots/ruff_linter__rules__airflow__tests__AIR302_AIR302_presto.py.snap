@@ -16,4 +16,4 @@ help: Install `apache-airflow-providers-presto>=1.0.0` and use `PrestoHook` from
 3 + from airflow.providers.presto.hooks.presto import PrestoHook
 4 | 
 5 | PrestoHook()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

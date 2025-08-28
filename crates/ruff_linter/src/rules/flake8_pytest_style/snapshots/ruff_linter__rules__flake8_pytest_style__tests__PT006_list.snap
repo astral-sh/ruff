@@ -18,7 +18,7 @@ help: Use a `list` for the first argument
 10 | def test_csv(param1, param2):
 11 |     ...
 12 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `list`
   --> PT006.py:14:26
@@ -37,7 +37,7 @@ help: Use a `list` for the first argument
 15 | def test_csv_with_whitespace(param1, param2):
 16 |     ...
 17 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `list`
   --> PT006.py:19:26
@@ -56,7 +56,7 @@ help: Use a `list` for the first argument
 20 | def test_csv_bad_quotes(param1, param2):
 21 |     ...
 22 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `list`
   --> PT006.py:24:26
@@ -75,7 +75,7 @@ help: Use a `list` for the first argument
 25 | def test_tuple(param1, param2):
 26 |     ...
 27 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
   --> PT006.py:29:26
@@ -130,7 +130,7 @@ help: Use a `list` for the first argument
 55 | def test_implicit_str_concat_with_parens(param1, param2, param3):
 56 |     ...
 57 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `list`
   --> PT006.py:59:26
@@ -149,7 +149,7 @@ help: Use a `list` for the first argument
 60 | def test_implicit_str_concat_no_parens(param1, param2, param3):
 61 |     ...
 62 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `list`
   --> PT006.py:64:26
@@ -168,7 +168,7 @@ help: Use a `list` for the first argument
 65 | def test_implicit_str_concat_with_multi_parens(param1, param2, param3):
 66 |     ...
 67 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `list`
   --> PT006.py:69:26
@@ -187,7 +187,7 @@ help: Use a `list` for the first argument
 70 | def test_csv_with_parens(param1, param2):
 71 |     ...
 72 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `list`
   --> PT006.py:74:39
@@ -206,7 +206,7 @@ help: Use a `list` for the first argument
 75 | 
 76 | @parametrize
 77 | def test_not_decorator(param1, param2):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `list`
   --> PT006.py:81:35
@@ -225,7 +225,7 @@ help: Use a `list` for the first argument
 82 | def test_keyword_arguments(param1, param2):
 83 |     ...
 84 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
   --> PT006.py:86:26
@@ -308,7 +308,7 @@ help: Use a string for the first argument
 105 | )
 106 | def test_comment_in_argnames(param):
 107 |     ...
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
    --> PT006.py:114:5
@@ -337,7 +337,7 @@ help: Use a string for the first argument
 118 |     ],
 119 | )
 120 | def test_comment_in_argvalues(param):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
    --> PT006.py:129:5

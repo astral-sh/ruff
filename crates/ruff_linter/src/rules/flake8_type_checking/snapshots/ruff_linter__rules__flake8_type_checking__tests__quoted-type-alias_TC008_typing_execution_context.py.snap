@@ -240,4 +240,4 @@ help: Remove quotes
 28 | 
 29 | 
 30 |     class Baz: ...
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

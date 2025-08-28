@@ -23,7 +23,7 @@ help: Replace with `return any(check(x) for x in iterable)`
 4 | 
 5 | 
 6 | def f():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM110 [*] Use `return all(not check(x) for x in iterable)` instead of `for` loop
   --> SIM110.py:25:5
@@ -48,7 +48,7 @@ help: Replace with `return all(not check(x) for x in iterable)`
 26 | 
 27 | 
 28 | def f():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM110 [*] Use `return all(x.is_empty() for x in iterable)` instead of `for` loop
   --> SIM110.py:33:5
@@ -73,7 +73,7 @@ help: Replace with `return all(x.is_empty() for x in iterable)`
 34 | 
 35 | 
 36 | def f():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM110 [*] Use `return any(check(x) for x in iterable)` instead of `for` loop
   --> SIM110.py:55:5
@@ -100,7 +100,7 @@ help: Replace with `return any(check(x) for x in iterable)`
 56 | 
 57 | 
 58 | def f():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM110 [*] Use `return all(not check(x) for x in iterable)` instead of `for` loop
   --> SIM110.py:64:5
@@ -127,7 +127,7 @@ help: Replace with `return all(not check(x) for x in iterable)`
 65 | 
 66 | 
 67 | def f():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM110 [*] Use `return any(check(x) for x in iterable)` instead of `for` loop
   --> SIM110.py:73:5
@@ -155,7 +155,7 @@ help: Replace with `return any(check(x) for x in iterable)`
 74 |     return True
 75 | 
 76 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM110 [*] Use `return all(not check(x) for x in iterable)` instead of `for` loop
   --> SIM110.py:83:5
@@ -183,7 +183,7 @@ help: Replace with `return all(not check(x) for x in iterable)`
 84 |     return False
 85 | 
 86 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM110 Use `return any(check(x) for x in iterable)` instead of `for` loop
    --> SIM110.py:124:5
@@ -233,7 +233,7 @@ help: Replace with `return any(check(x) for x in iterable)`
 145 | 
 146 | 
 147 | def f():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM110 [*] Use `return all(not check(x) for x in iterable)` instead of `for` loop
    --> SIM110.py:154:5
@@ -257,7 +257,7 @@ help: Replace with `return all(not check(x) for x in iterable)`
 155 | 
 156 | 
 157 | def f():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM110 [*] Use `return any(x.isdigit() for x in "012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ")` instead of `for` loop
    --> SIM110.py:162:5
@@ -282,7 +282,7 @@ help: Replace with `return any(x.isdigit() for x in "012ß9💣2ℝ9012ß9💣2�
 163 | 
 164 | 
 165 | def f():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM110 [*] Use `return any(check(x) for x in iterable)` instead of `for` loop
    --> SIM110.py:184:5
@@ -309,7 +309,7 @@ help: Replace with `return any(check(x) for x in iterable)`
 185 | 
 186 | async def f():
 187 |     # SIM110
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM110 [*] Use `return any(check(x) for x in await iterable)` instead of `for` loop
    --> SIM110.py:191:5
@@ -336,4 +336,4 @@ help: Replace with `return any(check(x) for x in await iterable)`
 192 | 
 193 | def f():
 194 |     # OK (can't turn this into any() because the yield would end up inside a genexp)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

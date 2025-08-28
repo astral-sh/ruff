@@ -19,7 +19,7 @@ help: Remove explicit positional indices
 4 | 
 5 | "a {3} complicated {1} string with {0} {2}".format(
 6 |     "first", "second", "third", "fourth"
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP030 [*] Use implicit references for positional format fields
  --> UP030_0.py:5:1
@@ -44,7 +44,7 @@ help: Remove explicit positional indices
 7 | )
 8 | 
 9 | '{0}'.format(1)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP030 [*] Use implicit references for positional format fields
   --> UP030_0.py:9:1
@@ -65,7 +65,7 @@ help: Remove explicit positional indices
 10 | 
 11 | '{0:x}'.format(30)
 12 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP030 [*] Use implicit references for positional format fields
   --> UP030_0.py:11:1
@@ -86,7 +86,7 @@ help: Remove explicit positional indices
 12 | 
 13 | x = '{0}'.format(1)
 14 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP030 [*] Use implicit references for positional format fields
   --> UP030_0.py:13:5
@@ -107,7 +107,7 @@ help: Remove explicit positional indices
 14 | 
 15 | '''{0}\n{1}\n'''.format(1, 2)
 16 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP030 [*] Use implicit references for positional format fields
   --> UP030_0.py:15:1
@@ -128,7 +128,7 @@ help: Remove explicit positional indices
 16 | 
 17 | x = "foo {0}" \
 18 |     "bar {1}".format(1, 2)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP030 [*] Use implicit references for positional format fields
   --> UP030_0.py:17:5
@@ -153,7 +153,7 @@ help: Remove explicit positional indices
 19 | 
 20 | ("{0}").format(1)
 21 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP030 [*] Use implicit references for positional format fields
   --> UP030_0.py:20:1
@@ -174,7 +174,7 @@ help: Remove explicit positional indices
 21 | 
 22 | "\N{snowman} {0}".format(1)
 23 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP030 [*] Use implicit references for positional format fields
   --> UP030_0.py:22:1
@@ -195,7 +195,7 @@ help: Remove explicit positional indices
 23 | 
 24 | print(
 25 |     'foo{0}'
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP030 [*] Use implicit references for positional format fields
   --> UP030_0.py:25:5
@@ -217,7 +217,7 @@ help: Remove explicit positional indices
 27 | )
 28 | 
 29 | print(
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP030 [*] Use implicit references for positional format fields
   --> UP030_0.py:30:5
@@ -239,7 +239,7 @@ help: Remove explicit positional indices
 32 | )
 33 | 
 34 | '{' '0}'.format(1)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP030 Use implicit references for positional format fields
   --> UP030_0.py:34:1
@@ -272,7 +272,7 @@ help: Remove explicit positional indices
 40 | 
 41 | "{0}".format(**kwargs)
 42 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP030 [*] Use implicit references for positional format fields
   --> UP030_0.py:41:1
@@ -293,7 +293,7 @@ help: Remove explicit positional indices
 42 | 
 43 | "{0}_{1}".format(*args)
 44 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP030 [*] Use implicit references for positional format fields
   --> UP030_0.py:43:1
@@ -314,7 +314,7 @@ help: Remove explicit positional indices
 44 | 
 45 | "{0}_{1}".format(1, *args)
 46 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP030 [*] Use implicit references for positional format fields
   --> UP030_0.py:45:1
@@ -335,7 +335,7 @@ help: Remove explicit positional indices
 46 | 
 47 | "{0}_{1}".format(1, 2, *args)
 48 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP030 [*] Use implicit references for positional format fields
   --> UP030_0.py:47:1
@@ -356,7 +356,7 @@ help: Remove explicit positional indices
 48 | 
 49 | "{0}_{1}".format(*args, 1, 2)
 50 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP030 [*] Use implicit references for positional format fields
   --> UP030_0.py:49:1
@@ -377,7 +377,7 @@ help: Remove explicit positional indices
 50 | 
 51 | "{0}_{1}_{2}".format(1, **kwargs)
 52 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP030 [*] Use implicit references for positional format fields
   --> UP030_0.py:51:1
@@ -398,7 +398,7 @@ help: Remove explicit positional indices
 52 | 
 53 | "{0}_{1}_{2}".format(1, 2, **kwargs)
 54 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP030 [*] Use implicit references for positional format fields
   --> UP030_0.py:53:1
@@ -419,7 +419,7 @@ help: Remove explicit positional indices
 54 | 
 55 | "{0}_{1}_{2}".format(1, 2, 3, **kwargs)
 56 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP030 [*] Use implicit references for positional format fields
   --> UP030_0.py:55:1
@@ -440,7 +440,7 @@ help: Remove explicit positional indices
 56 | 
 57 | "{0}_{1}_{2}".format(1, 2, 3, *args, **kwargs)
 58 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP030 [*] Use implicit references for positional format fields
   --> UP030_0.py:57:1
@@ -461,7 +461,7 @@ help: Remove explicit positional indices
 58 | 
 59 | "{1}_{0}".format(1, 2, *args)
 60 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP030 [*] Use implicit references for positional format fields
   --> UP030_0.py:59:1
@@ -482,7 +482,7 @@ help: Remove explicit positional indices
 60 | 
 61 | "{1}_{0}".format(1, 2)
 62 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP030 [*] Use implicit references for positional format fields
   --> UP030_0.py:61:1
@@ -503,7 +503,7 @@ help: Remove explicit positional indices
 62 | 
 63 | r"\d{{1,2}} {0}".format(42)
 64 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP030 [*] Use implicit references for positional format fields
   --> UP030_0.py:63:1
@@ -523,7 +523,7 @@ help: Remove explicit positional indices
 63 + r"\d{{1,2}} {}".format(42)
 64 | 
 65 | "{{{0}}}".format(123)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP030 [*] Use implicit references for positional format fields
   --> UP030_0.py:65:1
@@ -539,4 +539,4 @@ help: Remove explicit positional indices
 64 | 
    - "{{{0}}}".format(123)
 65 + "{{{}}}".format(123)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

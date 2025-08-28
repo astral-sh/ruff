@@ -260,4 +260,4 @@ help: Combine multiple `type` members
 30 | 
 31 | 
 32 | # OK
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

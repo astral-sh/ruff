@@ -185,7 +185,7 @@ help: Remove `super()` parameters
 114 |         super(
 115 |             ClassForCommentEnthusiasts,
 116 |             # even more helpful comment
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
    --> UP008.py:118:14
@@ -215,7 +215,7 @@ help: Remove `super()` parameters
 119 |         super(
 120 |             ClassForCommentEnthusiasts,
 121 |             self
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
    --> UP008.py:123:14
@@ -243,7 +243,7 @@ help: Remove `super()` parameters
 124 | 
 125 | 
 126 | # Issue #19096: super calls with keyword arguments should emit diagnostic but not be fixed
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP008 Use `super()` instead of `super(__class__, self)`
    --> UP008.py:133:21

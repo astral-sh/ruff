@@ -18,4 +18,4 @@ help: Replace `exit` with `sys.exit()`
 6 |     code = 1
   - exit(code)
 7 + sys.exit(code)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

@@ -23,7 +23,7 @@ help: Move into type-checking block
 8  |         pass
 9  | 
 10 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
   --> quote2.py:9:44
@@ -53,7 +53,7 @@ help: Move into type-checking block
 15 |         pass
 16 | 
 17 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
   --> quote2.py:16:44
@@ -83,7 +83,7 @@ help: Move into type-checking block
 22 |         pass
 23 | 
 24 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
   --> quote2.py:25:44
@@ -114,7 +114,7 @@ help: Move into type-checking block
 31 |         pass
 32 | 
 33 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
   --> quote2.py:34:44
@@ -145,7 +145,7 @@ help: Move into type-checking block
 40 |         pass
 41 | 
 42 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
   --> quote2.py:43:44
@@ -176,7 +176,7 @@ help: Move into type-checking block
 49 |         pass
 50 | 
 51 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
   --> quote2.py:52:44
@@ -207,7 +207,7 @@ help: Move into type-checking block
 58 |         pass
 59 | 
 60 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
   --> quote2.py:61:44
@@ -238,7 +238,7 @@ help: Move into type-checking block
 67 |         pass
 68 | 
 69 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
   --> quote2.py:70:44
@@ -269,4 +269,4 @@ help: Move into type-checking block
 76 |         pass
 77 | 
 78 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

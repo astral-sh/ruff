@@ -21,4 +21,4 @@ help: Move into type-checking block
 14 | 
 15 | 
 16 | @attrs.define(auto_attribs=True)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

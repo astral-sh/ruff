@@ -13,4 +13,4 @@ help: Add `from __future__ import annotations`
 2 | def main() -> None:
 3 |     a_list: list[str] = []
 4 |     a_list.append("hello")
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

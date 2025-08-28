@@ -511,7 +511,7 @@ help: Replace with list literal
 39 | )  # ["a,b,c"]
 40 | ("a,b,c"
 41 | # comment1
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM905 [*] Consider using a list literal instead of `str.split`
   --> SIM905.py:42:2
@@ -537,7 +537,7 @@ help: Replace with list literal
 43 | ) # ["a", "b", "c"]
 44 | ("a,"
 45 | # comment
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM905 [*] Consider using a list literal instead of `str.split`
   --> SIM905.py:46:2
@@ -566,7 +566,7 @@ help: Replace with list literal
 47 | ) # ["a", "b", "c"]
 48 | 
 49 | "hello "\
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM905 [*] Consider using a list literal instead of `str.split`
   --> SIM905.py:53:1

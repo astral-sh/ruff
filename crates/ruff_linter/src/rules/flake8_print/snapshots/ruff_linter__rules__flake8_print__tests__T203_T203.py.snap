@@ -18,7 +18,7 @@ help: Remove `pprint`
 3 | 
 4 | import pprint
 5 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 T203 [*] `pprint` found
  --> T203.py:7:1
@@ -37,4 +37,4 @@ help: Remove `pprint`
   - pprint.pprint("Hello, world!")  # T203
 7 | 
 8 | pprint.pformat("Hello, world!")
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

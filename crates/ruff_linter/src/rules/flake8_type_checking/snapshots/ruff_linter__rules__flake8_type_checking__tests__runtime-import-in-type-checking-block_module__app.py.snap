@@ -20,7 +20,7 @@ help: Move out of type-checking block
 10 |     from array import array  # TC004
 11 | 
 12 | app = fastapi.FastAPI("First application")
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TC004 [*] Move import `array.array` out of type-checking block. Import is used for more than type hinting.
   --> app.py:10:23
@@ -44,4 +44,4 @@ help: Move out of type-checking block
 11 | 
 12 | app = fastapi.FastAPI("First application")
 13 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

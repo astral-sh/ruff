@@ -14,7 +14,7 @@ help: Add return type annotation: `int`
 2 |     return 1
 3 | 
 4 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 ANN201 [*] Missing return type annotation for public function `func`
  --> auto_return_type.py:5:5
@@ -32,7 +32,7 @@ help: Add return type annotation: `float`
 6 |     return 1.5
 7 | 
 8 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 ANN201 [*] Missing return type annotation for public function `func`
   --> auto_return_type.py:9:5
@@ -51,7 +51,7 @@ help: Add return type annotation: `float`
 10 |     if x > 0:
 11 |         return 1
 12 |     else:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 ANN201 [*] Missing return type annotation for public function `func`
   --> auto_return_type.py:16:5
@@ -69,7 +69,7 @@ help: Add return type annotation: `bool`
 17 |     return True
 18 | 
 19 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 ANN201 [*] Missing return type annotation for public function `func`
   --> auto_return_type.py:20:5
@@ -88,7 +88,7 @@ help: Add return type annotation: `None`
 21 |     if x > 0:
 22 |         return None
 23 |     else:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 ANN201 [*] Missing return type annotation for public function `func`
   --> auto_return_type.py:27:5
@@ -111,7 +111,7 @@ help: Add return type annotation: `Union[str, float]`
 29 |     return 1 or 2.5 if x > 0 else 1.5 or "str"
 30 | 
 31 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 ANN201 [*] Missing return type annotation for public function `func`
   --> auto_return_type.py:31:5
@@ -134,7 +134,7 @@ help: Add return type annotation: `Union[str, float]`
 33 |     return 1 + 2.5 if x > 0 else 1.5 or "str"
 34 | 
 35 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 ANN201 Missing return type annotation for public function `func`
   --> auto_return_type.py:35:5
@@ -172,7 +172,7 @@ help: Add return type annotation: `int`
 46 |     if not x:
 47 |         return 1
 48 |     else:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 ANN201 [*] Missing return type annotation for public function `func`
   --> auto_return_type.py:52:5
@@ -196,7 +196,7 @@ help: Add return type annotation: `Optional[int]`
 54 |     if not x:
 55 |         return 1
 56 |     else:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 ANN201 [*] Missing return type annotation for public function `func`
   --> auto_return_type.py:59:5
@@ -220,7 +220,7 @@ help: Add return type annotation: `Union[str, int, None]`
 61 |     if not x:
 62 |         return 1
 63 |     elif x > 5:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 ANN201 [*] Missing return type annotation for public function `func`
   --> auto_return_type.py:68:5
@@ -244,7 +244,7 @@ help: Add return type annotation: `Optional[int]`
 70 |     if x:
 71 |         return 1
 72 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 ANN201 [*] Missing return type annotation for public function `func`
   --> auto_return_type.py:73:5
@@ -262,7 +262,7 @@ help: Add return type annotation: `None`
 74 |     x = 1
 75 | 
 76 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 ANN201 [*] Missing return type annotation for public function `func`
   --> auto_return_type.py:77:5
@@ -286,7 +286,7 @@ help: Add return type annotation: `Optional[int]`
 79 |     if x > 0:
 80 |         return 1
 81 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 ANN201 [*] Missing return type annotation for public function `func`
   --> auto_return_type.py:82:5
@@ -310,7 +310,7 @@ help: Add return type annotation: `Union[str, int, None]`
 84 |     match x:
 85 |         case [1, 2, 3]:
 86 |             return 1
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 ANN201 [*] Missing return type annotation for public function `func`
   --> auto_return_type.py:90:5
@@ -334,7 +334,7 @@ help: Add return type annotation: `Optional[int]`
 92 |     for i in range(5):
 93 |         if i > 0:
 94 |             return 1
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 ANN201 [*] Missing return type annotation for public function `func`
   --> auto_return_type.py:96:5
@@ -353,7 +353,7 @@ help: Add return type annotation: `int`
 97 |     for i in range(5):
 98 |         if i > 0:
 99 |             return 1
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 ANN201 [*] Missing return type annotation for public function `func`
    --> auto_return_type.py:104:5
@@ -377,7 +377,7 @@ help: Add return type annotation: `Optional[int]`
 106 |     for i in range(5):
 107 |         if i > 0:
 108 |             break
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 ANN201 [*] Missing return type annotation for public function `func`
    --> auto_return_type.py:112:5
@@ -401,7 +401,7 @@ help: Add return type annotation: `Optional[int]`
 114 |     try:
 115 |         pass
 116 |     except:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 ANN201 [*] Missing return type annotation for public function `func`
    --> auto_return_type.py:119:5
@@ -420,7 +420,7 @@ help: Add return type annotation: `int`
 120 |     try:
 121 |         pass
 122 |     except:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 ANN201 [*] Missing return type annotation for public function `func`
    --> auto_return_type.py:128:5
@@ -439,7 +439,7 @@ help: Add return type annotation: `int`
 129 |     try:
 130 |         pass
 131 |     except:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 ANN201 [*] Missing return type annotation for public function `func`
    --> auto_return_type.py:137:5
@@ -463,7 +463,7 @@ help: Add return type annotation: `Optional[int]`
 139 |     try:
 140 |         return 1
 141 |     except:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 ANN201 [*] Missing return type annotation for public function `func`
    --> auto_return_type.py:146:5
@@ -487,7 +487,7 @@ help: Add return type annotation: `Optional[int]`
 148 |     while x > 0:
 149 |         break
 150 |         return 1
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 ANN201 Missing return type annotation for public function `method`
    --> auto_return_type.py:158:9
@@ -560,7 +560,7 @@ help: Add return type annotation: `float`
 181 |         if self.x > 0:
 182 |             return 1
 183 |         else:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 ANN201 [*] Missing return type annotation for public function `func`
    --> auto_return_type.py:187:5
@@ -587,7 +587,7 @@ help: Add return type annotation: `Optional[int]`
 189 |     try:
 190 |         pass
 191 |     except:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 ANN201 [*] Missing return type annotation for public function `func`
    --> auto_return_type.py:194:5
@@ -606,7 +606,7 @@ help: Add return type annotation: `int`
 195 |     try:
 196 |         pass
 197 |     except:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 ANN201 [*] Missing return type annotation for public function `func`
    --> auto_return_type.py:203:5
@@ -633,7 +633,7 @@ help: Add return type annotation: `NoReturn`
 205 |     if not x:
 206 |         raise ValueError
 207 |     else:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 ANN201 [*] Missing return type annotation for public function `func`
    --> auto_return_type.py:210:5
@@ -652,7 +652,7 @@ help: Add return type annotation: `int`
 211 |     if not x:
 212 |         raise ValueError
 213 |     else:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 ANN201 [*] Missing return type annotation for public function `func`
    --> auto_return_type.py:234:5
@@ -671,7 +671,7 @@ help: Add return type annotation: `int`
 235 |     if not x:
 236 |         return 1
 237 |     raise ValueError
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 ANN201 [*] Missing return type annotation for public function `func`
    --> auto_return_type.py:240:5
@@ -690,7 +690,7 @@ help: Add return type annotation: `int`
 241 |     if not x:
 242 |         return 1
 243 |     else:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 ANN201 [*] Missing return type annotation for public function `func`
    --> auto_return_type.py:248:5
@@ -718,7 +718,7 @@ help: Add return type annotation: `Optional[int]`
 249 |     try:
 250 |         raise ValueError
 251 |     except:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 ANN201 [*] Missing return type annotation for public function `func`
    --> auto_return_type.py:255:5
@@ -746,7 +746,7 @@ help: Add return type annotation: `Optional[int]`
 256 |     try:
 257 |         return 1
 258 |     except:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 ANN201 [*] Missing return type annotation for public function `func`
    --> auto_return_type.py:262:5
@@ -765,7 +765,7 @@ help: Add return type annotation: `int`
 263 |     for _ in range(3):
 264 |         if x > 0:
 265 |             return 1
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 ANN201 [*] Missing return type annotation for public function `func`
    --> auto_return_type.py:269:5
@@ -784,7 +784,7 @@ help: Add return type annotation: `None`
 270 |     if x > 5:
 271 |         raise ValueError
 272 |     else:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 ANN201 [*] Missing return type annotation for public function `func`
    --> auto_return_type.py:276:5
@@ -803,7 +803,7 @@ help: Add return type annotation: `None`
 277 |     if x > 5:
 278 |         raise ValueError
 279 |     elif x > 10:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 ANN201 [*] Missing return type annotation for public function `func`
    --> auto_return_type.py:283:5
@@ -831,7 +831,7 @@ help: Add return type annotation: `Optional[int]`
 284 |     if x > 5:
 285 |         raise ValueError
 286 |     elif x > 10:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 ANN201 [*] Missing return type annotation for public function `func`
    --> auto_return_type.py:290:5
@@ -850,7 +850,7 @@ help: Add return type annotation: `int`
 291 |     try:
 292 |         return 5
 293 |     except:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 ANN201 [*] Missing return type annotation for public function `func`
    --> auto_return_type.py:299:5
@@ -878,4 +878,4 @@ help: Add return type annotation: `Union[str, int]`
 300 |     match x:
 301 |         case [1, 2, 3]:
 302 |             return 1
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

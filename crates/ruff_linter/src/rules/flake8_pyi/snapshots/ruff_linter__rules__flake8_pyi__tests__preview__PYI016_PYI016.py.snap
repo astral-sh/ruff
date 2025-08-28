@@ -390,7 +390,7 @@ help: Remove duplicate union member `set[int]`
 54 | 
 55 | # Should emit in cases with `typing.Union` instead of `|`
 56 | field19: typing.Union[int, int]  # Error
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PYI016 [*] Duplicate union member `int`
   --> PYI016.py:63:28
@@ -526,7 +526,7 @@ help: Remove duplicate union member `set[int]`
 76 | 
 77 | # Should emit twice (once for each `int` in the nested union, both of which are
 78 | # duplicates of the outer `int`), but not three times (which would indicate that
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PYI016 [*] Duplicate union member `int`
   --> PYI016.py:81:41

@@ -16,4 +16,4 @@ help: Replace `exit` with `sys.exit()`
 4 | 
 5 | 
 6 | from sys import argv
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

@@ -25,4 +25,4 @@ help: Move into type-checking block
 14 |     import os
 15 | 
 16 | def f(x: DataFrame):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

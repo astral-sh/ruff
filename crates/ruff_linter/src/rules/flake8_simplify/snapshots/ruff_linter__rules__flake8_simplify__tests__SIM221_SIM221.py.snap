@@ -14,7 +14,7 @@ help: Replace with `True`
 2 |     pass
 3 | 
 4 | if (a or not a) or b:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM221 [*] Use `True` instead of `a or not a`
  --> SIM221.py:4:5
@@ -34,7 +34,7 @@ help: Replace with `True`
 5 |     pass
 6 | 
 7 | if (a or not a) and b:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM221 [*] Use `True` instead of `a or not a`
  --> SIM221.py:7:5
@@ -54,4 +54,4 @@ help: Replace with `True`
 8  |     pass
 9  | 
 10 | if a:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

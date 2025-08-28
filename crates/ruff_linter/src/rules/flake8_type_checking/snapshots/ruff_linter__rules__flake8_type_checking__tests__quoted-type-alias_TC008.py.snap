@@ -163,7 +163,7 @@ help: Remove quotes
 30 | 
 31 | type B = 'Dict'  # TC008
 32 | type D = 'Foo[str]'  # TC008
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TC008 [*] Remove quotes from type alias
   --> TC008.py:32:10
@@ -364,7 +364,7 @@ help: Remove quotes
 43 | 
 44 | 
 45 | class Baz:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TC008 [*] Remove quotes from type alias
   --> TC008.py:48:14

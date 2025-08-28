@@ -18,7 +18,7 @@ help: Use `pytest.warns()` as a context-manager
 18 | 
 19 | 
 20 | def test_error_assign():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF061 [*] Use context-manager form of `pytest.warns()`
   --> RUF061_warns.py:20:9
@@ -38,7 +38,7 @@ help: Use `pytest.warns()` as a context-manager
 22 |     print(s)
 23 | 
 24 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF061 [*] Use context-manager form of `pytest.warns()`
   --> RUF061_warns.py:25:5
@@ -54,4 +54,4 @@ help: Use `pytest.warns()` as a context-manager
    -     pytest.warns(UserWarning, lambda: warnings.warn("", UserWarning))
 25 +     with pytest.warns(UserWarning):
 26 +         (lambda: warnings.warn("", UserWarning))()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

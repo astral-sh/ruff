@@ -17,7 +17,7 @@ help: Rewrite as a list comprehension
 3 | odd_nums = list(
 4 |     2 * x + 1 for x in range(3)
 5 | )
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C400 [*] Unnecessary generator (rewrite as a list comprehension)
  --> C400.py:3:12
@@ -41,7 +41,7 @@ help: Rewrite as a list comprehension
 6 | 
 7 | 
 8 | # Short-circuit case, combine with C416 and should produce x = list(range(3))
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C400 [*] Unnecessary generator (rewrite using `list()`)
   --> C400.py:9:5
@@ -61,7 +61,7 @@ help: Rewrite using `list()`
 10 | x = list(
 11 |     x for x in range(3)
 12 | )
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C400 [*] Unnecessary generator (rewrite using `list()`)
   --> C400.py:10:5
@@ -87,7 +87,7 @@ help: Rewrite using `list()`
 11 | 
 12 | # Strip parentheses from inner generators.
 13 | list((2 * x for x in range(3)))
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C400 [*] Unnecessary generator (rewrite as a list comprehension)
   --> C400.py:15:1
@@ -107,7 +107,7 @@ help: Rewrite as a list comprehension
 16 | list(((2 * x for x in range(3))))
 17 | list((((2 * x for x in range(3)))))
 18 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C400 [*] Unnecessary generator (rewrite as a list comprehension)
   --> C400.py:16:1
@@ -127,7 +127,7 @@ help: Rewrite as a list comprehension
 17 | list((((2 * x for x in range(3)))))
 18 | 
 19 | # Account for trailing comma in fix
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C400 [*] Unnecessary generator (rewrite as a list comprehension)
   --> C400.py:17:1
@@ -148,7 +148,7 @@ help: Rewrite as a list comprehension
 18 | 
 19 | # Account for trailing comma in fix
 20 | # See https://github.com/astral-sh/ruff/issues/15852
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C400 [*] Unnecessary generator (rewrite as a list comprehension)
   --> C400.py:21:1
@@ -169,7 +169,7 @@ help: Rewrite as a list comprehension
 22 | list(
 23 |      (0 for _ in [])
 24 |      # some comments
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C400 [*] Unnecessary generator (rewrite as a list comprehension)
   --> C400.py:22:1
@@ -200,4 +200,4 @@ help: Rewrite as a list comprehension
 26 | 
 27 | 
 28 | # Not built-in list.
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

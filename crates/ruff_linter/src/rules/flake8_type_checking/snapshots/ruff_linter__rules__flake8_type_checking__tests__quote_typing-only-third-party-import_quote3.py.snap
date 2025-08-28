@@ -26,7 +26,7 @@ help: Move into type-checking block
 10 |         pass
 11 | 
 12 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
   --> quote3.py:13:44
@@ -57,7 +57,7 @@ help: Move into type-checking block
 19 |         pass
 20 | 
 21 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
   --> quote3.py:22:44
@@ -88,7 +88,7 @@ help: Move into type-checking block
 28 |         pass
 29 | 
 30 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `django.contrib.auth.models` into a type-checking block
   --> quote3.py:31:37
@@ -119,7 +119,7 @@ help: Move into type-checking block
 37 |         pass
 38 | 
 39 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `django.contrib.auth.models` into a type-checking block
   --> quote3.py:40:37
@@ -150,7 +150,7 @@ help: Move into type-checking block
 46 |         pass
 47 | 
 48 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `third_party.Type` into a type-checking block
   --> quote3.py:59:29
@@ -181,7 +181,7 @@ help: Move into type-checking block
 65 |         pass
 66 | 
 67 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `third_party.Type` into a type-checking block
   --> quote3.py:67:29
@@ -210,4 +210,4 @@ help: Move into type-checking block
    -     def test_quote_contains_backslash(self, type1: Type[Literal["\n"]], type2: Type[Literal["\""]]):
 72 +     def test_quote_contains_backslash(self, type1: 'Type[Literal["\\n"]]', type2: 'Type[Literal[\'"\']]'):
 73 |         pass
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

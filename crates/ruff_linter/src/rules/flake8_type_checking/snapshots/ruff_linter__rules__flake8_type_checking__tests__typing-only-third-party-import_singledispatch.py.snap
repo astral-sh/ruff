@@ -22,4 +22,4 @@ help: Move into type-checking block
 15 |     from numpy import ndarray
 16 | 
 17 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

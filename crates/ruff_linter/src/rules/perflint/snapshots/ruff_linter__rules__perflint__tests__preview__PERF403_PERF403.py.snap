@@ -19,7 +19,7 @@ help: Replace for loop with dict comprehension
 4 | 
 5 | 
 6 | def foo():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PERF403 [*] Use a dictionary comprehension instead of a for-loop
   --> PERF403.py:13:13
@@ -41,7 +41,7 @@ help: Replace for loop with dict comprehension
 11 | 
 12 | 
 13 | def foo():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PERF403 [*] Use a dictionary comprehension instead of a for-loop
   --> PERF403.py:33:13
@@ -64,7 +64,7 @@ help: Replace for loop with dict comprehension
 31 | 
 32 | 
 33 | def foo():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PERF403 [*] Use `dict.update` instead of a for-loop
   --> PERF403.py:63:13
@@ -85,7 +85,7 @@ help: Replace for loop with `dict.update`
 62 | 
 63 | 
 64 | def foo():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PERF403 [*] Use a dictionary comprehension instead of a for-loop
   --> PERF403.py:78:9
@@ -106,7 +106,7 @@ help: Replace for loop with dict comprehension
 77 | 
 78 | 
 79 | def foo():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PERF403 [*] Use a dictionary comprehension instead of a for-loop
   --> PERF403.py:85:9
@@ -127,7 +127,7 @@ help: Replace for loop with dict comprehension
 84 | 
 85 | 
 86 | def foo():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PERF403 [*] Use a dictionary comprehension instead of a for-loop
   --> PERF403.py:94:9
@@ -148,7 +148,7 @@ help: Replace for loop with dict comprehension
 93 | 
 94 | 
 95 | def foo():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PERF403 [*] Use a dictionary comprehension instead of a for-loop
    --> PERF403.py:106:9
@@ -182,7 +182,7 @@ help: Replace for loop with dict comprehension
 105 | 
 106 | 
 107 | def foo():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PERF403 [*] Use a dictionary comprehension instead of a for-loop
    --> PERF403.py:115:9
@@ -204,7 +204,7 @@ help: Replace for loop with dict comprehension
 115 | 
 116 | 
 117 | def foo():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PERF403 [*] Use `dict.update` instead of a for-loop
    --> PERF403.py:122:9
@@ -224,7 +224,7 @@ help: Replace for loop with `dict.update`
 122 | 
 123 | 
 124 | def foo():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PERF403 [*] Use `dict.update` instead of a for-loop
    --> PERF403.py:129:9
@@ -244,7 +244,7 @@ help: Replace for loop with `dict.update`
 129 | 
 130 | 
 131 | def foo():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PERF403 [*] Use `dict.update` instead of a for-loop
    --> PERF403.py:137:9
@@ -264,7 +264,7 @@ help: Replace for loop with `dict.update`
 137 | 
 138 | 
 139 | def foo():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PERF403 [*] Use a dictionary comprehension instead of a for-loop
    --> PERF403.py:145:13
@@ -286,7 +286,7 @@ help: Replace for loop with dict comprehension
 143 | 
 144 | 
 145 | def foo():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PERF403 [*] Use a dictionary comprehension instead of a for-loop
    --> PERF403.py:153:9
@@ -307,7 +307,7 @@ help: Replace for loop with dict comprehension
 152 | 
 153 | 
 154 | def foo():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PERF403 [*] Use a dictionary comprehension instead of a for-loop
    --> PERF403.py:162:13
@@ -332,7 +332,7 @@ help: Replace for loop with dict comprehension
 160 | 
 161 |     for k, v in src:
 162 |         if lambda: 0:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PERF403 [*] Use `dict.update` instead of a for-loop
    --> PERF403.py:166:13
@@ -355,7 +355,7 @@ help: Replace for loop with `dict.update`
 165 | 
 166 | # https://github.com/astral-sh/ruff/issues/18859
 167 | def foo():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PERF403 [*] Use a dictionary comprehension instead of a for-loop
    --> PERF403.py:172:9
@@ -376,4 +376,4 @@ help: Replace for loop with dict comprehension
 171 | 
 172 | 
 173 | # https://github.com/astral-sh/ruff/issues/19005
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

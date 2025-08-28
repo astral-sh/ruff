@@ -170,7 +170,7 @@ help: Remove unnecessary parentheses
 38 | 
 39 | # OK
 40 | raise AssertionError
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RSE102 [*] Unnecessary parentheses on raised exception
   --> RSE102.py:74:17
@@ -268,7 +268,7 @@ help: Remove unnecessary parentheses
 85 | 
 86 | # OK
 87 | raise ctypes.WinError()
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RSE102 [*] Unnecessary parentheses on raised exception
    --> RSE102.py:107:27
@@ -287,7 +287,7 @@ help: Remove unnecessary parentheses
 108 | 
 109 | 
 110 | raise TypeError(
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RSE102 [*] Unnecessary parentheses on raised exception
    --> RSE102.py:110:16
@@ -306,4 +306,4 @@ help: Remove unnecessary parentheses
     -     # comment
     - )
 110 + raise TypeError
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

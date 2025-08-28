@@ -20,7 +20,7 @@ help: Break down assertion into multiple parts
 16 |     assert something and something_else and something_third
 17 |     assert something and not something_else
 18 |     assert something and (something_else or something_third)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PT018 [*] Assertion should be broken down into multiple parts
   --> PT018.py:15:5
@@ -42,7 +42,7 @@ help: Break down assertion into multiple parts
 17 |     assert something and not something_else
 18 |     assert something and (something_else or something_third)
 19 |     assert not something and something_else
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PT018 [*] Assertion should be broken down into multiple parts
   --> PT018.py:16:5
@@ -64,7 +64,7 @@ help: Break down assertion into multiple parts
 18 |     assert something and (something_else or something_third)
 19 |     assert not something and something_else
 20 |     assert not (something or something_else)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PT018 [*] Assertion should be broken down into multiple parts
   --> PT018.py:17:5
@@ -86,7 +86,7 @@ help: Break down assertion into multiple parts
 19 |     assert not something and something_else
 20 |     assert not (something or something_else)
 21 |     assert not (something or something_else or something_third)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PT018 [*] Assertion should be broken down into multiple parts
   --> PT018.py:18:5
@@ -108,7 +108,7 @@ help: Break down assertion into multiple parts
 20 |     assert not (something or something_else)
 21 |     assert not (something or something_else or something_third)
 22 |     assert something and something_else == """error
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PT018 [*] Assertion should be broken down into multiple parts
   --> PT018.py:19:5
@@ -130,7 +130,7 @@ help: Break down assertion into multiple parts
 21 |     assert not (something or something_else or something_third)
 22 |     assert something and something_else == """error
 23 |     message
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PT018 [*] Assertion should be broken down into multiple parts
   --> PT018.py:20:5
@@ -152,7 +152,7 @@ help: Break down assertion into multiple parts
 22 |     assert something and something_else == """error
 23 |     message
 24 |     """
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PT018 [*] Assertion should be broken down into multiple parts
   --> PT018.py:21:5
@@ -176,7 +176,7 @@ help: Break down assertion into multiple parts
 23 |     message
 24 |     """
 25 |     assert (
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PT018 [*] Assertion should be broken down into multiple parts
   --> PT018.py:24:5
@@ -206,7 +206,7 @@ help: Break down assertion into multiple parts
 27 |         == """error
 28 | message
 29 | """
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PT018 [*] Assertion should be broken down into multiple parts
   --> PT018.py:33:5
@@ -226,7 +226,7 @@ help: Break down assertion into multiple parts
 35 |     assert not (a or not (b and c))
 36 | 
 37 |     # detected, but no fix for messages
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PT018 [*] Assertion should be broken down into multiple parts
   --> PT018.py:34:5
@@ -248,7 +248,7 @@ help: Break down assertion into multiple parts
 36 | 
 37 |     # detected, but no fix for messages
 38 |     assert something and something_else, "error message"
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PT018 Assertion should be broken down into multiple parts
   --> PT018.py:37:5
@@ -301,7 +301,7 @@ help: Break down assertion into multiple parts
 46 | assert something and something_else and something_third  # Error
 47 | 
 48 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PT018 [*] Assertion should be broken down into multiple parts
   --> PT018.py:45:1
@@ -321,7 +321,7 @@ help: Break down assertion into multiple parts
 47 | 
 48 | 
 49 | def test_multiline():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PT018 Assertion should be broken down into multiple parts
   --> PT018.py:49:5
@@ -381,7 +381,7 @@ help: Break down assertion into multiple parts
 66 | 
 67 |     assert (not (
 68 |         self.find_graph_output(node.output[0])
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PT018 [*] Assertion should be broken down into multiple parts
   --> PT018.py:65:5
@@ -414,4 +414,4 @@ help: Break down assertion into multiple parts
 72 | 
 73 |     assert (not self.find_graph_output(node.output[0]) or
 74 |             self.find_graph_input(node.input[0]))
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

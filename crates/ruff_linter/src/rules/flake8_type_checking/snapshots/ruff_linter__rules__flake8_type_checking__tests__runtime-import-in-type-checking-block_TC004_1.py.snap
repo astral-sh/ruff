@@ -17,4 +17,4 @@ help: Move out of type-checking block
   -     from datetime import datetime
 5 +     pass
 6 | x = datetime
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

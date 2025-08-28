@@ -16,7 +16,7 @@ help: Replace with `==` operator
 3 |     pass
 4 | 
 5 | # SIM202
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM202 [*] Use `a == b + c` instead of `not a != b + c`
  --> SIM202.py:6:4
@@ -35,7 +35,7 @@ help: Replace with `==` operator
 7 |     pass
 8 | 
 9 | # SIM202
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM202 [*] Use `a + b == c` instead of `not a + b != c`
   --> SIM202.py:10:4
@@ -54,4 +54,4 @@ help: Replace with `==` operator
 11 |     pass
 12 | 
 13 | # OK
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

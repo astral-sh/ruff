@@ -15,4 +15,4 @@ help: Convert to `T | None`
   - def f(arg: int = None):  # RUF013
 4 + def f(arg: int | None = None):  # RUF013
 5 |     pass
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

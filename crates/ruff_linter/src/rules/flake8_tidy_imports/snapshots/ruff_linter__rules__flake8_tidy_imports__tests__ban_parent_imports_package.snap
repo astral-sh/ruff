@@ -31,7 +31,7 @@ help: Replace relative imports from parent modules with absolute imports
 7 | from ..server import example
 8 | from .. import server
 9 | from . import logger, models
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TID252 [*] Prefer absolute imports over relative imports from parent modules
  --> application.py:6:1
@@ -51,7 +51,7 @@ help: Replace relative imports from parent modules with absolute imports
 7 | from ..server import example
 8 | from .. import server
 9 | from . import logger, models
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TID252 [*] Prefer absolute imports over relative imports from parent modules
  --> application.py:6:1
@@ -71,7 +71,7 @@ help: Replace relative imports from parent modules with absolute imports
 7 | from ..server import example
 8 | from .. import server
 9 | from . import logger, models
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TID252 [*] Prefer absolute imports over relative imports from parent modules
  --> application.py:7:1
@@ -92,7 +92,7 @@ help: Replace relative imports from parent modules with absolute imports
 8  | from .. import server
 9  | from . import logger, models
 10 | from ..protocol.UpperCaseModule import some_function
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TID252 [*] Prefer absolute imports over relative imports from parent modules
   --> application.py:8:1
@@ -112,7 +112,7 @@ help: Replace relative imports from parent modules with absolute imports
 8  + from my_package.sublib import server
 9  | from . import logger, models
 10 | from ..protocol.UpperCaseModule import some_function
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 TID252 [*] Prefer absolute imports over relative imports from parent modules
   --> application.py:10:1
@@ -128,4 +128,4 @@ help: Replace relative imports from parent modules with absolute imports
 9  | from . import logger, models
    - from ..protocol.UpperCaseModule import some_function
 10 + from my_package.sublib.protocol.UpperCaseModule import some_function
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

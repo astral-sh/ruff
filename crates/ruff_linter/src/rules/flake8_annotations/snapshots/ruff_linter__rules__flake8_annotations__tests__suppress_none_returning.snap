@@ -18,7 +18,7 @@ help: Add return type annotation: `bool`
 46 |     return True
 47 | 
 48 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 ANN201 [*] Missing return type annotation for public function `foo`
   --> suppress_none_returning.py:50:5
@@ -38,7 +38,7 @@ help: Add return type annotation: `bool | None`
 51 |     a = 2 + 2
 52 |     if a == 4:
 53 |         return True
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 ANN001 Missing type annotation for function argument `a`
   --> suppress_none_returning.py:59:9

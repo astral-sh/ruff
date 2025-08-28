@@ -60,7 +60,7 @@ help: Remove `metaclass=type`
 16 |     ...
 17 | 
 18 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP050 [*] Class `A` uses `metaclass=type`, which is redundant
   --> UP050.py:24:5
@@ -84,7 +84,7 @@ help: Remove `metaclass=type`
 23 |     ...
 24 | 
 25 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP050 [*] Class `A` uses `metaclass=type`, which is redundant
   --> UP050.py:30:5
@@ -107,7 +107,7 @@ help: Remove `metaclass=type`
 30 |     ...
 31 | 
 32 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP050 [*] Class `A` uses `metaclass=type`, which is redundant
   --> UP050.py:38:5
@@ -132,7 +132,7 @@ help: Remove `metaclass=type`
 37 |     ...
 38 | 
 39 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP050 [*] Class `B` uses `metaclass=type`, which is redundant
   --> UP050.py:44:12
@@ -189,7 +189,7 @@ help: Remove `metaclass=type`
 57 | ):
 58 |     ...
 59 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP050 [*] Class `A` uses `metaclass=type`, which is redundant
   --> UP050.py:69:5
@@ -212,7 +212,7 @@ help: Remove `metaclass=type`
 69 |     ...
 70 | 
 71 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP050 [*] Class `A` uses `metaclass=type`, which is redundant
   --> UP050.py:83:9

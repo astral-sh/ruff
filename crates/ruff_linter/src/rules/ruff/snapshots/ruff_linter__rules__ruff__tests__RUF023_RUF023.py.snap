@@ -210,7 +210,7 @@ help: Apply a natural sort to `Klass3.__slots__`
 39 |     )
 40 |     __slots__ = [
 41 |         "d",
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF023 [*] `Klass3.__slots__` is not sorted
   --> RUF023.py:40:17
@@ -245,7 +245,7 @@ help: Apply a natural sort to `Klass3.__slots__`
 46 |     ]
 47 | 
 48 | ##################################
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF023 [*] `Klass4.__slots__` is not sorted
   --> RUF023.py:54:17
@@ -285,7 +285,7 @@ help: Apply a natural sort to `Klass4.__slots__`
 63 |         # comment5
 64 |     )  # comment6
 65 |     # comment7
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF023 [*] `Klass4.__slots__` is not sorted
   --> RUF023.py:64:17
@@ -319,7 +319,7 @@ help: Apply a natural sort to `Klass4.__slots__`
 71 |         # comment4
 72 |         # comment5
 73 |         # comment6
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF023 [*] `PurePath.__slots__` is not sorted
    --> RUF023.py:75:17
@@ -420,7 +420,7 @@ help: Apply a natural sort to `PurePath.__slots__`
 106 |     )
 107 | 
 108 | # From cpython/Lib/pickletools.py
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF023 [*] `ArgumentDescriptor.__slots__` is not sorted
    --> RUF023.py:113:17
@@ -475,7 +475,7 @@ help: Apply a natural sort to `ArgumentDescriptor.__slots__`
 126 |     )
 127 | 
 128 | ####################################
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF023 `SlotUser.__slots__` is not sorted
    --> RUF023.py:138:17
@@ -653,7 +653,7 @@ help: Apply a natural sort to `BezierBuilder4.__slots__`
 186 |         # strange comment 2
 187 |         ,
 188 |     )
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF023 [*] `BezierBuilder4.__slots__` is not sorted
    --> RUF023.py:191:17
@@ -701,4 +701,4 @@ help: Apply a natural sort to `VeryDRY.__slots__`
 200 |     __match_args__ = __slots__
 201 | 
 202 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

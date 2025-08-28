@@ -167,7 +167,7 @@ help: Replace with `deque()`
 68 |     deque([], foo=1)  # RUF037
 69 | 
 70 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF037 [*] Unnecessary empty iterable within a deque call
   --> RUF037.py:68:5
@@ -186,7 +186,7 @@ help: Replace with `deque()`
 69 | 
 70 | 
 71 | # Somewhat related to the issue, both okay because we can't generally look
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF037 [*] Unnecessary empty iterable within a deque call
   --> RUF037.py:80:5
@@ -213,7 +213,7 @@ help: Replace with `deque(maxlen=...)`
 81 | 
 82 | 
 83 | # `maxlen` can also be passed positionally
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF037 [*] Unnecessary empty iterable within a deque call
   --> RUF037.py:89:5
@@ -251,7 +251,7 @@ help: Replace with `deque()`
 94 | 
 95 | # https://github.com/astral-sh/ruff/issues/18854
 96 | deque("")
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 RUF037 [*] Unnecessary empty iterable within a deque call
   --> RUF037.py:96:1

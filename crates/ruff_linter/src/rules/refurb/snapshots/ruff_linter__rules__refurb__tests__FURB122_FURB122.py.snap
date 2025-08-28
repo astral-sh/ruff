@@ -142,7 +142,7 @@ help: Replace with `f.writelines`
 51 | 
 52 | 
 53 | def _():
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB122 [*] Use of `f.write` in a for loop
   --> FURB122.py:57:9
@@ -294,7 +294,7 @@ help: Replace with `f.writelines`
 97 | 
 98 | 
 99 | # OK
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 FURB122 [*] Use of `f.write` in a for loop
    --> FURB122.py:183:9

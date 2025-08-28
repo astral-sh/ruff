@@ -23,7 +23,7 @@ help: Replace `if`-`else`-block with `b = c if a else d`
 3 | 
 4 | # OK
 5 | b = c if a else d
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM108 [*] Use ternary operator `b = 1 if a else 2` instead of `if`-`else`-block
   --> SIM108.py:30:5
@@ -48,7 +48,7 @@ help: Replace `if`-`else`-block with `b = 1 if a else 2`
 31 | 
 32 | 
 33 | import sys
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM108 Use ternary operator `abc = x if x > 0 else -x` instead of `if`-`else`-block
   --> SIM108.py:58:1
@@ -86,7 +86,7 @@ help: Replace `if`-`else`-block with `b = "cccccccccccccccccccccccccccccccccß" 
 83 | 
 84 | 
 85 | # OK (too long)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM108 Use ternary operator `exitcode = 0 if True else 1` instead of `if`-`else`-block
    --> SIM108.py:105:1
@@ -147,7 +147,7 @@ help: Replace `if`-`else`-block with `z = cond or other_cond`
 142 | 
 143 | # SIM108 - should suggest
 144 | # z = cond and other_cond
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM108 [*] Use binary operator `z = cond and other_cond` instead of `if`-`else`-block
    --> SIM108.py:148:1
@@ -174,7 +174,7 @@ help: Replace `if`-`else`-block with `z = cond and other_cond`
 149 | 
 150 | # SIM108 - should suggest
 151 | # z = not cond and other_cond
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM108 [*] Use binary operator `z = not cond and other_cond` instead of `if`-`else`-block
    --> SIM108.py:155:1
@@ -201,7 +201,7 @@ help: Replace `if`-`else`-block with `z = not cond and other_cond`
 156 | 
 157 | # SIM108 does not suggest
 158 | # a binary option in these cases,
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM108 [*] Use ternary operator `z = 1 if True else other` instead of `if`-`else`-block
    --> SIM108.py:167:1
@@ -228,7 +228,7 @@ help: Replace `if`-`else`-block with `z = 1 if True else other`
 168 | 
 169 | if False:
 170 |     z = 1
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM108 [*] Use ternary operator `z = 1 if False else other` instead of `if`-`else`-block
    --> SIM108.py:172:1
@@ -255,7 +255,7 @@ help: Replace `if`-`else`-block with `z = 1 if False else other`
 173 | 
 174 | if 1:
 175 |     z = True
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM108 [*] Use ternary operator `z = True if 1 else other` instead of `if`-`else`-block
    --> SIM108.py:177:1
@@ -282,7 +282,7 @@ help: Replace `if`-`else`-block with `z = True if 1 else other`
 178 | 
 179 | # SIM108 does not suggest a binary option in this
 180 | # case, since we'd be reducing the number of calls
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM108 [*] Use ternary operator `z = foo() if foo() else other` instead of `if`-`else`-block
    --> SIM108.py:185:1
@@ -309,7 +309,7 @@ help: Replace `if`-`else`-block with `z = foo() if foo() else other`
 186 | 
 187 | # SIM108 does not suggest a binary option in this
 188 | # case, since we'd be reducing the number of calls
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM108 [*] Use ternary operator `z = not foo() if foo() else other` instead of `if`-`else`-block
    --> SIM108.py:193:1
@@ -334,7 +334,7 @@ help: Replace `if`-`else`-block with `z = not foo() if foo() else other`
 194 | 
 195 | 
 196 | # These two cases double as tests for f-string quote preservation. The first
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM108 [*] Use ternary operator `var = "str" if cond else f"{first}-{second}"` instead of `if`-`else`-block
    --> SIM108.py:202:1
@@ -361,7 +361,7 @@ help: Replace `if`-`else`-block with `var = "str" if cond else f"{first}-{second
 203 | 
 204 | if cond:
 205 |     var = "str"
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 SIM108 [*] Use ternary operator `var = "str" if cond else f'{first}-{second}'` instead of `if`-`else`-block
    --> SIM108.py:207:1
@@ -383,4 +383,4 @@ help: Replace `if`-`else`-block with `var = "str" if cond else f'{first}-{second
     - else:
     -     var = f'{first}-{second}'
 207 + var = "str" if cond else f'{first}-{second}'
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

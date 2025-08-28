@@ -590,7 +590,7 @@ help: Replace with string literal
 85 | 
 86 | # https://github.com/astral-sh/ruff/issues/17606
 87 | bool(True)and None
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 UP018 [*] Unnecessary `bool` call (rewrite as a literal)
   --> UP018.py:89:1

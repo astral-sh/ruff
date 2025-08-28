@@ -16,4 +16,4 @@ help: Convert to `T | None`
 16 | 
 17 | 
 18 | def return_type(arg: Optional = None) -> Optional: ...
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

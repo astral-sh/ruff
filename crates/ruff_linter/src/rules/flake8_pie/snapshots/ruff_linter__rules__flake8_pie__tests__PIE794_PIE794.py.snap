@@ -19,7 +19,7 @@ help: Remove duplicate field definition for `name`
 4 | 
 5 |     def remove(self) -> None:
 6 |         ...
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PIE794 [*] Class field `name` is defined multiple times
   --> PIE794.py:13:5
@@ -39,7 +39,7 @@ help: Remove duplicate field definition for `name`
 13 | 
 14 |     def foo(self) -> None:
 15 |         ...
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PIE794 [*] Class field `bar` is defined multiple times
   --> PIE794.py:23:5
@@ -57,7 +57,7 @@ help: Remove duplicate field definition for `bar`
 23 | 
 24 | 
 25 | class User(BaseModel):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PIE794 [*] Class field `bar` is defined multiple times
   --> PIE794.py:40:5
@@ -75,7 +75,7 @@ help: Remove duplicate field definition for `bar`
 40 | 
 41 | 
 42 | class Person:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PIE794 [*] Class field `name` is defined multiple times
   --> PIE794.py:46:5
@@ -93,7 +93,7 @@ help: Remove duplicate field definition for `name`
 46 | 
 47 | 
 48 | class Person:
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PIE794 [*] Class field `name` is defined multiple times
   --> PIE794.py:52:5
@@ -108,4 +108,4 @@ help: Remove duplicate field definition for `name`
 50 |     name: str = "Foo"
 51 |     name: str = name + " Bar"
    -     name: str = "Bar"  # PIE794
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

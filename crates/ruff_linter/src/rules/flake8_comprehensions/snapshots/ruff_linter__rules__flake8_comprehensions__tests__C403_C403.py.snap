@@ -15,7 +15,7 @@ help: Rewrite as a set comprehension
 2 | s = set(
 3 |     [x for x in range(3)]
 4 | )
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C403 [*] Unnecessary list comprehension (rewrite as a set comprehension)
  --> C403.py:2:5
@@ -40,7 +40,7 @@ help: Rewrite as a set comprehension
 5 | 
 6 | s = f"{set([x for x in 'ab'])}"
 7 | s = f'{set([x for x in "ab"])}'
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C403 [*] Unnecessary list comprehension (rewrite as a set comprehension)
  --> C403.py:6:8
@@ -60,7 +60,7 @@ help: Rewrite as a set comprehension
 7 | s = f'{set([x for x in "ab"])}'
 8 | 
 9 | def f(x):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C403 [*] Unnecessary list comprehension (rewrite as a set comprehension)
  --> C403.py:7:8
@@ -80,7 +80,7 @@ help: Rewrite as a set comprehension
 8  | 
 9  | def f(x):
 10 |     return x
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C403 [*] Unnecessary list comprehension (rewrite as a set comprehension)
   --> C403.py:12:8
@@ -101,7 +101,7 @@ help: Rewrite as a set comprehension
 13 | 
 14 | s = f"{ set([x for x in 'ab']) | set([x for x in 'ab']) }"
 15 | s = f"{set([x for x in 'ab']) | set([x for x in 'ab'])}"
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C403 [*] Unnecessary list comprehension (rewrite as a set comprehension)
   --> C403.py:14:9
@@ -121,7 +121,7 @@ help: Rewrite as a set comprehension
 15 | s = f"{set([x for x in 'ab']) | set([x for x in 'ab'])}"
 16 | 
 17 | s = set(  # comment
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C403 [*] Unnecessary list comprehension (rewrite as a set comprehension)
   --> C403.py:14:34
@@ -141,7 +141,7 @@ help: Rewrite as a set comprehension
 15 | s = f"{set([x for x in 'ab']) | set([x for x in 'ab'])}"
 16 | 
 17 | s = set(  # comment
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C403 [*] Unnecessary list comprehension (rewrite as a set comprehension)
   --> C403.py:15:8
@@ -161,7 +161,7 @@ help: Rewrite as a set comprehension
 16 | 
 17 | s = set(  # comment
 18 |     [x for x in range(3)]
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C403 [*] Unnecessary list comprehension (rewrite as a set comprehension)
   --> C403.py:15:33
@@ -181,7 +181,7 @@ help: Rewrite as a set comprehension
 16 | 
 17 | s = set(  # comment
 18 |     [x for x in range(3)]
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C403 [*] Unnecessary list comprehension (rewrite as a set comprehension)
   --> C403.py:17:5
@@ -209,7 +209,7 @@ help: Rewrite as a set comprehension
 20 | 
 21 | s = set([  # comment
 22 |     x for x in range(3)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C403 [*] Unnecessary list comprehension (rewrite as a set comprehension)
   --> C403.py:21:5
@@ -236,7 +236,7 @@ help: Rewrite as a set comprehension
 24 | 
 25 | s = set(([x for x in range(3)]))
 26 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C403 [*] Unnecessary list comprehension (rewrite as a set comprehension)
   --> C403.py:25:5
@@ -257,7 +257,7 @@ help: Rewrite as a set comprehension
 26 | 
 27 | s = set(((([x for x in range(3)]))))
 28 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C403 [*] Unnecessary list comprehension (rewrite as a set comprehension)
   --> C403.py:27:5
@@ -278,7 +278,7 @@ help: Rewrite as a set comprehension
 28 | 
 29 | s = set( # outer set comment
 30 | ( # inner paren comment - not preserved
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C403 [*] Unnecessary list comprehension (rewrite as a set comprehension)
   --> C403.py:29:5
@@ -312,7 +312,7 @@ help: Rewrite as a set comprehension
 32 | 
 33 | # Test trailing comma case
 34 | s = set([x for x in range(3)],)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C403 [*] Unnecessary list comprehension (rewrite as a set comprehension)
   --> C403.py:37:5
@@ -332,7 +332,7 @@ help: Rewrite as a set comprehension
 38 | 
 39 | s = t"{set([x for x in 'ab'])}"
 40 | s = t'{set([x for x in "ab"])}'
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C403 [*] Unnecessary list comprehension (rewrite as a set comprehension)
   --> C403.py:39:8
@@ -352,7 +352,7 @@ help: Rewrite as a set comprehension
 40 | s = t'{set([x for x in "ab"])}'
 41 | 
 42 | def f(x):
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C403 [*] Unnecessary list comprehension (rewrite as a set comprehension)
   --> C403.py:40:8
@@ -372,7 +372,7 @@ help: Rewrite as a set comprehension
 41 | 
 42 | def f(x):
 43 |     return x
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C403 [*] Unnecessary list comprehension (rewrite as a set comprehension)
   --> C403.py:45:8
@@ -393,7 +393,7 @@ help: Rewrite as a set comprehension
 46 | 
 47 | s = t"{ set([x for x in 'ab']) | set([x for x in 'ab']) }"
 48 | s = t"{set([x for x in 'ab']) | set([x for x in 'ab'])}"
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C403 [*] Unnecessary list comprehension (rewrite as a set comprehension)
   --> C403.py:47:9
@@ -412,7 +412,7 @@ help: Rewrite as a set comprehension
 47 + s = t"{ {x for x in 'ab'} | set([x for x in 'ab']) }"
 48 | s = t"{set([x for x in 'ab']) | set([x for x in 'ab'])}"
 49 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C403 [*] Unnecessary list comprehension (rewrite as a set comprehension)
   --> C403.py:47:34
@@ -431,7 +431,7 @@ help: Rewrite as a set comprehension
 47 + s = t"{ set([x for x in 'ab']) | {x for x in 'ab'} }"
 48 | s = t"{set([x for x in 'ab']) | set([x for x in 'ab'])}"
 49 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C403 [*] Unnecessary list comprehension (rewrite as a set comprehension)
   --> C403.py:48:8
@@ -447,7 +447,7 @@ help: Rewrite as a set comprehension
    - s = t"{set([x for x in 'ab']) | set([x for x in 'ab'])}"
 48 + s = t"{ {x for x in 'ab'} | set([x for x in 'ab'])}"
 49 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 C403 [*] Unnecessary list comprehension (rewrite as a set comprehension)
   --> C403.py:48:33
@@ -463,4 +463,4 @@ help: Rewrite as a set comprehension
    - s = t"{set([x for x in 'ab']) | set([x for x in 'ab'])}"
 48 + s = t"{set([x for x in 'ab']) | {x for x in 'ab'} }"
 49 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

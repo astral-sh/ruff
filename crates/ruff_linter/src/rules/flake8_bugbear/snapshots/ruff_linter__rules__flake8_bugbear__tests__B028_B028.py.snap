@@ -20,7 +20,7 @@ help: Set `stacklevel=2`
 9  | warnings.warn("test", DeprecationWarning, source=None)
 10 | warnings.warn("test", DeprecationWarning, source=None, stacklevel=2)
 11 | warnings.warn("test", DeprecationWarning, stacklevel=1)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 B028 [*] No explicit `stacklevel` keyword argument found
   --> B028.py:9:1
@@ -40,7 +40,7 @@ help: Set `stacklevel=2`
 10 | warnings.warn("test", DeprecationWarning, source=None, stacklevel=2)
 11 | warnings.warn("test", DeprecationWarning, stacklevel=1)
 12 | warnings.warn("test", DeprecationWarning, 1)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 B028 [*] No explicit `stacklevel` keyword argument found
   --> B028.py:22:1
@@ -61,7 +61,7 @@ help: Set `stacklevel=2`
 27 |     )
 28 | 
 29 | # https://github.com/astral-sh/ruff/issues/18011
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 B028 [*] No explicit `stacklevel` keyword argument found
   --> B028.py:32:1
@@ -82,4 +82,4 @@ help: Set `stacklevel=2`
 33 | 
 34 | _my_prefixes = ("this","that")
 35 | warnings.warn("test", skip_file_prefixes = _my_prefixes)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior

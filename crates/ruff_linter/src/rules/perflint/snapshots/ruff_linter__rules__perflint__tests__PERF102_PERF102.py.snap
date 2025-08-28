@@ -18,7 +18,7 @@ help: Replace `.items()` with `.values()`
 6 |         print(value)
 7 | 
 8 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PERF102 [*] When using only the keys of a dict use the `keys()` method
   --> PERF102.py:10:19
@@ -37,7 +37,7 @@ help: Replace `.items()` with `.keys()`
 11 |         print(key)
 12 | 
 13 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PERF102 [*] When using only the keys of a dict use the `keys()` method
   --> PERF102.py:15:30
@@ -56,7 +56,7 @@ help: Replace `.items()` with `.keys()`
 16 |         print(weird_arg_name)
 17 | 
 18 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PERF102 [*] When using only the keys of a dict use the `keys()` method
   --> PERF102.py:20:25
@@ -75,7 +75,7 @@ help: Replace `.items()` with `.keys()`
 21 |         print(name)
 22 | 
 23 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PERF102 [*] When using only the keys of a dict use the `keys()` method
   --> PERF102.py:30:30
@@ -94,7 +94,7 @@ help: Replace `.items()` with `.keys()`
 31 |         print(key1)
 32 | 
 33 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PERF102 [*] When using only the values of a dict use the `values()` method
   --> PERF102.py:35:36
@@ -113,7 +113,7 @@ help: Replace `.items()` with `.values()`
 36 |         print(value)
 37 | 
 38 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PERF102 [*] When using only the keys of a dict use the `keys()` method
   --> PERF102.py:50:32
@@ -132,7 +132,7 @@ help: Replace `.items()` with `.keys()`
 51 |         print(key2)
 52 | 
 53 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PERF102 [*] When using only the keys of a dict use the `keys()` method
   --> PERF102.py:85:25
@@ -151,7 +151,7 @@ help: Replace `.items()` with `.keys()`
 86 |         print(name)
 87 | 
 88 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PERF102 [*] When using only the keys of a dict use the `keys()` method
   --> PERF102.py:90:25
@@ -170,7 +170,7 @@ help: Replace `.items()` with `.keys()`
 91 |         print(name)
 92 | 
 93 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PERF102 [*] When using only the keys of a dict use the `keys()` method
   --> PERF102.py:95:31
@@ -189,7 +189,7 @@ help: Replace `.items()` with `.keys()`
 96 |         print(name)
 97 | 
 98 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PERF102 [*] When using only the values of a dict use the `values()` method
    --> PERF102.py:100:31
@@ -208,7 +208,7 @@ help: Replace `.items()` with `.values()`
 101 |         print(value)
 102 | 
 103 | 
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
 
 PERF102 [*] When using only the keys of a dict use the `keys()` method
    --> PERF102.py:106:16
@@ -226,4 +226,4 @@ help: Replace `.items()` with `.keys()`
     -     for(B,D)in A.items():
 106 +     for B in A.keys():
 107 |         if(C:=name_to_value.get(B.name)):A.run(B.set,C)
-note: This is an unsafe fix and may remove comments or change runtime behavior
+note: This is an unsafe fix and may change runtime behavior
