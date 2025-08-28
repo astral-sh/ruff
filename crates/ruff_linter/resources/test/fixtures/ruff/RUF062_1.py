@@ -236,6 +236,63 @@ def fully_illegal_match(variable):
         case "b":
             yield # invalid
 
+# (22) Invalid: multiple yields in terminating branch
+@contextlib.contextmanager
+def multiple_yields_in_terminating_branch():
+    try:
+        pass
+    except RuntimeError:
+        yield # valid
+        yield # invalid
+        return
+    except ValueError:
+        yield # valid
+        return
+    yield # valid
+
+# (23) Invalid: preceeding yield makes all try/except yields illegal; report max path (preceeding yield, try, succeeding)
+@contextlib.contextmanager
+def fully_illegal_try():
+    yield # valid
+    try:
+        yield # invalid, 23
+    except ValueError:
+        yield # invalid, 23
+        return
+    yield # invalid, 23
+
+
+# (24) Invalid: preceeding yield makes all try/except yields illegal; except returns
+@contextlib.contextmanager
+def fully_illegal_try_except_returns():
+    yield # valid
+    try:
+        pass
+    except ValueError:
+        yield # invalid, 24
+        return
+
+# (25) Invalid: preceeding yield makes all try/except yields illegal
+@contextlib.contextmanager
+def fully_illegal_try_except():
+    yield # valid
+    try:
+        pass
+    except ValueError:
+        yield # invalid, 25
+
+# (26) Invalid: preceeding yield makes all try/except yields illegal; finally returns
+@contextlib.contextmanager
+def fully_illegal_try_except_finally_returns():
+    yield # valid
+    try:
+        pass
+    except ValueError:
+        return
+    finally:
+        yield # invalid, 26
+        return
+
 
 
 
