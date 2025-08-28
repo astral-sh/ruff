@@ -975,7 +975,7 @@ impl<'db> AtomicConstraint<'db> {
         debug_assert_eq!(lower_type, lower_type.bottom_materialization(db));
         debug_assert_eq!(upper_type, upper_type.top_materialization(db));
 
-        // If `lower > upper`, then the constraint cannot be satisfied, since there is no type that
+        // If `lower ≰ upper`, then the constraint cannot be satisfied, since there is no type that
         // is both greater than `lower`, and less than `upper`. (This is true regardless of whether
         // the upper and lower bounds are open are closed.)
         if !lower_type.is_subtype_of(db, upper_type) {
