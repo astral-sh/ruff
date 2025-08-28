@@ -25,23 +25,28 @@ pub fn any_qualified_base_class(
     })
 }
 
-/// Return `true` if any base class matches an [`Expr`] predicate.
-pub fn any_base_class(
+#[derive(Debug, Copy, Clone, PartialEq, Eq, is_macro::Is)]
+pub enum TraversalContinuation {
+    Continue,
+    Stop,
+}
+
+pub fn traverse_base_classes(
     class_def: &ast::StmtClassDef,
     semantic: &SemanticModel,
-    func: &mut dyn FnMut(&Expr) -> bool,
-) -> bool {
+    func: &mut dyn FnMut(&Expr) -> TraversalContinuation,
+) {
     fn inner(
         class_def: &ast::StmtClassDef,
         semantic: &SemanticModel,
-        func: &mut dyn FnMut(&Expr) -> bool,
+        func: &mut dyn FnMut(&Expr) -> TraversalContinuation,
         seen: &mut FxHashSet<BindingId>,
-    ) -> bool {
-        class_def.bases().iter().any(|expr| {
+    ) -> TraversalContinuation {
+        for expr in class_def.bases() {
             // If the base class itself matches the pattern, then this does too.
             // Ex) `class Foo(BaseModel): ...`
-            if func(expr) {
-                return true;
+            if func(expr).is_stop() {
+                return TraversalContinuation::Stop;
             }
 
             // If the base class extends a class that matches the pattern, then this does too.
@@ -55,21 +60,41 @@ pub fn any_base_class(
                         .map(|id| &semantic.scopes[*id])
                         .and_then(|scope| scope.kind.as_class())
                     {
-                        if inner(base_class, semantic, func, seen) {
-                            return true;
+                        if inner(base_class, semantic, func, seen).is_stop() {
+                            return TraversalContinuation::Stop;
                         }
                     }
                 }
             }
-            false
-        })
+        }
+        TraversalContinuation::Continue
     }
 
     if class_def.bases().is_empty() {
-        return false;
+        return;
     }
 
-    inner(class_def, semantic, func, &mut FxHashSet::default())
+    inner(class_def, semantic, func, &mut FxHashSet::default());
+}
+
+/// Return `true` if any base class matches an [`Expr`] predicate.
+pub fn any_base_class(
+    class_def: &ast::StmtClassDef,
+    semantic: &SemanticModel,
+    func: &mut dyn FnMut(&Expr) -> bool,
+) -> bool {
+    let mut result = false;
+
+    traverse_base_classes(class_def, semantic, &mut |expr| {
+        if func(expr) {
+            result = true;
+            return TraversalContinuation::Stop;
+        }
+
+        TraversalContinuation::Continue
+    });
+
+    result
 }
 
 /// Returns an iterator over all base classes, beginning with the
