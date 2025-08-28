@@ -1406,7 +1406,7 @@ fn is_non_empty_f_string(expr: &ast::ExprFString) -> bool {
 
 /// Returns `true` if the expression definitely resolves to the empty string, when used as an f-string
 /// expression.
-fn is_empty_f_string(expr: &ast::ExprFString) -> bool {
+pub fn is_empty_f_string(expr: &ast::ExprFString) -> bool {
     fn inner(expr: &Expr) -> bool {
         match expr {
             Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => value.is_empty(),
