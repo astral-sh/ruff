@@ -90,3 +90,9 @@ impl<Tag, T: Hash + Eq + Clone, R: Clone> CycleDetector<Tag, T, R> {
         ret
     }
 }
+
+impl<Tag, T: Hash + Eq + Clone, R: Default + Clone> Default for CycleDetector<Tag, T, R> {
+    fn default() -> Self {
+        CycleDetector::new(R::default())
+    }
+}

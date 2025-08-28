@@ -337,6 +337,45 @@ fn single_expression_cycle_initial<'db>(
     Type::Never
 }
 
+/// Returns the statically-known truthiness of a given expression.
+///
+/// Returns [`Truthiness::Ambiguous`] in case any non-definitely bound places
+/// were encountered while inferring the type of the expression.
+#[salsa::tracked(cycle_fn=static_expression_truthiness_cycle_recover, cycle_initial=static_expression_truthiness_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
+pub(crate) fn static_expression_truthiness<'db>(
+    db: &'db dyn Db,
+    expression: Expression<'db>,
+) -> Truthiness {
+    let inference = infer_expression_types(db, expression);
+
+    if !inference.all_places_definitely_bound() {
+        return Truthiness::Ambiguous;
+    }
+
+    let file = expression.file(db);
+    let module = parsed_module(db, file).load(db);
+    let node = expression.node_ref(db, &module);
+
+    inference.expression_type(node).bool(db)
+}
+
+#[expect(clippy::trivially_copy_pass_by_ref)]
+fn static_expression_truthiness_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &Truthiness,
+    _count: u32,
+    _expression: Expression<'db>,
+) -> salsa::CycleRecoveryAction<Truthiness> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn static_expression_truthiness_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _expression: Expression<'db>,
+) -> Truthiness {
+    Truthiness::Ambiguous
+}
+
 /// Infer the types for an [`Unpack`] operation.
 ///
 /// This infers the expression type and performs structural match against the target expression
@@ -657,6 +696,9 @@ struct ExpressionInferenceExtra<'db> {
     ///
     /// Falls back to `Type::Never` if an expression is missing.
     cycle_fallback: bool,
+
+    /// `true` if all places in this expression are definitely bound
+    all_definitely_bound: bool,
 }
 
 impl<'db> ExpressionInference<'db> {
@@ -665,6 +707,7 @@ impl<'db> ExpressionInference<'db> {
         Self {
             extra: Some(Box::new(ExpressionInferenceExtra {
                 cycle_fallback: true,
+                all_definitely_bound: true,
                 ..ExpressionInferenceExtra::default()
             })),
             expressions: FxHashMap::default(),
@@ -697,6 +740,14 @@ impl<'db> ExpressionInference<'db> {
 
     fn fallback_type(&self) -> Option<Type<'db>> {
         self.is_cycle_callback().then_some(Type::Never)
+    }
+
+    /// Returns true if all places in this expression are definitely bound.
+    pub(crate) fn all_places_definitely_bound(&self) -> bool {
+        self.extra
+            .as_ref()
+            .map(|e| e.all_definitely_bound)
+            .unwrap_or(true)
     }
 }
 
@@ -847,6 +898,9 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     ///
     /// This is used only when constructing a cycle-recovery `TypeInference`.
     cycle_fallback: bool,
+
+    /// `true` if all places in this expression are definitely bound
+    all_definitely_bound: bool,
 }
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
@@ -880,6 +934,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred: VecSet::default(),
             undecorated_type: None,
             cycle_fallback: false,
+            all_definitely_bound: true,
         }
     }
 
@@ -6198,7 +6253,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let (resolved, constraint_keys) =
             self.infer_place_load(PlaceExprRef::from(&expr), ast::ExprRef::Name(name_node));
 
-        resolved
+        let resolved_after_fallback = resolved
             // Not found in the module's explicitly declared global symbols?
             // Check the "implicit globals" such as `__doc__`, `__file__`, `__name__`, etc.
             // These are looked up as attributes on `types.ModuleType`.
@@ -6234,8 +6289,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 } else {
                     Place::Unbound.into()
                 }
-            })
-            .unwrap_with_diagnostic(|lookup_error| match lookup_error {
+            });
+
+        if !resolved_after_fallback.place.is_definitely_bound() {
+            self.all_definitely_bound = false;
+        }
+
+        let ty =
+            resolved_after_fallback.unwrap_with_diagnostic(|lookup_error| match lookup_error {
                 LookupError::Unbound(qualifiers) => {
                     self.report_unresolved_reference(name_node);
                     TypeAndQualifiers::new(Type::unknown(), qualifiers)
@@ -6246,8 +6307,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                     type_when_bound
                 }
-            })
-            .inner_type()
+            });
+
+        ty.inner_type()
     }
 
     fn infer_local_place_load(
@@ -6677,7 +6739,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn narrow_expr_with_applicable_constraints<'r>(
-        &self,
+        &mut self,
         target: impl Into<ast::ExprRef<'r>>,
         target_ty: Type<'db>,
         constraint_keys: &[(FileScopeId, ConstraintKey)],
@@ -6720,11 +6782,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 assigned_type = Some(ty);
             }
         }
+        let fallback_place = value_type.member(db, &attr.id);
+        // Exclude non-definitely-bound places for purposes of reachability
+        // analysis. We currently do not perform boundness analysis for implicit
+        // instance attributes, so we exclude them here as well.
+        if !fallback_place.place.is_definitely_bound()
+            || fallback_place
+                .qualifiers
+                .contains(TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE)
+        {
+            self.all_definitely_bound = false;
+        }
 
-        let resolved_type = value_type
-            .member(db, &attr.id)
-            .map_type(|ty| self.narrow_expr_with_applicable_constraints(attribute, ty, &constraint_keys))
-            .unwrap_with_diagnostic(|lookup_error| match lookup_error {
+        let resolved_type =
+            fallback_place.map_type(|ty| {
+            self.narrow_expr_with_applicable_constraints(attribute, ty, &constraint_keys)
+        }).unwrap_with_diagnostic(|lookup_error| match lookup_error {
                 LookupError::Unbound(_) => {
                     let report_unresolved_attribute = self.is_reachable(attribute);
 
@@ -8832,6 +8905,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             declarations,
             deferred,
             cycle_fallback,
+            all_definitely_bound,
 
             // Ignored; only relevant to definition regions
             undecorated_type: _,
@@ -8858,7 +8932,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
 
         let extra =
-            (cycle_fallback || !bindings.is_empty() || !diagnostics.is_empty()).then(|| {
+            (cycle_fallback || !bindings.is_empty() || !diagnostics.is_empty() || !all_definitely_bound).then(|| {
                 if bindings.len() > 20 {
                     tracing::debug!(
                         "Inferred expression region `{:?}` contains {} bindings. Lookups by linear scan might be slow.",
@@ -8871,6 +8945,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     bindings: bindings.into_boxed_slice(),
                     diagnostics,
                     cycle_fallback,
+                    all_definitely_bound,
                 })
             });
 
@@ -8896,7 +8971,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred,
             cycle_fallback,
             undecorated_type,
-
+            all_definitely_bound: _,
             // builder only state
             typevar_binding_context: _,
             deferred_state: _,
@@ -8963,6 +9038,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred: _,
             bindings: _,
             declarations: _,
+            all_definitely_bound: _,
 
             // Ignored; only relevant to definition regions
             undecorated_type: _,

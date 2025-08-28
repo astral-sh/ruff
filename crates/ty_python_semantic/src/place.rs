@@ -135,6 +135,10 @@ impl<'db> Place<'db> {
             Place::Unbound => Place::Unbound,
         }
     }
+
+    pub(crate) const fn is_definitely_bound(&self) -> bool {
+        matches!(self, Place::Type(_, Boundness::Bound))
+    }
 }
 
 impl<'db> From<LookupResult<'db>> for PlaceAndQualifiers<'db> {

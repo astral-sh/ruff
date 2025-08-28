@@ -154,11 +154,16 @@ fn extract_types(annotation: &Expr, semantic: &SemanticModel) -> Option<(Vec<Exp
     }
 
     // The first argument to `Callable` must be a list of types, parameter
-    // specification, or ellipsis.
+    // specification (e.g., a `ParamSpec`), or ellipsis.
+    // For parameter specifications, we cannot assign per-parameter annotations,
+    // but we can still preserve the return type annotation.
     let params = match param_types {
         Expr::List(ast::ExprList { elts, .. }) => elts.clone(),
         Expr::EllipsisLiteral(_) => vec![],
-        _ => return None,
+        // Treat any other form (e.g., `ParamSpec`, `Concatenate`, etc.) as a
+        // parameter specification: do not annotate individual parameters, but
+        // keep the return type.
+        _ => vec![],
     };
 
     // The second argument to `Callable` must be a type.

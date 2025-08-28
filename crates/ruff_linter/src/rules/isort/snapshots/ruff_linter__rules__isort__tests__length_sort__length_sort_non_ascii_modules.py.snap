@@ -16,17 +16,15 @@ I001 [*] Import block is un-sorted or un-formatted
   | |_________________________^
   |
 help: Organize imports
-
-ℹ Safe fix
-1   |-import loooooooooooooong
-2   |-import mediuuuuuum
-3 1 | import short
-4 2 | import σηορτ
-5 3 | import shoort
-6 4 | import mediuuuuum
-  5 |+import μεδιυυυυυμ
-  6 |+import mediuuuuuum
-  7 |+import loooooooooooooong
-7 8 | import λοοοοοοοοοοοοοονγ
-8   |-import μεδιυυυυυμ
-9 9 | import looooooooooooooong
+  - import loooooooooooooong
+  - import mediuuuuuum
+1 | import short
+2 | import σηορτ
+3 | import shoort
+4 | import mediuuuuum
+5 + import μεδιυυυυυμ
+6 + import mediuuuuuum
+7 + import loooooooooooooong
+8 | import λοοοοοοοοοοοοοονγ
+  - import μεδιυυυυυμ
+9 | import looooooooooooooong
