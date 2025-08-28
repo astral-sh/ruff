@@ -177,13 +177,6 @@ impl<'a> YieldTracker<'a> {
             .map(|scope| (scope.yield_expressions, scope.does_return))
     }
 
-    fn clear_scope_yields(&mut self) {
-        self.scopes
-            .last_mut()
-            .expect("Missing current scope for clearing yields")
-            .clear();
-    }
-
     fn max_yields(branches: &[Vec<&'a Expr>]) -> Vec<&'a Expr> {
         branches
             .iter()
@@ -261,7 +254,6 @@ impl<'a> YieldTracker<'a> {
         let max_path = Self::append_finally(&base_path, &path.finally_yields);
 
         self.report_excess(&max_path);
-        self.clear_scope_yields();
     }
 
     // Finally doesn't return - execution continues, handle all paths
@@ -461,8 +453,13 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldTracker<'a> {
                 }
                 self.propagate_yields(&else_yields);
                 if else_returns {
-                    // If else returns, don't propagate yield count
-                    self.clear_scope_yields();
+                    // If the loop exits irregularly (break) else isn't executed
+                    // Subsequent yields may be valid
+                    // We should not count return guarded yields in else
+                    self.scopes
+                        .last_mut()
+                        .expect("Missing current scope for clearing yields")
+                        .clear();
                 }
             }
             _ => {}
