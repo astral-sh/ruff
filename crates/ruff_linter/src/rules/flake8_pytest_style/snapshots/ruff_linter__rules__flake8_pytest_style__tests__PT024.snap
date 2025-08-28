@@ -10,15 +10,13 @@ PT024 [*] `pytest.mark.asyncio` is unnecessary for fixtures
 16 | async def my_fixture():  # Error before
    |
 help: Remove `pytest.mark.asyncio`
-
-ℹ Safe fix
-11 11 |     pass
-12 12 | 
-13 13 | 
-14    |-@pytest.mark.asyncio()
-15 14 | @pytest.fixture()
-16 15 | async def my_fixture():  # Error before
-17 16 |     return 0
+11 |     pass
+12 | 
+13 | 
+   - @pytest.mark.asyncio()
+14 | @pytest.fixture()
+15 | async def my_fixture():  # Error before
+16 |     return 0
 
 PT024 [*] `pytest.mark.asyncio` is unnecessary for fixtures
   --> PT024.py:20:1
@@ -29,15 +27,13 @@ PT024 [*] `pytest.mark.asyncio` is unnecessary for fixtures
 22 | async def my_fixture():  # Error before no parens
    |
 help: Remove `pytest.mark.asyncio`
-
-ℹ Safe fix
-17 17 |     return 0
-18 18 | 
-19 19 | 
-20    |-@pytest.mark.asyncio
-21 20 | @pytest.fixture()
-22 21 | async def my_fixture():  # Error before no parens
-23 22 |     return 0
+17 |     return 0
+18 | 
+19 | 
+   - @pytest.mark.asyncio
+20 | @pytest.fixture()
+21 | async def my_fixture():  # Error before no parens
+22 |     return 0
 
 PT024 [*] `pytest.mark.asyncio` is unnecessary for fixtures
   --> PT024.py:27:1
@@ -49,15 +45,13 @@ PT024 [*] `pytest.mark.asyncio` is unnecessary for fixtures
 29 |     return 0
    |
 help: Remove `pytest.mark.asyncio`
-
-ℹ Safe fix
-24 24 | 
-25 25 | 
-26 26 | @pytest.fixture()
-27    |-@pytest.mark.asyncio()
-28 27 | async def my_fixture():  # Error after
-29 28 |     return 0
-30 29 | 
+24 | 
+25 | 
+26 | @pytest.fixture()
+   - @pytest.mark.asyncio()
+27 | async def my_fixture():  # Error after
+28 |     return 0
+29 | 
 
 PT024 [*] `pytest.mark.asyncio` is unnecessary for fixtures
   --> PT024.py:33:1
@@ -69,11 +63,9 @@ PT024 [*] `pytest.mark.asyncio` is unnecessary for fixtures
 35 |     return 0
    |
 help: Remove `pytest.mark.asyncio`
-
-ℹ Safe fix
-30 30 | 
-31 31 | 
-32 32 | @pytest.fixture()
-33    |-@pytest.mark.asyncio
-34 33 | async def my_fixture():  # Error after no parens
-35 34 |     return 0
+30 | 
+31 | 
+32 | @pytest.fixture()
+   - @pytest.mark.asyncio
+33 | async def my_fixture():  # Error after no parens
+34 |     return 0
