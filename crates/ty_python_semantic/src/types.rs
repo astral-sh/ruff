@@ -6910,10 +6910,10 @@ bitflags! {
         const NOT_REQUIRED = 1 << 4;
         /// `typing_extensions.ReadOnly`
         const READ_ONLY = 1 << 5;
-        /// An implicit instance attribute which is possibly unbound according
-        /// to local control flow within the method it is defined in. This flag
-        /// overrules the `Boundness` information on `PlaceAndQualifiers`.
-        const POSSIBLY_UNBOUND_IMPLICIT_ATTRIBUTE = 1 << 6;
+        /// A non-standard type qualifier that marks implicit instance attributes, i.e.
+        /// instance attributes that are only implicitly defined via `self.x = …` in
+        /// the body of a class method.
+        const IMPLICIT_INSTANCE_ATTRIBUTE = 1 << 6;
     }
 }
 
@@ -8661,14 +8661,6 @@ impl Truthiness {
 
     pub(crate) const fn negate_if(self, condition: bool) -> Self {
         if condition { self.negate() } else { self }
-    }
-
-    pub(crate) fn and(self, other: Self) -> Self {
-        match (self, other) {
-            (Truthiness::AlwaysTrue, Truthiness::AlwaysTrue) => Truthiness::AlwaysTrue,
-            (Truthiness::AlwaysFalse, _) | (_, Truthiness::AlwaysFalse) => Truthiness::AlwaysFalse,
-            _ => Truthiness::Ambiguous,
-        }
     }
 
     pub(crate) fn or(self, other: Self) -> Self {
