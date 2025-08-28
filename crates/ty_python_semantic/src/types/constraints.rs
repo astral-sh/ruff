@@ -256,7 +256,7 @@ impl<'db> ConstraintSet<'db> {
                     return;
                 }
 
-                Simplifiable::NotSimplifiable(existing, c) => {
+                Simplifiable::NotSimplified(existing, c) => {
                     // We couldn't simplify the new clause relative to this existing clause, so add
                     // the existing clause to the result. Continue trying to simplify the new
                     // clause against the later existing clauses.
@@ -513,7 +513,7 @@ impl<'db> ConstraintClause<'db> {
         }
 
         // Can't be simplified
-        Simplifiable::NotSimplifiable(self, other)
+        Simplifiable::NotSimplified(self, other)
     }
 
     /// Returns whether this clause subsumes `other` via intersection — that is, if the
@@ -573,7 +573,7 @@ impl<'db> ConstraintClause<'db> {
                         continue;
                     }
                     let union_constraint = match self_constraint.union(db, *other_constraint) {
-                        Simplifiable::NotSimplifiable(_, _) => {
+                        Simplifiable::NotSimplified(_, _) => {
                             // The constraints for this typevar are not identical, nor do they
                             // simplify.
                             return None;
@@ -968,7 +968,7 @@ impl<'db> AtomicConstraint<'db> {
             true
         };
         if !is_subtype_of(self.lower, other.upper) || !is_subtype_of(other.lower, self.upper) {
-            return Simplifiable::NotSimplifiable(self, other);
+            return Simplifiable::NotSimplified(self, other);
         }
 
         // Otherwise the result is `min_lower(s₁,s₂) : max_upper(t₁,t₂)`. (See the documentation of
@@ -1030,7 +1030,7 @@ pub(crate) enum Simplifiable<T> {
     NeverSatisfiable,
     AlwaysSatisfiable,
     Simplified(T),
-    NotSimplifiable(T, T),
+    NotSimplified(T, T),
 }
 
 impl<T> Simplifiable<T> {
