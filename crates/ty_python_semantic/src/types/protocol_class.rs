@@ -414,8 +414,25 @@ impl<'db> ProtocolInterface<'db> {
 impl<'db> VarianceInferable<'db> for ProtocolInterface<'db> {
     fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
         self.members(db)
-            // TODO do we need to switch on member kind?
-            .map(|member| member.ty().variance_of(db, typevar))
+            .map(|member| match member.kind {
+                ProtocolMemberKind::Method(method) => {
+                    Type::Callable(method).variance_of(db, typevar)
+                }
+                ProtocolMemberKind::Property(property) => property_get_type(db, property)
+                    .into_iter()
+                    .map(|get_type| get_type.variance_of(db, typevar))
+                    .chain(
+                        property_set_type(db, property)
+                            .map(|set_type| set_type.variance_of(db, typevar).flip()),
+                    )
+                    .collect(),
+                ProtocolMemberKind::Other(ty) => [
+                    ty.variance_of(db, typevar),
+                    ty.variance_of(db, typevar).flip(),
+                ]
+                .into_iter()
+                .collect(),
+            })
             .collect()
     }
 }
@@ -692,7 +709,7 @@ fn property_set_type<'db>(
     property: PropertyInstanceType<'db>,
 ) -> Option<Type<'db>> {
     let mut set_types = Vec::new();
-    for callable in property.setter(db)?.try_upcast_to_callable(db)?.iter() {
+    for callable in &property.setter(db)?.try_upcast_to_callable(db)? {
         for signature in callable.signatures(db) {
             set_types.push(signature.parameters().get_positional(1)?.annotated_type());
         }
