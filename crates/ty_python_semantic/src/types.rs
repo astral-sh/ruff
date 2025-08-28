@@ -9545,7 +9545,7 @@ impl<'db> UnionType<'db> {
                 place: ty_member,
                 qualifiers: new_qualifiers,
             } = transform_fn(ty);
-            qualifiers |= new_qualifiers;
+            qualifiers &= new_qualifiers;
             match ty_member {
                 Place::Unbound => {
                     possibly_unbound = true;
