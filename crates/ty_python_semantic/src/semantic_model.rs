@@ -50,7 +50,8 @@ impl<'db> SemanticModel<'db> {
                 let ty = Type::module_literal(self.db, self.file, module);
                 Completion {
                     name: Name::new(module.name(self.db).as_str()),
-                    ty,
+                    ty: Some(ty),
+                    kind: None,
                     builtin,
                 }
             })
@@ -162,7 +163,12 @@ impl<'db> SemanticModel<'db> {
 
         let mut completions = vec![];
         for crate::types::Member { name, ty } in crate::types::all_members(self.db, ty) {
-            completions.push(Completion { name, ty, builtin });
+            completions.push(Completion {
+                name,
+                ty: Some(ty),
+                kind: None,
+                builtin,
+            });
         }
         completions.extend(self.submodule_completions(&module));
         completions
@@ -177,7 +183,8 @@ impl<'db> SemanticModel<'db> {
             let ty = Type::module_literal(self.db, self.file, *submodule);
             completions.push(Completion {
                 name: Name::new(submodule.name(self.db).as_str()),
-                ty,
+                ty: Some(ty),
+                kind: None,
                 builtin,
             });
         }
@@ -191,7 +198,8 @@ impl<'db> SemanticModel<'db> {
             .into_iter()
             .map(|member| Completion {
                 name: member.name,
-                ty: member.ty,
+                ty: Some(member.ty),
+                kind: None,
                 builtin: false,
             })
             .collect()
@@ -227,7 +235,8 @@ impl<'db> SemanticModel<'db> {
                 all_declarations_and_bindings(self.db, file_scope.to_scope_id(self.db, self.file))
                     .map(|member| Completion {
                         name: member.name,
-                        ty: member.ty,
+                        ty: Some(member.ty),
+                        kind: None,
                         builtin: false,
                     }),
             );
@@ -277,8 +286,22 @@ impl NameKind {
 pub struct Completion<'db> {
     /// The label shown to the user for this suggestion.
     pub name: Name,
-    /// The type of this completion.
-    pub ty: Type<'db>,
+    /// The type of this completion, if available.
+    ///
+    /// Generally speaking, this is always available
+    /// *unless* this was a completion corresponding to
+    /// an unimported symbol. In that case, computing the
+    /// type of all such symbols could be quite expensive.
+    pub ty: Option<Type<'db>>,
+    /// The "kind" of this completion.
+    ///
+    /// When this is set, it takes priority over any kind
+    /// inferred from `ty`.
+    ///
+    /// Usually this is set when `ty` is `None`, since it
+    /// may be cheaper to compute at scale. (e.g., For
+    /// unimported symbol completions.)
+    pub kind: Option<CompletionKind>,
     /// Whether this suggestion came from builtins or not.
     ///
     /// At time of writing (2025-06-26), this information
@@ -336,7 +359,7 @@ impl<'db> Completion<'db> {
                 Type::TypeAlias(alias) => imp(db, alias.value_type(db))?,
             })
         }
-        imp(db, self.ty)
+        self.kind.or_else(|| self.ty.and_then(|ty| imp(db, ty)))
     }
 }
 

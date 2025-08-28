@@ -11,8 +11,8 @@ use crate::suppression::{INVALID_IGNORE_COMMENT, UNKNOWN_RULE, UNUSED_IGNORE_COM
 pub use db::Db;
 pub use module_name::ModuleName;
 pub use module_resolver::{
-    Module, SearchPath, SearchPathValidationError, SearchPaths, list_modules, resolve_module,
-    resolve_real_module, system_module_search_paths,
+    Module, SearchPath, SearchPathValidationError, SearchPaths, all_modules, list_modules,
+    resolve_module, resolve_real_module, system_module_search_paths,
 };
 pub use program::{
     Program, ProgramSettings, PythonVersionFileSource, PythonVersionSource,
