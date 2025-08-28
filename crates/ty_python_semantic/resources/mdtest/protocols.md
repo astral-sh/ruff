@@ -2452,6 +2452,30 @@ from ty_extensions import reveal_protocol_interface
 reveal_protocol_interface(Foo)
 ```
 
+## Cycles
+
+### Cyclic legacy-generic protocol
+
+```py
+from typing import Generic, TypeVar, Protocol
+
+T = TypeVar("T")
+
+class P(Protocol[T]):
+    attr: "P[T] | T"
+
+class A(Generic[T]):
+    attr: T
+
+class B(A[P[int]]):
+    pass
+
+def f(b: B):
+    reveal_type(b)  # revealed: B
+    reveal_type(b.attr)  # revealed: P[int]
+    reveal_type(b.attr.attr)  # revealed: P[int] | int
+```
+
 ## TODO
 
 Add tests for:

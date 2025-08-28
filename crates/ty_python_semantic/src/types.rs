@@ -5959,7 +5959,7 @@ impl<'db> Type<'db> {
     /// Note that this does not specialize generic classes, functions, or type aliases! That is a
     /// different operation that is performed explicitly (via a subscript operation), or implicitly
     /// via a call to the generic object.
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size, cycle_fn=apply_specialization_cycle_recover, cycle_initial=apply_specialization_cycle_initial)]
     pub(crate) fn apply_specialization(
         self,
         db: &'db dyn Db,
@@ -6574,6 +6574,24 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
         );
         v
     }
+}
+
+fn apply_specialization_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &Type<'db>,
+    _count: u32,
+    _self: Type<'db>,
+    _specialization: Specialization<'db>,
+) -> salsa::CycleRecoveryAction<Type<'db>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn apply_specialization_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _self: Type<'db>,
+    _specialization: Specialization<'db>,
+) -> Type<'db> {
+    Type::Never
 }
 
 /// A mapping that can be applied to a type, producing another type. This is applied inductively to
