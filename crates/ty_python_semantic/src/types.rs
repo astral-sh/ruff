@@ -5451,7 +5451,7 @@ impl<'db> Type<'db> {
 
                 // Use explicit return type if available, otherwise the specialized instance
                 let final_type = new_return_type.unwrap_or(specialized);
-
+                
                 Ok(final_type)
             }
 
@@ -6725,6 +6725,11 @@ fn extract_new_return_type_override<'db>(
 
             // Skip unknown (unresolved annotations) - treat as no annotation
             if ret_type.is_unknown() {
+                return None;
+            }
+            
+            // Skip Any - classes inheriting from Any should still return their instance type
+            if matches!(ret_type, Type::Dynamic(DynamicType::Any)) {
                 return None;
             }
 
