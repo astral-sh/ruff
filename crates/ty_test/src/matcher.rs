@@ -299,19 +299,40 @@ impl Matcher {
             ParsedAssertion::Revealed(expected_type) => {
                 #[cfg(not(debug_assertions))]
                 let expected_type = discard_todo_metadata(&expected_type);
+                let expected_reveal_type_message = format!("`{expected_type}`");
+
+                let diagnostic_matches_reveal = |diagnostic: &Diagnostic| {
+                    if diagnostic.id() != DiagnosticId::RevealedType {
+                        return false;
+                    }
+                    let primary_message = diagnostic.primary_message();
+                    let Some(primary_annotation) =
+                        (diagnostic.primary_annotation()).and_then(|a| a.get_message())
+                    else {
+                        return false;
+                    };
+
+                    // reveal_type
+                    if primary_message == "Revealed type"
+                        && primary_annotation == expected_reveal_type_message
+                    {
+                        return true;
+                    }
+
+                    // reveal_protocol_interface
+                    if primary_message == "Revealed protocol interface"
+                        && primary_annotation == expected_reveal_type_message
+                    {
+                        return true;
+                    }
+
+                    false
+                };
 
                 let mut matched_revealed_type = None;
                 let mut matched_undefined_reveal = None;
-                let expected_reveal_type_message = format!("`{expected_type}`");
                 for (index, diagnostic) in unmatched.iter().enumerate() {
-                    if matched_revealed_type.is_none()
-                        && diagnostic.id() == DiagnosticId::RevealedType
-                        && diagnostic
-                            .primary_annotation()
-                            .and_then(|a| a.get_message())
-                            .unwrap_or_default()
-                            == expected_reveal_type_message
-                    {
+                    if matched_revealed_type.is_none() && diagnostic_matches_reveal(diagnostic) {
                         matched_revealed_type = Some(index);
                     } else if matched_undefined_reveal.is_none()
                         && diagnostic.id().is_lint_named("undefined-reveal")
