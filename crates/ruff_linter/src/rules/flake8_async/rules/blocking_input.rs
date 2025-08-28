@@ -1,7 +1,6 @@
 use ruff_python_ast::ExprCall;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::name::QualifiedName;
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -12,8 +11,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Why is this bad?
 /// Blocking an async function via a blocking input call will block the entire
-/// event loop, preventing it from executing other tasks while waiting for the
-/// HTTP response, negating the benefits of asynchronous programming.
+/// event loop, preventing it from executing other tasks while waiting for user
+/// input, negating the benefits of asynchronous programming.
 ///
 /// Instead of making a blocking input call directly, wrap the input call in
 /// an executor to execute the blocking call on another thread.
@@ -43,19 +42,10 @@ impl Violation for BlockingInputInAsyncFunction {
     }
 }
 
-fn is_blocking_input(qualified_name: &QualifiedName) -> bool {
-    matches!(qualified_name.segments(), ["builtins" | "", "input"])
-}
-
 /// ASYNC250
 pub(crate) fn blocking_input(checker: &Checker, call: &ExprCall) {
     if checker.semantic().in_async_context() {
-        if checker
-            .semantic()
-            .resolve_qualified_name(call.func.as_ref())
-            .as_ref()
-            .is_some_and(is_blocking_input)
-        {
+        if checker.semantic().match_builtin_expr(&call.func, "input") {
             checker.report_diagnostic(BlockingInputInAsyncFunction, call.func.range());
         }
     }
