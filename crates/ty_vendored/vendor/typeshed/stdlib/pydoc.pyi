@@ -92,12 +92,12 @@ def classify_class_attrs(object: object) -> list[tuple[str, str, type, str]]:
     """Wrap inspect.classify_class_attrs, with fixup for data descriptors and bound methods."""
 
 if sys.version_info >= (3, 13):
-    @deprecated("Deprecated in Python 3.13.")
-    def ispackage(path: str) -> bool:
+    @deprecated("Deprecated since Python 3.13.")
+    def ispackage(path: str) -> bool:  # undocumented
         """Guess whether a path refers to a package directory."""
 
 else:
-    def ispackage(path: str) -> bool:
+    def ispackage(path: str) -> bool:  # undocumented
         """Guess whether a path refers to a package directory."""
 
 def source_synopsis(file: IO[AnyStr]) -> AnyStr | None:

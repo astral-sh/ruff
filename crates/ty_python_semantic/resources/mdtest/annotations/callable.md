@@ -398,7 +398,7 @@ def f_okay(c: Callable[[], None]):
         c.__qualname__ = "my_callable"
 
         result = getattr_static(c, "__qualname__")
-        reveal_type(result)  # revealed: Never
+        reveal_type(result)  # revealed: property
         if isinstance(result, property) and result.fset:
             c.__qualname__ = "my_callable"  # okay
 ```

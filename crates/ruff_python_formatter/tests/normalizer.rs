@@ -82,7 +82,7 @@ impl Transformer for Normalizer {
                             value: Box::from(string.value.to_str()),
                             range: string.range,
                             flags: StringLiteralFlags::empty(),
-                            node_index: AtomicNodeIndex::dummy(),
+                            node_index: AtomicNodeIndex::NONE,
                         });
                     }
                 }
@@ -99,7 +99,7 @@ impl Transformer for Normalizer {
                             value: bytes.value.bytes().collect(),
                             range: bytes.range,
                             flags: BytesLiteralFlags::empty(),
-                            node_index: AtomicNodeIndex::dummy(),
+                            node_index: AtomicNodeIndex::NONE,
                         });
                     }
                 }
@@ -143,7 +143,7 @@ impl Transformer for Normalizer {
                                         InterpolatedStringLiteralElement {
                                             range,
                                             value: literal.into(),
-                                            node_index: AtomicNodeIndex::dummy(),
+                                            node_index: AtomicNodeIndex::NONE,
                                         },
                                     ));
                                 }
@@ -185,7 +185,7 @@ impl Transformer for Normalizer {
                             elements: collector.elements.into(),
                             range: fstring.range,
                             flags: FStringFlags::empty(),
-                            node_index: AtomicNodeIndex::dummy(),
+                            node_index: AtomicNodeIndex::NONE,
                         });
                     }
                 }

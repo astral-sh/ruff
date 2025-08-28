@@ -41,7 +41,7 @@ impl<Tag> Default for TypeTransformer<'_, Tag> {
     }
 }
 
-pub(crate) type PairVisitor<'db, Tag> = CycleDetector<Tag, (Type<'db>, Type<'db>), bool>;
+pub(crate) type PairVisitor<'db, Tag, C> = CycleDetector<Tag, (Type<'db>, Type<'db>), C>;
 
 #[derive(Debug)]
 pub(crate) struct CycleDetector<Tag, T, R> {
@@ -63,7 +63,7 @@ pub(crate) struct CycleDetector<Tag, T, R> {
     _tag: PhantomData<Tag>,
 }
 
-impl<Tag, T: Hash + Eq + Copy, R: Copy> CycleDetector<Tag, T, R> {
+impl<Tag, T: Hash + Eq + Clone, R: Clone> CycleDetector<Tag, T, R> {
     pub(crate) fn new(fallback: R) -> Self {
         CycleDetector {
             seen: RefCell::new(FxIndexSet::default()),
@@ -75,18 +75,24 @@ impl<Tag, T: Hash + Eq + Copy, R: Copy> CycleDetector<Tag, T, R> {
 
     pub(crate) fn visit(&self, item: T, func: impl FnOnce() -> R) -> R {
         if let Some(val) = self.cache.borrow().get(&item) {
-            return *val;
+            return val.clone();
         }
 
         // We hit a cycle
-        if !self.seen.borrow_mut().insert(item) {
-            return self.fallback;
+        if !self.seen.borrow_mut().insert(item.clone()) {
+            return self.fallback.clone();
         }
 
         let ret = func();
         self.seen.borrow_mut().pop();
-        self.cache.borrow_mut().insert(item, ret);
+        self.cache.borrow_mut().insert(item, ret.clone());
 
         ret
+    }
+}
+
+impl<Tag, T: Hash + Eq + Clone, R: Default + Clone> Default for CycleDetector<Tag, T, R> {
+    fn default() -> Self {
+        CycleDetector::new(R::default())
     }
 }

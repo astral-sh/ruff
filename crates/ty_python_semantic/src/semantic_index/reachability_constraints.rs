@@ -209,6 +209,7 @@ use crate::semantic_index::predicate::{
 };
 use crate::types::{
     IntersectionBuilder, Truthiness, Type, UnionBuilder, UnionType, infer_expression_type,
+    static_expression_truthiness,
 };
 
 /// A ternary formula that defines under what conditions a binding is visible. (A ternary formula
@@ -424,9 +425,26 @@ impl ReachabilityConstraintsBuilder {
         }
     }
 
-    /// Returns whether `a` or `b` has a "larger" atom. TDDs are ordered such that interior nodes
-    /// can only have edges to "larger" nodes. Terminals are considered to have a larger atom than
-    /// any internal node, since they are leaf nodes.
+    /// Implements the ordering that determines which level a TDD node appears at.
+    ///
+    /// Each interior node checks the value of a single variable (for us, a `Predicate`).
+    /// TDDs are ordered such that every path from the root of the graph to the leaves must
+    /// check each variable at most once, and must check each variable in the same order.
+    ///
+    /// We can choose any ordering that we want, as long as it's consistent — with the
+    /// caveat that terminal nodes must always be last in the ordering, since they are the
+    /// leaf nodes of the graph.
+    ///
+    /// We currently compare interior nodes by looking at the Salsa IDs of each variable's
+    /// `Predicate`, since this is already available and easy to compare. We also _reverse_
+    /// the comparison of those Salsa IDs. The Salsa IDs are assigned roughly sequentially
+    /// while traversing the source code. Reversing the comparison means `Predicate`s that
+    /// appear later in the source will tend to be placed "higher" (closer to the root) in
+    /// the TDD graph. We have found empirically that this leads to smaller TDD graphs [1],
+    /// since there are often repeated combinations of `Predicate`s from earlier in the
+    /// file.
+    ///
+    /// [1]: https://github.com/astral-sh/ruff/pull/20098
     fn cmp_atoms(
         &self,
         a: ScopedReachabilityConstraintId,
@@ -439,7 +457,12 @@ impl ReachabilityConstraintsBuilder {
         } else if b.is_terminal() {
             Ordering::Less
         } else {
-            self.interiors[a].atom.cmp(&self.interiors[b].atom)
+            // See https://github.com/astral-sh/ruff/pull/20098 for an explanation of why this
+            // ordering is reversed.
+            self.interiors[a]
+                .atom
+                .cmp(&self.interiors[b].atom)
+                .reverse()
         }
     }
 
@@ -797,10 +820,11 @@ impl ReachabilityConstraints {
     }
 
     fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
+        let _span = tracing::trace_span!("analyze_single", ?predicate).entered();
+
         match predicate.node {
             PredicateNode::Expression(test_expr) => {
-                let ty = infer_expression_type(db, test_expr);
-                ty.bool(db).negate_if(!predicate.is_positive)
+                static_expression_truthiness(db, test_expr).negate_if(!predicate.is_positive)
             }
             PredicateNode::ReturnsNever(CallableAndCallExpr {
                 callable,

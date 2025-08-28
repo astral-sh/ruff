@@ -2,8 +2,11 @@ use std::borrow::Cow;
 use std::time::Instant;
 
 use lsp_types::request::Completion;
-use lsp_types::{CompletionItem, CompletionItemKind, CompletionParams, CompletionResponse, Url};
+use lsp_types::{
+    CompletionItem, CompletionItemKind, CompletionParams, CompletionResponse, Documentation, Url,
+};
 use ruff_db::source::{line_index, source_text};
+use ruff_source_file::OneIndexed;
 use ty_ide::completion;
 use ty_project::ProjectDatabase;
 use ty_python_semantic::CompletionKind;
@@ -57,16 +60,21 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
             return Ok(None);
         }
 
-        let max_index_len = completions.len().saturating_sub(1).to_string().len();
+        // Safety: we just checked that completions is not empty.
+        let max_index_len = OneIndexed::new(completions.len()).unwrap().digits().get();
         let items: Vec<CompletionItem> = completions
             .into_iter()
             .enumerate()
             .map(|(i, comp)| {
                 let kind = comp.kind(db).map(ty_kind_to_lsp_kind);
                 CompletionItem {
-                    label: comp.name.into(),
+                    label: comp.inner.name.into(),
                     kind,
                     sort_text: Some(format!("{i:-max_index_len$}")),
+                    detail: comp.inner.ty.display(db).to_string().into(),
+                    documentation: comp
+                        .documentation
+                        .map(|docstring| Documentation::String(docstring.render_plaintext())),
                     ..Default::default()
                 }
             })

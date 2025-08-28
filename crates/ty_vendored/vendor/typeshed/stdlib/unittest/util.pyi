@@ -7,12 +7,12 @@ from typing_extensions import TypeAlias
 _T = TypeVar("_T")
 _Mismatch: TypeAlias = tuple[_T, _T, int]
 
-_MAX_LENGTH: Final[int]
-_PLACEHOLDER_LEN: Final[int]
-_MIN_BEGIN_LEN: Final[int]
-_MIN_END_LEN: Final[int]
-_MIN_COMMON_LEN: Final[int]
-_MIN_DIFF_LEN: Final[int]
+_MAX_LENGTH: Final = 80
+_PLACEHOLDER_LEN: Final = 12
+_MIN_BEGIN_LEN: Final = 5
+_MIN_END_LEN: Final = 5
+_MIN_COMMON_LEN: Final = 5
+_MIN_DIFF_LEN: Final = 41
 
 def _shorten(s: str, prefixlen: int, suffixlen: int) -> str: ...
 def _common_shorten_repr(*args: str) -> tuple[str, ...]: ...

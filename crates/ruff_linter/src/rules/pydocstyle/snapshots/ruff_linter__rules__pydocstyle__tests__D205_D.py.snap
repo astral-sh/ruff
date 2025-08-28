@@ -28,12 +28,10 @@ D205 [*] 1 blank line required between summary line and description (found 2)
     | |_______^
     |
 help: Insert single blank line
-
-ℹ Safe fix
-209 209 | def multi_line_two_separating_blanks():
-210 210 |     """Summary.
-211 211 | 
-212     |-
-213 212 |     Description.
-214 213 | 
-215 214 |     """
+209 | def multi_line_two_separating_blanks():
+210 |     """Summary.
+211 | 
+    - 
+212 |     Description.
+213 | 
+214 |     """

@@ -227,13 +227,26 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             module: "airflow.sdk",
             name: (*rest).to_string(),
         },
+        [
+            "airflow",
+            "decorators",
+            "base",
+            rest @ ("DecoratedMappedOperator"
+            | "DecoratedOperator"
+            | "TaskDecorator"
+            | "get_unique_task_id"
+            | "task_decorator_factory"),
+        ] => Replacement::SourceModuleMoved {
+            module: "airflow.sdk.bases.decorator",
+            name: (*rest).to_string(),
+        },
 
         // airflow.io
         ["airflow", "io", "path", "ObjectStoragePath"] => Replacement::SourceModuleMoved {
             module: "airflow.sdk",
             name: "ObjectStoragePath".to_string(),
         },
-        ["airflow", "io", "storage", "attach"] => Replacement::SourceModuleMoved {
+        ["airflow", "io", "store", "attach"] => Replacement::SourceModuleMoved {
             module: "airflow.sdk.io",
             name: "attach".to_string(),
         },
@@ -245,6 +258,10 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
                 name: (*rest).to_string(),
             }
         }
+        ["airflow", "models", "Param"] => Replacement::AutoImport {
+            module: "airflow.sdk.definitions.param",
+            name: "Param",
+        },
 
         // airflow.models.baseoperator
         [
@@ -260,16 +277,30 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             module: "airflow.sdk",
             name: "BaseOperatorLink",
         },
+
         // airflow.model..DAG
         ["airflow", "models", .., "DAG"] => Replacement::SourceModuleMoved {
             module: "airflow.sdk",
             name: "DAG".to_string(),
         },
+
+        // airflow.sensors.base
+        [
+            "airflow",
+            "sensors",
+            "base",
+            rest @ ("BaseSensorOperator" | "PokeReturnValue" | "poke_mode_only"),
+        ] => Replacement::SourceModuleMoved {
+            module: "airflow.sdk",
+            name: (*rest).to_string(),
+        },
+
         // airflow.timetables
         ["airflow", "timetables", "datasets", "DatasetOrTimeSchedule"] => Replacement::AutoImport {
             module: "airflow.timetables.assets",
             name: "AssetOrTimeSchedule",
         },
+
         // airflow.utils
         [
             "airflow",

@@ -183,15 +183,7 @@ impl ClassInfoConstraintFunction {
 
         match classinfo {
             Type::TypeAlias(alias) => self.generate_constraint(db, alias.value_type(db)),
-            Type::ClassLiteral(class_literal) => {
-                // At runtime (on Python 3.11+), this will return `True` for classes that actually
-                // do inherit `typing.Any` and `False` otherwise. We could accurately model that?
-                if class_literal.is_known(db, KnownClass::Any) {
-                    None
-                } else {
-                    Some(constraint_fn(class_literal))
-                }
-            }
+            Type::ClassLiteral(class_literal) => Some(constraint_fn(class_literal)),
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 SubclassOfInner::Class(ClassType::NonGeneric(class)) => Some(constraint_fn(class)),
                 // It's not valid to use a generic alias as the second argument to `isinstance()` or `issubclass()`,
@@ -215,7 +207,7 @@ impl ClassInfoConstraintFunction {
             Type::Union(union) => {
                 union.try_map(db, |element| self.generate_constraint(db, *element))
             }
-            Type::TypeVar(bound_typevar) => match bound_typevar
+            Type::NonInferableTypeVar(bound_typevar) => match bound_typevar
                 .typevar(db)
                 .bound_or_constraints(db)?
             {
@@ -259,6 +251,7 @@ impl ClassInfoConstraintFunction {
             | Type::IntLiteral(_)
             | Type::KnownInstance(_)
             | Type::TypeIs(_)
+            | Type::TypeVar(_)
             | Type::WrapperDescriptor(_)
             | Type::DataclassTransformer(_)
             | Type::TypedDict(_) => None,

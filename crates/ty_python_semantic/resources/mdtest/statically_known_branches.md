@@ -1564,6 +1564,24 @@ if True:
 from module import symbol
 ```
 
+## Non-definitely bound symbols in conditions
+
+When a non-definitely bound symbol is used as a (part of a) condition, we always infer an ambiguous
+truthiness. If we didn't do that, `x` would be considered definitely bound in the following example:
+
+```py
+def _(flag: bool):
+    if flag:
+        ALWAYS_TRUE_IF_BOUND = True
+
+    # error: [possibly-unresolved-reference] "Name `ALWAYS_TRUE_IF_BOUND` used when possibly not defined"
+    if True and ALWAYS_TRUE_IF_BOUND:
+        x = 1
+
+    # error: [possibly-unresolved-reference] "Name `x` used when possibly not defined"
+    x
+```
+
 ## Unreachable code
 
 A closely related feature is the ability to detect unreachable code. For example, we do not emit a

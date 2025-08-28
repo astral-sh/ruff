@@ -336,10 +336,12 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Async, "115") => (RuleGroup::Stable, rules::flake8_async::rules::AsyncZeroSleep),
         (Flake8Async, "116") => (RuleGroup::Preview, rules::flake8_async::rules::LongSleepNotForever),
         (Flake8Async, "210") => (RuleGroup::Stable, rules::flake8_async::rules::BlockingHttpCallInAsyncFunction),
+        (Flake8Async, "212") => (RuleGroup::Preview, rules::flake8_async::rules::BlockingHttpCallHttpxInAsyncFunction),
         (Flake8Async, "220") => (RuleGroup::Stable, rules::flake8_async::rules::CreateSubprocessInAsyncFunction),
         (Flake8Async, "221") => (RuleGroup::Stable, rules::flake8_async::rules::RunProcessInAsyncFunction),
         (Flake8Async, "222") => (RuleGroup::Stable, rules::flake8_async::rules::WaitForProcessInAsyncFunction),
         (Flake8Async, "230") => (RuleGroup::Stable, rules::flake8_async::rules::BlockingOpenCallInAsyncFunction),
+        (Flake8Async, "250") => (RuleGroup::Preview, rules::flake8_async::rules::BlockingInputInAsyncFunction),
         (Flake8Async, "251") => (RuleGroup::Stable, rules::flake8_async::rules::BlockingSleepInAsyncFunction),
 
         // flake8-builtins
@@ -921,8 +923,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         // flake8-use-pathlib
         (Flake8UsePathlib, "100") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::OsPathAbspath),
         (Flake8UsePathlib, "101") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::OsChmod),
-        (Flake8UsePathlib, "102") => (RuleGroup::Stable, rules::flake8_use_pathlib::violations::OsMkdir),
-        (Flake8UsePathlib, "103") => (RuleGroup::Stable, rules::flake8_use_pathlib::violations::OsMakedirs),
+        (Flake8UsePathlib, "102") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::OsMkdir),
+        (Flake8UsePathlib, "103") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::OsMakedirs),
         (Flake8UsePathlib, "104") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::OsRename),
         (Flake8UsePathlib, "105") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::OsReplace),
         (Flake8UsePathlib, "106") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::OsRmdir),
@@ -954,7 +956,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8UsePathlib, "207") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::Glob),
         (Flake8UsePathlib, "208") => (RuleGroup::Stable, rules::flake8_use_pathlib::violations::OsListdir),
         (Flake8UsePathlib, "210") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::InvalidPathlibWithSuffix),
-        (Flake8UsePathlib, "211") => (RuleGroup::Preview, rules::flake8_use_pathlib::violations::OsSymlink),
+        (Flake8UsePathlib, "211") => (RuleGroup::Preview, rules::flake8_use_pathlib::rules::OsSymlink),
 
         // flake8-logging-format
         (Flake8LoggingFormat, "001") => (RuleGroup::Stable, rules::flake8_logging_format::violations::LoggingStringFormat),

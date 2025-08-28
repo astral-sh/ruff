@@ -11,10 +11,10 @@ from types import CodeType
 from typing import Any, Final, type_check_only
 from typing_extensions import deprecated
 
-DEBUGGER_ID: Final[int]
-COVERAGE_ID: Final[int]
-PROFILER_ID: Final[int]
-OPTIMIZER_ID: Final[int]
+DEBUGGER_ID: Final = 0
+COVERAGE_ID: Final = 1
+PROFILER_ID: Final = 2
+OPTIMIZER_ID: Final = 5
 
 def use_tool_id(tool_id: int, name: str, /) -> None: ...
 def free_tool_id(tool_id: int, /) -> None: ...
@@ -46,7 +46,7 @@ class _events:
         BRANCH_TAKEN: Final[int]
 
         @property
-        @deprecated("BRANCH is deprecated; use BRANCH_LEFT or BRANCH_TAKEN instead")
+        @deprecated("Deprecated since Python 3.14. Use `BRANCH_LEFT` or `BRANCH_TAKEN` instead.")
         def BRANCH(self) -> int: ...
 
     else:

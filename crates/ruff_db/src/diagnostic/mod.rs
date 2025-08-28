@@ -325,6 +325,11 @@ impl Diagnostic {
         self.inner.fix.as_ref()
     }
 
+    #[cfg(test)]
+    pub(crate) fn fix_mut(&mut self) -> Option<&mut Fix> {
+        Arc::make_mut(&mut self.inner).fix.as_mut()
+    }
+
     /// Set the fix for this diagnostic.
     pub fn set_fix(&mut self, fix: Fix) {
         debug_assert!(
@@ -1294,6 +1299,10 @@ pub struct DisplayDiagnosticConfig {
     hide_severity: bool,
     /// Whether to show the availability of a fix in a diagnostic.
     show_fix_status: bool,
+    /// Whether to show the diff for an available fix after the main diagnostic.
+    ///
+    /// This currently only applies to `DiagnosticFormat::Full`.
+    show_fix_diff: bool,
     /// The lowest applicability that should be shown when reporting diagnostics.
     fix_applicability: Applicability,
 }
@@ -1341,6 +1350,14 @@ impl DisplayDiagnosticConfig {
         }
     }
 
+    /// Whether to show a diff for an available fix after the main diagnostic.
+    pub fn show_fix_diff(self, yes: bool) -> DisplayDiagnosticConfig {
+        DisplayDiagnosticConfig {
+            show_fix_diff: yes,
+            ..self
+        }
+    }
+
     /// Set the lowest fix applicability that should be shown.
     ///
     /// In other words, an applicability of `Safe` (the default) would suppress showing fixes or fix
@@ -1364,6 +1381,7 @@ impl Default for DisplayDiagnosticConfig {
             preview: false,
             hide_severity: false,
             show_fix_status: false,
+            show_fix_diff: false,
             fix_applicability: Applicability::Safe,
         }
     }
@@ -1417,6 +1435,11 @@ pub enum DiagnosticFormat {
     /// Print diagnostics in the format expected by JUnit.
     #[cfg(feature = "junit")]
     Junit,
+    /// Print diagnostics in the JSON format used by GitLab [Code Quality] reports.
+    ///
+    /// [Code Quality]: https://docs.gitlab.com/ee/ci/testing/code_quality.html#implement-a-custom-tool
+    #[cfg(feature = "serde")]
+    Gitlab,
 }
 
 /// A representation of the kinds of messages inside a diagnostic.

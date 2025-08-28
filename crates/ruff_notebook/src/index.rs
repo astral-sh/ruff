@@ -33,6 +33,14 @@ impl NotebookIndex {
         self.row_to_row_in_cell.get(row.to_zero_indexed()).copied()
     }
 
+    /// Returns an iterator over the row:cell-number pairs (both 1-based).
+    pub fn iter(&self) -> impl Iterator<Item = (OneIndexed, OneIndexed)> {
+        self.row_to_cell
+            .iter()
+            .enumerate()
+            .map(|(row, cell)| (OneIndexed::from_zero_indexed(row), *cell))
+    }
+
     /// Translates the given [`LineColumn`] based on the indexing table.
     ///
     /// This will translate the row/column in the concatenated source code

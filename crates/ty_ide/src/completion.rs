@@ -8,9 +8,11 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_python_semantic::{Completion, NameKind, SemanticModel};
 
 use crate::Db;
+use crate::docstring::Docstring;
 use crate::find_node::covering_node;
+use crate::goto::DefinitionsOrTargets;
 
-pub fn completion(db: &dyn Db, file: File, offset: TextSize) -> Vec<Completion<'_>> {
+pub fn completion(db: &dyn Db, file: File, offset: TextSize) -> Vec<DetailedCompletion<'_>> {
     let parsed = parsed_module(db, file).load(db);
 
     let Some(target_token) = CompletionTargetTokens::find(&parsed, offset) else {
@@ -23,12 +25,44 @@ pub fn completion(db: &dyn Db, file: File, offset: TextSize) -> Vec<Completion<'
     let model = SemanticModel::new(db, file);
     let mut completions = match target {
         CompletionTargetAst::ObjectDot { expr } => model.attribute_completions(expr),
-        CompletionTargetAst::ImportFrom { import, name } => model.import_completions(import, name),
+        CompletionTargetAst::ObjectDotInImport { import, name } => {
+            model.import_submodule_completions(import, name)
+        }
+        CompletionTargetAst::ObjectDotInImportFrom { import } => {
+            model.from_import_submodule_completions(import)
+        }
+        CompletionTargetAst::ImportFrom { import, name } => {
+            model.from_import_completions(import, name)
+        }
+        CompletionTargetAst::Import { .. } | CompletionTargetAst::ImportViaFrom { .. } => {
+            model.import_completions()
+        }
         CompletionTargetAst::Scoped { node } => model.scoped_completions(node),
     };
     completions.sort_by(compare_suggestions);
     completions.dedup_by(|c1, c2| c1.name == c2.name);
     completions
+        .into_iter()
+        .map(|completion| {
+            let definition = DefinitionsOrTargets::from_ty(db, completion.ty);
+            let documentation = definition.and_then(|def| def.docstring(db));
+            DetailedCompletion {
+                inner: completion,
+                documentation,
+            }
+        })
+        .collect()
+}
+
+pub struct DetailedCompletion<'db> {
+    pub inner: Completion<'db>,
+    pub documentation: Option<Docstring>,
+}
+impl<'db> std::ops::Deref for DetailedCompletion<'db> {
+    type Target = Completion<'db>;
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
 }
 
 /// The kind of tokens identified under the cursor.
@@ -50,17 +84,31 @@ enum CompletionTargetTokens<'t> {
         object: &'t Token,
         /// The token, if non-empty, following the dot.
         ///
-        /// This is currently unused, but we should use this
-        /// eventually to remove completions that aren't a
-        /// prefix of what has already been typed. (We are
-        /// currently relying on the LSP client to do this.)
-        #[expect(dead_code)]
+        /// For right now, this is only used to determine which
+        /// module in an `import` statement to return submodule
+        /// completions for. But we could use it for other things,
+        /// like only returning completions that start with a prefix
+        /// corresponding to this token.
         attribute: Option<&'t Token>,
     },
     /// A `from module import attribute` token form was found, where
     /// `attribute` may be empty.
     ImportFrom {
         /// The module being imported from.
+        module: &'t Token,
+    },
+    /// A `import module` token form was found, where `module` may be
+    /// empty.
+    Import {
+        /// The token corresponding to the `import` keyword.
+        import: &'t Token,
+        /// The token closest to the cursor.
+        ///
+        /// This is currently unused, but we should use this
+        /// eventually to remove completions that aren't a
+        /// prefix of what has already been typed. (We are
+        /// currently relying on the LSP client to do this.)
+        #[expect(dead_code)]
         module: &'t Token,
     },
     /// A token was found under the cursor, but it didn't
@@ -105,6 +153,8 @@ impl<'t> CompletionTargetTokens<'t> {
                 }
             } else if let Some(module) = import_from_tokens(before) {
                 CompletionTargetTokens::ImportFrom { module }
+            } else if let Some((import, module)) = import_tokens(before) {
+                CompletionTargetTokens::Import { import, module }
             } else if let Some([_]) = token_suffix_by_kinds(before, [TokenKind::Float]) {
                 // If we're writing a `float`, then we should
                 // specifically not offer completions. This wouldn't
@@ -140,18 +190,46 @@ impl<'t> CompletionTargetTokens<'t> {
         offset: TextSize,
     ) -> Option<CompletionTargetAst<'t>> {
         match *self {
-            CompletionTargetTokens::PossibleObjectDot { object, .. } => {
+            CompletionTargetTokens::PossibleObjectDot { object, attribute } => {
                 let covering_node = covering_node(parsed.syntax().into(), object.range())
-                    // We require that the end of the node range not
-                    // exceed the cursor offset. This avoids selecting
-                    // a node "too high" in the AST in cases where
-                    // completions are requested in the middle of an
-                    // expression. e.g., `foo.<CURSOR>.bar`.
-                    .find_last(|node| node.is_expr_attribute() && node.range().end() <= offset)
+                    .find_last(|node| {
+                        // We require that the end of the node range not
+                        // exceed the cursor offset. This avoids selecting
+                        // a node "too high" in the AST in cases where
+                        // completions are requested in the middle of an
+                        // expression. e.g., `foo.<CURSOR>.bar`.
+                        if node.is_expr_attribute() {
+                            return node.range().end() <= offset;
+                        }
+                        // For import statements though, they can't be
+                        // nested, so we don't care as much about the
+                        // cursor being strictly after the statement.
+                        // And indeed, sometimes it won't be! e.g.,
+                        //
+                        //   import re, os.p<CURSOR>, zlib
+                        //
+                        // So just return once we find an import.
+                        node.is_stmt_import() || node.is_stmt_import_from()
+                    })
                     .ok()?;
                 match covering_node.node() {
                     ast::AnyNodeRef::ExprAttribute(expr) => {
                         Some(CompletionTargetAst::ObjectDot { expr })
+                    }
+                    ast::AnyNodeRef::StmtImport(import) => {
+                        let range = attribute
+                            .map(Ranged::range)
+                            .unwrap_or_else(|| object.range());
+                        // Find the name that overlaps with the
+                        // token we identified for the attribute.
+                        let name = import
+                            .names
+                            .iter()
+                            .position(|alias| alias.range().contains_range(range))?;
+                        Some(CompletionTargetAst::ObjectDotInImport { import, name })
+                    }
+                    ast::AnyNodeRef::StmtImportFrom(import) => {
+                        Some(CompletionTargetAst::ObjectDotInImportFrom { import })
                     }
                     _ => None,
                 }
@@ -164,6 +242,20 @@ impl<'t> CompletionTargetTokens<'t> {
                     return None;
                 };
                 Some(CompletionTargetAst::ImportFrom { import, name: None })
+            }
+            CompletionTargetTokens::Import { import, .. } => {
+                let covering_node = covering_node(parsed.syntax().into(), import.range())
+                    .find_first(|node| node.is_stmt_import() || node.is_stmt_import_from())
+                    .ok()?;
+                match covering_node.node() {
+                    ast::AnyNodeRef::StmtImport(import) => {
+                        Some(CompletionTargetAst::Import { import, name: None })
+                    }
+                    ast::AnyNodeRef::StmtImportFrom(import) => {
+                        Some(CompletionTargetAst::ImportViaFrom { import })
+                    }
+                    _ => None,
+                }
             }
             CompletionTargetTokens::Generic { token } => {
                 let covering_node = covering_node(parsed.syntax().into(), token.range());
@@ -188,6 +280,18 @@ enum CompletionTargetAst<'t> {
     /// A `object.attribute` scenario, where we want to
     /// list attributes on `object` for completions.
     ObjectDot { expr: &'t ast::ExprAttribute },
+    /// A `import module.submodule` scenario, where we only want to
+    /// list submodules for completions.
+    ObjectDotInImport {
+        /// The import statement.
+        import: &'t ast::StmtImport,
+        /// An index into `import.names`. The index is guaranteed to be
+        /// valid.
+        name: usize,
+    },
+    /// A `from module.submodule` scenario, where we only want to list
+    /// submodules for completions.
+    ObjectDotInImportFrom { import: &'t ast::StmtImportFrom },
     /// A `from module import attribute` scenario, where we want to
     /// list attributes on `module` for completions.
     ImportFrom {
@@ -196,6 +300,24 @@ enum CompletionTargetAst<'t> {
         /// An index into `import.names` if relevant. When this is
         /// set, the index is guaranteed to be valid.
         name: Option<usize>,
+    },
+    /// A `import module` scenario, where we want to
+    /// list available modules for completions.
+    Import {
+        /// The import statement.
+        #[expect(dead_code)]
+        import: &'t ast::StmtImport,
+        /// An index into `import.names` if relevant. When this is
+        /// set, the index is guaranteed to be valid.
+        #[expect(dead_code)]
+        name: Option<usize>,
+    },
+    /// A `from module` scenario, where we want to
+    /// list available modules for completions.
+    ImportViaFrom {
+        /// The import statement.
+        #[expect(dead_code)]
+        import: &'t ast::StmtImportFrom,
     },
     /// A scoped scenario, where we want to list all items available in
     /// the most narrow scope containing the giving AST node.
@@ -317,6 +439,52 @@ fn import_from_tokens(tokens: &[Token]) -> Option<&Token> {
     None
 }
 
+/// Looks for the start of a `import <CURSOR>` statement.
+///
+/// This also handles cases like `import foo, c<CURSOR>, bar`.
+///
+/// If found, a token corresponding to the `import` or `from` keyword
+/// and the the closest point of the `<CURSOR>` is returned.
+///
+/// It is assumed that callers will call `from_import_tokens` first to
+/// try and recognize a `from ... import ...` statement before using
+/// this.
+fn import_tokens(tokens: &[Token]) -> Option<(&Token, &Token)> {
+    use TokenKind as TK;
+
+    /// A look-back limit, in order to bound work.
+    ///
+    /// See `LIMIT` in `import_from_tokens` for more context.
+    const LIMIT: usize = 1_000;
+
+    /// A state used to "parse" the tokens preceding the user's cursor,
+    /// in reverse, to detect a `import` statement.
+    enum S {
+        Start,
+        Names,
+    }
+
+    let mut state = S::Start;
+    let module_token = tokens.last()?;
+    // Move backward through the tokens until we get to
+    // the `import` token.
+    for token in tokens.iter().rev().take(LIMIT) {
+        state = match (state, token.kind()) {
+            // It's okay to pop off a newline token here initially,
+            // since it may occur when the name being imported is
+            // empty.
+            (S::Start, TK::Newline) => S::Names,
+            // Munch through tokens that can make up an alias.
+            (S::Start | S::Names, TK::Name | TK::Comma | TK::As | TK::Unknown) => S::Names,
+            (S::Start | S::Names, TK::Import | TK::From) => {
+                return Some((token, module_token));
+            }
+            _ => return None,
+        };
+    }
+    None
+}
+
 /// Order completions lexicographically, with these exceptions:
 ///
 /// 1) A `_[^_]` prefix sorts last and
@@ -333,9 +501,8 @@ fn compare_suggestions(c1: &Completion, c2: &Completion) -> Ordering {
 mod tests {
     use insta::assert_snapshot;
     use ruff_python_parser::{Mode, ParseOptions, TokenKind, Tokens};
-    use ty_python_semantic::Completion;
 
-    use crate::completion;
+    use crate::completion::{DetailedCompletion, completion};
     use crate::tests::{CursorTest, cursor_test};
 
     use super::token_suffix_by_kinds;
@@ -1247,7 +1414,7 @@ quux.<CURSOR>
         __init_subclass__ :: bound method Quux.__init_subclass__() -> None
         __module__ :: str
         __ne__ :: bound method Quux.__ne__(value: object, /) -> bool
-        __new__ :: bound method Quux.__new__() -> Self@__new__
+        __new__ :: bound method Quux.__new__() -> Quux
         __reduce__ :: bound method Quux.__reduce__() -> str | tuple[Any, ...]
         __reduce_ex__ :: bound method Quux.__reduce_ex__(protocol: SupportsIndex, /) -> str | tuple[Any, ...]
         __repr__ :: bound method Quux.__repr__() -> str
@@ -1292,7 +1459,7 @@ quux.b<CURSOR>
         __init_subclass__ :: bound method Quux.__init_subclass__() -> None
         __module__ :: str
         __ne__ :: bound method Quux.__ne__(value: object, /) -> bool
-        __new__ :: bound method Quux.__new__() -> Self@__new__
+        __new__ :: bound method Quux.__new__() -> Quux
         __reduce__ :: bound method Quux.__reduce__() -> str | tuple[Any, ...]
         __reduce_ex__ :: bound method Quux.__reduce_ex__(protocol: SupportsIndex, /) -> str | tuple[Any, ...]
         __repr__ :: bound method Quux.__repr__() -> str
@@ -2262,7 +2429,11 @@ import fo<CURSOR>
 ",
         );
 
-        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+        // This snapshot would generate a big list of modules,
+        // which is kind of annoying. So just assert that it
+        // runs without panicking and produces some non-empty
+        // output.
+        assert!(!test.completions_without_builtins().is_empty());
     }
 
     // Ref: https://github.com/astral-sh/ty/issues/572
@@ -2274,7 +2445,11 @@ import foo as ba<CURSOR>
 ",
         );
 
-        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+        // This snapshot would generate a big list of modules,
+        // which is kind of annoying. So just assert that it
+        // runs without panicking and produces some non-empty
+        // output.
+        assert!(!test.completions_without_builtins().is_empty());
     }
 
     // Ref: https://github.com/astral-sh/ty/issues/572
@@ -2286,7 +2461,11 @@ from fo<CURSOR> import wat
 ",
         );
 
-        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+        // This snapshot would generate a big list of modules,
+        // which is kind of annoying. So just assert that it
+        // runs without panicking and produces some non-empty
+        // output.
+        assert!(!test.completions_without_builtins().is_empty());
     }
 
     // Ref: https://github.com/astral-sh/ty/issues/572
@@ -2698,6 +2877,143 @@ importlib.<CURSOR>
     }
 
     #[test]
+    fn import_with_leading_character() {
+        let test = cursor_test(
+            "\
+import c<CURSOR>
+",
+        );
+        test.assert_completions_include("collections");
+    }
+
+    #[test]
+    fn import_without_leading_character() {
+        let test = cursor_test(
+            "\
+import <CURSOR>
+",
+        );
+        test.assert_completions_include("collections");
+    }
+
+    #[test]
+    fn import_multiple() {
+        let test = cursor_test(
+            "\
+import re, c<CURSOR>, sys
+",
+        );
+        test.assert_completions_include("collections");
+    }
+
+    #[test]
+    fn import_with_aliases() {
+        let test = cursor_test(
+            "\
+import re as regexp, c<CURSOR>, sys as system
+",
+        );
+        test.assert_completions_include("collections");
+    }
+
+    #[test]
+    fn import_over_multiple_lines() {
+        let test = cursor_test(
+            "\
+import re as regexp, \\
+    c<CURSOR>, \\
+    sys as system
+",
+        );
+        test.assert_completions_include("collections");
+    }
+
+    #[test]
+    fn import_unknown_in_module() {
+        let test = cursor_test(
+            "\
+import ?, <CURSOR>
+",
+        );
+        test.assert_completions_include("collections");
+    }
+
+    #[test]
+    fn import_via_from_with_leading_character() {
+        let test = cursor_test(
+            "\
+from c<CURSOR>
+",
+        );
+        test.assert_completions_include("collections");
+    }
+
+    #[test]
+    fn import_via_from_without_leading_character() {
+        let test = cursor_test(
+            "\
+from <CURSOR>
+",
+        );
+        test.assert_completions_include("collections");
+    }
+
+    #[test]
+    fn import_statement_with_submodule_with_leading_character() {
+        let test = cursor_test(
+            "\
+import os.p<CURSOR>
+",
+        );
+        test.assert_completions_include("path");
+        test.assert_completions_do_not_include("abspath");
+    }
+
+    #[test]
+    fn import_statement_with_submodule_multiple() {
+        let test = cursor_test(
+            "\
+import re, os.p<CURSOR>, zlib
+",
+        );
+        test.assert_completions_include("path");
+        test.assert_completions_do_not_include("abspath");
+    }
+
+    #[test]
+    fn import_statement_with_submodule_without_leading_character() {
+        let test = cursor_test(
+            "\
+import os.<CURSOR>
+",
+        );
+        test.assert_completions_include("path");
+        test.assert_completions_do_not_include("abspath");
+    }
+
+    #[test]
+    fn import_via_from_with_submodule_with_leading_character() {
+        let test = cursor_test(
+            "\
+from os.p<CURSOR>
+",
+        );
+        test.assert_completions_include("path");
+        test.assert_completions_do_not_include("abspath");
+    }
+
+    #[test]
+    fn import_via_from_with_submodule_without_leading_character() {
+        let test = cursor_test(
+            "\
+from os.<CURSOR>
+",
+        );
+        test.assert_completions_include("path");
+        test.assert_completions_do_not_include("abspath");
+    }
+
+    #[test]
     fn regression_test_issue_642() {
         // Regression test for https://github.com/astral-sh/ty/issues/642
 
@@ -2728,14 +3044,14 @@ importlib.<CURSOR>
             )
         }
 
-        fn completions_if(&self, predicate: impl Fn(&Completion) -> bool) -> String {
+        fn completions_if(&self, predicate: impl Fn(&DetailedCompletion) -> bool) -> String {
             self.completions_if_snapshot(predicate, |c| c.name.as_str().to_string())
         }
 
         fn completions_if_snapshot(
             &self,
-            predicate: impl Fn(&Completion) -> bool,
-            snapshot: impl Fn(&Completion) -> String,
+            predicate: impl Fn(&DetailedCompletion) -> bool,
+            snapshot: impl Fn(&DetailedCompletion) -> String,
         ) -> String {
             let completions = completion(&self.db, self.cursor.file, self.cursor.offset);
             if completions.is_empty() {
