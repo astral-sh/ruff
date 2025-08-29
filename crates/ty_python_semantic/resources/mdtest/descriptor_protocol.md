@@ -171,7 +171,7 @@ def f1(flag: bool):
 
         def f(self):
             # TODO: Here we treat attr as if it's a data descriptor. But it should fallback to instance attribute.
-            # error: [invalid-assignment] "Invalid assignment to data descriptor attribute `attr` on type `Self` with custom `__set__` method"
+            # error: [invalid-assignment] "Invalid assignment to data descriptor attribute `attr` on type `Self@f` with custom `__set__` method"
             self.attr = "normal"
 
     reveal_type(C1().attr)  # revealed: Unknown | Literal["data", "normal"]
