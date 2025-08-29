@@ -21,7 +21,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/attribute_as
  7 | C.attr = "wrong"  # error: [invalid-assignment]
  8 | 
  9 | instance = C()
-10 | instance.attr = 1  # error: [invalid-attribute-access]
+10 | instance.attr = 1  # error: [invalid-assignment]
 ```
 
 # Diagnostics
@@ -41,13 +41,13 @@ info: rule `invalid-assignment` is enabled by default
 ```
 
 ```
-error[invalid-attribute-access]: Cannot assign to ClassVar `attr` from an instance of type `C`
+error[invalid-assignment]: Cannot assign to ClassVar `attr` from an instance of type `C`
   --> src/mdtest_snippet.py:10:1
    |
  9 | instance = C()
-10 | instance.attr = 1  # error: [invalid-attribute-access]
+10 | instance.attr = 1  # error: [invalid-assignment]
    | ^^^^^^^^^^^^^
    |
-info: rule `invalid-attribute-access` is enabled by default
+info: rule `invalid-assignment` is enabled by default
 
 ```
