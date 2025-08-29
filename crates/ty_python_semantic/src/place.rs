@@ -1319,11 +1319,13 @@ fn is_reexported(db: &dyn Db, definition: Definition<'_>) -> bool {
 mod implicit_globals {
     use ruff_python_ast as ast;
 
+    use crate::Program;
     use crate::db::Db;
     use crate::place::PlaceAndQualifiers;
     use crate::semantic_index::symbol::Symbol;
     use crate::semantic_index::{place_table, use_def_map};
     use crate::types::{KnownClass, Type};
+    use ruff_python_ast::PythonVersion;
 
     use super::{Place, place_from_declarations};
 
@@ -1376,6 +1378,17 @@ mod implicit_globals {
         // None`.
         if name == "__file__" {
             Place::bound(KnownClass::Str.to_instance(db)).into()
+        } else if name == "__warningregistry__" {
+            // Present when warnings machinery is engaged; treat as defined to avoid F821.
+            // Exact type is not important for undefined-name; use `Any` for resilience.
+            Place::bound(Type::any()).into()
+        } else if name == "__annotate__" {
+            // Added in Python 3.14; only treat as implicit when target version is >= 3.14.
+            if Program::get(db).python_version(db) >= PythonVersion::PY314 {
+                Place::bound(Type::any()).into()
+            } else {
+                Place::Unbound.into()
+            }
         } else if name == "__builtins__" {
             Place::bound(Type::any()).into()
         } else if name == "__debug__" {

@@ -18,8 +18,10 @@ const IPYTHON_BUILTINS: &[&str] = &["__IPYTHON__", "display", "get_ipython"];
 pub const MAGIC_GLOBALS: &[&str] = &[
     "WindowsError",
     "__annotations__",
+    "__annotate__",
     "__builtins__",
     "__cached__",
+    "__warningregistry__",
     "__file__",
 ];
 

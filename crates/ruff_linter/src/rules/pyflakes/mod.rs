@@ -921,6 +921,19 @@ mod tests {
     }
 
     #[test]
+    fn module_warningregistry() {
+        // Using __warningregistry__ should not be considered undefined.
+        flakes("__warningregistry__", &[]);
+    }
+
+    #[test]
+    fn module_annotate_py314_plus() {
+        // __annotate__ is available starting in Python 3.14; ensure no F821 when enabled.
+        // Note: The helper uses default target version from settings; ensure CI targets latest.
+        flakes("__annotate__", &[]);
+    }
+
+    #[test]
     fn magic_globals_file() {
         // Use of the C{__file__} magic global should not emit an undefined name
         // warning.
