@@ -1704,7 +1704,11 @@ class NotSubtype:
     def m(self, x: int) -> int:
         return 42
 
+class DefinitelyNotSubtype:
+    m = None
+
 static_assert(is_subtype_of(NominalSubtype, P))
+static_assert(not is_subtype_of(DefinitelyNotSubtype, P))
 
 # TODO: should pass
 static_assert(not is_subtype_of(NotSubtype, P))  # error: [static-assert-error]
