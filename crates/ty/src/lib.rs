@@ -319,12 +319,16 @@ impl MainLoop {
                             return Ok(ExitStatus::Success);
                         }
 
+                        let is_human_readable = terminal_settings.output_format.is_human_readable();
+
                         if result.is_empty() {
-                            writeln!(
-                                self.printer.stream_for_success_summary(),
-                                "{}",
-                                "All checks passed!".green().bold()
-                            )?;
+                            if is_human_readable {
+                                writeln!(
+                                    self.printer.stream_for_success_summary(),
+                                    "{}",
+                                    "All checks passed!".green().bold()
+                                )?;
+                            }
 
                             if self.watcher.is_none() {
                                 return Ok(ExitStatus::Success);
@@ -349,12 +353,14 @@ impl MainLoop {
                                 )?;
                             }
 
-                            writeln!(
-                                self.printer.stream_for_failure_summary(),
-                                "Found {} diagnostic{}",
-                                diagnostics_count,
-                                if diagnostics_count > 1 { "s" } else { "" }
-                            )?;
+                            if is_human_readable {
+                                writeln!(
+                                    self.printer.stream_for_failure_summary(),
+                                    "Found {} diagnostic{}",
+                                    diagnostics_count,
+                                    if diagnostics_count > 1 { "s" } else { "" }
+                                )?;
+                            }
 
                             if max_severity.is_fatal() {
                                 tracing::warn!(
