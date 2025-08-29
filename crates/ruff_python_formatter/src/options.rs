@@ -252,15 +252,20 @@ impl QuoteStyle {
     pub const fn is_preserve(self) -> bool {
         matches!(self, QuoteStyle::Preserve)
     }
+
+    /// Returns the string representation of the quote style.
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            QuoteStyle::Single => "single",
+            QuoteStyle::Double => "double",
+            QuoteStyle::Preserve => "preserve",
+        }
+    }
 }
 
 impl fmt::Display for QuoteStyle {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Single => write!(f, "single"),
-            Self::Double => write!(f, "double"),
-            Self::Preserve => write!(f, "preserve"),
-        }
+        f.write_str(self.as_str())
     }
 }
 
@@ -302,10 +307,10 @@ impl MagicTrailingComma {
 
 impl fmt::Display for MagicTrailingComma {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Respect => write!(f, "respect"),
-            Self::Ignore => write!(f, "ignore"),
-        }
+        f.write_str(match self {
+            MagicTrailingComma::Respect => "respect",
+            MagicTrailingComma::Ignore => "ignore",
+        })
     }
 }
 
