@@ -21,7 +21,7 @@ use clap::{CommandFactory, Parser};
 use colored::Colorize;
 use crossbeam::channel as crossbeam_channel;
 use rayon::ThreadPoolBuilder;
-use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, Severity};
+use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, DisplayDiagnostics, Severity};
 use ruff_db::files::File;
 use ruff_db::max_parallelism;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
@@ -330,18 +330,23 @@ impl MainLoop {
                                 return Ok(ExitStatus::Success);
                             }
                         } else {
-                            let mut max_severity = Severity::Info;
                             let diagnostics_count = result.len();
 
                             let mut stdout = self.printer.stream_for_details().lock();
-                            for diagnostic in result {
-                                // Only render diagnostics if they're going to be displayed, since doing
-                                // so is expensive.
-                                if stdout.is_enabled() {
-                                    write!(stdout, "{}", diagnostic.display(db, &display_config))?;
-                                }
+                            let max_severity = result
+                                .iter()
+                                .map(Diagnostic::severity)
+                                .max()
+                                .unwrap_or(Severity::Info);
 
-                                max_severity = max_severity.max(diagnostic.severity());
+                            // Only render diagnostics if they're going to be displayed, since doing
+                            // so is expensive.
+                            if stdout.is_enabled() {
+                                write!(
+                                    stdout,
+                                    "{}",
+                                    DisplayDiagnostics::new(db, &display_config, &result)
+                                )?;
                             }
 
                             writeln!(
