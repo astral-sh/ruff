@@ -10,7 +10,7 @@ use crate::semantic_index::SemanticIndex;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::place::{PlaceTable, ScopedPlaceId};
 use crate::suppression::FileSuppressionId;
-use crate::types::class::{ClassType, DisjointBase, DisjointBaseKind, Field};
+use crate::types::class::{DisjointBase, DisjointBaseKind, Field};
 use crate::types::function::KnownFunction;
 use crate::types::string_annotation::{
     BYTE_STRING_TYPE_ANNOTATION, ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION, FSTRING_TYPE_ANNOTATION,
@@ -1945,18 +1945,8 @@ pub(super) fn report_invalid_assignment(
     target_ty: Type,
     source_ty: Type,
 ) {
-    let mut settings = DisplaySettings::default();
-    // Handles the situation where the report naming is confusing, such as class with the same Name,
-    // but from different scopes.
-    if let Some(target_class) = type_to_class_literal(target_ty, context.db()) {
-        if let Some(source_class) = type_to_class_literal(source_ty, context.db()) {
-            if target_class != source_class
-                && target_class.name(context.db()) == source_class.name(context.db())
-            {
-                settings = settings.qualified();
-            }
-        }
-    }
+    let settings =
+        DisplaySettings::from_possibly_ambiguous_type_pair(context.db(), target_ty, source_ty);
 
     report_invalid_assignment_with_message(
         context,
@@ -1968,36 +1958,6 @@ pub(super) fn report_invalid_assignment(
             target_ty.display_with(context.db(), settings)
         ),
     );
-}
-
-// TODO: generalize this to a method that takes any two types, walks them recursively, and returns
-// a set of types with ambiguous names whose display should be qualified. Then we can use this in
-// any diagnostic that displays two types.
-fn type_to_class_literal<'db>(ty: Type<'db>, db: &'db dyn crate::Db) -> Option<ClassLiteral<'db>> {
-    match ty {
-        Type::ClassLiteral(class) => Some(class),
-        Type::NominalInstance(instance) => match instance.class(db) {
-            crate::types::class::ClassType::NonGeneric(class) => Some(class),
-            crate::types::class::ClassType::Generic(alias) => Some(alias.origin(db)),
-        },
-        Type::EnumLiteral(enum_literal) => Some(enum_literal.enum_class(db)),
-        Type::GenericAlias(alias) => Some(alias.origin(db)),
-        Type::ProtocolInstance(ProtocolInstanceType {
-            inner: Protocol::FromClass(class),
-            ..
-        }) => match class {
-            ClassType::NonGeneric(class) => Some(class),
-            ClassType::Generic(alias) => Some(alias.origin(db)),
-        },
-        Type::TypedDict(typed_dict) => match typed_dict.defining_class() {
-            ClassType::NonGeneric(class) => Some(class),
-            ClassType::Generic(alias) => Some(alias.origin(db)),
-        },
-        Type::SubclassOf(subclass_of) => {
-            type_to_class_literal(Type::from(subclass_of.subclass_of().into_class()?), db)
-        }
-        _ => None,
-    }
 }
 
 pub(super) fn report_invalid_attribute_assignment(
@@ -2030,18 +1990,20 @@ pub(super) fn report_invalid_return_type(
         return;
     };
 
+    let settings =
+        DisplaySettings::from_possibly_ambiguous_type_pair(context.db(), expected_ty, actual_ty);
     let return_type_span = context.span(return_type_range);
 
     let mut diag = builder.into_diagnostic("Return type does not match returned value");
     diag.set_primary_message(format_args!(
         "expected `{expected_ty}`, found `{actual_ty}`",
-        expected_ty = expected_ty.display(context.db()),
-        actual_ty = actual_ty.display(context.db()),
+        expected_ty = expected_ty.display_with(context.db(), settings),
+        actual_ty = actual_ty.display_with(context.db(), settings),
     ));
     diag.annotate(
         Annotation::secondary(return_type_span).message(format_args!(
             "Expected `{expected_ty}` because of return type",
-            expected_ty = expected_ty.display(context.db()),
+            expected_ty = expected_ty.display_with(context.db(), settings),
         )),
     );
 }
