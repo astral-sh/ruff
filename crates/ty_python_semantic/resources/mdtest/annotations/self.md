@@ -36,7 +36,7 @@ class Shape:
         inner(self)
 
     def implicit_self(self) -> Self:
-        reveal_type(self)  # revealed: Self
+        reveal_type(self)  # revealed: Self@implicit_self
         return self
 
 reveal_type(Shape().nested_type())  # revealed: list[Shape]
@@ -82,14 +82,14 @@ class Shape:
 
     @classmethod
     def bar(cls: type[Self]) -> Self:
-        # TODO: type[Shape]
+        # TODO(cls): type[Shape]
         reveal_type(cls)  # revealed: @Todo(unsupported type[X] special form)
         return cls()
 
 class Circle(Shape): ...
 
 reveal_type(Shape().foo())  # revealed: Shape
-# TODO: Shape
+# TODO(cls): Shape
 reveal_type(Shape.bar())  # revealed: Unknown
 ```
 
@@ -112,6 +112,20 @@ class LinkedList:
         return self.next_node
 
 reveal_type(LinkedList().next())  # revealed: LinkedList
+```
+
+Or attributes can have a type var type:
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Bar(Generic[T]):
+    foo: T
+    def bar(self) -> T:
+        reveal_type(self)  # revealed: Self@bar
+        return self.foo
 ```
 
 ## Generic Classes
@@ -163,25 +177,22 @@ b: Self
 
 # TODO: "Self" cannot be used in a function with a `self` or `cls` parameter that has a type annotation other than "Self"
 class Foo:
-    # TODO: rejected Self because self has a different type
+    # TODO: should be rejected Self because self has a different type
     def has_existing_self_annotation(self: T) -> Self:
         return self  # error: [invalid-return-type]
 
     def return_concrete_type(self) -> Self:
-        # TODO: tell user to use "Foo" instead of "Self"
+        # TODO: tell user to annotate with "Foo" instead of "Self"
         # error: [invalid-return-type]
         return Foo()
 
     @staticmethod
-    # TODO: reject because of staticmethod
+    # TODO: should be reject because of staticmethod
     def make() -> Self:
         # error: [invalid-return-type]
         return Foo()
 
-class Bar(Generic[T]):
-    foo: T
-    def bar(self) -> T:
-        return self.foo
+class Bar(Generic[T]): ...
 
 # error: [invalid-type-form]
 class Baz(Bar[Self]): ...

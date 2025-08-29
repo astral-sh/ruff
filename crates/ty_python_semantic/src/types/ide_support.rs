@@ -167,9 +167,6 @@ impl<'db> AllMembers<'db> {
                     let class_literal = generic_alias.origin(db);
                     self.extend_with_class_members(db, ty, class_literal);
                 }
-                Type::SubclassOf(_) => {
-                    self.extend_with_type(db, ty.to_meta_type(db));
-                }
                 _ => {}
             },
 

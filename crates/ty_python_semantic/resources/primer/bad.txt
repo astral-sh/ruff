@@ -20,4 +20,3 @@ spark  # too many iterations
 steam.py  # hangs (single threaded)
 streamlit  # too many iterations (uses packaging)
 xarray  # too many iterations
-zope.interface  # https://github.com/astral-sh/ty/issues/764

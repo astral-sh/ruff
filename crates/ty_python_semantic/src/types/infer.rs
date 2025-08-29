@@ -3001,7 +3001,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     /// Special case for unannotated `cls` and `self` arguments to class methods and instance methods.
-    fn special_first_method_argument(&self, parameter: &ast::Parameter) -> Option<Type<'db>> {
+    fn special_first_method_argument(&mut self, parameter: &ast::Parameter) -> Option<Type<'db>> {
         let current_scope_id = self.scope().file_scope_id(self.db());
         let current_scope = self.index.scope(current_scope_id);
         let module = &parsed_module(self.db(), self.scope().file(self.db())).load(self.db());
@@ -3035,9 +3035,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } else if func_type.has_known_decorator(self.db(), FunctionDecorators::STATICMETHOD) {
             return None;
         }
-        Type::SpecialForm(SpecialFormType::TypingSelf)
-            .in_type_expression(self.db(), self.scope())
-            .ok()
+        let previous_typevar_binding_context = self.typevar_binding_context.replace(definition);
+        let t = Type::SpecialForm(SpecialFormType::TypingSelf)
+            .in_type_expression(self.db(), self.scope(), self.typevar_binding_context)
+            .ok();
+
+        self.typevar_binding_context = previous_typevar_binding_context;
+        t
     }
 
     /// Set initial declared/inferred types for a `*args` variadic positional parameter.

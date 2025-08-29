@@ -33,6 +33,7 @@ cwltool
 dacite
 dd-trace-py
 dedupe
+discord.py
 django-stubs
 downforeveryone
 dragonchain

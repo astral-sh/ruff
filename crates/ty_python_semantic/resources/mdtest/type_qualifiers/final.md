@@ -88,7 +88,7 @@ class C:
         self.FINAL_C: Final[int] = 1
         self.FINAL_D: Final = 1
         self.FINAL_E: Final
-        # error: [invalid-assignment] "Cannot assign to final attribute `FINAL_E` on type `Self`"
+        # error: [invalid-assignment] "Cannot assign to final attribute `FINAL_E` on type `Self@__init__`"
         self.FINAL_E = 1
 
 reveal_type(C.FINAL_A)  # revealed: int
@@ -185,7 +185,7 @@ class C(metaclass=Meta):
         self.INSTANCE_FINAL_A: Final[int] = 1
         self.INSTANCE_FINAL_B: Final = 1
         self.INSTANCE_FINAL_C: Final[int]
-        # error: [invalid-assignment] "Cannot assign to final attribute `INSTANCE_FINAL_C` on type `Self`"
+        # error: [invalid-assignment] "Cannot assign to final attribute `INSTANCE_FINAL_C` on type `Self@__init__`"
         self.INSTANCE_FINAL_C = 1
 
 # error: [invalid-assignment] "Cannot assign to final attribute `META_FINAL_A` on type `<class 'C'>`"
