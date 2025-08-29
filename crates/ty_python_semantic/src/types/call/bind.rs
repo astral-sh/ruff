@@ -1975,7 +1975,6 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         }
         let matched_argument = &mut self.argument_matches[argument_index];
         matched_argument.parameters.push(parameter_index);
-        tracing::debug!("argument_type: {:?}", argument_type);
         matched_argument.types.push(argument_type);
         matched_argument.matched = true;
         self.parameter_matched[parameter_index] = true;
@@ -2335,9 +2334,22 @@ pub struct MatchedArgument<'db> {
     /// the `parameters` field is non-empty.)
     pub matched: bool,
 
-    /// The types of a variadic argument when it's unpacked. For example, given a `*args` whose
-    /// type is `tuple[A, B, C]`, this would be a 3 element vector containing the 3 types.
-    pub types: SmallVec<[Option<Type<'db>>; 1]>,
+    /// The types of a variadic argument when it's unpacked.
+    ///
+    /// The length of this vector is always the same as the `parameters` vector i.e., these are the
+    /// types assigned to each matched parameter. This isn't necessarily the same as the number of
+    /// types in the argument type which might not be a fixed-length iterable.
+    ///
+    /// Another thing to note is that the way this is populated means that for any other argument
+    /// kind (synthetic, positional, keyword, keyword-variadic), this will be a single-element
+    /// vector containing `None`, since we don't know the type of the argument when this is
+    /// constructed. So, this field is populated only for variadic arguments.
+    ///
+    /// For example, given a `*args` whose type is `tuple[A, B, C]` and the following parameters:
+    /// - `(x, *args)`: the `types` field will only have two elements (`B`, `C`) since `A` has been
+    ///   matched with `x`.
+    /// - `(*args)`: the `types` field will have all the three elements (`A`, `B`, `C`)
+    types: SmallVec<[Option<Type<'db>>; 1]>,
 }
 
 impl<'db> MatchedArgument<'db> {
