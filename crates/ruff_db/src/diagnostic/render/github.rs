@@ -30,7 +30,8 @@ impl<'a> GithubRenderer<'a> {
                     // so we show one that's clearly a fallback
                     None
                 } else {
-                    let source_code = diagnostic.ruff_source_file().unwrap().to_source_code();
+                    let diagnostic_source = file.diagnostic_source(self.resolver);
+                    let source_code = diagnostic_source.as_source_code();
 
                     span.range().map(|range| {
                         (
