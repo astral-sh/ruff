@@ -450,19 +450,51 @@ class Person(TypedDict, total=False):
 
 ```py
 from typing import TypedDict
+from typing_extensions import NotRequired
 
 class Person(TypedDict):
     name: str
     age: int | None
+    extra: NotRequired[str]
 
 def _(p: Person) -> None:
     reveal_type(p.keys())  # revealed: dict_keys[str, object]
     reveal_type(p.values())  # revealed: dict_values[str, object]
 
-    reveal_type(p.setdefault("name", "Alice"))  # revealed: @Todo(Support for `TypedDict`)
+    # `get()` returns the field type for required keys (no None union)
+    reveal_type(p.get("name"))  # revealed: str
+    reveal_type(p.get("age"))  # revealed: int | None
 
-    reveal_type(p.get("name"))  # revealed: @Todo(Support for `TypedDict`)
-    reveal_type(p.get("name", "Unknown"))  # revealed: @Todo(Support for `TypedDict`)
+    # It doesn't matter if a default is specified:
+    reveal_type(p.get("name", "default"))  # revealed: str
+    reveal_type(p.get("age", 999))  # revealed: int | None
+
+    # `get()` can return `None` for non-required keys
+    reveal_type(p.get("extra"))  # revealed: str | None
+    reveal_type(p.get("extra", "default"))  # revealed: str
+
+    # The type of the default parameter can be anything:
+    reveal_type(p.get("extra", 0))  # revealed: str | Literal[0]
+
+    # We allow access to unknown keys (they could be set for a subtype of Person)
+    reveal_type(p.get("unknown"))  # revealed: Unknown | None
+    reveal_type(p.get("unknown", "default"))  # revealed: Unknown | Literal["default"]
+
+    # `pop()` only works on non-required fields
+    reveal_type(p.pop("extra"))  # revealed: str
+    reveal_type(p.pop("extra", "fallback"))  # revealed: str
+    # error: [invalid-argument-type] "Cannot pop required field 'name' from TypedDict `Person`"
+    reveal_type(p.pop("name"))  # revealed: Unknown
+
+    # Similar to above, the default parameter can be of any type:
+    reveal_type(p.pop("extra", 0))  # revealed: str | Literal[0]
+
+    # `setdefault()` always returns the field type
+    reveal_type(p.setdefault("name", "Alice"))  # revealed: str
+    reveal_type(p.setdefault("extra", "default"))  # revealed: str
+
+    # error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "extraz" - did you mean "extra"?"
+    reveal_type(p.setdefault("extraz", "value"))  # revealed: Unknown
 ```
 
 ## Unlike normal classes
