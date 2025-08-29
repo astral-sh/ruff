@@ -78,7 +78,7 @@ impl<'a> ConciseRenderer<'a> {
                 }
                 if self.config.show_fix_status {
                     // Do not display an indicator for inapplicable fixes
-                    if diag.fix_applies(self.config) {
+                    if diag.is_fix_applicable(self.config) {
                         write!(f, "[{fix}] ", fix = fmt_styled("*", stylesheet.separator))?;
                     }
                 }

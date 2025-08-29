@@ -58,7 +58,7 @@ impl<'a> FullRenderer<'a> {
                 writeln!(f, "{}", renderer.render(diag.to_annotate()))?;
             }
 
-            if self.config.show_fix_diff && diag.fix_applies(self.config) {
+            if self.config.show_fix_diff && diag.is_fix_applicable(self.config) {
                 if let Some(diff) = Diff::from_diagnostic(diag, &stylesheet, self.resolver) {
                     write!(f, "{diff}")?;
                 }

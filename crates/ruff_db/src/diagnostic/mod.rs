@@ -351,7 +351,7 @@ impl Diagnostic {
 
     /// Returns `true` if the diagnostic is [`fixable`](Diagnostic::fixable) and applies at the
     /// configured applicability level.
-    pub fn fix_applies(&self, config: &DisplayDiagnosticConfig) -> bool {
+    pub fn is_fix_applicable(&self, config: &DisplayDiagnosticConfig) -> bool {
         self.fix()
             .is_some_and(|fix| fix.applies(config.fix_applicability))
     }
