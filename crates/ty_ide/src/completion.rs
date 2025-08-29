@@ -13,7 +13,17 @@ use crate::find_node::covering_node;
 use crate::goto::DefinitionsOrTargets;
 use crate::{Db, all_symbols};
 
-pub fn completion(db: &dyn Db, file: File, offset: TextSize) -> Vec<DetailedCompletion<'_>> {
+#[derive(Clone, Debug, Default)]
+pub struct CompletionSettings {
+    pub auto_import: bool,
+}
+
+pub fn completion<'db>(
+    db: &'db dyn Db,
+    settings: &CompletionSettings,
+    file: File,
+    offset: TextSize,
+) -> Vec<DetailedCompletion<'db>> {
     let parsed = parsed_module(db, file).load(db);
 
     let Some(target_token) = CompletionTargetTokens::find(&parsed, offset) else {
@@ -40,12 +50,14 @@ pub fn completion(db: &dyn Db, file: File, offset: TextSize) -> Vec<DetailedComp
         }
         CompletionTargetAst::Scoped { node } => {
             let mut completions = model.scoped_completions(node);
-            for symbol in all_symbols(db, "") {
-                completions.push(Completion {
-                    name: ast::name::Name::new(&symbol.symbol.name),
-                    ty: Type::unknown(),
-                    builtin: false,
-                });
+            if settings.auto_import {
+                for symbol in all_symbols(db, "") {
+                    completions.push(Completion {
+                        name: ast::name::Name::new(&symbol.symbol.name),
+                        ty: Type::unknown(),
+                        builtin: false,
+                    });
+                }
             }
             completions
         }
@@ -516,7 +528,7 @@ mod tests {
     use crate::completion::{DetailedCompletion, completion};
     use crate::tests::{CursorTest, cursor_test};
 
-    use super::token_suffix_by_kinds;
+    use super::{CompletionSettings, token_suffix_by_kinds};
 
     #[test]
     fn token_suffixes_match() {
@@ -3064,7 +3076,8 @@ from os.<CURSOR>
             predicate: impl Fn(&DetailedCompletion) -> bool,
             snapshot: impl Fn(&DetailedCompletion) -> String,
         ) -> String {
-            let completions = completion(&self.db, self.cursor.file, self.cursor.offset);
+            let settings = CompletionSettings::default();
+            let completions = completion(&self.db, &settings, self.cursor.file, self.cursor.offset);
             if completions.is_empty() {
                 return "<No completions found>".to_string();
             }
@@ -3087,7 +3100,8 @@ from os.<CURSOR>
 
         #[track_caller]
         fn assert_completions_include(&self, expected: &str) {
-            let completions = completion(&self.db, self.cursor.file, self.cursor.offset);
+            let settings = CompletionSettings::default();
+            let completions = completion(&self.db, &settings, self.cursor.file, self.cursor.offset);
 
             assert!(
                 completions
@@ -3099,7 +3113,8 @@ from os.<CURSOR>
 
         #[track_caller]
         fn assert_completions_do_not_include(&self, unexpected: &str) {
-            let completions = completion(&self.db, self.cursor.file, self.cursor.offset);
+            let settings = CompletionSettings::default();
+            let completions = completion(&self.db, &settings, self.cursor.file, self.cursor.offset);
 
             assert!(
                 completions
