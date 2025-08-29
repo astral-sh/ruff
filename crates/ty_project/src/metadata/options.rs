@@ -1057,7 +1057,7 @@ pub enum OutputFormat {
     Concise,
     /// Print diagnostics in the JSON format expected by GitLab [Code Quality] reports.
     ///
-    /// [Code Quality]: https://docs.gitlab.com/ee/ci/testing/code_quality.html#implement-a-custom-tool
+    /// [Code Quality]: https://docs.gitlab.com/ci/testing/code_quality/#code-quality-report-format
     Gitlab,
 }
 
