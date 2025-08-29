@@ -10,8 +10,10 @@ aioredis
 aiortc
 alectryon
 alerta
+antidote
 anyio
 apprise
+artigraph
 async-utils
 asynq
 attrs
@@ -27,6 +29,7 @@ cloud-init
 colour
 com2ann
 comtypes
+core
 cwltool
 dacite
 dd-trace-py
@@ -66,6 +69,8 @@ openlibrary
 operator
 optuna
 paasta
+pandas
+pandas-stubs
 paroxython
 parso
 pegen
@@ -114,6 +119,7 @@ urllib3
 vision
 websockets
 werkzeug
+xarray
 xarray-dataclasses
 yarl
 zipp
