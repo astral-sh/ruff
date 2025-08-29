@@ -606,25 +606,69 @@ fn unused_imports_in_scope<'a, 'b>(
         })
 }
 
+#[derive(Debug)]
+struct MarkedBindings<'a, 'b> {
+    bindings: Vec<&'a Binding<'b>>,
+    used: Vec<bool>,
+}
+
+impl<'a, 'b> MarkedBindings<'a, 'b> {
+    fn from_binding_id(semantic: &'a SemanticModel<'b>, id: BindingId, scope: &'a Scope) -> Self {
+        let unused: Vec<_> = scope
+            .shadowed_bindings(id)
+            .map(|id| semantic.binding(id))
+            .collect();
+
+        let num_unused = &unused.len();
+
+        Self {
+            bindings: unused,
+            used: vec![false; *num_unused],
+        }
+    }
+
+    fn to_unused(self) -> Vec<&'a Binding<'b>> {
+        self.bindings
+            .into_iter()
+            .zip(self.used.into_iter())
+            .filter_map(|(bdg, is_used)| (!is_used).then_some(bdg))
+            .collect()
+    }
+
+    fn iter_mut(&mut self) -> impl Iterator<Item = (&'a Binding<'b>, &mut bool)> {
+        self.bindings.iter().copied().zip(self.used.iter_mut())
+    }
+}
+
 fn unused_imports_from_binding<'a, 'b>(
     semantic: &'a SemanticModel<'b>,
     id: BindingId,
     scope: &'a Scope,
 ) -> Vec<&'a Binding<'b>> {
+    let mut marked = MarkedBindings::from_binding_id(semantic, id, scope);
+
     let binding = semantic.binding(id);
-    let mut unused: Vec<_> = scope
-        .shadowed_bindings(id)
-        .map(|id| semantic.binding(id))
-        .collect();
+
+    // ensure we only do this once since it involves an allocation
+    let mut marked_dunder_all = false;
 
     for ref_id in binding.references() {
-        let Some(expr_id) = semantic.reference(ref_id).expression_id() else {
+        let resolved_reference = semantic.reference(ref_id);
+        if !marked_dunder_all && resolved_reference.in_dunder_all_definition() {
+            let first = binding.as_any_import().unwrap().qualified_name().segments()[0];
+            mark_uses_of_qualified_name(&mut marked, &QualifiedName::user_defined(first));
+            marked_dunder_all = true;
             continue;
+        }
+        let Some(expr_id) = resolved_reference.expression_id() else {
+            // bail if there is some other kind of reference
+            dbg!("isn't this unreachable???");
+            return vec![binding];
         };
-        remove_uses_of_ref(semantic, &mut unused, expr_id);
+        mark_uses_of_ref(semantic, &mut marked, expr_id);
     }
 
-    unused
+    marked.to_unused()
 }
 
 fn expand_to_qualified_name_attribute<'b>(
@@ -654,12 +698,8 @@ fn expand_to_qualified_name_attribute<'b>(
     Some(builder.build())
 }
 
-fn remove_uses_of_ref(semantic: &SemanticModel, unused: &mut Vec<&Binding>, expr_id: NodeId) {
-    let Some(prototype) = expand_to_qualified_name_attribute(semantic, expr_id) else {
-        return;
-    };
-
-    let Some(best) = best_match(unused, &prototype) else {
+fn mark_uses_of_qualified_name(marked: &mut MarkedBindings, prototype: &QualifiedName) {
+    let Some(best) = best_match(&marked.bindings, &prototype) else {
         return;
     };
 
@@ -669,11 +709,25 @@ fn remove_uses_of_ref(semantic: &SemanticModel, unused: &mut Vec<&Binding>, expr
 
     let bname = bimp.qualified_name();
 
-    unused.retain(|binding| {
-        binding
+    for (binding, is_used) in marked.iter_mut() {
+        if *is_used {
+            continue;
+        }
+
+        if binding
             .as_any_import()
-            .is_some_and(|imp| imp.qualified_name() != bname)
-    });
+            .is_some_and(|imp| imp.qualified_name() == bname)
+        {
+            *is_used = true;
+        }
+    }
+}
+fn mark_uses_of_ref(semantic: &SemanticModel, marked: &mut MarkedBindings, expr_id: NodeId) {
+    let Some(prototype) = expand_to_qualified_name_attribute(semantic, expr_id) else {
+        return;
+    };
+
+    mark_uses_of_qualified_name(marked, &prototype);
 }
 
 fn rank_match(binding: &Binding, prototype: &QualifiedName) -> (usize, std::cmp::Reverse<usize>) {
