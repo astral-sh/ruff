@@ -276,6 +276,17 @@ def h(x: Intersection[A, B]):
     reveal_type(x)  # revealed: tuple[B] | None
 ```
 
+### Self-recursive callable type
+
+```py
+from typing import Callable
+
+type C = Callable[[], C | None]
+
+def _(x: C):
+    reveal_type(x)  # revealed: () -> C | None
+```
+
 ### Union inside generic
 
 #### With old-style union
