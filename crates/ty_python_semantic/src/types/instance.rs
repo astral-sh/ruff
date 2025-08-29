@@ -7,7 +7,7 @@ use super::protocol_class::ProtocolInterface;
 use super::{BoundTypeVarInstance, ClassType, KnownClass, SubclassOfType, Type, TypeVarVariance};
 use crate::place::PlaceAndQualifiers;
 use crate::semantic_index::definition::Definition;
-use crate::types::constraints::{Constraints, IteratorConstraintsExtension};
+use crate::types::constraints::{ConstraintSet, Constraints, IteratorConstraintsExtension};
 use crate::types::enums::is_single_member_enum;
 use crate::types::protocol_class::walk_protocol_interface;
 use crate::types::tuple::{TupleSpec, TupleType};
@@ -513,12 +513,15 @@ impl<'db> ProtocolInstanceType<'db> {
         visitor: &NormalizedVisitor<'db>,
     ) -> Type<'db> {
         let object = Type::object(db);
-        if object.satisfies_protocol(
-            db,
-            self,
-            TypeRelation::Subtyping,
-            &HasRelationToVisitor::new(true),
-        ) {
+        if object
+            .satisfies_protocol(
+                db,
+                self,
+                TypeRelation::Subtyping,
+                &HasRelationToVisitor::new(ConstraintSet::always_satisfiable(db)),
+            )
+            .is_always_satisfied(db)
+        {
             return object;
         }
         match self.inner {

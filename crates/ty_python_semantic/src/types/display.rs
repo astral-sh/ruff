@@ -16,8 +16,9 @@ use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::tuple::TupleSpec;
 use crate::types::{
-    CallableType, IntersectionType, KnownClass, MaterializationKind, MethodWrapperKind, Protocol,
-    StringLiteralType, SubclassOfInner, Type, UnionType, WrapperDescriptorKind,
+    BoundTypeVarInstance, CallableType, IntersectionType, KnownClass, MaterializationKind,
+    MethodWrapperKind, Protocol, StringLiteralType, SubclassOfInner, Type, UnionType,
+    WrapperDescriptorKind,
 };
 use ruff_db::parsed::parsed_module;
 
@@ -360,12 +361,7 @@ impl Display for DisplayRepresentation<'_> {
                 f.write_str(enum_literal.name(self.db))
             }
             Type::NonInferableTypeVar(bound_typevar) | Type::TypeVar(bound_typevar) => {
-                f.write_str(bound_typevar.typevar(self.db).name(self.db))?;
-                if let Some(binding_context) = bound_typevar.binding_context(self.db).name(self.db)
-                {
-                    write!(f, "@{binding_context}")?;
-                }
-                Ok(())
+                bound_typevar.display(self.db).fmt(f)
             }
             Type::AlwaysTruthy => f.write_str("AlwaysTruthy"),
             Type::AlwaysFalsy => f.write_str("AlwaysFalsy"),
@@ -399,6 +395,30 @@ impl Display for DisplayRepresentation<'_> {
             ),
             Type::TypeAlias(alias) => f.write_str(alias.name(self.db)),
         }
+    }
+}
+
+impl<'db> BoundTypeVarInstance<'db> {
+    pub(crate) fn display(self, db: &'db dyn Db) -> impl Display {
+        DisplayBoundTypeVarInstance {
+            bound_typevar: self,
+            db,
+        }
+    }
+}
+
+struct DisplayBoundTypeVarInstance<'db> {
+    bound_typevar: BoundTypeVarInstance<'db>,
+    db: &'db dyn Db,
+}
+
+impl Display for DisplayBoundTypeVarInstance<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_str(self.bound_typevar.typevar(self.db).name(self.db))?;
+        if let Some(binding_context) = self.bound_typevar.binding_context(self.db).name(self.db) {
+            write!(f, "@{binding_context}")?;
+        }
+        Ok(())
     }
 }
 
