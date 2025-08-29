@@ -36,6 +36,7 @@ use crate::fix;
 /// def str(x):
 ///     return x
 ///
+///
 /// from builtins import str
 ///
 /// str(1)  # `"1"` with the import, `1` without
