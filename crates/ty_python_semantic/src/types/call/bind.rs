@@ -7,7 +7,7 @@ use std::borrow::Cow;
 use std::collections::HashSet;
 use std::fmt;
 
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use ruff_db::parsed::parsed_module;
 use smallvec::{SmallVec, smallvec, smallvec_inline};
 
@@ -17,6 +17,7 @@ use crate::db::Db;
 use crate::dunder_all::dunder_all_names;
 use crate::place::{Boundness, Place};
 use crate::types::call::arguments::{Expansion, is_expandable_type};
+use crate::types::constraints::{ConstraintSet, Constraints};
 use crate::types::diagnostic::{
     CALL_NON_CALLABLE, CONFLICTING_ARGUMENT_FORMS, INVALID_ARGUMENT_TYPE, MISSING_ARGUMENT,
     NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED, TOO_MANY_POSITIONAL_ARGUMENTS,
@@ -100,11 +101,15 @@ impl<'db> Bindings<'db> {
     ///
     /// Once you have argument types available, you can call [`check_types`][Self::check_types] to
     /// verify that each argument type is assignable to the corresponding parameter type.
-    pub(crate) fn match_parameters(mut self, arguments: &CallArguments<'_, 'db>) -> Self {
+    pub(crate) fn match_parameters(
+        mut self,
+        db: &'db dyn Db,
+        arguments: &CallArguments<'_, 'db>,
+    ) -> Self {
         let mut argument_forms = vec![None; arguments.len()];
         let mut conflicting_forms = vec![false; arguments.len()];
         for binding in &mut self.elements {
-            binding.match_parameters(arguments, &mut argument_forms, &mut conflicting_forms);
+            binding.match_parameters(db, arguments, &mut argument_forms, &mut conflicting_forms);
         }
         self.argument_forms = argument_forms.into();
         self.conflicting_forms = conflicting_forms.into();
@@ -421,9 +426,9 @@ impl<'db> Bindings<'db> {
                                         overload.set_return_type(Type::unknown());
                                     }
                                 } else {
-                                    overload.errors.push(BindingError::InternalCallError(
-                                        "property has no getter",
-                                    ));
+                                    overload
+                                        .errors
+                                        .push(BindingError::PropertyHasNoSetter(*property));
                                     overload.set_return_type(Type::Never);
                                 }
                             }
@@ -477,9 +482,9 @@ impl<'db> Bindings<'db> {
                                     ));
                                 }
                             } else {
-                                overload.errors.push(BindingError::InternalCallError(
-                                    "property has no setter",
-                                ));
+                                overload
+                                    .errors
+                                    .push(BindingError::PropertyHasNoSetter(*property));
                             }
                         }
                     }
@@ -495,9 +500,9 @@ impl<'db> Bindings<'db> {
                                     ));
                                 }
                             } else {
-                                overload.errors.push(BindingError::InternalCallError(
-                                    "property has no setter",
-                                ));
+                                overload
+                                    .errors
+                                    .push(BindingError::PropertyHasNoSetter(property));
                             }
                         }
                     }
@@ -1242,6 +1247,7 @@ impl<'db> CallableBinding<'db> {
 
     fn match_parameters(
         &mut self,
+        db: &'db dyn Db,
         arguments: &CallArguments<'_, 'db>,
         argument_forms: &mut [Option<ParameterForm>],
         conflicting_forms: &mut [bool],
@@ -1251,7 +1257,7 @@ impl<'db> CallableBinding<'db> {
         let arguments = arguments.with_self(self.bound_type);
 
         for overload in &mut self.overloads {
-            overload.match_parameters(arguments.as_ref(), argument_forms, conflicting_forms);
+            overload.match_parameters(db, arguments.as_ref(), argument_forms, conflicting_forms);
         }
     }
 
@@ -1902,7 +1908,7 @@ struct ArgumentMatcher<'a, 'db> {
     conflicting_forms: &'a mut [bool],
     errors: &'a mut Vec<BindingError<'db>>,
 
-    argument_matches: Vec<MatchedArgument>,
+    argument_matches: Vec<MatchedArgument<'db>>,
     parameter_matched: Vec<bool>,
     next_positional: usize,
     first_excess_positional: Option<usize>,
@@ -1946,6 +1952,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         &mut self,
         argument_index: usize,
         argument: Argument<'a>,
+        argument_type: Option<Type<'db>>,
         parameter_index: usize,
         parameter: &Parameter<'db>,
         positional: bool,
@@ -1969,6 +1976,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         }
         let matched_argument = &mut self.argument_matches[argument_index];
         matched_argument.parameters.push(parameter_index);
+        matched_argument.types.push(argument_type);
         matched_argument.matched = true;
         self.parameter_matched[parameter_index] = true;
     }
@@ -1977,6 +1985,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         &mut self,
         argument_index: usize,
         argument: Argument<'a>,
+        argument_type: Option<Type<'db>>,
     ) -> Result<(), ()> {
         if matches!(argument, Argument::Synthetic) {
             self.num_synthetic_args += 1;
@@ -1995,6 +2004,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         self.assign_argument(
             argument_index,
             argument,
+            argument_type,
             parameter_index,
             parameter,
             !parameter.is_variadic(),
@@ -2019,20 +2029,35 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             });
             return Err(());
         };
-        self.assign_argument(argument_index, argument, parameter_index, parameter, false);
+        self.assign_argument(
+            argument_index,
+            argument,
+            None,
+            parameter_index,
+            parameter,
+            false,
+        );
         Ok(())
     }
 
     fn match_variadic(
         &mut self,
+        db: &'db dyn Db,
         argument_index: usize,
         argument: Argument<'a>,
+        argument_type: Option<Type<'db>>,
         length: TupleLength,
     ) -> Result<(), ()> {
+        let tuple = argument_type.map(|ty| ty.iterate(db));
+        let mut argument_types = match tuple.as_ref() {
+            Some(tuple) => Either::Left(tuple.all_elements().copied()),
+            None => Either::Right(std::iter::empty()),
+        };
+
         // We must be able to match up the fixed-length portion of the argument with positional
         // parameters, so we pass on any errors that occur.
         for _ in 0..length.minimum() {
-            self.match_positional(argument_index, argument)?;
+            self.match_positional(argument_index, argument, argument_types.next())?;
         }
 
         // If the tuple is variable-length, we assume that it will soak up all remaining positional
@@ -2043,14 +2068,14 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                 .get_positional(self.next_positional)
                 .is_some()
             {
-                self.match_positional(argument_index, argument)?;
+                self.match_positional(argument_index, argument, argument_types.next())?;
             }
         }
 
         Ok(())
     }
 
-    fn finish(self) -> Box<[MatchedArgument]> {
+    fn finish(self) -> Box<[MatchedArgument<'db>]> {
         if let Some(first_excess_argument_index) = self.first_excess_positional {
             self.errors.push(BindingError::TooManyPositionalArguments {
                 first_excess_argument_index: self.get_argument_index(first_excess_argument_index),
@@ -2087,7 +2112,7 @@ struct ArgumentTypeChecker<'a, 'db> {
     db: &'db dyn Db,
     signature: &'a Signature<'db>,
     arguments: &'a CallArguments<'a, 'db>,
-    argument_matches: &'a [MatchedArgument],
+    argument_matches: &'a [MatchedArgument<'db>],
     parameter_tys: &'a mut [Option<Type<'db>>],
     errors: &'a mut Vec<BindingError<'db>>,
 
@@ -2100,7 +2125,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         db: &'db dyn Db,
         signature: &'a Signature<'db>,
         arguments: &'a CallArguments<'a, 'db>,
-        argument_matches: &'a [MatchedArgument],
+        argument_matches: &'a [MatchedArgument<'db>],
         parameter_tys: &'a mut [Option<Type<'db>>],
         errors: &'a mut Vec<BindingError<'db>>,
     ) -> Self {
@@ -2155,12 +2180,17 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         for (argument_index, adjusted_argument_index, _, argument_type) in
             self.enumerate_argument_types()
         {
-            for parameter_index in &self.argument_matches[argument_index].parameters {
-                let parameter = &parameters[*parameter_index];
+            for (parameter_index, variadic_argument_type) in
+                self.argument_matches[argument_index].iter()
+            {
+                let parameter = &parameters[parameter_index];
                 let Some(expected_type) = parameter.annotated_type() else {
                     continue;
                 };
-                if let Err(error) = builder.infer(expected_type, argument_type) {
+                if let Err(error) = builder.infer(
+                    expected_type,
+                    variadic_argument_type.unwrap_or(argument_type),
+                ) {
                     self.errors.push(BindingError::SpecializationError {
                         error,
                         argument_index: adjusted_argument_index,
@@ -2198,7 +2228,16 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     argument_type.apply_specialization(self.db, inherited_specialization);
                 expected_ty = expected_ty.apply_specialization(self.db, inherited_specialization);
             }
-            if !argument_type.is_assignable_to(self.db, expected_ty) {
+            // This is one of the few places where we want to check if there's _any_ specialization
+            // where assignability holds; normally we want to check that assignability holds for
+            // _all_ specializations.
+            // TODO: Soon we will go further, and build the actual specializations from the
+            // constraint set that we get from this assignability check, instead of inferring and
+            // building them in an earlier separate step.
+            if argument_type
+                .when_assignable_to::<ConstraintSet>(self.db, expected_ty)
+                .is_never_satisfied(self.db)
+            {
                 let positional = matches!(argument, Argument::Positional | Argument::Synthetic)
                     && !parameter.is_variadic();
                 self.errors.push(BindingError::InvalidArgumentType {
@@ -2295,7 +2334,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 /// Information about which parameter(s) an argument was matched against. This is tracked
 /// separately for each overload.
 #[derive(Clone, Debug, Default)]
-pub struct MatchedArgument {
+pub struct MatchedArgument<'db> {
     /// The index of the parameter(s) that an argument was matched against. A splatted argument
     /// might be matched against multiple parameters.
     pub parameters: SmallVec<[usize; 1]>,
@@ -2304,6 +2343,33 @@ pub struct MatchedArgument {
     /// elements must have been successfully matched. (That means that this can be `false` while
     /// the `parameters` field is non-empty.)
     pub matched: bool,
+
+    /// The types of a variadic argument when it's unpacked.
+    ///
+    /// The length of this vector is always the same as the `parameters` vector i.e., these are the
+    /// types assigned to each matched parameter. This isn't necessarily the same as the number of
+    /// types in the argument type which might not be a fixed-length iterable.
+    ///
+    /// Another thing to note is that the way this is populated means that for any other argument
+    /// kind (synthetic, positional, keyword, keyword-variadic), this will be a single-element
+    /// vector containing `None`, since we don't know the type of the argument when this is
+    /// constructed. So, this field is populated only for variadic arguments.
+    ///
+    /// For example, given a `*args` whose type is `tuple[A, B, C]` and the following parameters:
+    /// - `(x, *args)`: the `types` field will only have two elements (`B`, `C`) since `A` has been
+    ///   matched with `x`.
+    /// - `(*args)`: the `types` field will have all the three elements (`A`, `B`, `C`)
+    types: SmallVec<[Option<Type<'db>>; 1]>,
+}
+
+impl<'db> MatchedArgument<'db> {
+    /// Returns an iterator over the parameter indices and the corresponding argument type.
+    pub fn iter(&self) -> impl Iterator<Item = (usize, Option<Type<'db>>)> + '_ {
+        self.parameters
+            .iter()
+            .copied()
+            .zip(self.types.iter().copied())
+    }
 }
 
 /// Binding information for one of the overloads of a callable.
@@ -2331,7 +2397,7 @@ pub(crate) struct Binding<'db> {
 
     /// Information about which parameter(s) each argument was matched with, in argument source
     /// order.
-    argument_matches: Box<[MatchedArgument]>,
+    argument_matches: Box<[MatchedArgument<'db>]>,
 
     /// Bound types for parameters, in parameter source order, or `None` if no argument was matched
     /// to that parameter.
@@ -2364,6 +2430,7 @@ impl<'db> Binding<'db> {
 
     pub(crate) fn match_parameters(
         &mut self,
+        db: &'db dyn Db,
         arguments: &CallArguments<'_, 'db>,
         argument_forms: &mut [Option<ParameterForm>],
         conflicting_forms: &mut [bool],
@@ -2376,16 +2443,17 @@ impl<'db> Binding<'db> {
             conflicting_forms,
             &mut self.errors,
         );
-        for (argument_index, (argument, _)) in arguments.iter().enumerate() {
+        for (argument_index, (argument, argument_type)) in arguments.iter().enumerate() {
             match argument {
                 Argument::Positional | Argument::Synthetic => {
-                    let _ = matcher.match_positional(argument_index, argument);
+                    let _ = matcher.match_positional(argument_index, argument, None);
                 }
                 Argument::Keyword(name) => {
                     let _ = matcher.match_keyword(argument_index, argument, name);
                 }
                 Argument::Variadic(length) => {
-                    let _ = matcher.match_variadic(argument_index, argument, length);
+                    let _ =
+                        matcher.match_variadic(db, argument_index, argument, argument_type, length);
                 }
                 Argument::Keywords => {
                     // TODO
@@ -2522,8 +2590,12 @@ impl<'db> Binding<'db> {
 
     /// Returns a vector where each index corresponds to an argument position,
     /// and the value is the parameter index that argument maps to (if any).
-    pub(crate) fn argument_matches(&self) -> &[MatchedArgument] {
+    pub(crate) fn argument_matches(&self) -> &[MatchedArgument<'db>] {
         &self.argument_matches
+    }
+
+    pub(crate) fn errors(&self) -> &[BindingError<'db>] {
+        &self.errors
     }
 }
 
@@ -2532,7 +2604,7 @@ struct BindingSnapshot<'db> {
     return_ty: Type<'db>,
     specialization: Option<Specialization<'db>>,
     inherited_specialization: Option<Specialization<'db>>,
-    argument_matches: Box<[MatchedArgument]>,
+    argument_matches: Box<[MatchedArgument<'db>]>,
     parameter_tys: Box<[Option<Type<'db>>]>,
     errors: Vec<BindingError<'db>>,
 }
@@ -2743,7 +2815,9 @@ pub(crate) enum BindingError<'db> {
         provided_ty: Type<'db>,
     },
     /// One or more required parameters (that is, with no default) is not supplied by any argument.
-    MissingArguments { parameters: ParameterContexts },
+    MissingArguments {
+        parameters: ParameterContexts,
+    },
     /// A call argument can't be matched to any parameter.
     UnknownArgument {
         argument_name: ast::name::Name,
@@ -2765,6 +2839,7 @@ pub(crate) enum BindingError<'db> {
         error: SpecializationError<'db>,
         argument_index: Option<usize>,
     },
+    PropertyHasNoSetter(PropertyInstanceType<'db>),
     /// The call itself might be well constructed, but an error occurred while evaluating the call.
     /// We use this variant to report errors in `property.__get__` and `property.__set__`, which
     /// can occur when the call to the underlying getter/setter fails.
@@ -3029,6 +3104,17 @@ impl<'db> BindingError<'db> {
                 if let Some(union_diag) = union_diag {
                     union_diag.add_union_context(context.db(), &mut diag);
                 }
+            }
+
+            Self::PropertyHasNoSetter(_) => {
+                BindingError::InternalCallError("property has no setter").report_diagnostic(
+                    context,
+                    node,
+                    callable_ty,
+                    callable_description,
+                    union_diag,
+                    matching_overload,
+                );
             }
 
             Self::InternalCallError(reason) => {

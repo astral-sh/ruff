@@ -638,7 +638,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
     pub(super) fn instance_set_type(&self) -> Result<Type<'db>, AttributeAssignmentError<'db>> {
         match self.kind {
             ProtocolMemberKind::Property { set_type, .. } => {
-                set_type.ok_or(AttributeAssignmentError::ReadOnlyProperty)
+                set_type.ok_or(AttributeAssignmentError::ReadOnlyProperty(None))
             }
             ProtocolMemberKind::Method(_) => Err(AttributeAssignmentError::CannotAssign),
             ProtocolMemberKind::Attribute(ty) => {
@@ -689,7 +689,8 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                 db,
                 matches!(
                     other.to_meta_type(db).member(db, self.name).place,
-                    Place::Type(_, Boundness::Bound)
+                    Place::Type(ty, Boundness::Bound)
+                    if ty.is_assignable_to(db, CallableType::single(db, Signature::dynamic(Type::any())))
                 ),
             );
         }
