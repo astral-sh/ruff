@@ -528,7 +528,7 @@ impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
     }
 
     fn in_async_context(&self) -> bool {
-        if let Some(scope) = self.scopes.iter().rev().next() {
+        if let Some(scope) = self.scopes.iter().next_back() {
             match scope {
                 Scope::Class | Scope::Module => false,
                 Scope::Comprehension { is_async } => *is_async,
