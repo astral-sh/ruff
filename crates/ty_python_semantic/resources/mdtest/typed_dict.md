@@ -477,7 +477,7 @@ def _(p: Person) -> None:
     reveal_type(p.get("extra", 0))  # revealed: str | Literal[0]
 
     # We allow access to unknown keys (they could be set for a subtype of Person)
-    reveal_type(p.get("unknown"))  # revealed: Unknown
+    reveal_type(p.get("unknown"))  # revealed: Unknown | None
     reveal_type(p.get("unknown", "default"))  # revealed: Unknown | Literal["default"]
 
     # `pop()` only works on non-required fields

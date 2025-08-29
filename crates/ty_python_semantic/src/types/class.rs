@@ -2393,7 +2393,10 @@ impl<'db> ClassLiteral<'db> {
                                 Parameter::positional_only(Some(Name::new_static("key")))
                                     .with_annotated_type(KnownClass::Str.to_instance(db)),
                             ]),
-                            Some(Type::unknown()),
+                            Some(UnionType::from_elements(
+                                db,
+                                [Type::unknown(), Type::none(db)],
+                            )),
                         )
                     }))
                     .chain(std::iter::once({
