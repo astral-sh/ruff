@@ -3204,12 +3204,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_class_deferred(&mut self, definition: Definition<'db>, class: &ast::StmtClassDef) {
         let previous_typevar_binding_context = self.typevar_binding_context.replace(definition);
-        let previous_deferred_state =
-            std::mem::replace(&mut self.deferred_state, DeferredExpressionState::Deferred);
         for base in class.bases() {
-            self.infer_expression(base);
+            if self.in_stub() {
+                self.infer_expression_with_state(base, DeferredExpressionState::Deferred);
+            } else {
+                self.infer_expression(base);
+            }
         }
-        self.deferred_state = previous_deferred_state;
         self.typevar_binding_context = previous_typevar_binding_context;
     }
 
@@ -5602,6 +5603,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
 
         self.infer_expression_impl(expression)
+    }
+
+    fn infer_expression_with_state(
+        &mut self,
+        expression: &ast::Expr,
+        state: DeferredExpressionState,
+    ) -> Type<'db> {
+        let previous_deferred_state = std::mem::replace(&mut self.deferred_state, state);
+        let ty = self.infer_expression(expression);
+        self.deferred_state = previous_deferred_state;
+        ty
     }
 
     fn infer_maybe_standalone_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
