@@ -8010,12 +8010,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         if let Some(diagnostic_builder) =
                             builder.context.report_lint(&UNSUPPORTED_OPERATOR, range)
                         {
+                            let error_left_ty_display = error.left_ty.display(builder.db());
+                            let error_right_ty_display = error.right_ty.display(builder.db());
                             // Handle unsupported operators (diagnostic, `bool`/`Unknown` outcome)
-                            diagnostic_builder.into_diagnostic(format_args!(
-                                "Operator `{}` is not supported for types `{}` and `{}`{}",
+                            let mut diagnostic = diagnostic_builder.into_diagnostic(format_args!(
+                                "Operator `{}` is not supported for types `{error_left_ty_display}` and `{error_right_ty_display}`{}",
                                 error.op,
-                                error.left_ty.display(builder.db()),
-                                error.right_ty.display(builder.db()),
                                 if (left_ty, right_ty) == (error.left_ty, error.right_ty) {
                                     String::new()
                                 } else {
@@ -8026,6 +8026,37 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     )
                                 }
                             ));
+
+                            if let Some(call_dunder_error) = error.call_dunder_error {
+                                match call_dunder_error {
+                                    CallDunderError::CallError(call_error_kind, _) => {
+                                        match call_error_kind {
+                                            CallErrorKind::NotCallable => {
+                                                diagnostic.info(format_args!(
+                                                    "Operator '{}' is not callable on object of type '{error_left_ty_display}'",
+                                                    error.op
+                                                ));
+                                            }
+                                            CallErrorKind::BindingError => {
+                                                diagnostic.info(format_args!(
+                                                    "Operator '{}' on object of type '{error_left_ty_display}' cannot be used with object of type '{error_right_ty_display}'",
+                                                    error.op,
+                                                ));
+                                            }
+                                            CallErrorKind::PossiblyNotCallable => {
+                                                diagnostic.info(format_args!(
+                                                    "Operator '{}' is possibly not callable on object of type '{error_left_ty_display}'",
+                                                    error.op,
+                                                ));
+                                            }
+                                        }
+                                    }
+                                    CallDunderError::PossiblyUnbound(_) => diagnostic.info(
+                                        format_args!("Operator '{}' is possibly unbound on object of type '{error_left_ty_display}'", error.op),
+                                    ),
+                                    CallDunderError::MethodNotAvailable => {}
+                                }
+                            }
                         }
 
                         match op {
@@ -8316,6 +8347,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     op,
                     left_ty: left,
                     right_ty: right,
+                    call_dunder_error: None,
                 }),
             }),
             (Type::IntLiteral(_), Type::NominalInstance(_)) => {
@@ -8465,24 +8497,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (Type::EnumLiteral(literal_1), Type::EnumLiteral(literal_2))
                 if op == ast::CmpOp::Eq =>
             {
-                Some(Ok(match try_dunder(self, MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK) {
-                    Ok(ty) => ty,
-                    Err(_) => Type::BooleanLiteral(literal_1 == literal_2),
-                }))
+                Some(Ok(
+                    match try_dunder(self, MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK) {
+                        Ok(ty) => ty,
+                        Err(_) => Type::BooleanLiteral(literal_1 == literal_2),
+                    },
+                ))
             }
             (Type::EnumLiteral(literal_1), Type::EnumLiteral(literal_2))
                 if op == ast::CmpOp::NotEq =>
             {
-                Some(Ok(match try_dunder(self, MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK) {
-                    Ok(ty) => ty,
-                    Err(_) => Type::BooleanLiteral(literal_1 != literal_2),
-                }))
+                Some(Ok(
+                    match try_dunder(self, MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK) {
+                        Ok(ty) => ty,
+                        Err(_) => Type::BooleanLiteral(literal_1 != literal_2),
+                    },
+                ))
             }
 
-            (
-                Type::NominalInstance(nominal1),
-                Type::NominalInstance(nominal2),
-            ) => nominal1.tuple_spec(self.db())
+            (Type::NominalInstance(nominal1), Type::NominalInstance(nominal2)) => nominal1
+                .tuple_spec(self.db())
                 .and_then(|lhs_tuple| Some((lhs_tuple, nominal2.tuple_spec(self.db())?)))
                 .map(|(lhs_tuple, rhs_tuple)| {
                     let mut tuple_rich_comparison =
@@ -8501,11 +8535,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                             for ty in rhs_tuple.all_elements().copied() {
                                 let eq_result = self.infer_binary_type_comparison(
-                                left,
-                                ast::CmpOp::Eq,
-                                ty,
-                                range,
-                            ).expect("infer_binary_type_comparison should never return None for `CmpOp::Eq`");
+                                    left,
+                                    ast::CmpOp::Eq,
+                                    ty,
+                                    range,
+                                )?;
 
                                 match eq_result {
                                     todo @ Type::Dynamic(DynamicType::Todo(_)) => return Ok(todo),
@@ -8531,9 +8565,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ast::CmpOp::Is | ast::CmpOp::IsNot => {
                             // - `[ast::CmpOp::Is]`: returns `false` if the elements are definitely unequal, otherwise `bool`
                             // - `[ast::CmpOp::IsNot]`: returns `true` if the elements are definitely unequal, otherwise `bool`
-                            let eq_result = tuple_rich_comparison(RichCompareOperator::Eq).expect(
-                            "infer_binary_type_comparison should never return None for `CmpOp::Eq`",
-                        );
+                            let eq_result = tuple_rich_comparison(RichCompareOperator::Eq)?;
 
                             Ok(match eq_result {
                                 todo @ Type::Dynamic(DynamicType::Todo(_)) => todo,
@@ -8547,8 +8579,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             })
                         }
                     }
-                }
-            ),
+                }),
 
             _ => None,
         };
@@ -8580,36 +8611,50 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 db,
                 op.dunder(),
                 &mut CallArguments::positional([right]),
-                policy,
+                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
             )
             .map(|outcome| outcome.return_type(db))
-            .ok()
         };
 
         // The reflected dunder has priority if the right-hand side is a strict subclass of the left-hand side.
         if left != right && right.is_subtype_of(db, left) {
-            call_dunder(op.reflect(), right, left).or_else(|| call_dunder(op, left, right))
+            let first_call = call_dunder(op.reflect(), right, left);
+            match first_call {
+                Ok(ty) => Ok(ty),
+                Err(e) => match call_dunder(op, left, right) {
+                    Ok(ty) => Ok(ty),
+                    Err(_) => Err(e),
+                },
+            }
         } else {
-            call_dunder(op, left, right).or_else(|| call_dunder(op.reflect(), right, left))
+            let first_call = call_dunder(op, left, right);
+            match first_call {
+                Ok(ty) => Ok(ty),
+                Err(e) => match call_dunder(op.reflect(), right, left) {
+                    Ok(ty) => Ok(ty),
+                    Err(_) => Err(e),
+                },
+            }
         }
-        .or_else(|| {
+        .or_else(|e| {
             // When no appropriate method returns any value other than NotImplemented,
             // the `==` and `!=` operators will fall back to `is` and `is not`, respectively.
             // refer to `<https://docs.python.org/3/reference/datamodel.html#object.__eq__>`
             if matches!(op, RichCompareOperator::Eq | RichCompareOperator::Ne)
                 // This branch implements specific behavior of the `__eq__` and `__ne__` methods
                 // on `object`, so it does not apply if we skip looking up attributes on `object`.
-                && !policy.mro_no_object_fallback()
+                && !policy.mro_no_object_fallback() && matches!(e, CallDunderError::MethodNotAvailable)
             {
-                Some(KnownClass::Bool.to_instance(db))
+                Ok(KnownClass::Bool.to_instance(db))
             } else {
-                None
+                Err(e)
             }
         })
-        .ok_or_else(|| CompareUnsupportedError {
+        .map_err(|e| CompareUnsupportedError {
             op: op.into(),
             left_ty: left,
             right_ty: right,
+            call_dunder_error: Some(e),
         })
     }
 
@@ -8664,6 +8709,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 op: op.into(),
                 left_ty: left,
                 right_ty: right,
+                call_dunder_error: None,
             })
     }
 
@@ -8693,9 +8739,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut builder = UnionBuilder::new(self.db());
 
         for (l_ty, r_ty) in left_iter.zip(right_iter) {
-            let pairwise_eq_result = self
-                .infer_binary_type_comparison(l_ty, ast::CmpOp::Eq, r_ty, range)
-                .expect("infer_binary_type_comparison should never return None for `CmpOp::Eq`");
+            let pairwise_eq_result =
+                self.infer_binary_type_comparison(l_ty, ast::CmpOp::Eq, r_ty, range)?;
 
             match pairwise_eq_result
                 .try_bool(self.db())
@@ -11446,11 +11491,12 @@ impl From<MembershipTestCompareOperator> for ast::CmpOp {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug)]
 struct CompareUnsupportedError<'db> {
     op: ast::CmpOp,
     left_ty: Type<'db>,
     right_ty: Type<'db>,
+    call_dunder_error: Option<CallDunderError<'db>>,
 }
 
 fn format_import_from_module(level: u32, module: Option<&str>) -> String {
