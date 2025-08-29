@@ -522,6 +522,18 @@ c.name = None
 c.name = 42
 ```
 
+If a property has no setter, we emit a bespoke error message when a user attempts to set that
+attribute, since this is a common error:
+
+```py
+class DontAssignToMe:
+    @property
+    def immutable(self): ...
+
+# error: [invalid-assignment] "Cannot assign to read-only property `immutable` on object of type `DontAssignToMe`"
+DontAssignToMe().immutable = "the properties, they are a-changing"
+```
+
 ### Built-in `classmethod` descriptor
 
 Similarly to `property`, `classmethod` decorator creates an implicit descriptor that binds the first
