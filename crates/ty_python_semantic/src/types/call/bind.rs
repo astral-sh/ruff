@@ -131,7 +131,14 @@ impl<'db> Bindings<'db> {
         argument_types: &CallArguments<'_, 'db>,
     ) -> Result<Self, CallError<'db>> {
         for element in &mut self.elements {
-            element.check_types(db, argument_types);
+            if let Some((global_argument_forms, global_conflicting_forms)) =
+                element.check_types(db, argument_types)
+            {
+                // If this element returned global forms (indicating successful argument type expansion),
+                // update the Bindings with these forms
+                self.argument_forms = global_argument_forms.into();
+                self.conflicting_forms = global_conflicting_forms.into();
+            }
         }
 
         self.evaluate_known_cases(db);
@@ -1261,7 +1268,11 @@ impl<'db> CallableBinding<'db> {
         }
     }
 
-    fn check_types(&mut self, db: &'db dyn Db, argument_types: &CallArguments<'_, 'db>) {
+    fn check_types(
+        &mut self,
+        db: &'db dyn Db,
+        argument_types: &CallArguments<'_, 'db>,
+    ) -> Option<(Vec<Option<ParameterForm>>, Vec<bool>)> {
         // If this callable is a bound method, prepend the self instance onto the arguments list
         // before checking.
         let argument_types = argument_types.with_self(self.bound_type);
@@ -1275,14 +1286,14 @@ impl<'db> CallableBinding<'db> {
                 if let [overload] = self.overloads.as_mut_slice() {
                     overload.check_types(db, argument_types.as_ref());
                 }
-                return;
+                return None;
             }
             MatchingOverloadIndex::Single(index) => {
                 // If only one candidate overload remains, it is the winning match. Evaluate it as
                 // a regular (non-overloaded) call.
                 self.matching_overload_index = Some(index);
                 self.overloads[index].check_types(db, argument_types.as_ref());
-                return;
+                return None;
             }
             MatchingOverloadIndex::Multiple(indexes) => {
                 // If two or more candidate overloads remain, proceed to step 2.
@@ -1308,7 +1319,7 @@ impl<'db> CallableBinding<'db> {
             }
             MatchingOverloadIndex::Single(_) => {
                 // If only one overload evaluates without error, it is the winning match.
-                return;
+                return None;
             }
             MatchingOverloadIndex::Multiple(indexes) => {
                 // If two or more candidate overloads remain, proceed to step 4.
@@ -1318,7 +1329,7 @@ impl<'db> CallableBinding<'db> {
                 self.filter_overloads_using_any_or_unknown(db, argument_types.as_ref(), &indexes);
 
                 // We're returning here because this shouldn't lead to argument type expansion.
-                return;
+                return None;
             }
         }
 
@@ -1328,7 +1339,7 @@ impl<'db> CallableBinding<'db> {
 
         if expansions.peek().is_none() {
             // Return early if there are no argument types to expand.
-            return;
+            return None;
         }
 
         // State of the bindings _after_ evaluating (type checking) the matching overloads using
@@ -1377,9 +1388,15 @@ impl<'db> CallableBinding<'db> {
                     argument_type.display(db)
                 );
                 snapshotter.restore(self, post_evaluation_snapshot);
-                return;
+                return None;
             }
         }
+
+        tracing::debug!("Performing argument type expansion");
+
+        // Global argument_forms and conflicting_forms that will be merged across all expansions
+        let mut global_argument_forms: Vec<Option<ParameterForm>> = Vec::new();
+        let mut global_conflicting_forms: Vec<bool> = Vec::new();
 
         for expansion in expansions {
             let expanded_argument_lists = match expansion {
@@ -1388,7 +1405,7 @@ impl<'db> CallableBinding<'db> {
                     self.overload_call_return_type = Some(
                         OverloadCallReturnType::ArgumentTypeExpansionLimitReached(index),
                     );
-                    return;
+                    return Some((global_argument_forms, global_conflicting_forms));
                 }
                 Expansion::Expanded(argument_lists) => argument_lists,
             };
@@ -1400,11 +1417,37 @@ impl<'db> CallableBinding<'db> {
 
             let mut return_types = Vec::new();
 
-            for expanded_argument_types in &expanded_argument_lists {
+            for expanded_arguments in &expanded_argument_lists {
                 let pre_evaluation_snapshot = snapshotter.take(self);
 
+                // Clear the state of all overloads before re-evaluating from step 1
+                for overload in &mut self.overloads {
+                    overload.clear();
+                }
+
+                let mut argument_forms = vec![None; expanded_arguments.len()];
+                let mut conflicting_forms = vec![false; expanded_arguments.len()];
+
+                // Re-evaluate from step 1: match parameters for all overloads (not just matching ones)
+                for overload in &mut self.overloads {
+                    overload.match_parameters(
+                        db,
+                        expanded_arguments,
+                        &mut argument_forms,
+                        &mut conflicting_forms,
+                    );
+                }
+
+                // Merge argument_forms and conflicting_forms into global ones
+                Self::merge_argument_forms(
+                    &mut global_argument_forms,
+                    &mut global_conflicting_forms,
+                    &argument_forms,
+                    &conflicting_forms,
+                );
+
                 for (_, overload) in self.matching_overloads_mut() {
-                    overload.check_types(db, expanded_argument_types);
+                    overload.check_types(db, expanded_arguments);
                 }
 
                 let return_type = match self.matching_overload_index() {
@@ -1417,13 +1460,25 @@ impl<'db> CallableBinding<'db> {
 
                         self.filter_overloads_using_any_or_unknown(
                             db,
-                            expanded_argument_types,
+                            expanded_arguments,
                             &matching_overload_indexes,
                         );
 
                         Some(self.return_type())
                     }
                 };
+
+                tracing::debug!(
+                    "Return type after evaluating expanded arguments (`{}`): {}",
+                    expanded_arguments
+                        .iter_types()
+                        .map(|arg| arg.display(db).to_string())
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                    return_type
+                        .map(|ty| ty.display(db).to_string())
+                        .unwrap_or_else(|| "None".to_string())
+                );
 
                 // This split between initializing and updating the merged evaluation state is
                 // required because otherwise it's difficult to differentiate between the
@@ -1468,7 +1523,7 @@ impl<'db> CallableBinding<'db> {
                         UnionType::from_elements(db, return_types),
                     ));
 
-                return;
+                return Some((global_argument_forms, global_conflicting_forms));
             }
         }
 
@@ -1477,6 +1532,44 @@ impl<'db> CallableBinding<'db> {
         // argument types. This is necessary because we restore the state to the pre-evaluation
         // snapshot when processing the expanded argument lists.
         snapshotter.restore(self, post_evaluation_snapshot);
+        None
+    }
+
+    /// Merge argument forms and conflicting forms into global ones.
+    fn merge_argument_forms(
+        global_argument_forms: &mut Vec<Option<ParameterForm>>,
+        global_conflicting_forms: &mut Vec<bool>,
+        local_argument_forms: &[Option<ParameterForm>],
+        local_conflicting_forms: &[bool],
+    ) {
+        // Resize global lists to match local length if needed
+        if global_argument_forms.len() < local_argument_forms.len() {
+            global_argument_forms.resize(local_argument_forms.len(), None);
+            global_conflicting_forms.resize(local_conflicting_forms.len(), false);
+        }
+
+        // Merge argument forms and conflicting forms
+        for (i, (local_form, local_conflict)) in local_argument_forms
+            .iter()
+            .zip(local_conflicting_forms.iter())
+            .enumerate()
+        {
+            // Update global argument form
+            if let Some(global_form) = &mut global_argument_forms[i] {
+                if let Some(local_form) = local_form {
+                    if *global_form != *local_form {
+                        // Different parameter forms, mark as conflicting
+                        global_conflicting_forms[i] = true;
+                        *global_form = *local_form; // Use the new form
+                    }
+                }
+            } else {
+                global_argument_forms[i] = *local_form;
+            }
+
+            // Update global conflicting form (true takes precedence)
+            global_conflicting_forms[i] |= local_conflict;
+        }
     }
 
     /// Filter overloads based on [`Any`] or [`Unknown`] argument types.
@@ -2048,6 +2141,14 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         argument_type: Option<Type<'db>>,
         length: TupleLength,
     ) -> Result<(), ()> {
+        tracing::debug!("tuple length: {length:?}");
+        tracing::debug!(
+            "argument type: {}",
+            argument_type
+                .map(|ty| ty.display(db).to_string())
+                .unwrap_or_else(|| "<None>".to_string())
+        );
+
         let tuple = argument_type.map(|ty| ty.iterate(db));
         let mut argument_types = match tuple.as_ref() {
             Some(tuple) => Either::Left(tuple.all_elements().copied()),
@@ -2592,6 +2693,16 @@ impl<'db> Binding<'db> {
     /// and the value is the parameter index that argument maps to (if any).
     pub(crate) fn argument_matches(&self) -> &[MatchedArgument<'db>] {
         &self.argument_matches
+    }
+
+    /// Clears the state of this binding, resetting it to its initial state.
+    pub(crate) fn clear(&mut self) {
+        self.return_ty = Type::unknown();
+        self.specialization = None;
+        self.inherited_specialization = None;
+        self.argument_matches = Box::from([]);
+        self.parameter_tys = Box::from([]);
+        self.errors.clear();
     }
 }
 

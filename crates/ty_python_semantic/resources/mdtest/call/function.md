@@ -587,7 +587,7 @@ def _(t: tuple[int, str, int]) -> None:
     f(*t)
 
 def _(t: tuple[int, str] | tuple[int, str, int]) -> None:
-    # TODO: error: [invalid-argument-type]
+    # error: [no-matching-overload]
     f(*t)
 ```
 
