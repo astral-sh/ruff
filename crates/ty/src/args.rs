@@ -321,6 +321,9 @@ pub enum OutputFormat {
     /// dropped.
     #[value(name = "concise")]
     Concise,
+    /// Print diagnostics in the JSON format expected by GitLab Code Quality reports.
+    #[value(name = "gitlab")]
+    Gitlab,
 }
 
 impl From<OutputFormat> for ty_project::metadata::options::OutputFormat {
@@ -328,6 +331,7 @@ impl From<OutputFormat> for ty_project::metadata::options::OutputFormat {
         match format {
             OutputFormat::Full => Self::Full,
             OutputFormat::Concise => Self::Concise,
+            OutputFormat::Gitlab => Self::Gitlab,
         }
     }
 }

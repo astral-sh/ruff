@@ -1055,6 +1055,10 @@ pub enum OutputFormat {
     ///
     /// This may use color when printing to a `tty`.
     Concise,
+    /// Print diagnostics in the JSON format expected by GitLab [Code Quality] reports.
+    ///
+    /// [Code Quality]: https://docs.gitlab.com/ee/ci/testing/code_quality.html#implement-a-custom-tool
+    Gitlab,
 }
 
 impl From<OutputFormat> for DiagnosticFormat {
@@ -1062,6 +1066,7 @@ impl From<OutputFormat> for DiagnosticFormat {
         match value {
             OutputFormat::Full => Self::Full,
             OutputFormat::Concise => Self::Concise,
+            OutputFormat::Gitlab => Self::Gitlab,
         }
     }
 }
