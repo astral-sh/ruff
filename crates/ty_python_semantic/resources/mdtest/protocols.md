@@ -1387,7 +1387,7 @@ class ClassVarXProto(Protocol):
 def f(obj: ClassVarXProto):
     reveal_type(obj.x)  # revealed: int
     reveal_type(type(obj).x)  # revealed: int
-    obj.x = 42  # error: [invalid-assignment] "Cannot assign to ClassVar `x` from an instance of type `ClassVarXProto`"
+    obj.x = 42  # error: [invalid-attribute-access] "Cannot assign to ClassVar `x` from an instance of type `ClassVarXProto`"
 
 class InstanceAttrX:
     x: int

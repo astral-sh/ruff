@@ -53,7 +53,7 @@ C.attr = 1  # fine
 C.attr = "wrong"  # error: [invalid-assignment]
 
 instance = C()
-instance.attr = 1  # error: [invalid-assignment]
+instance.attr = 1  # error: [invalid-attribute-access]
 ```
 
 ## Unknown attributes
