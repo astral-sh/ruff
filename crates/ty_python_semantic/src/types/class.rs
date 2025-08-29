@@ -2331,7 +2331,7 @@ impl<'db> ClassLiteral<'db> {
                 )))
             }
             (CodeGeneratorKind::TypedDict, "get") => {
-                let overloads: Vec<_> = self
+                let overloads = self
                     .fields(db, specialization, field_policy)
                     .into_iter()
                     .flat_map(|(name, field)| {
@@ -2415,8 +2415,7 @@ impl<'db> ClassLiteral<'db> {
                                 [Type::unknown(), Type::TypeVar(t_default)],
                             )),
                         )
-                    }))
-                    .collect();
+                    }));
 
                 Some(Type::Callable(CallableType::new(
                     db,
@@ -2425,8 +2424,8 @@ impl<'db> ClassLiteral<'db> {
                 )))
             }
             (CodeGeneratorKind::TypedDict, "pop") => {
-                let overloads = self
-                    .fields(db, specialization, field_policy)
+                let fields = self.fields(db, specialization, field_policy);
+                let overloads = fields
                     .iter()
                     .filter(|(_, field)| {
                         // Only synthesize `pop` for fields that are not required.
@@ -2470,8 +2469,7 @@ impl<'db> ClassLiteral<'db> {
                         );
 
                         [pop_sig, pop_with_default_sig]
-                    })
-                    .collect::<Vec<_>>();
+                    });
 
                 Some(Type::Callable(CallableType::new(
                     db,
@@ -2480,27 +2478,23 @@ impl<'db> ClassLiteral<'db> {
                 )))
             }
             (CodeGeneratorKind::TypedDict, "setdefault") => {
-                let overloads = self
-                    .fields(db, specialization, field_policy)
-                    .iter()
-                    .map(|(name, field)| {
-                        let key_type =
-                            Type::StringLiteral(StringLiteralType::new(db, name.as_str()));
+                let fields = self.fields(db, specialization, field_policy);
+                let overloads = fields.iter().map(|(name, field)| {
+                    let key_type = Type::StringLiteral(StringLiteralType::new(db, name.as_str()));
 
-                        // `setdefault` always returns the field type
-                        Signature::new(
-                            Parameters::new([
-                                Parameter::positional_only(Some(Name::new_static("self")))
-                                    .with_annotated_type(instance_ty),
-                                Parameter::positional_only(Some(Name::new_static("key")))
-                                    .with_annotated_type(key_type),
-                                Parameter::positional_only(Some(Name::new_static("default")))
-                                    .with_annotated_type(field.declared_ty),
-                            ]),
-                            Some(field.declared_ty),
-                        )
-                    })
-                    .collect::<Vec<_>>();
+                    // `setdefault` always returns the field type
+                    Signature::new(
+                        Parameters::new([
+                            Parameter::positional_only(Some(Name::new_static("self")))
+                                .with_annotated_type(instance_ty),
+                            Parameter::positional_only(Some(Name::new_static("key")))
+                                .with_annotated_type(key_type),
+                            Parameter::positional_only(Some(Name::new_static("default")))
+                                .with_annotated_type(field.declared_ty),
+                        ]),
+                        Some(field.declared_ty),
+                    )
+                });
 
                 Some(Type::Callable(CallableType::new(
                     db,
