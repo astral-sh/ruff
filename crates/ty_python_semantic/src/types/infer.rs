@@ -4195,7 +4195,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             meta_attr @ PlaceAndQualifiers { .. } if meta_attr.is_class_var() => {
                                 if emit_diagnostics {
                                     if let Some(builder) =
-                                        self.context.report_lint(&INVALID_ATTRIBUTE_ACCESS, target)
+                                        self.context.report_lint(&INVALID_ASSIGNMENT, target)
                                     {
                                         builder.into_diagnostic(format_args!(
                                             "Cannot assign to ClassVar `{attribute}` \
