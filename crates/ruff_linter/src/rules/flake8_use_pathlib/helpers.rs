@@ -24,10 +24,7 @@ pub(crate) fn is_pathlib_path_call(checker: &Checker, expr: &Expr) -> bool {
 /// Check if the given segments represent a pathlib Path subclass or `PackagePath` with preview mode support.
 /// In stable mode, only checks for `Path` and `PurePath`. In preview mode, also checks for
 /// `PosixPath`, `PurePosixPath`, `WindowsPath`, `PureWindowsPath`, and `PackagePath`.
-pub(crate) fn is_pure_path_subclass_with_preview(
-    checker: &crate::checkers::ast::Checker,
-    segments: &[&str],
-) -> bool {
+pub(crate) fn is_pure_path_subclass_with_preview(checker: &Checker, segments: &[&str]) -> bool {
     let is_core_pathlib = matches!(segments, ["pathlib", "Path" | "PurePath"]);
 
     if is_core_pathlib {
@@ -134,7 +131,6 @@ pub(crate) fn is_file_descriptor(expr: &Expr, semantic: &SemanticModel) -> bool 
     typing::is_int(binding, semantic)
 }
 
-#[expect(clippy::too_many_arguments)]
 pub(crate) fn check_os_pathlib_two_arg_calls(
     checker: &Checker,
     call: &ExprCall,
@@ -142,7 +138,6 @@ pub(crate) fn check_os_pathlib_two_arg_calls(
     path_arg: &str,
     second_arg: &str,
     fix_enabled: bool,
-    allowed: &[&str],
     violation: impl Violation,
 ) {
     let range = call.range();
@@ -157,10 +152,6 @@ pub(crate) fn check_os_pathlib_two_arg_calls(
 
     let path_code = checker.locator().slice(path_expr.range());
     let second_code = checker.locator().slice(second_expr.range());
-
-    if has_unknown_keywords_or_starred_expr(&call.arguments, allowed) {
-        return;
-    }
 
     if fix_enabled {
         diagnostic.try_set_fix(|| {

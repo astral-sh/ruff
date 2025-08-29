@@ -1,7 +1,8 @@
 use crate::checkers::ast::Checker;
 use crate::preview::is_fix_os_rename_enabled;
 use crate::rules::flake8_use_pathlib::helpers::{
-    check_os_pathlib_two_arg_calls, is_keyword_only_argument_non_default,
+    check_os_pathlib_two_arg_calls, has_unknown_keywords_or_starred_expr,
+    is_keyword_only_argument_non_default,
 };
 use crate::{FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -79,14 +80,11 @@ pub(crate) fn os_rename(checker: &Checker, call: &ExprCall, segments: &[&str]) {
         return;
     }
 
-    check_os_pathlib_two_arg_calls(
-        checker,
-        call,
-        "rename",
-        "src",
-        "dst",
-        is_fix_os_rename_enabled(checker.settings()),
-        &["src", "dst", "src_dir_fd", "dst_dir_fd"],
-        OsRename,
-    );
+    let fix_enabled = is_fix_os_rename_enabled(checker.settings())
+        && !has_unknown_keywords_or_starred_expr(
+            &call.arguments,
+            &["src", "dst", "src_dir_fd", "dst_dir_fd"],
+        );
+
+    check_os_pathlib_two_arg_calls(checker, call, "rename", "src", "dst", fix_enabled, OsRename);
 }

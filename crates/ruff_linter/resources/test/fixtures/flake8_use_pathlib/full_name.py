@@ -127,13 +127,14 @@ os.makedirs(name="name", mode=0o777, exist_ok=False)
 os.makedirs("name", unknown_kwarg=True)
 
 # https://github.com/astral-sh/ruff/issues/20134
-# fixable
-os.chmod("pth1_link", 0o600, follow_symlinks=False)
+os.chmod("pth1_link", mode=0o600, follow_symlinks=      False    )
+os.chmod("pth1_link", mode=0o600, follow_symlinks=True)
 
-# not offer fix
-os.chmod("pth1_link", 0o600, follow_symlinks="False")
+# Only diagnostic
+os.chmod("pth1_link", 0o600, follow_symlinks="False") # string instead of a bool
 os.chmod("pth1_file", 0o700, None, True, 1, *[1], **{"x": 1}, foo=1)
-os.chmod("pth1_link", 0o600, unknown=False)
+
 os.rename("pth1_file", "pth1_file1", None, None, 1, *[1], **{"x": 1}, foo=1)
 os.replace("pth1_file1", "pth1_file", None, None, 1, *[1], **{"x": 1}, foo=1)
+
 os.path.samefile("pth1_file", "pth1_link", 1, *[1], **{"x": 1}, foo=1)
