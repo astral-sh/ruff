@@ -1,24 +1,4 @@
-use std::io::Write;
-
-use ruff_db::diagnostic::{Diagnostic, FileResolver};
-
-use crate::message::{Emitter, EmitterContext};
-
-/// Generate error workflow command in GitHub Actions format.
-/// See: [GitHub documentation](https://docs.github.com/en/actions/reference/workflow-commands-for-github-actions#setting-an-error-message)
-#[derive(Default)]
-pub struct GithubEmitter;
-
-impl Emitter for GithubEmitter {
-    fn emit(
-        &mut self,
-        writer: &mut dyn Write,
-        diagnostics: &[Diagnostic],
-        context: &EmitterContext,
-    ) -> anyhow::Result<()> {
-        GithubRenderer::new(context).render(writer, diagnostics)
-    }
-}
+use crate::diagnostic::{Diagnostic, FileResolver};
 
 pub(super) struct GithubRenderer<'a> {
     resolver: &'a dyn FileResolver,
@@ -31,9 +11,9 @@ impl<'a> GithubRenderer<'a> {
 
     pub(super) fn render(
         &self,
-        f: &mut dyn Write,
+        f: &mut std::fmt::Formatter,
         diagnostics: &[Diagnostic],
-    ) -> anyhow::Result<()> {
+    ) -> std::fmt::Result {
         for diagnostic in diagnostics {
             write!(
                 f,
@@ -94,26 +74,20 @@ impl<'a> GithubRenderer<'a> {
 
 #[cfg(test)]
 mod tests {
-    use insta::assert_snapshot;
-
-    use crate::message::GithubEmitter;
-    use crate::message::tests::{
-        capture_emitter_output, create_diagnostics, create_syntax_error_diagnostics,
+    use crate::diagnostic::{
+        DiagnosticFormat,
+        render::tests::{create_diagnostics, create_syntax_error_diagnostics},
     };
 
     #[test]
     fn output() {
-        let mut emitter = GithubEmitter;
-        let content = capture_emitter_output(&mut emitter, &create_diagnostics());
-
-        assert_snapshot!(content);
+        let (env, diagnostics) = create_diagnostics(DiagnosticFormat::Github);
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics));
     }
 
     #[test]
     fn syntax_errors() {
-        let mut emitter = GithubEmitter;
-        let content = capture_emitter_output(&mut emitter, &create_syntax_error_diagnostics());
-
-        assert_snapshot!(content);
+        let (env, diagnostics) = create_syntax_error_diagnostics(DiagnosticFormat::Github);
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics));
     }
 }
