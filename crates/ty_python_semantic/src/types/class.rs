@@ -2384,6 +2384,38 @@ impl<'db> ClassLiteral<'db> {
 
                         [get_sig, get_with_default_sig]
                     })
+                    // Fallback overloads for unknown keys
+                    .chain(std::iter::once({
+                        Signature::new(
+                            Parameters::new([
+                                Parameter::positional_only(Some(Name::new_static("self")))
+                                    .with_annotated_type(instance_ty),
+                                Parameter::positional_only(Some(Name::new_static("key")))
+                                    .with_annotated_type(KnownClass::Str.to_instance(db)),
+                            ]),
+                            Some(Type::unknown()),
+                        )
+                    }))
+                    .chain(std::iter::once({
+                        let t_default =
+                            BoundTypeVarInstance::synthetic(db, "T", TypeVarVariance::Covariant);
+
+                        Signature::new_generic(
+                            Some(GenericContext::from_typevar_instances(db, [t_default])),
+                            Parameters::new([
+                                Parameter::positional_only(Some(Name::new_static("self")))
+                                    .with_annotated_type(instance_ty),
+                                Parameter::positional_only(Some(Name::new_static("key")))
+                                    .with_annotated_type(KnownClass::Str.to_instance(db)),
+                                Parameter::positional_only(Some(Name::new_static("default")))
+                                    .with_annotated_type(Type::TypeVar(t_default)),
+                            ]),
+                            Some(UnionType::from_elements(
+                                db,
+                                [Type::unknown(), Type::TypeVar(t_default)],
+                            )),
+                        )
+                    }))
                     .collect();
 
                 Some(Type::Callable(CallableType::new(

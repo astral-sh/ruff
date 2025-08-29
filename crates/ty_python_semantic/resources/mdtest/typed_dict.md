@@ -476,9 +476,9 @@ def _(p: Person) -> None:
     # The type of the default parameter can be anything:
     reveal_type(p.get("extra", 0))  # revealed: str | Literal[0]
 
-    # Invalid keys with intelligent suggestions
-    # error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "nam" - did you mean "name"?"
-    reveal_type(p.get("nam"))  # revealed: Unknown
+    # We allow access to unknown keys (they could be set for a subtype of Person)
+    reveal_type(p.get("unknown"))  # revealed: Unknown
+    reveal_type(p.get("unknown", "default"))  # revealed: Unknown | Literal["default"]
 
     # `pop()` only works on non-required fields
     reveal_type(p.pop("extra"))  # revealed: str

@@ -6279,9 +6279,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if let ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() {
             let value_type = self.expression_type(value);
             if let Type::TypedDict(typed_dict_ty) = value_type {
-                if matches!(attr.id.as_str(), "get" | "pop" | "setdefault")
-                    && !arguments.args.is_empty()
-                {
+                if matches!(attr.id.as_str(), "pop" | "setdefault") && !arguments.args.is_empty() {
                     // Validate the key argument for `TypedDict` methods
                     if let Some(first_arg) = arguments.args.first() {
                         if let ast::Expr::StringLiteral(ast::ExprStringLiteral {
