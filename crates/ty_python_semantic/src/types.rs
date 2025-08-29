@@ -7528,6 +7528,28 @@ pub struct BoundTypeVarInstance<'db> {
 impl get_size2::GetSize for BoundTypeVarInstance<'_> {}
 
 impl<'db> BoundTypeVarInstance<'db> {
+    /// Create a new PEP 695 type variable that can be used in signatures
+    /// of synthetic generic functions.
+    pub(crate) fn synthetic(
+        db: &'db dyn Db,
+        name: &'static str,
+        variance: TypeVarVariance,
+    ) -> Self {
+        Self::new(
+            db,
+            TypeVarInstance::new(
+                db,
+                Name::new_static(name),
+                None, // definition
+                None, // _bound_or_constraints
+                Some(variance),
+                None, // _default
+                TypeVarKind::Pep695,
+            ),
+            BindingContext::Synthetic,
+        )
+    }
+
     pub(crate) fn variance_with_polarity(
         self,
         db: &'db dyn Db,

@@ -2338,16 +2338,12 @@ impl<'db> ClassLiteral<'db> {
                         let key_type =
                             Type::StringLiteral(StringLiteralType::new(db, name.as_str()));
 
-                        // `.get()` for a required field returns the field type,
-                        // while for an optional field it returns a union of the field type and `None`.
-                        let return_type = if field.is_required() {
-                            field.declared_ty
-                        } else {
-                            UnionBuilder::new(db)
-                                .add(field.declared_ty)
-                                .add(Type::none(db))
-                                .build()
-                        };
+                        // For a required key, `.get()` always returns the value type. For a non-required key,
+                        // `.get()` returns the union of the value type and the type of the default argument
+                        // (which defaults to `None`).
+
+                        // TODO: For now, we use two overloads here. They can be merged into a single function
+                        // once the generics solver takes default arguments into account.
 
                         let get_sig = Signature::new(
                             Parameters::new([
@@ -2356,20 +2352,34 @@ impl<'db> ClassLiteral<'db> {
                                 Parameter::positional_only(Some(Name::new_static("key")))
                                     .with_annotated_type(key_type),
                             ]),
-                            Some(return_type),
+                            Some(if field.is_required() {
+                                field.declared_ty
+                            } else {
+                                UnionType::from_elements(db, [field.declared_ty, Type::none(db)])
+                            }),
                         );
 
-                        // `.get()` with a default value returns the field type
-                        let get_with_default_sig = Signature::new(
+                        let t_default =
+                            BoundTypeVarInstance::synthetic(db, "T", TypeVarVariance::Covariant);
+
+                        let get_with_default_sig = Signature::new_generic(
+                            Some(GenericContext::from_typevar_instances(db, [t_default])),
                             Parameters::new([
                                 Parameter::positional_only(Some(Name::new_static("self")))
                                     .with_annotated_type(instance_ty),
                                 Parameter::positional_only(Some(Name::new_static("key")))
                                     .with_annotated_type(key_type),
                                 Parameter::positional_only(Some(Name::new_static("default")))
-                                    .with_annotated_type(field.declared_ty),
+                                    .with_annotated_type(Type::TypeVar(t_default)),
                             ]),
-                            Some(field.declared_ty),
+                            Some(if field.is_required() {
+                                field.declared_ty
+                            } else {
+                                UnionType::from_elements(
+                                    db,
+                                    [field.declared_ty, Type::TypeVar(t_default)],
+                                )
+                            }),
                         );
 
                         [get_sig, get_with_default_sig]
@@ -2394,6 +2404,8 @@ impl<'db> ClassLiteral<'db> {
                         let key_type =
                             Type::StringLiteral(StringLiteralType::new(db, name.as_str()));
 
+                        // TODO: Similar to above: consider merging these two overloads into one
+
                         // `.pop()` without default
                         let pop_sig = Signature::new(
                             Parameters::new([
@@ -2406,16 +2418,23 @@ impl<'db> ClassLiteral<'db> {
                         );
 
                         // `.pop()` with a default value
-                        let pop_with_default_sig = Signature::new(
+                        let t_default =
+                            BoundTypeVarInstance::synthetic(db, "T", TypeVarVariance::Covariant);
+
+                        let pop_with_default_sig = Signature::new_generic(
+                            Some(GenericContext::from_typevar_instances(db, [t_default])),
                             Parameters::new([
                                 Parameter::positional_only(Some(Name::new_static("self")))
                                     .with_annotated_type(instance_ty),
                                 Parameter::positional_only(Some(Name::new_static("key")))
                                     .with_annotated_type(key_type),
                                 Parameter::positional_only(Some(Name::new_static("default")))
-                                    .with_annotated_type(field.declared_ty),
+                                    .with_annotated_type(Type::TypeVar(t_default)),
                             ]),
-                            Some(field.declared_ty),
+                            Some(UnionType::from_elements(
+                                db,
+                                [field.declared_ty, Type::TypeVar(t_default)],
+                            )),
                         );
 
                         [pop_sig, pop_with_default_sig]

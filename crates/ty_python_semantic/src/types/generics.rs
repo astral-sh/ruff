@@ -128,6 +128,14 @@ impl<'db> GenericContext<'db> {
         Self::new(db, variables)
     }
 
+    /// Creates a generic context from a list of (synthetic) `BoundTypeVarInstance`s.
+    pub(crate) fn from_typevar_instances(
+        db: &'db dyn Db,
+        type_params: impl IntoIterator<Item = BoundTypeVarInstance<'db>>,
+    ) -> Self {
+        Self::new(db, type_params.into_iter().collect::<FxOrderSet<_>>())
+    }
+
     fn variable_from_type_param(
         db: &'db dyn Db,
         index: &'db SemanticIndex<'db>,

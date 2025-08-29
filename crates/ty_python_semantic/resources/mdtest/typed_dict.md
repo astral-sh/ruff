@@ -465,13 +465,16 @@ def _(p: Person) -> None:
     reveal_type(p.get("name"))  # revealed: str
     reveal_type(p.get("age"))  # revealed: int | None
 
-    # `get()` with defaults always returns the field type
+    # It doesn't matter if a default is specified:
     reveal_type(p.get("name", "default"))  # revealed: str
     reveal_type(p.get("age", 999))  # revealed: int | None
 
     # `get()` can return `None` for non-required keys
     reveal_type(p.get("extra"))  # revealed: str | None
     reveal_type(p.get("extra", "default"))  # revealed: str
+
+    # The type of the default parameter can be anything:
+    reveal_type(p.get("extra", 0))  # revealed: str | Literal[0]
 
     # Invalid keys with intelligent suggestions
     # error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "nam" - did you mean "name"?"
@@ -482,6 +485,9 @@ def _(p: Person) -> None:
     reveal_type(p.pop("extra", "fallback"))  # revealed: str
     # error: [invalid-argument-type] "Cannot pop required field 'name' from TypedDict `Person`"
     reveal_type(p.pop("name"))  # revealed: Unknown
+
+    # Similar to above, the default parameter can be of any type:
+    reveal_type(p.pop("extra", 0))  # revealed: str | Literal[0]
 
     # `setdefault()` always returns the field type
     reveal_type(p.setdefault("name", "Alice"))  # revealed: str
