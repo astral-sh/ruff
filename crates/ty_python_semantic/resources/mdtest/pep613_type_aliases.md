@@ -63,6 +63,21 @@ f(1)
 f("foo")
 ```
 
+### Name resolution is not deferred
+
+Unlike with a PEP 695 type alias, the right-hand side of a PEP 613 type alias is evaluated
+immediately, name resolution is not deferred.
+
+```py
+from typing import TypeAlias
+
+A: TypeAlias = B | None  # error: [unresolved-reference]
+B: TypeAlias = int
+
+def _(a: A):
+    reveal_type(a)  # revealed: Unknown | None
+```
+
 ## Multiple layers of union aliases
 
 ```py
@@ -149,7 +164,7 @@ class B(A[Alias]):
 ```py
 from typing import TypeAlias
 
-A: TypeAlias = tuple[B] | None
+A: TypeAlias = tuple["B"] | None
 B: TypeAlias = tuple[A] | None
 
 def f(x: A):
@@ -173,7 +188,7 @@ def h(x: Intersection[A, B]):
 ```py
 from typing import Callable, TypeAlias
 
-C: TypeAlias = Callable[[], C | None]
+C: TypeAlias = Callable[[], "C" | None]
 
 def _(x: C):
     reveal_type(x)  # revealed: () -> C | None
