@@ -1118,9 +1118,7 @@ impl<'db> Type<'db> {
     #[must_use]
     pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         match self {
-            Type::Union(union) => {
-                visitor.visit(self, || Type::Union(union.normalized_impl(db, visitor)))
-            }
+            Type::Union(union) => visitor.visit(self, || union.normalized_impl(db, visitor)),
             Type::Intersection(intersection) => visitor.visit(self, || {
                 Type::Intersection(intersection.normalized_impl(db, visitor))
             }),
@@ -1887,14 +1885,14 @@ impl<'db> Type<'db> {
             }
 
             (Type::TypeAlias(self_alias), _) => {
-                let self_alias_ty = self_alias.value_type(db);
+                let self_alias_ty = self_alias.value_type(db).normalized(db);
                 visitor.visit((self_alias_ty, other), || {
                     self_alias_ty.is_equivalent_to_impl(db, other, visitor)
                 })
             }
 
             (_, Type::TypeAlias(other_alias)) => {
-                let other_alias_ty = other_alias.value_type(db);
+                let other_alias_ty = other_alias.value_type(db).normalized(db);
                 visitor.visit((self, other_alias_ty), || {
                     self.is_equivalent_to_impl(db, other_alias_ty, visitor)
                 })
@@ -7697,7 +7695,17 @@ impl<'db> TypeVarBoundOrConstraints<'db> {
                 TypeVarBoundOrConstraints::UpperBound(bound.normalized_impl(db, visitor))
             }
             TypeVarBoundOrConstraints::Constraints(constraints) => {
-                TypeVarBoundOrConstraints::Constraints(constraints.normalized_impl(db, visitor))
+                // Constraints are a non-normalized union by design (it's not really a union at
+                // all, we are just using a union to store the types). Normalize the types but not
+                // the containing union.
+                TypeVarBoundOrConstraints::Constraints(UnionType::new(
+                    db,
+                    constraints
+                        .elements(db)
+                        .iter()
+                        .map(|ty| ty.normalized_impl(db, visitor))
+                        .collect::<Box<_>>(),
+                ))
             }
         }
     }
@@ -9654,18 +9662,25 @@ impl<'db> UnionType<'db> {
     ///
     /// See [`Type::normalized`] for more details.
     #[must_use]
-    pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
+    pub(crate) fn normalized(self, db: &'db dyn Db) -> Type<'db> {
         self.normalized_impl(db, &NormalizedVisitor::default())
     }
 
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        let mut new_elements: Vec<Type<'db>> = self
-            .elements(db)
+    pub(crate) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &NormalizedVisitor<'db>,
+    ) -> Type<'db> {
+        self.elements(db)
             .iter()
-            .map(|element| element.normalized_impl(db, visitor))
-            .collect();
-        new_elements.sort_unstable_by(|l, r| union_or_intersection_elements_ordering(db, l, r));
-        UnionType::new(db, new_elements.into_boxed_slice())
+            .map(|ty| ty.normalized_impl(db, visitor))
+            .fold(
+                UnionBuilder::new(db)
+                    .order_elements(true)
+                    .unpack_aliases(true),
+                UnionBuilder::add,
+            )
+            .build()
     }
 
     pub(crate) fn is_equivalent_to_impl<C: Constraints<'db>>(
@@ -9687,7 +9702,7 @@ impl<'db> UnionType<'db> {
 
         let sorted_self = self.normalized(db);
 
-        if sorted_self == other {
+        if sorted_self == Type::Union(other) {
             return C::always_satisfiable(db);
         }
 
