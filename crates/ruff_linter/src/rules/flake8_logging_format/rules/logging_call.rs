@@ -1,5 +1,9 @@
 use ruff_python_ast::InterpolatedStringElement;
 use ruff_python_ast::{self as ast, Arguments, Expr, Keyword, Operator, StringFlags};
+use std::str::FromStr;
+
+use ruff_python_literal::cformat::{CFormatPart, CFormatString, CFormatType};
+use ruff_python_literal::format::FormatConversion;
 use ruff_python_semantic::analyze::logging;
 use ruff_python_stdlib::logging::LoggingLevel;
 use ruff_text_size::Ranged;
@@ -8,7 +12,7 @@ use crate::checkers::ast::Checker;
 use crate::preview::is_fix_f_string_logging_enabled;
 use crate::registry::Rule;
 use crate::rules::flake8_logging_format::violations::{
-    LoggingExcInfo, LoggingExtraAttrClash, LoggingFString, LoggingPercentFormat,
+    LoggingExcInfo, LoggingExtraAttrClash, LoggingFString, LoggingPercentFormat, LoggingPreFormat,
     LoggingRedundantExcInfo, LoggingStringConcat, LoggingStringFormat, LoggingWarn,
 };
 use crate::{Edit, Fix};
@@ -254,6 +258,52 @@ pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCall) {
     let msg_pos = usize::from(matches!(logging_call_type, LoggingCallType::LogCall));
     if let Some(format_arg) = call.arguments.find_argument_value("msg", msg_pos) {
         check_msg(checker, format_arg, &call.arguments, msg_pos);
+    }
+
+    // G005
+    if checker.is_rule_enabled(Rule::LoggingPreFormat) {
+        // Extract a format string from the logging statement msg argument
+        let Ok(format_string) = (match call.arguments.find_argument_value("msg", msg_pos) {
+            Some(Expr::StringLiteral(string_literal)) => {
+                CFormatString::from_str(string_literal.value.to_str())
+            }
+            _ => return,
+        }) else {
+            return;
+        };
+
+        // Iterate over % placeholders in format string and zip with logging statement arguments
+        let skip = match logging_call_type {
+            LoggingCallType::LevelCall(_) => 1,
+            LoggingCallType::LogCall => 2,
+        };
+        for (spec, arg) in format_string
+            .iter()
+            .filter_map(|(_, part)| {
+                if let CFormatPart::Spec(spec) = part {
+                    Some(spec)
+                } else {
+                    None
+                }
+            })
+            .zip(call.arguments.args.iter().skip(skip))
+        {
+            // Check if the argument is a call to eagerly format a value
+            if let Expr::Call(ast::ExprCall { func, .. }) = arg {
+                let CFormatType::String(format_conversion) = spec.format_type else {
+                    continue;
+                };
+
+                // Check for use of %s with str() or %r with repr()
+                if checker.semantic().match_builtin_expr(func.as_ref(), "str")
+                    && matches!(format_conversion, FormatConversion::Str)
+                    || checker.semantic().match_builtin_expr(func.as_ref(), "repr")
+                        && matches!(format_conversion, FormatConversion::Repr)
+                {
+                    checker.report_diagnostic(LoggingPreFormat { format_conversion }, arg.range());
+                }
+            }
+        }
     }
 
     // G010
