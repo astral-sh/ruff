@@ -1986,11 +1986,6 @@ impl<'db> Type<'db> {
 
             (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => C::unsatisfiable(db),
 
-            (Type::TypedDict(_), _) | (_, Type::TypedDict(_)) => {
-                // TODO: Implement disjointness for TypedDict
-                C::unsatisfiable(db)
-            }
-
             (Type::TypeAlias(alias), _) => {
                 let self_alias_ty = alias.value_type(db);
                 visitor.visit((self_alias_ty, other), || {
@@ -2003,6 +1998,11 @@ impl<'db> Type<'db> {
                 visitor.visit((self, other_alias_ty), || {
                     self.is_disjoint_from_impl(db, other_alias_ty, visitor)
                 })
+            }
+
+            (Type::TypedDict(_), _) | (_, Type::TypedDict(_)) => {
+                // TODO: Implement disjointness for TypedDict
+                C::unsatisfiable(db)
             }
 
             // A typevar is never disjoint from itself, since all occurrences of the typevar must
@@ -5924,6 +5924,8 @@ impl<'db> Type<'db> {
             Type::AlwaysTruthy | Type::AlwaysFalsy => KnownClass::Type.to_instance(db),
             Type::BoundSuper(_) => KnownClass::Super.to_class_literal(db),
             Type::ProtocolInstance(protocol) => protocol.to_meta_type(db),
+            // `TypedDict` instances are instances of `dict` at runtime, but its important that we
+            // understand a more specific meta type in order to correctly handle `__getitem__`.
             Type::TypedDict(typed_dict) => SubclassOfType::from(db, typed_dict.defining_class()),
             Type::TypeAlias(alias) => alias.value_type(db).to_meta_type(db),
         }
