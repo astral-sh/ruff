@@ -4843,7 +4843,7 @@ impl<'db> Type<'db> {
         argument_types: &CallArguments<'_, 'db>,
     ) -> Result<Bindings<'db>, CallError<'db>> {
         self.bindings(db)
-            .match_parameters(argument_types)
+            .match_parameters(db, argument_types)
             .check_types(db, argument_types)
     }
 
@@ -4892,7 +4892,7 @@ impl<'db> Type<'db> {
             Place::Type(dunder_callable, boundness) => {
                 let bindings = dunder_callable
                     .bindings(db)
-                    .match_parameters(argument_types)
+                    .match_parameters(db, argument_types)
                     .check_types(db, argument_types)?;
                 if boundness == Boundness::PossiblyUnbound {
                     return Err(CallDunderError::PossiblyUnbound(Box::new(bindings)));
