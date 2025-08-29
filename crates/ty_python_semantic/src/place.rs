@@ -1379,9 +1379,9 @@ mod implicit_globals {
         if name == "__file__" {
             Place::bound(KnownClass::Str.to_instance(db)).into()
         } else if name == "__warningregistry__" {
-            // Present when warnings machinery is engaged; treat as defined to avoid F821.
-            // Exact type is not important for undefined-name; use `Any` for resilience.
-            Place::bound(Type::any()).into()
+            // Created lazily by the warnings machinery; may be absent.
+            // Model as possibly-unbound to avoid false negatives.
+            Place::Type(Type::any(), super::Boundness::PossiblyUnbound).into()
         } else if name == "__annotate__" {
             // Added in Python 3.14; only treat as implicit when target version is >= 3.14.
             if Program::get(db).python_version(db) >= PythonVersion::PY314 {
