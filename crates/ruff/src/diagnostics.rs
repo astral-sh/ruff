@@ -40,6 +40,7 @@ pub(crate) struct Diagnostics {
     pub(crate) inner: Vec<Diagnostic>,
     pub(crate) fixed: FixMap,
     pub(crate) notebook_indexes: FxHashMap<String, NotebookIndex>,
+    pub(crate) panics: Vec<String>,
 }
 
 impl Diagnostics {
@@ -51,6 +52,7 @@ impl Diagnostics {
             inner: diagnostics,
             fixed: FixMap::default(),
             notebook_indexes,
+            panics: Vec::default(),
         }
     }
 
@@ -129,6 +131,7 @@ impl AddAssign for Diagnostics {
         self.inner.extend(other.inner);
         self.fixed += other.fixed;
         self.notebook_indexes.extend(other.notebook_indexes);
+        self.panics.extend(other.panics);
     }
 }
 
@@ -345,6 +348,7 @@ pub(crate) fn lint_path(
         inner: diagnostics,
         fixed: FixMap::from_iter([(fs::relativize_path(path), fixed)]),
         notebook_indexes,
+        ..Diagnostics::default()
     })
 }
 
@@ -384,6 +388,7 @@ pub(crate) fn lint_stdin(
                     inner: lint_pyproject_toml(&source_file, &settings.linter),
                     fixed: FixMap::from_iter([(fs::relativize_path(path), FixTable::default())]),
                     notebook_indexes: FxHashMap::default(),
+                    ..Diagnostics::default()
                 });
             }
 
@@ -492,5 +497,6 @@ pub(crate) fn lint_stdin(
             fixed,
         )]),
         notebook_indexes,
+        ..Diagnostics::default()
     })
 }

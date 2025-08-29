@@ -6,7 +6,7 @@ use std::time::Instant;
 use anyhow::Result;
 use colored::Colorize;
 use ignore::Error;
-use log::{debug, error, warn};
+use log::{debug, warn};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
 use rustc_hash::FxHashMap;
@@ -192,23 +192,15 @@ fn lint_path(
 
     match result {
         Ok(inner) => inner,
-        Err(error) => {
-            let message = r"This indicates a bug in Ruff. If you could open an issue at:
-
-    https://github.com/astral-sh/ruff/issues/new?title=%5BLinter%20panic%5D
-
-...with the relevant file contents, the `pyproject.toml` settings, and the following stack trace, we'd be very appreciative!
-";
-
-            error!(
-                "{}{}{} {message}\n{error}",
+        Err(error) => Ok(Diagnostics {
+            panics: vec![format!(
+                "{}{}{}\n{error}",
                 "Panicked while linting ".bold(),
                 fs::relativize_path(path).bold(),
                 ":".bold()
-            );
-
-            Ok(Diagnostics::default())
-        }
+            )],
+            ..Diagnostics::default()
+        }),
     }
 }
 
