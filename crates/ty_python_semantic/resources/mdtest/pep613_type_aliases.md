@@ -63,6 +63,25 @@ f(1)
 f("foo")
 ```
 
+## Multiple layers of union aliases
+
+```py
+from typing import TypeAlias
+
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+
+W: TypeAlias = A | B
+X: TypeAlias = C | D
+Y: TypeAlias = W | X
+
+from ty_extensions import is_equivalent_to, static_assert
+
+static_assert(is_equivalent_to(Y, A | B | C | D))
+```
+
 ## Cycles
 
 We also support cyclic type aliases:
@@ -123,6 +142,41 @@ class A(Generic[T]):
 
 class B(A[Alias]):
     pass
+```
+
+### Mutually recursive
+
+```py
+from typing import TypeAlias
+
+A: TypeAlias = tuple[B] | None
+B: TypeAlias = tuple[A] | None
+
+def f(x: A):
+    if x is not None:
+        reveal_type(x)  # revealed: tuple[B]
+        y = x[0]
+        if y is not None:
+            reveal_type(y)  # revealed: tuple[A]
+
+def g(x: A | B):
+    reveal_type(x)  # revealed: tuple[B] | None
+
+from ty_extensions import Intersection
+
+def h(x: Intersection[A, B]):
+    reveal_type(x)  # revealed: tuple[B] | None
+```
+
+### Self-recursive callable type
+
+```py
+from typing import Callable, TypeAlias
+
+C: TypeAlias = Callable[[], C | None]
+
+def _(x: C):
+    reveal_type(x)  # revealed: () -> C | None
 ```
 
 ### Union inside generic
