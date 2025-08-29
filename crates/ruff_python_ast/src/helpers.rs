@@ -1410,7 +1410,9 @@ pub fn is_empty_f_string(expr: &ast::ExprFString) -> bool {
     fn inner(expr: &Expr) -> bool {
         match expr {
             Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => value.is_empty(),
-            Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => value.is_empty(),
+            // Confusingly, `bool(f"{b""}") == True` even though
+            // `bool(b"") == False`
+            Expr::BytesLiteral(_) => false,
             Expr::FString(ast::ExprFString { value, .. }) => {
                 value
                     .elements()
@@ -1418,10 +1420,12 @@ pub fn is_empty_f_string(expr: &ast::ExprFString) -> bool {
                         InterpolatedStringElement::Literal(
                             ast::InterpolatedStringLiteralElement { value, .. },
                         ) => value.is_empty(),
-                        InterpolatedStringElement::Interpolation(ast::InterpolatedElement {
-                            expression,
-                            ..
-                        }) => inner(expression),
+                        InterpolatedStringElement::Interpolation(f_string) => {
+                            f_string.debug_text.is_none()
+                                && f_string.conversion.is_none()
+                                && f_string.format_spec.is_none()
+                                && inner(&f_string.expression)
+                        }
                     })
             }
             _ => false,
@@ -1433,7 +1437,12 @@ pub fn is_empty_f_string(expr: &ast::ExprFString) -> bool {
         ast::FStringPart::FString(f_string) => {
             f_string.elements.iter().all(|element| match element {
                 InterpolatedStringElement::Literal(string_literal) => string_literal.is_empty(),
-                InterpolatedStringElement::Interpolation(f_string) => inner(&f_string.expression),
+                InterpolatedStringElement::Interpolation(f_string) => {
+                    f_string.debug_text.is_none()
+                        && f_string.conversion.is_none()
+                        && f_string.format_spec.is_none()
+                        && inner(&f_string.expression)
+                }
             })
         }
     })
