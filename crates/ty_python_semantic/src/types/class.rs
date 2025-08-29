@@ -2360,7 +2360,6 @@ impl<'db> ClassLiteral<'db> {
                         );
 
                         // `.get()` with a default value returns the field type
-                        // (we could prevent this method for required fields but for now let's do that)
                         let get_with_default_sig = Signature::new(
                             Parameters::new([
                                 Parameter::positional_only(Some(Name::new_static("self")))
