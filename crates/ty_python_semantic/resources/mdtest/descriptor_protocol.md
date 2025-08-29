@@ -522,15 +522,19 @@ c.name = None
 c.name = 42
 ```
 
+### Properties with no setters
+
+<!-- snapshot-diagnostics -->
+
 If a property has no setter, we emit a bespoke error message when a user attempts to set that
-attribute, since this is a common error:
+attribute, since this is a common error.
 
 ```py
 class DontAssignToMe:
     @property
     def immutable(self): ...
 
-# error: [invalid-assignment] "Cannot assign to read-only property `immutable` on object of type `DontAssignToMe`"
+# error: [invalid-assignment]
 DontAssignToMe().immutable = "the properties, they are a-changing"
 ```
 

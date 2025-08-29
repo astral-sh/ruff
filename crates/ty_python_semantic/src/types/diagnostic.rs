@@ -27,7 +27,7 @@ use crate::{
     Db, DisplaySettings, FxIndexMap, FxOrderMap, Module, ModuleName, Program, declare_lint,
 };
 use itertools::Itertools;
-use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
+use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange};
@@ -1990,18 +1990,31 @@ pub(super) fn report_bad_dunder_set_call<'db>(
     let Some(builder) = context.report_lint(&INVALID_ASSIGNMENT, target) else {
         return;
     };
-    if dunder_set_failure.stems_from_attempt_to_set_property_with_no_setter() {
-        builder.into_diagnostic(format_args!(
-            "Cannot assign to read-only property `{attribute}` on object of type `{}`",
-            object_type.display(context.db())
+    let db = context.db();
+    if let Some(property) = dunder_set_failure.as_attempt_to_set_property_with_no_setter() {
+        let object_type = object_type.display(db);
+        let mut diagnostic = builder.into_diagnostic(format_args!(
+            "Cannot assign to read-only property `{attribute}` on object of type `{object_type}`",
         ));
+        if let Some(file_range) = property
+            .getter(db)
+            .and_then(|getter| getter.definition(db))
+            .and_then(|definition| definition.focus_range(db))
+        {
+            diagnostic.annotate(Annotation::secondary(Span::from(file_range)).message(
+                format_args!("Property `{object_type}.{attribute}` defined here with no setter"),
+            ));
+            diagnostic.set_primary_message(format_args!(
+                "Attempted assignment to `{object_type}.{attribute}` here"
+            ));
+        }
     } else {
         // TODO: Here, it would be nice to emit an additional diagnostic
         // that explains why the call failed
         builder.into_diagnostic(format_args!(
             "Invalid assignment to data descriptor attribute \
             `{attribute}` on type `{}` with custom `__set__` method",
-            object_type.display(context.db())
+            object_type.display(db)
         ));
     }
 }
