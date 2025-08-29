@@ -444,7 +444,9 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
         }
 
         if !cli.exit_zero {
-            if cli.diff {
+            if !diagnostics.panics.is_empty() {
+                return Ok(ExitStatus::Error);
+            } else if cli.diff {
                 // If we're printing a diff, we always want to exit non-zero if there are
                 // any fixable violations (since we've printed the diff, but not applied the
                 // fixes).

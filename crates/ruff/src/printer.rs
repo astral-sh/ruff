@@ -6,6 +6,7 @@ use anyhow::Result;
 use bitflags::bitflags;
 use colored::Colorize;
 use itertools::{Itertools, iterate};
+use log::error;
 use ruff_linter::linter::FixTable;
 use serde::Serialize;
 
@@ -196,6 +197,25 @@ impl Printer {
         Ok(())
     }
 
+    pub(crate) fn write_panics(diagnostics: &Diagnostics) {
+        if diagnostics.panics.is_empty() {
+            return;
+        }
+
+        for message in &diagnostics.panics {
+            error!("{message}");
+        }
+
+        let message = r"This indicates a bug in Ruff. If you could open an issue at:
+
+https://github.com/astral-sh/ruff/issues/new?title=%5BLinter%20panic%5D
+
+...with the relevant file contents, the `pyproject.toml` settings, and the stack trace above, we'd be very appreciative!
+";
+
+        error!("{message}");
+    }
+
     pub(crate) fn write_once(
         &self,
         diagnostics: &Diagnostics,
@@ -319,6 +339,7 @@ impl Printer {
         }
 
         writer.flush()?;
+        Self::write_panics(diagnostics);
 
         Ok(())
     }
@@ -425,6 +446,7 @@ impl Printer {
         }
 
         writer.flush()?;
+        Self::write_panics(diagnostics);
 
         Ok(())
     }
@@ -466,6 +488,7 @@ impl Printer {
                 .emit(writer, &diagnostics.inner, &context)?;
         }
         writer.flush()?;
+        Self::write_panics(diagnostics);
 
         Ok(())
     }
