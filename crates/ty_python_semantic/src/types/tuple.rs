@@ -26,9 +26,9 @@ use crate::types::Truthiness;
 use crate::types::class::{ClassType, KnownClass};
 use crate::types::constraints::{Constraints, IteratorConstraintsExtension};
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, HasRelationToVisitor, IsDisjointVisitor,
-    IsEquivalentVisitor, NormalizedVisitor, Type, TypeMapping, TypeRelation, TypeVarVariance,
-    UnionBuilder, UnionType,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
+    IsDisjointVisitor, IsEquivalentVisitor, MaterializationKind, NormalizedVisitor, Type,
+    TypeMapping, TypeRelation, UnionBuilder, UnionType,
 };
 use crate::util::subscript::{Nth, OutOfBoundsError, PyIndex, PySlice, StepSizeZeroError};
 use crate::{Db, FxOrderSet, Program};
@@ -228,8 +228,12 @@ impl<'db> TupleType<'db> {
         TupleType::new(db, &self.tuple(db).normalized_impl(db, visitor))
     }
 
-    pub(crate) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Option<Self> {
-        TupleType::new(db, &self.tuple(db).materialize(db, variance))
+    pub(crate) fn materialize(
+        self,
+        db: &'db dyn Db,
+        materialization_kind: MaterializationKind,
+    ) -> Option<Self> {
+        TupleType::new(db, &self.tuple(db).materialize(db, materialization_kind))
     }
 
     pub(crate) fn apply_type_mapping_impl<'a>(
@@ -246,14 +250,15 @@ impl<'db> TupleType<'db> {
         )
     }
 
-    pub(crate) fn find_legacy_typevars(
+    pub(crate) fn find_legacy_typevars_impl(
         self,
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+        visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         self.tuple(db)
-            .find_legacy_typevars(db, binding_context, typevars);
+            .find_legacy_typevars_impl(db, binding_context, typevars, visitor);
     }
 
     pub(crate) fn has_relation_to_impl<C: Constraints<'db>>(
@@ -389,8 +394,12 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         Self::from_elements(self.0.iter().map(|ty| ty.normalized_impl(db, visitor)))
     }
 
-    fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
-        Self::from_elements(self.0.iter().map(|ty| ty.materialize(db, variance)))
+    fn materialize(&self, db: &'db dyn Db, materialization_kind: MaterializationKind) -> Self {
+        Self::from_elements(
+            self.0
+                .iter()
+                .map(|ty| ty.materialize(db, materialization_kind)),
+        )
     }
 
     fn apply_type_mapping_impl<'a>(
@@ -406,14 +415,15 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         )
     }
 
-    fn find_legacy_typevars(
+    fn find_legacy_typevars_impl(
         &self,
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+        visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         for ty in &self.0 {
-            ty.find_legacy_typevars(db, binding_context, typevars);
+            ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
         }
     }
 
@@ -703,11 +713,19 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         })
     }
 
-    fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> TupleSpec<'db> {
+    fn materialize(
+        &self,
+        db: &'db dyn Db,
+        materialization_kind: MaterializationKind,
+    ) -> TupleSpec<'db> {
         Self::mixed(
-            self.prefix.iter().map(|ty| ty.materialize(db, variance)),
-            self.variable.materialize(db, variance),
-            self.suffix.iter().map(|ty| ty.materialize(db, variance)),
+            self.prefix
+                .iter()
+                .map(|ty| ty.materialize(db, materialization_kind)),
+            self.variable.materialize(db, materialization_kind),
+            self.suffix
+                .iter()
+                .map(|ty| ty.materialize(db, materialization_kind)),
         )
     }
 
@@ -729,19 +747,20 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         )
     }
 
-    fn find_legacy_typevars(
+    fn find_legacy_typevars_impl(
         &self,
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+        visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         for ty in &self.prefix {
-            ty.find_legacy_typevars(db, binding_context, typevars);
+            ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
         }
         self.variable
-            .find_legacy_typevars(db, binding_context, typevars);
+            .find_legacy_typevars_impl(db, binding_context, typevars, visitor);
         for ty in &self.suffix {
-            ty.find_legacy_typevars(db, binding_context, typevars);
+            ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
         }
     }
 
@@ -1058,10 +1077,14 @@ impl<'db> Tuple<Type<'db>> {
         }
     }
 
-    pub(crate) fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+    pub(crate) fn materialize(
+        &self,
+        db: &'db dyn Db,
+        materialization_kind: MaterializationKind,
+    ) -> Self {
         match self {
-            Tuple::Fixed(tuple) => Tuple::Fixed(tuple.materialize(db, variance)),
-            Tuple::Variable(tuple) => tuple.materialize(db, variance),
+            Tuple::Fixed(tuple) => Tuple::Fixed(tuple.materialize(db, materialization_kind)),
+            Tuple::Variable(tuple) => tuple.materialize(db, materialization_kind),
         }
     }
 
@@ -1079,15 +1102,20 @@ impl<'db> Tuple<Type<'db>> {
         }
     }
 
-    fn find_legacy_typevars(
+    fn find_legacy_typevars_impl(
         &self,
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+        visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         match self {
-            Tuple::Fixed(tuple) => tuple.find_legacy_typevars(db, binding_context, typevars),
-            Tuple::Variable(tuple) => tuple.find_legacy_typevars(db, binding_context, typevars),
+            Tuple::Fixed(tuple) => {
+                tuple.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+            }
+            Tuple::Variable(tuple) => {
+                tuple.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+            }
         }
     }
 

@@ -40,6 +40,11 @@ pub(crate) const fn is_bad_version_info_in_non_stub_enabled(settings: &LinterSet
     settings.preview.is_enabled()
 }
 
+/// <https://github.com/astral-sh/ruff/pull/19303>
+pub(crate) const fn is_fix_f_string_logging_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
 // https://github.com/astral-sh/ruff/pull/16719
 pub(crate) const fn is_fix_manual_dict_comprehension_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
@@ -248,5 +253,10 @@ pub(crate) const fn is_trailing_comma_type_params_enabled(settings: &LinterSetti
 
 // https://github.com/astral-sh/ruff/pull/19851
 pub(crate) const fn is_maxsplit_without_separator_fix_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/pull/20106
+pub(crate) const fn is_bidi_forbid_arabic_letter_mark_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }

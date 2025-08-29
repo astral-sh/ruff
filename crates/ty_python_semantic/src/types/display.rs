@@ -8,32 +8,104 @@ use ruff_python_literal::escape::AsciiEscape;
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::Db;
+use crate::module_resolver::file_to_module;
+use crate::semantic_index::{scope::ScopeKind, semantic_index};
 use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
 use crate::types::function::{FunctionType, OverloadLiteral};
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::tuple::TupleSpec;
 use crate::types::{
-    CallableType, IntersectionType, KnownClass, MethodWrapperKind, Protocol, StringLiteralType,
-    SubclassOfInner, Type, UnionType, WrapperDescriptorKind,
+    BoundTypeVarInstance, CallableType, IntersectionType, KnownClass, MaterializationKind,
+    MethodWrapperKind, Protocol, ProtocolInstanceType, StringLiteralType, SubclassOfInner, Type,
+    UnionType, WrapperDescriptorKind,
 };
+use ruff_db::parsed::parsed_module;
 
 /// Settings for displaying types and signatures
 #[derive(Debug, Copy, Clone, Default)]
 pub struct DisplaySettings {
     /// Whether rendering can be multiline
     pub multiline: bool,
+    /// Whether rendering will show qualified display (e.g., module.class)
+    pub qualified: bool,
 }
 
 impl DisplaySettings {
     #[must_use]
     pub fn multiline(self) -> Self {
-        Self { multiline: true }
+        Self {
+            multiline: true,
+            ..self
+        }
     }
 
     #[must_use]
     pub fn singleline(self) -> Self {
-        Self { multiline: false }
+        Self {
+            multiline: false,
+            ..self
+        }
+    }
+
+    #[must_use]
+    pub fn qualified(self) -> Self {
+        Self {
+            qualified: true,
+            ..self
+        }
+    }
+
+    #[must_use]
+    pub fn from_possibly_ambiguous_type_pair<'db>(
+        db: &'db dyn Db,
+        type_1: Type<'db>,
+        type_2: Type<'db>,
+    ) -> Self {
+        let result = Self::default();
+
+        let Some(class_1) = type_to_class_literal(db, type_1) else {
+            return result;
+        };
+
+        let Some(class_2) = type_to_class_literal(db, type_2) else {
+            return result;
+        };
+
+        if class_1 == class_2 {
+            return result;
+        }
+
+        if class_1.name(db) == class_2.name(db) {
+            result.qualified()
+        } else {
+            result
+        }
+    }
+}
+
+// TODO: generalize this to a method that takes any two types, walks them recursively, and returns
+// a set of types with ambiguous names whose display should be qualified. Then we can use this in
+// any diagnostic that displays two types.
+fn type_to_class_literal<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<ClassLiteral<'db>> {
+    match ty {
+        Type::ClassLiteral(class) => Some(class),
+        Type::NominalInstance(instance) => {
+            type_to_class_literal(db, Type::from(instance.class(db)))
+        }
+        Type::EnumLiteral(enum_literal) => Some(enum_literal.enum_class(db)),
+        Type::GenericAlias(alias) => Some(alias.origin(db)),
+        Type::ProtocolInstance(ProtocolInstanceType {
+            inner: Protocol::FromClass(class),
+            ..
+        }) => type_to_class_literal(db, Type::from(class)),
+        Type::TypedDict(typed_dict) => {
+            type_to_class_literal(db, Type::from(typed_dict.defining_class()))
+        }
+        Type::SubclassOf(subclass_of) => {
+            type_to_class_literal(db, Type::from(subclass_of.subclass_of().into_class()?))
+        }
+        _ => None,
     }
 }
 
@@ -76,9 +148,6 @@ impl Display for DisplayType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let representation = self.ty.representation(self.db, self.settings);
         match self.ty {
-            Type::ClassLiteral(literal) if literal.is_known(self.db, KnownClass::Any) => {
-                write!(f, "typing.Any")
-            }
             Type::IntLiteral(_)
             | Type::BooleanLiteral(_)
             | Type::StringLiteral(_)
@@ -94,6 +163,78 @@ impl Display for DisplayType<'_> {
 impl fmt::Debug for DisplayType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         Display::fmt(self, f)
+    }
+}
+
+impl<'db> ClassLiteral<'db> {
+    fn display_with(self, db: &'db dyn Db, settings: DisplaySettings) -> ClassDisplay<'db> {
+        ClassDisplay {
+            db,
+            class: self,
+            settings,
+        }
+    }
+}
+
+struct ClassDisplay<'db> {
+    db: &'db dyn Db,
+    class: ClassLiteral<'db>,
+    settings: DisplaySettings,
+}
+
+impl ClassDisplay<'_> {
+    fn class_parents(&self) -> Vec<String> {
+        let body_scope = self.class.body_scope(self.db);
+        let file = body_scope.file(self.db);
+        let module_ast = parsed_module(self.db, file).load(self.db);
+        let index = semantic_index(self.db, file);
+        let file_scope_id = body_scope.file_scope_id(self.db);
+
+        let mut name_parts = vec![];
+
+        // Skips itself
+        for (ancestor_file_scope_id, ancestor_scope) in index.ancestor_scopes(file_scope_id).skip(1)
+        {
+            let ancestor_scope_id = ancestor_file_scope_id.to_scope_id(self.db, file);
+            let node = ancestor_scope_id.node(self.db);
+
+            match ancestor_scope.kind() {
+                ScopeKind::Class => {
+                    if let Some(class_def) = node.as_class(&module_ast) {
+                        name_parts.push(class_def.name.as_str().to_string());
+                    }
+                }
+                ScopeKind::Function => {
+                    if let Some(function_def) = node.as_function(&module_ast) {
+                        name_parts.push(format!(
+                            "<locals of function '{}'>",
+                            function_def.name.as_str()
+                        ));
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        if let Some(module) = file_to_module(self.db, file) {
+            let module_name = module.name(self.db);
+            name_parts.push(module_name.as_str().to_string());
+        }
+
+        name_parts.reverse();
+        name_parts
+    }
+}
+
+impl Display for ClassDisplay<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        if self.settings.qualified {
+            for parent in self.class_parents() {
+                f.write_str(&parent)?;
+                f.write_char('.')?;
+            }
+        }
+        f.write_str(self.class.name(self.db))
     }
 }
 
@@ -123,13 +264,15 @@ impl Display for DisplayRepresentation<'_> {
                         .expect("Specialization::tuple() should always return `Some()` for `KnownClass::Tuple`")
                         .display_with(self.db, self.settings)
                         .fmt(f),
-                    (ClassType::NonGeneric(class), _) => f.write_str(class.name(self.db)),
+                    (ClassType::NonGeneric(class), _) => {
+                        class.display_with(self.db, self.settings).fmt(f)
+                    },
                     (ClassType::Generic(alias), _) => alias.display_with(self.db, self.settings).fmt(f),
                 }
             }
             Type::ProtocolInstance(protocol) => match protocol.inner {
                 Protocol::FromClass(ClassType::NonGeneric(class)) => {
-                    f.write_str(class.name(self.db))
+                    class.display_with(self.db, self.settings).fmt(f)
                 }
                 Protocol::FromClass(ClassType::Generic(alias)) => {
                     alias.display_with(self.db, self.settings).fmt(f)
@@ -153,9 +296,11 @@ impl Display for DisplayRepresentation<'_> {
             Type::ModuleLiteral(module) => {
                 write!(f, "<module '{}'>", module.module(self.db).name(self.db))
             }
-            Type::ClassLiteral(class) => {
-                write!(f, "<class '{}'>", class.name(self.db))
-            }
+            Type::ClassLiteral(class) => write!(
+                f,
+                "<class '{}'>",
+                class.display_with(self.db, self.settings)
+            ),
             Type::GenericAlias(generic) => write!(
                 f,
                 "<class '{}'>",
@@ -163,7 +308,7 @@ impl Display for DisplayRepresentation<'_> {
             ),
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 SubclassOfInner::Class(ClassType::NonGeneric(class)) => {
-                    write!(f, "type[{}]", class.name(self.db))
+                    write!(f, "type[{}]", class.display_with(self.db, self.settings))
                 }
                 SubclassOfInner::Class(ClassType::Generic(alias)) => {
                     write!(
@@ -238,13 +383,13 @@ impl Display for DisplayRepresentation<'_> {
                 )
             }
             Type::MethodWrapper(MethodWrapperKind::PropertyDunderGet(_)) => {
-                write!(f, "<method-wrapper `__get__` of `property` object>",)
+                f.write_str("<method-wrapper `__get__` of `property` object>")
             }
             Type::MethodWrapper(MethodWrapperKind::PropertyDunderSet(_)) => {
-                write!(f, "<method-wrapper `__set__` of `property` object>",)
+                f.write_str("<method-wrapper `__set__` of `property` object>")
             }
             Type::MethodWrapper(MethodWrapperKind::StrStartswith(_)) => {
-                write!(f, "<method-wrapper `startswith` of `str` object>",)
+                f.write_str("<method-wrapper `startswith` of `str` object>")
             }
             Type::WrapperDescriptor(kind) => {
                 let (method, object) = match kind {
@@ -273,21 +418,16 @@ impl Display for DisplayRepresentation<'_> {
 
                 escape.bytes_repr(TripleQuotes::No).write(f)
             }
-            Type::EnumLiteral(enum_literal) => {
-                write!(
-                    f,
-                    "{enum_class}.{name}",
-                    enum_class = enum_literal.enum_class(self.db).name(self.db),
-                    name = enum_literal.name(self.db),
-                )
-            }
+            Type::EnumLiteral(enum_literal) => write!(
+                f,
+                "{enum_class}.{literal_name}",
+                enum_class = enum_literal
+                    .enum_class(self.db)
+                    .display_with(self.db, self.settings),
+                literal_name = enum_literal.name(self.db)
+            ),
             Type::NonInferableTypeVar(bound_typevar) | Type::TypeVar(bound_typevar) => {
-                f.write_str(bound_typevar.typevar(self.db).name(self.db))?;
-                if let Some(binding_context) = bound_typevar.binding_context(self.db).name(self.db)
-                {
-                    write!(f, "@{binding_context}")?;
-                }
-                Ok(())
+                bound_typevar.display(self.db).fmt(f)
             }
             Type::AlwaysTruthy => f.write_str("AlwaysTruthy"),
             Type::AlwaysFalsy => f.write_str("AlwaysFalsy"),
@@ -315,9 +455,38 @@ impl Display for DisplayRepresentation<'_> {
                 }
                 f.write_str("]")
             }
-            Type::TypedDict(typed_dict) => f.write_str(typed_dict.defining_class().name(self.db)),
+            Type::TypedDict(typed_dict) => typed_dict
+                .defining_class()
+                .class_literal(self.db)
+                .0
+                .display_with(self.db, self.settings)
+                .fmt(f),
             Type::TypeAlias(alias) => f.write_str(alias.name(self.db)),
         }
+    }
+}
+
+impl<'db> BoundTypeVarInstance<'db> {
+    pub(crate) fn display(self, db: &'db dyn Db) -> impl Display {
+        DisplayBoundTypeVarInstance {
+            bound_typevar: self,
+            db,
+        }
+    }
+}
+
+struct DisplayBoundTypeVarInstance<'db> {
+    bound_typevar: BoundTypeVarInstance<'db>,
+    db: &'db dyn Db,
+}
+
+impl Display for DisplayBoundTypeVarInstance<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_str(self.bound_typevar.typevar(self.db).name(self.db))?;
+        if let Some(binding_context) = self.bound_typevar.binding_context(self.db).name(self.db) {
+            write!(f, "@{binding_context}")?;
+        }
+        Ok(())
     }
 }
 
@@ -533,14 +702,25 @@ impl Display for DisplayGenericAlias<'_> {
         if let Some(tuple) = self.specialization.tuple(self.db) {
             tuple.display_with(self.db, self.settings).fmt(f)
         } else {
+            let prefix = match self.specialization.materialization_kind(self.db) {
+                None => "",
+                Some(MaterializationKind::Top) => "Top[",
+                Some(MaterializationKind::Bottom) => "Bottom[",
+            };
+            let suffix = match self.specialization.materialization_kind(self.db) {
+                None => "",
+                Some(_) => "]",
+            };
             write!(
                 f,
-                "{origin}{specialization}",
-                origin = self.origin.name(self.db),
+                "{prefix}{origin}{specialization}{suffix}",
+                prefix = prefix,
+                origin = self.origin.display_with(self.db, self.settings),
                 specialization = self.specialization.display_short(
                     self.db,
                     TupleSpecialization::from_class(self.db, self.origin)
                 ),
+                suffix = suffix,
             )
         }
     }

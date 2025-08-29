@@ -77,7 +77,7 @@ if sys.version_info >= (3, 13):  # needed to satisfy pyright checks for Python <
             timeout: SupportsIndex | None = None,
             *,
             unbounditems: _AnyUnbound | None = None,
-            _delay: float = ...,
+            _delay: float = 0.01,
         ) -> None:
             """Add the object to the queue.
 
@@ -116,7 +116,7 @@ if sys.version_info >= (3, 13):  # needed to satisfy pyright checks for Python <
             """
 
         def put_nowait(self, obj: object, *, unbounditems: _AnyUnbound | None = None) -> None: ...
-        def get(self, timeout: SupportsIndex | None = None, *, _delay: float = ...) -> object:
+        def get(self, timeout: SupportsIndex | None = None, *, _delay: float = 0.01) -> object:
             """Return the next object from the queue.
 
             This blocks while the queue is empty.

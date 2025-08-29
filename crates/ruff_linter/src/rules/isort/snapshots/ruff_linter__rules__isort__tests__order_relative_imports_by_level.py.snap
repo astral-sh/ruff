@@ -11,10 +11,8 @@ I001 [*] Import block is un-sorted or un-formatted
   | |________________^
   |
 help: Organize imports
-
-ℹ Safe fix
-1   |-from .a import a
-2 1 | from ..a import a
-3 2 | from ..b import a
-  3 |+from .a import a
-4 4 | from .b import a
+  - from .a import a
+1 | from ..a import a
+2 | from ..b import a
+3 + from .a import a
+4 | from .b import a

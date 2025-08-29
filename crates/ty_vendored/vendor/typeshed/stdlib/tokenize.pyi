@@ -26,7 +26,7 @@ from collections.abc import Callable, Generator, Iterable, Sequence
 from re import Pattern
 from token import *
 from typing import Any, Final, NamedTuple, TextIO, type_check_only
-from typing_extensions import TypeAlias
+from typing_extensions import TypeAlias, disjoint_base
 
 if sys.version_info < (3, 12):
     # Avoid double assignment to Final name by imports, which pyright objects to.
@@ -137,9 +137,16 @@ class _TokenInfo(NamedTuple):
     end: _Position
     line: str
 
-class TokenInfo(_TokenInfo):
-    @property
-    def exact_type(self) -> int: ...
+if sys.version_info >= (3, 12):
+    class TokenInfo(_TokenInfo):
+        @property
+        def exact_type(self) -> int: ...
+
+else:
+    @disjoint_base
+    class TokenInfo(_TokenInfo):
+        @property
+        def exact_type(self) -> int: ...
 
 # Backwards compatible tokens can be sequences of a shorter length too
 _Token: TypeAlias = TokenInfo | Sequence[int | str | _Position]

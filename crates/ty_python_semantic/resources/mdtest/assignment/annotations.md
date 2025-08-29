@@ -75,7 +75,7 @@ a: tuple[()] = (1, 2)
 # error: [invalid-assignment] "Object of type `tuple[Literal["foo"]]` is not assignable to `tuple[int]`"
 b: tuple[int] = ("foo",)
 
-# error: [invalid-assignment] "Object of type `tuple[list[Unknown], Literal["foo"]]` is not assignable to `tuple[str | int, str]`"
+# error: [invalid-assignment]
 c: tuple[str | int, str] = ([], "foo")
 ```
 

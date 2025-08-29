@@ -12,13 +12,11 @@ E242 [*] Tab after comma
 8 | b = (1, 20)  # space before 20
   |
 help: Replace with single space
-
-ℹ Safe fix
-3 3 | #: Okay
-4 4 | b = (1, 20)
-5 5 | #: E242
-6   |-a = (1,	2)  # tab before 2
-  6 |+a = (1, 2)  # tab before 2
-7 7 | #: Okay
-8 8 | b = (1, 20)  # space before 20
-9 9 | #: E241 E241 E241
+3 | #: Okay
+4 | b = (1, 20)
+5 | #: E242
+  - a = (1,	2)  # tab before 2
+6 + a = (1, 2)  # tab before 2
+7 | #: Okay
+8 | b = (1, 20)  # space before 20
+9 | #: E241 E241 E241

@@ -15,19 +15,17 @@ I001 [*] Import block is un-sorted or un-formatted
   | |__________________^
   |
 help: Organize imports
-
-ℹ Safe fix
-1  1  | import sys
-   2  |+
-   3  |+import foo
-   4  |+from foo import bar, baz
-   5  |+
-2  6  | import baz
-3     |-from foo import bar, baz
-   7  |+import foo.bar
-   8  |+import foo.bar.baz
-4  9  | from foo.bar import blah, blub
-5  10 | from foo.bar.baz import something
-6     |-import foo
-7     |-import foo.bar
-8     |-import foo.bar.baz
+1  | import sys
+2  + 
+3  + import foo
+4  + from foo import bar, baz
+5  + 
+6  | import baz
+   - from foo import bar, baz
+7  + import foo.bar
+8  + import foo.bar.baz
+9  | from foo.bar import blah, blub
+10 | from foo.bar.baz import something
+   - import foo
+   - import foo.bar
+   - import foo.bar.baz

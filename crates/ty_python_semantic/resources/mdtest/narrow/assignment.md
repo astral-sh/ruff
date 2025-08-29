@@ -207,7 +207,7 @@ dd[0] = 0
 cm: ChainMap[int, int] = ChainMap({1: 1}, {0: 0})
 cm[0] = 0
 # TODO: should be ChainMap[int, int]
-reveal_type(cm)  # revealed: ChainMap[Unknown, Unknown]
+reveal_type(cm)  # revealed: ChainMap[@Todo(dict literal key type), @Todo(dict literal value type)]
 
 reveal_type(l[0])  # revealed: Literal[0]
 reveal_type(d[0])  # revealed: Literal[0]

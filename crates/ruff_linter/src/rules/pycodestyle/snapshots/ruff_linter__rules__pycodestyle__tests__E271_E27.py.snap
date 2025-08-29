@@ -12,16 +12,14 @@ E271 [*] Multiple spaces after keyword
 6 | True  and False
   |
 help: Replace with single space
-
-ℹ Safe fix
-1 1 | #: Okay
-2 2 | True and False
-3 3 | #: E271
-4   |-True and  False
-  4 |+True and False
-5 5 | #: E272
-6 6 | True  and False
-7 7 | #: E271
+1 | #: Okay
+2 | True and False
+3 | #: E271
+  - True and  False
+4 + True and False
+5 | #: E272
+6 | True  and False
+7 | #: E271
 
 E271 [*] Multiple spaces after keyword
  --> E27.py:6:5
@@ -34,16 +32,14 @@ E271 [*] Multiple spaces after keyword
 8 | if   1:
   |
 help: Replace with single space
-
-ℹ Safe fix
-3 3 | #: E271
-4 4 | True and  False
-5 5 | #: E272
-6   |-True  and False
-  6 |+True and False
-7 7 | #: E271
-8 8 | if   1:
-9 9 |     pass
+3 | #: E271
+4 | True and  False
+5 | #: E272
+  - True  and False
+6 + True and False
+7 | #: E271
+8 | if   1:
+9 |     pass
 
 E271 [*] Multiple spaces after keyword
   --> E27.py:8:3
@@ -56,16 +52,14 @@ E271 [*] Multiple spaces after keyword
 10 | #: E273
    |
 help: Replace with single space
-
-ℹ Safe fix
-5 5 | #: E272
-6 6 | True  and False
-7 7 | #: E271
-8   |-if   1:
-  8 |+if 1:
-9 9 |     pass
-10 10 | #: E273
-11 11 | True and		False
+5  | #: E272
+6  | True  and False
+7  | #: E271
+   - if   1:
+8  + if 1:
+9  |     pass
+10 | #: E273
+11 | True and		False
 
 E271 [*] Multiple spaces after keyword
   --> E27.py:15:6
@@ -78,16 +72,14 @@ E271 [*] Multiple spaces after keyword
 17 | 1 and  b
    |
 help: Replace with single space
-
-ℹ Safe fix
-12 12 | #: E273 E274
-13 13 | True		and	False
-14 14 | #: E271
-15    |-a and  b
-   15 |+a and b
-16 16 | #: E271
-17 17 | 1 and  b
-18 18 | #: E271
+12 | #: E273 E274
+13 | True		and	False
+14 | #: E271
+   - a and  b
+15 + a and b
+16 | #: E271
+17 | 1 and  b
+18 | #: E271
 
 E271 [*] Multiple spaces after keyword
   --> E27.py:17:6
@@ -100,16 +92,14 @@ E271 [*] Multiple spaces after keyword
 19 | a and  2
    |
 help: Replace with single space
-
-ℹ Safe fix
-14 14 | #: E271
-15 15 | a and  b
-16 16 | #: E271
-17    |-1 and  b
-   17 |+1 and b
-18 18 | #: E271
-19 19 | a and  2
-20 20 | #: E271 E272
+14 | #: E271
+15 | a and  b
+16 | #: E271
+   - 1 and  b
+17 + 1 and b
+18 | #: E271
+19 | a and  2
+20 | #: E271 E272
 
 E271 [*] Multiple spaces after keyword
   --> E27.py:19:6
@@ -122,16 +112,14 @@ E271 [*] Multiple spaces after keyword
 21 | 1  and  b
    |
 help: Replace with single space
-
-ℹ Safe fix
-16 16 | #: E271
-17 17 | 1 and  b
-18 18 | #: E271
-19    |-a and  2
-   19 |+a and 2
-20 20 | #: E271 E272
-21 21 | 1  and  b
-22 22 | #: E271 E272
+16 | #: E271
+17 | 1 and  b
+18 | #: E271
+   - a and  2
+19 + a and 2
+20 | #: E271 E272
+21 | 1  and  b
+22 | #: E271 E272
 
 E271 [*] Multiple spaces after keyword
   --> E27.py:21:7
@@ -144,16 +132,14 @@ E271 [*] Multiple spaces after keyword
 23 | a  and  2
    |
 help: Replace with single space
-
-ℹ Safe fix
-18 18 | #: E271
-19 19 | a and  2
-20 20 | #: E271 E272
-21    |-1  and  b
-   21 |+1  and b
-22 22 | #: E271 E272
-23 23 | a  and  2
-24 24 | #: E272
+18 | #: E271
+19 | a and  2
+20 | #: E271 E272
+   - 1  and  b
+21 + 1  and b
+22 | #: E271 E272
+23 | a  and  2
+24 | #: E272
 
 E271 [*] Multiple spaces after keyword
   --> E27.py:23:7
@@ -166,16 +152,14 @@ E271 [*] Multiple spaces after keyword
 25 | this  and False
    |
 help: Replace with single space
-
-ℹ Safe fix
-20 20 | #: E271 E272
-21 21 | 1  and  b
-22 22 | #: E271 E272
-23    |-a  and  2
-   23 |+a  and 2
-24 24 | #: E272
-25 25 | this  and False
-26 26 | #: E273
+20 | #: E271 E272
+21 | 1  and  b
+22 | #: E271 E272
+   - a  and  2
+23 + a  and 2
+24 | #: E272
+25 | this  and False
+26 | #: E273
 
 E271 [*] Multiple spaces after keyword
   --> E27.py:36:14
@@ -188,16 +172,14 @@ E271 [*] Multiple spaces after keyword
 38 | from w import(e, f)
    |
 help: Replace with single space
-
-ℹ Safe fix
-33 33 | from u import (a, b)
-34 34 | from v import c, d
-35 35 | #: E271
-36    |-from w import  (e, f)
-   36 |+from w import (e, f)
-37 37 | #: E275
-38 38 | from w import(e, f)
-39 39 | #: E275
+33 | from u import (a, b)
+34 | from v import c, d
+35 | #: E271
+   - from w import  (e, f)
+36 + from w import (e, f)
+37 | #: E275
+38 | from w import(e, f)
+39 | #: E275
 
 E271 [*] Multiple spaces after keyword
   --> E27.py:71:5
@@ -209,13 +191,11 @@ E271 [*] Multiple spaces after keyword
 73 | #: E273
    |
 help: Replace with single space
-
-ℹ Safe fix
-68 68 | # Soft keywords
-69 69 | 
-70 70 | #: E271
-71    |-type  Number = int
-   71 |+type Number = int
-72 72 | 
-73 73 | #: E273
-74 74 | type	Number = int
+68 | # Soft keywords
+69 | 
+70 | #: E271
+   - type  Number = int
+71 + type Number = int
+72 | 
+73 | #: E273
+74 | type	Number = int

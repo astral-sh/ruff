@@ -1,17 +1,16 @@
-use ruff_python_ast::name::Name;
-
 use crate::place::PlaceAndQualifiers;
 use crate::semantic_index::definition::Definition;
 use crate::types::constraints::Constraints;
 use crate::types::variance::VarianceInferable;
 use crate::types::{
-    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, ClassType, DynamicType,
-    HasRelationToVisitor, IsDisjointVisitor, KnownClass, MemberLookupPolicy, NormalizedVisitor,
-    Type, TypeMapping, TypeRelation, TypeVarInstance,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, DynamicType,
+    FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, KnownClass,
+    MaterializationKind, MemberLookupPolicy, NormalizedVisitor, SpecialFormType, Type, TypeMapping,
+    TypeRelation,
 };
 use crate::{Db, FxOrderSet};
 
-use super::{TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance};
+use super::TypeVarVariance;
 
 /// A type that represents `type[C]`, i.e. the class object `C` and class objects that are subclasses of `C`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
@@ -47,14 +46,10 @@ impl<'db> SubclassOfType<'db> {
             SubclassOfInner::Class(class) => {
                 if class.is_final(db) {
                     Type::from(class)
+                } else if class.is_object(db) {
+                    KnownClass::Type.to_instance(db)
                 } else {
-                    match class.known(db) {
-                        Some(KnownClass::Object) => KnownClass::Type.to_instance(db),
-                        Some(KnownClass::Any) => Type::SubclassOf(Self {
-                            subclass_of: SubclassOfInner::Dynamic(DynamicType::Any),
-                        }),
-                        _ => Type::SubclassOf(Self { subclass_of }),
-                    }
+                    Type::SubclassOf(Self { subclass_of })
                 }
             }
         }
@@ -85,34 +80,15 @@ impl<'db> SubclassOfType<'db> {
         subclass_of.is_dynamic()
     }
 
-    pub(super) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Type<'db> {
+    pub(super) fn materialize(
+        self,
+        db: &'db dyn Db,
+        materialization_kind: MaterializationKind,
+    ) -> Type<'db> {
         match self.subclass_of {
-            SubclassOfInner::Dynamic(_) => match variance {
-                TypeVarVariance::Covariant => KnownClass::Type.to_instance(db),
-                TypeVarVariance::Contravariant => Type::Never,
-                TypeVarVariance::Invariant => {
-                    // We need to materialize this to `type[T]` but that isn't representable so
-                    // we instead use a type variable with an upper bound of `type`.
-                    Type::NonInferableTypeVar(BoundTypeVarInstance::new(
-                        db,
-                        TypeVarInstance::new(
-                            db,
-                            Name::new_static("T_all"),
-                            None,
-                            Some(
-                                TypeVarBoundOrConstraints::UpperBound(
-                                    KnownClass::Type.to_instance(db),
-                                )
-                                .into(),
-                            ),
-                            Some(variance),
-                            None,
-                            TypeVarKind::Pep695,
-                        ),
-                        BindingContext::Synthetic,
-                    ))
-                }
-                TypeVarVariance::Bivariant => unreachable!(),
+            SubclassOfInner::Dynamic(_) => match materialization_kind {
+                MaterializationKind::Top => KnownClass::Type.to_instance(db),
+                MaterializationKind::Bottom => Type::Never,
             },
             SubclassOfInner::Class(_) => Type::SubclassOf(self),
         }
@@ -136,15 +112,16 @@ impl<'db> SubclassOfType<'db> {
         }
     }
 
-    pub(super) fn find_legacy_typevars(
+    pub(super) fn find_legacy_typevars_impl(
         self,
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+        visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         match self.subclass_of {
             SubclassOfInner::Class(class) => {
-                class.find_legacy_typevars(db, binding_context, typevars);
+                class.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
             }
             SubclassOfInner::Dynamic(_) => {}
         }
@@ -288,12 +265,9 @@ impl<'db> SubclassOfInner<'db> {
     pub(crate) fn try_from_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
         match ty {
             Type::Dynamic(dynamic) => Some(Self::Dynamic(dynamic)),
-            Type::ClassLiteral(literal) => Some(if literal.is_known(db, KnownClass::Any) {
-                Self::Dynamic(DynamicType::Any)
-            } else {
-                Self::Class(literal.default_specialization(db))
-            }),
+            Type::ClassLiteral(literal) => Some(Self::Class(literal.default_specialization(db))),
             Type::GenericAlias(generic) => Some(Self::Class(ClassType::Generic(generic))),
+            Type::SpecialForm(SpecialFormType::Any) => Some(Self::Dynamic(DynamicType::Any)),
             _ => None,
         }
     }

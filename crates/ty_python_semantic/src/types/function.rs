@@ -68,7 +68,7 @@ use crate::types::call::{Binding, CallArguments};
 use crate::types::constraints::Constraints;
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{
-    REDUNDANT_CAST, STATIC_ASSERT_ERROR, TYPE_ASSERTION_FAILURE,
+    INVALID_ARGUMENT_TYPE, REDUNDANT_CAST, STATIC_ASSERT_ERROR, TYPE_ASSERTION_FAILURE,
     report_bad_argument_to_get_protocol_members, report_bad_argument_to_protocol_interface,
     report_runtime_check_against_non_runtime_checkable_protocol,
 };
@@ -78,9 +78,9 @@ use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::any_over_type;
 use crate::types::{
     BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, ClassType,
-    DeprecatedInstance, DynamicType, HasRelationToVisitor, IsEquivalentVisitor, KnownClass,
-    NormalizedVisitor, Truthiness, Type, TypeMapping, TypeRelation, UnionBuilder, all_members,
-    walk_type_mapping,
+    DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
+    IsEquivalentVisitor, KnownClass, NormalizedVisitor, SpecialFormType, Truthiness, Type,
+    TypeMapping, TypeRelation, UnionBuilder, all_members, walk_type_mapping,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -915,15 +915,16 @@ impl<'db> FunctionType<'db> {
         self_signature.is_equivalent_to_impl(db, other_signature, visitor)
     }
 
-    pub(crate) fn find_legacy_typevars(
+    pub(crate) fn find_legacy_typevars_impl(
         self,
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+        visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         let signatures = self.signature(db);
         for signature in &signatures.overloads {
-            signature.find_legacy_typevars(db, binding_context, typevars);
+            signature.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
         }
     }
 
@@ -1109,7 +1110,8 @@ pub enum KnownFunction {
 
     /// `typing(_extensions).final`
     Final,
-
+    /// `typing(_extensions).disjoint_base`
+    DisjointBase,
     /// [`typing(_extensions).no_type_check`](https://typing.python.org/en/latest/spec/directives.html#no-type-check)
     NoTypeCheck,
 
@@ -1212,6 +1214,7 @@ impl KnownFunction {
             | Self::GetProtocolMembers
             | Self::RuntimeCheckable
             | Self::DataclassTransform
+            | Self::DisjointBase
             | Self::NoTypeCheck => {
                 matches!(module, KnownModule::Typing | KnownModule::TypingExtensions)
             }
@@ -1431,7 +1434,7 @@ impl KnownFunction {
                     return;
                 };
                 let Some(protocol_class) = param_type
-                    .into_class_literal()
+                    .to_class_type(db)
                     .and_then(|class| class.into_protocol_class(db))
                 else {
                     report_bad_argument_to_protocol_interface(
@@ -1454,25 +1457,48 @@ impl KnownFunction {
             }
 
             KnownFunction::IsInstance | KnownFunction::IsSubclass => {
-                let [Some(first_arg), Some(Type::ClassLiteral(class))] = parameter_types else {
+                let [Some(first_arg), Some(second_argument)] = parameter_types else {
                     return;
                 };
 
-                if let Some(protocol_class) = class.into_protocol_class(db) {
-                    if !protocol_class.is_runtime_checkable(db) {
-                        report_runtime_check_against_non_runtime_checkable_protocol(
-                            context,
-                            call_expression,
-                            protocol_class,
-                            self,
-                        );
-                    }
-                }
+                match second_argument {
+                    Type::ClassLiteral(class) => {
+                        if let Some(protocol_class) = class.into_protocol_class(db) {
+                            if !protocol_class.is_runtime_checkable(db) {
+                                report_runtime_check_against_non_runtime_checkable_protocol(
+                                    context,
+                                    call_expression,
+                                    protocol_class,
+                                    self,
+                                );
+                            }
+                        }
 
-                if self == KnownFunction::IsInstance {
-                    overload.set_return_type(
-                        is_instance_truthiness(db, *first_arg, *class).into_type(db),
-                    );
+                        if self == KnownFunction::IsInstance {
+                            overload.set_return_type(
+                                is_instance_truthiness(db, *first_arg, *class).into_type(db),
+                            );
+                        }
+                    }
+                    // The special-casing here is necessary because we recognise the symbol `typing.Any` as an
+                    // instance of `type` at runtime. Even once we understand typeshed's annotation for
+                    // `isinstance()`, we'd continue to accept calls such as `isinstance(x, typing.Any)` without
+                    // emitting a diagnostic if we didn't have this branch.
+                    Type::SpecialForm(SpecialFormType::Any)
+                        if self == KnownFunction::IsInstance =>
+                    {
+                        let Some(builder) =
+                            context.report_lint(&INVALID_ARGUMENT_TYPE, call_expression)
+                        else {
+                            return;
+                        };
+                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                            "`typing.Any` cannot be used with `isinstance()`"
+                        ));
+                        diagnostic
+                            .set_primary_message("This call will raise `TypeError` at runtime");
+                    }
+                    _ => {}
                 }
             }
 
@@ -1551,6 +1577,7 @@ pub(crate) mod tests {
                 | KnownFunction::GetProtocolMembers
                 | KnownFunction::RuntimeCheckable
                 | KnownFunction::DataclassTransform
+                | KnownFunction::DisjointBase
                 | KnownFunction::NoTypeCheck => KnownModule::TypingExtensions,
 
                 KnownFunction::IsSingleton

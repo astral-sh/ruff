@@ -10,7 +10,7 @@ use crate::semantic_index::SemanticIndex;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::place::{PlaceTable, ScopedPlaceId};
 use crate::suppression::FileSuppressionId;
-use crate::types::class::{Field, SolidBase, SolidBaseKind};
+use crate::types::class::{DisjointBase, DisjointBaseKind, Field};
 use crate::types::function::KnownFunction;
 use crate::types::string_annotation::{
     BYTE_STRING_TYPE_ANNOTATION, ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION, FSTRING_TYPE_ANNOTATION,
@@ -20,9 +20,11 @@ use crate::types::string_annotation::{
 use crate::types::{
     DynamicType, LintDiagnosticGuard, Protocol, ProtocolInstanceType, SubclassOfInner, binding_type,
 };
-use crate::types::{SpecialFormType, Type, protocol_class::ProtocolClassLiteral};
+use crate::types::{SpecialFormType, Type, protocol_class::ProtocolClass};
 use crate::util::diagnostics::format_enumeration;
-use crate::{Db, FxIndexMap, FxOrderMap, Module, ModuleName, Program, declare_lint};
+use crate::{
+    Db, DisplaySettings, FxIndexMap, FxOrderMap, Module, ModuleName, Program, declare_lint,
+};
 use itertools::Itertools;
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::name::Name;
@@ -405,7 +407,7 @@ declare_lint! {
     ///
     /// ## Known problems
     /// Classes that have "dynamic" definitions of `__slots__` (definitions do not consist
-    /// of string literals, or tuples of string literals) are not currently considered solid
+    /// of string literals, or tuples of string literals) are not currently considered disjoint
     /// bases by ty.
     ///
     /// Additionally, this check is not exhaustive: many C extensions (including several in
@@ -1943,14 +1945,17 @@ pub(super) fn report_invalid_assignment(
     target_ty: Type,
     source_ty: Type,
 ) {
+    let settings =
+        DisplaySettings::from_possibly_ambiguous_type_pair(context.db(), target_ty, source_ty);
+
     report_invalid_assignment_with_message(
         context,
         node,
         target_ty,
         format_args!(
             "Object of type `{}` is not assignable to `{}`",
-            source_ty.display(context.db()),
-            target_ty.display(context.db()),
+            source_ty.display_with(context.db(), settings),
+            target_ty.display_with(context.db(), settings)
         ),
     );
 }
@@ -1985,18 +1990,20 @@ pub(super) fn report_invalid_return_type(
         return;
     };
 
+    let settings =
+        DisplaySettings::from_possibly_ambiguous_type_pair(context.db(), expected_ty, actual_ty);
     let return_type_span = context.span(return_type_range);
 
     let mut diag = builder.into_diagnostic("Return type does not match returned value");
     diag.set_primary_message(format_args!(
         "expected `{expected_ty}`, found `{actual_ty}`",
-        expected_ty = expected_ty.display(context.db()),
-        actual_ty = actual_ty.display(context.db()),
+        expected_ty = expected_ty.display_with(context.db(), settings),
+        actual_ty = actual_ty.display_with(context.db(), settings),
     ));
     diag.annotate(
         Annotation::secondary(return_type_span).message(format_args!(
             "Expected `{expected_ty}` because of return type",
-            expected_ty = expected_ty.display(context.db()),
+            expected_ty = expected_ty.display_with(context.db(), settings),
         )),
     );
 }
@@ -2170,9 +2177,9 @@ pub(crate) fn report_instance_layout_conflict(
     context: &InferContext,
     class: ClassLiteral,
     node: &ast::StmtClassDef,
-    solid_bases: &IncompatibleBases,
+    disjoint_bases: &IncompatibleBases,
 ) {
-    debug_assert!(solid_bases.len() > 1);
+    debug_assert!(disjoint_bases.len() > 1);
 
     let db = context.db();
 
@@ -2186,7 +2193,7 @@ pub(crate) fn report_instance_layout_conflict(
 
     diagnostic.set_primary_message(format_args!(
         "Bases {} cannot be combined in multiple inheritance",
-        solid_bases.describe_problematic_class_bases(db)
+        disjoint_bases.describe_problematic_class_bases(db)
     ));
 
     let mut subdiagnostic = SubDiagnostic::new(
@@ -2195,23 +2202,23 @@ pub(crate) fn report_instance_layout_conflict(
         have incompatible memory layouts",
     );
 
-    for (solid_base, solid_base_info) in solid_bases {
+    for (disjoint_base, disjoint_base_info) in disjoint_bases {
         let IncompatibleBaseInfo {
             node_index,
             originating_base,
-        } = solid_base_info;
+        } = disjoint_base_info;
 
         let span = context.span(&node.bases()[*node_index]);
         let mut annotation = Annotation::secondary(span.clone());
-        if solid_base.class == *originating_base {
-            match solid_base.kind {
-                SolidBaseKind::DefinesSlots => {
+        if disjoint_base.class == *originating_base {
+            match disjoint_base.kind {
+                DisjointBaseKind::DefinesSlots => {
                     annotation = annotation.message(format_args!(
                         "`{base}` instances have a distinct memory layout because `{base}` defines non-empty `__slots__`",
                         base = originating_base.name(db)
                     ));
                 }
-                SolidBaseKind::HardCoded => {
+                DisjointBaseKind::DisjointBaseDecorator => {
                     annotation = annotation.message(format_args!(
                         "`{base}` instances have a distinct memory layout because of the way `{base}` \
                         is implemented in a C extension",
@@ -2223,26 +2230,28 @@ pub(crate) fn report_instance_layout_conflict(
         } else {
             annotation = annotation.message(format_args!(
                 "`{base}` instances have a distinct memory layout \
-                because `{base}` inherits from `{solid_base}`",
+                because `{base}` inherits from `{disjoint_base}`",
                 base = originating_base.name(db),
-                solid_base = solid_base.class.name(db)
+                disjoint_base = disjoint_base.class.name(db)
             ));
             subdiagnostic.annotate(annotation);
 
             let mut additional_annotation = Annotation::secondary(span);
 
-            additional_annotation = match solid_base.kind {
-                SolidBaseKind::DefinesSlots => additional_annotation.message(format_args!(
-                    "`{solid_base}` instances have a distinct memory layout because `{solid_base}` \
+            additional_annotation = match disjoint_base.kind {
+                DisjointBaseKind::DefinesSlots => additional_annotation.message(format_args!(
+                    "`{disjoint_base}` instances have a distinct memory layout because `{disjoint_base}` \
                         defines non-empty `__slots__`",
-                    solid_base = solid_base.class.name(db),
+                    disjoint_base = disjoint_base.class.name(db),
                 )),
 
-                SolidBaseKind::HardCoded => additional_annotation.message(format_args!(
-                    "`{solid_base}` instances have a distinct memory layout \
-                        because of the way `{solid_base}` is implemented in a C extension",
-                    solid_base = solid_base.class.name(db),
-                )),
+                DisjointBaseKind::DisjointBaseDecorator => {
+                    additional_annotation.message(format_args!(
+                        "`{disjoint_base}` instances have a distinct memory layout \
+                        because of the way `{disjoint_base}` is implemented in a C extension",
+                        disjoint_base = disjoint_base.class.name(db),
+                    ))
+                }
             };
 
             subdiagnostic.annotate(additional_annotation);
@@ -2252,20 +2261,20 @@ pub(crate) fn report_instance_layout_conflict(
     diagnostic.sub(subdiagnostic);
 }
 
-/// Information regarding the conflicting solid bases a class is inferred to have in its MRO.
+/// Information regarding the conflicting disjoint bases a class is inferred to have in its MRO.
 ///
-/// For each solid base, we record information about which element in the class's bases list
-/// caused the solid base to be included in the class's MRO.
+/// For each disjoint base, we record information about which element in the class's bases list
+/// caused the disjoint base to be included in the class's MRO.
 ///
-/// The inner data is an `IndexMap` to ensure that diagnostics regarding conflicting solid bases
+/// The inner data is an `IndexMap` to ensure that diagnostics regarding conflicting disjoint bases
 /// are reported in a stable order.
 #[derive(Debug, Default)]
-pub(super) struct IncompatibleBases<'db>(FxIndexMap<SolidBase<'db>, IncompatibleBaseInfo<'db>>);
+pub(super) struct IncompatibleBases<'db>(FxIndexMap<DisjointBase<'db>, IncompatibleBaseInfo<'db>>);
 
 impl<'db> IncompatibleBases<'db> {
     pub(super) fn insert(
         &mut self,
-        base: SolidBase<'db>,
+        base: DisjointBase<'db>,
         node_index: usize,
         class: ClassLiteral<'db>,
     ) {
@@ -2287,19 +2296,19 @@ impl<'db> IncompatibleBases<'db> {
         self.0.len()
     }
 
-    /// Two solid bases are allowed to coexist in an MRO if one is a subclass of the other.
+    /// Two disjoint bases are allowed to coexist in an MRO if one is a subclass of the other.
     /// This method therefore removes any entry in `self` that is a subclass of one or more
     /// other entries also contained in `self`.
     pub(super) fn remove_redundant_entries(&mut self, db: &'db dyn Db) {
         self.0 = self
             .0
             .iter()
-            .filter(|(solid_base, _)| {
+            .filter(|(disjoint_base, _)| {
                 self.0
                     .keys()
-                    .filter(|other_base| other_base != solid_base)
+                    .filter(|other_base| other_base != disjoint_base)
                     .all(|other_base| {
-                        !solid_base.class.is_subclass_of(
+                        !disjoint_base.class.is_subclass_of(
                             db,
                             None,
                             other_base.class.default_specialization(db),
@@ -2312,25 +2321,25 @@ impl<'db> IncompatibleBases<'db> {
 }
 
 impl<'a, 'db> IntoIterator for &'a IncompatibleBases<'db> {
-    type Item = (&'a SolidBase<'db>, &'a IncompatibleBaseInfo<'db>);
-    type IntoIter = indexmap::map::Iter<'a, SolidBase<'db>, IncompatibleBaseInfo<'db>>;
+    type Item = (&'a DisjointBase<'db>, &'a IncompatibleBaseInfo<'db>);
+    type IntoIter = indexmap::map::Iter<'a, DisjointBase<'db>, IncompatibleBaseInfo<'db>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.iter()
     }
 }
 
-/// Information about which class base the "solid base" stems from
+/// Information about which class base the "disjoint base" stems from
 #[derive(Debug, Copy, Clone)]
 pub(super) struct IncompatibleBaseInfo<'db> {
     /// The index of the problematic base in the [`ast::StmtClassDef`]'s bases list.
     node_index: usize,
 
     /// The base class in the [`ast::StmtClassDef`]'s bases list that caused
-    /// the solid base to be included in the class's MRO.
+    /// the disjoint base to be included in the class's MRO.
     ///
-    /// This won't necessarily be the same class as the `SolidBase`'s class,
-    /// as the `SolidBase` may have found its way into the class's MRO by dint of it being a
+    /// This won't necessarily be the same class as the `DisjointBase`'s class,
+    /// as the `DisjointBase` may have found its way into the class's MRO by dint of it being a
     /// superclass of one of the classes in the class definition's bases list.
     originating_base: ClassLiteral<'db>,
 }
@@ -2465,7 +2474,7 @@ pub(crate) fn add_type_expression_reference_link<'db, 'ctx>(
 pub(crate) fn report_runtime_check_against_non_runtime_checkable_protocol(
     context: &InferContext,
     call: &ast::ExprCall,
-    protocol: ProtocolClassLiteral,
+    protocol: ProtocolClass,
     function: KnownFunction,
 ) {
     let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, call) else {
@@ -2502,7 +2511,7 @@ pub(crate) fn report_runtime_check_against_non_runtime_checkable_protocol(
 pub(crate) fn report_attempted_protocol_instantiation(
     context: &InferContext,
     call: &ast::ExprCall,
-    protocol: ProtocolClassLiteral,
+    protocol: ProtocolClass,
 ) {
     let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, call) else {
         return;
@@ -2527,7 +2536,7 @@ pub(crate) fn report_attempted_protocol_instantiation(
 pub(crate) fn report_undeclared_protocol_member(
     context: &InferContext,
     definition: Definition,
-    protocol_class: ProtocolClassLiteral,
+    protocol_class: ProtocolClass,
     class_symbol_table: &PlaceTable,
 ) {
     /// We want to avoid suggesting an annotation for e.g. `x = None`,

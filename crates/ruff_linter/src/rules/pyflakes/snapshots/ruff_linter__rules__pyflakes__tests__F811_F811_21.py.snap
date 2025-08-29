@@ -19,15 +19,13 @@ F811 [*] Redefinition of unused `Sequence` from line 26
 27 | )
    |
 help: Remove definition: `Sequence`
-
-ℹ Safe fix
-27 27 | )
-28 28 | 
-29 29 | # This should ignore the first error.
-30    |-from typing import (
-31    |-    List,  # noqa: F811
-32    |-    Sequence,
-33    |-)
-34 30 | 
-35 31 | # This should ignore both errors.
-36 32 | from typing import (  # noqa
+27 | )
+28 | 
+29 | # This should ignore the first error.
+   - from typing import (
+   -     List,  # noqa: F811
+   -     Sequence,
+   - )
+30 | 
+31 | # This should ignore both errors.
+32 | from typing import (  # noqa

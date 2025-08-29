@@ -700,6 +700,25 @@ impl SearchPath {
             SearchPathInner::StandardLibraryVendored(_) => "std-vendored",
         }
     }
+
+    /// Returns a string suitable for describing what kind of search path this is
+    /// in user-facing diagnostics.
+    #[must_use]
+    pub(crate) fn describe_kind(&self) -> &'static str {
+        match *self.0 {
+            SearchPathInner::Extra(_) => {
+                "extra search path specified on the CLI or in your config file"
+            }
+            SearchPathInner::FirstParty(_) => "first-party code",
+            SearchPathInner::StandardLibraryCustom(_) => {
+                "custom stdlib stubs specified on the CLI or in your config file"
+            }
+            SearchPathInner::StandardLibraryReal(_) => "runtime stdlib source code",
+            SearchPathInner::SitePackages(_) => "site-packages",
+            SearchPathInner::Editable(_) => "editable install",
+            SearchPathInner::StandardLibraryVendored(_) => "stdlib typeshed stubs vendored by ty",
+        }
+    }
 }
 
 impl PartialEq<SystemPath> for SearchPath {

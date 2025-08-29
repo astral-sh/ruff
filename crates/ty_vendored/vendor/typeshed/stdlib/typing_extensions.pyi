@@ -265,7 +265,27 @@ def final(f: _F) -> _F:
     object to allow runtime introspection.
     """
 
-def disjoint_base(cls: _TC) -> _TC: ...
+def disjoint_base(cls: _TC) -> _TC:
+    """This decorator marks a class as a disjoint base.
+
+    Child classes of a disjoint base cannot inherit from other disjoint bases that are
+    not parent classes of the disjoint base.
+
+    For example:
+
+        @disjoint_base
+        class Disjoint1: pass
+
+        @disjoint_base
+        class Disjoint2: pass
+
+        class Disjoint3(Disjoint1, Disjoint2): pass  # Type checker error
+
+    Type checkers can use knowledge of disjoint bases to detect unreachable code
+    and determine when two types can overlap.
+
+    See PEP 800.
+    """
 
 Literal: _SpecialForm
 
@@ -780,6 +800,7 @@ else:
     class SupportsInt(Protocol, metaclass=abc.ABCMeta):
         """An ABC with one abstract method __int__."""
 
+        __slots__ = ()
         @abc.abstractmethod
         def __int__(self) -> int: ...
 
@@ -787,6 +808,7 @@ else:
     class SupportsFloat(Protocol, metaclass=abc.ABCMeta):
         """An ABC with one abstract method __float__."""
 
+        __slots__ = ()
         @abc.abstractmethod
         def __float__(self) -> float: ...
 
@@ -794,6 +816,7 @@ else:
     class SupportsComplex(Protocol, metaclass=abc.ABCMeta):
         """An ABC with one abstract method __complex__."""
 
+        __slots__ = ()
         @abc.abstractmethod
         def __complex__(self) -> complex: ...
 
@@ -801,11 +824,13 @@ else:
     class SupportsBytes(Protocol, metaclass=abc.ABCMeta):
         """An ABC with one abstract method __bytes__."""
 
+        __slots__ = ()
         @abc.abstractmethod
         def __bytes__(self) -> bytes: ...
 
     @runtime_checkable
     class SupportsIndex(Protocol, metaclass=abc.ABCMeta):
+        __slots__ = ()
         @abc.abstractmethod
         def __index__(self) -> int: ...
 
@@ -815,6 +840,7 @@ else:
         An ABC with one abstract method __abs__ that is covariant in its return type.
         """
 
+        __slots__ = ()
         @abc.abstractmethod
         def __abs__(self) -> _T_co: ...
 
@@ -824,6 +850,7 @@ else:
         An ABC with one abstract method __round__ that is covariant in its return type.
         """
 
+        __slots__ = ()
         @overload
         @abc.abstractmethod
         def __round__(self) -> int: ...
@@ -1298,7 +1325,14 @@ else:
         format: Format | None = None,
         _recursive_guard: Container[str] = ...,
     ) -> AnnotationForm: ...
-    def type_repr(value: object) -> str: ...
+    def type_repr(value: object) -> str:
+        """Convert a Python value to a format suitable for use with the STRING format.
+
+        This is intended as a helper for tools that support the STRING format but do
+        not have access to the code that originally produced the annotations. It uses
+        repr() for most objects.
+
+        """
 
 # PEP 661
 class Sentinel:
