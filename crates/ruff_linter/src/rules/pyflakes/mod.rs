@@ -2724,7 +2724,7 @@ lambda: fu
         import fu.bar
         fu.x
         ",
-            &[],
+            &[Rule::UnusedImport],
         );
 
         flakes(
@@ -2733,7 +2733,7 @@ lambda: fu
         import fu
         fu.x
         ",
-            &[],
+            &[Rule::UnusedImport],
         );
     }
 
@@ -2767,7 +2767,7 @@ lambda: fu
         import fu
         import fu.bar
         ",
-            &[Rule::UnusedImport],
+            &[Rule::UnusedImport, Rule::UnusedImport],
         );
     }
 
