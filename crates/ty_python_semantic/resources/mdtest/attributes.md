@@ -699,7 +699,7 @@ reveal_type(c_instance.pure_class_variable1)  # revealed: str
 
 reveal_type(c_instance.pure_class_variable2)  # revealed: Unknown | Literal[1]
 
-# error: [invalid-assignment] "Cannot assign to ClassVar `pure_class_variable1` from an instance of type `C`"
+# error: [invalid-attribute-access] "Cannot assign to ClassVar `pure_class_variable1` from an instance of type `C`"
 c_instance.pure_class_variable1 = "value set on instance"
 
 C.pure_class_variable1 = "overwritten on class"
