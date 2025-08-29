@@ -31,7 +31,7 @@ pub fn goto_definition(
 
 #[cfg(test)]
 mod test {
-    use crate::tests::{CursorTest, IntoDiagnostic};
+    use crate::tests::{CursorTest, IntoDiagnostic, cursor_test};
     use crate::{NavigationTarget, goto_definition};
     use insta::assert_snapshot;
     use ruff_db::diagnostic::{
@@ -469,6 +469,22 @@ class MyOtherClass:
         3 | x = MyClass(0)
           |     ^^^^^^^
           |
+
+        info[goto-definition]: Definition
+         --> mymodule.py:3:9
+          |
+        2 | class MyClass:
+        3 |     def __init__(self, val):
+          |         ^^^^^^^^
+        4 |         self.val = val
+          |
+        info: Source
+         --> main.py:3:5
+          |
+        2 | from mymodule import MyClass
+        3 | x = MyClass(0)
+          |     ^^^^^^^
+          |
         ");
     }
 
@@ -780,6 +796,310 @@ my_func(my_other_func(a<CURSOR>b=5, y=2), 0)
           |                       ^^
           |
         ");
+    }
+
+    #[test]
+    fn goto_definition_overload_type_disambiguated1() {
+        let test = cursor_test(
+            r#"
+            from typing import overload
+
+            @overload
+            def ab(a: int):
+                """The first overload"""
+
+            @overload
+            def ab(a: str):
+                """The second overload"""
+
+            def ab(a): ...
+
+            a<CURSOR>b(1)
+            "#,
+        );
+
+        assert_snapshot!(test.goto_definition(), @r#"
+        info[goto-definition]: Definition
+         --> main.py:5:5
+          |
+        4 | @overload
+        5 | def ab(a: int):
+          |     ^^
+        6 |     """The first overload"""
+          |
+        info: Source
+          --> main.py:14:1
+           |
+        12 | def ab(a): ...
+        13 |
+        14 | ab(1)
+           | ^^
+           |
+
+        info[goto-definition]: Definition
+          --> main.py:9:5
+           |
+         8 | @overload
+         9 | def ab(a: str):
+           |     ^^
+        10 |     """The second overload"""
+           |
+        info: Source
+          --> main.py:14:1
+           |
+        12 | def ab(a): ...
+        13 |
+        14 | ab(1)
+           | ^^
+           |
+
+        info[goto-definition]: Definition
+          --> main.py:12:5
+           |
+        10 |     """The second overload"""
+        11 |
+        12 | def ab(a): ...
+           |     ^^
+        13 |
+        14 | ab(1)
+           |
+        info: Source
+          --> main.py:14:1
+           |
+        12 | def ab(a): ...
+        13 |
+        14 | ab(1)
+           | ^^
+           |
+        "#);
+    }
+
+    #[test]
+    fn goto_definition_overload_type_disambiguated2() {
+        let test = cursor_test(
+            r#"
+            from typing import overload
+
+            @overload
+            def ab(a: int):
+                """The first overload"""
+
+            @overload
+            def ab(a: str):
+                """The second overload"""
+
+            def ab(a): ...
+
+            a<CURSOR>b("hello")
+            "#,
+        );
+
+        assert_snapshot!(test.goto_definition(), @r#"
+        info[goto-definition]: Definition
+         --> main.py:5:5
+          |
+        4 | @overload
+        5 | def ab(a: int):
+          |     ^^
+        6 |     """The first overload"""
+          |
+        info: Source
+          --> main.py:14:1
+           |
+        12 | def ab(a): ...
+        13 |
+        14 | ab("hello")
+           | ^^
+           |
+
+        info[goto-definition]: Definition
+          --> main.py:9:5
+           |
+         8 | @overload
+         9 | def ab(a: str):
+           |     ^^
+        10 |     """The second overload"""
+           |
+        info: Source
+          --> main.py:14:1
+           |
+        12 | def ab(a): ...
+        13 |
+        14 | ab("hello")
+           | ^^
+           |
+
+        info[goto-definition]: Definition
+          --> main.py:12:5
+           |
+        10 |     """The second overload"""
+        11 |
+        12 | def ab(a): ...
+           |     ^^
+        13 |
+        14 | ab("hello")
+           |
+        info: Source
+          --> main.py:14:1
+           |
+        12 | def ab(a): ...
+        13 |
+        14 | ab("hello")
+           | ^^
+           |
+        "#);
+    }
+
+    #[test]
+    fn goto_definition_overload_arity_disambiguated1() {
+        let test = cursor_test(
+            r#"
+            from typing import overload
+
+            @overload
+            def ab(a: int, b: int):
+                """The first overload"""
+
+            @overload
+            def ab(a: int):
+                """The second overload"""
+
+            def ab(a, b = None): ...
+
+            a<CURSOR>b(1, 2)
+            "#,
+        );
+
+        assert_snapshot!(test.goto_definition(), @r#"
+        info[goto-definition]: Definition
+         --> main.py:5:5
+          |
+        4 | @overload
+        5 | def ab(a: int, b: int):
+          |     ^^
+        6 |     """The first overload"""
+          |
+        info: Source
+          --> main.py:14:1
+           |
+        12 | def ab(a, b = None): ...
+        13 |
+        14 | ab(1, 2)
+           | ^^
+           |
+
+        info[goto-definition]: Definition
+          --> main.py:9:5
+           |
+         8 | @overload
+         9 | def ab(a: int):
+           |     ^^
+        10 |     """The second overload"""
+           |
+        info: Source
+          --> main.py:14:1
+           |
+        12 | def ab(a, b = None): ...
+        13 |
+        14 | ab(1, 2)
+           | ^^
+           |
+
+        info[goto-definition]: Definition
+          --> main.py:12:5
+           |
+        10 |     """The second overload"""
+        11 |
+        12 | def ab(a, b = None): ...
+           |     ^^
+        13 |
+        14 | ab(1, 2)
+           |
+        info: Source
+          --> main.py:14:1
+           |
+        12 | def ab(a, b = None): ...
+        13 |
+        14 | ab(1, 2)
+           | ^^
+           |
+        "#);
+    }
+
+    #[test]
+    fn goto_definition_overload_arity_disambiguated2() {
+        let test = cursor_test(
+            r#"
+            from typing import overload
+
+            @overload
+            def ab(a: int, b: int):
+                """The first overload"""
+
+            @overload
+            def ab(a: int):
+                """The second overload"""
+
+            def ab(a, b = None): ...
+
+            a<CURSOR>b(1)
+            "#,
+        );
+
+        assert_snapshot!(test.goto_definition(), @r#"
+        info[goto-definition]: Definition
+         --> main.py:5:5
+          |
+        4 | @overload
+        5 | def ab(a: int, b: int):
+          |     ^^
+        6 |     """The first overload"""
+          |
+        info: Source
+          --> main.py:14:1
+           |
+        12 | def ab(a, b = None): ...
+        13 |
+        14 | ab(1)
+           | ^^
+           |
+
+        info[goto-definition]: Definition
+          --> main.py:9:5
+           |
+         8 | @overload
+         9 | def ab(a: int):
+           |     ^^
+        10 |     """The second overload"""
+           |
+        info: Source
+          --> main.py:14:1
+           |
+        12 | def ab(a, b = None): ...
+        13 |
+        14 | ab(1)
+           | ^^
+           |
+
+        info[goto-definition]: Definition
+          --> main.py:12:5
+           |
+        10 |     """The second overload"""
+        11 |
+        12 | def ab(a, b = None): ...
+           |     ^^
+        13 |
+        14 | ab(1)
+           |
+        info: Source
+          --> main.py:14:1
+           |
+        12 | def ab(a, b = None): ...
+        13 |
+        14 | ab(1)
+           | ^^
+           |
+        "#);
     }
 
     impl CursorTest {
