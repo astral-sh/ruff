@@ -462,7 +462,7 @@ reveal_type(D().h(1))  # revealed: Literal[2] | Unknown
 reveal_type(C().h(True))  # revealed: Literal[True]
 reveal_type(D().h(True))  # revealed: Literal[2] | Unknown
 reveal_type(C().i(1))  # revealed: list[Literal[1]]
-reveal_type(D().i(1))  # revealed: list[Unknown]
+reveal_type(D().i(1))  # revealed: list[@Todo(list literal element type)]
 
 class F:
     def f(self) -> Literal[1, 2]:

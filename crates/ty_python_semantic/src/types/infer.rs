@@ -639,7 +639,25 @@ impl<'db> ScopeInference<'db> {
                 }
             }
         }
-        union.build()
+
+        let module = parsed_module(db, self.scope.file(db)).load(db);
+        if self
+            .scope
+            .node(db)
+            .as_function(&module)
+            .is_some_and(|func| {
+                let index = semantic_index(db, self.scope.file(db));
+                let is_generator = self.scope.file_scope_id(db).is_generator_function(index);
+
+                func.is_async && !is_generator
+            })
+        {
+            // TODO: yield/await type inference
+            KnownClass::CoroutineType
+                .to_specialized_instance(db, [Type::any(), Type::any(), union.build()])
+        } else {
+            union.build()
+        }
     }
 }
 

@@ -131,7 +131,8 @@ match obj:
 
 ```py
 class C:
-    def __await__(self): ...
+    def __await__(self):
+        yield
 
 # error: [invalid-syntax] "`return` statement outside of a function"
 return
@@ -147,6 +148,8 @@ yield from []
 await C()
 
 def f():
+    # TODO: no error, C is awaitable
+    # error: [invalid-await] "`C` is not awaitable"
     # error: [invalid-syntax] "`await` outside of an asynchronous function"
     await C()
 ```

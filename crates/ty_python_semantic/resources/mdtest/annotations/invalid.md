@@ -74,7 +74,9 @@ def _(
 def bar() -> None:
     return None
 
-async def baz(): ...
+async def baz() -> int:
+    return 42
+
 async def outer():  # avoid unrelated syntax errors on yield, yield from, and await
     def _(
         a: 1,  # error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"

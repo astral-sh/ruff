@@ -762,12 +762,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     };
 
                     let rhs_ty = inference.expression_type(right);
-                    let rhs_class = match rhs_ty {
-                        Type::ClassLiteral(class) => class,
-                        Type::GenericAlias(alias) => alias.origin(self.db),
-                        _ => {
-                            continue;
-                        }
+                    let Type::ClassLiteral(rhs_class) = rhs_ty else {
+                        continue;
                     };
 
                     // `else`-branch narrowing for `if type(x) is Y` can only be done
