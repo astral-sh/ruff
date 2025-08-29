@@ -26,7 +26,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/attribute_as
 # Diagnostics
 
 ```
-error[invalid-assignment]: Object of type `Literal["wrong"]` is not assignable to attribute `attr` of type `int`
+error[invalid-assignment]: Object of type `Literal["wrong"]` is not assignable to attribute `attr` on type `int`
  --> src/mdtest_snippet.py:7:1
   |
 5 | instance = C()

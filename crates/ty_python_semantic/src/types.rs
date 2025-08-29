@@ -243,6 +243,74 @@ impl AttributeKind {
     }
 }
 
+#[derive(Debug, Default)]
+pub(crate) struct AttributeAssignmentErrors<'db>(FxOrderSet<AttributeAssignmentError<'db>>);
+
+impl<'db> IntoIterator for AttributeAssignmentErrors<'db> {
+    type Item = AttributeAssignmentError<'db>;
+    type IntoIter = ordermap::set::IntoIter<AttributeAssignmentError<'db>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl<'db> AttributeAssignmentErrors<'db> {
+    pub(crate) fn is_possibly_unbound(&self) -> bool {
+        self.0
+            .iter()
+            .any(AttributeAssignmentError::is_possibly_unbound)
+    }
+
+    fn insert(&mut self, result: AttributeAssignmentError<'db>) {
+        self.0.insert(result);
+    }
+
+    fn insert_if_error<T>(&mut self, result: Result<T, AttributeAssignmentError<'db>>) {
+        if let Err(error) = result {
+            self.insert(error);
+        }
+    }
+
+    fn and<T>(mut self, result: Result<T, AttributeAssignmentError<'db>>) -> Result<T, Self> {
+        match result {
+            Ok(value) => {
+                if self.0.is_empty() {
+                    Ok(value)
+                } else {
+                    Err(self)
+                }
+            }
+            Err(error) => {
+                self.0.insert(error);
+                Err(self)
+            }
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub(crate) enum AttributeAssignmentError<'db> {
+    PossiblyUnbound,
+    TypeMismatch(Type<'db>),
+    CannotAssign,
+    CannotAssignToClassVar,
+    CannotAssignToInstanceAttr,
+    CannotAssignToFinal,
+    CannotAssignToUnresolved,
+    ReadOnlyProperty(Option<PropertyInstanceType<'db>>),
+    FailToSet,
+    FailToSetAttr,
+    SetAttrReturnsNeverOrNoReturn,
+    Unresolved,
+}
+
+impl AttributeAssignmentError<'_> {
+    pub(crate) const fn is_possibly_unbound(&self) -> bool {
+        matches!(self, Self::PossiblyUnbound)
+    }
+}
+
 /// This enum is used to control the behavior of the descriptor protocol implementation.
 /// When invoked on a class object, the fallback type (a class attribute) can shadow a
 /// non-data descriptor of the meta-type (the class's metaclass). However, this is not
@@ -1633,9 +1701,9 @@ impl<'db> Type<'db> {
             }
             // A protocol instance can never be a subtype of a nominal type, with the *sole* exception of `object`.
             (Type::ProtocolInstance(_), _) => C::unsatisfiable(db),
-            (_, Type::ProtocolInstance(protocol)) => {
+            (_, Type::ProtocolInstance(protocol)) => visitor.visit((self, target), || {
                 self.satisfies_protocol(db, protocol, relation, visitor)
-            }
+            }),
 
             // All `StringLiteral` types are a subtype of `LiteralString`.
             (Type::StringLiteral(_), Type::LiteralString) => C::always_satisfiable(db),
@@ -1973,12 +2041,28 @@ impl<'db> Type<'db> {
             visitor: &IsDisjointVisitor<'db, C>,
         ) -> C {
             protocol.interface(db).members(db).when_any(db, |member| {
-                other
-                    .member(db, member.name())
-                    .place
-                    .ignore_possibly_unbound()
-                    .when_none_or(db, |attribute_type| {
-                        member.has_disjoint_type_from(db, attribute_type, visitor)
+                let attribute = member.name();
+
+                member
+                    .instance_get_type(db)
+                    .when_some_and(db, |get_type| {
+                        other
+                            .member(db, attribute)
+                            .place
+                            .ignore_possibly_unbound()
+                            .when_none_or(db, |attribute_type| {
+                                get_type.is_disjoint_from_impl(db, attribute_type, visitor)
+                            })
+                    })
+                    .or(db, || {
+                        C::from_bool(
+                            db,
+                            member.instance_set_type().is_ok_and(|set_type| {
+                                other
+                                    .validate_attribute_assignment(db, attribute, set_type)
+                                    .is_err()
+                            }),
+                        )
                     })
             })
         }
@@ -2248,15 +2332,17 @@ impl<'db> Type<'db> {
                 })
             }
 
-            (Type::ProtocolInstance(protocol), other)
-            | (other, Type::ProtocolInstance(protocol)) => visitor.visit((self, other), || {
+            (Type::ProtocolInstance(protocol), other_ty)
+            | (other_ty, Type::ProtocolInstance(protocol)) => visitor.visit((self, other), || {
                 protocol.interface(db).members(db).when_any(db, |member| {
-                    match other.member(db, member.name()).place {
-                        Place::Type(attribute_type, _) => {
-                            member.has_disjoint_type_from(db, attribute_type, visitor)
-                        }
-                        Place::Unbound => C::unsatisfiable(db),
-                    }
+                    member.instance_get_type(db).when_some_and(db, |get_type| {
+                        let Place::Type(attribute_type, _) =
+                            other_ty.member(db, member.name()).place
+                        else {
+                            return C::unsatisfiable(db);
+                        };
+                        get_type.is_disjoint_from_impl(db, attribute_type, visitor)
+                    })
                 })
             }),
 
@@ -2878,9 +2964,14 @@ impl<'db> Type<'db> {
             }),
             // TODO: Once `to_meta_type` for the synthesized protocol is fully implemented, this handling should be removed.
             Type::ProtocolInstance(ProtocolInstanceType {
-                inner: Protocol::Synthesized(_),
+                inner: Protocol::Synthesized(synthesized),
                 ..
-            }) => self.instance_member(db, &name),
+            }) => synthesized
+                .interface()
+                .member_by_name(db, &name)
+                .and_then(|member| member.meta_get_type())
+                .map(|ty| Place::bound(ty).into())
+                .unwrap_or_default(),
             _ => self
                 .to_meta_type(db)
                 .find_name_in_mro_with_policy(db, name.as_str(), policy)
@@ -4828,6 +4919,364 @@ impl<'db> Type<'db> {
             | Type::ModuleLiteral(_)
             | Type::TypeIs(_)
             | Type::TypedDict(_) => CallableBinding::not_callable(self).into(),
+        }
+    }
+
+    /// Make sure that the attribute assignment `obj.attribute = value` is valid.
+    ///
+    /// `attribute` is the name of the attribute being assigned, and `value_ty` is the type of the right-hand side of
+    /// the assignment.
+    fn validate_attribute_assignment(
+        self,
+        db: &'db dyn Db,
+        attribute: &str,
+        value_ty: Type<'db>,
+    ) -> Result<(), AttributeAssignmentErrors<'db>> {
+        let ensure_assignable_to = |attr_ty| -> Result<(), AttributeAssignmentError> {
+            if value_ty.is_assignable_to(db, attr_ty) {
+                Ok(())
+            } else {
+                Err(AttributeAssignmentError::TypeMismatch(attr_ty))
+            }
+        };
+
+        // Return true if this is an invalid assignment to a `Final` attribute.
+        let invalid_assignment_to_final =
+            |qualifiers: TypeQualifiers| -> bool { qualifiers.contains(TypeQualifiers::FINAL) };
+
+        let mut results = AttributeAssignmentErrors::default();
+
+        match self {
+            Type::Union(union) => {
+                if union.elements(db).iter().all(|elem| {
+                    let res = elem.validate_attribute_assignment(db, attribute, value_ty);
+                    match res {
+                        Ok(()) => true,
+                        Err(errors) if errors.is_possibly_unbound() => {
+                            results.insert(AttributeAssignmentError::PossiblyUnbound);
+                            true
+                        }
+                        _ => false,
+                    }
+                }) {
+                    results.and(Ok(()))
+                } else {
+                    results.and(Err(AttributeAssignmentError::TypeMismatch(self)))
+                }
+            }
+
+            Type::Intersection(intersection) => {
+                // TODO: Handle negative intersection elements
+                if intersection.positive(db).iter().any(|elem| {
+                    let res = elem.validate_attribute_assignment(db, attribute, value_ty);
+                    match res {
+                        Ok(()) => true,
+                        Err(errors) if errors.is_possibly_unbound() => {
+                            results.insert(AttributeAssignmentError::PossiblyUnbound);
+                            true
+                        }
+                        _ => false,
+                    }
+                }) {
+                    results.and(Ok(()))
+                } else {
+                    results.and(Err(AttributeAssignmentError::TypeMismatch(self)))
+                }
+            }
+
+            Type::TypeAlias(alias) => {
+                self.validate_attribute_assignment(db, attribute, alias.value_type(db))
+            }
+
+            // Super instances do not allow attribute assignment
+            Type::NominalInstance(instance)
+                if instance.class(db).is_known(db, KnownClass::Super) =>
+            {
+                results.and(Err(AttributeAssignmentError::CannotAssign))
+            }
+            Type::BoundSuper(_) => results.and(Err(AttributeAssignmentError::CannotAssign)),
+
+            Type::Dynamic(..) | Type::Never => results.and(Ok(())),
+
+            Type::NominalInstance(..)
+            | Type::ProtocolInstance(_)
+            | Type::BooleanLiteral(..)
+            | Type::IntLiteral(..)
+            | Type::StringLiteral(..)
+            | Type::BytesLiteral(..)
+            | Type::EnumLiteral(_)
+            | Type::LiteralString
+            | Type::SpecialForm(..)
+            | Type::KnownInstance(..)
+            | Type::PropertyInstance(..)
+            | Type::FunctionLiteral(..)
+            | Type::Callable(..)
+            | Type::BoundMethod(_)
+            | Type::MethodWrapper(_)
+            | Type::WrapperDescriptor(_)
+            | Type::DataclassDecorator(_)
+            | Type::DataclassTransformer(_)
+            | Type::NonInferableTypeVar(_)
+            | Type::TypeVar(..)
+            | Type::AlwaysTruthy
+            | Type::AlwaysFalsy
+            | Type::TypeIs(_)
+            | Type::TypedDict(_) => {
+                if let Type::ProtocolInstance(protocol) = self {
+                    if let Some(member) = protocol.interface(db).member_by_name(db, attribute) {
+                        if let Err(err) = member.instance_set_type() {
+                            return results.and(Err(err));
+                        }
+                    }
+                }
+
+                // First, try to call the `__setattr__` dunder method. If this is present/defined, overrides
+                // assigning the attributed by the normal mechanism.
+                let setattr_dunder_call_result = self.try_call_dunder_with_policy(
+                    db,
+                    "__setattr__",
+                    &mut CallArguments::positional([
+                        Type::StringLiteral(StringLiteralType::new(db, Box::from(attribute))),
+                        value_ty,
+                    ]),
+                    MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+                );
+
+                let check_setattr_return_type = |result: Bindings<'db>| match result.return_type(db)
+                {
+                    Type::Never => {
+                        let is_setattr_synthesized = match self.class_member_with_policy(
+                            db,
+                            "__setattr__".into(),
+                            MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+                        ) {
+                            PlaceAndQualifiers {
+                                place: Place::Type(attr_ty, _),
+                                qualifiers: _,
+                            } => attr_ty.is_callable_type(),
+                            _ => false,
+                        };
+
+                        let member_exists = !self.member(db, attribute).place.is_unbound();
+
+                        Err(if !member_exists {
+                            AttributeAssignmentError::CannotAssignToUnresolved
+                        } else if is_setattr_synthesized {
+                            AttributeAssignmentError::ReadOnlyProperty(None)
+                        } else {
+                            AttributeAssignmentError::SetAttrReturnsNeverOrNoReturn
+                        })
+                    }
+                    _ => Ok(()),
+                };
+
+                match setattr_dunder_call_result {
+                    Ok(bindings) => results.and(check_setattr_return_type(bindings)),
+                    Err(CallDunderError::PossiblyUnbound(bindings)) => {
+                        results.and(check_setattr_return_type(*bindings))
+                    }
+                    Err(CallDunderError::CallError(..)) => {
+                        results.and(Err(AttributeAssignmentError::FailToSetAttr))
+                    }
+                    Err(CallDunderError::MethodNotAvailable) => {
+                        match self.class_member(db, attribute.into()) {
+                            meta_attr @ PlaceAndQualifiers { .. } if meta_attr.is_class_var() => {
+                                results.and(Err(AttributeAssignmentError::CannotAssignToClassVar))
+                            }
+                            PlaceAndQualifiers {
+                                place: Place::Type(meta_attr_ty, meta_attr_boundness),
+                                qualifiers,
+                            } => {
+                                if invalid_assignment_to_final(qualifiers) {
+                                    return results
+                                        .and(Err(AttributeAssignmentError::CannotAssignToFinal));
+                                }
+
+                                // Check if it is assignable to the meta attribute type.
+                                if let Place::Type(meta_dunder_set, _) =
+                                    meta_attr_ty.class_member(db, "__set__".into()).place
+                                {
+                                    let dunder_set_result = meta_dunder_set.try_call(
+                                        db,
+                                        &CallArguments::positional([meta_attr_ty, self, value_ty]),
+                                    );
+
+                                    if let Err(dunder_set_error) = dunder_set_result {
+                                        results.insert(
+                                            if let Some(property) = dunder_set_error
+                                                .as_attempt_to_set_property_with_no_setter()
+                                            {
+                                                AttributeAssignmentError::ReadOnlyProperty(Some(
+                                                    property,
+                                                ))
+                                            } else {
+                                                AttributeAssignmentError::FailToSet
+                                            },
+                                        );
+                                    }
+                                } else {
+                                    results.insert_if_error(ensure_assignable_to(meta_attr_ty));
+                                }
+
+                                // Check if it is assignable to the instance attribute type.
+                                if meta_attr_boundness == Boundness::PossiblyUnbound {
+                                    let (assignable, boundness) = if let Place::Type(
+                                        instance_attr_ty,
+                                        instance_attr_boundness,
+                                    ) =
+                                        self.instance_member(db, attribute).place
+                                    {
+                                        (
+                                            ensure_assignable_to(instance_attr_ty),
+                                            instance_attr_boundness,
+                                        )
+                                    } else {
+                                        (Ok(()), Boundness::PossiblyUnbound)
+                                    };
+
+                                    results.insert_if_error(assignable);
+
+                                    if boundness == Boundness::PossiblyUnbound {
+                                        results.insert(AttributeAssignmentError::PossiblyUnbound);
+                                    }
+                                }
+
+                                results.and(Ok(()))
+                            }
+
+                            PlaceAndQualifiers {
+                                place: Place::Unbound,
+                                ..
+                            } => {
+                                if let PlaceAndQualifiers {
+                                    place: Place::Type(instance_attr_ty, instance_attr_boundness),
+                                    qualifiers,
+                                } = self.instance_member(db, attribute)
+                                {
+                                    if invalid_assignment_to_final(qualifiers) {
+                                        return results.and(Err(
+                                            AttributeAssignmentError::CannotAssignToFinal,
+                                        ));
+                                    }
+
+                                    if instance_attr_boundness == Boundness::PossiblyUnbound {
+                                        results.insert(AttributeAssignmentError::PossiblyUnbound);
+                                    }
+                                    results.and(ensure_assignable_to(instance_attr_ty))
+                                } else {
+                                    results.and(Err(AttributeAssignmentError::Unresolved))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
+                match self.class_member(db, attribute.into()) {
+                    PlaceAndQualifiers {
+                        place: Place::Type(meta_attr_ty, meta_attr_boundness),
+                        qualifiers,
+                    } => {
+                        if invalid_assignment_to_final(qualifiers) {
+                            return results.and(Err(AttributeAssignmentError::CannotAssignToFinal));
+                        }
+
+                        // Check if it is assignable to the meta attribute type.
+                        if let Place::Type(meta_dunder_set, _) =
+                            meta_attr_ty.class_member(db, "__set__".into()).place
+                        {
+                            let dunder_set_result = meta_dunder_set.try_call(
+                                db,
+                                &CallArguments::positional([meta_attr_ty, self, value_ty]),
+                            );
+
+                            if let Err(dunder_set_error) = dunder_set_result {
+                                results.insert(
+                                    if let Some(property) =
+                                        dunder_set_error.as_attempt_to_set_property_with_no_setter()
+                                    {
+                                        AttributeAssignmentError::ReadOnlyProperty(Some(property))
+                                    } else {
+                                        AttributeAssignmentError::FailToSet
+                                    },
+                                );
+                            }
+                        } else {
+                            results.insert_if_error(ensure_assignable_to(meta_attr_ty));
+                        }
+
+                        // Check if it is assignable to the class attribute type.
+                        if meta_attr_boundness == Boundness::PossiblyUnbound {
+                            let (assignable, boundness) =
+                                if let Place::Type(class_attr_ty, class_attr_boundness) = self
+                                    .find_name_in_mro(db, attribute)
+                                    .expect("called on Type::ClassLiteral or Type::SubclassOf")
+                                    .place
+                                {
+                                    (ensure_assignable_to(class_attr_ty), class_attr_boundness)
+                                } else {
+                                    (Ok(()), Boundness::PossiblyUnbound)
+                                };
+
+                            if boundness == Boundness::PossiblyUnbound {
+                                results.insert(AttributeAssignmentError::PossiblyUnbound);
+                            }
+
+                            results.insert_if_error(assignable);
+                        }
+
+                        results.and(Ok(()))
+                    }
+                    PlaceAndQualifiers {
+                        place: Place::Unbound,
+                        ..
+                    } => {
+                        if let PlaceAndQualifiers {
+                            place: Place::Type(class_attr_ty, class_attr_boundness),
+                            qualifiers,
+                        } = self
+                            .find_name_in_mro(db, attribute)
+                            .expect("called on Type::ClassLiteral or Type::SubclassOf")
+                        {
+                            if invalid_assignment_to_final(qualifiers) {
+                                return results
+                                    .and(Err(AttributeAssignmentError::CannotAssignToFinal));
+                            }
+
+                            if class_attr_boundness == Boundness::PossiblyUnbound {
+                                results.insert(AttributeAssignmentError::PossiblyUnbound);
+                            }
+                            results.and(ensure_assignable_to(class_attr_ty))
+                        } else {
+                            let attribute_is_bound_on_instance =
+                                self.to_instance(db).is_some_and(|instance| {
+                                    !instance.instance_member(db, attribute).place.is_unbound()
+                                });
+
+                            // Attribute is declared or bound on instance. Forbid access from the class object
+                            if attribute_is_bound_on_instance {
+                                results
+                                    .and(Err(AttributeAssignmentError::CannotAssignToInstanceAttr))
+                            } else {
+                                results.and(Err(AttributeAssignmentError::Unresolved))
+                            }
+                        }
+                    }
+                }
+            }
+
+            Type::ModuleLiteral(module) => {
+                if let Place::Type(attr_ty, _) = module.static_member(db, attribute).place {
+                    if value_ty.is_assignable_to(db, attr_ty) {
+                        results.and(Ok(()))
+                    } else {
+                        results.and(Err(AttributeAssignmentError::TypeMismatch(attr_ty)))
+                    }
+                } else {
+                    results.and(Err(AttributeAssignmentError::Unresolved))
+                }
+            }
         }
     }
 

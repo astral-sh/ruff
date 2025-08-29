@@ -10,7 +10,6 @@ use crate::semantic_index::SemanticIndex;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::place::{PlaceTable, ScopedPlaceId};
 use crate::suppression::FileSuppressionId;
-use crate::types::call::CallError;
 use crate::types::class::{DisjointBase, DisjointBaseKind, Field};
 use crate::types::function::KnownFunction;
 use crate::types::string_annotation::{
@@ -19,7 +18,8 @@ use crate::types::string_annotation::{
     RAW_STRING_TYPE_ANNOTATION,
 };
 use crate::types::{
-    DynamicType, LintDiagnosticGuard, Protocol, ProtocolInstanceType, SubclassOfInner, binding_type,
+    DynamicType, LintDiagnosticGuard, PropertyInstanceType, Protocol, ProtocolInstanceType,
+    SubclassOfInner, binding_type,
 };
 use crate::types::{SpecialFormType, Type, protocol_class::ProtocolClass};
 use crate::util::diagnostics::format_enumeration;
@@ -1973,16 +1973,16 @@ pub(super) fn report_invalid_attribute_assignment(
         node,
         target_ty,
         format_args!(
-            "Object of type `{}` is not assignable to attribute `{attribute_name}` of type `{}`",
+            "Object of type `{}` is not assignable to attribute `{attribute_name}` on type `{}`",
             source_ty.display(context.db()),
             target_ty.display(context.db()),
         ),
     );
 }
 
-pub(super) fn report_bad_dunder_set_call<'db>(
+pub(super) fn report_attempted_write_to_read_only_property<'db>(
     context: &InferContext<'db, '_>,
-    dunder_set_failure: &CallError<'db>,
+    property: Option<PropertyInstanceType<'db>>,
     attribute: &str,
     object_type: Type<'db>,
     target: &ast::ExprAttribute,
@@ -1991,30 +1991,27 @@ pub(super) fn report_bad_dunder_set_call<'db>(
         return;
     };
     let db = context.db();
-    if let Some(property) = dunder_set_failure.as_attempt_to_set_property_with_no_setter() {
-        let object_type = object_type.display(db);
+    let object_type = object_type.display(db);
+
+    if let Some(file_range) = property
+        .and_then(|property| property.getter(db))
+        .and_then(|getter| getter.definition(db))
+        .and_then(|definition| definition.focus_range(db))
+    {
         let mut diagnostic = builder.into_diagnostic(format_args!(
             "Cannot assign to read-only property `{attribute}` on object of type `{object_type}`",
         ));
-        if let Some(file_range) = property
-            .getter(db)
-            .and_then(|getter| getter.definition(db))
-            .and_then(|definition| definition.focus_range(db))
-        {
-            diagnostic.annotate(Annotation::secondary(Span::from(file_range)).message(
-                format_args!("Property `{object_type}.{attribute}` defined here with no setter"),
-            ));
-            diagnostic.set_primary_message(format_args!(
-                "Attempted assignment to `{object_type}.{attribute}` here"
-            ));
-        }
+        diagnostic.annotate(
+            Annotation::secondary(Span::from(file_range)).message(format_args!(
+                "Property `{object_type}.{attribute}` defined here with no setter"
+            )),
+        );
+        diagnostic.set_primary_message(format_args!(
+            "Attempted assignment to `{object_type}.{attribute}` here"
+        ));
     } else {
-        // TODO: Here, it would be nice to emit an additional diagnostic
-        // that explains why the call failed
         builder.into_diagnostic(format_args!(
-            "Invalid assignment to data descriptor attribute \
-            `{attribute}` on type `{}` with custom `__set__` method",
-            object_type.display(db)
+            "Attribute `{attribute}` on object of type `{object_type}` is read-only",
         ));
     }
 }

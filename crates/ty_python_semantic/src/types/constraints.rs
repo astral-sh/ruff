@@ -167,6 +167,21 @@ impl<T> OptionConstraintsExtension<T> for Option<T> {
     }
 }
 
+pub(crate) trait ResultConstraintsExtension<T> {
+    /// Returns [`always_satisfiable`][Constraints::always_satisfiable] if the result is `Err(_)`; otherwise
+    /// applies a function to determine under what constraints the value inside of it holds.
+    fn when_err_or<'db, C: Constraints<'db>>(self, db: &'db dyn Db, f: impl FnOnce(T) -> C) -> C;
+}
+
+impl<T, E> ResultConstraintsExtension<T> for Result<T, E> {
+    fn when_err_or<'db, C: Constraints<'db>>(self, db: &'db dyn Db, f: impl FnOnce(T) -> C) -> C {
+        match self {
+            Ok(value) => f(value),
+            Err(_) => C::always_satisfiable(db),
+        }
+    }
+}
+
 /// An extension trait for building constraint sets from an [`Iterator`].
 pub(crate) trait IteratorConstraintsExtension<T> {
     /// Returns the constraints under which any element of the iterator holds.

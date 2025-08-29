@@ -78,7 +78,7 @@ reveal_type(Person.id)  # revealed: property
 reveal_type(Person.name)  # revealed: property
 reveal_type(Person.age)  # revealed: property
 
-# error: [invalid-assignment] "Cannot assign to read-only property `id` on object of type `Person`"
+# error: [invalid-assignment] "Attribute `id` on object of type `Person` is read-only"
 alice.id = 42
 # error: [invalid-assignment]
 bob.age = None
@@ -218,7 +218,7 @@ james = SuperUser(0, "James", 42, "Jimmy")
 # on the subclass
 james.name = "Robert"
 
-# error: [invalid-assignment] "Cannot assign to read-only property `nickname` on object of type `SuperUser`"
+# error: [invalid-assignment] "Attribute `nickname` on object of type `SuperUser` is read-only"
 james.nickname = "Bob"
 ```
 

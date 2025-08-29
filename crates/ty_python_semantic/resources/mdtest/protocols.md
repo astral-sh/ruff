@@ -413,7 +413,7 @@ To see the kinds and types of the protocol members, you can use the debugging ai
 from ty_extensions import reveal_protocol_interface
 from typing import SupportsIndex, SupportsAbs, ClassVar, Iterator
 
-# error: [revealed-type] "Revealed protocol interface: `{"method_member": MethodMember(`(self) -> bytes`), "x": AttributeMember(`int`), "y": PropertyMember { getter: `def y(self) -> str` }, "z": PropertyMember { getter: `def z(self) -> int`, setter: `def z(self, z: int) -> None` }}`"
+# error: [revealed-type] "Revealed protocol interface: `{"method_member": MethodMember(`(self) -> bytes`), "x": AttributeMember(`int`), "y": PropertyMember { get_type: `str` }, "z": PropertyMember { get_type: `int`, set_type: `int` }}`"
 reveal_protocol_interface(Foo)
 # error: [revealed-type] "Revealed protocol interface: `{"__index__": MethodMember(`(self) -> int`)}`"
 reveal_protocol_interface(SupportsIndex)
@@ -706,12 +706,13 @@ class HasClassVarX(Protocol):
 
 static_assert(is_subtype_of(FooWithZero, HasClassVarX))
 static_assert(is_assignable_to(FooWithZero, HasClassVarX))
+
 # TODO: these should pass
 static_assert(not is_subtype_of(Foo, HasClassVarX))  # error: [static-assert-error]
 static_assert(not is_assignable_to(Foo, HasClassVarX))  # error: [static-assert-error]
-static_assert(not is_subtype_of(Qux, HasClassVarX))  # error: [static-assert-error]
-static_assert(not is_assignable_to(Qux, HasClassVarX))  # error: [static-assert-error]
 
+static_assert(not is_subtype_of(Qux, HasClassVarX))
+static_assert(not is_assignable_to(Qux, HasClassVarX))
 static_assert(is_subtype_of(Sequence[Foo], Sequence[HasX]))
 static_assert(is_assignable_to(Sequence[Foo], Sequence[HasX]))
 static_assert(not is_subtype_of(list[Foo], list[HasX]))
@@ -731,16 +732,14 @@ class A:
     def x(self) -> int:
         return 42
 
-# TODO: these should pass
-static_assert(not is_subtype_of(A, HasX))  # error: [static-assert-error]
-static_assert(not is_assignable_to(A, HasX))  # error: [static-assert-error]
+static_assert(not is_subtype_of(A, HasX))
+static_assert(not is_assignable_to(A, HasX))
 
 class B:
     x: Final = 42
 
-# TODO: these should pass
-static_assert(not is_subtype_of(A, HasX))  # error: [static-assert-error]
-static_assert(not is_assignable_to(A, HasX))  # error: [static-assert-error]
+static_assert(not is_subtype_of(A, HasX))
+static_assert(not is_assignable_to(A, HasX))
 
 class IntSub(int): ...
 
@@ -772,16 +771,14 @@ static_assert(is_assignable_to(MutableDataclass, HasX))
 class ImmutableDataclass:
     x: int
 
-# TODO: these should pass
-static_assert(not is_subtype_of(ImmutableDataclass, HasX))  # error: [static-assert-error]
-static_assert(not is_assignable_to(ImmutableDataclass, HasX))  # error: [static-assert-error]
+static_assert(not is_subtype_of(ImmutableDataclass, HasX))
+static_assert(not is_assignable_to(ImmutableDataclass, HasX))
 
 class NamedTupleWithX(NamedTuple):
     x: int
 
-# TODO: these should pass
-static_assert(not is_subtype_of(NamedTupleWithX, HasX))  # error: [static-assert-error]
-static_assert(not is_assignable_to(NamedTupleWithX, HasX))  # error: [static-assert-error]
+static_assert(not is_subtype_of(NamedTupleWithX, HasX))
+static_assert(not is_assignable_to(NamedTupleWithX, HasX))
 ```
 
 However, a type with a read-write property `x` *does* satisfy the `HasX` protocol. The `HasX`
@@ -1401,9 +1398,8 @@ class PropertyX:
     def x(self) -> int:
         return 42
 
-# TODO: these should pass
-static_assert(not is_assignable_to(PropertyX, ClassVarXProto))  # error: [static-assert-error]
-static_assert(not is_subtype_of(PropertyX, ClassVarXProto))  # error: [static-assert-error]
+static_assert(not is_assignable_to(PropertyX, ClassVarXProto))
+static_assert(not is_subtype_of(PropertyX, ClassVarXProto))
 
 class ClassVarX:
     x: ClassVar[int] = 42
@@ -1512,9 +1508,8 @@ class XReadProperty:
     def x(self) -> int:
         return 42
 
-# TODO: these should pass
-static_assert(not is_subtype_of(XReadProperty, HasXProperty))  # error: [static-assert-error]
-static_assert(not is_assignable_to(XReadProperty, HasXProperty))  # error: [static-assert-error]
+static_assert(is_subtype_of(XReadProperty, HasXProperty))
+static_assert(is_assignable_to(XReadProperty, HasXProperty))
 
 class XReadWriteProperty:
     @property
@@ -1598,9 +1593,8 @@ class MyIntSub(MyInt):
 class XAttrSubSub:
     x: MyIntSub
 
-# TODO: should pass
-static_assert(not is_subtype_of(XAttrSubSub, HasAsymmetricXProperty))  # error: [static-assert-error]
-static_assert(not is_assignable_to(XAttrSubSub, HasAsymmetricXProperty))  # error: [static-assert-error]
+static_assert(not is_subtype_of(XAttrSubSub, HasAsymmetricXProperty))
+static_assert(not is_assignable_to(XAttrSubSub, HasAsymmetricXProperty))
 ```
 
 An asymmetric property on a protocol can also be satisfied by an asymmetric property on a nominal
@@ -1649,17 +1643,15 @@ class HasGetAttr:
 static_assert(is_subtype_of(HasGetAttr, HasXProperty))
 static_assert(is_assignable_to(HasGetAttr, HasXProperty))
 
-# TODO: these should pass
-static_assert(not is_subtype_of(HasGetAttr, HasMutableXAttr))  # error: [static-assert-error]
-static_assert(not is_subtype_of(HasGetAttr, HasMutableXAttr))  # error: [static-assert-error]
+static_assert(not is_subtype_of(HasGetAttr, HasMutableXAttr))
+static_assert(not is_subtype_of(HasGetAttr, HasMutableXAttr))
 
 class HasGetAttrWithUnsuitableReturn:
     def __getattr__(self, attr: str) -> tuple[int, int]:
         return (1, 2)
 
-# TODO: these should pass
-static_assert(not is_subtype_of(HasGetAttrWithUnsuitableReturn, HasXProperty))  # error: [static-assert-error]
-static_assert(not is_assignable_to(HasGetAttrWithUnsuitableReturn, HasXProperty))  # error: [static-assert-error]
+static_assert(not is_subtype_of(HasGetAttrWithUnsuitableReturn, HasXProperty))
+static_assert(not is_assignable_to(HasGetAttrWithUnsuitableReturn, HasXProperty))
 
 class HasGetAttrAndSetAttr:
     def __getattr__(self, attr: str) -> MyInt:
@@ -1670,9 +1662,8 @@ class HasGetAttrAndSetAttr:
 static_assert(is_subtype_of(HasGetAttrAndSetAttr, HasXProperty))
 static_assert(is_assignable_to(HasGetAttrAndSetAttr, HasXProperty))
 
-# TODO: these should pass
-static_assert(is_subtype_of(HasGetAttrAndSetAttr, XAsymmetricProperty))  # error: [static-assert-error]
-static_assert(is_assignable_to(HasGetAttrAndSetAttr, XAsymmetricProperty))  # error: [static-assert-error]
+static_assert(is_subtype_of(HasGetAttrAndSetAttr, HasAsymmetricXProperty))
+static_assert(is_assignable_to(HasGetAttrAndSetAttr, HasAsymmetricXProperty))
 
 class HasSetAttrWithUnsuitableInput:
     def __getattr__(self, attr: str) -> int:
@@ -1680,9 +1671,8 @@ class HasSetAttrWithUnsuitableInput:
 
     def __setattr__(self, attr: str, value: str) -> None: ...
 
-# TODO: these should pass
-static_assert(not is_subtype_of(HasSetAttrWithUnsuitableInput, HasMutableXProperty))  # error: [static-assert-error]
-static_assert(not is_assignable_to(HasSetAttrWithUnsuitableInput, HasMutableXProperty))  # error: [static-assert-error]
+static_assert(not is_subtype_of(HasSetAttrWithUnsuitableInput, HasMutableXProperty))
+static_assert(not is_assignable_to(HasSetAttrWithUnsuitableInput, HasMutableXProperty))
 ```
 
 ## Subtyping of protocols with method members
@@ -1789,9 +1779,21 @@ from ty_extensions import is_equivalent_to, static_assert
 
 class P1(Protocol):
     def x(self, y: int) -> None: ...
+    @property
+    def y(self) -> str: ...
+    @property
+    def z(self) -> bytes: ...
+    @z.setter
+    def z(self, value: int) -> None: ...
 
 class P2(Protocol):
     def x(self, y: int) -> None: ...
+    @property
+    def y(self) -> str: ...
+    @property
+    def z(self) -> bytes: ...
+    @z.setter
+    def z(self, value: int) -> None: ...
 
 class P3(Protocol):
     @property
@@ -1810,9 +1812,7 @@ class P4(Protocol):
     def z(self, value: int) -> None: ...
 
 static_assert(is_equivalent_to(P1, P2))
-
-# TODO: should pass
-static_assert(is_equivalent_to(P3, P4))  # error: [static-assert-error]
+static_assert(is_equivalent_to(P3, P4))
 ```
 
 As with protocols that only have non-method members, this also holds true when they appear in
@@ -1823,9 +1823,7 @@ class A: ...
 class B: ...
 
 static_assert(is_equivalent_to(A | B | P1, P2 | B | A))
-
-# TODO: should pass
-static_assert(is_equivalent_to(A | B | P3, P4 | B | A))  # error: [static-assert-error]
+static_assert(is_equivalent_to(A | B | P3, P4 | B | A))
 ```
 
 ## Narrowing of protocols
@@ -2106,8 +2104,6 @@ class Bar(Protocol):
     @property
     def x(self) -> "Bar": ...
 
-# TODO: this should pass
-# error: [static-assert-error]
 static_assert(is_equivalent_to(Foo, Bar))
 
 T = TypeVar("T", bound="TypeVarRecursive")
