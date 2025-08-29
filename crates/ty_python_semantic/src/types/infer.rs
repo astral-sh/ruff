@@ -102,7 +102,7 @@ use crate::types::diagnostic::{
     INVALID_TYPE_VARIABLE_CONSTRAINTS, IncompatibleBases, POSSIBLY_UNBOUND_IMPLICIT_CALL,
     POSSIBLY_UNBOUND_IMPORT, TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE,
     UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR,
-    report_implicit_return_type, report_instance_layout_conflict,
+    report_bad_dunder_set_call, report_implicit_return_type, report_instance_layout_conflict,
     report_invalid_argument_number_to_special_form, report_invalid_arguments_to_annotated,
     report_invalid_arguments_to_callable, report_invalid_assignment,
     report_invalid_attribute_assignment, report_invalid_generator_function_return_type,
@@ -4217,32 +4217,30 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     if let Place::Type(meta_dunder_set, _) =
                                         meta_attr_ty.class_member(db, "__set__".into()).place
                                     {
-                                        let successful_call = meta_dunder_set
-                                            .try_call(
-                                                db,
-                                                &CallArguments::positional([
-                                                    meta_attr_ty,
-                                                    object_ty,
-                                                    value_ty,
-                                                ]),
-                                            )
-                                            .is_ok();
+                                        let dunder_set_result = meta_dunder_set.try_call(
+                                            db,
+                                            &CallArguments::positional([
+                                                meta_attr_ty,
+                                                object_ty,
+                                                value_ty,
+                                            ]),
+                                        );
 
-                                        if !successful_call && emit_diagnostics {
-                                            if let Some(builder) = self
-                                                .context
-                                                .report_lint(&INVALID_ASSIGNMENT, target)
+                                        if emit_diagnostics {
+                                            if let Err(dunder_set_failure) =
+                                                dunder_set_result.as_ref()
                                             {
-                                                // TODO: Here, it would be nice to emit an additional diagnostic that explains why the call failed
-                                                builder.into_diagnostic(format_args!(
-                                            "Invalid assignment to data descriptor attribute \
-                                         `{attribute}` on type `{}` with custom `__set__` method",
-                                            object_ty.display(db)
-                                        ));
+                                                report_bad_dunder_set_call(
+                                                    &self.context,
+                                                    dunder_set_failure,
+                                                    attribute,
+                                                    object_ty,
+                                                    target,
+                                                );
                                             }
                                         }
 
-                                        successful_call
+                                        dunder_set_result.is_ok()
                                     } else {
                                         ensure_assignable_to(meta_attr_ty)
                                     };
@@ -4343,27 +4341,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         let assignable_to_meta_attr = if let Place::Type(meta_dunder_set, _) =
                             meta_attr_ty.class_member(db, "__set__".into()).place
                         {
-                            let successful_call = meta_dunder_set
-                                .try_call(
-                                    db,
-                                    &CallArguments::positional([meta_attr_ty, object_ty, value_ty]),
-                                )
-                                .is_ok();
+                            let dunder_set_result = meta_dunder_set.try_call(
+                                db,
+                                &CallArguments::positional([meta_attr_ty, object_ty, value_ty]),
+                            );
 
-                            if !successful_call && emit_diagnostics {
-                                if let Some(builder) =
-                                    self.context.report_lint(&INVALID_ASSIGNMENT, target)
-                                {
-                                    // TODO: Here, it would be nice to emit an additional diagnostic that explains why the call failed
-                                    builder.into_diagnostic(format_args!(
-                                        "Invalid assignment to data descriptor attribute \
-                                         `{attribute}` on type `{}` with custom `__set__` method",
-                                        object_ty.display(db)
-                                    ));
+                            if emit_diagnostics {
+                                if let Err(dunder_set_failure) = dunder_set_result.as_ref() {
+                                    report_bad_dunder_set_call(
+                                        &self.context,
+                                        dunder_set_failure,
+                                        attribute,
+                                        object_ty,
+                                        target,
+                                    );
                                 }
                             }
 
-                            successful_call
+                            dunder_set_result.is_ok()
                         } else {
                             ensure_assignable_to(meta_attr_ty)
                         };

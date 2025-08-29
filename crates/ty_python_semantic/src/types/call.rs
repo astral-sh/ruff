@@ -1,6 +1,7 @@
 use super::context::InferContext;
 use super::{Signature, Type};
 use crate::Db;
+use crate::types::call::bind::BindingError;
 
 mod arguments;
 pub(crate) mod bind;
@@ -13,6 +14,17 @@ pub(super) use bind::{Binding, Bindings, CallableBinding, MatchedArgument};
 /// The bindings are boxed so that we do not pass around large `Err` variants on the stack.
 #[derive(Debug)]
 pub(crate) struct CallError<'db>(pub(crate) CallErrorKind, pub(crate) Box<Bindings<'db>>);
+
+impl CallError<'_> {
+    pub(crate) fn stems_from_attempt_to_set_property_with_no_setter(&self) -> bool {
+        self.0 == CallErrorKind::BindingError
+            && self.1.into_iter().flatten().any(|binding| {
+                binding
+                    .errors()
+                    .contains(&BindingError::PropertyHasNoSetter)
+            })
+    }
+}
 
 /// The reason why calling a type failed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

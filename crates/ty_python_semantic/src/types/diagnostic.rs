@@ -10,6 +10,7 @@ use crate::semantic_index::SemanticIndex;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::place::{PlaceTable, ScopedPlaceId};
 use crate::suppression::FileSuppressionId;
+use crate::types::call::CallError;
 use crate::types::class::{DisjointBase, DisjointBaseKind, Field};
 use crate::types::function::KnownFunction;
 use crate::types::string_annotation::{
@@ -1977,6 +1978,32 @@ pub(super) fn report_invalid_attribute_assignment(
             target_ty.display(context.db()),
         ),
     );
+}
+
+pub(super) fn report_bad_dunder_set_call<'db>(
+    context: &InferContext<'db, '_>,
+    dunder_set_failure: &CallError<'db>,
+    attribute: &str,
+    object_type: Type<'db>,
+    target: &ast::ExprAttribute,
+) {
+    let Some(builder) = context.report_lint(&INVALID_ASSIGNMENT, target) else {
+        return;
+    };
+    if dunder_set_failure.stems_from_attempt_to_set_property_with_no_setter() {
+        builder.into_diagnostic(format_args!(
+            "Cannot assign to read-only property `{attribute}` on object of type `{}`",
+            object_type.display(context.db())
+        ));
+    } else {
+        // TODO: Here, it would be nice to emit an additional diagnostic
+        // that explains why the call failed
+        builder.into_diagnostic(format_args!(
+            "Invalid assignment to data descriptor attribute \
+            `{attribute}` on type `{}` with custom `__set__` method",
+            object_type.display(context.db())
+        ));
+    }
 }
 
 pub(super) fn report_invalid_return_type(
