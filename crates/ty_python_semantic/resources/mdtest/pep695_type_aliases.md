@@ -123,23 +123,12 @@ def f(x: IntOrStr, y: str | bytes):
 ## Multiple layers of union aliases
 
 ```py
-class A:
-    pass
-
-class B:
-    pass
-
-class C:
-    pass
-
-class D:
-    pass
-
-class E:
-    pass
-
-class G[T]:
-    pass
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+class E: ...
+class G[T]: ...
 
 type W = A | B
 type X = C | D

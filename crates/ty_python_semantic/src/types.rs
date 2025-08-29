@@ -7682,8 +7682,7 @@ impl<'db> TypeVarBoundOrConstraints<'db> {
                         .elements(db)
                         .iter()
                         .map(|ty| ty.normalized_impl(db, visitor))
-                        .collect::<Vec<_>>()
-                        .into_boxed_slice(),
+                        .collect::<Box<_>>(),
                 ))
             }
         }
