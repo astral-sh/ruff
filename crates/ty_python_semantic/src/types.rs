@@ -489,13 +489,18 @@ fn walk_property_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 impl get_size2::GetSize for PropertyInstanceType<'_> {}
 
 impl<'db> PropertyInstanceType<'db> {
-    fn apply_type_mapping<'a>(self, db: &'db dyn Db, type_mapping: &TypeMapping<'a, 'db>) -> Self {
+    fn apply_type_mapping_impl<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
         let getter = self
             .getter(db)
-            .map(|ty| ty.apply_type_mapping(db, type_mapping));
+            .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, visitor));
         let setter = self
             .setter(db)
-            .map(|ty| ty.apply_type_mapping(db, type_mapping));
+            .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, visitor));
         Self::new(db, getter, setter)
     }
 
@@ -6077,18 +6082,18 @@ impl<'db> Type<'db> {
 
             Type::MethodWrapper(MethodWrapperKind::PropertyDunderGet(property)) => {
                 Type::MethodWrapper(MethodWrapperKind::PropertyDunderGet(
-                    property.apply_type_mapping(db, type_mapping),
+                    property.apply_type_mapping_impl(db, type_mapping, visitor),
                 ))
             }
 
             Type::MethodWrapper(MethodWrapperKind::PropertyDunderSet(property)) => {
                 Type::MethodWrapper(MethodWrapperKind::PropertyDunderSet(
-                    property.apply_type_mapping(db, type_mapping),
+                    property.apply_type_mapping_impl(db, type_mapping, visitor),
                 ))
             }
 
             Type::Callable(callable) => {
-                Type::Callable(callable.apply_type_mapping(db, type_mapping))
+                Type::Callable(callable.apply_type_mapping_impl(db, type_mapping, visitor))
             }
 
             Type::GenericAlias(generic) => {
@@ -6104,7 +6109,7 @@ impl<'db> Type<'db> {
             ),
 
             Type::PropertyInstance(property) => {
-                Type::PropertyInstance(property.apply_type_mapping(db, type_mapping))
+                Type::PropertyInstance(property.apply_type_mapping_impl(db, type_mapping, visitor))
             }
 
             Type::Union(union) => union.map(db, |element| {
@@ -8985,10 +8990,16 @@ impl<'db> CallableType<'db> {
         )
     }
 
-    fn apply_type_mapping<'a>(self, db: &'db dyn Db, type_mapping: &TypeMapping<'a, 'db>) -> Self {
+    fn apply_type_mapping_impl<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
         CallableType::new(
             db,
-            self.signatures(db).apply_type_mapping(db, type_mapping),
+            self.signatures(db)
+                .apply_type_mapping_impl(db, type_mapping, visitor),
             self.is_function_like(db),
         )
     }
