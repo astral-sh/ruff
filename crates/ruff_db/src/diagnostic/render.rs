@@ -254,7 +254,7 @@ impl<'a> ResolvedDiagnostic<'a> {
             id,
             message: diag.inner.message.as_str().to_string(),
             annotations,
-            is_fixable: diag.is_fix_applicable(config),
+            is_fixable: diag.has_applicable_fix(config),
         }
     }
 
