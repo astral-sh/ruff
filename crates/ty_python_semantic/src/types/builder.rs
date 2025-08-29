@@ -38,6 +38,7 @@
 //! unnecessary `is_subtype_of` checks.
 
 use crate::types::enums::{enum_member_literals, enum_metadata};
+use crate::types::type_ordering::union_or_intersection_elements_ordering;
 use crate::types::{
     BytesLiteralType, IntersectionType, KnownClass, StringLiteralType, Type,
     TypeVarBoundOrConstraints, UnionType,
@@ -211,6 +212,7 @@ pub(crate) struct UnionBuilder<'db> {
     elements: Vec<UnionElement<'db>>,
     db: &'db dyn Db,
     unpack_aliases: bool,
+    order_elements: bool,
 }
 
 impl<'db> UnionBuilder<'db> {
@@ -219,11 +221,17 @@ impl<'db> UnionBuilder<'db> {
             db,
             elements: vec![],
             unpack_aliases: true,
+            order_elements: false,
         }
     }
 
     pub(crate) fn unpack_aliases(mut self, val: bool) -> Self {
         self.unpack_aliases = val;
+        self
+    }
+
+    pub(crate) fn order_elements(mut self, val: bool) -> Self {
+        self.order_elements = val;
         self
     }
 
@@ -544,6 +552,9 @@ impl<'db> UnionBuilder<'db> {
                 }
                 UnionElement::Type(ty) => types.push(ty),
             }
+        }
+        if self.order_elements {
+            types.sort_unstable_by(|l, r| union_or_intersection_elements_ordering(self.db, l, r));
         }
         match types.len() {
             0 => None,
