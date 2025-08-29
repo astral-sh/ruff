@@ -466,6 +466,7 @@ help: Replace with `Path(...).name`
 30 | os.path.dirname(p)
 31 | os.path.samefile(p)
 32 | os.path.splitext(p)
+note: This is an unsafe fix and may change runtime behavior
 
 PTH120 [*] `os.path.dirname()` should be replaced by `Path.parent`
   --> full_name.py:29:1
@@ -493,6 +494,7 @@ help: Replace with `Path(...).parent`
 31 | os.path.samefile(p)
 32 | os.path.splitext(p)
 33 | with open(p) as fp:
+note: This is an unsafe fix and may change runtime behavior
 
 PTH121 `os.path.samefile()` should be replaced by `Path.samefile()`
   --> full_name.py:30:1
