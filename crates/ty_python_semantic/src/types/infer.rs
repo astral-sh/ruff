@@ -999,9 +999,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.index.has_future_annotations() || self.in_stub()
     }
 
-    /// Are we currently inferring deferred types?
+    /// Are we currently in a context where name resolution should be deferred
+    /// (`__future__.annotations`, stub file, or stringified annotation)?
     fn is_deferred(&self) -> bool {
-        matches!(self.region, InferenceRegion::Deferred(_)) || self.deferred_state.is_deferred()
+        self.deferred_state.is_deferred()
     }
 
     /// Return the node key of the given AST node, or the key of the outermost enclosing string
@@ -3173,10 +3174,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.infer_expression(&keyword.value);
             }
 
-            // Inference of bases deferred in stubs
-            // TODO: Only defer the references that are actually string literals, instead of
-            // deferring the entire class definition if a string literal occurs anywhere in the
-            // base class list.
+            // Inference of bases deferred in stubs, or if any are string literals.
             if self.in_stub() || class_node.bases().iter().any(contains_string_literal) {
                 self.deferred.insert(definition);
             } else {
@@ -3206,9 +3204,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_class_deferred(&mut self, definition: Definition<'db>, class: &ast::StmtClassDef) {
         let previous_typevar_binding_context = self.typevar_binding_context.replace(definition);
+        let previous_deferred_state =
+            std::mem::replace(&mut self.deferred_state, DeferredExpressionState::Deferred);
         for base in class.bases() {
             self.infer_expression(base);
         }
+        self.deferred_state = previous_deferred_state;
         self.typevar_binding_context = previous_typevar_binding_context;
     }
 
@@ -3561,6 +3562,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             bound,
             default,
         } = node;
+        let previous_deferred_state =
+            std::mem::replace(&mut self.deferred_state, DeferredExpressionState::Deferred);
         match bound.as_deref() {
             Some(expr @ ast::Expr::Tuple(ast::ExprTuple { elts, .. })) => {
                 // We don't use UnionType::from_elements or UnionBuilder here, because we don't
@@ -3582,6 +3585,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             None => {}
         }
         self.infer_optional_type_expression(default.as_deref());
+        self.deferred_state = previous_deferred_state;
     }
 
     fn infer_paramspec_definition(
