@@ -28,7 +28,6 @@ use crate::semantic_index::scope::{
 use crate::semantic_index::symbol::ScopedSymbolId;
 use crate::semantic_index::use_def::{EnclosingSnapshotKey, ScopedEnclosingSnapshotId, UseDefMap};
 use crate::semantic_model::HasTrackedScope;
-use crate::util::get_size::untracked_arc_size;
 
 pub mod ast_ids;
 mod builder;
@@ -52,7 +51,7 @@ pub(crate) use self::use_def::{
 /// Returns the semantic index for `file`.
 ///
 /// Prefer using [`symbol_table`] when working with symbols from a single scope.
-#[salsa::tracked(returns(ref), no_eq, heap_size=get_size2::heap_size)]
+#[salsa::tracked(returns(ref), no_eq, heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn semantic_index(db: &dyn Db, file: File) -> SemanticIndex<'_> {
     let _span = tracing::trace_span!("semantic_index", ?file).entered();
 
@@ -66,13 +65,12 @@ pub(crate) fn semantic_index(db: &dyn Db, file: File) -> SemanticIndex<'_> {
 /// Using [`place_table`] over [`semantic_index`] has the advantage that
 /// Salsa can avoid invalidating dependent queries if this scope's place table
 /// is unchanged.
-#[salsa::tracked(returns(deref), heap_size=get_size2::heap_size)]
+#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn place_table<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<PlaceTable> {
     let file = scope.file(db);
     let _span = tracing::trace_span!("place_table", scope=?scope.as_id(), ?file).entered();
     let index = semantic_index(db, file);
-
-    index.place_table(scope.file_scope_id(db))
+    Arc::clone(&index.place_tables[scope.file_scope_id(db)])
 }
 
 /// Returns the set of modules that are imported anywhere in `file`.
@@ -86,7 +84,7 @@ pub(crate) fn place_table<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<Plac
 ///
 ///   - We cannot resolve relative imports (which aren't allowed in `import` statements) without
 ///     knowing the name of the current module, and whether it's a package.
-#[salsa::tracked(returns(deref), heap_size=get_size2::heap_size)]
+#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn imported_modules<'db>(db: &'db dyn Db, file: File) -> Arc<FxHashSet<ModuleName>> {
     semantic_index(db, file).imported_modules.clone()
 }
@@ -96,13 +94,12 @@ pub(crate) fn imported_modules<'db>(db: &'db dyn Db, file: File) -> Arc<FxHashSe
 /// Using [`use_def_map`] over [`semantic_index`] has the advantage that
 /// Salsa can avoid invalidating dependent queries if this scope's use-def map
 /// is unchanged.
-#[salsa::tracked(returns(deref), heap_size=get_size2::heap_size)]
-pub(crate) fn use_def_map<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> ArcUseDefMap<'db> {
+#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+pub(crate) fn use_def_map<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<UseDefMap<'db>> {
     let file = scope.file(db);
     let _span = tracing::trace_span!("use_def_map", scope=?scope.as_id(), ?file).entered();
     let index = semantic_index(db, file);
-
-    index.use_def_map(scope.file_scope_id(db))
+    Arc::clone(&index.use_def_maps[scope.file_scope_id(db)])
 }
 
 /// Returns all attribute assignments (and their method scope IDs) with a symbol name matching
@@ -123,7 +120,7 @@ pub(crate) fn attribute_assignments<'db, 's>(
         let member = place_table.member_id_by_instance_attribute_name(name)?;
         let use_def = &index.use_def_maps[function_scope_id];
         Some((
-            use_def.inner.all_reachable_member_bindings(member),
+            use_def.all_reachable_member_bindings(member),
             function_scope_id,
         ))
     })
@@ -147,7 +144,7 @@ pub(crate) fn attribute_declarations<'db, 's>(
         let member = place_table.member_id_by_instance_attribute_name(name)?;
         let use_def = &index.use_def_maps[function_scope_id];
         Some((
-            use_def.inner.all_reachable_member_declarations(member),
+            use_def.all_reachable_member_declarations(member),
             function_scope_id,
         ))
     })
@@ -166,9 +163,9 @@ pub(crate) fn attribute_scopes<'db, 's>(
     let index = semantic_index(db, file);
     let class_scope_id = class_body_scope.file_scope_id(db);
 
-    ChildrenIter::new(index, class_scope_id).filter_map(move |(child_scope_id, scope)| {
+    ChildrenIter::new(&index.scopes, class_scope_id).filter_map(move |(child_scope_id, scope)| {
         let (function_scope_id, function_scope) =
-            if scope.node().scope_kind() == ScopeKind::Annotation {
+            if scope.node().scope_kind() == ScopeKind::TypeParams {
                 // This could be a generic method with a type-params scope.
                 // Go one level deeper to find the function scope. The first
                 // descendant is the (potential) function scope.
@@ -184,7 +181,7 @@ pub(crate) fn attribute_scopes<'db, 's>(
 }
 
 /// Returns the module global scope of `file`.
-#[salsa::tracked(heap_size=get_size2::heap_size)]
+#[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn global_scope(db: &dyn Db, file: File) -> ScopeId<'_> {
     let _span = tracing::trace_span!("global_scope", ?file).entered();
 
@@ -223,7 +220,7 @@ pub(crate) struct SemanticIndex<'db> {
     scope_ids_by_scope: IndexVec<FileScopeId, ScopeId<'db>>,
 
     /// Use-def map for each scope in this file.
-    use_def_maps: IndexVec<FileScopeId, ArcUseDefMap<'db>>,
+    use_def_maps: IndexVec<FileScopeId, Arc<UseDefMap<'db>>>,
 
     /// Lookup table to map between node ids and ast nodes.
     ///
@@ -253,8 +250,8 @@ impl<'db> SemanticIndex<'db> {
     /// Use the Salsa cached [`place_table()`] query if you only need the
     /// place table for a single scope.
     #[track_caller]
-    pub(super) fn place_table(&self, scope_id: FileScopeId) -> Arc<PlaceTable> {
-        self.place_tables[scope_id].clone()
+    pub(super) fn place_table(&self, scope_id: FileScopeId) -> &PlaceTable {
+        &self.place_tables[scope_id]
     }
 
     /// Returns the use-def map for a specific scope.
@@ -262,8 +259,8 @@ impl<'db> SemanticIndex<'db> {
     /// Use the Salsa cached [`use_def_map()`] query if you only need the
     /// use-def map for a single scope.
     #[track_caller]
-    pub(super) fn use_def_map(&self, scope_id: FileScopeId) -> ArcUseDefMap<'_> {
-        self.use_def_maps[scope_id].clone()
+    pub(super) fn use_def_map(&self, scope_id: FileScopeId) -> &UseDefMap<'db> {
+        &self.use_def_maps[scope_id]
     }
 
     #[track_caller]
@@ -302,7 +299,7 @@ impl<'db> SemanticIndex<'db> {
         &self.scopes[id]
     }
 
-    pub(crate) fn scope_ids(&self) -> impl Iterator<Item = ScopeId> {
+    pub(crate) fn scope_ids(&self) -> impl Iterator<Item = ScopeId<'db>> + '_ {
         self.scope_ids_by_scope.iter().copied()
     }
 
@@ -372,19 +369,19 @@ impl<'db> SemanticIndex<'db> {
 
     /// Returns an iterator over the descendent scopes of `scope`.
     #[allow(unused)]
-    pub(crate) fn descendent_scopes(&self, scope: FileScopeId) -> DescendantsIter {
-        DescendantsIter::new(self, scope)
+    pub(crate) fn descendent_scopes(&self, scope: FileScopeId) -> DescendantsIter<'_> {
+        DescendantsIter::new(&self.scopes, scope)
     }
 
     /// Returns an iterator over the direct child scopes of `scope`.
     #[allow(unused)]
-    pub(crate) fn child_scopes(&self, scope: FileScopeId) -> ChildrenIter {
-        ChildrenIter::new(self, scope)
+    pub(crate) fn child_scopes(&self, scope: FileScopeId) -> ChildrenIter<'_> {
+        ChildrenIter::new(&self.scopes, scope)
     }
 
     /// Returns an iterator over all ancestors of `scope`, starting with `scope` itself.
-    pub(crate) fn ancestor_scopes(&self, scope: FileScopeId) -> AncestorsIter {
-        AncestorsIter::new(self, scope)
+    pub(crate) fn ancestor_scopes(&self, scope: FileScopeId) -> AncestorsIter<'_> {
+        AncestorsIter::new(&self.scopes, scope)
     }
 
     /// Returns an iterator over ancestors of `scope` that are visible for name resolution,
@@ -401,8 +398,8 @@ impl<'db> SemanticIndex<'db> {
     ///         print(x)  # Refers to global x=1, not class x=2
     /// ```
     /// The `method` function can see the global scope but not the class scope.
-    pub(crate) fn visible_ancestor_scopes(&self, scope: FileScopeId) -> VisibleAncestorsIter {
-        VisibleAncestorsIter::new(self, scope)
+    pub(crate) fn visible_ancestor_scopes(&self, scope: FileScopeId) -> VisibleAncestorsIter<'_> {
+        VisibleAncestorsIter::new(&self.scopes, scope)
     }
 
     /// Returns the [`definition::Definition`] salsa ingredient(s) for `definition_key`.
@@ -510,7 +507,6 @@ impl<'db> SemanticIndex<'db> {
                         };
                         if let Some(id) = self.enclosing_snapshots.get(&key) {
                             return self.use_def_maps[enclosing_scope]
-                                .inner
                                 .enclosing_snapshot(*id, key.nested_laziness);
                         }
                     }
@@ -530,35 +526,11 @@ impl<'db> SemanticIndex<'db> {
         let Some(id) = self.enclosing_snapshots.get(&key) else {
             return EnclosingSnapshotResult::NotFound;
         };
-        self.use_def_maps[enclosing_scope]
-            .inner
-            .enclosing_snapshot(*id, key.nested_laziness)
+        self.use_def_maps[enclosing_scope].enclosing_snapshot(*id, key.nested_laziness)
     }
 
     pub(crate) fn semantic_syntax_errors(&self) -> &[SemanticSyntaxError] {
         &self.semantic_syntax_errors
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, salsa::Update, get_size2::GetSize)]
-pub(crate) struct ArcUseDefMap<'db> {
-    #[get_size(size_fn = untracked_arc_size)]
-    inner: Arc<UseDefMap<'db>>,
-}
-
-impl<'db> std::ops::Deref for ArcUseDefMap<'db> {
-    type Target = UseDefMap<'db>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.inner
-    }
-}
-
-impl<'db> ArcUseDefMap<'db> {
-    pub(crate) fn new(inner: UseDefMap<'db>) -> Self {
-        Self {
-            inner: Arc::new(inner),
-        }
     }
 }
 
@@ -568,9 +540,9 @@ pub(crate) struct AncestorsIter<'a> {
 }
 
 impl<'a> AncestorsIter<'a> {
-    fn new(module_table: &'a SemanticIndex, start: FileScopeId) -> Self {
+    fn new(scopes: &'a IndexSlice<FileScopeId, Scope>, start: FileScopeId) -> Self {
         Self {
-            scopes: &module_table.scopes,
+            scopes,
             next_id: Some(start),
         }
     }
@@ -597,10 +569,10 @@ pub(crate) struct VisibleAncestorsIter<'a> {
 }
 
 impl<'a> VisibleAncestorsIter<'a> {
-    fn new(module_table: &'a SemanticIndex, start: FileScopeId) -> Self {
-        let starting_scope = &module_table.scopes[start];
+    fn new(scopes: &'a IndexSlice<FileScopeId, Scope>, start: FileScopeId) -> Self {
+        let starting_scope = &scopes[start];
         Self {
-            inner: AncestorsIter::new(module_table, start),
+            inner: AncestorsIter::new(scopes, start),
             starting_scope_kind: starting_scope.kind(),
             yielded_count: 0,
         }
@@ -623,8 +595,8 @@ impl<'a> Iterator for VisibleAncestorsIter<'a> {
             // Skip class scopes for subsequent scopes (following Python's lexical scoping rules)
             // Exception: type parameter scopes can see names defined in an immediately-enclosing class scope
             if scope.kind() == ScopeKind::Class {
-                // Allow type parameter scopes to see their immediately-enclosing class scope exactly once
-                if self.starting_scope_kind.is_type_parameter() && self.yielded_count == 2 {
+                // Allow annotation scopes to see their immediately-enclosing class scope exactly once
+                if self.starting_scope_kind.is_annotation() && self.yielded_count == 2 {
                     return Some((scope_id, scope));
                 }
                 continue;
@@ -643,9 +615,9 @@ pub(crate) struct DescendantsIter<'a> {
 }
 
 impl<'a> DescendantsIter<'a> {
-    fn new(index: &'a SemanticIndex, scope_id: FileScopeId) -> Self {
-        let scope = &index.scopes[scope_id];
-        let scopes = &index.scopes[scope.descendants()];
+    fn new(scopes: &'a IndexSlice<FileScopeId, Scope>, scope_id: FileScopeId) -> Self {
+        let scope = &scopes[scope_id];
+        let scopes = &scopes[scope.descendants()];
 
         Self {
             next_id: scope_id + 1,
@@ -680,8 +652,8 @@ pub(crate) struct ChildrenIter<'a> {
 }
 
 impl<'a> ChildrenIter<'a> {
-    pub(crate) fn new(module_index: &'a SemanticIndex, parent: FileScopeId) -> Self {
-        let descendants = DescendantsIter::new(module_index, parent);
+    pub(crate) fn new(scopes: &'a IndexSlice<FileScopeId, Scope>, parent: FileScopeId) -> Self {
+        let descendants = DescendantsIter::new(scopes, parent);
 
         Self {
             parent,
@@ -933,7 +905,7 @@ y = 2
         );
 
         let class_table = index.place_table(class_scope_id);
-        assert_eq!(names(&class_table), vec!["x"]);
+        assert_eq!(names(class_table), vec!["x"]);
 
         let use_def = index.use_def_map(class_scope_id);
         let binding = use_def
@@ -955,7 +927,7 @@ y = 2
         let index = semantic_index(&db, file);
         let global_table = index.place_table(FileScopeId::global());
 
-        assert_eq!(names(&global_table), vec!["func", "y"]);
+        assert_eq!(names(global_table), vec!["func", "y"]);
 
         let [(function_scope_id, function_scope)] = index
             .child_scopes(FileScopeId::global())
@@ -970,7 +942,7 @@ y = 2
         );
 
         let function_table = index.place_table(function_scope_id);
-        assert_eq!(names(&function_table), vec!["x"]);
+        assert_eq!(names(function_table), vec!["x"]);
 
         let use_def = index.use_def_map(function_scope_id);
         let binding = use_def
@@ -1002,7 +974,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
 
         let function_table = index.place_table(function_scope_id);
         assert_eq!(
-            names(&function_table),
+            names(function_table),
             vec!["a", "b", "c", "d", "args", "kwargs"],
         );
 
@@ -1047,7 +1019,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
 
         let lambda_table = index.place_table(lambda_scope_id);
         assert_eq!(
-            names(&lambda_table),
+            names(lambda_table),
             vec!["a", "b", "c", "d", "args", "kwargs"],
         );
 
@@ -1088,7 +1060,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
         let index = semantic_index(&db, file);
         let global_table = index.place_table(FileScopeId::global());
 
-        assert_eq!(names(&global_table), vec!["iter1"]);
+        assert_eq!(names(global_table), vec!["iter1"]);
 
         let [(comprehension_scope_id, comprehension_scope)] = index
             .child_scopes(FileScopeId::global())
@@ -1107,7 +1079,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
 
         let comprehension_symbol_table = index.place_table(comprehension_scope_id);
 
-        assert_eq!(names(&comprehension_symbol_table), vec!["x", "y"]);
+        assert_eq!(names(comprehension_symbol_table), vec!["x", "y"]);
 
         let use_def = index.use_def_map(comprehension_scope_id);
         for name in ["x", "y"] {
@@ -1185,7 +1157,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
         let index = semantic_index(&db, file);
         let global_table = index.place_table(FileScopeId::global());
 
-        assert_eq!(names(&global_table), vec!["iter1"]);
+        assert_eq!(names(global_table), vec!["iter1"]);
 
         let [(comprehension_scope_id, comprehension_scope)] = index
             .child_scopes(FileScopeId::global())
@@ -1204,7 +1176,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
 
         let comprehension_symbol_table = index.place_table(comprehension_scope_id);
 
-        assert_eq!(names(&comprehension_symbol_table), vec!["y", "iter2"]);
+        assert_eq!(names(comprehension_symbol_table), vec!["y", "iter2"]);
 
         let [(inner_comprehension_scope_id, inner_comprehension_scope)] = index
             .child_scopes(comprehension_scope_id)
@@ -1223,7 +1195,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
 
         let inner_comprehension_symbol_table = index.place_table(inner_comprehension_scope_id);
 
-        assert_eq!(names(&inner_comprehension_symbol_table), vec!["x"]);
+        assert_eq!(names(inner_comprehension_symbol_table), vec!["x"]);
     }
 
     #[test]
@@ -1238,7 +1210,7 @@ with item1 as x, item2 as y:
         let index = semantic_index(&db, file);
         let global_table = index.place_table(FileScopeId::global());
 
-        assert_eq!(names(&global_table), vec!["item1", "x", "item2", "y"]);
+        assert_eq!(names(global_table), vec!["item1", "x", "item2", "y"]);
 
         let use_def = index.use_def_map(FileScopeId::global());
         for name in ["x", "y"] {
@@ -1261,7 +1233,7 @@ with context() as (x, y):
         let index = semantic_index(&db, file);
         let global_table = index.place_table(FileScopeId::global());
 
-        assert_eq!(names(&global_table), vec!["context", "x", "y"]);
+        assert_eq!(names(global_table), vec!["context", "x", "y"]);
 
         let use_def = index.use_def_map(FileScopeId::global());
         for name in ["x", "y"] {
@@ -1286,7 +1258,7 @@ def func():
         let index = semantic_index(&db, file);
         let global_table = index.place_table(FileScopeId::global());
 
-        assert_eq!(names(&global_table), vec!["func"]);
+        assert_eq!(names(global_table), vec!["func"]);
         let [
             (func_scope1_id, func_scope_1),
             (func_scope2_id, func_scope_2),
@@ -1311,8 +1283,8 @@ def func():
 
         let func1_table = index.place_table(func_scope1_id);
         let func2_table = index.place_table(func_scope2_id);
-        assert_eq!(names(&func1_table), vec!["x"]);
-        assert_eq!(names(&func2_table), vec!["y"]);
+        assert_eq!(names(func1_table), vec!["x"]);
+        assert_eq!(names(func2_table), vec!["y"]);
 
         let use_def = index.use_def_map(FileScopeId::global());
         let binding = use_def
@@ -1334,7 +1306,7 @@ def func[T]():
         let index = semantic_index(&db, file);
         let global_table = index.place_table(FileScopeId::global());
 
-        assert_eq!(names(&global_table), vec!["func"]);
+        assert_eq!(names(global_table), vec!["func"]);
 
         let [(ann_scope_id, ann_scope)] = index
             .child_scopes(FileScopeId::global())
@@ -1343,13 +1315,13 @@ def func[T]():
             panic!("expected one child scope");
         };
 
-        assert_eq!(ann_scope.kind(), ScopeKind::Annotation);
+        assert_eq!(ann_scope.kind(), ScopeKind::TypeParams);
         assert_eq!(
             ann_scope_id.to_scope_id(&db, file).name(&db, &module),
             "func"
         );
         let ann_table = index.place_table(ann_scope_id);
-        assert_eq!(names(&ann_table), vec!["T"]);
+        assert_eq!(names(ann_table), vec!["T"]);
 
         let [(func_scope_id, func_scope)] =
             index.child_scopes(ann_scope_id).collect::<Vec<_>>()[..]
@@ -1362,7 +1334,7 @@ def func[T]():
             "func"
         );
         let func_table = index.place_table(func_scope_id);
-        assert_eq!(names(&func_table), vec!["x"]);
+        assert_eq!(names(func_table), vec!["x"]);
     }
 
     #[test]
@@ -1378,7 +1350,7 @@ class C[T]:
         let index = semantic_index(&db, file);
         let global_table = index.place_table(FileScopeId::global());
 
-        assert_eq!(names(&global_table), vec!["C"]);
+        assert_eq!(names(global_table), vec!["C"]);
 
         let [(ann_scope_id, ann_scope)] = index
             .child_scopes(FileScopeId::global())
@@ -1387,10 +1359,10 @@ class C[T]:
             panic!("expected one child scope");
         };
 
-        assert_eq!(ann_scope.kind(), ScopeKind::Annotation);
+        assert_eq!(ann_scope.kind(), ScopeKind::TypeParams);
         assert_eq!(ann_scope_id.to_scope_id(&db, file).name(&db, &module), "C");
         let ann_table = index.place_table(ann_scope_id);
-        assert_eq!(names(&ann_table), vec!["T"]);
+        assert_eq!(names(ann_table), vec!["T"]);
         assert!(
             ann_table
                 .symbol_by_name("T")
@@ -1409,7 +1381,7 @@ class C[T]:
             class_scope_id.to_scope_id(&db, file).name(&db, &module),
             "C"
         );
-        assert_eq!(names(&index.place_table(class_scope_id)), vec!["x"]);
+        assert_eq!(names(index.place_table(class_scope_id)), vec!["x"]);
     }
 
     #[test]

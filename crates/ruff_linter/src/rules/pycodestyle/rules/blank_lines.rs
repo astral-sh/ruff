@@ -60,7 +60,7 @@ const BLANK_LINES_NESTED_LEVEL: u32 = 1;
 /// ## References
 /// - [PEP 8: Blank Lines](https://peps.python.org/pep-0008/#blank-lines)
 /// - [Flake 8 rule](https://www.flake8rules.com/rules/E301.html)
-/// - [Typing Style Guide](https://typing.python.org/en/latest/source/stubs.html#blank-lines)
+/// - [Typing Style Guide](https://typing.python.org/en/latest/guides/writing_stubs.html#blank-lines)
 #[derive(ViolationMetadata)]
 pub(crate) struct BlankLineBetweenMethods;
 
@@ -113,7 +113,7 @@ impl AlwaysFixableViolation for BlankLineBetweenMethods {
 /// ## References
 /// - [PEP 8: Blank Lines](https://peps.python.org/pep-0008/#blank-lines)
 /// - [Flake 8 rule](https://www.flake8rules.com/rules/E302.html)
-/// - [Typing Style Guide](https://typing.python.org/en/latest/source/stubs.html#blank-lines)
+/// - [Typing Style Guide](https://typing.python.org/en/latest/guides/writing_stubs.html#blank-lines)
 #[derive(ViolationMetadata)]
 pub(crate) struct BlankLinesTopLevel {
     actual_blank_lines: u32,
@@ -180,7 +180,7 @@ impl AlwaysFixableViolation for BlankLinesTopLevel {
 /// ## References
 /// - [PEP 8: Blank Lines](https://peps.python.org/pep-0008/#blank-lines)
 /// - [Flake 8 rule](https://www.flake8rules.com/rules/E303.html)
-/// - [Typing Style Guide](https://typing.python.org/en/latest/source/stubs.html#blank-lines)
+/// - [Typing Style Guide](https://typing.python.org/en/latest/guides/writing_stubs.html#blank-lines)
 #[derive(ViolationMetadata)]
 pub(crate) struct TooManyBlankLines {
     actual_blank_lines: u32,
@@ -277,7 +277,7 @@ impl AlwaysFixableViolation for BlankLineAfterDecorator {
 /// ## References
 /// - [PEP 8: Blank Lines](https://peps.python.org/pep-0008/#blank-lines)
 /// - [Flake 8 rule](https://www.flake8rules.com/rules/E305.html)
-/// - [Typing Style Guide](https://typing.python.org/en/latest/source/stubs.html#blank-lines)
+/// - [Typing Style Guide](https://typing.python.org/en/latest/guides/writing_stubs.html#blank-lines)
 #[derive(ViolationMetadata)]
 pub(crate) struct BlankLinesAfterFunctionOrClass {
     actual_blank_lines: u32,
@@ -331,7 +331,7 @@ impl AlwaysFixableViolation for BlankLinesAfterFunctionOrClass {
 /// ## References
 /// - [PEP 8: Blank Lines](https://peps.python.org/pep-0008/#blank-lines)
 /// - [Flake 8 rule](https://www.flake8rules.com/rules/E306.html)
-/// - [Typing Style Guide](https://typing.python.org/en/latest/source/stubs.html#blank-lines)
+/// - [Typing Style Guide](https://typing.python.org/en/latest/guides/writing_stubs.html#blank-lines)
 #[derive(ViolationMetadata)]
 pub(crate) struct BlankLinesBeforeNestedDefinition;
 

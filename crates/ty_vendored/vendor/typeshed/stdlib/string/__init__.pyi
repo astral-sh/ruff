@@ -18,7 +18,7 @@ import sys
 from _typeshed import StrOrLiteralStr
 from collections.abc import Iterable, Mapping, Sequence
 from re import Pattern, RegexFlag
-from typing import Any, ClassVar, overload
+from typing import Any, ClassVar, Final, overload
 from typing_extensions import LiteralString
 
 __all__ = [
@@ -36,15 +36,15 @@ __all__ = [
     "Template",
 ]
 
-ascii_letters: LiteralString
-ascii_lowercase: LiteralString
-ascii_uppercase: LiteralString
-digits: LiteralString
-hexdigits: LiteralString
-octdigits: LiteralString
-punctuation: LiteralString
-printable: LiteralString
-whitespace: LiteralString
+whitespace: Final = " \t\n\r\v\f"
+ascii_lowercase: Final = "abcdefghijklmnopqrstuvwxyz"
+ascii_uppercase: Final = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+ascii_letters: Final[LiteralString]  # string too long
+digits: Final = "0123456789"
+hexdigits: Final = "0123456789abcdefABCDEF"
+octdigits: Final = "01234567"
+punctuation: Final = r"""!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~"""
+printable: Final[LiteralString]  # string too long
 
 def capwords(s: StrOrLiteralStr, sep: StrOrLiteralStr | None = None) -> StrOrLiteralStr:
     """capwords(s [,sep]) -> string

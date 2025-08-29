@@ -188,7 +188,7 @@ fn generate_keyword_fix(checker: &Checker, call: &ast::ExprCall) -> Fix {
                 value: Box::from("utf-8"),
                 flags: checker.default_string_flags(),
                 range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             }))
         ),
         &call.arguments,

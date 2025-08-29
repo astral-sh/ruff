@@ -21,7 +21,7 @@ from ctypes import (
     c_wchar,
     c_wchar_p,
 )
-from typing import Any, TypeVar
+from typing import Any, Final, TypeVar
 from typing_extensions import Self, TypeAlias
 
 if sys.version_info >= (3, 12):
@@ -177,7 +177,7 @@ class MSG(Structure):
     pt: _CField[POINT, POINT, POINT]
 
 tagMSG = MSG
-MAX_PATH: int
+MAX_PATH: Final = 260
 
 class WIN32_FIND_DATAA(Structure):
     dwFileAttributes: _CIntLikeField[DWORD]

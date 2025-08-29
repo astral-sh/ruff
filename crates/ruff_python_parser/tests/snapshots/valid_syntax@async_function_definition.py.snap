@@ -7,26 +7,24 @@ input_file: crates/ruff_python_parser/resources/inline/ok/async_function_definit
 ```
 Module(
     ModModule {
-        node_index: AtomicNodeIndex(..),
+        node_index: NodeIndex(None),
         range: 0..21,
         body: [
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 0..20,
                     is_async: true,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("foo"),
                         range: 10..13,
-                        node_index: AtomicNodeIndex(..),
+                        node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 13..15,
-                        node_index: AtomicNodeIndex(
-                            0,
-                        ),
+                        node_index: NodeIndex(None),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -37,11 +35,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 range: 17..20,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 17..20,
                                     },
                                 ),

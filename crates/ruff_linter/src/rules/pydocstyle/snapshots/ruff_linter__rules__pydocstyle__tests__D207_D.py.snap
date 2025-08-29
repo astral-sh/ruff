@@ -1,80 +1,76 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-D.py:232:1: D207 [*] Docstring is under-indented
+D207 [*] Docstring is under-indented
+   --> D.py:232:1
     |
 230 |     """Summary.
 231 |
 232 | Description.
-    | ^ D207
+    | ^
 233 |
 234 |     """
     |
-    = help: Increase indentation
+help: Increase indentation
+229 | def asdfsdf():
+230 |     """Summary.
+231 | 
+    - Description.
+232 +     Description.
+233 | 
+234 |     """
+235 | 
 
-ℹ Safe fix
-229 229 | def asdfsdf():
-230 230 |     """Summary.
-231 231 | 
-232     |-Description.
-    232 |+    Description.
-233 233 | 
-234 234 |     """
-235 235 | 
-
-D.py:244:1: D207 [*] Docstring is under-indented
+D207 [*] Docstring is under-indented
+   --> D.py:244:1
     |
 242 |     Description.
 243 |
 244 | """
-    | ^ D207
+    | ^
     |
-    = help: Increase indentation
+help: Increase indentation
+241 | 
+242 |     Description.
+243 | 
+    - """
+244 +     """
+245 | 
+246 | 
+247 | @expect('D208: Docstring is over-indented')
 
-ℹ Safe fix
-241 241 | 
-242 242 |     Description.
-243 243 | 
-244     |-"""
-    244 |+    """
-245 245 | 
-246 246 | 
-247 247 | @expect('D208: Docstring is over-indented')
-
-D.py:440:1: D207 [*] Docstring is under-indented
+D207 [*] Docstring is under-indented
+   --> D.py:440:1
     |
 438 | def docstring_start_in_same_line(): """First Line.
 439 |
 440 |     Second Line
-    | ^ D207
+    | ^
 441 |     """
     |
-    = help: Increase indentation
+help: Increase indentation
+437 | @expect('D213: Multi-line docstring summary should start at the second line')
+438 | def docstring_start_in_same_line(): """First Line.
+439 | 
+    -     Second Line
+440 +                                     Second Line
+441 |     """
+442 | 
+443 | 
 
-ℹ Safe fix
-437 437 | @expect('D213: Multi-line docstring summary should start at the second line')
-438 438 | def docstring_start_in_same_line(): """First Line.
-439 439 | 
-440     |-    Second Line
-    440 |+                                    Second Line
-441 441 |     """
-442 442 | 
-443 443 | 
-
-D.py:441:1: D207 [*] Docstring is under-indented
+D207 [*] Docstring is under-indented
+   --> D.py:441:1
     |
 440 |     Second Line
 441 |     """
-    | ^ D207
+    | ^
     |
-    = help: Increase indentation
-
-ℹ Safe fix
-438 438 | def docstring_start_in_same_line(): """First Line.
-439 439 | 
-440 440 |     Second Line
-441     |-    """
-    441 |+                                    """
-442 442 | 
-443 443 | 
-444 444 | def function_with_lambda_arg(x=lambda y: y):
+help: Increase indentation
+438 | def docstring_start_in_same_line(): """First Line.
+439 | 
+440 |     Second Line
+    -     """
+441 +                                     """
+442 | 
+443 | 
+444 | def function_with_lambda_arg(x=lambda y: y):

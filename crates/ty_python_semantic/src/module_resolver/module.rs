@@ -59,7 +59,7 @@ impl<'db> Module<'db> {
     }
 
     /// Is this a module that we special-case somehow? If so, which one?
-    pub(crate) fn known(self, db: &'db dyn Database) -> Option<KnownModule> {
+    pub fn known(self, db: &'db dyn Database) -> Option<KnownModule> {
         match self {
             Module::File(module) => module.known(db),
             Module::Namespace(_) => None,
@@ -72,7 +72,10 @@ impl<'db> Module<'db> {
     }
 
     /// The search path from which the module was resolved.
-    pub(crate) fn search_path(self, db: &'db dyn Database) -> Option<&'db SearchPath> {
+    ///
+    /// It is guaranteed that if `None` is returned, then this is a namespace
+    /// package. Otherwise, this is a regular package or file module.
+    pub fn search_path(self, db: &'db dyn Database) -> Option<&'db SearchPath> {
         match self {
             Module::File(module) => Some(module.search_path(db)),
             Module::Namespace(_) => None,
@@ -211,25 +214,25 @@ fn all_submodule_names_for_package(db: &dyn Db, file: File) -> Option<Vec<Name>>
 }
 
 /// A module that resolves to a file (`lib.py` or `package/__init__.py`)
-#[salsa::tracked(debug)]
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct FileModule<'db> {
     #[returns(ref)]
-    name: ModuleName,
-    kind: ModuleKind,
+    pub(super) name: ModuleName,
+    pub(super) kind: ModuleKind,
     #[returns(ref)]
-    search_path: SearchPath,
-    file: File,
-    known: Option<KnownModule>,
+    pub(super) search_path: SearchPath,
+    pub(super) file: File,
+    pub(super) known: Option<KnownModule>,
 }
 
 /// A namespace package.
 ///
 /// Namespace packages are special because there are
 /// multiple possible paths and they have no corresponding code file.
-#[salsa::tracked(debug)]
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct NamespacePackage<'db> {
     #[returns(ref)]
-    name: ModuleName,
+    pub(super) name: ModuleName,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize)]
@@ -267,6 +270,8 @@ pub enum KnownModule {
     Dataclasses,
     Collections,
     Inspect,
+    #[strum(serialize = "string.templatelib")]
+    Templatelib,
     #[strum(serialize = "_typeshed._type_checker_internals")]
     TypeCheckerInternals,
     TyExtensions,
@@ -302,6 +307,7 @@ impl KnownModule {
             Self::UnittestMock => "unittest.mock",
             #[cfg(test)]
             Self::Uuid => "uuid",
+            Self::Templatelib => "string.templatelib",
         }
     }
 

@@ -170,13 +170,13 @@ pub(crate) fn repeated_equality_comparison(checker: &Checker, bool_op: &ast::Exp
                 Expr::Set(ast::ExprSet {
                     elts: comparators.iter().copied().cloned().collect(),
                     range: TextRange::default(),
-                    node_index: AtomicNodeIndex::dummy(),
+                    node_index: AtomicNodeIndex::NONE,
                 })
             } else {
                 Expr::Tuple(ast::ExprTuple {
                     elts: comparators.iter().copied().cloned().collect(),
                     range: TextRange::default(),
-                    node_index: AtomicNodeIndex::dummy(),
+                    node_index: AtomicNodeIndex::NONE,
                     ctx: ExprContext::Load,
                     parenthesized: true,
                 })
@@ -194,12 +194,12 @@ pub(crate) fn repeated_equality_comparison(checker: &Checker, bool_op: &ast::Exp
                             },
                             comparators: Box::from([comparator]),
                             range: bool_op.range(),
-                            node_index: AtomicNodeIndex::dummy(),
+                            node_index: AtomicNodeIndex::NONE,
                         })))
                         .chain(after)
                         .collect(),
                     range: bool_op.range(),
-                    node_index: AtomicNodeIndex::dummy(),
+                    node_index: AtomicNodeIndex::NONE,
                 })),
                 bool_op.range(),
             )));

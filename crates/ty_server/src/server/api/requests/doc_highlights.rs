@@ -20,7 +20,7 @@ impl RequestHandler for DocumentHighlightRequestHandler {
 }
 
 impl BackgroundDocumentRequestHandler for DocumentHighlightRequestHandler {
-    fn document_url(params: &DocumentHighlightParams) -> Cow<Url> {
+    fn document_url(params: &DocumentHighlightParams) -> Cow<'_, Url> {
         Cow::Borrowed(&params.text_document_position_params.text_document.uri)
     }
 

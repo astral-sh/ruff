@@ -18,7 +18,8 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
     any(
         target_arch = "x86_64",
         target_arch = "aarch64",
-        target_arch = "powerpc64"
+        target_arch = "powerpc64",
+        target_arch = "riscv64"
     )
 ))]
 #[global_allocator]

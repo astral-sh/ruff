@@ -237,10 +237,15 @@ If the type of a constructor parameter is a class typevar, we can use that to in
 parameter. The types inferred from a type context and from a constructor parameter must be
 consistent with each other.
 
+We have to add `x: T` to the classes to ensure they're not bivariant in `T` (__new__ and __init__
+signatures don't count towards variance).
+
 ### `__new__` only
 
 ```py
 class C[T]:
+    x: T
+
     def __new__(cls, x: T) -> "C[T]":
         return object.__new__(cls)
 
@@ -254,6 +259,8 @@ wrong_innards: C[int] = C("five")
 
 ```py
 class C[T]:
+    x: T
+
     def __init__(self, x: T) -> None: ...
 
 reveal_type(C(1))  # revealed: C[int]
@@ -266,6 +273,8 @@ wrong_innards: C[int] = C("five")
 
 ```py
 class C[T]:
+    x: T
+
     def __new__(cls, x: T) -> "C[T]":
         return object.__new__(cls)
 
@@ -281,6 +290,8 @@ wrong_innards: C[int] = C("five")
 
 ```py
 class C[T]:
+    x: T
+
     def __new__(cls, *args, **kwargs) -> "C[T]":
         return object.__new__(cls)
 
@@ -292,6 +303,8 @@ reveal_type(C(1))  # revealed: C[int]
 wrong_innards: C[int] = C("five")
 
 class D[T]:
+    x: T
+
     def __new__(cls, x: T) -> "D[T]":
         return object.__new__(cls)
 
@@ -355,10 +368,31 @@ class C[T, U](tuple[T, U]): ...
 reveal_type(C((1, 2)))  # revealed: C[int, int]
 ```
 
+### Upcasting a `tuple` to its `Sequence` supertype
+
+This test is taken from the
+[typing spec conformance suite](https://github.com/python/typing/blob/c141cdfb9d7085c1aafa76726c8ce08362837e8b/conformance/tests/tuples_type_compat.py#L133-L153)
+
+```py
+from typing import Sequence, Never
+
+def test_seq[T](x: Sequence[T]) -> Sequence[T]:
+    return x
+
+def func8(t1: tuple[complex, list[int]], t2: tuple[int, *tuple[str, ...]], t3: tuple[()]):
+    reveal_type(test_seq(t1))  # revealed: Sequence[int | float | complex | list[int]]
+    reveal_type(test_seq(t2))  # revealed: Sequence[int | str]
+
+    # TODO: this should be `Sequence[Never]`
+    reveal_type(test_seq(t3))  # revealed: Sequence[Unknown]
+```
+
 ### `__init__` is itself generic
 
 ```py
 class C[T]:
+    x: T
+
     def __init__[S](self, x: T, y: S) -> None: ...
 
 reveal_type(C(1, 1))  # revealed: C[int]
@@ -372,9 +406,14 @@ wrong_innards: C[int] = C("five", 1)
 ### Some `__init__` overloads only apply to certain specializations
 
 ```py
+from __future__ import annotations
 from typing import overload
 
 class C[T]:
+    # we need to use the type variable or else the class is bivariant in T, and
+    # specializations become meaningless
+    x: T
+
     @overload
     def __init__(self: C[str], x: str) -> None: ...
     @overload
@@ -416,6 +455,19 @@ class A[T]:
     x: T
 
 reveal_type(A(x=1))  # revealed: A[int]
+```
+
+### Class typevar has another typevar as a default
+
+```py
+class C[T, U = T]: ...
+
+reveal_type(C())  # revealed: C[Unknown, Unknown]
+
+class D[T, U = T]:
+    def __init__(self) -> None: ...
+
+reveal_type(D())  # revealed: D[Unknown, Unknown]
 ```
 
 ## Generic subclass
@@ -522,6 +574,23 @@ class WithOverloadedMethod[T]:
 reveal_type(WithOverloadedMethod[int].method)
 ```
 
+## Scoping of typevars
+
+### No back-references
+
+Typevar bounds/constraints/defaults are lazy, but cannot refer to later typevars:
+
+```py
+# TODO error
+class C[S: T, T]:
+    pass
+
+class D[S: X]:
+    pass
+
+X = int
+```
+
 ## Cyclic class definitions
 
 ### F-bounded quantification
@@ -572,12 +641,41 @@ class Derived[T](list[Derived[T]]): ...
 
 Inheritance that would result in a cyclic MRO is detected as an error.
 
-```py
+```pyi
 # error: [cyclic-class-definition]
 class C[T](C): ...
 
 # error: [cyclic-class-definition]
 class D[T](D[int]): ...
+```
+
+## Tuple as a PEP-695 generic class
+
+Our special handling for `tuple` does not break if `tuple` is defined as a PEP-695 generic class in
+typeshed:
+
+```toml
+[environment]
+python-version = "3.12"
+typeshed = "/typeshed"
+```
+
+`/typeshed/stdlib/builtins.pyi`:
+
+```pyi
+class tuple[T]: ...
+```
+
+`/typeshed/stdlib/typing_extensions.pyi`:
+
+```pyi
+def reveal_type(obj, /): ...
+```
+
+`main.py`:
+
+```py
+reveal_type((1, 2, 3))  # revealed: tuple[Literal[1], Literal[2], Literal[3]]
 ```
 
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern

@@ -3,21 +3,21 @@
 use anyhow::{Context, anyhow};
 use index::DocumentQueryError;
 use lsp_server::{Message, RequestId};
-use lsp_types::notification::{Exit, Notification};
+use lsp_types::notification::{DidChangeWatchedFiles, Exit, Notification};
 use lsp_types::request::{
-    DocumentDiagnosticRequest, RegisterCapability, Request, Shutdown, UnregisterCapability,
+    DocumentDiagnosticRequest, RegisterCapability, Rename, Request, Shutdown, UnregisterCapability,
     WorkspaceDiagnosticRequest,
 };
 use lsp_types::{
-    DiagnosticRegistrationOptions, DiagnosticServerCapabilities, Registration, RegistrationParams,
+    DiagnosticRegistrationOptions, DiagnosticServerCapabilities,
+    DidChangeWatchedFilesRegistrationOptions, FileSystemWatcher, Registration, RegistrationParams,
     TextDocumentContentChangeEvent, Unregistration, UnregistrationParams, Url,
 };
 use options::GlobalOptions;
 use ruff_db::Db;
 use ruff_db::files::File;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
-use settings::GlobalSettings;
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::{BTreeMap, HashSet, VecDeque};
 use std::ops::{Deref, DerefMut};
 use std::panic::RefUnwindSafe;
 use std::sync::Arc;
@@ -29,8 +29,10 @@ use ty_project::{ChangeResult, CheckMode, Db as _, ProjectDatabase, ProjectMetad
 pub(crate) use self::index::DocumentQuery;
 pub(crate) use self::options::InitializationOptions;
 pub use self::options::{ClientOptions, DiagnosticMode};
-pub(crate) use self::settings::WorkspaceSettings;
-use crate::capabilities::{ResolvedClientCapabilities, server_diagnostic_options};
+pub(crate) use self::settings::{GlobalSettings, WorkspaceSettings};
+use crate::capabilities::{
+    ResolvedClientCapabilities, server_diagnostic_options, server_rename_options,
+};
 use crate::document::{DocumentKey, DocumentVersion, NotebookDocument};
 use crate::server::{Action, publish_settings_diagnostics};
 use crate::session::client::Client;
@@ -91,8 +93,6 @@ pub(crate) struct Session {
     shutdown_requested: bool,
 
     /// Whether the server has dynamically registered the diagnostic capability with the client.
-    diagnostic_capability_registered: bool,
-
     /// Is the connected client a `TestServer` instance.
     in_test: bool,
 
@@ -107,6 +107,10 @@ pub(crate) struct Session {
     /// We'll re-run the request after every change to `Session` (see `revision`)
     /// to see if there are now changes and, if so, respond to the client.
     suspended_workspace_diagnostics_request: Option<SuspendedWorkspaceDiagnosticRequest>,
+
+    /// Registrations is a set of LSP methods that have been dynamically registered with the
+    /// client.
+    registrations: HashSet<String>,
 }
 
 /// LSP State for a Project
@@ -166,10 +170,10 @@ impl Session {
             resolved_client_capabilities,
             request_queue: RequestQueue::new(),
             shutdown_requested: false,
-            diagnostic_capability_registered: false,
             in_test,
             suspended_workspace_diagnostics_request: None,
             revision: 0,
+            registrations: HashSet::new(),
         })
     }
 
@@ -305,6 +309,14 @@ impl Session {
         &self.project_state(path).db
     }
 
+    /// Returns an iterator, in arbitrary order, over all project databases
+    /// in this session.
+    pub(crate) fn project_dbs(&self) -> impl Iterator<Item = &ProjectDatabase> {
+        self.projects
+            .values()
+            .map(|project_state| &project_state.db)
+    }
+
     /// Returns a mutable reference to the project's [`ProjectDatabase`] in which the given `path`
     /// belongs.
     ///
@@ -415,7 +427,7 @@ impl Session {
     /// Returns a mutable iterator over all project databases that have been initialized to this point.
     ///
     /// This iterator will only yield the default project database if it has been used.
-    fn projects_mut(&mut self) -> impl Iterator<Item = &'_ mut ProjectDatabase> + '_ {
+    pub(crate) fn projects_mut(&mut self) -> impl Iterator<Item = &'_ mut ProjectDatabase> + '_ {
         self.project_states_mut().map(|project| &mut project.db)
     }
 
@@ -567,7 +579,7 @@ impl Session {
             self.global_settings = Arc::new(global_settings);
         }
 
-        self.register_diagnostic_capability(client);
+        self.register_capabilities(client);
 
         assert!(
             self.workspaces.all_initialized(),
@@ -583,67 +595,228 @@ impl Session {
         }
     }
 
-    /// Sends a registration notification to the client to enable / disable workspace diagnostics
-    /// as per the `diagnostic_mode`.
+    /// Registers the dynamic capabilities with the client as per the resolved global settings.
     ///
-    /// This method is a no-op if the client doesn't support dynamic registration of diagnostic
-    /// capabilities.
-    fn register_diagnostic_capability(&mut self, client: &Client) {
+    /// ## Diagnostic capability
+    ///
+    /// This capability is used to enable / disable workspace diagnostics as per the
+    /// `ty.diagnosticMode` global setting.
+    ///
+    /// ## Rename capability
+    ///
+    /// This capability is used to enable / disable rename functionality as per the
+    /// `ty.experimental.rename` global setting.
+    fn register_capabilities(&mut self, client: &Client) {
         static DIAGNOSTIC_REGISTRATION_ID: &str = "ty/textDocument/diagnostic";
+        static RENAME_REGISTRATION_ID: &str = "ty/textDocument/rename";
+        static FILE_WATCHER_REGISTRATION_ID: &str = "ty/workspace/didChangeWatchedFiles";
 
-        if !self
+        let mut registrations = vec![];
+        let mut unregistrations = vec![];
+
+        if self
             .resolved_client_capabilities
             .supports_diagnostic_dynamic_registration()
         {
+            if self
+                .registrations
+                .contains(DocumentDiagnosticRequest::METHOD)
+            {
+                unregistrations.push(Unregistration {
+                    id: DIAGNOSTIC_REGISTRATION_ID.into(),
+                    method: DocumentDiagnosticRequest::METHOD.into(),
+                });
+            }
+
+            let diagnostic_mode = self.global_settings.diagnostic_mode;
+
+            tracing::debug!(
+                "Registering diagnostic capability with {diagnostic_mode:?} diagnostic mode"
+            );
+            registrations.push(Registration {
+                id: DIAGNOSTIC_REGISTRATION_ID.into(),
+                method: DocumentDiagnosticRequest::METHOD.into(),
+                register_options: Some(
+                    serde_json::to_value(DiagnosticServerCapabilities::RegistrationOptions(
+                        DiagnosticRegistrationOptions {
+                            diagnostic_options: server_diagnostic_options(
+                                diagnostic_mode.is_workspace(),
+                            ),
+                            ..Default::default()
+                        },
+                    ))
+                    .unwrap(),
+                ),
+            });
+        }
+
+        if self
+            .resolved_client_capabilities
+            .supports_rename_dynamic_registration()
+        {
+            let is_rename_enabled = self.global_settings.is_rename_enabled();
+
+            if !is_rename_enabled {
+                tracing::debug!("Rename capability is disabled in the resolved global settings");
+                if self.registrations.contains(Rename::METHOD) {
+                    unregistrations.push(Unregistration {
+                        id: RENAME_REGISTRATION_ID.into(),
+                        method: Rename::METHOD.into(),
+                    });
+                }
+            }
+
+            if is_rename_enabled {
+                registrations.push(Registration {
+                    id: RENAME_REGISTRATION_ID.into(),
+                    method: Rename::METHOD.into(),
+                    register_options: Some(serde_json::to_value(server_rename_options()).unwrap()),
+                });
+            }
+        }
+
+        if let Some(register_options) = self.file_watcher_registration_options() {
+            if self.registrations.contains(DidChangeWatchedFiles::METHOD) {
+                unregistrations.push(Unregistration {
+                    id: FILE_WATCHER_REGISTRATION_ID.into(),
+                    method: DidChangeWatchedFiles::METHOD.into(),
+                });
+            }
+            registrations.push(Registration {
+                id: FILE_WATCHER_REGISTRATION_ID.into(),
+                method: DidChangeWatchedFiles::METHOD.into(),
+                register_options: Some(serde_json::to_value(register_options).unwrap()),
+            });
+        }
+
+        // First, unregister any existing capabilities and then register or re-register them.
+        self.unregister_dynamic_capability(client, unregistrations);
+        self.register_dynamic_capability(client, registrations);
+    }
+
+    /// Registers a list of dynamic capabilities with the client.
+    fn register_dynamic_capability(&mut self, client: &Client, registrations: Vec<Registration>) {
+        if registrations.is_empty() {
             return;
         }
 
-        let diagnostic_mode = self.global_settings.diagnostic_mode;
-
-        if self.diagnostic_capability_registered {
-            client.send_request::<UnregisterCapability>(
-                self,
-                UnregistrationParams {
-                    unregisterations: vec![Unregistration {
-                        id: DIAGNOSTIC_REGISTRATION_ID.into(),
-                        method: DocumentDiagnosticRequest::METHOD.into(),
-                    }],
-                },
-                |_: &Client, ()| {
-                    tracing::debug!("Unregistered diagnostic capability");
-                },
-            );
+        for registration in &registrations {
+            self.registrations.insert(registration.method.clone());
         }
-
-        let registration = Registration {
-            id: DIAGNOSTIC_REGISTRATION_ID.into(),
-            method: DocumentDiagnosticRequest::METHOD.into(),
-            register_options: Some(
-                serde_json::to_value(DiagnosticServerCapabilities::RegistrationOptions(
-                    DiagnosticRegistrationOptions {
-                        diagnostic_options: server_diagnostic_options(
-                            diagnostic_mode.is_workspace(),
-                        ),
-                        ..Default::default()
-                    },
-                ))
-                .unwrap(),
-            ),
-        };
 
         client.send_request::<RegisterCapability>(
             self,
-            RegistrationParams {
-                registrations: vec![registration],
-            },
-            move |_: &Client, ()| {
-                tracing::debug!(
-                    "Registered diagnostic capability in {diagnostic_mode:?} diagnostic mode"
-                );
+            RegistrationParams { registrations },
+            |_: &Client, ()| {
+                tracing::debug!("Registered dynamic capabilities");
             },
         );
+    }
 
-        self.diagnostic_capability_registered = true;
+    /// Unregisters a list of dynamic capabilities with the client.
+    fn unregister_dynamic_capability(
+        &mut self,
+        client: &Client,
+        unregistrations: Vec<Unregistration>,
+    ) {
+        if unregistrations.is_empty() {
+            return;
+        }
+
+        for unregistration in &unregistrations {
+            if !self.registrations.remove(&unregistration.method) {
+                tracing::debug!(
+                    "Unregistration for `{}` was requested, but it was not registered",
+                    unregistration.method
+                );
+            }
+        }
+
+        client.send_request::<UnregisterCapability>(
+            self,
+            UnregistrationParams {
+                unregisterations: unregistrations,
+            },
+            |_: &Client, ()| {
+                tracing::debug!("Unregistered dynamic capabilities");
+            },
+        );
+    }
+
+    /// Try to register the file watcher provided by the client if the client supports it.
+    ///
+    /// Note that this should be called *after* workspaces/projects have been initialized.
+    /// This is required because the globs we use for registering file watching take
+    /// project search paths into account.
+    fn file_watcher_registration_options(
+        &self,
+    ) -> Option<DidChangeWatchedFilesRegistrationOptions> {
+        fn make_watcher(glob: &str) -> FileSystemWatcher {
+            FileSystemWatcher {
+                glob_pattern: lsp_types::GlobPattern::String(glob.into()),
+                kind: Some(lsp_types::WatchKind::all()),
+            }
+        }
+
+        fn make_relative_watcher(relative_to: &SystemPath, glob: &str) -> FileSystemWatcher {
+            let base_uri = Url::from_file_path(relative_to.as_std_path())
+                .expect("system path must be a valid URI");
+            let glob_pattern = lsp_types::GlobPattern::Relative(lsp_types::RelativePattern {
+                base_uri: lsp_types::OneOf::Right(base_uri),
+                pattern: glob.to_string(),
+            });
+            FileSystemWatcher {
+                glob_pattern,
+                kind: Some(lsp_types::WatchKind::all()),
+            }
+        }
+
+        if !self.client_capabilities().supports_file_watcher() {
+            tracing::warn!(
+                "Your LSP client doesn't support file watching: \
+                 You may see stale results when files change outside the editor"
+            );
+            return None;
+        }
+
+        // We also want to watch everything in the search paths as
+        // well. But this seems to require "relative" watcher support.
+        // I had trouble getting this working without using a base uri.
+        //
+        // Specifically, I tried this for each search path:
+        //
+        //     make_watcher(&format!("{path}/**"))
+        //
+        // But while this seemed to work for the project root, it
+        // simply wouldn't result in any file notifications for changes
+        // to files outside of the project root.
+        #[allow(clippy::if_not_else)] // no! it reads better this way ---AG
+        let watchers = if !self.client_capabilities().supports_relative_file_watcher() {
+            tracing::warn!(
+                "Your LSP client doesn't support file watching outside of project: \
+                 You may see stale results when dependencies change"
+            );
+            // Initialize our list of watchers with the standard globs relative
+            // to the project root if we can't use relative globs.
+            vec![make_watcher("**")]
+        } else {
+            // Gather up all of our project roots and all of the corresponding
+            // project root system paths, then deduplicate them relative to
+            // one another. Then listen to everything.
+            let roots = self.project_dbs().map(|db| db.project().root(db));
+            let paths = self
+                .project_dbs()
+                .flat_map(|db| {
+                    ty_python_semantic::system_module_search_paths(db).map(move |path| (db, path))
+                })
+                .filter(|(db, path)| !path.starts_with(db.project().root(*db)))
+                .map(|(_, path)| path)
+                .chain(roots);
+            ruff_db::system::deduplicate_nested_paths(paths)
+                .map(|path| make_relative_watcher(path, "**"))
+                .collect()
+        };
+        Some(DidChangeWatchedFilesRegistrationOptions { watchers })
     }
 
     /// Creates a document snapshot with the URL referencing the document to snapshot.
@@ -750,7 +923,7 @@ impl Session {
     /// This method drops all references to the index and returns a guard that will restore the
     /// references when dropped. This guard holds the only reference to the index and allows
     /// modifying it.
-    fn index_mut(&mut self) -> MutIndexGuard {
+    fn index_mut(&mut self) -> MutIndexGuard<'_> {
         let index = self.index.take().unwrap();
 
         for db in self.projects_mut() {

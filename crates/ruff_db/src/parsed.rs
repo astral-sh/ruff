@@ -21,7 +21,7 @@ use crate::source::source_text;
 /// reflected in the changed AST offsets.
 /// The other reason is that Ruff's AST doesn't implement `Eq` which Salsa requires
 /// for determining if a query result is unchanged.
-#[salsa::tracked(returns(ref), no_eq, heap_size=get_size2::heap_size)]
+#[salsa::tracked(returns(ref), no_eq, heap_size=ruff_memory_usage::heap_size)]
 pub fn parsed_module(db: &dyn Db, file: File) -> ParsedModule {
     let _span = tracing::trace_span!("parsed_module", ?file).entered();
 
@@ -92,14 +92,14 @@ impl ParsedModule {
         self.inner.store(None);
     }
 
-    /// Returns a pointer for this [`ParsedModule`].
+    /// Returns the pointer address of this [`ParsedModule`].
     ///
     /// The pointer uniquely identifies the module within the current Salsa revision,
     /// regardless of whether particular [`ParsedModuleRef`] instances are garbage collected.
-    pub fn as_ptr(&self) -> *const () {
+    pub fn addr(&self) -> usize {
         // Note that the outer `Arc` in `inner` is stable across garbage collection, while the inner
         // `Arc` within the `ArcSwap` may change.
-        Arc::as_ptr(&self.inner).cast()
+        Arc::as_ptr(&self.inner).addr()
     }
 }
 
@@ -202,9 +202,13 @@ mod indexed {
 
         /// Returns the node at the given index.
         pub fn get_by_index<'ast>(&'ast self, index: NodeIndex) -> AnyRootNodeRef<'ast> {
+            let index = index
+                .as_u32()
+                .expect("attempted to access uninitialized `NodeIndex`");
+
             // Note that this method restores the correct lifetime: the nodes are valid for as
             // long as the reference to `IndexedModule` is alive.
-            self.index[index.as_usize()]
+            self.index[index as usize]
         }
     }
 
@@ -220,7 +224,7 @@ mod indexed {
             T: HasNodeIndex + std::fmt::Debug,
             AnyRootNodeRef<'a>: From<&'a T>,
         {
-            node.node_index().set(self.index);
+            node.node_index().set(NodeIndex::from(self.index));
             self.nodes.push(AnyRootNodeRef::from(node));
             self.index += 1;
         }

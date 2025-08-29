@@ -21,18 +21,18 @@ from _imp import (
 from _typeshed import StrPath
 from os import PathLike
 from types import TracebackType
-from typing import IO, Any, Protocol
+from typing import IO, Any, Final, Protocol, type_check_only
 
-SEARCH_ERROR: int
-PY_SOURCE: int
-PY_COMPILED: int
-C_EXTENSION: int
-PY_RESOURCE: int
-PKG_DIRECTORY: int
-C_BUILTIN: int
-PY_FROZEN: int
-PY_CODERESOURCE: int
-IMP_HOOK: int
+SEARCH_ERROR: Final = 0
+PY_SOURCE: Final = 1
+PY_COMPILED: Final = 2
+C_EXTENSION: Final = 3
+PY_RESOURCE: Final = 4
+PKG_DIRECTORY: Final = 5
+C_BUILTIN: Final = 6
+PY_FROZEN: Final = 7
+PY_CODERESOURCE: Final = 8
+IMP_HOOK: Final = 9
 
 def new_module(name: str) -> types.ModuleType:
     """**DEPRECATED**
@@ -95,6 +95,7 @@ class NullImporter:
 
 # Technically, a text file has to support a slightly different set of operations than a binary file,
 # but we ignore that here.
+@type_check_only
 class _FileLike(Protocol):
     closed: bool
     mode: str

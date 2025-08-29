@@ -39,9 +39,13 @@ class HeterogeneousSubclass0(tuple[()]): ...
 reveal_type(HeterogeneousSubclass0.__getitem__)
 
 def f0(h0: HeterogeneousSubclass0, i: int):
-    reveal_type(h0[0])  # revealed: Never
-    reveal_type(h0[1])  # revealed: Never
-    reveal_type(h0[-1])  # revealed: Never
+    # error: [index-out-of-bounds]
+    reveal_type(h0[0])  # revealed: Unknown
+    # error: [index-out-of-bounds]
+    reveal_type(h0[1])  # revealed: Unknown
+    # error: [index-out-of-bounds]
+    reveal_type(h0[-1])  # revealed: Unknown
+
     reveal_type(h0[i])  # revealed: Never
 
 class HeterogeneousSubclass1(tuple[I0]): ...
@@ -51,7 +55,8 @@ reveal_type(HeterogeneousSubclass1.__getitem__)
 
 def f0(h1: HeterogeneousSubclass1, i: int):
     reveal_type(h1[0])  # revealed: I0
-    reveal_type(h1[1])  # revealed: I0
+    # error: [index-out-of-bounds]
+    reveal_type(h1[1])  # revealed: Unknown
     reveal_type(h1[-1])  # revealed: I0
     reveal_type(h1[i])  # revealed: I0
 
@@ -84,24 +89,18 @@ def g(m: MixedSubclass, i: int):
     reveal_type(m[2])  # revealed: I1 | I2 | I3
     reveal_type(m[3])  # revealed: I1 | I2 | I3
     reveal_type(m[4])  # revealed: I1 | I2 | I3 | I5
+    reveal_type(m[5])  # revealed: I1 | I2 | I3 | I5
+    reveal_type(m[10])  # revealed: I1 | I2 | I3 | I5
 
     reveal_type(m[-1])  # revealed: I5
     reveal_type(m[-2])  # revealed: I2
     reveal_type(m[-3])  # revealed: I3
     reveal_type(m[-4])  # revealed: I2
-    reveal_type(m[-5])  # revealed: I1 | I0
+    reveal_type(m[-5])  # revealed: I0 | I1
+    reveal_type(m[-6])  # revealed: I0 | I1
+    reveal_type(m[-10])  # revealed: I0 | I1
 
     reveal_type(m[i])  # revealed: I0 | I1 | I2 | I3 | I5
-
-    # Ideally we would not include `I0` in the unions for these,
-    # but it's not possible to do this using only synthesized overloads.
-    reveal_type(m[5])  # revealed: I0 | I1 | I2 | I3 | I5
-    reveal_type(m[10])  # revealed: I0 | I1 | I2 | I3 | I5
-
-    # Similarly, ideally these would just be `I0` | I1`,
-    # but achieving that with only synthesized overloads wouldn't be possible
-    reveal_type(m[-6])  # revealed: I0 | I1 | I2 | I3 | I5
-    reveal_type(m[-10])  # revealed: I0 | I1 | I2 | I3 | I5
 
 class MixedSubclass2(tuple[I0, I1, *tuple[I2, ...], I3]): ...
 
@@ -112,18 +111,12 @@ def g(m: MixedSubclass2, i: int):
     reveal_type(m[0])  # revealed: I0
     reveal_type(m[1])  # revealed: I1
     reveal_type(m[2])  # revealed: I2 | I3
-
-    # Ideally this would just be `I2 | I3`,
-    # but that's not possible to achieve with synthesized overloads
-    reveal_type(m[3])  # revealed: I0 | I1 | I2 | I3
+    reveal_type(m[3])  # revealed: I2 | I3
 
     reveal_type(m[-1])  # revealed: I3
-    reveal_type(m[-2])  # revealed: I2 | I1
-    reveal_type(m[-3])  # revealed: I2 | I1 | I0
-
-    # Ideally this would just be `I2 | I1 | I0`,
-    # but that's not possible to achieve with synthesized overloads
-    reveal_type(m[-4])  # revealed: I0 | I1 | I2 | I3
+    reveal_type(m[-2])  # revealed: I1 | I2
+    reveal_type(m[-3])  # revealed: I0 | I1 | I2
+    reveal_type(m[-4])  # revealed: I0 | I1 | I2
 ```
 
 The stdlib API `os.stat` is a commonly used API that returns an instance of a tuple subclass
@@ -147,6 +140,15 @@ reveal_type(os.stat_result.__mro__)
 #
 # revealed: Overload[(self, index: Literal[-10, -9, -8, -7, -6, -5, -4, 0, 1, 2, 3, 4, 5, 6], /) -> int, (self, index: SupportsIndex, /) -> int | float, (self, index: slice[Any, Any, Any], /) -> tuple[int | float, ...]]
 reveal_type(os.stat_result.__getitem__)
+```
+
+But perhaps the most commonly used tuple subclass instance is the singleton `sys.version_info`:
+
+```py
+import sys
+
+# revealed: Overload[(self, index: Literal[-5, 0], /) -> Literal[3], (self, index: Literal[-4, 1], /) -> Literal[11], (self, index: Literal[-3, -1, 2, 4], /) -> int, (self, index: Literal[-2, 3], /) -> Literal["alpha", "beta", "candidate", "final"], (self, index: SupportsIndex, /) -> int | Literal["alpha", "beta", "candidate", "final"], (self, index: slice[Any, Any, Any], /) -> tuple[int | Literal["alpha", "beta", "candidate", "final"], ...]]
+reveal_type(type(sys.version_info).__getitem__)
 ```
 
 Because of the synthesized `__getitem__` overloads we synthesize for tuples and tuple subclasses,
@@ -217,9 +219,61 @@ def _(m: int, n: int):
 
     tuple_slice = t[m:n]
     reveal_type(tuple_slice)  # revealed: tuple[Literal[1, "a", b"b"] | None, ...]
+
+class I0: ...
+class I1: ...
+class I2: ...
+class I3: ...
+class HeterogeneousTupleSubclass(tuple[I0, I1, I2, I3]): ...
+
+def __(t: HeterogeneousTupleSubclass, m: int, n: int):
+    reveal_type(t[0:0])  # revealed: tuple[()]
+    reveal_type(t[0:1])  # revealed: tuple[I0]
+    reveal_type(t[0:2])  # revealed: tuple[I0, I1]
+    reveal_type(t[0:4])  # revealed: tuple[I0, I1, I2, I3]
+    reveal_type(t[0:5])  # revealed: tuple[I0, I1, I2, I3]
+    reveal_type(t[1:3])  # revealed: tuple[I1, I2]
+
+    reveal_type(t[-2:4])  # revealed: tuple[I2, I3]
+    reveal_type(t[-3:-1])  # revealed: tuple[I1, I2]
+    reveal_type(t[-10:10])  # revealed: tuple[I0, I1, I2, I3]
+
+    reveal_type(t[0:])  # revealed: tuple[I0, I1, I2, I3]
+    reveal_type(t[2:])  # revealed: tuple[I2, I3]
+    reveal_type(t[4:])  # revealed: tuple[()]
+    reveal_type(t[:0])  # revealed: tuple[()]
+    reveal_type(t[:2])  # revealed: tuple[I0, I1]
+    reveal_type(t[:10])  # revealed: tuple[I0, I1, I2, I3]
+    reveal_type(t[:])  # revealed: tuple[I0, I1, I2, I3]
+
+    reveal_type(t[::-1])  # revealed: tuple[I3, I2, I1, I0]
+    reveal_type(t[::2])  # revealed: tuple[I0, I2]
+    reveal_type(t[-2:-5:-1])  # revealed: tuple[I2, I1, I0]
+    reveal_type(t[::-2])  # revealed: tuple[I3, I1]
+    reveal_type(t[-1::-3])  # revealed: tuple[I3, I0]
+
+    reveal_type(t[None:2:None])  # revealed: tuple[I0, I1]
+    reveal_type(t[1:None:1])  # revealed: tuple[I1, I2, I3]
+    reveal_type(t[None:None:None])  # revealed: tuple[I0, I1, I2, I3]
+
+    start = 1
+    stop = None
+    step = 2
+    reveal_type(t[start:stop:step])  # revealed: tuple[I1, I3]
+
+    reveal_type(t[False:True])  # revealed: tuple[I0]
+    reveal_type(t[True:3])  # revealed: tuple[I1, I2]
+
+    t[0:4:0]  # error: [zero-stepsize-in-slice]
+    t[:4:0]  # error: [zero-stepsize-in-slice]
+    t[0::0]  # error: [zero-stepsize-in-slice]
+    t[::0]  # error: [zero-stepsize-in-slice]
+
+    tuple_slice = t[m:n]
+    reveal_type(tuple_slice)  # revealed: tuple[I0 | I1 | I2 | I3, ...]
 ```
 
-## Slices of homogeneous and mixed tuples
+## Indexes into homogeneous and mixed tuples
 
 ```toml
 [environment]

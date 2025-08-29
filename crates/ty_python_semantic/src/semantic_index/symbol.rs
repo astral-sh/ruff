@@ -80,6 +80,38 @@ impl Symbol {
         self.flags.contains(SymbolFlags::MARKED_NONLOCAL)
     }
 
+    /// Is the symbol defined in this scope, vs referring to some enclosing scope?
+    ///
+    /// There are three common cases where a name refers to an enclosing scope:
+    ///
+    /// 1. explicit `global` variables
+    /// 2. explicit `nonlocal` variables
+    /// 3. "free" variables, which are used in a scope where they're neither bound nor declared
+    ///
+    /// Note that even if `is_local` is false, that doesn't necessarily mean there's an enclosing
+    /// scope that resolves the reference. The symbol could be a built-in like `print`, or a name
+    /// error at runtime, or a global variable added dynamically with e.g. `globals()`.
+    ///
+    /// XXX: There's a fourth case that we don't (can't) handle here. A variable that's bound or
+    /// declared (anywhere) in a class body, but used before it's bound (at runtime), resolves
+    /// (unbelievably) to the global scope. For example:
+    /// ```py
+    /// x = 42
+    /// def f():
+    ///     x = 43
+    ///     class Foo:
+    ///         print(x)  # 42 (never 43)
+    ///         if secrets.randbelow(2):
+    ///             x = 44
+    ///         print(x)  # 42 or 44
+    /// ```
+    /// In cases like this, the resolution isn't known until runtime, and in fact it varies from
+    /// one use to the next. The semantic index alone can't resolve this, and instead it's a
+    /// special case in type inference (see `infer_place_load`).
+    pub(crate) fn is_local(&self) -> bool {
+        !self.is_global() && !self.is_nonlocal() && (self.is_bound() || self.is_declared())
+    }
+
     pub(crate) const fn is_reassigned(&self) -> bool {
         self.flags.contains(SymbolFlags::IS_REASSIGNED)
     }
@@ -153,7 +185,7 @@ impl SymbolTable {
     }
 
     /// Iterate over the symbols in this symbol table.
-    pub(crate) fn iter(&self) -> std::slice::Iter<Symbol> {
+    pub(crate) fn iter(&self) -> std::slice::Iter<'_, Symbol> {
         self.symbols.iter()
     }
 

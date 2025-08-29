@@ -130,6 +130,9 @@ match obj:
 ## `return`, `yield`, `yield from`, and `await` outside function
 
 ```py
+class C:
+    def __await__(self): ...
+
 # error: [invalid-syntax] "`return` statement outside of a function"
 return
 
@@ -141,11 +144,11 @@ yield from []
 
 # error: [invalid-syntax] "`await` statement outside of a function"
 # error: [invalid-syntax] "`await` outside of an asynchronous function"
-await 1
+await C()
 
 def f():
     # error: [invalid-syntax] "`await` outside of an asynchronous function"
-    await 1
+    await C()
 ```
 
 Generators are evaluated lazily, so `await` is allowed, even outside of a function.
@@ -339,7 +342,8 @@ async def elements(n) -> Unknown:
 
 def _():
     # error: [invalid-syntax] "`await` outside of an asynchronous function"
-    await 1
+    await elements(1)
+
     # error: [invalid-syntax] "`async for` outside of an asynchronous function"
     async for _ in elements(1):
         ...

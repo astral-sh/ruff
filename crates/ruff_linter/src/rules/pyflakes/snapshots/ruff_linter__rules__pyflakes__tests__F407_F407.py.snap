@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
-snapshot_kind: text
 ---
-F407.py:2:24: F407 Future feature `non_existent_feature` is not defined
+F407 Future feature `non_existent_feature` is not defined
+ --> F407.py:2:24
   |
 1 | from __future__ import print_function
 2 | from __future__ import non_existent_feature
-  |                        ^^^^^^^^^^^^^^^^^^^^ F407
+  |                        ^^^^^^^^^^^^^^^^^^^^
   |

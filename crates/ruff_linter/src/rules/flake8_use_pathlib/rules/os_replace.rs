@@ -45,7 +45,7 @@ use ruff_python_ast::ExprCall;
 /// - [Python documentation: `Path.replace`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.replace)
 /// - [Python documentation: `os.replace`](https://docs.python.org/3/library/os.html#os.replace)
 /// - [PEP 428 – The pathlib module – object-oriented filesystem paths](https://peps.python.org/pep-0428/)
-/// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#correspondence-to-tools-in-the-os-module)
+/// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#corresponding-tools)
 /// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
 /// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
 #[derive(ViolationMetadata)]

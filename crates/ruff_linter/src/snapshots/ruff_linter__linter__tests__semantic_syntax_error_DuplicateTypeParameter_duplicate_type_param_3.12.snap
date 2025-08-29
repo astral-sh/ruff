@@ -1,7 +1,8 @@
 ---
 source: crates/ruff_linter/src/linter.rs
 ---
-<filename>:1:12: invalid-syntax: duplicate type parameter
+invalid-syntax: duplicate type parameter
+ --> <filename>:1:12
   |
 1 | class C[T, T]: pass
   |            ^

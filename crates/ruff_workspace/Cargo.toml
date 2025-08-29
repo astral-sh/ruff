@@ -64,6 +64,7 @@ default = []
 schemars = [
     "dep:schemars",
     "ruff_formatter/schemars",
+    "ruff_linter/schemars",
     "ruff_python_formatter/schemars",
     "ruff_python_semantic/schemars",
 ]

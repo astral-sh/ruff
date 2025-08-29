@@ -1871,10 +1871,10 @@ class Foo:
     }
 
     /// test all of the valid string literal prefix and quote combinations from
-    /// https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals
+    /// <https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals>
     ///
     /// Note that the numeric ids on the input/output and quote fields prevent name conflicts from
-    /// the test_matrix but are otherwise unnecessary
+    /// the `test_matrix` but are otherwise unnecessary
     #[test_case::test_matrix(
         [
             ("r", "r", 0),

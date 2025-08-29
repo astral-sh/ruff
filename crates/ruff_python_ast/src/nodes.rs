@@ -162,13 +162,13 @@ impl Ranged for DictItem {
 impl ExprDict {
     /// Returns an `Iterator` over the AST nodes representing the
     /// dictionary's keys.
-    pub fn iter_keys(&self) -> DictKeyIterator {
+    pub fn iter_keys(&self) -> DictKeyIterator<'_> {
         DictKeyIterator::new(&self.items)
     }
 
     /// Returns an `Iterator` over the AST nodes representing the
     /// dictionary's values.
-    pub fn iter_values(&self) -> DictValueIterator {
+    pub fn iter_values(&self) -> DictValueIterator<'_> {
         DictValueIterator::new(&self.items)
     }
 
@@ -462,13 +462,13 @@ impl FStringValue {
     }
 
     /// Returns an iterator over all the [`FStringPart`]s contained in this value.
-    pub fn iter(&self) -> Iter<FStringPart> {
+    pub fn iter(&self) -> Iter<'_, FStringPart> {
         self.as_slice().iter()
     }
 
     /// Returns an iterator over all the [`FStringPart`]s contained in this value
     /// that allows modification.
-    pub fn iter_mut(&mut self) -> IterMut<FStringPart> {
+    pub fn iter_mut(&mut self) -> IterMut<'_, FStringPart> {
         self.as_mut_slice().iter_mut()
     }
 
@@ -515,7 +515,7 @@ impl FStringValue {
 
     /// Returns `true` if the node represents an empty f-string literal.
     ///
-    /// Noteh that a [`FStringValue`] node will always have >= 1 [`FStringPart`]s inside it.
+    /// Note that a [`FStringValue`] node will always have >= 1 [`FStringPart`]s inside it.
     /// This method checks whether the value of the concatenated parts is equal to the empty
     /// f-string, not whether the f-string has 0 parts inside it.
     pub fn is_empty_literal(&self) -> bool {
@@ -657,13 +657,13 @@ impl TStringValue {
     }
 
     /// Returns an iterator over all the [`TString`]s contained in this value.
-    pub fn iter(&self) -> Iter<TString> {
+    pub fn iter(&self) -> Iter<'_, TString> {
         self.as_slice().iter()
     }
 
     /// Returns an iterator over all the [`TString`]s contained in this value
     /// that allows modification.
-    pub fn iter_mut(&mut self) -> IterMut<TString> {
+    pub fn iter_mut(&mut self) -> IterMut<'_, TString> {
         self.as_mut_slice().iter_mut()
     }
 
@@ -680,6 +680,22 @@ impl TStringValue {
     /// interpolation (`x`) and string literal (`"qux"`).
     pub fn elements(&self) -> impl Iterator<Item = &InterpolatedStringElement> {
         self.iter().flat_map(|tstring| tstring.elements.iter())
+    }
+
+    /// Returns `true` if the node represents an empty t-string in the
+    /// sense that `__iter__` returns an empty iterable.
+    ///
+    /// Beware that empty t-strings are still truthy, i.e. `bool(t"") == True`.
+    ///
+    /// Note that a [`TStringValue`] node will always contain at least one
+    /// [`TString`] node. This method checks whether each of the constituent
+    /// t-strings (in an implicitly concatenated t-string) are empty
+    /// in the above sense.
+    pub fn is_empty_iterable(&self) -> bool {
+        match &self.inner {
+            TStringValueInner::Single(tstring) => tstring.is_empty(),
+            TStringValueInner::Concatenated(tstrings) => tstrings.iter().all(TString::is_empty),
+        }
     }
 }
 
@@ -765,7 +781,7 @@ pub trait StringFlags: Copy {
         AnyStringFlags::new(self.prefix(), self.quote_style(), self.triple_quotes())
     }
 
-    fn display_contents(self, contents: &str) -> DisplayFlags {
+    fn display_contents(self, contents: &str) -> DisplayFlags<'_> {
         DisplayFlags {
             flags: self.as_any_string_flags(),
             contents,
@@ -1182,6 +1198,10 @@ impl TString {
     pub fn quote_style(&self) -> Quote {
         self.flags.quote_style()
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.elements.is_empty()
+    }
 }
 
 impl From<TString> for Expr {
@@ -1289,13 +1309,13 @@ impl StringLiteralValue {
     }
 
     /// Returns an iterator over all the [`StringLiteral`] parts contained in this value.
-    pub fn iter(&self) -> Iter<StringLiteral> {
+    pub fn iter(&self) -> Iter<'_, StringLiteral> {
         self.as_slice().iter()
     }
 
     /// Returns an iterator over all the [`StringLiteral`] parts contained in this value
     /// that allows modification.
-    pub fn iter_mut(&mut self) -> IterMut<StringLiteral> {
+    pub fn iter_mut(&mut self) -> IterMut<'_, StringLiteral> {
         self.as_mut_slice().iter_mut()
     }
 
@@ -1582,7 +1602,7 @@ impl StringLiteral {
         Self {
             range,
             value: "".into(),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
             flags: StringLiteralFlags::empty().with_invalid(),
         }
     }
@@ -1602,7 +1622,7 @@ impl From<StringLiteral> for Expr {
     fn from(payload: StringLiteral) -> Self {
         ExprStringLiteral {
             range: payload.range,
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
             value: StringLiteralValue::single(payload),
         }
         .into()
@@ -1717,13 +1737,13 @@ impl BytesLiteralValue {
     }
 
     /// Returns an iterator over all the [`BytesLiteral`] parts contained in this value.
-    pub fn iter(&self) -> Iter<BytesLiteral> {
+    pub fn iter(&self) -> Iter<'_, BytesLiteral> {
         self.as_slice().iter()
     }
 
     /// Returns an iterator over all the [`BytesLiteral`] parts contained in this value
     /// that allows modification.
-    pub fn iter_mut(&mut self) -> IterMut<BytesLiteral> {
+    pub fn iter_mut(&mut self) -> IterMut<'_, BytesLiteral> {
         self.as_mut_slice().iter_mut()
     }
 
@@ -1981,7 +2001,7 @@ impl BytesLiteral {
         Self {
             range,
             value: Box::new([]),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
             flags: BytesLiteralFlags::empty().with_invalid(),
         }
     }
@@ -1991,7 +2011,7 @@ impl From<BytesLiteral> for Expr {
     fn from(payload: BytesLiteral) -> Self {
         ExprBytesLiteral {
             range: payload.range,
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
             value: BytesLiteralValue::single(payload),
         }
         .into()
@@ -3011,7 +3031,7 @@ impl Parameters {
     }
 
     /// Returns an iterator over all parameters included in this [`Parameters`] node.
-    pub fn iter(&self) -> ParametersIterator {
+    pub fn iter(&self) -> ParametersIterator<'_> {
         ParametersIterator::new(self)
     }
 
@@ -3328,7 +3348,7 @@ impl Arguments {
     /// Return the argument with the given name or at the given position, or `None` if no such
     /// argument exists. Used to retrieve arguments that can be provided _either_ as keyword or
     /// positional arguments.
-    pub fn find_argument(&self, name: &str, position: usize) -> Option<ArgOrKeyword> {
+    pub fn find_argument(&self, name: &str, position: usize) -> Option<ArgOrKeyword<'_>> {
         self.find_keyword(name)
             .map(ArgOrKeyword::from)
             .or_else(|| self.find_positional(position).map(ArgOrKeyword::from))
@@ -3525,7 +3545,7 @@ impl Identifier {
     pub fn new(id: impl Into<Name>, range: TextRange) -> Self {
         Self {
             id: id.into(),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
             range,
         }
     }

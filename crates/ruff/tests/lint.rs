@@ -5588,15 +5588,15 @@ fn cookiecutter_globbing() -> Result<()> {
                 .args(STDIN_BASE_OPTIONS)
                 .arg("--select=F811")
                 .current_dir(tempdir.path()), @r"
-			success: false
-			exit_code: 1
-			----- stdout -----
-			{{cookiecutter.repo_name}}/tests/maintest.py:3:8: F811 [*] Redefinition of unused `foo` from line 1
-			Found 1 error.
-			[*] 1 fixable with the `--fix` option.
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        {{cookiecutter.repo_name}}/tests/maintest.py:3:8: F811 [*] Redefinition of unused `foo` from line 1: `foo` redefined here
+        Found 1 error.
+        [*] 1 fixable with the `--fix` option.
 
-			----- stderr -----
-		");
+        ----- stderr -----
+        ");
     });
 
     Ok(())
@@ -5798,6 +5798,35 @@ fn future_annotations_preview_warning() {
 
     ----- stderr -----
     warning: The `lint.future-annotations` setting will have no effect because `preview` is disabled
+    ",
+    );
+}
+
+#[test]
+fn up045_nested_optional_flatten_all() {
+    let contents = "\
+from typing import Optional
+nested_optional: Optional[Optional[Optional[str]]] = None
+";
+
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .args(["--select", "UP045", "--diff", "--target-version", "py312"])
+            .arg("-")
+            .pass_stdin(contents),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    @@ -1,2 +1,2 @@
+     from typing import Optional
+    -nested_optional: Optional[Optional[Optional[str]]] = None
+    +nested_optional: str | None = None
+
+
+    ----- stderr -----
+    Would fix 1 error.
     ",
     );
 }

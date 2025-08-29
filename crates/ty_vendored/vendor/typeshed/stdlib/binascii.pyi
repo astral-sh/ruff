@@ -2,7 +2,7 @@
 
 import sys
 from _typeshed import ReadableBuffer
-from typing_extensions import TypeAlias
+from typing_extensions import TypeAlias, deprecated
 
 # Many functions in binascii accept buffer objects
 # or ASCII-only strings.
@@ -42,15 +42,19 @@ def b2a_qp(data: ReadableBuffer, quotetabs: bool = False, istext: bool = True, h
     """
 
 if sys.version_info < (3, 11):
+    @deprecated("Deprecated since Python 3.9; removed in Python 3.11.")
     def a2b_hqx(data: _AsciiBuffer, /) -> bytes:
         """Decode .hqx coding."""
 
+    @deprecated("Deprecated since Python 3.9; removed in Python 3.11.")
     def rledecode_hqx(data: ReadableBuffer, /) -> bytes:
         """Decode hexbin RLE-coded string."""
 
+    @deprecated("Deprecated since Python 3.9; removed in Python 3.11.")
     def rlecode_hqx(data: ReadableBuffer, /) -> bytes:
         """Binhex RLE-code binary data."""
 
+    @deprecated("Deprecated since Python 3.9; removed in Python 3.11.")
     def b2a_hqx(data: ReadableBuffer, /) -> bytes:
         """Encode .hqx data."""
 
@@ -60,7 +64,7 @@ def crc_hqx(data: ReadableBuffer, crc: int, /) -> int:
 def crc32(data: ReadableBuffer, crc: int = 0, /) -> int:
     """Compute CRC-32 incrementally."""
 
-def b2a_hex(data: ReadableBuffer, sep: str | bytes = ..., bytes_per_sep: int = ...) -> bytes:
+def b2a_hex(data: ReadableBuffer, sep: str | bytes = ..., bytes_per_sep: int = 1) -> bytes:
     """Hexadecimal representation of binary data.
 
       sep
@@ -81,7 +85,7 @@ def b2a_hex(data: ReadableBuffer, sep: str | bytes = ..., bytes_per_sep: int = .
     b'b9_01ef'
     """
 
-def hexlify(data: ReadableBuffer, sep: str | bytes = ..., bytes_per_sep: int = ...) -> bytes:
+def hexlify(data: ReadableBuffer, sep: str | bytes = ..., bytes_per_sep: int = 1) -> bytes:
     """Hexadecimal representation of binary data.
 
       sep

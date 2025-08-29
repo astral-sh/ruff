@@ -23,6 +23,7 @@ We can then place custom stub files in `/typeshed/stdlib`, for example:
 
 ```pyi
 class object: ...
+class tuple: ...
 class BuiltinClass: ...
 
 builtin_symbol: BuiltinClass
@@ -97,6 +98,12 @@ simple untyped definition is enough to make `reveal_type` work in tests:
 typeshed = "/typeshed"
 ```
 
+`/typeshed/stdlib/builtins.pyi`:
+
+```pyi
+class tuple: ...
+```
+
 `/typeshed/stdlib/typing_extensions.pyi`:
 
 ```pyi
@@ -104,5 +111,5 @@ def reveal_type(obj, /): ...
 ```
 
 ```py
-reveal_type(())  # revealed: tuple[()]
+reveal_type(())  # revealed: tuple
 ```

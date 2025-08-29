@@ -89,7 +89,7 @@ pub(super) trait BackgroundDocumentRequestHandler: RetriableRequestHandler {
     /// Returns the URL of the document that this request handler operates on.
     fn document_url(
         params: &<<Self as RequestHandler>::RequestType as Request>::Params,
-    ) -> Cow<Url>;
+    ) -> Cow<'_, Url>;
 
     /// Processes the request parameters and returns the LSP request result.
     ///
@@ -184,7 +184,7 @@ pub(super) trait BackgroundDocumentNotificationHandler: NotificationHandler {
     /// Returns the URL of the document that this notification handler operates on.
     fn document_url(
         params: &<<Self as NotificationHandler>::NotificationType as Notification>::Params,
-    ) -> Cow<Url>;
+    ) -> Cow<'_, Url>;
 
     fn run_with_snapshot(
         snapshot: DocumentSnapshot,

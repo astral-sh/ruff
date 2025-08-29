@@ -1,20 +1,21 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
-snapshot_kind: text
 ---
-F631.py:1:1: F631 Assert test is a non-empty tuple, which is always `True`
+F631 Assert test is a non-empty tuple, which is always `True`
+ --> F631.py:1:1
   |
 1 | assert (False, "x")
-  | ^^^^^^^^^^^^^^^^^^^ F631
+  | ^^^^^^^^^^^^^^^^^^^
 2 | assert (False,)
 3 | assert ()
   |
 
-F631.py:2:1: F631 Assert test is a non-empty tuple, which is always `True`
+F631 Assert test is a non-empty tuple, which is always `True`
+ --> F631.py:2:1
   |
 1 | assert (False, "x")
 2 | assert (False,)
-  | ^^^^^^^^^^^^^^^ F631
+  | ^^^^^^^^^^^^^^^
 3 | assert ()
 4 | assert True
   |

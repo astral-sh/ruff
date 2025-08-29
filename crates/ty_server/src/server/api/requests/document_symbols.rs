@@ -4,7 +4,7 @@ use lsp_types::request::DocumentSymbolRequest;
 use lsp_types::{DocumentSymbol, DocumentSymbolParams, SymbolInformation, Url};
 use ruff_db::source::{line_index, source_text};
 use ruff_source_file::LineIndex;
-use ty_ide::{SymbolInfo, SymbolsOptions, document_symbols_with_options};
+use ty_ide::{HierarchicalSymbols, SymbolId, SymbolInfo, document_symbols};
 use ty_project::ProjectDatabase;
 
 use crate::document::{PositionEncoding, ToRangeExt};
@@ -22,7 +22,7 @@ impl RequestHandler for DocumentSymbolRequestHandler {
 }
 
 impl BackgroundDocumentRequestHandler for DocumentSymbolRequestHandler {
-    fn document_url(params: &DocumentSymbolParams) -> Cow<Url> {
+    fn document_url(params: &DocumentSymbolParams) -> Cow<'_, Url> {
         Cow::Borrowed(&params.text_document.uri)
     }
 
@@ -51,24 +51,19 @@ impl BackgroundDocumentRequestHandler for DocumentSymbolRequestHandler {
             .resolved_client_capabilities()
             .supports_hierarchical_document_symbols();
 
-        let options = SymbolsOptions {
-            hierarchical: supports_hierarchical,
-            global_only: false,
-            query_string: None,
-        };
-
-        let symbols = document_symbols_with_options(db, file, &options);
-
+        let symbols = document_symbols(db, file);
         if symbols.is_empty() {
             return Ok(None);
         }
 
         if supports_hierarchical {
-            // Return hierarchical symbols
+            let symbols = symbols.to_hierarchical();
             let lsp_symbols: Vec<DocumentSymbol> = symbols
-                .into_iter()
-                .map(|symbol| {
+                .iter()
+                .map(|(id, symbol)| {
                     convert_to_lsp_document_symbol(
+                        &symbols,
+                        id,
                         symbol,
                         &source,
                         &line_index,
@@ -81,8 +76,8 @@ impl BackgroundDocumentRequestHandler for DocumentSymbolRequestHandler {
         } else {
             // Return flattened symbols as SymbolInformation
             let lsp_symbols: Vec<SymbolInformation> = symbols
-                .into_iter()
-                .map(|symbol| {
+                .iter()
+                .map(|(_, symbol)| {
                     convert_to_lsp_symbol_information(
                         symbol,
                         &params.text_document.uri,
@@ -101,7 +96,9 @@ impl BackgroundDocumentRequestHandler for DocumentSymbolRequestHandler {
 impl RetriableRequestHandler for DocumentSymbolRequestHandler {}
 
 fn convert_to_lsp_document_symbol(
-    symbol: SymbolInfo,
+    symbols: &HierarchicalSymbols,
+    id: SymbolId,
+    symbol: SymbolInfo<'_>,
     source: &str,
     line_index: &LineIndex,
     encoding: PositionEncoding,
@@ -109,7 +106,7 @@ fn convert_to_lsp_document_symbol(
     let symbol_kind = convert_symbol_kind(symbol.kind);
 
     DocumentSymbol {
-        name: symbol.name,
+        name: symbol.name.into_owned(),
         detail: None,
         kind: symbol_kind,
         tags: None,
@@ -118,10 +115,13 @@ fn convert_to_lsp_document_symbol(
         range: symbol.full_range.to_lsp_range(source, line_index, encoding),
         selection_range: symbol.name_range.to_lsp_range(source, line_index, encoding),
         children: Some(
-            symbol
-                .children
-                .into_iter()
-                .map(|child| convert_to_lsp_document_symbol(child, source, line_index, encoding))
+            symbols
+                .children(id)
+                .map(|(child_id, child)| {
+                    convert_to_lsp_document_symbol(
+                        symbols, child_id, child, source, line_index, encoding,
+                    )
+                })
                 .collect(),
         ),
     }

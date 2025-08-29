@@ -64,11 +64,60 @@ x: MyIntOrStr = 1
 y: MyIntOrStr = None
 ```
 
+## Unpacking from a type alias
+
+```py
+type T = tuple[int, str]
+
+def f(x: T):
+    a, b = x
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: str
+```
+
+## Scoping
+
+PEP 695 type aliases delay runtime evaluation of their right-hand side, so they are a lazy (not
+eager) nested scope.
+
+```py
+type Alias = Foo | str
+
+def f(x: Alias):
+    reveal_type(x)  # revealed: Foo | str
+
+class Foo:
+    pass
+```
+
+But narrowing of names used in the type alias is still respected:
+
+```py
+def _(flag: bool):
+    t = int if flag else None
+    if t is not None:
+        type Alias = t | str
+        def f(x: Alias):
+            reveal_type(x)  # revealed: int | str
+```
+
 ## Generic type aliases
 
 ```py
 type ListOrSet[T] = list[T] | set[T]
 reveal_type(ListOrSet.__type_params__)  # revealed: tuple[TypeVar | ParamSpec | TypeVarTuple, ...]
+```
+
+## In unions and intersections
+
+We can "break apart" a type alias by e.g. adding it to a union:
+
+```py
+type IntOrStr = int | str
+
+def f(x: IntOrStr, y: str | bytes):
+    z = x or y
+    reveal_type(z)  # revealed: (int & ~AlwaysFalsy) | str | bytes
 ```
 
 ## `TypeAliasType` properties
@@ -137,4 +186,114 @@ def get_name() -> str:
 
 # error: [invalid-type-alias-type] "The name of a `typing.TypeAlias` must be a string literal"
 IntOrStr = TypeAliasType(get_name(), int | str)
+```
+
+## Cyclic aliases
+
+### Self-referential
+
+```py
+type OptNestedInt = int | tuple[OptNestedInt, ...] | None
+
+def f(x: OptNestedInt) -> None:
+    reveal_type(x)  # revealed: int | tuple[OptNestedInt, ...] | None
+    if x is not None:
+        reveal_type(x)  # revealed: int | tuple[OptNestedInt, ...]
+```
+
+### Invalid self-referential
+
+```py
+# TODO emit a diagnostic on these two lines
+type IntOr = int | IntOr
+type OrInt = OrInt | int
+
+def f(x: IntOr, y: OrInt):
+    reveal_type(x)  # revealed: int
+    reveal_type(y)  # revealed: int
+    if not isinstance(x, int):
+        reveal_type(x)  # revealed: Never
+    if not isinstance(y, int):
+        reveal_type(y)  # revealed: Never
+```
+
+### With legacy generic
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+type Alias = list["Alias"] | int
+
+class A(Generic[T]):
+    attr: T
+
+class B(A[Alias]):
+    pass
+
+def f(b: B):
+    reveal_type(b)  # revealed: B
+    reveal_type(b.attr)  # revealed: list[Alias] | int
+```
+
+### Mutually recursive
+
+```py
+type A = tuple[B] | None
+type B = tuple[A] | None
+
+def f(x: A):
+    if x is not None:
+        reveal_type(x)  # revealed: tuple[B]
+        y = x[0]
+        if y is not None:
+            reveal_type(y)  # revealed: tuple[A]
+
+def g(x: A | B):
+    reveal_type(x)  # revealed: tuple[B] | None
+
+from ty_extensions import Intersection
+
+def h(x: Intersection[A, B]):
+    reveal_type(x)  # revealed: tuple[B] | None
+```
+
+### Union inside generic
+
+#### With old-style union
+
+```py
+from typing import Union
+
+type A = list[Union["A", str]]
+
+def f(x: A):
+    reveal_type(x)  # revealed: list[A | str]
+    for item in x:
+        reveal_type(item)  # revealed: list[A | str] | str
+```
+
+#### With new-style union
+
+```py
+type A = list["A" | str]
+
+def f(x: A):
+    reveal_type(x)  # revealed: list[A | str]
+    for item in x:
+        reveal_type(item)  # revealed: list[A | str] | str
+```
+
+#### With Optional
+
+```py
+from typing import Optional, Union
+
+type A = list[Optional[Union["A", str]]]
+
+def f(x: A):
+    reveal_type(x)  # revealed: list[A | str | None]
+    for item in x:
+        reveal_type(item)  # revealed: list[A | str | None] | str | None
 ```

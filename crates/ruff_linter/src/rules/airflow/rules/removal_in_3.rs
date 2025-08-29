@@ -710,6 +710,10 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         },
 
         // airflow.secrets
+        ["airflow", "secrets", "cache", "SecretCache"] => Replacement::AutoImport {
+            module: "airflow.sdk",
+            name: "SecretCache",
+        },
         ["airflow", "secrets", "local_filesystem", "load_connections"] => Replacement::AutoImport {
             module: "airflow.secrets.local_filesystem",
             name: "load_connections_dict",

@@ -15,6 +15,7 @@ ruff_db = { workspace = true }
 ruff_annotate_snippets = { workspace = true }
 ruff_index = { workspace = true, features = ["salsa"] }
 ruff_macros = { workspace = true }
+ruff_memory_usage = { workspace = true }
 ruff_python_ast = { workspace = true, features = ["salsa"] }
 ruff_python_parser = { workspace = true }
 ruff_python_stdlib = { workspace = true }

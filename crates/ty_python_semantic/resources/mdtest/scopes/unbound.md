@@ -34,10 +34,26 @@ class C:
     if coinflip():
         x = 1
 
-    # error: [possibly-unresolved-reference]
+    # Possibly unbound variables in enclosing scopes are considered bound.
     y = x
 
 reveal_type(C.y)  # revealed: Unknown | Literal[1, "abc"]
+```
+
+## Possibly unbound in class scope with multiple declarations
+
+```py
+def coinflip() -> bool:
+    return True
+
+class C:
+    if coinflip():
+        x: int = 1
+    elif coinflip():
+        x: str = "abc"
+
+# error: [possibly-unbound-attribute]
+reveal_type(C.x)  # revealed: int | str
 ```
 
 ## Unbound function local

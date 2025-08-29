@@ -7,12 +7,13 @@ import unittest.result
 import unittest.suite
 from collections.abc import Iterable
 from types import ModuleType
-from typing import Any, Final, Protocol
+from typing import Any, Final, Protocol, type_check_only
 from typing_extensions import deprecated
 
 MAIN_EXAMPLES: Final[str]
 MODULE_EXAMPLES: Final[str]
 
+@type_check_only
 class _TestRunner(Protocol):
     def run(self, test: unittest.suite.TestSuite | unittest.case.TestCase, /) -> unittest.result.TestResult: ...
 
@@ -69,8 +70,11 @@ class TestProgram:
         ) -> None: ...
 
     if sys.version_info < (3, 13):
-        @deprecated("Deprecated in Python 3.11; removal scheduled for Python 3.13")
-        def usageExit(self, msg: Any = None) -> None: ...
+        if sys.version_info >= (3, 11):
+            @deprecated("Deprecated since Python 3.11; removed in Python 3.13.")
+            def usageExit(self, msg: Any = None) -> None: ...
+        else:
+            def usageExit(self, msg: Any = None) -> None: ...
 
     def parseArgs(self, argv: list[str]) -> None: ...
     def createTests(self, from_discovery: bool = False, Loader: unittest.loader.TestLoader | None = None) -> None: ...

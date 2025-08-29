@@ -20,7 +20,7 @@ impl RequestHandler for HoverRequestHandler {
 }
 
 impl BackgroundDocumentRequestHandler for HoverRequestHandler {
-    fn document_url(params: &HoverParams) -> Cow<Url> {
+    fn document_url(params: &HoverParams) -> Cow<'_, Url> {
         Cow::Borrowed(&params.text_document_position_params.text_document.uri)
     }
 

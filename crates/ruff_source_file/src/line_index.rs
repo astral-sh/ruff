@@ -562,11 +562,11 @@ pub struct OneIndexed(NonZeroUsize);
 
 impl OneIndexed {
     /// The largest value that can be represented by this integer type
-    pub const MAX: Self = unwrap(Self::new(usize::MAX));
+    pub const MAX: Self = Self::new(usize::MAX).unwrap();
     // SAFETY: These constants are being initialized with non-zero values
     /// The smallest value that can be represented by this integer type.
-    pub const MIN: Self = unwrap(Self::new(1));
-    pub const ONE: NonZeroUsize = unwrap(NonZeroUsize::new(1));
+    pub const MIN: Self = Self::new(1).unwrap();
+    pub const ONE: NonZeroUsize = NonZeroUsize::new(1).unwrap();
 
     /// Creates a non-zero if the given value is not zero.
     pub const fn new(value: usize) -> Option<Self> {
@@ -622,6 +622,33 @@ impl OneIndexed {
     pub fn checked_sub(self, rhs: Self) -> Option<Self> {
         self.0.get().checked_sub(rhs.get()).and_then(Self::new)
     }
+
+    /// Calculate the number of digits in `self`.
+    ///
+    /// This is primarily intended for computing the length of the string representation for
+    /// formatted printing.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ruff_source_file::OneIndexed;
+    ///
+    /// let one = OneIndexed::new(1).unwrap();
+    /// assert_eq!(one.digits().get(), 1);
+    ///
+    /// let hundred = OneIndexed::new(100).unwrap();
+    /// assert_eq!(hundred.digits().get(), 3);
+    ///
+    /// let thousand = OneIndexed::new(1000).unwrap();
+    /// assert_eq!(thousand.digits().get(), 4);
+    /// ```
+    pub const fn digits(self) -> NonZeroUsize {
+        // Safety: the 1+ ensures this is always non-zero, and
+        // `usize::MAX.ilog10()` << `usize::MAX`, so the result is always safe
+        // to cast to a usize, even though it's returned as a u32
+        // (u64::MAX.ilog10() is 19).
+        NonZeroUsize::new(1 + self.0.get().ilog10() as usize).unwrap()
+    }
 }
 
 impl Default for OneIndexed {
@@ -633,15 +660,6 @@ impl Default for OneIndexed {
 impl fmt::Display for OneIndexed {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         std::fmt::Debug::fmt(&self.0.get(), f)
-    }
-}
-
-/// A const `Option::unwrap` without nightly features:
-/// [Tracking issue](https://github.com/rust-lang/rust/issues/67441)
-const fn unwrap<T: Copy>(option: Option<T>) -> T {
-    match option {
-        Some(value) => value,
-        None => panic!("unwrapping None"),
     }
 }
 

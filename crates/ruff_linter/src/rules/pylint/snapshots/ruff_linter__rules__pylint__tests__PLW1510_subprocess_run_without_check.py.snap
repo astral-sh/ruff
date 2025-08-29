@@ -1,85 +1,82 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-subprocess_run_without_check.py:4:1: PLW1510 [*] `subprocess.run` without explicit `check` argument
+PLW1510 [*] `subprocess.run` without explicit `check` argument
+ --> subprocess_run_without_check.py:4:1
   |
 3 | # Errors.
 4 | subprocess.run("ls")
-  | ^^^^^^^^^^^^^^ PLW1510
+  | ^^^^^^^^^^^^^^
 5 | subprocess.run("ls", shell=True)
 6 | subprocess.run(
   |
-  = help: Add explicit `check=False`
+help: Add explicit `check=False`
+1 | import subprocess
+2 | 
+3 | # Errors.
+  - subprocess.run("ls")
+4 + subprocess.run("ls", check=False)
+5 | subprocess.run("ls", shell=True)
+6 | subprocess.run(
+7 |     ["ls"],
 
-ℹ Safe fix
-1 1 | import subprocess
-2 2 | 
-3 3 | # Errors.
-4   |-subprocess.run("ls")
-  4 |+subprocess.run("ls", check=False)
-5 5 | subprocess.run("ls", shell=True)
-6 6 | subprocess.run(
-7 7 |     ["ls"],
-
-subprocess_run_without_check.py:5:1: PLW1510 [*] `subprocess.run` without explicit `check` argument
+PLW1510 [*] `subprocess.run` without explicit `check` argument
+ --> subprocess_run_without_check.py:5:1
   |
 3 | # Errors.
 4 | subprocess.run("ls")
 5 | subprocess.run("ls", shell=True)
-  | ^^^^^^^^^^^^^^ PLW1510
+  | ^^^^^^^^^^^^^^
 6 | subprocess.run(
 7 |     ["ls"],
   |
-  = help: Add explicit `check=False`
+help: Add explicit `check=False`
+2 | 
+3 | # Errors.
+4 | subprocess.run("ls")
+  - subprocess.run("ls", shell=True)
+5 + subprocess.run("ls", check=False, shell=True)
+6 | subprocess.run(
+7 |     ["ls"],
+8 |     shell=False,
 
-ℹ Safe fix
-2 2 | 
-3 3 | # Errors.
-4 4 | subprocess.run("ls")
-5   |-subprocess.run("ls", shell=True)
-  5 |+subprocess.run("ls", check=False, shell=True)
-6 6 | subprocess.run(
-7 7 |     ["ls"],
-8 8 |     shell=False,
-
-subprocess_run_without_check.py:6:1: PLW1510 [*] `subprocess.run` without explicit `check` argument
+PLW1510 [*] `subprocess.run` without explicit `check` argument
+ --> subprocess_run_without_check.py:6:1
   |
 4 | subprocess.run("ls")
 5 | subprocess.run("ls", shell=True)
 6 | subprocess.run(
-  | ^^^^^^^^^^^^^^ PLW1510
+  | ^^^^^^^^^^^^^^
 7 |     ["ls"],
 8 |     shell=False,
   |
-  = help: Add explicit `check=False`
+help: Add explicit `check=False`
+5  | subprocess.run("ls", shell=True)
+6  | subprocess.run(
+7  |     ["ls"],
+   -     shell=False,
+8  +     check=False, shell=False,
+9  | )
+10 | subprocess.run(["ls"], **kwargs)
+11 | 
 
-ℹ Safe fix
-5 5 | subprocess.run("ls", shell=True)
-6 6 | subprocess.run(
-7 7 |     ["ls"],
-8   |-    shell=False,
-  8 |+    check=False, shell=False,
-9 9 | )
-10 10 | subprocess.run(["ls"], **kwargs)
-11 11 | 
-
-subprocess_run_without_check.py:10:1: PLW1510 [*] `subprocess.run` without explicit `check` argument
+PLW1510 [*] `subprocess.run` without explicit `check` argument
+  --> subprocess_run_without_check.py:10:1
    |
  8 |     shell=False,
  9 | )
 10 | subprocess.run(["ls"], **kwargs)
-   | ^^^^^^^^^^^^^^ PLW1510
+   | ^^^^^^^^^^^^^^
 11 |
 12 | # Non-errors.
    |
-   = help: Add explicit `check=False`
-
-ℹ Unsafe fix
-7  7  |     ["ls"],
-8  8  |     shell=False,
-9  9  | )
-10    |-subprocess.run(["ls"], **kwargs)
-   10 |+subprocess.run(["ls"], check=False, **kwargs)
-11 11 | 
-12 12 | # Non-errors.
-13 13 | subprocess.run("ls", check=True)
+help: Add explicit `check=False`
+7  |     ["ls"],
+8  |     shell=False,
+9  | )
+   - subprocess.run(["ls"], **kwargs)
+10 + subprocess.run(["ls"], check=False, **kwargs)
+11 | 
+12 | # Non-errors.
+13 | subprocess.run("ls", check=True)
+note: This is an unsafe fix and may change runtime behavior

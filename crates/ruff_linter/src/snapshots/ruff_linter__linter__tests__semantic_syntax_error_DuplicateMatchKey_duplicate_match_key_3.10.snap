@@ -1,7 +1,8 @@
 ---
 source: crates/ruff_linter/src/linter.rs
 ---
-<filename>:3:21: invalid-syntax: mapping pattern checks duplicate key `'key'`
+invalid-syntax: mapping pattern checks duplicate key `'key'`
+ --> <filename>:3:21
   |
 2 | match x:
 3 |     case {'key': 1, 'key': 2}:

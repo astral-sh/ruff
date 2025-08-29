@@ -16,7 +16,7 @@ impl RequestHandler for SemanticTokensRequestHandler {
 }
 
 impl BackgroundDocumentRequestHandler for SemanticTokensRequestHandler {
-    fn document_url(params: &SemanticTokensParams) -> Cow<Url> {
+    fn document_url(params: &SemanticTokensParams) -> Cow<'_, Url> {
         Cow::Borrowed(&params.text_document.uri)
     }
 

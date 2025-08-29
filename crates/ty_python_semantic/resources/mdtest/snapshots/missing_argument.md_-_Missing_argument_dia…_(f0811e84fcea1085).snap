@@ -1,0 +1,117 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: missing_argument.md - Missing argument diagnostics
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/missing_argument.md
+---
+
+# Python source files
+
+## module.py
+
+```
+1 | def f(a, b=42): ...
+2 | def g(a, b): ...
+3 | 
+4 | class Foo:
+5 |     def method(self, a): ...
+```
+
+## main.py
+
+```
+ 1 | from module import f, g, Foo
+ 2 | 
+ 3 | f()  # error: [missing-argument]
+ 4 | 
+ 5 | def coinflip() -> bool:
+ 6 |     return True
+ 7 | 
+ 8 | h = f if coinflip() else g
+ 9 | 
+10 | # error: [missing-argument]
+11 | # error: [missing-argument]
+12 | h(b=56)
+13 | 
+14 | Foo().method()  # error: [missing-argument]
+```
+
+# Diagnostics
+
+```
+error[missing-argument]: No argument provided for required parameter `a` of function `f`
+ --> src/main.py:3:1
+  |
+1 | from module import f, g, Foo
+2 |
+3 | f()  # error: [missing-argument]
+  | ^^^
+4 |
+5 | def coinflip() -> bool:
+  |
+info: Parameter declared here
+ --> src/module.py:1:7
+  |
+1 | def f(a, b=42): ...
+  |       ^
+2 | def g(a, b): ...
+  |
+info: rule `missing-argument` is enabled by default
+
+```
+
+```
+error[missing-argument]: No argument provided for required parameter `a` of function `f`
+  --> src/main.py:12:1
+   |
+10 | # error: [missing-argument]
+11 | # error: [missing-argument]
+12 | h(b=56)
+   | ^^^^^^^
+13 |
+14 | Foo().method()  # error: [missing-argument]
+   |
+info: Union variant `def f(a, b=Literal[42]) -> Unknown` is incompatible with this call site
+info: Attempted to call union type `(def f(a, b=Literal[42]) -> Unknown) | (def g(a, b) -> Unknown)`
+info: rule `missing-argument` is enabled by default
+
+```
+
+```
+error[missing-argument]: No argument provided for required parameter `a` of function `g`
+  --> src/main.py:12:1
+   |
+10 | # error: [missing-argument]
+11 | # error: [missing-argument]
+12 | h(b=56)
+   | ^^^^^^^
+13 |
+14 | Foo().method()  # error: [missing-argument]
+   |
+info: Union variant `def g(a, b) -> Unknown` is incompatible with this call site
+info: Attempted to call union type `(def f(a, b=Literal[42]) -> Unknown) | (def g(a, b) -> Unknown)`
+info: rule `missing-argument` is enabled by default
+
+```
+
+```
+error[missing-argument]: No argument provided for required parameter `a` of bound method `method`
+  --> src/main.py:14:1
+   |
+12 | h(b=56)
+13 |
+14 | Foo().method()  # error: [missing-argument]
+   | ^^^^^^^^^^^^^^
+   |
+info: Parameter declared here
+ --> src/module.py:5:22
+  |
+4 | class Foo:
+5 |     def method(self, a): ...
+  |                      ^
+  |
+info: rule `missing-argument` is enabled by default
+
+```

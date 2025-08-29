@@ -1,11 +1,18 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
-snapshot_kind: text
 ---
-F811_0.py:10:5: F811 Redefinition of unused `bar` from line 6
+F811 Redefinition of unused `bar` from line 6
+  --> F811_0.py:10:5
    |
 10 | def bar():
-   |     ^^^ F811
+   |     ^^^ `bar` redefined here
 11 |     pass
    |
-   = help: Remove definition: `bar`
+  ::: F811_0.py:6:5
+   |
+ 5 | @foo
+ 6 | def bar():
+   |     --- previous definition of `bar` here
+ 7 |     pass
+   |
+help: Remove definition: `bar`

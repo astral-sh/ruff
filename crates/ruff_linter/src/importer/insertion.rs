@@ -63,9 +63,9 @@ impl<'a> Insertion<'a> {
                 return Insertion::inline(" ", location.add(offset).add(TextSize::of(';')), ";");
             }
 
-            // If the first token after the docstring is a continuation character (i.e. "\"), advance
-            // an additional row to prevent inserting in the same logical line.
-            if match_continuation(locator.after(location)).is_some() {
+            // While the first token after the docstring is a continuation character (i.e. "\"), advance
+            // additional rows to prevent inserting in the same logical line.
+            while match_continuation(locator.after(location)).is_some() {
                 location = locator.full_line_end(location);
             }
 
@@ -329,7 +329,7 @@ mod tests {
 
     #[test]
     fn start_of_file() -> Result<()> {
-        fn insert(contents: &str) -> Result<Insertion> {
+        fn insert(contents: &str) -> Result<Insertion<'_>> {
             let parsed = parse_module(contents)?;
             let locator = Locator::new(contents);
             let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
@@ -377,6 +377,17 @@ mod tests {
         assert_eq!(
             insert(contents)?,
             Insertion::own_line("", TextSize::from(22), "\n")
+        );
+
+        let contents = r#"
+"""Hello, world!"""\
+\
+
+"#
+        .trim_start();
+        assert_eq!(
+            insert(contents)?,
+            Insertion::own_line("", TextSize::from(24), "\n")
         );
 
         let contents = r"
@@ -450,7 +461,7 @@ x = 1
 
     #[test]
     fn start_of_block() {
-        fn insert(contents: &str, offset: TextSize) -> Insertion {
+        fn insert(contents: &str, offset: TextSize) -> Insertion<'_> {
             let parsed = parse_module(contents).unwrap();
             let locator = Locator::new(contents);
             let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());

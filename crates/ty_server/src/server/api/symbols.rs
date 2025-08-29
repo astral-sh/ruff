@@ -27,7 +27,7 @@ pub(crate) fn convert_symbol_kind(kind: ty_ide::SymbolKind) -> SymbolKind {
 
 /// Convert a `ty_ide` `SymbolInfo` to LSP `SymbolInformation`
 pub(crate) fn convert_to_lsp_symbol_information(
-    symbol: SymbolInfo,
+    symbol: SymbolInfo<'_>,
     uri: &Url,
     source: &str,
     line_index: &LineIndex,
@@ -36,7 +36,7 @@ pub(crate) fn convert_to_lsp_symbol_information(
     let symbol_kind = convert_symbol_kind(symbol.kind);
 
     SymbolInformation {
-        name: symbol.name,
+        name: symbol.name.into_owned(),
         kind: symbol_kind,
         tags: None,
         #[allow(deprecated)]

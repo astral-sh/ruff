@@ -212,7 +212,7 @@ impl Diagnostic {
     /// The type returned implements the `std::fmt::Display` trait. In most
     /// cases, just converting it to a string (or printing it) will do what
     /// you want.
-    pub fn concise_message(&self) -> ConciseMessage {
+    pub fn concise_message(&self) -> ConciseMessage<'_> {
         let main = self.inner.message.as_str();
         let annotation = self
             .primary_annotation()
@@ -252,6 +252,11 @@ impl Diagnostic {
             .annotations
             .iter_mut()
             .find(|ann| ann.is_primary)
+    }
+
+    /// Returns a mutable borrow of all annotations of this diagnostic.
+    pub fn annotations_mut(&mut self) -> impl Iterator<Item = &mut Annotation> {
+        Arc::make_mut(&mut self.inner).annotations.iter_mut()
     }
 
     /// Returns the "primary" span of this diagnostic if one exists.
@@ -310,9 +315,19 @@ impl Diagnostic {
         &self.inner.subs
     }
 
+    /// Returns a mutable borrow of the sub-diagnostics of this diagnostic.
+    pub fn sub_diagnostics_mut(&mut self) -> impl Iterator<Item = &mut SubDiagnostic> {
+        Arc::make_mut(&mut self.inner).subs.iter_mut()
+    }
+
     /// Returns the fix for this diagnostic if it exists.
     pub fn fix(&self) -> Option<&Fix> {
         self.inner.fix.as_ref()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn fix_mut(&mut self) -> Option<&mut Fix> {
+        Arc::make_mut(&mut self.inner).fix.as_mut()
     }
 
     /// Set the fix for this diagnostic.
@@ -621,6 +636,11 @@ impl SubDiagnostic {
         &self.inner.annotations
     }
 
+    /// Returns a mutable borrow of the annotations of this sub-diagnostic.
+    pub fn annotations_mut(&mut self) -> impl Iterator<Item = &mut Annotation> {
+        self.inner.annotations.iter_mut()
+    }
+
     /// Returns a shared borrow of the "primary" annotation of this diagnostic
     /// if one exists.
     ///
@@ -654,7 +674,7 @@ impl SubDiagnostic {
     /// The type returned implements the `std::fmt::Display` trait. In most
     /// cases, just converting it to a string (or printing it) will do what
     /// you want.
-    pub fn concise_message(&self) -> ConciseMessage {
+    pub fn concise_message(&self) -> ConciseMessage<'_> {
         let main = self.inner.message.as_str();
         let annotation = self
             .primary_annotation()
@@ -1099,7 +1119,7 @@ enum DiagnosticSource {
 
 impl DiagnosticSource {
     /// Returns this input as a `SourceCode` for convenient querying.
-    fn as_source_code(&self) -> SourceCode {
+    fn as_source_code(&self) -> SourceCode<'_, '_> {
         match self {
             DiagnosticSource::Ty(input) => SourceCode::new(input.text.as_str(), &input.line_index),
             DiagnosticSource::Ruff(source) => SourceCode::new(source.source_text(), source.index()),
@@ -1279,6 +1299,10 @@ pub struct DisplayDiagnosticConfig {
     hide_severity: bool,
     /// Whether to show the availability of a fix in a diagnostic.
     show_fix_status: bool,
+    /// Whether to show the diff for an available fix after the main diagnostic.
+    ///
+    /// This currently only applies to `DiagnosticFormat::Full`.
+    show_fix_diff: bool,
     /// The lowest applicability that should be shown when reporting diagnostics.
     fix_applicability: Applicability,
 }
@@ -1326,6 +1350,14 @@ impl DisplayDiagnosticConfig {
         }
     }
 
+    /// Whether to show a diff for an available fix after the main diagnostic.
+    pub fn show_fix_diff(self, yes: bool) -> DisplayDiagnosticConfig {
+        DisplayDiagnosticConfig {
+            show_fix_diff: yes,
+            ..self
+        }
+    }
+
     /// Set the lowest fix applicability that should be shown.
     ///
     /// In other words, an applicability of `Safe` (the default) would suppress showing fixes or fix
@@ -1349,6 +1381,7 @@ impl Default for DisplayDiagnosticConfig {
             preview: false,
             hide_severity: false,
             show_fix_status: false,
+            show_fix_diff: false,
             fix_applicability: Applicability::Safe,
         }
     }
@@ -1402,6 +1435,11 @@ pub enum DiagnosticFormat {
     /// Print diagnostics in the format expected by JUnit.
     #[cfg(feature = "junit")]
     Junit,
+    /// Print diagnostics in the JSON format used by GitLab [Code Quality] reports.
+    ///
+    /// [Code Quality]: https://docs.gitlab.com/ee/ci/testing/code_quality.html#implement-a-custom-tool
+    #[cfg(feature = "serde")]
+    Gitlab,
 }
 
 /// A representation of the kinds of messages inside a diagnostic.

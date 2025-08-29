@@ -298,6 +298,10 @@ impl System for LSPSystem {
     fn env_var(&self, name: &str) -> std::result::Result<String, std::env::VarError> {
         self.native_system.env_var(name)
     }
+
+    fn dyn_clone(&self) -> Box<dyn System> {
+        Box::new(self.clone())
+    }
 }
 
 fn not_a_text_document(path: impl Display) -> std::io::Error {

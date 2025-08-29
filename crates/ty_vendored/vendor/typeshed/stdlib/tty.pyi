@@ -17,13 +17,13 @@ if sys.platform != "win32":
     _FD: TypeAlias = int | IO[str]
 
     # XXX: Undocumented integer constants
-    IFLAG: Final[int]
-    OFLAG: Final[int]
-    CFLAG: Final[int]
-    LFLAG: Final[int]
-    ISPEED: Final[int]
-    OSPEED: Final[int]
-    CC: Final[int]
+    IFLAG: Final = 0
+    OFLAG: Final = 1
+    CFLAG: Final = 2
+    LFLAG: Final = 3
+    ISPEED: Final = 4
+    OSPEED: Final = 5
+    CC: Final = 6
     def setraw(fd: _FD, when: int = 2) -> _ModeSetterReturn:
         """Put terminal into raw mode."""
 

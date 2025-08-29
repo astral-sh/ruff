@@ -13,7 +13,7 @@ TODO: Fill out more detailed documentation on the operators.
 # nor `float` as a subtype of `numbers.Real`, etc.)
 
 from abc import ABCMeta, abstractmethod
-from typing import ClassVar, Literal, Protocol, overload
+from typing import ClassVar, Literal, Protocol, overload, type_check_only
 
 __all__ = ["Number", "Complex", "Real", "Rational", "Integral"]
 
@@ -27,6 +27,7 @@ __all__ = ["Number", "Complex", "Real", "Rational", "Integral"]
 # NOTE: We can't include `__complex__` here,
 # as we want `int` to be seen as a subtype of `_ComplexLike`,
 # and `int.__complex__` does not exist :(
+@type_check_only
 class _ComplexLike(Protocol):
     def __neg__(self) -> _ComplexLike: ...
     def __pos__(self) -> _ComplexLike: ...
@@ -34,6 +35,7 @@ class _ComplexLike(Protocol):
 
 # _RealLike is a structural-typing approximation
 # of the `Real` ABC, which is not (and cannot be) a protocol
+@type_check_only
 class _RealLike(_ComplexLike, Protocol):
     def __trunc__(self) -> _IntegralLike: ...
     def __floor__(self) -> _IntegralLike: ...
@@ -46,6 +48,7 @@ class _RealLike(_ComplexLike, Protocol):
 
 # _IntegralLike is a structural-typing approximation
 # of the `Integral` ABC, which is not (and cannot be) a protocol
+@type_check_only
 class _IntegralLike(_RealLike, Protocol):
     def __invert__(self) -> _IntegralLike: ...
     def __int__(self) -> int: ...
@@ -69,6 +72,7 @@ class Number(metaclass=ABCMeta):
     caring what kind, use isinstance(x, Number).
     """
 
+    __slots__ = ()
     @abstractmethod
     def __hash__(self) -> int:
         """The type of the None singleton."""
@@ -86,6 +90,7 @@ class Complex(Number, _ComplexLike):
     type as described below.
     """
 
+    __slots__ = ()
     @abstractmethod
     def __complex__(self) -> complex:
         """Return a builtin complex instance. Called for complex(self)."""
@@ -179,6 +184,7 @@ class Real(Complex, _RealLike):
     Real also provides defaults for the derived operations.
     """
 
+    __slots__ = ()
     @abstractmethod
     def __float__(self) -> float:
         """Any Real can be converted to a native float object.
@@ -287,12 +293,20 @@ class Real(Complex, _RealLike):
 class Rational(Real):
     """.numerator and .denominator should be in lowest terms."""
 
+    __slots__ = ()
     @property
     @abstractmethod
-    def numerator(self) -> _IntegralLike: ...
+    def numerator(self) -> _IntegralLike:
+        """The numerator of a rational number in lowest terms."""
+
     @property
     @abstractmethod
-    def denominator(self) -> _IntegralLike: ...
+    def denominator(self) -> _IntegralLike:
+        """The denominator of a rational number in lowest terms.
+
+        This denominator should be positive.
+        """
+
     def __float__(self) -> float:
         """float(self) = self.numerator / self.denominator
 
@@ -311,6 +325,7 @@ class Integral(Rational, _IntegralLike):
     bit-string operations.
     """
 
+    __slots__ = ()
     @abstractmethod
     def __int__(self) -> int:
         """int(self)"""

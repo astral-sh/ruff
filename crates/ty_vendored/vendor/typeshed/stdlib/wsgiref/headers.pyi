@@ -6,12 +6,12 @@ written by Barry Warsaw.
 """
 
 from re import Pattern
-from typing import overload
+from typing import Final, overload
 from typing_extensions import TypeAlias
 
 _HeaderList: TypeAlias = list[tuple[str, str]]
 
-tspecials: Pattern[str]  # undocumented
+tspecials: Final[Pattern[str]]  # undocumented
 
 class Headers:
     """Manage a collection of HTTP response headers"""

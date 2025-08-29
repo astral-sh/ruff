@@ -18,7 +18,7 @@ impl RequestHandler for SemanticTokensRangeRequestHandler {
 }
 
 impl BackgroundDocumentRequestHandler for SemanticTokensRangeRequestHandler {
-    fn document_url(params: &SemanticTokensRangeParams) -> Cow<Url> {
+    fn document_url(params: &SemanticTokensRangeParams) -> Cow<'_, Url> {
         Cow::Borrowed(&params.text_document.uri)
     }
 

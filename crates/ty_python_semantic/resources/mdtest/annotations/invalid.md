@@ -48,6 +48,24 @@ def _(
         reveal_type(h_)  # revealed: Unknown
         reveal_type(i_)  # revealed: Unknown
         reveal_type(j_)  # revealed: Unknown
+
+# Inspired by the conformance test suite at
+# https://github.com/python/typing/blob/d4f39b27a4a47aac8b6d4019e1b0b5b3156fabdc/conformance/tests/aliases_implicit.py#L88-L122
+B = [x for x in range(42)]
+C = {x for x in range(42)}
+D = {x: y for x, y in enumerate(range(42))}
+E = (x for x in range(42))
+
+def _(
+    b: B,  # error: [invalid-type-form]
+    c: C,  # error: [invalid-type-form]
+    d: D,  # error: [invalid-type-form]
+    e: E,  # error: [invalid-type-form]
+):
+    reveal_type(b)  # revealed: Unknown
+    reveal_type(c)  # revealed: Unknown
+    reveal_type(d)  # revealed: Unknown
+    reveal_type(e)  # revealed: Unknown
 ```
 
 ## Invalid AST nodes
@@ -56,6 +74,7 @@ def _(
 def bar() -> None:
     return None
 
+async def baz(): ...
 async def outer():  # avoid unrelated syntax errors on yield, yield from, and await
     def _(
         a: 1,  # error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
@@ -69,7 +88,7 @@ async def outer():  # avoid unrelated syntax errors on yield, yield from, and aw
         i: not 1,  # error: [invalid-type-form] "Unary operations are not allowed in type expressions"
         j: lambda: 1,  # error: [invalid-type-form] "`lambda` expressions are not allowed in type expressions"
         k: 1 if True else 2,  # error: [invalid-type-form] "`if` expressions are not allowed in type expressions"
-        l: await 1,  # error: [invalid-type-form] "`await` expressions are not allowed in type expressions"
+        l: await baz(),  # error: [invalid-type-form] "`await` expressions are not allowed in type expressions"
         m: (yield 1),  # error: [invalid-type-form] "`yield` expressions are not allowed in type expressions"
         n: (yield from [1]),  # error: [invalid-type-form] "`yield from` expressions are not allowed in type expressions"
         o: 1 < 2,  # error: [invalid-type-form] "Comparison expressions are not allowed in type expressions"
