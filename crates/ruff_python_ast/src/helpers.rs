@@ -1411,7 +1411,8 @@ pub fn is_empty_f_string(expr: &ast::ExprFString) -> bool {
         match expr {
             Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => value.is_empty(),
             // Confusingly, `bool(f"{b""}") == True` even though
-            // `bool(b"") == False`
+            // `bool(b"") == False`. This is because `f"{b""}"`
+            // evaluates as the string `'b""'` of length 3.
             Expr::BytesLiteral(_) => false,
             Expr::FString(ast::ExprFString { value, .. }) => {
                 value
