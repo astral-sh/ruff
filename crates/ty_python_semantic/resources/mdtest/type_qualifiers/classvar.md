@@ -26,15 +26,15 @@ reveal_type(C.e)  # revealed: int
 
 c = C()
 
-# error: [invalid-assignment]
+# error: [invalid-attribute-access]
 c.a = 2
-# error: [invalid-assignment]
+# error: [invalid-attribute-access]
 c.b = 2
-# error: [invalid-assignment]
+# error: [invalid-attribute-access]
 c.c = 2
-# error: [invalid-assignment]
+# error: [invalid-attribute-access]
 c.d = 2
-# error: [invalid-assignment]
+# error: [invalid-attribute-access]
 c.e = 2
 ```
 
@@ -58,7 +58,7 @@ class C:
 from module import C
 
 c = C()
-c.a = 2  # error: [invalid-assignment]
+c.a = 2  # error: [invalid-attribute-access]
 ```
 
 ## Conflicting type qualifiers
@@ -82,7 +82,7 @@ reveal_type(C.a)  # revealed: int | str
 
 c = C()
 
-# error: [invalid-assignment]
+# error: [invalid-attribute-access]
 c.a = 2
 ```
 
