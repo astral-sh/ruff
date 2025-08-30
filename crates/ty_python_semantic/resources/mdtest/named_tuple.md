@@ -208,7 +208,7 @@ class SuperUser(User):
     def now_called_robert(self):
         self.name = "Robert"  # fine because overridden with a mutable attribute
 
-        # error: [invalid-assignment] "Invalid assignment to data descriptor attribute `nickname` on type `Self@now_called_robert` with custom `__set__` method"
+        # error: 9 [invalid-assignment] "Cannot assign to read-only property `nickname` on object of type `Self@now_called_robert`"
         self.nickname = "Bob"
 
 james = SuperUser(0, "James", 42, "Jimmy")
