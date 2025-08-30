@@ -1299,6 +1299,10 @@ impl<'db> Type<'db> {
 
             Type::TypeAlias(alias) => alias.value_type(db).into_callable(db),
 
+            Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderCall(function)) => {
+                Some(Type::Callable(function.into_callable_type(db)))
+            }
+
             Type::Never
             | Type::DataclassTransformer(_)
             | Type::AlwaysTruthy
@@ -3063,7 +3067,7 @@ impl<'db> Type<'db> {
                     Some((self, AttributeKind::NormalOrNonDataDescriptor))
                 } else {
                     Some((
-                        callable.bind_self(db),
+                        Type::Callable(callable.bind_self(db)),
                         AttributeKind::NormalOrNonDataDescriptor,
                     ))
                 };
@@ -3416,6 +3420,11 @@ impl<'db> Type<'db> {
                         })
                 }
             },
+            Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderCall(function))
+                if name == "__call__" =>
+            {
+                Place::bound(Type::Callable(function.into_callable_type(db))).into()
+            }
             Type::MethodWrapper(_) => KnownClass::MethodWrapperType
                 .to_instance(db)
                 .member_lookup_with_policy(db, name, policy),
@@ -8821,7 +8830,7 @@ impl<'db> BoundMethodType<'db> {
         let mut self_instance = self.self_instance(db);
         if self
             .function(db)
-            .has_known_decorator(db, FunctionDecorators::CLASSMETHOD)
+            .has_known_decorators(db, FunctionDecorators::CLASSMETHOD)
         {
             self_instance = self_instance.to_instance(db).unwrap_or_else(Type::unknown);
         }
@@ -8954,12 +8963,8 @@ impl<'db> CallableType<'db> {
         Self::single(db, Signature::unknown())
     }
 
-    pub(crate) fn bind_self(self, db: &'db dyn Db) -> Type<'db> {
-        Type::Callable(CallableType::new(
-            db,
-            self.signatures(db).bind_self(db, None),
-            false,
-        ))
+    pub(crate) fn bind_self(self, db: &'db dyn Db) -> CallableType<'db> {
+        CallableType::new(db, self.signatures(db).bind_self(db, None), false)
     }
 
     fn materialize(self, db: &'db dyn Db, materialization_kind: MaterializationKind) -> Self {

@@ -9,9 +9,10 @@ use rustc_hash::FxHashMap;
 use super::TypeVarVariance;
 use crate::semantic_index::place::ScopedPlaceId;
 use crate::semantic_index::{SemanticIndex, place_table};
-use crate::types::ClassType;
 use crate::types::context::InferContext;
 use crate::types::diagnostic::report_undeclared_protocol_member;
+use crate::types::function::FunctionDecorators;
+use crate::types::{ClassType, todo_type};
 use crate::{
     Db, FxOrderSet,
     place::{Boundness, Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations},
@@ -570,15 +571,50 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         visitor: &HasRelationToVisitor<'db, C>,
     ) -> C {
         match &self.kind {
-            // TODO: consider the types of the attribute on `other` for method members
-            ProtocolMemberKind::Method(_) => C::from_bool(
-                db,
-                matches!(
-                    other.to_meta_type(db).member(db, self.name).place,
-                    Place::Type(ty, Boundness::Bound)
-                    if ty.is_assignable_to(db, CallableType::single(db, Signature::dynamic(Type::any())))
-                ),
-            ),
+            ProtocolMemberKind::Method(method) => {
+                let Place::Type(instance_type, Boundness::Bound) =
+                    other.member(db, self.name).place
+                else {
+                    return C::unsatisfiable(db);
+                };
+                // TODO: ideally we'd check the type of the meta-type member too,
+                // but this is tricky because:
+                // - `self` arguments on methods are usually not annotated (we currently
+                //   infer these methods as non-fully-static as a result!)
+                // - `self` arguments on methods are often not explicitly marked as being
+                //   positional-only, but you'd usually want a method with a
+                //   positional-or-keyword `self` argument to satisfy a protocol method
+                //   with a positional-only `self` argument.
+                if !other
+                    .to_meta_type(db)
+                    .member(db, self.name)
+                    .place
+                    .is_definitely_bound()
+                {
+                    return C::unsatisfiable(db);
+                }
+                let bound_method = method.bind_self(db);
+
+                if bound_method.signatures(db).iter().any(|sig| {
+                    sig.parameters()
+                        .iter()
+                        .filter_map(Parameter::annotated_type)
+                        .chain(sig.return_ty)
+                        .any(|annotation| matches!(annotation, Type::TypeVar(_)))
+                }) {
+                    // TODO: proper validation for generic methods on protocols
+                    return C::always_satisfiable(db);
+                }
+
+                visitor.visit((instance_type, Type::Callable(bound_method)), || {
+                    instance_type.has_relation_to_impl(
+                        db,
+                        Type::Callable(bound_method),
+                        relation,
+                        visitor,
+                    )
+                })
+            }
             // TODO: consider the types of the attribute on `other` for property members
             ProtocolMemberKind::Property(_) => C::from_bool(
                 db,
@@ -723,6 +759,16 @@ fn cached_protocol_interface<'db>(
                     if bound_on_class.is_yes() && callable.is_function_like(db) =>
                 {
                     ProtocolMemberKind::Method(callable)
+                }
+                Type::FunctionLiteral(function)
+                    if function.has_known_decorators(
+                        db,
+                        FunctionDecorators::STATICMETHOD | FunctionDecorators::CLASSMETHOD,
+                    ) =>
+                {
+                    ProtocolMemberKind::Other(todo_type!(
+                        "classmethod and staticmethod protocol members"
+                    ))
                 }
                 Type::FunctionLiteral(function) if bound_on_class.is_yes() => {
                     ProtocolMemberKind::Method(function.into_callable_type(db))

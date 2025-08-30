@@ -272,7 +272,7 @@ impl<'db> Bindings<'db> {
             for (overload_index, overload) in binding.matching_overloads_mut() {
                 match binding_type {
                     Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(function)) => {
-                        if function.has_known_decorator(db, FunctionDecorators::CLASSMETHOD) {
+                        if function.has_known_decorators(db, FunctionDecorators::CLASSMETHOD) {
                             match overload.parameter_types() {
                                 [_, Some(owner)] => {
                                     overload.set_return_type(Type::BoundMethod(
@@ -290,7 +290,8 @@ impl<'db> Bindings<'db> {
                                 }
                                 _ => {}
                             }
-                        } else if function.has_known_decorator(db, FunctionDecorators::STATICMETHOD)
+                        } else if function
+                            .has_known_decorators(db, FunctionDecorators::STATICMETHOD)
                         {
                             overload.set_return_type(Type::FunctionLiteral(function));
                         } else if let [Some(first), _] = overload.parameter_types() {
@@ -308,7 +309,7 @@ impl<'db> Bindings<'db> {
                         if let [Some(function_ty @ Type::FunctionLiteral(function)), ..] =
                             overload.parameter_types()
                         {
-                            if function.has_known_decorator(db, FunctionDecorators::CLASSMETHOD) {
+                            if function.has_known_decorators(db, FunctionDecorators::CLASSMETHOD) {
                                 match overload.parameter_types() {
                                     [_, _, Some(owner)] => {
                                         overload.set_return_type(Type::BoundMethod(
@@ -329,7 +330,7 @@ impl<'db> Bindings<'db> {
                                     _ => {}
                                 }
                             } else if function
-                                .has_known_decorator(db, FunctionDecorators::STATICMETHOD)
+                                .has_known_decorators(db, FunctionDecorators::STATICMETHOD)
                             {
                                 overload.set_return_type(*function_ty);
                             } else {
