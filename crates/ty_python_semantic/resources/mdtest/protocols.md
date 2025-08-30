@@ -1774,15 +1774,23 @@ class Bar:
 f(Bar())  # error: [invalid-argument-type]
 ```
 
-Some protocols use the old convention (specified in PEP-484) for denoting
-positional-only parameters. We do not properly support this yet, but we
-also do not emit false positives on it:
+Some protocols use the old convention (specified in PEP-484) for denoting positional-only
+parameters. We do not properly support this yet, but we also do not emit false positives on it:
 
 ```py
 class SupportsLessThan(Protocol):
     def __lt__(self, __other) -> bool: ...
 
 static_assert(is_assignable_to(str, SupportsLessThan))
+```
+
+`None` is understood as hashable:
+
+```py
+from _typeshed import NoneType
+from typing import Hashable
+
+static_assert(is_subtype_of(NoneType, Hashable))
 ```
 
 ## Equivalence of protocols with method or property members
