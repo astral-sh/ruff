@@ -25,6 +25,7 @@ use std::cell::RefCell;
 use std::path::Path;
 
 use itertools::Itertools;
+use libcst_native::Name;
 use log::debug;
 use rustc_hash::{FxHashMap, FxHashSet};
 
@@ -69,7 +70,8 @@ use crate::package::PackageRoot;
 use crate::preview::is_undefined_export_in_dunder_init_enabled;
 use crate::registry::Rule;
 use crate::rules::pyflakes::rules::{
-    LateFutureImport, ReturnOutsideFunction, YieldOutsideFunction,
+    LateFutureImport, ReturnOutsideFunction, UndefinedLocalWithNestedImportStarUsage,
+    YieldOutsideFunction,
 };
 use crate::rules::pylint::rules::{AwaitOutsideAsync, LoadBeforeGlobalDeclaration};
 use crate::rules::{flake8_pyi, flake8_type_checking, pyflakes, pyupgrade};
@@ -655,6 +657,14 @@ impl SemanticSyntaxContext for Checker<'_> {
             SemanticSyntaxErrorKind::YieldOutsideFunction(kind) => {
                 if self.is_rule_enabled(Rule::YieldOutsideFunction) {
                     self.report_diagnostic(YieldOutsideFunction::new(kind), error.range);
+                }
+            }
+            SemanticSyntaxErrorKind::UndefinedLocalWithNestedImportStarUsage(name) => {
+                if self.is_rule_enabled(Rule::UndefinedLocalWithNestedImportStarUsage) {
+                    self.report_diagnostic(
+                        UndefinedLocalWithNestedImportStarUsage { name },
+                        error.range,
+                    );
                 }
             }
             SemanticSyntaxErrorKind::ReturnOutsideFunction => {
