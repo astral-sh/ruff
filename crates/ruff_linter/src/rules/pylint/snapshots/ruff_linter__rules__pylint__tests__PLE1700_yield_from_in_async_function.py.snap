@@ -9,12 +9,3 @@ PLE1700 `yield from` statement in async function; use `async for` instead
 7 |     yield from l
   |     ^^^^^^^^^^^^
   |
-
-PLE1700 `yield from` statement in async function; use `async for` instead
- --> yield_from_in_async_function.py:7:5
-  |
-5 | async def fail():
-6 |     l = (1, 2, 3)
-7 |     yield from l
-  |     ^^^^^^^^^^^^
-  |
