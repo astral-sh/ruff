@@ -24,10 +24,7 @@ pub(crate) fn is_pathlib_path_call(checker: &Checker, expr: &Expr) -> bool {
 /// Check if the given segments represent a pathlib Path subclass or `PackagePath` with preview mode support.
 /// In stable mode, only checks for `Path` and `PurePath`. In preview mode, also checks for
 /// `PosixPath`, `PurePosixPath`, `WindowsPath`, `PureWindowsPath`, and `PackagePath`.
-pub(crate) fn is_pure_path_subclass_with_preview(
-    checker: &crate::checkers::ast::Checker,
-    segments: &[&str],
-) -> bool {
+pub(crate) fn is_pure_path_subclass_with_preview(checker: &Checker, segments: &[&str]) -> bool {
     let is_core_pathlib = matches!(segments, ["pathlib", "Path" | "PurePath"]);
 
     if is_core_pathlib {

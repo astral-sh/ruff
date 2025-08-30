@@ -1,11 +1,16 @@
+use ruff_diagnostics::{Applicability, Edit, Fix};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::{ArgOrKeyword, ExprCall};
+use ruff_text_size::Ranged;
+
 use crate::checkers::ast::Checker;
+use crate::importer::ImportRequest;
 use crate::preview::is_fix_os_chmod_enabled;
 use crate::rules::flake8_use_pathlib::helpers::{
-    check_os_pathlib_two_arg_calls, is_file_descriptor, is_keyword_only_argument_non_default,
+    has_unknown_keywords_or_starred_expr, is_file_descriptor, is_keyword_only_argument_non_default,
+    is_pathlib_path_call,
 };
 use crate::{FixAvailability, Violation};
-use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::ExprCall;
 
 /// ## What it does
 /// Checks for uses of `os.chmod`.
@@ -82,13 +87,85 @@ pub(crate) fn os_chmod(checker: &Checker, call: &ExprCall, segments: &[&str]) {
         return;
     }
 
-    check_os_pathlib_two_arg_calls(
-        checker,
-        call,
-        "chmod",
-        "path",
-        "mode",
-        is_fix_os_chmod_enabled(checker.settings()),
-        OsChmod,
-    );
+    let range = call.range();
+    let mut diagnostic = checker.report_diagnostic(OsChmod, call.func.range());
+
+    if call.arguments.len() < 2 {
+        return;
+    }
+
+    let Some(path) = call.arguments.find_argument_value("path", 0) else {
+        return;
+    };
+
+    if !is_fix_os_chmod_enabled(checker.settings()) {
+        return;
+    }
+
+    if has_unknown_keywords_or_starred_expr(
+        &call.arguments,
+        &["path", "mode", "dir_fd", "follow_symlinks"],
+    ) {
+        return;
+    }
+
+    if let Some(expr) = call.arguments.find_argument_value("follow_symlinks", 3) {
+        if expr.as_boolean_literal_expr().is_none() {
+            return;
+        }
+    }
+
+    diagnostic.try_set_fix(|| {
+        let (import_edit, binding) = checker.importer().get_or_import_symbol(
+            &ImportRequest::import("pathlib", "Path"),
+            call.start(),
+            checker.semantic(),
+        )?;
+
+        let applicability = if checker.comment_ranges().intersects(range) {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        };
+
+        let locator = checker.locator();
+
+        let mode = call.arguments.find_argument("mode", 1);
+        let follow_symlinks = call.arguments.find_argument("follow_symlinks", 3);
+
+        let path_code = locator.slice(path.range());
+
+        let args = |arg: &ArgOrKeyword| match arg {
+            ArgOrKeyword::Arg(expr) => locator.slice(expr),
+            ArgOrKeyword::Keyword(keyword) => locator.slice(&keyword.value),
+        };
+
+        let follow_symlinks_is_false = |arg: &ArgOrKeyword| {
+            let expr = match arg {
+                ArgOrKeyword::Arg(e) => e,
+                ArgOrKeyword::Keyword(k) => &k.value,
+            };
+            expr.as_boolean_literal_expr().is_some_and(|bl| !bl.value)
+        };
+
+        let chmod_args = match (mode, follow_symlinks) {
+            (Some(m), Some(f)) if follow_symlinks_is_false(&f) => {
+                format!("{}, follow_symlinks=False", args(&m))
+            }
+            (Some(arg), _) | (_, Some(arg)) => args(&arg).to_string(),
+            _ => String::new(),
+        };
+
+        let replacement = if is_pathlib_path_call(checker, path) {
+            format!("{path_code}.chmod({chmod_args})")
+        } else {
+            format!("{binding}({path_code}).chmod({chmod_args})")
+        };
+
+        Ok(Fix::applicable_edits(
+            Edit::range_replacement(replacement, range),
+            [import_edit],
+            applicability,
+        ))
+    });
 }
