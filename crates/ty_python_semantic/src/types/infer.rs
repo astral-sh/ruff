@@ -6426,7 +6426,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Special handling for `TypedDict` method calls
         if let ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() {
-            let value_type = self.expression_type(value);
+            let value_type = self.expression_type(value.as_ref());
             if let Type::TypedDict(typed_dict_ty) = value_type {
                 if matches!(attr.id.as_str(), "pop" | "setdefault") && !arguments.args.is_empty() {
                     // Validate the key argument for `TypedDict` methods
