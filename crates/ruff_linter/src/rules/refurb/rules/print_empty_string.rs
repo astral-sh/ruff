@@ -30,6 +30,11 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// print()
 /// ```
 ///
+/// ## Fix safety
+/// This fix is marked as unsafe if it removes an unused `sep` keyword argument
+/// that may have side effects. Removing such arguments may change the program's
+/// behavior by skipping the execution of those side effects.
+///
 /// ## References
 /// - [Python documentation: `print`](https://docs.python.org/3/library/functions.html#print)
 #[derive(ViolationMetadata)]

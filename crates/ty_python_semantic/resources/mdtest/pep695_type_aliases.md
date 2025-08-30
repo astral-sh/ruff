@@ -120,6 +120,23 @@ def f(x: IntOrStr, y: str | bytes):
     reveal_type(z)  # revealed: (int & ~AlwaysFalsy) | str | bytes
 ```
 
+## Multiple layers of union aliases
+
+```py
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+
+type W = A | B
+type X = C | D
+type Y = W | X
+
+from ty_extensions import is_equivalent_to, static_assert
+
+static_assert(is_equivalent_to(Y, A | B | C | D))
+```
+
 ## `TypeAliasType` properties
 
 Two `TypeAliasType`s are distinct and disjoint, even if they refer to the same type
@@ -257,6 +274,17 @@ from ty_extensions import Intersection
 
 def h(x: Intersection[A, B]):
     reveal_type(x)  # revealed: tuple[B] | None
+```
+
+### Self-recursive callable type
+
+```py
+from typing import Callable
+
+type C = Callable[[], C | None]
+
+def _(x: C):
+    reveal_type(x)  # revealed: () -> C | None
 ```
 
 ### Union inside generic

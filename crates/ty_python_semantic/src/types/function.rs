@@ -583,7 +583,7 @@ impl<'db> FunctionLiteral<'db> {
             if overloads.is_empty() {
                 return CallableSignature::single(type_mappings.iter().fold(
                     implementation.signature(db, inherited_generic_context),
-                    |ty, mapping| ty.apply_type_mapping(db, mapping),
+                    |sig, mapping| sig.apply_type_mapping(db, mapping),
                 ));
             }
         }
@@ -591,7 +591,7 @@ impl<'db> FunctionLiteral<'db> {
         CallableSignature::from_overloads(overloads.iter().map(|overload| {
             type_mappings.iter().fold(
                 overload.signature(db, inherited_generic_context),
-                |ty, mapping| ty.apply_type_mapping(db, mapping),
+                |sig, mapping| sig.apply_type_mapping(db, mapping),
             )
         }))
     }
@@ -616,7 +616,7 @@ impl<'db> FunctionLiteral<'db> {
         type_mappings.iter().fold(
             self.last_definition(db)
                 .signature(db, inherited_generic_context),
-            |ty, mapping| ty.apply_type_mapping(db, mapping),
+            |sig, mapping| sig.apply_type_mapping(db, mapping),
         )
     }
 

@@ -258,7 +258,7 @@ help: Use `Self` as return type
 228 |     def __new__(cls: type[Generic1]) -> Generic1: ...
 note: This is an unsafe fix and may change runtime behavior
 
-PYI034 `__new__` methods in classes like `Generic1` usually return `self` at runtime
+PYI034 [*] `__new__` methods in classes like `Generic1` usually return `self` at runtime
    --> PYI034.pyi:228:9
     |
 227 | class Generic1[T](list):
@@ -277,7 +277,7 @@ help: Use `Self` as return type
 231 | 
 note: This is a display-only fix and is likely to be incorrect
 
-PYI034 `__enter__` methods in classes like `Generic1` usually return `self` at runtime
+PYI034 [*] `__enter__` methods in classes like `Generic1` usually return `self` at runtime
    --> PYI034.pyi:229:9
     |
 227 | class Generic1[T](list):
@@ -296,7 +296,7 @@ help: Use `Self` as return type
 232 | ### Correctness of typevar-likes are not verified.
 note: This is a display-only fix and is likely to be incorrect
 
-PYI034 `__new__` methods in classes like `Generic2` usually return `self` at runtime
+PYI034 [*] `__new__` methods in classes like `Generic2` usually return `self` at runtime
    --> PYI034.pyi:239:9
     |
 238 | class Generic2(Generic[T]):
@@ -315,7 +315,7 @@ help: Use `Self` as return type
 242 | class Generic3(tuple[*Ts]):
 note: This is a display-only fix and is likely to be incorrect
 
-PYI034 `__enter__` methods in classes like `Generic2` usually return `self` at runtime
+PYI034 [*] `__enter__` methods in classes like `Generic2` usually return `self` at runtime
    --> PYI034.pyi:240:9
     |
 238 | class Generic2(Generic[T]):
@@ -336,7 +336,7 @@ help: Use `Self` as return type
 243 |     def __new__(cls: type[Generic3]) -> Generic3: ...
 note: This is a display-only fix and is likely to be incorrect
 
-PYI034 `__new__` methods in classes like `Generic3` usually return `self` at runtime
+PYI034 [*] `__new__` methods in classes like `Generic3` usually return `self` at runtime
    --> PYI034.pyi:243:9
     |
 242 | class Generic3(tuple[*Ts]):
@@ -355,7 +355,7 @@ help: Use `Self` as return type
 246 | class Generic4(collections.abc.Callable[P, ...]):
 note: This is a display-only fix and is likely to be incorrect
 
-PYI034 `__enter__` methods in classes like `Generic3` usually return `self` at runtime
+PYI034 [*] `__enter__` methods in classes like `Generic3` usually return `self` at runtime
    --> PYI034.pyi:244:9
     |
 242 | class Generic3(tuple[*Ts]):
@@ -376,7 +376,7 @@ help: Use `Self` as return type
 247 |     def __new__(cls: type[Generic4]) -> Generic4: ...
 note: This is a display-only fix and is likely to be incorrect
 
-PYI034 `__new__` methods in classes like `Generic4` usually return `self` at runtime
+PYI034 [*] `__new__` methods in classes like `Generic4` usually return `self` at runtime
    --> PYI034.pyi:247:9
     |
 246 | class Generic4(collections.abc.Callable[P, ...]):
@@ -395,7 +395,7 @@ help: Use `Self` as return type
 250 | from some_module import PotentialTypeVar
 note: This is a display-only fix and is likely to be incorrect
 
-PYI034 `__enter__` methods in classes like `Generic4` usually return `self` at runtime
+PYI034 [*] `__enter__` methods in classes like `Generic4` usually return `self` at runtime
    --> PYI034.pyi:248:9
     |
 246 | class Generic4(collections.abc.Callable[P, ...]):
@@ -416,7 +416,7 @@ help: Use `Self` as return type
 251 | 
 note: This is a display-only fix and is likely to be incorrect
 
-PYI034 `__new__` methods in classes like `Generic5` usually return `self` at runtime
+PYI034 [*] `__new__` methods in classes like `Generic5` usually return `self` at runtime
    --> PYI034.pyi:253:9
     |
 252 | class Generic5(list[PotentialTypeVar]):
@@ -433,7 +433,7 @@ help: Use `Self` as return type
 254 |     def __enter__(self: Generic5) -> Generic5: ...
 note: This is a display-only fix and is likely to be incorrect
 
-PYI034 `__enter__` methods in classes like `Generic5` usually return `self` at runtime
+PYI034 [*] `__enter__` methods in classes like `Generic5` usually return `self` at runtime
    --> PYI034.pyi:254:9
     |
 252 | class Generic5(list[PotentialTypeVar]):

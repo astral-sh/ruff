@@ -10,7 +10,8 @@ use crate::semantic_index::SemanticIndex;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::place::{PlaceTable, ScopedPlaceId};
 use crate::suppression::FileSuppressionId;
-use crate::types::class::{ClassType, DisjointBase, DisjointBaseKind, Field};
+use crate::types::call::CallError;
+use crate::types::class::{DisjointBase, DisjointBaseKind, Field};
 use crate::types::function::KnownFunction;
 use crate::types::string_annotation::{
     BYTE_STRING_TYPE_ANNOTATION, ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION, FSTRING_TYPE_ANNOTATION,
@@ -26,7 +27,7 @@ use crate::{
     Db, DisplaySettings, FxIndexMap, FxOrderMap, Module, ModuleName, Program, declare_lint,
 };
 use itertools::Itertools;
-use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
+use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange};
@@ -1945,18 +1946,8 @@ pub(super) fn report_invalid_assignment(
     target_ty: Type,
     source_ty: Type,
 ) {
-    let mut settings = DisplaySettings::default();
-    // Handles the situation where the report naming is confusing, such as class with the same Name,
-    // but from different scopes.
-    if let Some(target_class) = type_to_class_literal(target_ty, context.db()) {
-        if let Some(source_class) = type_to_class_literal(source_ty, context.db()) {
-            if target_class != source_class
-                && target_class.name(context.db()) == source_class.name(context.db())
-            {
-                settings = settings.qualified();
-            }
-        }
-    }
+    let settings =
+        DisplaySettings::from_possibly_ambiguous_type_pair(context.db(), target_ty, source_ty);
 
     report_invalid_assignment_with_message(
         context,
@@ -1968,36 +1959,6 @@ pub(super) fn report_invalid_assignment(
             target_ty.display_with(context.db(), settings)
         ),
     );
-}
-
-// TODO: generalize this to a method that takes any two types, walks them recursively, and returns
-// a set of types with ambiguous names whose display should be qualified. Then we can use this in
-// any diagnostic that displays two types.
-fn type_to_class_literal<'db>(ty: Type<'db>, db: &'db dyn crate::Db) -> Option<ClassLiteral<'db>> {
-    match ty {
-        Type::ClassLiteral(class) => Some(class),
-        Type::NominalInstance(instance) => match instance.class(db) {
-            crate::types::class::ClassType::NonGeneric(class) => Some(class),
-            crate::types::class::ClassType::Generic(alias) => Some(alias.origin(db)),
-        },
-        Type::EnumLiteral(enum_literal) => Some(enum_literal.enum_class(db)),
-        Type::GenericAlias(alias) => Some(alias.origin(db)),
-        Type::ProtocolInstance(ProtocolInstanceType {
-            inner: Protocol::FromClass(class),
-            ..
-        }) => match class {
-            ClassType::NonGeneric(class) => Some(class),
-            ClassType::Generic(alias) => Some(alias.origin(db)),
-        },
-        Type::TypedDict(typed_dict) => match typed_dict.defining_class() {
-            ClassType::NonGeneric(class) => Some(class),
-            ClassType::Generic(alias) => Some(alias.origin(db)),
-        },
-        Type::SubclassOf(subclass_of) => {
-            type_to_class_literal(Type::from(subclass_of.subclass_of().into_class()?), db)
-        }
-        _ => None,
-    }
 }
 
 pub(super) fn report_invalid_attribute_assignment(
@@ -2019,6 +1980,45 @@ pub(super) fn report_invalid_attribute_assignment(
     );
 }
 
+pub(super) fn report_bad_dunder_set_call<'db>(
+    context: &InferContext<'db, '_>,
+    dunder_set_failure: &CallError<'db>,
+    attribute: &str,
+    object_type: Type<'db>,
+    target: &ast::ExprAttribute,
+) {
+    let Some(builder) = context.report_lint(&INVALID_ASSIGNMENT, target) else {
+        return;
+    };
+    let db = context.db();
+    if let Some(property) = dunder_set_failure.as_attempt_to_set_property_with_no_setter() {
+        let object_type = object_type.display(db);
+        let mut diagnostic = builder.into_diagnostic(format_args!(
+            "Cannot assign to read-only property `{attribute}` on object of type `{object_type}`",
+        ));
+        if let Some(file_range) = property
+            .getter(db)
+            .and_then(|getter| getter.definition(db))
+            .and_then(|definition| definition.focus_range(db))
+        {
+            diagnostic.annotate(Annotation::secondary(Span::from(file_range)).message(
+                format_args!("Property `{object_type}.{attribute}` defined here with no setter"),
+            ));
+            diagnostic.set_primary_message(format_args!(
+                "Attempted assignment to `{object_type}.{attribute}` here"
+            ));
+        }
+    } else {
+        // TODO: Here, it would be nice to emit an additional diagnostic
+        // that explains why the call failed
+        builder.into_diagnostic(format_args!(
+            "Invalid assignment to data descriptor attribute \
+            `{attribute}` on type `{}` with custom `__set__` method",
+            object_type.display(db)
+        ));
+    }
+}
+
 pub(super) fn report_invalid_return_type(
     context: &InferContext,
     object_range: impl Ranged,
@@ -2030,18 +2030,20 @@ pub(super) fn report_invalid_return_type(
         return;
     };
 
+    let settings =
+        DisplaySettings::from_possibly_ambiguous_type_pair(context.db(), expected_ty, actual_ty);
     let return_type_span = context.span(return_type_range);
 
     let mut diag = builder.into_diagnostic("Return type does not match returned value");
     diag.set_primary_message(format_args!(
         "expected `{expected_ty}`, found `{actual_ty}`",
-        expected_ty = expected_ty.display(context.db()),
-        actual_ty = actual_ty.display(context.db()),
+        expected_ty = expected_ty.display_with(context.db(), settings),
+        actual_ty = actual_ty.display_with(context.db(), settings),
     ));
     diag.annotate(
         Annotation::secondary(return_type_span).message(format_args!(
             "Expected `{expected_ty}` because of return type",
-            expected_ty = expected_ty.display(context.db()),
+            expected_ty = expected_ty.display_with(context.db(), settings),
         )),
     );
 }
@@ -2946,6 +2948,21 @@ pub(crate) fn report_missing_typed_dict_key<'db>(
         let typed_dict_name = typed_dict_ty.display(db);
         builder.into_diagnostic(format_args!(
             "Missing required key '{missing_field}' in TypedDict `{typed_dict_name}` constructor",
+        ));
+    }
+}
+
+pub(crate) fn report_cannot_pop_required_field_on_typed_dict<'db>(
+    context: &InferContext<'db, '_>,
+    key_node: AnyNodeRef,
+    typed_dict_ty: Type<'db>,
+    field_name: &str,
+) {
+    let db = context.db();
+    if let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, key_node) {
+        let typed_dict_name = typed_dict_ty.display(db);
+        builder.into_diagnostic(format_args!(
+            "Cannot pop required field '{field_name}' from TypedDict `{typed_dict_name}`",
         ));
     }
 }

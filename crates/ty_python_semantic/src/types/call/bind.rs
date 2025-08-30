@@ -426,9 +426,9 @@ impl<'db> Bindings<'db> {
                                         overload.set_return_type(Type::unknown());
                                     }
                                 } else {
-                                    overload.errors.push(BindingError::InternalCallError(
-                                        "property has no getter",
-                                    ));
+                                    overload
+                                        .errors
+                                        .push(BindingError::PropertyHasNoSetter(*property));
                                     overload.set_return_type(Type::Never);
                                 }
                             }
@@ -482,9 +482,9 @@ impl<'db> Bindings<'db> {
                                     ));
                                 }
                             } else {
-                                overload.errors.push(BindingError::InternalCallError(
-                                    "property has no setter",
-                                ));
+                                overload
+                                    .errors
+                                    .push(BindingError::PropertyHasNoSetter(*property));
                             }
                         }
                     }
@@ -500,9 +500,9 @@ impl<'db> Bindings<'db> {
                                     ));
                                 }
                             } else {
-                                overload.errors.push(BindingError::InternalCallError(
-                                    "property has no setter",
-                                ));
+                                overload
+                                    .errors
+                                    .push(BindingError::PropertyHasNoSetter(property));
                             }
                         }
                     }
@@ -2598,6 +2598,10 @@ impl<'db> Binding<'db> {
     pub(crate) fn argument_matches(&self) -> &[MatchedArgument<'db>] {
         &self.argument_matches
     }
+
+    pub(crate) fn errors(&self) -> &[BindingError<'db>] {
+        &self.errors
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -2816,7 +2820,9 @@ pub(crate) enum BindingError<'db> {
         provided_ty: Type<'db>,
     },
     /// One or more required parameters (that is, with no default) is not supplied by any argument.
-    MissingArguments { parameters: ParameterContexts },
+    MissingArguments {
+        parameters: ParameterContexts,
+    },
     /// A call argument can't be matched to any parameter.
     UnknownArgument {
         argument_name: ast::name::Name,
@@ -2838,6 +2844,7 @@ pub(crate) enum BindingError<'db> {
         error: SpecializationError<'db>,
         argument_index: Option<usize>,
     },
+    PropertyHasNoSetter(PropertyInstanceType<'db>),
     /// The call itself might be well constructed, but an error occurred while evaluating the call.
     /// We use this variant to report errors in `property.__get__` and `property.__set__`, which
     /// can occur when the call to the underlying getter/setter fails.
@@ -3102,6 +3109,17 @@ impl<'db> BindingError<'db> {
                 if let Some(union_diag) = union_diag {
                     union_diag.add_union_context(context.db(), &mut diag);
                 }
+            }
+
+            Self::PropertyHasNoSetter(_) => {
+                BindingError::InternalCallError("property has no setter").report_diagnostic(
+                    context,
+                    node,
+                    callable_ty,
+                    callable_description,
+                    union_diag,
+                    matching_overload,
+                );
             }
 
             Self::InternalCallError(reason) => {
