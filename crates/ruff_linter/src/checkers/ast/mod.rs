@@ -71,7 +71,9 @@ use crate::registry::Rule;
 use crate::rules::pyflakes::rules::{
     LateFutureImport, ReturnOutsideFunction, YieldOutsideFunction,
 };
-use crate::rules::pylint::rules::{AwaitOutsideAsync, LoadBeforeGlobalDeclaration};
+use crate::rules::pylint::rules::{
+    AwaitOutsideAsync, LoadBeforeGlobalDeclaration, YieldFromInAsyncFunction,
+};
 use crate::rules::{flake8_pyi, flake8_type_checking, pyflakes, pyupgrade};
 use crate::settings::rule_table::RuleTable;
 use crate::settings::{LinterSettings, TargetVersion, flags};
@@ -666,6 +668,12 @@ impl SemanticSyntaxContext for Checker<'_> {
             SemanticSyntaxErrorKind::AwaitOutsideAsyncFunction(_) => {
                 if self.is_rule_enabled(Rule::AwaitOutsideAsync) {
                     self.report_diagnostic(AwaitOutsideAsync, error.range);
+                }
+            }
+            SemanticSyntaxErrorKind::YieldFromInAsyncFunction => {
+                // PLE1700
+                if self.is_rule_enabled(Rule::YieldFromInAsyncFunction) {
+                    self.report_diagnostic(YieldFromInAsyncFunction, error.range);
                 }
             }
             SemanticSyntaxErrorKind::ReboundComprehensionVariable

@@ -1231,6 +1231,10 @@ mod tests {
     )]
     #[test_case(Rule::AwaitOutsideAsync, Path::new("await_outside_async_function.py"))]
     #[test_case(Rule::AwaitOutsideAsync, Path::new("async_comprehension.py"))]
+    #[test_case(
+        Rule::YieldFromInAsyncFunction,
+        Path::new("yield_from_in_async_function.py")
+    )]
     fn test_syntax_errors(rule: Rule, path: &Path) -> Result<()> {
         let snapshot = path.to_string_lossy().to_string();
         let path = Path::new("resources/test/fixtures/syntax_errors").join(path);
