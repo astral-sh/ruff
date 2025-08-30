@@ -12,6 +12,7 @@ use crate::semantic_index::{SemanticIndex, place_table};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::report_undeclared_protocol_member;
 use crate::types::function::FunctionDecorators;
+use crate::types::visitor::any_over_type;
 use crate::types::{ClassType, todo_type};
 use crate::{
     Db, FxOrderSet,
@@ -595,18 +596,17 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                 }
                 let bound_method = method.bind_self(db);
 
+                let is_generic = |ty| any_over_type(db, ty, &|t| matches!(t, Type::TypeVar(_)));
+
                 for signature in bound_method.signatures(db) {
-                    if matches!(signature.return_ty, Some(Type::TypeVar(_))) {
+                    if signature.return_ty.is_some_and(is_generic) {
                         // TODO: proper validation for generic methods on protocols
                         return C::always_satisfiable(db);
                     }
 
                     let mut found_non_positional_only = false;
                     for param in signature.parameters() {
-                        if param
-                            .annotated_type()
-                            .is_some_and(|ty| matches!(ty, Type::TypeVar(_)))
-                        {
+                        if param.annotated_type().is_some_and(is_generic) {
                             // TODO: proper validation for generic methods on protocols
                             return C::always_satisfiable(db);
                         }

@@ -7,7 +7,9 @@ use super::protocol_class::ProtocolInterface;
 use super::{BoundTypeVarInstance, ClassType, KnownClass, SubclassOfType, Type, TypeVarVariance};
 use crate::place::PlaceAndQualifiers;
 use crate::semantic_index::definition::Definition;
-use crate::types::constraints::{ConstraintSet, Constraints, IteratorConstraintsExtension};
+use crate::types::constraints::{
+    ConstraintSet, Constraints, IteratorConstraintsExtension, OptionConstraintsExtension,
+};
 use crate::types::enums::is_single_member_enum;
 use crate::types::protocol_class::walk_protocol_interface;
 use crate::types::tuple::{TupleSpec, TupleType};
@@ -113,6 +115,28 @@ impl<'db> Type<'db> {
             .members(db)
             .when_all(db, |member| {
                 member.is_satisfied_by(db, self, relation, visitor)
+            })
+            .or(db, || {
+                let ProtocolInstanceType {
+                    inner: Protocol::FromClass(protocol_class),
+                    ..
+                } = protocol
+                else {
+                    return C::unsatisfiable(db);
+                };
+                self.into_nominal_instance()
+                    .or_else(|| {
+                        self.literal_fallback_instance(db)
+                            .and_then(Type::into_nominal_instance)
+                    })
+                    .when_some_and(db, |instance| {
+                        instance.class(db).has_relation_to_impl(
+                            db,
+                            protocol_class,
+                            relation,
+                            visitor,
+                        )
+                    })
             })
             .or(db, || {
                 let object = Type::object(db);
