@@ -170,10 +170,10 @@ reveal_type(len(ZeroOrOne()))  # revealed: Literal[0, 1]
 reveal_type(len(ZeroOrTrue()))  # revealed: Literal[0, 1]
 reveal_type(len(OneOrFalse()))  # revealed: Literal[1, 0]
 
-# TODO: Emit a diagnostic
+# error: [invalid-argument-type] "Argument to function `len` is incorrect: Expected `Sized`, found `OneOrFoo`"
 reveal_type(len(OneOrFoo()))  # revealed: int
 
-# TODO: Emit a diagnostic
+# error: [invalid-argument-type] "Argument to function `len` is incorrect: Expected `Sized`, found `ZeroOrStr`"
 reveal_type(len(ZeroOrStr()))  # revealed: int
 ```
 
@@ -227,10 +227,15 @@ class IntUnion:
     def __len__(self) -> Literal[SomeEnum.INT, SomeEnum.INT_2]:
         return SomeEnum.INT
 
+# error: [invalid-argument-type] "Argument to function `len` is incorrect: Expected `Sized`, found `Auto`"
 reveal_type(len(Auto()))  # revealed: int
+# error: [invalid-argument-type] "Argument to function `len` is incorrect: Expected `Sized`, found `Int`"
 reveal_type(len(Int()))  # revealed: int
+# error: [invalid-argument-type] "Argument to function `len` is incorrect: Expected `Sized`, found `Str`"
 reveal_type(len(Str()))  # revealed: int
+# error: [invalid-argument-type] "Argument to function `len` is incorrect: Expected `Sized`, found `Tuple`"
 reveal_type(len(Tuple()))  # revealed: int
+# error: [invalid-argument-type] "Argument to function `len` is incorrect: Expected `Sized`, found `IntUnion`"
 reveal_type(len(IntUnion()))  # revealed: int
 ```
 
@@ -263,8 +268,8 @@ class SecondRequiredArgument:
 # this is fine: the call succeeds at runtime since the second argument is optional
 reveal_type(len(SecondOptionalArgument()))  # revealed: Literal[0]
 
-# TODO: Emit a diagnostic
-reveal_type(len(SecondRequiredArgument()))  # revealed: Literal[1]
+# error: [invalid-argument-type] "Argument to function `len` is incorrect: Expected `Sized`, found `SecondRequiredArgument`"
+reveal_type(len(SecondRequiredArgument()))  # revealed: int
 ```
 
 ### No `__len__`

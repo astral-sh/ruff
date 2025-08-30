@@ -3090,7 +3090,7 @@ impl<'db> Type<'db> {
                     Some((self, AttributeKind::NormalOrNonDataDescriptor))
                 } else {
                     Some((
-                        callable.bind_self(db),
+                        Type::Callable(callable.bind_self(db)),
                         AttributeKind::NormalOrNonDataDescriptor,
                     ))
                 };
@@ -3443,6 +3443,11 @@ impl<'db> Type<'db> {
                         })
                 }
             },
+            Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(function))
+                if name == "__call__" =>
+            {
+                Place::bound(Type::Callable(function.into_callable_type(db))).into()
+            }
             Type::KnownBoundMethod(method) => method
                 .class()
                 .to_instance(db)
@@ -9067,12 +9072,8 @@ impl<'db> CallableType<'db> {
         Self::single(db, Signature::unknown())
     }
 
-    pub(crate) fn bind_self(self, db: &'db dyn Db) -> Type<'db> {
-        Type::Callable(CallableType::new(
-            db,
-            self.signatures(db).bind_self(db, None),
-            false,
-        ))
+    pub(crate) fn bind_self(self, db: &'db dyn Db) -> CallableType<'db> {
+        CallableType::new(db, self.signatures(db).bind_self(db, None), false)
     }
 
     /// Create a callable type which represents a fully-static "bottom" callable.

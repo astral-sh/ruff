@@ -1766,9 +1766,7 @@ class DefinitelyNotSubtype:
 
 static_assert(is_subtype_of(NominalSubtype, P))
 static_assert(not is_subtype_of(DefinitelyNotSubtype, P))
-
-# TODO: should pass
-static_assert(not is_subtype_of(NotSubtype, P))  # error: [static-assert-error]
+static_assert(not is_subtype_of(NotSubtype, P))
 ```
 
 A callable instance attribute is not sufficient for a type to satisfy a protocol with a method
@@ -2219,17 +2217,15 @@ class Foo(Protocol):
 static_assert(is_subtype_of(Callable[[int], str], Foo))
 static_assert(is_assignable_to(Callable[[int], str], Foo))
 
-# TODO: these should pass
-static_assert(not is_subtype_of(Callable[[str], str], Foo))  # error: [static-assert-error]
-static_assert(not is_assignable_to(Callable[[str], str], Foo))  # error: [static-assert-error]
-static_assert(not is_subtype_of(Callable[[CallMeMaybe, int], str], Foo))  # error: [static-assert-error]
-static_assert(not is_assignable_to(Callable[[CallMeMaybe, int], str], Foo))  # error: [static-assert-error]
+static_assert(not is_subtype_of(Callable[[str], str], Foo))
+static_assert(not is_assignable_to(Callable[[str], str], Foo))
+static_assert(not is_subtype_of(Callable[[CallMeMaybe, int], str], Foo))
+static_assert(not is_assignable_to(Callable[[CallMeMaybe, int], str], Foo))
 
 def h(obj: Callable[[int], str], obj2: Foo, obj3: Callable[[str], str]):
     obj2 = obj
 
-    # TODO: we should emit [invalid-assignment] here because the signature of `obj3` is not assignable
-    # to the declared type of `obj2`
+    # error: [invalid-assignment] "Object of type `(str, /) -> str` is not assignable to `Foo`"
     obj2 = obj3
 
 def satisfies_foo(x: int) -> str:
