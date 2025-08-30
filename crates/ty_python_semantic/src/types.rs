@@ -10132,6 +10132,17 @@ impl<'db> SuperOwnerKind<'db> {
             Type::SpecialForm(special_form) => {
                 SuperOwnerKind::try_from_type(db, special_form.instance_fallback(db))
             }
+            // I'm not sure about this, I thought if a type var is passed, then
+            // the best option we have is to treat is as an instance of the
+            // constraint if there is one.
+            Type::TypeVar(typevar) | Type::NonInferableTypeVar(typevar) => {
+                match typevar.typevar(db).bound_or_constraints(db) {
+                    Some(TypeVarBoundOrConstraints::UpperBound(upper_bound)) => {
+                        SuperOwnerKind::try_from_type(db, upper_bound)
+                    }
+                    _ => None,
+                }
+            }
             _ => None,
         }
     }
@@ -10225,6 +10236,7 @@ impl<'db> BoundSuperType<'db> {
                 let Some(owner_class) = owner.into_class(db) else {
                     return Some(owner);
                 };
+
                 if owner_class.is_subclass_of(db, pivot_class) {
                     Some(owner)
                 } else {

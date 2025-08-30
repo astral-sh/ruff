@@ -684,7 +684,8 @@ fn anyio(criterion: &mut Criterion) {
             max_dep_date: "2025-06-17",
             python_version: PythonVersion::PY313,
         },
-        100,
+        // Increased after implicit self was added
+        150,
     );
 
     bench_project(&benchmark, criterion);

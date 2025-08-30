@@ -943,7 +943,8 @@ class Foo(Protocol):
         self.b: int = 128  # TODO: should emit diagnostic
 
     def non_init_method(self) -> None:
-        self.y = 64  # fine
+        # TODO: should be fine
+        self.y = 64  # error: [invalid-assignment] "Object of type `Literal[64]` is not assignable to attribute `y` of type `str`"
         self.c = 72  # TODO: should emit diagnostic
 
 # Note: the list of members does not include `a`, `b` or `c`,
