@@ -92,3 +92,17 @@ if (x := f()) in (1,):
 else:
     reveal_type(x)  # revealed: Literal[2, 3]
 ```
+
+## Union with `Literal`, `None` and `int`
+
+```py
+from typing import Literal
+
+def test(x: Literal["a", "b", "c"] | None | int = None):
+    if x in ("a", "b"):
+        # int is included because custom __eq__ methods could make
+        # an int equal to "a" or "b", so we can't eliminate it
+        reveal_type(x)  # revealed: Literal["a", "b"] | int
+    else:
+        reveal_type(x)  # revealed: Literal["c"] | None | int
+```
