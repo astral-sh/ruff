@@ -140,24 +140,6 @@ help: Remove `super()` parameters
 95 | # see: https://github.com/astral-sh/ruff/issues/18684
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
-   --> UP008.py:107:23
-    |
-105 | class C:
-106 |     def f(self):
-107 |         builtins.super(C, self)
-    |                       ^^^^^^^^^
-    |
-help: Remove `super()` parameters
-104 | 
-105 | class C:
-106 |     def f(self):
-    -         builtins.super(C, self)
-107 +         builtins.super()
-108 | 
-109 | 
-110 | # see: https://github.com/astral-sh/ruff/issues/18533
-
-UP008 [*] Use `super()` instead of `super(__class__, self)`
    --> UP008.py:113:14
     |
 111 |   class ClassForCommentEnthusiasts(BaseClass):
@@ -286,6 +268,8 @@ UP008 [*] Use `super()` instead of `super(__class__, self)`
 142 |     def method3(self):
 143 |         super(ExampleWithKeywords, self).some_method()  # Should be fixed - no keywords
     |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+144 |
+145 | # See: https://github.com/astral-sh/ruff/issues/19357
     |
 help: Remove `super()` parameters
 140 |         super(ExampleWithKeywords, self, **{"kwarg": "value"}).some_method()  # Should emit diagnostic but NOT be fixed
@@ -293,3 +277,202 @@ help: Remove `super()` parameters
 142 |     def method3(self):
     -         super(ExampleWithKeywords, self).some_method()  # Should be fixed - no keywords
 143 +         super().some_method()  # Should be fixed - no keywords
+144 | 
+145 | # See: https://github.com/astral-sh/ruff/issues/19357
+146 | # Must be detected
+
+UP008 [*] Use `super()` instead of `super(__class__, self)`
+   --> UP008.py:154:23
+    |
+152 |     def f(self):
+153 |         if False: __class__ # Python injects __class__ into scope
+154 |         builtins.super(ChildD1, self).f()
+    |                       ^^^^^^^^^^^^^^^
+155 |
+156 | class ChildD2(ParentD):
+    |
+help: Remove `super()` parameters
+151 | class ChildD1(ParentD):
+152 |     def f(self):
+153 |         if False: __class__ # Python injects __class__ into scope
+    -         builtins.super(ChildD1, self).f()
+154 +         builtins.super().f()
+155 | 
+156 | class ChildD2(ParentD):
+157 |     def f(self):
+
+UP008 [*] Use `super()` instead of `super(__class__, self)`
+   --> UP008.py:159:23
+    |
+157 |     def f(self):
+158 |         if False: super # Python injects __class__ into scope
+159 |         builtins.super(ChildD2, self).f()
+    |                       ^^^^^^^^^^^^^^^
+160 |
+161 | class ChildD3(ParentD):
+    |
+help: Remove `super()` parameters
+156 | class ChildD2(ParentD):
+157 |     def f(self):
+158 |         if False: super # Python injects __class__ into scope
+    -         builtins.super(ChildD2, self).f()
+159 +         builtins.super().f()
+160 | 
+161 | class ChildD3(ParentD):
+162 |     def f(self):
+
+UP008 [*] Use `super()` instead of `super(__class__, self)`
+   --> UP008.py:163:23
+    |
+161 | class ChildD3(ParentD):
+162 |     def f(self):
+163 |         builtins.super(ChildD3, self).f()
+    |                       ^^^^^^^^^^^^^^^
+164 |         super # Python injects __class__ into scope
+    |
+help: Remove `super()` parameters
+160 | 
+161 | class ChildD3(ParentD):
+162 |     def f(self):
+    -         builtins.super(ChildD3, self).f()
+163 +         builtins.super().f()
+164 |         super # Python injects __class__ into scope
+165 | 
+166 | import builtins as builtins_alias
+
+UP008 [*] Use `super()` instead of `super(__class__, self)`
+   --> UP008.py:169:29
+    |
+167 | class ChildD4(ParentD):
+168 |     def f(self):
+169 |         builtins_alias.super(ChildD4, self).f()
+    |                             ^^^^^^^^^^^^^^^
+170 |         super # Python injects __class__ into scope
+    |
+help: Remove `super()` parameters
+166 | import builtins as builtins_alias
+167 | class ChildD4(ParentD):
+168 |     def f(self):
+    -         builtins_alias.super(ChildD4, self).f()
+169 +         builtins_alias.super().f()
+170 |         super # Python injects __class__ into scope
+171 | 
+172 | class ChildD5(ParentD):
+
+UP008 [*] Use `super()` instead of `super(__class__, self)`
+   --> UP008.py:176:23
+    |
+174 |         super = 1
+175 |         super # Python injects __class__ into scope
+176 |         builtins.super(ChildD5, self).f()
+    |                       ^^^^^^^^^^^^^^^
+177 |
+178 | class ChildD6(ParentD):
+    |
+help: Remove `super()` parameters
+173 |     def f(self):
+174 |         super = 1
+175 |         super # Python injects __class__ into scope
+    -         builtins.super(ChildD5, self).f()
+176 +         builtins.super().f()
+177 | 
+178 | class ChildD6(ParentD):
+179 |     def f(self):
+
+UP008 [*] Use `super()` instead of `super(__class__, self)`
+   --> UP008.py:182:23
+    |
+180 |         super: "Any"
+181 |         __class__ # Python injects __class__ into scope
+182 |         builtins.super(ChildD6, self).f()
+    |                       ^^^^^^^^^^^^^^^
+183 |
+184 | class ChildD7(ParentD):
+    |
+help: Remove `super()` parameters
+179 |     def f(self):
+180 |         super: "Any"
+181 |         __class__ # Python injects __class__ into scope
+    -         builtins.super(ChildD6, self).f()
+182 +         builtins.super().f()
+183 | 
+184 | class ChildD7(ParentD):
+185 |     def f(self):
+
+UP008 [*] Use `super()` instead of `super(__class__, self)`
+   --> UP008.py:188:23
+    |
+186 |         def x():
+187 |             __class__ # Python injects __class__ into scope
+188 |         builtins.super(ChildD7, self).f()
+    |                       ^^^^^^^^^^^^^^^
+189 |
+190 | class ChildD8(ParentD):
+    |
+help: Remove `super()` parameters
+185 |     def f(self):
+186 |         def x():
+187 |             __class__ # Python injects __class__ into scope
+    -         builtins.super(ChildD7, self).f()
+188 +         builtins.super().f()
+189 | 
+190 | class ChildD8(ParentD):
+191 |     def f(self):
+
+UP008 [*] Use `super()` instead of `super(__class__, self)`
+   --> UP008.py:195:23
+    |
+193 |             super = 1
+194 |         super # Python injects __class__ into scope
+195 |         builtins.super(ChildD8, self).f()
+    |                       ^^^^^^^^^^^^^^^
+196 |
+197 | class ChildD9(ParentD):
+    |
+help: Remove `super()` parameters
+192 |         def x():
+193 |             super = 1
+194 |         super # Python injects __class__ into scope
+    -         builtins.super(ChildD8, self).f()
+195 +         builtins.super().f()
+196 | 
+197 | class ChildD9(ParentD):
+198 |     def f(self):
+
+UP008 [*] Use `super()` instead of `super(__class__, self)`
+   --> UP008.py:202:23
+    |
+200 |             __class__ = 1
+201 |         __class__ # Python injects __class__ into scope
+202 |         builtins.super(ChildD9, self).f()
+    |                       ^^^^^^^^^^^^^^^
+203 |
+204 | class ChildD10(ParentD):
+    |
+help: Remove `super()` parameters
+199 |         def x():
+200 |             __class__ = 1
+201 |         __class__ # Python injects __class__ into scope
+    -         builtins.super(ChildD9, self).f()
+202 +         builtins.super().f()
+203 | 
+204 | class ChildD10(ParentD):
+205 |     def f(self):
+
+UP008 [*] Use `super()` instead of `super(__class__, self)`
+   --> UP008.py:209:23
+    |
+207 |             __class__ = 1
+208 |         super # Python injects __class__ into scope
+209 |         builtins.super(ChildD10, self).f()
+    |                       ^^^^^^^^^^^^^^^^
+    |
+help: Remove `super()` parameters
+206 |         def x():
+207 |             __class__ = 1
+208 |         super # Python injects __class__ into scope
+    -         builtins.super(ChildD10, self).f()
+209 +         builtins.super().f()
+210 | 
+211 | 
+212 | # Must be ignored
