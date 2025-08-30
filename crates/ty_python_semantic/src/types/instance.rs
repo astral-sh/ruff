@@ -114,6 +114,13 @@ impl<'db> Type<'db> {
             .when_all(db, |member| {
                 member.is_satisfied_by(db, self, relation, visitor)
             })
+            .or(db, || {
+                let object = Type::object(db);
+                if self == object {
+                    return C::unsatisfiable(db);
+                }
+                object.satisfies_protocol(db, protocol, relation, visitor)
+            })
     }
 }
 

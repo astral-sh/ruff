@@ -1799,6 +1799,15 @@ static_assert(is_assignable_to(str, SupportsLessThan))
 static_assert(is_assignable_to(int, Invertable))
 ```
 
+`None` is understood as hashable:
+
+```py
+from _typeshed import NoneType
+from typing import Hashable
+
+static_assert(is_subtype_of(NoneType, Hashable))
+```
+
 ## Equivalence of protocols with method or property members
 
 Two protocols `P1` and `P2`, both with a method member `x`, are considered equivalent if the
