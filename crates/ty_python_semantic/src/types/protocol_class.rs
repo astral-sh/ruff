@@ -12,6 +12,7 @@ use crate::semantic_index::{SemanticIndex, place_table};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::report_undeclared_protocol_member;
 use crate::types::function::FunctionDecorators;
+use crate::types::visitor::any_over_type;
 use crate::types::{ClassType, todo_type};
 use crate::{
     Db, FxOrderSet,
@@ -569,7 +570,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                             .filter_map(Parameter::annotated_type)
                             .chain(sig.return_ty)
                     })
-                    .any(|ty| matches!(ty, Type::TypeVar(_)))
+                    .any(|ty| any_over_type(db, ty, &|t| matches!(t, Type::TypeVar(_))))
                 {
                     // TODO: proper validation for generic methods on protocols
                     return C::always_satisfiable(db);

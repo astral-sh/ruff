@@ -1808,6 +1808,20 @@ from typing import Hashable
 static_assert(is_subtype_of(NoneType, Hashable))
 ```
 
+`str` does not actually constitute a valid subtype of `Container` from a structural perspective (its
+`__contains__` method only accepts `str`, not `object`), but it does have `Container[str]` in its
+MRO, so we say it is a subtype of `Container[str]` anyway. This isn't *particularly* principled but
+improves compatibility with other type checkers.
+
+```py
+from typing_extensions import Container, LiteralString, Literal
+from ty_extensions import is_subtype_of
+
+static_assert(is_subtype_of(str, Container[str]))
+static_assert(is_subtype_of(LiteralString, Container[str]))
+static_assert(is_subtype_of(Literal["foo"], Container[str]))
+```
+
 ## Equivalence of protocols with method or property members
 
 Two protocols `P1` and `P2`, both with a method member `x`, are considered equivalent if the
