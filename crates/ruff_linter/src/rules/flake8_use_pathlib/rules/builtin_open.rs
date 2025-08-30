@@ -120,10 +120,6 @@ pub(crate) fn builtin_open(checker: &Checker, call: &ExprCall, segments: &[&str]
         return;
     }
 
-    if call.arguments.is_empty() {
-        return;
-    }
-
     if has_unknown_keywords_or_starred_expr(
         &call.arguments,
         &[
