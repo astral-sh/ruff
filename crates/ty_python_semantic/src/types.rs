@@ -1,6 +1,5 @@
 use infer::nearest_enclosing_class;
 use itertools::{Either, Itertools};
-use ruff_db::parsed::parsed_module;
 
 use std::borrow::Cow;
 
@@ -13,6 +12,7 @@ use diagnostic::{
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_db::files::File;
+use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange};
@@ -57,7 +57,7 @@ pub use crate::types::ide_support::{
     definitions_for_attribute, definitions_for_imported_symbol, definitions_for_keyword_argument,
     definitions_for_name, find_active_signature_from_details, inlay_hint_function_argument_details,
 };
-use crate::types::infer::infer_unpack_types;
+use crate::types::infer::{divergence_safe_todo, infer_unpack_types};
 use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
 use crate::types::signatures::{Parameter, ParameterForm, Parameters, walk_signature};
@@ -104,6 +104,34 @@ mod visitor;
 mod definition;
 #[cfg(test)]
 mod property_tests;
+
+fn return_type_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &Type<'db>,
+    _count: u32,
+    _self: BoundMethodType<'db>,
+) -> salsa::CycleRecoveryAction<Type<'db>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn return_type_cycle_initial<'db>(_db: &'db dyn Db, _self: BoundMethodType<'db>) -> Type<'db> {
+    Type::Dynamic(DynamicType::Divergent)
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)]
+fn has_divergent_type_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &bool,
+    _count: u32,
+    _self: Type<'db>,
+    _unit: (),
+) -> salsa::CycleRecoveryAction<bool> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn has_divergent_type_cycle_initial<'db>(_db: &'db dyn Db, _slf: Type<'db>, _unit: ()) -> bool {
+    false
+}
 
 pub fn check_types(db: &dyn Db, file: File) -> Vec<Diagnostic> {
     let _span = tracing::trace_span!("check_types", ?file).entered();
@@ -4834,6 +4862,19 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Returns the inferred return type of `self` if it is a function literal / bound method.
+    fn infer_return_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        match self {
+            Type::FunctionLiteral(function_type) if !function_type.file(db).is_stub(db) => {
+                Some(function_type.infer_return_type(db))
+            }
+            Type::BoundMethod(method_type) if !method_type.function(db).file(db).is_stub(db) => {
+                Some(method_type.infer_return_type(db))
+            }
+            _ => None,
+        }
+    }
+
     /// Calls `self`. Returns a [`CallError`] if `self` is (always or possibly) not callable, or if
     /// the arguments are not compatible with the formal parameters.
     ///
@@ -4996,8 +5037,10 @@ impl<'db> Type<'db> {
         let special_case = match self {
             Type::NominalInstance(nominal) => nominal.tuple_spec(db),
             Type::GenericAlias(alias) if alias.origin(db).is_tuple(db) => {
-                Some(Cow::Owned(TupleSpec::homogeneous(todo_type!(
-                    "*tuple[] annotations"
+                Some(Cow::Owned(TupleSpec::homogeneous(divergence_safe_todo(
+                    db,
+                    "*tuple[] annotations",
+                    [self],
                 ))))
             }
             Type::StringLiteral(string_literal_ty) => {
@@ -5511,7 +5554,11 @@ impl<'db> Type<'db> {
             }
             Type::TypeVar(bound_typevar) => Some(Type::TypeVar(bound_typevar.to_instance(db)?)),
             Type::TypeAlias(alias) => alias.value_type(db).to_instance(db),
-            Type::Intersection(_) => Some(todo_type!("Type::Intersection.to_instance")),
+            Type::Intersection(_) => Some(divergence_safe_todo(
+                db,
+                "Type::Intersection.to_instance",
+                [self],
+            )),
             Type::BooleanLiteral(_)
             | Type::BytesLiteral(_)
             | Type::EnumLiteral(_)
@@ -5917,10 +5964,10 @@ impl<'db> Type<'db> {
                         .unwrap_or(SubclassOfInner::unknown()),
                 ),
             },
-
             Type::StringLiteral(_) | Type::LiteralString => KnownClass::Str.to_class_literal(db),
             Type::Dynamic(dynamic) => SubclassOfType::from(db, SubclassOfInner::Dynamic(dynamic)),
             // TODO intersections
+            // TODO divergence safety
             Type::Intersection(_) => SubclassOfType::from(
                 db,
                 SubclassOfInner::try_from_type(db, todo_type!("Intersection meta-type"))
@@ -6523,6 +6570,75 @@ impl<'db> Type<'db> {
             _ => None,
         }
     }
+
+    pub(super) fn has_divergent_type(self, db: &'db dyn Db) -> bool {
+        self._has_divergent_type(db, ())
+    }
+
+    #[allow(clippy::used_underscore_binding)]
+    #[salsa::tracked(cycle_fn=has_divergent_type_cycle_recover, cycle_initial=has_divergent_type_cycle_initial, heap_size=get_size2::heap_size)]
+    fn _has_divergent_type(self, db: &'db dyn Db, _unit: ()) -> bool {
+        match self {
+            Type::Dynamic(DynamicType::Divergent) => true,
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .any(|ty| ty.has_divergent_type(db)),
+            Type::Intersection(intersection) => {
+                intersection
+                    .positive(db)
+                    .iter()
+                    .any(|ty| ty.has_divergent_type(db))
+                    || intersection
+                        .negative(db)
+                        .iter()
+                        .any(|ty| ty.has_divergent_type(db))
+            }
+            Type::GenericAlias(alias) => alias.specialization(db).has_divergent_type(db),
+            Type::NominalInstance(instance) => instance.class(db).has_divergent_type(db),
+            Type::Callable(callable) => callable.has_divergent_type(db),
+            Type::ProtocolInstance(protocol) => protocol.has_divergent_type(db),
+            Type::PropertyInstance(property) => {
+                property
+                    .setter(db)
+                    .is_some_and(|setter| setter.has_divergent_type(db))
+                    || property
+                        .getter(db)
+                        .is_some_and(|getter| getter.has_divergent_type(db))
+            }
+            Type::TypeIs(type_is) => type_is.return_type(db).has_divergent_type(db),
+            Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
+                SubclassOfInner::Dynamic(DynamicType::Divergent) => true,
+                SubclassOfInner::Dynamic(_) => false,
+                SubclassOfInner::Class(class) => class.has_divergent_type(db),
+            },
+            Type::TypedDict(typed_dict) => typed_dict.defining_class().has_divergent_type(db),
+            Type::Never
+            | Type::AlwaysTruthy
+            | Type::AlwaysFalsy
+            | Type::WrapperDescriptor(_)
+            | Type::MethodWrapper(_)
+            | Type::DataclassDecorator(_)
+            | Type::DataclassTransformer(_)
+            | Type::ModuleLiteral(_)
+            | Type::ClassLiteral(_)
+            | Type::IntLiteral(_)
+            | Type::BooleanLiteral(_)
+            | Type::LiteralString
+            | Type::StringLiteral(_)
+            | Type::BytesLiteral(_)
+            | Type::EnumLiteral(_)
+            | Type::BoundSuper(_)
+            | Type::SpecialForm(_)
+            | Type::KnownInstance(_)
+            | Type::NonInferableTypeVar(_)
+            | Type::TypeVar(_)
+            | Type::FunctionLiteral(_)
+            | Type::BoundMethod(_)
+            | Type::Dynamic(_)
+            | Type::TypeAlias(_) => false,
+        }
+    }
 }
 
 impl<'db> From<&Type<'db>> for Type<'db> {
@@ -6911,12 +7027,20 @@ pub enum DynamicType {
     TodoTypeAlias,
     /// A special Todo-variant for `Unpack[Ts]`, so that we can treat it specially in `Generic[Unpack[Ts]]`
     TodoUnpack,
+    /// A type that is determined to be divergent during type inference for a recursive function.
+    /// This type must never be eliminated by reduction
+    /// (e.g. `Divergent` is assignable to `@Todo`, but `@Todo | Divergent` must not be reducted to `@Todo`).
+    /// Otherwise, type inference cannot converge properly.
+    Divergent,
 }
 
 impl DynamicType {
-    #[expect(clippy::unused_self)]
     fn normalized(self) -> Self {
-        Self::Any
+        if matches!(self, Self::Divergent) {
+            self
+        } else {
+            Self::Any
+        }
     }
 }
 
@@ -6949,6 +7073,7 @@ impl std::fmt::Display for DynamicType {
                     f.write_str("@Todo")
                 }
             }
+            DynamicType::Divergent => f.write_str("Divergent"),
         }
     }
 }
@@ -8846,6 +8971,75 @@ impl<'db> BoundMethodType<'db> {
         )
     }
 
+    /// Infers this method scope's types and returns the inferred return type.
+    #[salsa::tracked(cycle_fn=return_type_cycle_recover, cycle_initial=return_type_cycle_initial, heap_size=get_size2::heap_size)]
+    pub(crate) fn infer_return_type(self, db: &'db dyn Db) -> Type<'db> {
+        let scope = self
+            .function(db)
+            .literal(db)
+            .last_definition(db)
+            .body_scope(db);
+        let inference = infer_scope_types(db, scope);
+        inference.infer_return_type(db, Some(self))
+    }
+
+    #[salsa::tracked]
+    fn class_definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
+        let definition_scope = self.function(db).definition(db).scope(db);
+        let index = semantic_index(db, definition_scope.file(db));
+        let module = parsed_module(db, definition_scope.file(db)).load(db);
+        Some(index.expect_single_definition(definition_scope.node(db).as_class(&module)?))
+    }
+
+    pub(crate) fn is_final(self, db: &'db dyn Db) -> bool {
+        if self
+            .function(db)
+            .has_known_decorator(db, FunctionDecorators::FINAL)
+        {
+            return true;
+        }
+        let Some(class_ty) = self
+            .class_definition(db)
+            .and_then(|class| binding_type(db, class).into_class_literal())
+        else {
+            return false;
+        };
+        class_ty
+            .known_function_decorators(db)
+            .any(|deco| deco == KnownFunction::Final)
+    }
+
+    pub(crate) fn base_signature_and_return_type(
+        self,
+        db: &'db dyn Db,
+    ) -> Option<(Signature<'db>, Type<'db>)> {
+        let class = binding_type(db, self.class_definition(db)?).to_class_type(db)?;
+        let name = self.function(db).name(db);
+
+        let base = class
+            .iter_mro(db)
+            .nth(1)
+            .and_then(class_base::ClassBase::into_class)?;
+        let base_member = base.class_member(db, name, MemberLookupPolicy::default());
+        if let Place::Type(Type::FunctionLiteral(base_func), _) = base_member.place {
+            if let [signature] = base_func.signature(db).overloads.as_slice() {
+                Some((
+                    signature.clone(),
+                    signature.return_ty.unwrap_or_else(|| {
+                        let base_method_ty =
+                            base_func.into_bound_method_type(db, Type::instance(db, class));
+                        base_method_ty.infer_return_type(db)
+                    }),
+                ))
+            } else {
+                // TODO: Handle overloaded base methods.
+                None
+            }
+        } else {
+            None
+        }
+    }
+
     fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         Self::new(
             db,
@@ -9049,6 +9243,10 @@ impl<'db> CallableType<'db> {
             self.signatures(db)
                 .is_equivalent_to_impl(db, other.signatures(db), visitor)
         })
+    }
+
+    fn has_divergent_type(self, db: &'db dyn Db) -> bool {
+        self.signatures(db).has_divergent_type(db)
     }
 }
 

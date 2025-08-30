@@ -234,6 +234,12 @@ impl<'db> CallableSignature<'db> {
             }
         }
     }
+
+    pub(super) fn has_divergent_type(&self, db: &'db dyn Db) -> bool {
+        self.overloads
+            .iter()
+            .any(|signature| signature.has_divergent_type(db))
+    }
 }
 
 impl<'a, 'db> IntoIterator for &'a CallableSignature<'db> {
@@ -1016,6 +1022,12 @@ impl<'db> Signature<'db> {
     pub(crate) fn with_definition(self, definition: Option<Definition<'db>>) -> Self {
         Self { definition, ..self }
     }
+
+    fn has_divergent_type(&self, db: &'db dyn Db) -> bool {
+        self.return_ty
+            .is_some_and(|return_ty| return_ty.has_divergent_type(db))
+            || self.parameters.has_divergent_type(db)
+    }
 }
 
 impl<'db> VarianceInferable<'db> for &Signature<'db> {
@@ -1318,6 +1330,14 @@ impl<'db> Parameters<'db> {
         self.iter()
             .enumerate()
             .rfind(|(_, parameter)| parameter.is_keyword_variadic())
+    }
+
+    fn has_divergent_type(&self, db: &'db dyn Db) -> bool {
+        self.iter().any(|parameter| {
+            parameter
+                .annotated_type()
+                .is_some_and(|ty| ty.has_divergent_type(db))
+        })
     }
 }
 

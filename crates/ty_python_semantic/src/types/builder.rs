@@ -40,7 +40,7 @@
 use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::type_ordering::union_or_intersection_elements_ordering;
 use crate::types::{
-    BytesLiteralType, IntersectionType, KnownClass, StringLiteralType, Type,
+    BytesLiteralType, DynamicType, IntersectionType, KnownClass, StringLiteralType, Type,
     TypeVarBoundOrConstraints, UnionType,
 };
 use crate::{Db, FxOrderSet};
@@ -452,6 +452,15 @@ impl<'db> UnionBuilder<'db> {
             ty if ty.is_object(self.db) => {
                 self.collapse_to_object();
             }
+            Type::Dynamic(DynamicType::Divergent) => {
+                if !self
+                    .elements
+                    .iter()
+                    .any(|elem| matches!(elem, UnionElement::Type(elem) if ty == *elem))
+                {
+                    self.elements.push(UnionElement::Type(ty));
+                }
+            }
             _ => {
                 let bool_pair = if let Type::BooleanLiteral(b) = ty {
                     Some(Type::BooleanLiteral(!b))
@@ -470,6 +479,16 @@ impl<'db> UnionBuilder<'db> {
                 } else {
                     Type::Never // won't be used
                 };
+
+                if ty.has_divergent_type(self.db)
+                    && !self
+                        .elements
+                        .iter()
+                        .any(|elem| matches!(elem, UnionElement::Type(elem) if ty == *elem))
+                {
+                    self.elements.push(UnionElement::Type(ty));
+                    return;
+                }
 
                 for (index, element) in self.elements.iter_mut().enumerate() {
                     let element_type = match element.try_reduce(self.db, ty) {
@@ -864,7 +883,9 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 self.add_positive(db, Type::LiteralString);
                 self.add_negative(db, Type::string_literal(db, ""));
             }
-
+            Type::Dynamic(DynamicType::Divergent) => {
+                self.positive.insert(new_positive);
+            }
             _ => {
                 let known_instance = new_positive
                     .into_nominal_instance()
@@ -933,6 +954,9 @@ impl<'db> InnerIntersectionBuilder<'db> {
 
                 let mut to_remove = SmallVec::<[usize; 1]>::new();
                 for (index, existing_positive) in self.positive.iter().enumerate() {
+                    if new_positive.has_divergent_type(db) {
+                        break;
+                    }
                     // S & T = S    if S <: T
                     if existing_positive.is_subtype_of(db, new_positive)
                         || existing_positive.is_equivalent_to(db, new_positive)
@@ -956,6 +980,9 @@ impl<'db> InnerIntersectionBuilder<'db> {
 
                 let mut to_remove = SmallVec::<[usize; 1]>::new();
                 for (index, existing_negative) in self.negative.iter().enumerate() {
+                    if new_positive.has_divergent_type(db) {
+                        break;
+                    }
                     // S & ~T = Never    if S <: T
                     if new_positive.is_subtype_of(db, *existing_negative) {
                         *self = Self::default();

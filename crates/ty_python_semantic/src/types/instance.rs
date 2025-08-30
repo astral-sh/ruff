@@ -638,6 +638,13 @@ impl<'db> ProtocolInstanceType<'db> {
     pub(super) fn interface(self, db: &'db dyn Db) -> ProtocolInterface<'db> {
         self.inner.interface(db)
     }
+
+    pub(super) fn has_divergent_type(self, db: &'db dyn Db) -> bool {
+        self.inner
+            .interface(db)
+            .members(db)
+            .any(|member| member.ty().has_divergent_type(db))
+    }
 }
 
 impl<'db> VarianceInferable<'db> for ProtocolInstanceType<'db> {

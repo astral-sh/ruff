@@ -285,6 +285,12 @@ impl<'db> TupleType<'db> {
     pub(crate) fn is_single_valued(self, db: &'db dyn Db) -> bool {
         self.tuple(db).is_single_valued(db)
     }
+
+    pub(super) fn has_divergent_type(self, db: &'db dyn Db) -> bool {
+        self.tuple(db)
+            .all_elements()
+            .any(|ty| ty.has_divergent_type(db))
+    }
 }
 
 fn to_class_type_cycle_recover<'db>(

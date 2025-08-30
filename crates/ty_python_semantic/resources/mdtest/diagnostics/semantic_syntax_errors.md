@@ -15,7 +15,10 @@ python-version = "3.10"
 ```
 
 ```py
-async def elements(n):
+from ty_extensions import Unknown
+
+# TODO: async generator type inference support
+async def elements(n) -> Unknown:
     yield n
 
 async def f():
@@ -54,7 +57,10 @@ python-version = "3.11"
 ```
 
 ```py
-async def elements(n):
+from ty_extensions import Unknown
+
+# TODO: async generator type inference support
+async def elements(n) -> Unknown:
     yield n
 
 async def f():
@@ -125,7 +131,8 @@ match obj:
 
 ```py
 class C:
-    def __await__(self): ...
+    def __await__(self):
+        yield
 
 # error: [invalid-syntax] "`return` statement outside of a function"
 return
@@ -141,6 +148,8 @@ yield from []
 await C()
 
 def f():
+    # TODO: no error, C is awaitable
+    # error: [invalid-await] "`C` is not awaitable"
     # error: [invalid-syntax] "`await` outside of an asynchronous function"
     await C()
 ```
@@ -328,7 +337,10 @@ def _():
 This error includes `await`, `async for`, `async with`, and `async` comprehensions.
 
 ```py
-async def elements(n):
+from ty_extensions import Unknown
+
+# TODO: async generator type inference support
+async def elements(n) -> Unknown:
     yield n
 
 def _():
