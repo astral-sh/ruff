@@ -560,13 +560,17 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                 }
                 let bound_method = method.bind_self(db);
 
-                if bound_method.signatures(db).iter().any(|sig| {
-                    sig.parameters()
-                        .iter()
-                        .filter_map(Parameter::annotated_type)
-                        .chain(sig.return_ty)
-                        .any(|annotation| matches!(annotation, Type::TypeVar(_)))
-                }) {
+                if bound_method
+                    .signatures(db)
+                    .iter()
+                    .flat_map(|sig| {
+                        sig.parameters()
+                            .iter()
+                            .filter_map(Parameter::annotated_type)
+                            .chain(sig.return_ty)
+                    })
+                    .any(|ty| matches!(ty, Type::TypeVar(_)))
+                {
                     // TODO: proper validation for generic methods on protocols
                     return C::always_satisfiable(db);
                 }
