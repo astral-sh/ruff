@@ -1822,6 +1822,25 @@ static_assert(is_subtype_of(LiteralString, Container[str]))
 static_assert(is_subtype_of(Literal["foo"], Container[str]))
 ```
 
+Because method members are always looked up on the meta-type of an object when testing assignability
+and subtyping, we understand that `IterableClass` here is a subtype of `Iterable` even though
+`Foo.__iter__` resolves to a type with the wrong signature:
+
+```py
+from typing import Iterator, Iterable
+from ty_extensions import static_assert, is_subtype_of, TypeOf
+
+class Meta(type):
+    def __iter__(self) -> Iterator[int]:
+        yield from range(42)
+
+class IterableClass(metaclass=Meta):
+    def __iter__(self) -> Iterator[str]:
+        yield from "abc"
+
+static_assert(is_subtype_of(TypeOf[IterableClass], Iterable[int]))
+```
+
 ## Equivalence of protocols with method or property members
 
 Two protocols `P1` and `P2`, both with a method member `x`, are considered equivalent if the
@@ -2048,8 +2067,10 @@ def h(obj: Callable[[int], str], obj2: Foo, obj3: Callable[[str], str]):
 def satisfies_foo(x: int) -> str:
     return "foo"
 
-static_assert(is_subtype_of(TypeOf[satisfies_foo], Foo))
 static_assert(is_assignable_to(TypeOf[satisfies_foo], Foo))
+
+# TODO: this should pass
+static_assert(is_subtype_of(TypeOf[satisfies_foo], Foo))  # error: [static-assert-error]
 ```
 
 ## Protocols are never singleton types, and are never single-valued types

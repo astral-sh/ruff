@@ -13,7 +13,9 @@ use crate::types::context::InferContext;
 use crate::types::diagnostic::report_undeclared_protocol_member;
 use crate::types::function::FunctionDecorators;
 use crate::types::visitor::any_over_type;
-use crate::types::{ClassType, todo_type};
+use crate::types::{
+    ClassType, InstanceFallbackShadowsNonDataDescriptor, MemberLookupPolicy, todo_type,
+};
 use crate::{
     Db, FxOrderSet,
     place::{Boundness, Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations},
@@ -538,30 +540,22 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
     ) -> C {
         match &self.kind {
             ProtocolMemberKind::Method(method) => {
-                let Place::Type(instance_type, Boundness::Bound) =
-                    other.member(db, self.name).place
+                let Place::Type(attribute_type, Boundness::Bound) = other
+                    .invoke_descriptor_protocol(
+                        db,
+                        self.name,
+                        Place::Unbound.into(),
+                        InstanceFallbackShadowsNonDataDescriptor::No,
+                        MemberLookupPolicy::default(),
+                    )
+                    .place
                 else {
                     return C::unsatisfiable(db);
                 };
-                // TODO: ideally we'd check the type of the meta-type member too,
-                // but this is tricky because:
-                // - `self` arguments on methods are usually not annotated (we currently
-                //   infer these methods as non-fully-static as a result!)
-                // - `self` arguments on methods are often not explicitly marked as being
-                //   positional-only, but you'd usually want a method with a
-                //   positional-or-keyword `self` argument to satisfy a protocol method
-                //   with a positional-only `self` argument.
-                if !other
-                    .to_meta_type(db)
-                    .member(db, self.name)
-                    .place
-                    .is_definitely_bound()
-                {
-                    return C::unsatisfiable(db);
-                }
-                let bound_method = method.bind_self(db);
 
-                if bound_method
+                let proto_member_as_bound_method = method.bind_self(db);
+
+                if proto_member_as_bound_method
                     .signatures(db)
                     .iter()
                     .flat_map(|sig| {
@@ -576,14 +570,17 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                     return C::always_satisfiable(db);
                 }
 
-                visitor.visit((instance_type, Type::Callable(bound_method)), || {
-                    instance_type.has_relation_to_impl(
-                        db,
-                        Type::Callable(bound_method),
-                        relation,
-                        visitor,
-                    )
-                })
+                visitor.visit(
+                    (attribute_type, Type::Callable(proto_member_as_bound_method)),
+                    || {
+                        attribute_type.has_relation_to_impl(
+                            db,
+                            Type::Callable(proto_member_as_bound_method),
+                            relation,
+                            visitor,
+                        )
+                    },
+                )
             }
             // TODO: consider the types of the attribute on `other` for property members
             ProtocolMemberKind::Property(_) => C::from_bool(
