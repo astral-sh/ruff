@@ -22,6 +22,7 @@ use ruff_python_ast::PythonVersion;
 use rustc_hash::FxHasher;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
+use std::env;
 use std::fmt::{self, Debug, Display};
 use std::hash::BuildHasherDefault;
 use std::ops::Deref;
@@ -277,6 +278,28 @@ impl Options {
             roots
         };
 
+        // collect the existing site packages
+        let mut site_packages_paths = site_packages_paths.into_vec();
+
+        // If read_python_path is defined in config, read all the paths off the
+        // PYTHONPATH environment variable, check they exists, and add them to
+        // the vec of site_package_paths, as that is conceptually what they are.
+        if environment.read_python_path.unwrap_or_default() {
+            if let Ok(python_path) = env::var("PYTHONPATH") {
+                let splits: Vec<SystemPathBuf> = python_path
+                    .split(':')
+                    .filter_map(|str_path| {
+                        let possible_path = std::path::PathBuf::from(str_path);
+                        match possible_path.try_exists() {
+                            Ok(true) => SystemPathBuf::from_path_buf(possible_path).ok(),
+                            _ => None,
+                        }
+                    })
+                    .collect();
+                site_packages_paths.extend(splits);
+            }
+        }
+
         let settings = SearchPathSettings {
             extra_paths: environment
                 .extra_paths
@@ -290,7 +313,7 @@ impl Options {
                 .typeshed
                 .as_ref()
                 .map(|path| path.absolute(project_root, system)),
-            site_packages_paths: site_packages_paths.into_vec(),
+            site_packages_paths,
             real_stdlib_path,
         };
 
@@ -440,6 +463,17 @@ pub struct EnvironmentOptions {
         "#
     )]
     pub root: Option<Vec<RelativePathBuf>>,
+
+    /// Read PYTHONPATH to find modules
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[option(
+        default = r#"false"#,
+        value_type = "bool",
+        example = r#"
+            read_python_path = true
+        "#
+    )]
+    pub read_python_path: Option<bool>,
 
     /// Specifies the version of Python that will be used to analyze the source code.
     /// The version should be specified as a string in the format `M.m` where `M` is the major version
