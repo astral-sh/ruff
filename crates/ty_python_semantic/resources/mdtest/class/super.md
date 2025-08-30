@@ -279,7 +279,7 @@ class A[T]:
 class B[T](A[T]):
     def f(self, b: T) -> T:
         # TODO: https://github.com/astral-sh/ty/issues/697
-        # error: [invalid-super-argument] "`Self` is not an instance or subclass of `<class 'B'>` in `super(<class 'B'>, Self)` call"
+        # error: [invalid-super-argument] "`Self@f` is not an instance or subclass of `<class 'B'>` in `super(<class 'B'>, Self@f)` call"
         return super().f(b)
 ```
 
