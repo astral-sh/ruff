@@ -25,7 +25,6 @@ use std::cell::RefCell;
 use std::path::Path;
 
 use itertools::Itertools;
-use libcst_native::Name;
 use log::debug;
 use rustc_hash::{FxHashMap, FxHashSet};
 

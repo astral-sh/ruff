@@ -3,17 +3,15 @@
 //! This checker is not responsible for traversing the AST itself. Instead, its
 //! [`SemanticSyntaxChecker::visit_stmt`] and [`SemanticSyntaxChecker::visit_expr`] methods should
 //! be called in a parent `Visitor`'s `visit_stmt` and `visit_expr` methods, respectively.
-use std::{default, fmt::Display, ops::Deref};
-
 use ruff_python_ast::{
     self as ast, Expr, ExprContext, IrrefutablePatternKind, Pattern, PythonVersion, Stmt, StmtExpr,
     StmtImportFrom,
     comparable::ComparableExpr,
-    name,
     visitor::{Visitor, walk_expr},
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::{FxBuildHasher, FxHashSet};
+use std::fmt::Display;
 
 #[derive(Debug, Default)]
 pub struct SemanticSyntaxChecker {
@@ -84,7 +82,6 @@ impl SemanticSyntaxChecker {
                     }
                 }
             }
-            Stmt::Import(_) => {}
             Stmt::Match(match_stmt) => {
                 Self::irrefutable_match_case(match_stmt, ctx);
                 for case in &match_stmt.cases {
