@@ -595,15 +595,37 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                 }
                 let bound_method = method.bind_self(db);
 
-                if bound_method.signatures(db).iter().any(|sig| {
-                    sig.parameters()
-                        .iter()
-                        .filter_map(Parameter::annotated_type)
-                        .chain(sig.return_ty)
-                        .any(|annotation| matches!(annotation, Type::TypeVar(_)))
-                }) {
-                    // TODO: proper validation for generic methods on protocols
-                    return C::always_satisfiable(db);
+                for signature in bound_method.signatures(db) {
+                    if matches!(signature.return_ty, Some(Type::TypeVar(_))) {
+                        // TODO: proper validation for generic methods on protocols
+                        return C::always_satisfiable(db);
+                    }
+
+                    let mut found_non_positional_only = false;
+                    for param in signature.parameters() {
+                        if param
+                            .annotated_type()
+                            .is_some_and(|ty| matches!(ty, Type::TypeVar(_)))
+                        {
+                            // TODO: proper validation for generic methods on protocols
+                            return C::always_satisfiable(db);
+                        }
+                        if param.is_positional_only() {
+                            continue;
+                        }
+                        if found_non_positional_only {
+                            continue;
+                        }
+                        if param
+                            .name()
+                            .is_some_and(|name| name.starts_with("__") && !name.ends_with("__"))
+                        {
+                            // TODO: proper validation for protocols that use the PEP-484 `__arg` convention
+                            // for denoting positional-only parameters
+                            return C::always_satisfiable(db);
+                        }
+                        found_non_positional_only = true;
+                    }
                 }
 
                 visitor.visit((instance_type, Type::Callable(bound_method)), || {

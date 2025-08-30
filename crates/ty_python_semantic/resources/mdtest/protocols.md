@@ -1774,6 +1774,17 @@ class Bar:
 f(Bar())  # error: [invalid-argument-type]
 ```
 
+Some protocols use the old convention (specified in PEP-484) for denoting
+positional-only parameters. We do not properly support this yet, but we
+also do not emit false positives on it:
+
+```py
+class SupportsLessThan(Protocol):
+    def __lt__(self, __other) -> bool: ...
+
+static_assert(is_assignable_to(str, SupportsLessThan))
+```
+
 ## Equivalence of protocols with method or property members
 
 Two protocols `P1` and `P2`, both with a method member `x`, are considered equivalent if the
