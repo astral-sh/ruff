@@ -477,9 +477,9 @@ impl<'db> FunctionLiteral<'db> {
         self.last_definition(db).known(db)
     }
 
-    fn has_known_decorator(self, db: &dyn Db, decorator: FunctionDecorators) -> bool {
+    fn has_known_decorators(self, db: &dyn Db, decorators: FunctionDecorators) -> bool {
         self.iter_overloads_and_implementation(db)
-            .any(|overload| overload.decorators(db).contains(decorator))
+            .any(|overload| overload.decorators(db).intersects(decorators))
     }
 
     /// If the implementation of this function is deprecated, returns the `@warnings.deprecated`.
@@ -712,13 +712,14 @@ impl<'db> FunctionType<'db> {
         self.known(db) == Some(known_function)
     }
 
-    /// Returns if any of the overloads of this function have a particular decorator.
+    /// Returns if any of the overloads of this function is decorated with one or more of
+    /// `decorators`.
     ///
     /// Some decorators are expected to appear on every overload; others are expected to appear
     /// only the implementation or first overload. This method does not check either of those
     /// conditions.
-    pub(crate) fn has_known_decorator(self, db: &dyn Db, decorator: FunctionDecorators) -> bool {
-        self.literal(db).has_known_decorator(db, decorator)
+    pub(crate) fn has_known_decorators(self, db: &dyn Db, decorators: FunctionDecorators) -> bool {
+        self.literal(db).has_known_decorators(db, decorators)
     }
 
     /// If the implementation of this function is deprecated, returns the `@warnings.deprecated`.

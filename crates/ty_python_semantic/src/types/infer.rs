@@ -1532,7 +1532,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     return None;
                 }
                 let function = ty.inner_type().into_function_literal()?;
-                if function.has_known_decorator(self.db(), FunctionDecorators::OVERLOAD) {
+                if function.has_known_decorators(self.db(), FunctionDecorators::OVERLOAD) {
                     Some(definition.place(self.db()))
                 } else {
                     None

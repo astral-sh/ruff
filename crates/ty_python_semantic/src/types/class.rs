@@ -1258,8 +1258,8 @@ pub(super) enum MethodDecorator {
 impl MethodDecorator {
     fn try_from_fn_type(db: &dyn Db, fn_type: FunctionType) -> Result<Self, ()> {
         match (
-            fn_type.has_known_decorator(db, FunctionDecorators::CLASSMETHOD),
-            fn_type.has_known_decorator(db, FunctionDecorators::STATICMETHOD),
+            fn_type.has_known_decorators(db, FunctionDecorators::CLASSMETHOD),
+            fn_type.has_known_decorators(db, FunctionDecorators::STATICMETHOD),
         ) {
             (true, true) => Err(()), // A method can't be static and class method at the same time.
             (true, false) => Ok(Self::ClassMethod),
