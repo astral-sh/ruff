@@ -3265,6 +3265,10 @@ impl<'db> Type<'db> {
         policy: InstanceFallbackShadowsNonDataDescriptor,
         member_policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
+        if name == "__call__" && self.is_callable_type() {
+            return Place::bound(self).into();
+        }
+
         let (
             PlaceAndQualifiers {
                 place: meta_attr,

@@ -14,14 +14,16 @@ use crate::{
     },
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral,
-        ClassType, FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor,
-        KnownFunction, NormalizedVisitor, PropertyInstanceType, Signature, Type, TypeMapping,
+        ClassType, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
+        InstanceFallbackShadowsNonDataDescriptor, IsDisjointVisitor, KnownFunction,
+        MemberLookupPolicy, NormalizedVisitor, PropertyInstanceType, Signature, Type, TypeMapping,
         TypeQualifiers, TypeRelation, TypeVarVariance, VarianceInferable,
         constraints::{ConstraintSet, IteratorConstraintsExtension},
         context::InferContext,
         diagnostic::report_undeclared_protocol_member,
         signatures::{Parameter, Parameters},
         todo_type,
+        visitor::any_over_type,
     },
 };
 
@@ -539,46 +541,46 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
     ) -> ConstraintSet<'db> {
         match &self.kind {
             ProtocolMemberKind::Method(method) => {
-                let Place::Type(instance_type, Boundness::Bound) =
-                    other.member(db, self.name).place
+                let Place::Type(attribute_type, Boundness::Bound) = other
+                    .invoke_descriptor_protocol(
+                        db,
+                        self.name,
+                        Place::Unbound.into(),
+                        InstanceFallbackShadowsNonDataDescriptor::No,
+                        MemberLookupPolicy::default(),
+                    )
+                    .place
                 else {
                     return ConstraintSet::from(false);
                 };
-                // TODO: ideally we'd check the type of the meta-type member too,
-                // but this is tricky because:
-                // - `self` arguments on methods are usually not annotated (we currently
-                //   infer these methods as non-fully-static as a result!)
-                // - `self` arguments on methods are often not explicitly marked as being
-                //   positional-only, but you'd usually want a method with a
-                //   positional-or-keyword `self` argument to satisfy a protocol method
-                //   with a positional-only `self` argument.
-                if !other
-                    .to_meta_type(db)
-                    .member(db, self.name)
-                    .place
-                    .is_definitely_bound()
-                {
-                    return ConstraintSet::from(false);
-                }
-                let bound_method = method.bind_self(db);
 
-                if bound_method.signatures(db).iter().any(|sig| {
-                    sig.parameters()
-                        .iter()
-                        .filter_map(Parameter::annotated_type)
-                        .chain(sig.return_ty)
-                        .any(|annotation| matches!(annotation, Type::TypeVar(_)))
-                }) {
+                let proto_member_as_bound_method = method.bind_self(db);
+
+                if proto_member_as_bound_method
+                    .signatures(db)
+                    .iter()
+                    .flat_map(|sig| {
+                        sig.parameters()
+                            .iter()
+                            .filter_map(Parameter::annotated_type)
+                            .chain(sig.return_ty)
+                    })
+                    .any(|ty| any_over_type(db, ty, &|t| matches!(t, Type::TypeVar(_))))
+                {
                     // TODO: proper validation for generic methods on protocols
                     return ConstraintSet::from(false);
                 }
 
                 visitor.visit(
-                    (instance_type, Type::Callable(bound_method), relation),
+                    (
+                        attribute_type,
+                        Type::Callable(proto_member_as_bound_method),
+                        relation,
+                    ),
                     || {
-                        instance_type.has_relation_to_impl(
+                        attribute_type.has_relation_to_impl(
                             db,
-                            Type::Callable(bound_method),
+                            Type::Callable(proto_member_as_bound_method),
                             relation,
                             visitor,
                         )

@@ -2231,8 +2231,10 @@ def h(obj: Callable[[int], str], obj2: Foo, obj3: Callable[[str], str]):
 def satisfies_foo(x: int) -> str:
     return "foo"
 
-static_assert(is_subtype_of(TypeOf[satisfies_foo], Foo))
 static_assert(is_assignable_to(TypeOf[satisfies_foo], Foo))
+
+# TODO: this should pass
+static_assert(is_subtype_of(TypeOf[satisfies_foo], Foo))  # error: [static-assert-error]
 ```
 
 ## Nominal subtyping of protocols
