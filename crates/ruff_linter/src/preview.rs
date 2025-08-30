@@ -261,7 +261,7 @@ pub(crate) const fn is_bidi_forbid_arabic_letter_mark_enabled(settings: &LinterS
     settings.preview.is_enabled()
 }
 
-// https://github.com/astral-sh/ruff/pull/
+// https://github.com/astral-sh/ruff/pull/20169
 pub(crate) const fn is_fix_builtin_open_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
