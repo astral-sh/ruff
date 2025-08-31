@@ -571,14 +571,22 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
     ) -> C {
         match &self.kind {
             // TODO: consider the types of the attribute on `other` for method members
-            ProtocolMemberKind::Method(_) => C::from_bool(
-                db,
-                matches!(
-                    other.to_meta_type(db).member(db, self.name).place,
-                    Place::Type(ty, Boundness::Bound)
-                    if ty.is_assignable_to(db, CallableType::single(db, Signature::dynamic(Type::any())))
-                ),
-            ),
+            ProtocolMemberKind::Method(_) => {
+                let Place::Type(ty, Boundness::Bound) =
+                    other.to_meta_type(db).member(db, self.name).place
+                else {
+                    return C::unsatisfiable(db);
+                };
+                let dynamic_callable = CallableType::single(db, Signature::dynamic(Type::any()));
+                visitor.visit((ty, dynamic_callable), || {
+                    ty.has_relation_to_impl(
+                        db,
+                        dynamic_callable,
+                        TypeRelation::Assignability,
+                        visitor,
+                    )
+                })
+            }
             // TODO: consider the types of the attribute on `other` for property members
             ProtocolMemberKind::Property(_) => C::from_bool(
                 db,
@@ -593,10 +601,14 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                 else {
                     return C::unsatisfiable(db);
                 };
-                member_type
-                    .has_relation_to_impl(db, attribute_type, relation, visitor)
+                visitor
+                    .visit((*member_type, attribute_type), || {
+                        member_type.has_relation_to_impl(db, attribute_type, relation, visitor)
+                    })
                     .and(db, || {
-                        attribute_type.has_relation_to_impl(db, *member_type, relation, visitor)
+                        visitor.visit((attribute_type, *member_type), || {
+                            attribute_type.has_relation_to_impl(db, *member_type, relation, visitor)
+                        })
                     })
             }
         }
