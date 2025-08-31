@@ -348,4 +348,15 @@ AIR301 `airflow.www.utils.should_hide_value_for_key` is removed in Airflow 3.0
 110 | get_sensitive_variables_fields
 111 | should_hide_value_for_key
     | ^^^^^^^^^^^^^^^^^^^^^^^^^
+112 |
+113 | from airflow.operators.postgres_operator import Mapping
+    |
+
+AIR301 `airflow.operators.postgres_operator.Mapping` is removed in Airflow 3.0
+   --> AIR301_names.py:115:1
+    |
+113 | from airflow.operators.postgres_operator import Mapping
+114 |
+115 | Mapping()
+    | ^^^^^^^
     |
