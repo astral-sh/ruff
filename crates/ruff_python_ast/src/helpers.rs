@@ -1294,17 +1294,73 @@ impl Truthiness {
                     return Self::Falsey;
                 }
 
-                if dict.items.iter().all(|item| {
-                    matches!(
-                        item,
-                        DictItem {
-                            key: None,
-                            value: Expr::Name(..)
+                // If the dict consists only of double-starred items (e.g., {**x, **y}),
+                // its truthiness depends on the truthiness of the unpacked mappings.
+                // - If any unpacked mapping is definitely truthy, the result is truthy.
+                // - If all unpacked mappings are definitely falsey (e.g., {} or dict()),
+                //   the result is falsey.
+                // - Otherwise, the result is unknown.
+                if dict
+                    .items
+                    .iter()
+                    .all(|item| matches!(item, DictItem { key: None, .. }))
+                {
+                    // Evaluate only simple, non-recursive cases to avoid generic recursion.
+                    let mut any_definitely_truthy = false;
+                    let mut all_definitely_falsey = true;
+
+                    for item in &dict.items {
+                        let mapping_expr = &item.value;
+                        let (is_true, is_false, is_unknown) = match mapping_expr {
+                            // Literal dict: empty => falsey, non-empty => truthy
+                            Expr::Dict(inner) => {
+                                if inner.is_empty() {
+                                    (false, true, false)
+                                } else {
+                                    (true, false, false)
+                                }
+                            }
+                            // dict() initializer
+                            Expr::Call(ast::ExprCall {
+                                func, arguments, ..
+                            }) => {
+                                if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
+                                    if id.as_str() == "dict" && is_builtin("dict") {
+                                        if arguments.is_empty() {
+                                            // dict()
+                                            (false, true, false)
+                                        } else {
+                                            // dict(x) / dict(a=1) => unknown at analysis time
+                                            (false, false, true)
+                                        }
+                                    } else {
+                                        (false, false, true)
+                                    }
+                                } else {
+                                    (false, false, true)
+                                }
+                            }
+                            // Name or other complex expressions => unknown
+                            _ => (false, false, true),
+                        };
+
+                        if is_true {
+                            any_definitely_truthy = true;
+                            break;
                         }
-                    )
-                }) {
-                    // {**foo} / {**foo, **bar}
-                    Self::Unknown
+                        if !is_false {
+                            all_definitely_falsey = false;
+                        }
+                        let _ = is_unknown;
+                    }
+
+                    if any_definitely_truthy {
+                        Self::Truthy
+                    } else if all_definitely_falsey {
+                        Self::Falsey
+                    } else {
+                        Self::Unknown
+                    }
                 } else {
                     Self::Truthy
                 }
