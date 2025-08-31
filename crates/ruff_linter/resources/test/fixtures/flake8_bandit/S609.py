@@ -8,3 +8,4 @@ subprocess.Popen("/usr/local/bin/rsync * no_injection_here:")
 os.system("tar cf foo.tar bar/*")
 
 subprocess.Popen(["chmod", "+w", "*.py"], shell={**{}})
+subprocess.Popen(["chmod", "+w", "*.py"], shell={**{**{}}})

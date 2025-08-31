@@ -5,3 +5,4 @@ def foo(shell):
 foo(shell=True)
 
 foo(shell={**{}})
+foo(shell={**{**{}}})
