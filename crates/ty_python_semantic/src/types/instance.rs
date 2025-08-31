@@ -12,9 +12,9 @@ use crate::types::enums::is_single_member_enum;
 use crate::types::protocol_class::walk_protocol_interface;
 use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
-    ApplyTypeMappingVisitor, ClassBase, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
-    IsDisjointVisitor, IsEquivalentVisitor, MaterializationKind, NormalizedVisitor, TypeMapping,
-    TypeRelation, VarianceInferable,
+    ApplyTypeMappingVisitor, ClassBase, FindLegacyTypeVarsVisitor, HasDivergentTypeVisitor,
+    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, MaterializationKind,
+    NormalizedVisitor, TypeMapping, TypeRelation, VarianceInferable,
 };
 use crate::{Db, FxOrderSet};
 
@@ -639,11 +639,15 @@ impl<'db> ProtocolInstanceType<'db> {
         self.inner.interface(db)
     }
 
-    pub(super) fn has_divergent_type(self, db: &'db dyn Db) -> bool {
+    pub(super) fn has_divergent_type_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &HasDivergentTypeVisitor<'db>,
+    ) -> bool {
         self.inner
             .interface(db)
             .members(db)
-            .any(|member| member.ty().has_divergent_type(db))
+            .any(|member| member.ty().has_divergent_type_impl(db, visitor))
     }
 }
 

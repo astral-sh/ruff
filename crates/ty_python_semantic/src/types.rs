@@ -118,21 +118,6 @@ fn return_type_cycle_initial<'db>(_db: &'db dyn Db, _self: BoundMethodType<'db>)
     Type::Dynamic(DynamicType::Divergent)
 }
 
-#[allow(clippy::trivially_copy_pass_by_ref)]
-fn has_divergent_type_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &bool,
-    _count: u32,
-    _self: Type<'db>,
-    _unit: (),
-) -> salsa::CycleRecoveryAction<bool> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
-fn has_divergent_type_cycle_initial<'db>(_db: &'db dyn Db, _slf: Type<'db>, _unit: ()) -> bool {
-    false
-}
-
 pub fn check_types(db: &dyn Db, file: File) -> Vec<Diagnostic> {
     let _span = tracing::trace_span!("check_types", ?file).entered();
 
@@ -226,6 +211,9 @@ pub(crate) struct FindLegacyTypeVars;
 /// A [`TypeTransformer`] that is used in `normalized` methods.
 pub(crate) type NormalizedVisitor<'db> = TypeTransformer<'db, Normalized>;
 pub(crate) struct Normalized;
+
+pub(crate) type HasDivergentTypeVisitor<'db> = CycleDetector<HasDivergentType, Type<'db>, bool>;
+pub(crate) struct HasDivergentType;
 
 /// How a generic type has been specialized.
 ///
@@ -563,6 +551,18 @@ impl<'db> PropertyInstanceType<'db> {
             self.setter(db)
                 .map(|ty| ty.materialize(db, materialization_kind)),
         )
+    }
+
+    fn has_divergent_type_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &HasDivergentTypeVisitor<'db>,
+    ) -> bool {
+        self.setter(db)
+            .is_some_and(|setter| setter.has_divergent_type_impl(db, visitor))
+            || self
+                .getter(db)
+                .is_some_and(|getter| getter.has_divergent_type_impl(db, visitor))
     }
 }
 
@@ -6572,47 +6572,51 @@ impl<'db> Type<'db> {
     }
 
     pub(super) fn has_divergent_type(self, db: &'db dyn Db) -> bool {
-        self._has_divergent_type(db, ())
+        let visitor = HasDivergentTypeVisitor::new(false);
+        self.has_divergent_type_impl(db, &visitor)
     }
 
-    #[allow(clippy::used_underscore_binding)]
-    #[salsa::tracked(cycle_fn=has_divergent_type_cycle_recover, cycle_initial=has_divergent_type_cycle_initial, heap_size=get_size2::heap_size)]
-    fn _has_divergent_type(self, db: &'db dyn Db, _unit: ()) -> bool {
+    fn has_divergent_type_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &HasDivergentTypeVisitor<'db>,
+    ) -> bool {
         match self {
             Type::Dynamic(DynamicType::Divergent) => true,
-            Type::Union(union) => union
-                .elements(db)
-                .iter()
-                .any(|ty| ty.has_divergent_type(db)),
+            Type::Union(union) => {
+                visitor.visit(self, || union.has_divergent_type_impl(db, visitor))
+            }
             Type::Intersection(intersection) => {
-                intersection
-                    .positive(db)
-                    .iter()
-                    .any(|ty| ty.has_divergent_type(db))
-                    || intersection
-                        .negative(db)
-                        .iter()
-                        .any(|ty| ty.has_divergent_type(db))
+                visitor.visit(self, || intersection.has_divergent_type_impl(db, visitor))
             }
-            Type::GenericAlias(alias) => alias.specialization(db).has_divergent_type(db),
-            Type::NominalInstance(instance) => instance.class(db).has_divergent_type(db),
-            Type::Callable(callable) => callable.has_divergent_type(db),
-            Type::ProtocolInstance(protocol) => protocol.has_divergent_type(db),
+            Type::GenericAlias(alias) => visitor.visit(self, || {
+                alias
+                    .specialization(db)
+                    .has_divergent_type_impl(db, visitor)
+            }),
+            Type::NominalInstance(instance) => visitor.visit(self, || {
+                instance.class(db).has_divergent_type_impl(db, visitor)
+            }),
+            Type::Callable(callable) => {
+                visitor.visit(self, || callable.has_divergent_type_impl(db, visitor))
+            }
+            Type::ProtocolInstance(protocol) => {
+                visitor.visit(self, || protocol.has_divergent_type_impl(db, visitor))
+            }
             Type::PropertyInstance(property) => {
-                property
-                    .setter(db)
-                    .is_some_and(|setter| setter.has_divergent_type(db))
-                    || property
-                        .getter(db)
-                        .is_some_and(|getter| getter.has_divergent_type(db))
+                visitor.visit(self, || property.has_divergent_type_impl(db, visitor))
             }
-            Type::TypeIs(type_is) => type_is.return_type(db).has_divergent_type(db),
-            Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
-                SubclassOfInner::Dynamic(DynamicType::Divergent) => true,
-                SubclassOfInner::Dynamic(_) => false,
-                SubclassOfInner::Class(class) => class.has_divergent_type(db),
-            },
-            Type::TypedDict(typed_dict) => typed_dict.defining_class().has_divergent_type(db),
+            Type::TypeIs(type_is) => visitor.visit(self, || {
+                type_is.return_type(db).has_divergent_type_impl(db, visitor)
+            }),
+            Type::SubclassOf(subclass_of) => {
+                visitor.visit(self, || subclass_of.has_divergent_type_impl(db, visitor))
+            }
+            Type::TypedDict(typed_dict) => visitor.visit(self, || {
+                typed_dict
+                    .defining_class()
+                    .has_divergent_type_impl(db, visitor)
+            }),
             Type::Never
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy
@@ -9245,8 +9249,12 @@ impl<'db> CallableType<'db> {
         })
     }
 
-    fn has_divergent_type(self, db: &'db dyn Db) -> bool {
-        self.signatures(db).has_divergent_type(db)
+    fn has_divergent_type_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &HasDivergentTypeVisitor<'db>,
+    ) -> bool {
+        self.signatures(db).has_divergent_type_impl(db, visitor)
     }
 }
 
@@ -9919,6 +9927,16 @@ impl<'db> UnionType<'db> {
 
         C::from_bool(db, sorted_self == other.normalized(db))
     }
+
+    fn has_divergent_type_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &HasDivergentTypeVisitor<'db>,
+    ) -> bool {
+        self.elements(db)
+            .iter()
+            .any(|ty| ty.has_divergent_type_impl(db, visitor))
+    }
 }
 
 #[salsa::interned(debug, heap_size=IntersectionType::heap_size)]
@@ -10133,6 +10151,20 @@ impl<'db> IntersectionType<'db> {
     fn heap_size((positive, negative): &(FxOrderSet<Type<'db>>, FxOrderSet<Type<'db>>)) -> usize {
         ruff_memory_usage::order_set_heap_size(positive)
             + ruff_memory_usage::order_set_heap_size(negative)
+    }
+
+    fn has_divergent_type_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &HasDivergentTypeVisitor<'db>,
+    ) -> bool {
+        self.positive(db)
+            .iter()
+            .any(|ty| ty.has_divergent_type_impl(db, visitor))
+            || self
+                .negative(db)
+                .iter()
+                .any(|ty| ty.has_divergent_type_impl(db, visitor))
     }
 }
 
