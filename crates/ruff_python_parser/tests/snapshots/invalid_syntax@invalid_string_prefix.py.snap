@@ -1,0 +1,120 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/invalid_string_prefix.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: AtomicNodeIndex(..),
+        range: 0..40,
+        body: [
+            Expr(
+                StmtExpr {
+                    node_index: AtomicNodeIndex(..),
+                    range: 0..7,
+                    value: StringLiteral(
+                        ExprStringLiteral {
+                            node_index: AtomicNodeIndex(..),
+                            range: 0..7,
+                            value: StringLiteralValue {
+                                inner: Single(
+                                    StringLiteral {
+                                        range: 0..7,
+                                        node_index: AtomicNodeIndex(..),
+                                        value: "hey",
+                                        flags: StringLiteralFlags {
+                                            quote_style: Double,
+                                            prefix: Empty,
+                                            triple_quoted: false,
+                                        },
+                                    },
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: AtomicNodeIndex(..),
+                    range: 8..17,
+                    value: StringLiteral(
+                        ExprStringLiteral {
+                            node_index: AtomicNodeIndex(..),
+                            range: 8..17,
+                            value: StringLiteralValue {
+                                inner: Single(
+                                    StringLiteral {
+                                        range: 8..17,
+                                        node_index: AtomicNodeIndex(..),
+                                        value: "there",
+                                        flags: StringLiteralFlags {
+                                            quote_style: Double,
+                                            prefix: Empty,
+                                            triple_quoted: false,
+                                        },
+                                    },
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: AtomicNodeIndex(..),
+                    range: 18..39,
+                    value: StringLiteral(
+                        ExprStringLiteral {
+                            node_index: AtomicNodeIndex(..),
+                            range: 18..39,
+                            value: StringLiteralValue {
+                                inner: Single(
+                                    StringLiteral {
+                                        range: 18..39,
+                                        node_index: AtomicNodeIndex(..),
+                                        value: "howsit\ngoing?",
+                                        flags: StringLiteralFlags {
+                                            quote_style: Double,
+                                            prefix: Empty,
+                                            triple_quoted: true,
+                                        },
+                                    },
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | uf"hey"
+  | ^^ Syntax Error: "u" and "f" prefixes are incompatible
+2 | uu"there"
+3 | ru"""howsit
+  |
+
+
+  |
+1 | uf"hey"
+2 | uu"there"
+  | ^^ Syntax Error: repeated string prefixes
+3 | ru"""howsit
+4 | going?"""
+  |
+
+
+  |
+1 | uf"hey"
+2 | uu"there"
+3 | ru"""howsit
+  | ^^ Syntax Error: "r" and "u" prefixes are incompatible
+4 | going?"""
+  |
