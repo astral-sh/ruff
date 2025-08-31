@@ -601,14 +601,10 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                 else {
                     return C::unsatisfiable(db);
                 };
-                visitor
-                    .visit((*member_type, attribute_type), || {
-                        member_type.has_relation_to_impl(db, attribute_type, relation, visitor)
-                    })
+                member_type
+                    .has_relation_to_impl(db, attribute_type, relation, visitor)
                     .and(db, || {
-                        visitor.visit((attribute_type, *member_type), || {
-                            attribute_type.has_relation_to_impl(db, *member_type, relation, visitor)
-                        })
+                        attribute_type.has_relation_to_impl(db, *member_type, relation, visitor)
                     })
             }
         }
