@@ -16,7 +16,6 @@ apprise
 artigraph
 async-utils
 asynq
-attrs
 bandersnatch
 beartype
 bidict
@@ -51,7 +50,6 @@ isort
 itsdangerous
 janus
 jinja
-koda-validate
 kopf
 kornia
 manticore
@@ -68,7 +66,6 @@ nionutils
 openlibrary
 operator
 optuna
-paasta
 pandas
 pandas-stubs
 paroxython
@@ -77,7 +74,6 @@ pegen
 poetry
 porcupine
 ppb-vector
-prefect
 psycopg
 pwndbg
 pybind11
