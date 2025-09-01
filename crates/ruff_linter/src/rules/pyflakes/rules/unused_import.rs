@@ -637,7 +637,7 @@ impl<'a, 'b> MarkedBindings<'a, 'b> {
         }
     }
 
-    fn to_unused(self) -> Vec<&'a Binding<'b>> {
+    fn into_unused(self) -> Vec<&'a Binding<'b>> {
         self.bindings
             .into_iter()
             .zip(self.used)
@@ -678,7 +678,7 @@ fn unused_imports_from_binding<'a, 'b>(
         mark_uses_of_ref(semantic, &mut marked, expr_id);
     }
 
-    marked.to_unused()
+    marked.into_unused()
 }
 
 fn expand_to_qualified_name_attribute<'b>(
