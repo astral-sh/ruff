@@ -17,10 +17,12 @@ use crate::checkers::ast::Checker;
 use crate::fix;
 use crate::preview::{
     is_dunder_init_fix_unused_import_enabled, is_full_path_match_source_strategy_enabled,
+    is_refined_submodule_import_match_enabled,
 };
 use crate::registry::Rule;
 use crate::rules::isort::categorize::MatchSourceStrategy;
 use crate::rules::{isort, isort::ImportSection, isort::ImportType};
+use crate::settings::LinterSettings;
 use crate::{Applicability, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -294,7 +296,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
     let mut unused: BTreeMap<(NodeId, Exceptions), Vec<ImportBinding>> = BTreeMap::default();
     let mut ignored: BTreeMap<(NodeId, Exceptions), Vec<ImportBinding>> = BTreeMap::default();
 
-    for binding in unused_imports_in_scope(checker.semantic(), scope) {
+    for binding in unused_imports_in_scope(checker.semantic(), scope, checker.settings()) {
         let Some(import) = binding.as_any_import() else {
             continue;
         };
@@ -586,6 +588,7 @@ fn fix_by_reexporting<'a>(
 fn unused_imports_in_scope<'a, 'b>(
     semantic: &'a SemanticModel<'b>,
     scope: &'a Scope,
+    settings: &'a LinterSettings,
 ) -> impl Iterator<Item = &'a Binding<'b>> {
     scope
         .binding_ids()
@@ -600,13 +603,19 @@ fn unused_imports_in_scope<'a, 'b>(
         })
         .filter(|(_, bdg)| !bdg.is_global() && !bdg.is_nonlocal() && !bdg.is_explicit_export())
         .flat_map(|(id, bdg)| {
-            if scope.shadowed_bindings(id).all(|shadow| {
-                let shadowed_binding = semantic.binding(shadow);
-                matches!(
-                    shadowed_binding.kind,
-                    BindingKind::Import(_) | BindingKind::SubmoduleImport(_)
-                ) && !shadowed_binding.flags.contains(BindingFlags::ALIAS)
-            }) {
+            if is_refined_submodule_import_match_enabled(settings)
+                // Only apply the new logic when all shadowed bindings
+                // are un-aliased imports and submodule imports to avoid
+                // complexity, false positives, and intersection with
+                // `redefined-while-unused` (`F811`).
+                && scope.shadowed_bindings(id).all(|shadow| {
+                    let shadowed_binding = semantic.binding(shadow);
+                    matches!(
+                        shadowed_binding.kind,
+                        BindingKind::Import(_) | BindingKind::SubmoduleImport(_)
+                    ) && !shadowed_binding.flags.contains(BindingFlags::ALIAS)
+                })
+            {
                 unused_imports_from_binding(semantic, id, scope)
             } else if bdg.is_used() {
                 vec![]
@@ -659,7 +668,7 @@ fn unused_imports_from_binding<'a, 'b>(
 
     let binding = semantic.binding(id);
 
-    // ensure we only do this once since it involves an allocation
+    // ensure we only do this once
     let mut marked_dunder_all = false;
 
     for ref_id in binding.references() {
@@ -671,8 +680,8 @@ fn unused_imports_from_binding<'a, 'b>(
             continue;
         }
         let Some(expr_id) = resolved_reference.expression_id() else {
-            // bail if there is some other kind of reference
-            dbg!("isn't this unreachable???");
+            // If there is some other kind of reference, abandon
+            // the refined approach for the usual one
             return vec![binding];
         };
         mark_uses_of_ref(semantic, &mut marked, expr_id);
@@ -732,6 +741,7 @@ fn mark_uses_of_qualified_name(marked: &mut MarkedBindings, prototype: &Qualifie
         }
     }
 }
+
 fn mark_uses_of_ref(semantic: &SemanticModel, marked: &mut MarkedBindings, expr_id: NodeId) {
     let Some(prototype) = expand_to_qualified_name_attribute(semantic, expr_id) else {
         return;
