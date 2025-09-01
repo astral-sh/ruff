@@ -125,6 +125,28 @@ help: Replace with `f"{secrets.token_urlsafe()}a{secrets.token_hex()}"`
 13 | nok2 = a.join(["1", "2", "3"])  # Not OK (not a static joiner)
 note: This is an unsafe fix and may change runtime behavior
 
+FLY002 [*] Consider f-string instead of string join
+  --> FLY002.py:19:8
+   |
+17 | nok6 = "a".join(x for x in "feefoofum")  # Not OK (generator)
+18 | nok7 = "a".join([f"foo{8}", "bar"])  # Not OK (contains an f-string)
+19 | nok8 = '\n'.join([r'line1','line2']) # https://github.com/astral-sh/ruff/issues/19887
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+20 |
+21 | # Regression test for: https://github.com/astral-sh/ruff/issues/7197
+   |
+help: Replace with f-string
+16 | nok5 = "a".join([choice("flarp")])  # Not OK (not a simple call)
+17 | nok6 = "a".join(x for x in "feefoofum")  # Not OK (generator)
+18 | nok7 = "a".join([f"foo{8}", "bar"])  # Not OK (contains an f-string)
+   - nok8 = '\n'.join([r'line1','line2']) # https://github.com/astral-sh/ruff/issues/19887
+19 + nok8 = r'''line1
+20 + line2''' # https://github.com/astral-sh/ruff/issues/19887
+21 | 
+22 | # Regression test for: https://github.com/astral-sh/ruff/issues/7197
+23 | def create_file_public_url(url, filename):
+note: This is an unsafe fix and may change runtime behavior
+
 FLY002 [*] Consider `f"{url}{filename}"` instead of string join
   --> FLY002.py:23:11
    |
