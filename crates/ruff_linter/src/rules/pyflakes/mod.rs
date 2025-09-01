@@ -437,6 +437,13 @@ mod tests {
         r"
         import a
         import a.b
+        import a.c",
+        "f401_multiple_unused_submodules"
+    )]
+    #[test_case(
+        r"
+        import a
+        import a.b
         a.foo()",
         "f401_use_top_member"
     )]
@@ -2837,7 +2844,7 @@ lambda: fu
         import fu.bar
         fu.x
         ",
-            &[Rule::UnusedImport],
+            &[],
         );
 
         flakes(
@@ -2846,7 +2853,7 @@ lambda: fu
         import fu
         fu.x
         ",
-            &[Rule::UnusedImport],
+            &[],
         );
     }
 
@@ -2880,7 +2887,7 @@ lambda: fu
         import fu
         import fu.bar
         ",
-            &[Rule::UnusedImport, Rule::UnusedImport],
+            &[Rule::UnusedImport],
         );
     }
 
