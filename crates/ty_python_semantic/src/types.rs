@@ -6560,6 +6560,7 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             }
             Type::GenericAlias(generic_alias) => generic_alias.variance_of(db, typevar),
             Type::Callable(callable_type) => callable_type.signatures(db).variance_of(db, typevar),
+            // A type variable is always covariant in itself.
             Type::TypeVar(other_typevar) | Type::NonInferableTypeVar(other_typevar)
                 if other_typevar == typevar =>
             {
@@ -6569,11 +6570,19 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             Type::ProtocolInstance(protocol_instance_type) => {
                 protocol_instance_type.variance_of(db, typevar)
             }
+            // unions are covariant in their disjuncts
             Type::Union(union_type) => union_type
                 .elements(db)
                 .iter()
                 .map(|ty| ty.variance_of(db, typevar))
                 .collect(),
+
+            // Products are covariant in their conjuncts. For negative
+            // conjuncts, they're contravariant. To see this, suppose we have
+            // `B` a subtype of `A`. A value of type `~B` could be some non-`B`
+            // `A`, and so is not assignable to `~A`. On the other hand, a value
+            // of type `~A` excludes all `A`s, and thus all `B`s, and so _is_
+            // assignable to `~B`.
             Type::Intersection(intersection_type) => intersection_type
                 .positive(db)
                 .iter()
