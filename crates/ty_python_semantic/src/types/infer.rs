@@ -127,10 +127,10 @@ use crate::types::typed_dict::{
 };
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    BoundMethodType, CallDunderError, CallableType, ClassLiteral, ClassType, DataclassParams,
-    DynamicType, IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType,
-    LintDiagnosticGuard, MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, Parameter,
-    ParameterForm, Parameters, SpecialFormType, SubclassOfType, Truthiness, Type, TypeAliasType,
+    CallDunderError, CallableType, ClassLiteral, ClassType, DataclassParams, DynamicType,
+    IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, LintDiagnosticGuard,
+    MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm,
+    Parameters, SpecialFormType, SubclassOfType, Truthiness, Type, TypeAliasType,
     TypeAndQualifiers, TypeIsType, TypeQualifiers, TypeVarBoundOrConstraintsEvaluation,
     TypeVarDefaultEvaluation, TypeVarInstance, TypeVarKind, UnionBuilder, UnionType, binding_type,
     todo_type,
@@ -580,48 +580,57 @@ impl<'db> ScopeInference<'db> {
     /// or `None` if the region is not a function body.
     /// In the case of methods, the return type of the superclass method is further unioned.
     /// If there is no superclass method and this method is not `final`, it will be unioned with `Unknown`.
-    pub(crate) fn infer_return_type(
-        &self,
-        db: &'db dyn Db,
-        method_ty: Option<BoundMethodType<'db>>,
-    ) -> Type<'db> {
+    pub(crate) fn infer_return_type(&self, db: &'db dyn Db, callee_ty: Type<'db>) -> Type<'db> {
+        // TODO: async function type inference
+        if self.scope.is_async_function(db) {
+            return Type::unknown();
+        }
+
         let mut union = UnionBuilder::new(db);
+        let div = Type::Dynamic(DynamicType::Divergent);
+        if self.is_cycle_callback() {
+            union = union.add(div);
+        }
+        let mut union_add = |ty: Type<'db>| {
+            let temp = std::mem::replace(&mut union, UnionBuilder::new(db));
+            if ty == div {
+                // `Divergent` appearing in a union does not mean true divergence, so it can be removed.
+            } else if ty.has_divergent_type(db) {
+                if let Type::Union(union_ty) = ty {
+                    let union_ty = union_ty.filter(db, |ty| **ty != div);
+                    if union_ty.has_divergent_type(db) {
+                        union = temp.add(div);
+                    } else {
+                        union = temp.add(union_ty);
+                    }
+                } else {
+                    union = temp.add(div);
+                }
+            } else {
+                union = temp.add(ty);
+            }
+        };
+        let previous_type = callee_ty.infer_return_type(db).unwrap();
+        // In fixed-point iteration of return type inference, the return type must be monotonically widened and not "oscillate".
+        // Here, monotonicity is guaranteed by pre-unioning the type of the previous iteration into the current result.
+        union_add(previous_type);
+
         let Some(extra) = &self.extra else {
             unreachable!(
                 "infer_return_type should only be called on a function body scope inference"
             );
         };
-        let div = Type::Dynamic(DynamicType::Divergent);
         for returnee in &extra.returnees {
             let ty = returnee.map_or(Type::none(db), |expression| {
                 self.expression_type(expression)
             });
-            // `Divergent` appearing in a union does not mean true divergence, so it can be removed.
-            if ty == div {
-                continue;
-            } else if ty.has_divergent_type(db) {
-                if let Type::Union(union_ty) = ty {
-                    let union_ty = union_ty.filter(db, |ty| **ty != div);
-                    if union_ty.has_divergent_type(db) {
-                        union = union.add(div);
-                    } else {
-                        union = union.add(union_ty);
-                    }
-                } else {
-                    union = union.add(div);
-                }
-            } else {
-                union = union.add(ty);
-            }
-        }
-        if self.is_cycle_callback() {
-            union = union.add(div);
+            union_add(ty);
         }
         let use_def = use_def_map(db, self.scope);
         if use_def.can_implicitly_return_none(db) {
-            union = union.add(Type::none(db));
+            union_add(Type::none(db));
         }
-        if let Some(method_ty) = method_ty {
+        if let Type::BoundMethod(method_ty) = callee_ty {
             // If the method is not final and the typing is implicit, the inferred return type should be unioned with `Unknown`.
             // If any method in a base class does not have an annotated return type, `base_return_type` will include `Unknown`.
             // On the other hand, if the return types of all methods in the base classes are annotated, there is no need to include `Unknown`.
@@ -631,34 +640,17 @@ impl<'db> ScopeInference<'db> {
                     .unwrap_or((Signature::unknown(), Type::unknown()));
                 if let Some(generic_context) = signature.generic_context.as_ref() {
                     // If the return type of the base method contains a type variable, replace it with `Unknown` to avoid dangling type variables.
-                    union = union.add(
+                    union_add(
                         return_ty
                             .apply_specialization(db, generic_context.unknown_specialization(db)),
                     );
                 } else {
-                    union = union.add(return_ty);
+                    union_add(return_ty);
                 }
             }
         }
 
-        let module = parsed_module(db, self.scope.file(db)).load(db);
-        if self
-            .scope
-            .node(db)
-            .as_function(&module)
-            .is_some_and(|func| {
-                let index = semantic_index(db, self.scope.file(db));
-                let is_generator = self.scope.file_scope_id(db).is_generator_function(index);
-
-                func.is_async && !is_generator
-            })
-        {
-            // TODO: yield/await type inference
-            KnownClass::CoroutineType
-                .to_specialized_instance(db, [Type::any(), Type::any(), union.build()])
-        } else {
-            union.build()
-        }
+        union.build().normalized(db)
     }
 }
 

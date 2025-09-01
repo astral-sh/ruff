@@ -206,7 +206,7 @@ enum ReduceResult<'db> {
 //
 // For now (until we solve https://github.com/astral-sh/ty/issues/957), keep this number
 // below 200, which is the salsa fixpoint iteration limit.
-const MAX_UNION_LITERALS: usize = 199;
+const MAX_UNION_LITERALS: usize = 198;
 
 pub(crate) struct UnionBuilder<'db> {
     elements: Vec<UnionElement<'db>>,

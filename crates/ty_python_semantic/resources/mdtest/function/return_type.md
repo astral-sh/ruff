@@ -284,7 +284,7 @@ def h(x: int, y: str):
     elif x > 5:
         return y
 
-reveal_type(h(1, "a"))  # revealed: int | str | None
+reveal_type(h(1, "a"))  # revealed: int | None | str
 
 def generator():
     yield 1
@@ -339,7 +339,7 @@ def divergent(value):
         return None
 
 # tuple[tuple[tuple[...] | None] | None] | None => tuple[Unknown] | None
-reveal_type(divergent((1,)))  # revealed: Divergent | None
+reveal_type(divergent((1,)))  # revealed: None | Divergent
 
 def call_divergent(x: int):
     return (divergent((1, 2, 3)), x)
@@ -360,7 +360,26 @@ def eager_nested_scope():
 
     return A.x
 
-reveal_type(eager_nested_scope())  # revealed: Unknown
+reveal_type(eager_nested_scope())  # revealed: Any
+
+class C:
+    def flip(self) -> "D":
+        return D()
+
+class D(C):
+    def flip(self) -> "C":
+        return C()
+
+def c_or_d(n: int):
+    if n == 0:
+        return D()
+    else:
+        return c_or_d(n - 1).flip()
+
+# In fixed-point iteration of the return type inference, the return type is monotonically widened.
+# For example, once the return type of `c_or_d` is determined to be `C`,
+# it will never be determined to be a subtype `D` in the subsequent iterations.
+reveal_type(c_or_d(1))  # revealed: C
 ```
 
 ### Class method
@@ -380,8 +399,8 @@ class D(C):
     def f(self):
         return None
 
-reveal_type(C().f())  # revealed: Literal[1] | Unknown
-reveal_type(D().f())  # revealed: None | Literal[1] | Unknown
+reveal_type(C().f())  # revealed: Literal[1] | Any
+reveal_type(D().f())  # revealed: Literal[1] | None | Any
 ```
 
 However, in the following cases, `Unknown` is not included in the inferred return type because there
@@ -456,13 +475,13 @@ reveal_type(C().f())  # revealed: int
 reveal_type(D().f())  # revealed: int
 reveal_type(E().f())  # revealed: int
 reveal_type(C().g(1))  # revealed: Literal[1]
-reveal_type(D().g(1))  # revealed: Literal[2] | Unknown
+reveal_type(D().g(1))  # revealed: Literal[2] | Any
 reveal_type(C().h(1))  # revealed: Literal[1]
-reveal_type(D().h(1))  # revealed: Literal[2] | Unknown
+reveal_type(D().h(1))  # revealed: Literal[2] | Any
 reveal_type(C().h(True))  # revealed: Literal[True]
-reveal_type(D().h(True))  # revealed: Literal[2] | Unknown
+reveal_type(D().h(True))  # revealed: Literal[2] | Any
 reveal_type(C().i(1))  # revealed: list[Literal[1]]
-reveal_type(D().i(1))  # revealed: list[@Todo(list literal element type)]
+reveal_type(D().i(1))  # revealed: list[Any]
 
 class F:
     def f(self) -> Literal[1, 2]:

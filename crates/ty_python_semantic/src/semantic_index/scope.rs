@@ -1,6 +1,9 @@
 use std::ops::Range;
 
-use ruff_db::{files::File, parsed::ParsedModuleRef};
+use ruff_db::{
+    files::File,
+    parsed::{ParsedModuleRef, parsed_module},
+};
 use ruff_index::newtype_index;
 use ruff_python_ast as ast;
 
@@ -69,6 +72,16 @@ impl<'db> ScopeId<'db> {
             NodeWithScopeKind::DictComprehension(_) => "<dictcomp>",
             NodeWithScopeKind::GeneratorExpression(_) => "<generator>",
         }
+    }
+
+    pub(crate) fn is_async_function(self, db: &'db dyn Db) -> bool {
+        let module = parsed_module(db, self.file(db)).load(db);
+        self.node(db).as_function(&module).is_some_and(|func| {
+            let index = semantic_index(db, self.file(db));
+            let is_generator = self.file_scope_id(db).is_generator_function(index);
+
+            func.is_async && !is_generator
+        })
     }
 }
 

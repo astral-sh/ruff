@@ -8984,7 +8984,7 @@ impl<'db> BoundMethodType<'db> {
             .last_definition(db)
             .body_scope(db);
         let inference = infer_scope_types(db, scope);
-        inference.infer_return_type(db, Some(self))
+        inference.infer_return_type(db, Type::BoundMethod(self))
     }
 
     #[salsa::tracked]
