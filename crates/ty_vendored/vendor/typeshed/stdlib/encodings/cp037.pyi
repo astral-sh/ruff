@@ -1,5 +1,3 @@
-"""Python Character Mapping Codec cp037 generated from 'MAPPINGS/VENDORS/MICSFT/EBCDIC/CP037.TXT' with gencodec.py."""
-
 import codecs
 from _codecs import _EncodingMap
 from _typeshed import ReadableBuffer
