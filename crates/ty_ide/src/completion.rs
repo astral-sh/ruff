@@ -1411,7 +1411,7 @@ quux.<CURSOR>
         __getstate__ :: bound method Quux.__getstate__() -> object
         __hash__ :: bound method Quux.__hash__() -> int
         __init__ :: bound method Quux.__init__() -> Unknown
-        __init_subclass__ :: bound method Quux.__init_subclass__() -> None
+        __init_subclass__ :: bound method type[Quux].__init_subclass__() -> None
         __module__ :: str
         __ne__ :: bound method Quux.__ne__(value: object, /) -> bool
         __new__ :: bound method Quux.__new__() -> Quux
@@ -1456,7 +1456,7 @@ quux.b<CURSOR>
         __getstate__ :: bound method Quux.__getstate__() -> object
         __hash__ :: bound method Quux.__hash__() -> int
         __init__ :: bound method Quux.__init__() -> Unknown
-        __init_subclass__ :: bound method Quux.__init_subclass__() -> None
+        __init_subclass__ :: bound method type[Quux].__init_subclass__() -> None
         __module__ :: str
         __ne__ :: bound method Quux.__ne__(value: object, /) -> bool
         __new__ :: bound method Quux.__new__() -> Quux
@@ -1506,7 +1506,7 @@ C.<CURSOR>
         __getstate__ :: def __getstate__(self) -> object
         __hash__ :: def __hash__(self) -> int
         __init__ :: def __init__(self) -> None
-        __init_subclass__ :: def __init_subclass__(cls) -> None
+        __init_subclass__ :: bound method <class 'C'>.__init_subclass__() -> None
         __instancecheck__ :: bound method <class 'C'>.__instancecheck__(instance: Any, /) -> bool
         __itemsize__ :: int
         __module__ :: str
@@ -1575,7 +1575,7 @@ Meta.<CURSOR>
                 __getstate__ :: def __getstate__(self) -> object
                 __hash__ :: def __hash__(self) -> int
                 __init__ :: Overload[(self, o: object, /) -> None, (self, name: str, bases: tuple[type, ...], dict: dict[str, Any], /, **kwds: Any) -> None]
-                __init_subclass__ :: def __init_subclass__(cls) -> None
+                __init_subclass__ :: bound method <class 'Meta'>.__init_subclass__() -> None
                 __instancecheck__ :: def __instancecheck__(self, instance: Any, /) -> bool
                 __itemsize__ :: int
                 __module__ :: str
@@ -1682,7 +1682,7 @@ Quux.<CURSOR>
         __getstate__ :: def __getstate__(self) -> object
         __hash__ :: def __hash__(self) -> int
         __init__ :: def __init__(self) -> Unknown
-        __init_subclass__ :: def __init_subclass__(cls) -> None
+        __init_subclass__ :: bound method <class 'Quux'>.__init_subclass__() -> None
         __instancecheck__ :: bound method <class 'Quux'>.__instancecheck__(instance: Any, /) -> bool
         __itemsize__ :: int
         __module__ :: str
@@ -1756,7 +1756,7 @@ Answer.<CURSOR>
                 __getstate__ :: def __getstate__(self) -> object
                 __hash__ :: def __hash__(self) -> int
                 __init__ :: def __init__(self) -> None
-                __init_subclass__ :: def __init_subclass__(cls) -> None
+                __init_subclass__ :: bound method <class 'Answer'>.__init_subclass__() -> None
                 __instancecheck__ :: bound method <class 'Answer'>.__instancecheck__(instance: Any, /) -> bool
                 __itemsize__ :: int
                 __iter__ :: bound method <class 'Answer'>.__iter__[_EnumMemberT]() -> Iterator[_EnumMemberT@__iter__]

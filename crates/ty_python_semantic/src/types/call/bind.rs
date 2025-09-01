@@ -272,7 +272,7 @@ impl<'db> Bindings<'db> {
             for (overload_index, overload) in binding.matching_overloads_mut() {
                 match binding_type {
                     Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(function)) => {
-                        if function.has_known_decorator(db, FunctionDecorators::CLASSMETHOD) {
+                        if function.is_classmethod(db) {
                             match overload.parameter_types() {
                                 [_, Some(owner)] => {
                                     overload.set_return_type(Type::BoundMethod(
@@ -308,7 +308,7 @@ impl<'db> Bindings<'db> {
                         if let [Some(function_ty @ Type::FunctionLiteral(function)), ..] =
                             overload.parameter_types()
                         {
-                            if function.has_known_decorator(db, FunctionDecorators::CLASSMETHOD) {
+                            if function.is_classmethod(db) {
                                 match overload.parameter_types() {
                                     [_, _, Some(owner)] => {
                                         overload.set_return_type(Type::BoundMethod(
