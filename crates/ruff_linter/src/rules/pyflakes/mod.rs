@@ -499,6 +499,14 @@ mod tests {
         a.foo()",
         "f401_import_submodules_different_lengths_but_use_top_level"
     )]
+    #[test_case(
+        r"
+        import a
+        def foo():
+            import a.b
+            a.foo()",
+        "f401_import_submodules_in_function_scope"
+    )]
     fn f401_preview_refined_submodule_handling(contents: &str, snapshot: &str) {
         let diagnostics = test_contents(
             &SourceKind::Python(dedent(contents).to_string()),
