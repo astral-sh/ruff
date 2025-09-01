@@ -613,56 +613,6 @@ def _(args: str) -> None:
     takes_at_least_two_positional_only(*args)
 ```
 
-### Argument expansion regression
-
-This is a regression that was highlighted by the ecosystem check, which shows that we might need to
-rethink how we perform argument expansion during overload resolution. In particular, we might need
-to retry both `match_parameters` *and* `check_types` for each expansion. Currently we only retry
-`check_types`.
-
-The issue is that argument expansion might produce a splatted value with a different arity than what
-we originally inferred for the unexpanded value, and that in turn can affect which parameters the
-splatted value is matched with.
-
-The first example correctly produces an error. The `tuple[int, str]` union element has a precise
-arity of two, and so parameter matching chooses the first overload. The second element of the tuple
-does not match the second parameter type, which yielding an `invalid-argument-type` error.
-
-The third example should produce the same error. However, because we have a union, we do not see the
-precise arity of each union element during parameter matching. Instead, we infer an arity of "zero
-or more" for the union as a whole, and use that less precise arity when matching parameters. We
-therefore consider the second overload to still be a potential candidate for the `tuple[int, str]`
-union element. During type checking, we have to force the arity of each union element to match the
-inferred arity of the union as a whole (turning `tuple[int, str]` into `tuple[int | str, ...]`).
-That less precise tuple type-checks successfully against the second overload, making us incorrectly
-think that `tuple[int, str]` is a valid splatted call.
-
-If we update argument expansion to retry parameter matching with the precise arity of each union
-element, we will correctly rule out the second overload for `tuple[int, str]`, just like we do when
-splatting that tuple directly (instead of as part of a union).
-
-```py
-from typing import overload
-
-@overload
-def f(x: int, y: int) -> None: ...
-@overload
-def f(x: int, y: str, z: int) -> None: ...
-def f(*args): ...
-
-# Test all of the above with a number of different splatted argument types
-
-def _(t: tuple[int, str]) -> None:
-    f(*t)  # error: [invalid-argument-type]
-
-def _(t: tuple[int, str, int]) -> None:
-    f(*t)
-
-def _(t: tuple[int, str] | tuple[int, str, int]) -> None:
-    # TODO: error: [invalid-argument-type]
-    f(*t)
-```
-
 ## Wrong argument type
 
 ### Positional argument, positional-or-keyword parameter
