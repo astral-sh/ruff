@@ -292,7 +292,7 @@ def generator():
     return None
 
 # TODO: Should be `Generator[Literal[1, 2], Any, None]`
-reveal_type(generator())  # revealed: None
+reveal_type(generator())  # revealed: Unknown
 ```
 
 The return type of a recursive function is also inferred. When the return type inference would

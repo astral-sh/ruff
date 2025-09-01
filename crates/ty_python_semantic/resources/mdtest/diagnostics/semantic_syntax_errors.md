@@ -148,8 +148,6 @@ yield from []
 await C()
 
 def f():
-    # TODO: no error, C is awaitable
-    # error: [invalid-await] "`C` is not awaitable"
     # error: [invalid-syntax] "`await` outside of an asynchronous function"
     await C()
 ```

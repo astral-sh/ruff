@@ -74,14 +74,16 @@ impl<'db> ScopeId<'db> {
         }
     }
 
-    pub(crate) fn is_async_function(self, db: &'db dyn Db) -> bool {
+    pub(crate) fn is_coroutine_function(self, db: &'db dyn Db) -> bool {
         let module = parsed_module(db, self.file(db)).load(db);
-        self.node(db).as_function(&module).is_some_and(|func| {
-            let index = semantic_index(db, self.file(db));
-            let is_generator = self.file_scope_id(db).is_generator_function(index);
+        self.node(db)
+            .as_function(&module)
+            .is_some_and(|func| func.is_async && !self.is_generator_function(db))
+    }
 
-            func.is_async && !is_generator
-        })
+    pub(crate) fn is_generator_function(self, db: &'db dyn Db) -> bool {
+        let index = semantic_index(db, self.file(db));
+        self.file_scope_id(db).is_generator_function(index)
     }
 }
 

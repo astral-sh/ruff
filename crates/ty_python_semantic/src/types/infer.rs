@@ -581,8 +581,9 @@ impl<'db> ScopeInference<'db> {
     /// In the case of methods, the return type of the superclass method is further unioned.
     /// If there is no superclass method and this method is not `final`, it will be unioned with `Unknown`.
     pub(crate) fn infer_return_type(&self, db: &'db dyn Db, callee_ty: Type<'db>) -> Type<'db> {
-        // TODO: async function type inference
-        if self.scope.is_async_function(db) {
+        // TODO: coroutine function type inference
+        // TODO: generator function type inference
+        if self.scope.is_coroutine_function(db) || self.scope.is_generator_function(db) {
             return Type::unknown();
         }
 
