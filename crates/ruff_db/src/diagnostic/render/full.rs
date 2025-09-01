@@ -1,12 +1,11 @@
 use std::borrow::Cow;
 use std::num::NonZeroUsize;
 
-use anstyle::Style;
-use ruff_notebook::NotebookIndex;
 use similar::{ChangeTag, TextDiff};
 
 use ruff_annotate_snippets::Renderer as AnnotateRenderer;
 use ruff_diagnostics::{Applicability, Fix};
+use ruff_notebook::NotebookIndex;
 use ruff_source_file::OneIndexed;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -58,13 +57,14 @@ impl<'a> FullRenderer<'a> {
             for diag in renderable.diagnostics.iter() {
                 writeln!(f, "{}", renderer.render(diag.to_annotate()))?;
             }
-            writeln!(f)?;
 
-            if self.config.show_fix_diff {
+            if self.config.show_fix_diff && diag.has_applicable_fix(self.config) {
                 if let Some(diff) = Diff::from_diagnostic(diag, &stylesheet, self.resolver) {
-                    writeln!(f, "{diff}")?;
+                    write!(f, "{diff}")?;
                 }
             }
+
+            writeln!(f)?;
         }
 
         Ok(())
@@ -126,19 +126,6 @@ impl std::fmt::Display for Diff<'_> {
             vec![(None, source_text.text_len())]
         };
 
-        let message = match self.fix.applicability() {
-            // TODO(zanieb): Adjust this messaging once it's user-facing
-            Applicability::Safe => "Safe fix",
-            Applicability::Unsafe => "Unsafe fix",
-            Applicability::DisplayOnly => "Display-only fix",
-        };
-
-        // TODO(brent) `stylesheet.separator` is cyan rather than blue, as we had before. I think
-        // we're getting rid of this soon anyway, so I didn't think it was worth adding another
-        // style to the stylesheet temporarily. The color doesn't appear at all in the snapshot
-        // tests, which is the only place these are currently used.
-        writeln!(f, "ℹ {}", fmt_styled(message, self.stylesheet.separator))?;
-
         let mut last_end = TextSize::ZERO;
         for (cell, offset) in cells {
             let range = TextRange::new(last_end, offset);
@@ -167,64 +154,67 @@ impl std::fmt::Display for Diff<'_> {
 
             let diff = TextDiff::from_lines(input, &output);
 
-            let (largest_old, largest_new) = diff
-                .ops()
-                .last()
-                .map(|op| (op.old_range().start, op.new_range().start))
-                .unwrap_or_default();
+            let grouped_ops = diff.grouped_ops(3);
 
-            let digit_with = OneIndexed::from_zero_indexed(largest_new.max(largest_old)).digits();
+            // Find the new line number with the largest number of digits to align all of the line
+            // number separators.
+            let last_op = grouped_ops.last().and_then(|group| group.last());
+            let largest_new = last_op.map(|op| op.new_range().end).unwrap_or_default();
+
+            let digit_with = OneIndexed::new(largest_new).unwrap_or_default().digits();
 
             if let Some(cell) = cell {
-                // Room for 2 digits, 2 x 1 space before each digit, 1 space, and 1 `|`. This
-                // centers the three colons on the pipe.
-                writeln!(f, "{:>1$} cell {cell}", ":::", 2 * digit_with.get() + 4)?;
+                // Room for 1 digit, 1 space, 1 `|`, and 1 more following space. This centers the
+                // three colons on the pipe.
+                writeln!(f, "{:>1$} cell {cell}", ":::", digit_with.get() + 3)?;
             }
 
-            for (idx, group) in diff.grouped_ops(3).iter().enumerate() {
+            for (idx, group) in grouped_ops.iter().enumerate() {
                 if idx > 0 {
                     writeln!(f, "{:-^1$}", "-", 80)?;
                 }
                 for op in group {
                     for change in diff.iter_inline_changes(op) {
-                        let sign = match change.tag() {
-                            ChangeTag::Delete => "-",
-                            ChangeTag::Insert => "+",
-                            ChangeTag::Equal => " ",
+                        let (sign, style, line_no_style, index) = match change.tag() {
+                            ChangeTag::Delete => (
+                                "-",
+                                self.stylesheet.deletion,
+                                self.stylesheet.deletion_line_no,
+                                None,
+                            ),
+                            ChangeTag::Insert => (
+                                "+",
+                                self.stylesheet.insertion,
+                                self.stylesheet.insertion_line_no,
+                                change.new_index(),
+                            ),
+                            ChangeTag::Equal => (
+                                "|",
+                                self.stylesheet.none,
+                                self.stylesheet.line_no,
+                                change.new_index(),
+                            ),
                         };
 
-                        let line_style = LineStyle::from(change.tag(), self.stylesheet);
-
-                        let old_index = change.old_index().map(OneIndexed::from_zero_indexed);
-                        let new_index = change.new_index().map(OneIndexed::from_zero_indexed);
+                        let line = Line {
+                            index: index.map(OneIndexed::from_zero_indexed),
+                            width: digit_with,
+                        };
 
                         write!(
                             f,
-                            "{} {} |{}",
-                            Line {
-                                index: old_index,
-                                width: digit_with,
-                            },
-                            Line {
-                                index: new_index,
-                                width: digit_with,
-                            },
-                            fmt_styled(line_style.apply_to(sign), self.stylesheet.emphasis),
+                            "{line} {sign} ",
+                            line = fmt_styled(line, self.stylesheet.line_no),
+                            sign = fmt_styled(sign, line_no_style),
                         )?;
 
                         for (emphasized, value) in change.iter_strings_lossy() {
                             let value = show_nonprinting(&value);
+                            let styled = fmt_styled(value, style);
                             if emphasized {
-                                write!(
-                                    f,
-                                    "{}",
-                                    fmt_styled(
-                                        line_style.apply_to(&value),
-                                        self.stylesheet.underline
-                                    )
-                                )?;
+                                write!(f, "{}", fmt_styled(styled, self.stylesheet.emphasis))?;
                             } else {
-                                write!(f, "{}", line_style.apply_to(&value))?;
+                                write!(f, "{styled}")?;
                             }
                         }
                         if change.missing_newline() {
@@ -235,31 +225,35 @@ impl std::fmt::Display for Diff<'_> {
             }
         }
 
-        Ok(())
-    }
-}
-
-struct LineStyle {
-    style: Style,
-}
-
-impl LineStyle {
-    fn apply_to(&self, input: &str) -> impl std::fmt::Display {
-        fmt_styled(input, self.style)
-    }
-
-    fn from(value: ChangeTag, stylesheet: &DiagnosticStylesheet) -> LineStyle {
-        match value {
-            ChangeTag::Equal => LineStyle {
-                style: stylesheet.none,
-            },
-            ChangeTag::Delete => LineStyle {
-                style: stylesheet.deletion,
-            },
-            ChangeTag::Insert => LineStyle {
-                style: stylesheet.insertion,
-            },
+        match self.fix.applicability() {
+            Applicability::Safe => {}
+            Applicability::Unsafe => {
+                writeln!(
+                    f,
+                    "{note}: {msg}",
+                    note = fmt_styled("note", self.stylesheet.warning),
+                    msg = fmt_styled(
+                        "This is an unsafe fix and may change runtime behavior",
+                        self.stylesheet.emphasis
+                    )
+                )?;
+            }
+            Applicability::DisplayOnly => {
+                // Note that this is still only used in tests. There's no `--display-only-fixes`
+                // analog to `--unsafe-fixes` for users to activate this or see the styling.
+                writeln!(
+                    f,
+                    "{note}: {msg}",
+                    note = fmt_styled("note", self.stylesheet.error),
+                    msg = fmt_styled(
+                        "This is a display-only fix and is likely to be incorrect",
+                        self.stylesheet.emphasis
+                    )
+                )?;
+            }
         }
+
+        Ok(())
     }
 }
 
@@ -297,7 +291,7 @@ fn show_nonprinting(s: &str) -> Cow<'_, str> {
 
 #[cfg(test)]
 mod tests {
-    use ruff_diagnostics::{Applicability, Fix};
+    use ruff_diagnostics::{Applicability, Edit, Fix};
     use ruff_text_size::{TextLen, TextRange, TextSize};
 
     use crate::diagnostic::{
@@ -703,6 +697,8 @@ print()
     fn notebook_output_with_diff() {
         let (mut env, diagnostics) = create_notebook_diagnostics(DiagnosticFormat::Full);
         env.show_fix_diff(true);
+        env.fix_applicability(Applicability::DisplayOnly);
+
         insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r"
         error[unused-import][*]: `os` imported but unused
          --> notebook.ipynb:cell 1:2:8
@@ -712,11 +708,9 @@ print()
           |        ^^
           |
         help: Remove unused import: `os`
-
-        ℹ Safe fix
-           ::: cell 1
-        1 1 | # cell 1
-        2   |-import os
+         ::: cell 1
+        1 | # cell 1
+          - import os
 
         error[unused-import][*]: `math` imported but unused
          --> notebook.ipynb:cell 2:2:8
@@ -728,15 +722,13 @@ print()
         4 | print('hello world')
           |
         help: Remove unused import: `math`
+         ::: cell 2
+        1 | # cell 2
+          - import math
+        2 | 
+        3 | print('hello world')
 
-        ℹ Safe fix
-           ::: cell 2
-        1 1 | # cell 2
-        2   |-import math
-        3 2 | 
-        4 3 | print('hello world')
-
-        error[unused-variable]: Local variable `x` is assigned to but never used
+        error[unused-variable][*]: Local variable `x` is assigned to but never used
          --> notebook.ipynb:cell 3:4:5
           |
         2 | def foo():
@@ -745,14 +737,13 @@ print()
           |     ^
           |
         help: Remove assignment to unused variable `x`
-
-        ℹ Unsafe fix
-           ::: cell 3
-        1 1 | # cell 3
-        2 2 | def foo():
-        3 3 |     print()
-        4   |-    x = 1
-        5 4 |
+         ::: cell 3
+        1 | # cell 3
+        2 | def foo():
+        3 |     print()
+          -     x = 1
+        4 | 
+        note: This is an unsafe fix and may change runtime behavior
         ");
     }
 
@@ -760,6 +751,7 @@ print()
     fn notebook_output_with_diff_spanning_cells() {
         let (mut env, mut diagnostics) = create_notebook_diagnostics(DiagnosticFormat::Full);
         env.show_fix_diff(true);
+        env.fix_applicability(Applicability::DisplayOnly);
 
         // Move all of the edits from the later diagnostics to the first diagnostic to simulate a
         // single diagnostic with edits in different cells.
@@ -772,7 +764,7 @@ print()
         *fix = Fix::unsafe_edits(edits.remove(0), edits);
 
         insta::assert_snapshot!(env.render(&diagnostic), @r"
-        error[unused-import]: `os` imported but unused
+        error[unused-import][*]: `os` imported but unused
          --> notebook.ipynb:cell 1:2:8
           |
         1 | # cell 1
@@ -780,22 +772,21 @@ print()
           |        ^^
           |
         help: Remove unused import: `os`
-
-        ℹ Unsafe fix
-           ::: cell 1
-        1 1 | # cell 1
-        2   |-import os
-           ::: cell 2
-        1 1 | # cell 2
-        2   |-import math
-        3 2 | 
-        4 3 | print('hello world')
-           ::: cell 3
-        1 1 | # cell 3
-        2 2 | def foo():
-        3 3 |     print()
-        4   |-    x = 1
-        5 4 |
+         ::: cell 1
+        1 | # cell 1
+          - import os
+         ::: cell 2
+        1 | # cell 2
+          - import math
+        2 | 
+        3 | print('hello world')
+         ::: cell 3
+        1 | # cell 3
+        2 | def foo():
+        3 |     print()
+          -     x = 1
+        4 | 
+        note: This is an unsafe fix and may change runtime behavior
         ");
     }
 
@@ -899,6 +890,76 @@ print()
         1 | unexpected eof
           |               ^
           |
+        ");
+    }
+
+    /// Test that we handle the width calculation for the line number correctly even for context
+    /// lines at the end of a diff. For example, we want it to render like this:
+    ///
+    /// ```
+    /// 8  |
+    /// 9  |
+    /// 10 |
+    /// ```
+    ///
+    /// and not like this:
+    ///
+    /// ```
+    /// 8 |
+    /// 9 |
+    /// 10 |
+    /// ```
+    #[test]
+    fn longer_line_number_end_of_context() {
+        let mut env = TestEnvironment::new();
+        let contents = "\
+line 1
+line 2
+line 3
+line 4
+line 5
+line 6
+line 7
+line 8
+line 9
+line 10
+        ";
+        env.add("example.py", contents);
+        env.format(DiagnosticFormat::Full);
+        env.show_fix_diff(true);
+        env.fix_applicability(Applicability::DisplayOnly);
+
+        let mut diagnostic = env.err().primary("example.py", "3", "3", "label").build();
+        diagnostic.help("Start of diff:");
+        let target = "line 7";
+        let line9 = contents.find(target).unwrap();
+        let range = TextRange::at(TextSize::try_from(line9).unwrap(), target.text_len());
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+            format!("fixed {target}"),
+            range,
+        )));
+
+        insta::assert_snapshot!(env.render(&diagnostic), @r"
+        error[test-diagnostic][*]: main diagnostic message
+         --> example.py:3:1
+          |
+        1 | line 1
+        2 | line 2
+        3 | line 3
+          | ^^^^^^ label
+        4 | line 4
+        5 | line 5
+          |
+        help: Start of diff:
+        4  | line 4
+        5  | line 5
+        6  | line 6
+           - line 7
+        7  + fixed line 7
+        8  | line 8
+        9  | line 9
+        10 | line 10
+        note: This is an unsafe fix and may change runtime behavior
         ");
     }
 }

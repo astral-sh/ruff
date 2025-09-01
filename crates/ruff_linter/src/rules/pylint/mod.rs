@@ -252,6 +252,30 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::BidirectionalUnicode, Path::new("bidirectional_unicode.py"))]
+    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "preview__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("pylint").join(path).as_path(),
+            &LinterSettings {
+                pylint: pylint::settings::Settings {
+                    allow_dunder_method_names: FxHashSet::from_iter([
+                        "__special_custom_magic__".to_string()
+                    ]),
+                    ..pylint::settings::Settings::default()
+                },
+                preview: PreviewMode::Enabled,
+                ..LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
     #[test]
     fn continue_in_finally() -> Result<()> {
         let diagnostics = test_path(

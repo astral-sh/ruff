@@ -17,11 +17,12 @@ use smallvec::{SmallVec, smallvec_inline};
 
 use super::{DynamicType, Type, TypeVarVariance, definition_expression_type};
 use crate::semantic_index::definition::Definition;
-use crate::types::constraints::{Constraints, IteratorConstraintsExtension};
+use crate::types::constraints::{ConstraintSet, Constraints, IteratorConstraintsExtension};
 use crate::types::generics::{GenericContext, walk_generic_context};
 use crate::types::{
-    BindingContext, BoundTypeVarInstance, HasRelationToVisitor, IsEquivalentVisitor, KnownClass,
-    NormalizedVisitor, TypeMapping, TypeRelation, VarianceInferable, todo_type,
+    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, FindLegacyTypeVarsVisitor,
+    HasRelationToVisitor, IsEquivalentVisitor, KnownClass, MaterializationKind, NormalizedVisitor,
+    TypeMapping, TypeRelation, VarianceInferable, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -57,11 +58,15 @@ impl<'db> CallableSignature<'db> {
         self.overloads.iter()
     }
 
-    pub(super) fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+    pub(super) fn materialize(
+        &self,
+        db: &'db dyn Db,
+        materialization_kind: MaterializationKind,
+    ) -> Self {
         Self::from_overloads(
             self.overloads
                 .iter()
-                .map(|signature| signature.materialize(db, variance)),
+                .map(|signature| signature.materialize(db, materialization_kind)),
         )
     }
 
@@ -77,26 +82,28 @@ impl<'db> CallableSignature<'db> {
         )
     }
 
-    pub(crate) fn apply_type_mapping<'a>(
+    pub(crate) fn apply_type_mapping_impl<'a>(
         &self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         Self::from_overloads(
             self.overloads
                 .iter()
-                .map(|signature| signature.apply_type_mapping(db, type_mapping)),
+                .map(|signature| signature.apply_type_mapping_impl(db, type_mapping, visitor)),
         )
     }
 
-    pub(crate) fn find_legacy_typevars(
+    pub(crate) fn find_legacy_typevars_impl(
         &self,
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+        visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         for signature in &self.overloads {
-            signature.find_legacy_typevars(db, binding_context, typevars);
+            signature.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
         }
     }
 
@@ -117,7 +124,8 @@ impl<'db> CallableSignature<'db> {
     ///
     /// See [`Type::is_subtype_of`] for more details.
     pub(crate) fn is_subtype_of(&self, db: &'db dyn Db, other: &Self) -> bool {
-        self.is_subtype_of_impl(db, other)
+        self.is_subtype_of_impl::<ConstraintSet>(db, other)
+            .is_always_satisfied(db)
     }
 
     fn is_subtype_of_impl<C: Constraints<'db>>(&self, db: &'db dyn Db, other: &Self) -> C {
@@ -137,8 +145,9 @@ impl<'db> CallableSignature<'db> {
             db,
             other,
             TypeRelation::Assignability,
-            &HasRelationToVisitor::new(true),
+            &HasRelationToVisitor::new(ConstraintSet::always_satisfiable(db)),
         )
+        .is_always_satisfied(db)
     }
 
     pub(crate) fn has_relation_to_impl<C: Constraints<'db>>(
@@ -405,17 +414,17 @@ impl<'db> Signature<'db> {
         self
     }
 
-    fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+    fn materialize(&self, db: &'db dyn Db, materialization_kind: MaterializationKind) -> Self {
         Self {
             generic_context: self.generic_context,
             inherited_generic_context: self.inherited_generic_context,
             definition: self.definition,
             // Parameters are at contravariant position, so the variance is flipped.
-            parameters: self.parameters.materialize(db, variance.flip()),
+            parameters: self.parameters.materialize(db, materialization_kind.flip()),
             return_ty: Some(
                 self.return_ty
                     .unwrap_or(Type::unknown())
-                    .materialize(db, variance),
+                    .materialize(db, materialization_kind),
             ),
         }
     }
@@ -451,33 +460,45 @@ impl<'db> Signature<'db> {
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
     ) -> Self {
+        self.apply_type_mapping_impl(db, type_mapping, &ApplyTypeMappingVisitor::default())
+    }
+
+    pub(crate) fn apply_type_mapping_impl<'a>(
+        &self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
         Self {
             generic_context: self.generic_context,
             inherited_generic_context: self.inherited_generic_context,
             definition: self.definition,
-            parameters: self.parameters.apply_type_mapping(db, type_mapping),
+            parameters: self
+                .parameters
+                .apply_type_mapping_impl(db, type_mapping, visitor),
             return_ty: self
                 .return_ty
-                .map(|ty| ty.apply_type_mapping(db, type_mapping)),
+                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, visitor)),
         }
     }
 
-    pub(crate) fn find_legacy_typevars(
+    pub(crate) fn find_legacy_typevars_impl(
         &self,
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+        visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         for param in &self.parameters {
             if let Some(ty) = param.annotated_type() {
-                ty.find_legacy_typevars(db, binding_context, typevars);
+                ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
             }
             if let Some(ty) = param.default_type() {
-                ty.find_legacy_typevars(db, binding_context, typevars);
+                ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
             }
         }
         if let Some(ty) = self.return_ty {
-            ty.find_legacy_typevars(db, binding_context, typevars);
+            ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
         }
     }
 
@@ -495,7 +516,11 @@ impl<'db> Signature<'db> {
         let mut parameters = Parameters::new(self.parameters().iter().skip(1).cloned());
         let mut return_ty = self.return_ty;
         if let Some(self_type) = self_type {
-            parameters = parameters.apply_type_mapping(db, &TypeMapping::BindSelf(self_type));
+            parameters = parameters.apply_type_mapping_impl(
+                db,
+                &TypeMapping::BindSelf(self_type),
+                &ApplyTypeMappingVisitor::default(),
+            );
             return_ty =
                 return_ty.map(|ty| ty.apply_type_mapping(db, &TypeMapping::BindSelf(self_type)));
         }
@@ -1063,13 +1088,13 @@ impl<'db> Parameters<'db> {
         }
     }
 
-    fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+    fn materialize(&self, db: &'db dyn Db, materialization_kind: MaterializationKind) -> Self {
         if self.is_gradual {
             Parameters::object(db)
         } else {
             Parameters::new(
                 self.iter()
-                    .map(|parameter| parameter.materialize(db, variance)),
+                    .map(|parameter| parameter.materialize(db, materialization_kind)),
             )
         }
     }
@@ -1223,12 +1248,17 @@ impl<'db> Parameters<'db> {
         )
     }
 
-    fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: &TypeMapping<'a, 'db>) -> Self {
+    fn apply_type_mapping_impl<'a>(
+        &self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
         Self {
             value: self
                 .value
                 .iter()
-                .map(|param| param.apply_type_mapping(db, type_mapping))
+                .map(|param| param.apply_type_mapping_impl(db, type_mapping, visitor))
                 .collect(),
             is_gradual: self.is_gradual,
         }
@@ -1395,24 +1425,29 @@ impl<'db> Parameter<'db> {
         self
     }
 
-    fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+    fn materialize(&self, db: &'db dyn Db, materialization_kind: MaterializationKind) -> Self {
         Self {
             annotated_type: Some(
                 self.annotated_type
                     .unwrap_or(Type::unknown())
-                    .materialize(db, variance),
+                    .materialize(db, materialization_kind),
             ),
             kind: self.kind.clone(),
             form: self.form,
         }
     }
 
-    fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: &TypeMapping<'a, 'db>) -> Self {
+    fn apply_type_mapping_impl<'a>(
+        &self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
         Self {
             annotated_type: self
                 .annotated_type
-                .map(|ty| ty.apply_type_mapping(db, type_mapping)),
-            kind: self.kind.apply_type_mapping(db, type_mapping),
+                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, visitor)),
+            kind: self.kind.apply_type_mapping_impl(db, type_mapping, visitor),
             form: self.form,
         }
     }
@@ -1616,24 +1651,29 @@ pub(crate) enum ParameterKind<'db> {
 }
 
 impl<'db> ParameterKind<'db> {
-    fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: &TypeMapping<'a, 'db>) -> Self {
+    fn apply_type_mapping_impl<'a>(
+        &self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
         match self {
             Self::PositionalOnly { default_type, name } => Self::PositionalOnly {
                 default_type: default_type
                     .as_ref()
-                    .map(|ty| ty.apply_type_mapping(db, type_mapping)),
+                    .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, visitor)),
                 name: name.clone(),
             },
             Self::PositionalOrKeyword { default_type, name } => Self::PositionalOrKeyword {
                 default_type: default_type
                     .as_ref()
-                    .map(|ty| ty.apply_type_mapping(db, type_mapping)),
+                    .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, visitor)),
                 name: name.clone(),
             },
             Self::KeywordOnly { default_type, name } => Self::KeywordOnly {
                 default_type: default_type
                     .as_ref()
-                    .map(|ty| ty.apply_type_mapping(db, type_mapping)),
+                    .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, visitor)),
                 name: name.clone(),
             },
             Self::Variadic { .. } | Self::KeywordVariadic { .. } => self.clone(),

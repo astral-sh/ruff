@@ -241,7 +241,9 @@ fn run_test(
 
             db.write_file(&full_path, &embedded.code).unwrap();
 
-            if !(full_path.starts_with(&src_path) && matches!(embedded.lang, "py" | "pyi")) {
+            if !(full_path.starts_with(&src_path)
+                && matches!(embedded.lang, "py" | "python" | "pyi"))
+            {
                 // These files need to be written to the file system (above), but we don't run any checks on them.
                 return None;
             }

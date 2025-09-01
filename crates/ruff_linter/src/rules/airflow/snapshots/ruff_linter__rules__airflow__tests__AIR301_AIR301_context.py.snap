@@ -337,16 +337,14 @@ AIR301 [*] `schedule_interval` is removed in Airflow 3.0
 113 |     template_searchpath=["/templates"],
     |
 help: Use `schedule` instead
-
-ℹ Safe fix
-108 108 | 
-109 109 | with DAG(
-110 110 |     dag_id="example_dag",
-111     |-    schedule_interval="@daily",
-    111 |+    schedule="@daily",
-112 112 |     start_date=datetime(2023, 1, 1),
-113 113 |     template_searchpath=["/templates"],
-114 114 | ) as dag:
+108 | 
+109 | with DAG(
+110 |     dag_id="example_dag",
+    -     schedule_interval="@daily",
+111 +     schedule="@daily",
+112 |     start_date=datetime(2023, 1, 1),
+113 |     template_searchpath=["/templates"],
+114 | ) as dag:
 
 AIR301 `next_ds` is removed in Airflow 3.0
    --> AIR301_context.py:135:23

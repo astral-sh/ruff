@@ -18,7 +18,7 @@ use crate::semantic_index::{
     BindingWithConstraints, DeclarationWithConstraint, SemanticIndex, attribute_declarations,
     attribute_scopes,
 };
-use crate::types::constraints::{Constraints, IteratorConstraintsExtension};
+use crate::types::constraints::{ConstraintSet, Constraints, IteratorConstraintsExtension};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{INVALID_LEGACY_TYPE_VARIABLE, INVALID_TYPE_ALIAS_TYPE};
 use crate::types::enums::enum_metadata;
@@ -30,11 +30,11 @@ use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::typed_dict::typed_dict_params_from_class_def;
 use crate::types::{
     ApplyTypeMappingVisitor, Binding, BoundSuperError, BoundSuperType, CallableType,
-    DataclassParams, DeprecatedInstance, HasRelationToVisitor, IsEquivalentVisitor,
-    KnownInstanceType, ManualPEP695TypeAliasType, NormalizedVisitor, PropertyInstanceType,
-    StringLiteralType, TypeAliasType, TypeMapping, TypeRelation, TypeVarBoundOrConstraints,
-    TypeVarInstance, TypeVarKind, TypedDictParams, VarianceInferable, declaration_type,
-    infer_definition_types, todo_type,
+    DataclassParams, DeprecatedInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
+    IsEquivalentVisitor, KnownInstanceType, ManualPEP695TypeAliasType, MaterializationKind,
+    NormalizedVisitor, PropertyInstanceType, StringLiteralType, TypeAliasType, TypeMapping,
+    TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, TypedDictParams,
+    UnionBuilder, VarianceInferable, declaration_type, infer_definition_types,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet, Program,
@@ -51,7 +51,7 @@ use crate::{
         semantic_index, use_def_map,
     },
     types::{
-        CallArguments, CallError, CallErrorKind, MetaclassCandidate, UnionBuilder, UnionType,
+        CallArguments, CallError, CallErrorKind, MetaclassCandidate, UnionType,
         definition_expression_type,
     },
 };
@@ -272,11 +272,16 @@ impl<'db> GenericAlias<'db> {
         )
     }
 
-    pub(super) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+    pub(super) fn materialize(
+        self,
+        db: &'db dyn Db,
+        materialization_kind: MaterializationKind,
+    ) -> Self {
         Self::new(
             db,
             self.origin(db),
-            self.specialization(db).materialize(db, variance),
+            self.specialization(db)
+                .materialize(db, materialization_kind),
         )
     }
 
@@ -298,14 +303,15 @@ impl<'db> GenericAlias<'db> {
         )
     }
 
-    pub(super) fn find_legacy_typevars(
+    pub(super) fn find_legacy_typevars_impl(
         self,
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+        visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         self.specialization(db)
-            .find_legacy_typevars(db, binding_context, typevars);
+            .find_legacy_typevars_impl(db, binding_context, typevars, visitor);
     }
 
     pub(super) fn is_typed_dict(self, db: &'db dyn Db) -> bool {
@@ -404,10 +410,14 @@ impl<'db> ClassType<'db> {
         }
     }
 
-    pub(super) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+    pub(super) fn materialize(
+        self,
+        db: &'db dyn Db,
+        materialization_kind: MaterializationKind,
+    ) -> Self {
         match self {
             Self::NonGeneric(_) => self,
-            Self::Generic(generic) => Self::Generic(generic.materialize(db, variance)),
+            Self::Generic(generic) => Self::Generic(generic.materialize(db, materialization_kind)),
         }
     }
 
@@ -494,15 +504,18 @@ impl<'db> ClassType<'db> {
         }
     }
 
-    pub(super) fn find_legacy_typevars(
+    pub(super) fn find_legacy_typevars_impl(
         self,
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+        visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         match self {
             Self::NonGeneric(_) => {}
-            Self::Generic(generic) => generic.find_legacy_typevars(db, binding_context, typevars),
+            Self::Generic(generic) => {
+                generic.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+            }
         }
     }
 
@@ -539,7 +552,8 @@ impl<'db> ClassType<'db> {
 
     /// Return `true` if `other` is present in this class's MRO.
     pub(super) fn is_subclass_of(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
-        self.when_subclass_of(db, other)
+        self.when_subclass_of::<ConstraintSet>(db, other)
+            .is_always_satisfied(db)
     }
 
     pub(super) fn when_subclass_of<C: Constraints<'db>>(
@@ -1197,6 +1211,14 @@ impl<'db> ClassType<'db> {
                 }
             }
         }
+    }
+
+    pub(super) fn is_protocol(self, db: &'db dyn Db) -> bool {
+        self.class_literal(db).0.is_protocol(db)
+    }
+
+    pub(super) fn header_span(self, db: &'db dyn Db) -> Span {
+        self.class_literal(db).0.header_span(db)
     }
 }
 
@@ -2309,49 +2331,179 @@ impl<'db> ClassLiteral<'db> {
                 )))
             }
             (CodeGeneratorKind::TypedDict, "get") => {
-                // TODO: synthesize a set of overloads with precise types
-                let signature = Signature::new(
-                    Parameters::new([
-                        Parameter::positional_only(Some(Name::new_static("self")))
-                            .with_annotated_type(instance_ty),
-                        Parameter::positional_only(Some(Name::new_static("key"))),
-                        Parameter::positional_only(Some(Name::new_static("default")))
-                            .with_default_type(Type::unknown()),
-                    ]),
-                    Some(todo_type!("Support for `TypedDict`")),
-                );
+                let overloads = self
+                    .fields(db, specialization, field_policy)
+                    .into_iter()
+                    .flat_map(|(name, field)| {
+                        let key_type =
+                            Type::StringLiteral(StringLiteralType::new(db, name.as_str()));
 
-                Some(CallableType::function_like(db, signature))
+                        // For a required key, `.get()` always returns the value type. For a non-required key,
+                        // `.get()` returns the union of the value type and the type of the default argument
+                        // (which defaults to `None`).
+
+                        // TODO: For now, we use two overloads here. They can be merged into a single function
+                        // once the generics solver takes default arguments into account.
+
+                        let get_sig = Signature::new(
+                            Parameters::new([
+                                Parameter::positional_only(Some(Name::new_static("self")))
+                                    .with_annotated_type(instance_ty),
+                                Parameter::positional_only(Some(Name::new_static("key")))
+                                    .with_annotated_type(key_type),
+                            ]),
+                            Some(if field.is_required() {
+                                field.declared_ty
+                            } else {
+                                UnionType::from_elements(db, [field.declared_ty, Type::none(db)])
+                            }),
+                        );
+
+                        let t_default =
+                            BoundTypeVarInstance::synthetic(db, "T", TypeVarVariance::Covariant);
+
+                        let get_with_default_sig = Signature::new_generic(
+                            Some(GenericContext::from_typevar_instances(db, [t_default])),
+                            Parameters::new([
+                                Parameter::positional_only(Some(Name::new_static("self")))
+                                    .with_annotated_type(instance_ty),
+                                Parameter::positional_only(Some(Name::new_static("key")))
+                                    .with_annotated_type(key_type),
+                                Parameter::positional_only(Some(Name::new_static("default")))
+                                    .with_annotated_type(Type::TypeVar(t_default)),
+                            ]),
+                            Some(if field.is_required() {
+                                field.declared_ty
+                            } else {
+                                UnionType::from_elements(
+                                    db,
+                                    [field.declared_ty, Type::TypeVar(t_default)],
+                                )
+                            }),
+                        );
+
+                        [get_sig, get_with_default_sig]
+                    })
+                    // Fallback overloads for unknown keys
+                    .chain(std::iter::once({
+                        Signature::new(
+                            Parameters::new([
+                                Parameter::positional_only(Some(Name::new_static("self")))
+                                    .with_annotated_type(instance_ty),
+                                Parameter::positional_only(Some(Name::new_static("key")))
+                                    .with_annotated_type(KnownClass::Str.to_instance(db)),
+                            ]),
+                            Some(UnionType::from_elements(
+                                db,
+                                [Type::unknown(), Type::none(db)],
+                            )),
+                        )
+                    }))
+                    .chain(std::iter::once({
+                        let t_default =
+                            BoundTypeVarInstance::synthetic(db, "T", TypeVarVariance::Covariant);
+
+                        Signature::new_generic(
+                            Some(GenericContext::from_typevar_instances(db, [t_default])),
+                            Parameters::new([
+                                Parameter::positional_only(Some(Name::new_static("self")))
+                                    .with_annotated_type(instance_ty),
+                                Parameter::positional_only(Some(Name::new_static("key")))
+                                    .with_annotated_type(KnownClass::Str.to_instance(db)),
+                                Parameter::positional_only(Some(Name::new_static("default")))
+                                    .with_annotated_type(Type::TypeVar(t_default)),
+                            ]),
+                            Some(UnionType::from_elements(
+                                db,
+                                [Type::unknown(), Type::TypeVar(t_default)],
+                            )),
+                        )
+                    }));
+
+                Some(Type::Callable(CallableType::new(
+                    db,
+                    CallableSignature::from_overloads(overloads),
+                    true,
+                )))
             }
             (CodeGeneratorKind::TypedDict, "pop") => {
-                // TODO: synthesize a set of overloads with precise types.
-                // Required keys should be forbidden to be popped.
-                let signature = Signature::new(
-                    Parameters::new([
-                        Parameter::positional_only(Some(Name::new_static("self")))
-                            .with_annotated_type(instance_ty),
-                        Parameter::positional_only(Some(Name::new_static("key"))),
-                        Parameter::positional_only(Some(Name::new_static("default")))
-                            .with_default_type(Type::unknown()),
-                    ]),
-                    Some(todo_type!("Support for `TypedDict`")),
-                );
+                let fields = self.fields(db, specialization, field_policy);
+                let overloads = fields
+                    .iter()
+                    .filter(|(_, field)| {
+                        // Only synthesize `pop` for fields that are not required.
+                        !field.is_required()
+                    })
+                    .flat_map(|(name, field)| {
+                        let key_type =
+                            Type::StringLiteral(StringLiteralType::new(db, name.as_str()));
 
-                Some(CallableType::function_like(db, signature))
+                        // TODO: Similar to above: consider merging these two overloads into one
+
+                        // `.pop()` without default
+                        let pop_sig = Signature::new(
+                            Parameters::new([
+                                Parameter::positional_only(Some(Name::new_static("self")))
+                                    .with_annotated_type(instance_ty),
+                                Parameter::positional_only(Some(Name::new_static("key")))
+                                    .with_annotated_type(key_type),
+                            ]),
+                            Some(field.declared_ty),
+                        );
+
+                        // `.pop()` with a default value
+                        let t_default =
+                            BoundTypeVarInstance::synthetic(db, "T", TypeVarVariance::Covariant);
+
+                        let pop_with_default_sig = Signature::new_generic(
+                            Some(GenericContext::from_typevar_instances(db, [t_default])),
+                            Parameters::new([
+                                Parameter::positional_only(Some(Name::new_static("self")))
+                                    .with_annotated_type(instance_ty),
+                                Parameter::positional_only(Some(Name::new_static("key")))
+                                    .with_annotated_type(key_type),
+                                Parameter::positional_only(Some(Name::new_static("default")))
+                                    .with_annotated_type(Type::TypeVar(t_default)),
+                            ]),
+                            Some(UnionType::from_elements(
+                                db,
+                                [field.declared_ty, Type::TypeVar(t_default)],
+                            )),
+                        );
+
+                        [pop_sig, pop_with_default_sig]
+                    });
+
+                Some(Type::Callable(CallableType::new(
+                    db,
+                    CallableSignature::from_overloads(overloads),
+                    true,
+                )))
             }
             (CodeGeneratorKind::TypedDict, "setdefault") => {
-                // TODO: synthesize a set of overloads with precise types
-                let signature = Signature::new(
-                    Parameters::new([
-                        Parameter::positional_only(Some(Name::new_static("self")))
-                            .with_annotated_type(instance_ty),
-                        Parameter::positional_only(Some(Name::new_static("key"))),
-                        Parameter::positional_only(Some(Name::new_static("default"))),
-                    ]),
-                    Some(todo_type!("Support for `TypedDict`")),
-                );
+                let fields = self.fields(db, specialization, field_policy);
+                let overloads = fields.iter().map(|(name, field)| {
+                    let key_type = Type::StringLiteral(StringLiteralType::new(db, name.as_str()));
 
-                Some(CallableType::function_like(db, signature))
+                    // `setdefault` always returns the field type
+                    Signature::new(
+                        Parameters::new([
+                            Parameter::positional_only(Some(Name::new_static("self")))
+                                .with_annotated_type(instance_ty),
+                            Parameter::positional_only(Some(Name::new_static("key")))
+                                .with_annotated_type(key_type),
+                            Parameter::positional_only(Some(Name::new_static("default")))
+                                .with_annotated_type(field.declared_ty),
+                        ]),
+                        Some(field.declared_ty),
+                    )
+                });
+
+                Some(Type::Callable(CallableType::new(
+                    db,
+                    CallableSignature::from_overloads(overloads),
+                    true,
+                )))
             }
             (CodeGeneratorKind::TypedDict, "update") => {
                 // TODO: synthesize a set of overloads with precise types
@@ -2669,7 +2821,7 @@ impl<'db> ClassLiteral<'db> {
         // that attribute. We include `Unknown` in that union to account for the fact that the
         // attribute might be externally modified.
         let mut union_of_inferred_types = UnionBuilder::new(db);
-        let mut qualifiers = TypeQualifiers::empty();
+        let mut qualifiers = TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE;
 
         let mut is_attribute_bound = false;
 
@@ -2719,16 +2871,10 @@ impl<'db> ClassLiteral<'db> {
                 //     self.name: <annotation>
                 //     self.name: <annotation> = …
 
-                if use_def_map(db, method_scope)
-                    .is_declaration_reachable(db, &attribute_declaration)
-                    .is_always_false()
-                {
-                    continue;
-                }
-
                 let annotation = declaration_type(db, declaration);
-                let annotation =
-                    Place::bound(annotation.inner).with_qualifiers(annotation.qualifiers);
+                let annotation = Place::bound(annotation.inner).with_qualifiers(
+                    annotation.qualifiers | TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE,
+                );
 
                 if let Some(all_qualifiers) = annotation.is_bare_final() {
                     if let Some(value) = assignment.value(&module) {
@@ -2761,8 +2907,6 @@ impl<'db> ClassLiteral<'db> {
                 continue;
             }
 
-            let method_map = use_def_map(db, method_scope);
-
             // The attribute assignment inherits the reachability of the method which contains it
             let is_method_reachable =
                 if let Some(method_def) = method_scope.node(db).as_function(&module) {
@@ -2772,7 +2916,7 @@ impl<'db> ClassLiteral<'db> {
                         .all_reachable_symbol_bindings(method_place)
                         .find_map(|bind| {
                             (bind.binding.is_defined_and(|def| def == method))
-                                .then(|| class_map.is_binding_reachable(db, &bind))
+                                .then(|| class_map.binding_reachability(db, &bind))
                         })
                         .unwrap_or(Truthiness::AlwaysFalse)
                 } else {
@@ -2782,49 +2926,16 @@ impl<'db> ClassLiteral<'db> {
                 continue;
             }
 
-            // Storage for the implicit `DefinitionState::Undefined` binding. If present, it
-            // will be the first binding in the `attribute_assignments` iterator.
-            let mut unbound_binding = None;
-
             for attribute_assignment in attribute_assignments {
                 if let DefinitionState::Undefined = attribute_assignment.binding {
-                    // Store the implicit unbound binding here so that we can delay the
-                    // computation of `unbound_reachability` to the point when we actually
-                    // need it. This is an optimization for the common case where the
-                    // `unbound` binding is the only binding of the `name` attribute,
-                    // i.e. if there is no `self.name = …` assignment in this method.
-                    unbound_binding = Some(attribute_assignment);
                     continue;
                 }
 
                 let DefinitionState::Defined(binding) = attribute_assignment.binding else {
                     continue;
                 };
-                match method_map
-                    .is_binding_reachable(db, &attribute_assignment)
-                    .and(is_method_reachable)
-                {
-                    Truthiness::AlwaysTrue | Truthiness::Ambiguous => {
-                        is_attribute_bound = true;
-                    }
-                    Truthiness::AlwaysFalse => {
-                        continue;
-                    }
-                }
 
-                // There is at least one attribute assignment that may be reachable, so if `unbound_reachability` is
-                // always false then this attribute is considered bound.
-                // TODO: this is incomplete logic since the attributes bound after termination are considered reachable.
-                let unbound_reachability = unbound_binding
-                    .as_ref()
-                    .map(|binding| method_map.is_binding_reachable(db, binding))
-                    .unwrap_or(Truthiness::AlwaysFalse);
-
-                if unbound_reachability
-                    .negate()
-                    .and(is_method_reachable)
-                    .is_always_true()
-                {
+                if !is_method_reachable.is_always_false() {
                     is_attribute_bound = true;
                 }
 

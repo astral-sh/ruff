@@ -213,3 +213,17 @@ async def get_id_pydantic_full(
 async def get_id_pydantic_short(params: Annotated[PydanticParams, Depends()]): ...
 @app.get("/{my_id}")
 async def get_id_init_not_annotated(params = Depends(InitParams)): ...
+
+@app.get("/things/{ thing_id }")
+async def read_thing(query: str):
+    return {"query": query}
+
+
+@app.get("/things/{ thing_id : path }")
+async def read_thing(query: str):
+    return {"query": query}
+
+
+@app.get("/things/{ thing_id : str }")
+async def read_thing(query: str):
+    return {"query": query}
