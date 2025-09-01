@@ -18,5 +18,4 @@ setuptools  # vendors packaging, see above
 spack  # slow, success, but mypy-primer hangs processing the output
 spark  # too many iterations
 steam.py  # hangs (single threaded)
-sympy  # stack overflow (multi threaded)
 streamlit  # too many iterations (uses packaging)

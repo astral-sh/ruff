@@ -110,6 +110,7 @@ static-frame
 stone
 strawberry
 svcs
+sympy
 tornado
 trio
 twine
