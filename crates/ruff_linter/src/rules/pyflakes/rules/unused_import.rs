@@ -640,7 +640,7 @@ impl<'a, 'b> MarkedBindings<'a, 'b> {
     fn to_unused(self) -> Vec<&'a Binding<'b>> {
         self.bindings
             .into_iter()
-            .zip(self.used.into_iter())
+            .zip(self.used)
             .filter_map(|(bdg, is_used)| (!is_used).then_some(bdg))
             .collect()
     }
@@ -709,7 +709,7 @@ fn expand_to_qualified_name_attribute<'b>(
 }
 
 fn mark_uses_of_qualified_name(marked: &mut MarkedBindings, prototype: &QualifiedName) {
-    let Some(best) = best_match(&marked.bindings, &prototype) else {
+    let Some(best) = best_match(&marked.bindings, prototype) else {
         return;
     };
 
