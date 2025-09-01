@@ -271,6 +271,40 @@ OTHER = "OTHER"
     Ok(())
 }
 
+/// Regression test for <https://github.com/astral-sh/ruff/issues/20035>
+#[test]
+fn deduplicate_directory_and_explicit_file() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let root = tempdir.path();
+
+    let main = root.join("main.py");
+    fs::write(&main, "import os\n")?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+        assert_cmd_snapshot!(
+            Command::new(get_cargo_bin(BIN_NAME))
+                .current_dir(root)
+                .args(STDIN_BASE_OPTIONS)
+                .arg(".")
+                .arg("main.py"),
+            @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    main.py:1:8: F401 [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    "
+        );
+    });
+
+    Ok(())
+}
+
 #[test]
 fn exclude_stdin() -> Result<()> {
     let tempdir = TempDir::new()?;
