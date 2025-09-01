@@ -3337,7 +3337,7 @@ impl<'db> Type<'db> {
         name: Name,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
-        tracing::trace!("member_lookup_with_policy: {}.{}", self.display(db), name);
+        let _span = tracing::trace_span!("member_lookup_with_policy: {}", ?name).entered();
         if name == "__class__" {
             return Place::bound(self.dunder_class(db)).into();
         }
