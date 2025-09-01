@@ -84,6 +84,117 @@ async def main():
         ...
 ```
 
+## Union context managers with specific member issues
+
+### Union where one member lacks `__aenter__`
+
+```py
+async def _(flag: bool):
+    class Bound:
+        async def __aenter__(self) -> str:
+            return "foo"
+
+        async def __aexit__(self, exc_type, exc_value, traceback): ...
+
+    class EnterUnbound:
+        async def __aexit__(self): ...
+
+    context_expr = Bound() if flag else EnterUnbound()
+
+    # error: [invalid-context-manager] "Object of type `Bound | EnterUnbound` cannot be used with `async with` because the method `__aenter__` of `EnterUnbound` is possibly unbound"
+    async with context_expr as f:
+        reveal_type(f)  # revealed: CoroutineType[Any, Any, str]
+```
+
+### Union where one member lacks `__aexit__`
+
+```py
+async def _(flag: bool):
+    class Bound:
+        async def __aenter__(self) -> str:
+            return "foo"
+
+        async def __aexit__(self, exc_type, exc_value, traceback): ...
+
+    class ExitUnbound:
+        async def __aenter__(self): ...
+
+    context_expr = Bound() if flag else ExitUnbound()
+
+    # error: [invalid-context-manager] "Object of type `Bound | ExitUnbound` cannot be used with `async with` because the method `__aexit__` of `ExitUnbound` is possibly unbound"
+    async with context_expr as f:
+        reveal_type(f)  # revealed: str | Unknown
+```
+
+### Union where one member lacks both methods
+
+```py
+async def _(flag: bool):
+    class Bound:
+        async def __aenter__(self) -> str:
+            return "foo"
+
+        async def __aexit__(self, exc_type, exc_value, traceback): ...
+
+    class Unbound: ...
+    context_expr = Bound() if flag else Unbound()
+
+    # error: [invalid-context-manager] "Object of type `Bound | Unbound` cannot be used with `async with` because the methods `__aenter__` and `__aexit__` of `Unbound` are possibly unbound"
+    async with context_expr as f:
+        reveal_type(f)  # revealed: CoroutineType[Any, Any, str]
+```
+
+### Complex union with multiple issues
+
+```py
+async def _(flag: int):
+    class Bound:
+        async def __aenter__(self) -> str:
+            return "foo"
+
+        async def __aexit__(self, exc_type, exc_value, traceback): ...
+
+    class EnterUnbound:
+        async def __aexit__(self): ...
+
+    class ExitUnbound:
+        async def __aenter__(self): ...
+
+    if flag == 0:
+        context_expr = Bound()
+    elif flag == 1:
+        context_expr = EnterUnbound()
+    else:
+        context_expr = ExitUnbound()
+
+    # error: [invalid-context-manager] "Object of type `Bound | EnterUnbound | ExitUnbound` cannot be used with `async with` because the method `__aenter__` of `EnterUnbound` is possibly unbound, and the method `__aexit__` of `ExitUnbound` is possibly unbound"
+    async with context_expr as f:
+        reveal_type(f)  # revealed: CoroutineType[Any, Any, str] | Unknown
+```
+
+### Union with multiple members missing the same methods
+
+```py
+async def _(flag: int):
+    class EnterUnbound:
+        async def __aexit__(self): ...
+
+    class ExitUnbound:
+        async def __aenter__(self): ...
+
+    class Unbound: ...
+    if flag == 0:
+        context_expr = EnterUnbound()
+    elif flag == 1:
+        context_expr = ExitUnbound()
+    else:
+        context_expr = Unbound()
+
+    # error: [invalid-context-manager] "Object of type `EnterUnbound | ExitUnbound | Unbound` cannot be used with `async with` because the method `__aenter__` of `EnterUnbound` and `Unbound` are possibly unbound, and the method `__aexit__` of `ExitUnbound` and `Unbound` are possibly unbound"
+    async with context_expr:
+        ...
+```
+
 ## Context manager with non-callable `__aexit__` attribute
 
 ```py
@@ -113,7 +224,7 @@ async def _(flag: bool):
     class NotAContextManager: ...
     context_expr = Manager1() if flag else NotAContextManager()
 
-    # error: [invalid-context-manager] "Object of type `Manager1 | NotAContextManager` cannot be used with `async with` because the methods `__aenter__` and `__aexit__` are possibly unbound"
+    # error: [invalid-context-manager] "Object of type `Manager1 | NotAContextManager` cannot be used with `async with` because the methods `__aenter__` and `__aexit__` of `NotAContextManager` are possibly unbound"
     async with context_expr as f:
         reveal_type(f)  # revealed: str
 ```

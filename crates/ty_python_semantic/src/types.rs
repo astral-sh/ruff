@@ -7896,15 +7896,59 @@ impl<'db> ContextManagerError<'db> {
             EvaluationMode::Sync => ("__enter__", "__exit__"),
         };
 
+        let db = context.db();
+
+        // Helper function to analyze union members for specific method issues
+        let analyze_union_method_issues = |method_name: &str| -> (Vec<Type<'db>>, Vec<Type<'db>>) {
+            if let Type::Union(union) = context_expression_type {
+                let mut missing_method = Vec::new();
+                let mut has_method = Vec::new();
+
+                for element in union.elements(db) {
+                    let member_lookup = element.member_lookup_with_policy(
+                        db,
+                        method_name.into(),
+                        MemberLookupPolicy::default() | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                    );
+
+                    match member_lookup.place {
+                        Place::Unbound => missing_method.push(*element),
+                        Place::Type(_, _) => has_method.push(*element),
+                    }
+                }
+
+                (missing_method, has_method)
+            } else {
+                (Vec::new(), Vec::new())
+            }
+        };
+
         let format_call_dunder_error = |call_dunder_error: &CallDunderError<'db>, name: &str| {
             match call_dunder_error {
                 CallDunderError::MethodNotAvailable => format!("it does not implement `{name}`"),
                 CallDunderError::PossiblyUnbound(_) => {
+                    // For unions, provide more specific information about which members lack the method
+                    if let Type::Union(_) = context_expression_type {
+                        let (missing_method, _) = analyze_union_method_issues(name);
+                        if !missing_method.is_empty() {
+                            let missing_types: Vec<_> = missing_method
+                                .iter()
+                                .map(|t| t.display(db).to_string())
+                                .collect();
+                            return format!(
+                                "the method `{name}` of `{}` {} possibly unbound",
+                                missing_types.join("` and `"),
+                                if missing_types.len() == 1 {
+                                    "is"
+                                } else {
+                                    "are"
+                                }
+                            );
+                        }
+                    }
+
                     format!("the method `{name}` is possibly unbound")
                 }
-                // TODO: Use more specific error messages for the different error cases.
-                //  E.g. hint toward the union variant that doesn't correctly implement enter,
-                //  distinguish between a not callable `__enter__` attribute and a wrong signature.
                 CallDunderError::CallError(_, _) => {
                     format!("it does not correctly implement `{name}`")
                 }
@@ -7917,6 +7961,25 @@ impl<'db> ContextManagerError<'db> {
                                          name_b: &str| {
             match (error_a, error_b) {
                 (CallDunderError::PossiblyUnbound(_), CallDunderError::PossiblyUnbound(_)) => {
+                    // For unions, provide more specific information about which members lack the methods
+                    if let Type::Union(_) = context_expression_type {
+                        let (missing_enter, _) = analyze_union_method_issues(name_a);
+                        let (missing_exit, _) = analyze_union_method_issues(name_b);
+
+                        // Find union members that are missing both methods
+                        let missing_both: Vec<_> = missing_enter
+                            .iter()
+                            .filter(|t| missing_exit.contains(t))
+                            .map(|t| t.display(db).to_string())
+                            .collect();
+
+                        if !missing_both.is_empty() {
+                            return format!(
+                                "the methods `{name_a}` and `{name_b}` of `{}` are possibly unbound",
+                                missing_both.join("` and `")
+                            );
+                        }
+                    }
                     format!("the methods `{name_a}` and `{name_b}` are possibly unbound")
                 }
                 (CallDunderError::MethodNotAvailable, CallDunderError::MethodNotAvailable) => {
@@ -7925,15 +7988,59 @@ impl<'db> ContextManagerError<'db> {
                 (CallDunderError::CallError(_, _), CallDunderError::CallError(_, _)) => {
                     format!("it does not correctly implement `{name_a}` or `{name_b}`")
                 }
-                (_, _) => format!(
-                    "{format_a}, and {format_b}",
-                    format_a = format_call_dunder_error(error_a, name_a),
-                    format_b = format_call_dunder_error(error_b, name_b)
-                ),
+                (_, _) => {
+                    // For mixed error cases with unions, provide detailed information about which members have issues
+                    if let Type::Union(_) = context_expression_type {
+                        let (missing_enter, _) = analyze_union_method_issues(name_a);
+                        let (missing_exit, _) = analyze_union_method_issues(name_b);
+
+                        let mut parts = Vec::new();
+
+                        if !missing_enter.is_empty() {
+                            let missing_types: Vec<_> = missing_enter
+                                .iter()
+                                .map(|t| t.display(db).to_string())
+                                .collect();
+                            parts.push(format!(
+                                "the method `{name_a}` of `{}` {} possibly unbound",
+                                missing_types.join("` and `"),
+                                if missing_types.len() == 1 {
+                                    "is"
+                                } else {
+                                    "are"
+                                }
+                            ));
+                        }
+
+                        if !missing_exit.is_empty() {
+                            let missing_types: Vec<_> = missing_exit
+                                .iter()
+                                .map(|t| t.display(db).to_string())
+                                .collect();
+                            parts.push(format!(
+                                "the method `{name_b}` of `{}` {} possibly unbound",
+                                missing_types.join("` and `"),
+                                if missing_types.len() == 1 {
+                                    "is"
+                                } else {
+                                    "are"
+                                }
+                            ));
+                        }
+
+                        if !parts.is_empty() {
+                            return parts.join(", and ");
+                        }
+                    }
+
+                    format!(
+                        "{format_a}, and {format_b}",
+                        format_a = format_call_dunder_error(error_a, name_a),
+                        format_b = format_call_dunder_error(error_b, name_b)
+                    )
+                }
             }
         };
-
-        let db = context.db();
 
         let formatted_errors = match self {
             Self::Exit {

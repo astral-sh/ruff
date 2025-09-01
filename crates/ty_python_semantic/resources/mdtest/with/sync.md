@@ -85,6 +85,117 @@ with Manager():
     ...
 ```
 
+## Union context managers with specific member issues
+
+### Union where one member lacks `__enter__`
+
+```py
+def _(flag: bool):
+    class Bound:
+        def __enter__(self) -> str:
+            return "foo"
+
+        def __exit__(self, exc_type, exc_value, traceback): ...
+
+    class EnterUnbound:
+        def __exit__(self): ...
+
+    context_expr = Bound() if flag else EnterUnbound()
+
+    # error: [invalid-context-manager] "Object of type `Bound | EnterUnbound` cannot be used with `with` because the method `__enter__` of `EnterUnbound` is possibly unbound"
+    with context_expr as f:
+        reveal_type(f)  # revealed: str
+```
+
+### Union where one member lacks `__exit__`
+
+```py
+def _(flag: bool):
+    class Bound:
+        def __enter__(self) -> str:
+            return "foo"
+
+        def __exit__(self, exc_type, exc_value, traceback): ...
+
+    class ExitUnbound:
+        def __enter__(self): ...
+
+    context_expr = Bound() if flag else ExitUnbound()
+
+    # error: [invalid-context-manager] "Object of type `Bound | ExitUnbound` cannot be used with `with` because the method `__exit__` of `ExitUnbound` is possibly unbound"
+    with context_expr as f:
+        reveal_type(f)  # revealed: str | Unknown
+```
+
+### Union where one member lacks both methods
+
+```py
+def _(flag: bool):
+    class Bound:
+        def __enter__(self) -> str:
+            return "foo"
+
+        def __exit__(self, exc_type, exc_value, traceback): ...
+
+    class Unbound: ...
+    context_expr = Bound() if flag else Unbound()
+
+    # error: [invalid-context-manager] "Object of type `Bound | Unbound` cannot be used with `with` because the methods `__enter__` and `__exit__` of `Unbound` are possibly unbound"
+    with context_expr as f:
+        reveal_type(f)  # revealed: str
+```
+
+### Complex union with multiple issues
+
+```py
+def _(flag: int):
+    class Bound:
+        def __enter__(self) -> str:
+            return "foo"
+
+        def __exit__(self, exc_type, exc_value, traceback): ...
+
+    class EnterUnbound:
+        def __exit__(self): ...
+
+    class ExitUnbound:
+        def __enter__(self): ...
+
+    if flag == 0:
+        context_expr = Bound()
+    elif flag == 1:
+        context_expr = EnterUnbound()
+    else:
+        context_expr = ExitUnbound()
+
+    # error: [invalid-context-manager] "Object of type `Bound | EnterUnbound | ExitUnbound` cannot be used with `with` because the method `__enter__` of `EnterUnbound` is possibly unbound, and the method `__exit__` of `ExitUnbound` is possibly unbound"
+    with context_expr as f:
+        reveal_type(f)  # revealed: str | Unknown
+```
+
+### Union with multiple members missing the same methods
+
+```py
+def _(flag: int):
+    class EnterUnbound:
+        def __exit__(self): ...
+
+    class ExitUnbound:
+        def __enter__(self): ...
+
+    class Unbound: ...
+    if flag == 0:
+        context_expr = EnterUnbound()
+    elif flag == 1:
+        context_expr = ExitUnbound()
+    else:
+        context_expr = Unbound()
+
+    # error: [invalid-context-manager] "Object of type `EnterUnbound | ExitUnbound | Unbound` cannot be used with `with` because the method `__enter__` of `EnterUnbound` and `Unbound` are possibly unbound, and the method `__exit__` of `ExitUnbound` and `Unbound` are possibly unbound"
+    with context_expr:
+        ...
+```
+
 ## Context manager with non-callable `__exit__` attribute
 
 ```py
@@ -113,7 +224,7 @@ def _(flag: bool):
     class NotAContextManager: ...
     context_expr = Manager1() if flag else NotAContextManager()
 
-    # error: [invalid-context-manager] "Object of type `Manager1 | NotAContextManager` cannot be used with `with` because the methods `__enter__` and `__exit__` are possibly unbound"
+    # error: [invalid-context-manager] "Object of type `Manager1 | NotAContextManager` cannot be used with `with` because the methods `__enter__` and `__exit__` of `NotAContextManager` are possibly unbound"
     with context_expr as f:
         reveal_type(f)  # revealed: str
 ```
