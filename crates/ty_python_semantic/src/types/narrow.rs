@@ -616,11 +616,6 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     }
 
     fn evaluate_expr_in(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
-        tracing::debug!(
-            "evaluate_expr_in:\n lhs_ty = {:?},\n rhs_ty = {:?}",
-            lhs_ty,
-            rhs_ty
-        );
         if lhs_ty.is_single_valued(self.db) || lhs_ty.is_union_of_single_valued(self.db) {
             if let Type::StringLiteral(string_literal) = rhs_ty {
                 Some(UnionType::from_elements(
