@@ -654,9 +654,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 None
             };
 
-            let Some(rhs_values) = rhs_values else {
-                return None;
-            };
+            let rhs_values = rhs_values?;
 
             let mut builder = UnionBuilder::new(self.db);
 
@@ -691,9 +689,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         } else {
             None
         };
-        let Some(rhs_values) = rhs_values else {
-            return None;
-        };
+        let rhs_values = rhs_values?;
 
         if lhs_ty.is_single_valued(self.db) || lhs_ty.is_union_of_single_valued(self.db) {
             // Exclude the RHS values from the entire (single-valued) LHS domain.
