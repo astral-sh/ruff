@@ -235,3 +235,8 @@ pub(crate) const fn is_a003_class_scope_shadowing_expansion_enabled(
 ) -> bool {
     settings.preview.is_enabled()
 }
+
+// TODO
+pub(crate) const fn is_refined_submodule_import_match_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
