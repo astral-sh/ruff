@@ -347,6 +347,15 @@ def call_divergent(x: int):
 # TODO: it would be better to reveal `tuple[Divergent | None, int]`
 reveal_type(call_divergent(1))  # revealed: Divergent
 
+def get_non_empty(node):
+    for child in node.children:
+        node = get_non_empty(child)
+        if node is not None:
+            return node
+    return None
+
+reveal_type(get_non_empty(None))  # revealed: None | Divergent
+
 def nested_scope():
     def inner():
         return nested_scope()

@@ -592,22 +592,21 @@ impl<'db> ScopeInference<'db> {
             union = union.add(div);
         }
         let mut union_add = |ty: Type<'db>| {
-            let temp = std::mem::replace(&mut union, UnionBuilder::new(db));
             if ty == div {
                 // `Divergent` appearing in a union does not mean true divergence, so it can be removed.
             } else if ty.has_divergent_type(db) {
                 if let Type::Union(union_ty) = ty {
                     let union_ty = union_ty.filter(db, |ty| **ty != div);
                     if union_ty.has_divergent_type(db) {
-                        union = temp.add(div);
+                        union = std::mem::replace(&mut union, UnionBuilder::new(db)).add(div);
                     } else {
-                        union = temp.add(union_ty);
+                        union = std::mem::replace(&mut union, UnionBuilder::new(db)).add(union_ty);
                     }
                 } else {
-                    union = temp.add(div);
+                    union = std::mem::replace(&mut union, UnionBuilder::new(db)).add(div);
                 }
             } else {
-                union = temp.add(ty);
+                union = std::mem::replace(&mut union, UnionBuilder::new(db)).add(ty);
             }
         };
         let previous_type = callee_ty.infer_return_type(db).unwrap();
