@@ -441,7 +441,7 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install cargo-binstall"
-        uses: cargo-bins/cargo-binstall@0dca8cf8dfb40cb77a29cece06933ce674674523 # v1.15.1
+        uses: cargo-bins/cargo-binstall@2bb61346d075e720d4c3da92f23b6d612d5a7543 # v1.15.3
         with:
           tool: cargo-fuzz@0.11.2
       - name: "Install cargo-fuzz"
@@ -694,7 +694,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-      - uses: cargo-bins/cargo-binstall@0dca8cf8dfb40cb77a29cece06933ce674674523 # v1.15.1
+      - uses: cargo-bins/cargo-binstall@2bb61346d075e720d4c3da92f23b6d612d5a7543 # v1.15.3
       - run: cargo binstall --no-confirm cargo-shear
       - run: cargo shear
 
