@@ -675,7 +675,11 @@ fn unused_imports_from_binding<'a, 'b>(
             // the refined approach for the usual one
             return vec![binding];
         };
-        mark_uses_of_ref(semantic, &mut marked, expr_id);
+        let Some(prototype) = expand_to_qualified_name_attribute(semantic, expr_id) else {
+            continue;
+        };
+
+        mark_uses_of_qualified_name(&mut marked, &prototype);
     }
 
     marked.into_unused()
@@ -731,14 +735,6 @@ fn mark_uses_of_qualified_name(marked: &mut MarkedBindings, prototype: &Qualifie
             *is_used = true;
         }
     }
-}
-
-fn mark_uses_of_ref(semantic: &SemanticModel, marked: &mut MarkedBindings, expr_id: NodeId) {
-    let Some(prototype) = expand_to_qualified_name_attribute(semantic, expr_id) else {
-        return;
-    };
-
-    mark_uses_of_qualified_name(marked, &prototype);
 }
 
 fn rank_match(binding: &Binding, prototype: &QualifiedName) -> (usize, std::cmp::Reverse<usize>) {
