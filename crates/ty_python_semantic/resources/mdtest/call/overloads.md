@@ -889,6 +889,48 @@ def _(a: int | None):
     )
 ```
 
+### Retry from parameter matching
+
+As per the spec, the argument type expansion should retry evaluating the expanded argument list from
+the type checking step. However, that creates an issue when variadic arguments are involved because
+if a variadic argument is a union type, it could be expanded to have different arities. So, ty
+retries it from the start which includes parameter matching as well.
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+@overload
+def f(x: int, y: int) -> None: ...
+@overload
+def f(x: int, y: str, z: int) -> None: ...
+```
+
+```py
+from overloaded import f
+
+# Test all of the above with a number of different splatted argument types
+
+def _(t: tuple[int, str]) -> None:
+    # This correctly produces an error because the first element of the union has a precise arity of
+    # 2, which matches the first overload, but the second element of the tuple doesn't match the
+    # second parameter type, yielding an `invalid-argument-type` error.
+    f(*t)  # error: [invalid-argument-type]
+
+def _(t: tuple[int, str, int]) -> None:
+    # This correctly produces no error because the first element of the union has a precise arity of
+    # 3, which matches the second overload.
+    f(*t)
+
+def _(t: tuple[int, str] | tuple[int, str, int]) -> None:
+    # This produces an error because the expansion produces two argument lists: `[*tuple[int, str]]`
+    # and `[*tuple[int, str, int]]`. The first list produces produces a type checking error as
+    # described in the first example, while the second list matches the second overload. And,
+    # because not all of the expanded argument list evaluates successfully, we produce an error.
+    f(*t)  # error: [no-matching-overload]
+```
+
 ## Filtering based on `Any` / `Unknown`
 
 This is the step 5 of the overload call evaluation algorithm which specifies that:

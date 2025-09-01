@@ -1048,6 +1048,7 @@ impl<'db> Tuple<Type<'db>> {
     }
 
     /// Concatenates another tuple to the end of this tuple, returning a new tuple.
+    #[expect(dead_code)]
     pub(crate) fn concat(&self, db: &'db dyn Db, other: &Self) -> Self {
         TupleSpecBuilder::from(self).concat(db, other).build()
     }
