@@ -284,7 +284,7 @@ def h(x: int, y: str):
     elif x > 5:
         return y
 
-reveal_type(h(1, "a"))  # revealed: int | None | str
+reveal_type(h(1, "a"))  # revealed: int | str | None
 
 def generator():
     yield 1
@@ -369,7 +369,7 @@ def eager_nested_scope():
 
     return A.x
 
-reveal_type(eager_nested_scope())  # revealed: Any
+reveal_type(eager_nested_scope())  # revealed: Unknown
 
 class C:
     def flip(self) -> "D":
@@ -408,8 +408,8 @@ class D(C):
     def f(self):
         return None
 
-reveal_type(C().f())  # revealed: Literal[1] | Any
-reveal_type(D().f())  # revealed: Literal[1] | None | Any
+reveal_type(C().f())  # revealed: Literal[1] | Unknown
+reveal_type(D().f())  # revealed: None | Literal[1] | Unknown
 ```
 
 However, in the following cases, `Unknown` is not included in the inferred return type because there
@@ -484,13 +484,13 @@ reveal_type(C().f())  # revealed: int
 reveal_type(D().f())  # revealed: int
 reveal_type(E().f())  # revealed: int
 reveal_type(C().g(1))  # revealed: Literal[1]
-reveal_type(D().g(1))  # revealed: Literal[2] | Any
+reveal_type(D().g(1))  # revealed: Literal[2] | Unknown
 reveal_type(C().h(1))  # revealed: Literal[1]
-reveal_type(D().h(1))  # revealed: Literal[2] | Any
+reveal_type(D().h(1))  # revealed: Literal[2] | Unknown
 reveal_type(C().h(True))  # revealed: Literal[True]
-reveal_type(D().h(True))  # revealed: Literal[2] | Any
+reveal_type(D().h(True))  # revealed: Literal[2] | Unknown
 reveal_type(C().i(1))  # revealed: list[Literal[1]]
-reveal_type(D().i(1))  # revealed: list[Any]
+reveal_type(D().i(1))  # revealed: list[@Todo(list literal element type)]
 
 class F:
     def f(self) -> Literal[1, 2]:

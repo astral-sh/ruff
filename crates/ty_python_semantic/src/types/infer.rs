@@ -649,7 +649,7 @@ impl<'db> ScopeInference<'db> {
             }
         }
 
-        union.build().normalized(db)
+        union.build()
     }
 }
 
