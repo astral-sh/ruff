@@ -523,7 +523,7 @@ impl<'config> WalkPythonFilesState<'config> {
         let (files, error) = self.merged.into_inner().unwrap();
         error?;
 
-        let deduplicated_files = deduplicate_files(&files);
+        let deduplicated_files = deduplicate_files(files);
 
         Ok((deduplicated_files, self.resolver.into_inner().unwrap()))
     }
@@ -536,35 +536,21 @@ impl<'config> WalkPythonFilesState<'config> {
 /// version takes precedence. This behavior is important for explicit exclusion
 /// handling, where explicitly passed files should override directory-based
 /// discovery rules.
-fn deduplicate_files(files: &ResolvedFiles) -> ResolvedFiles {
-    let mut seen_paths = FxHashSet::default();
-    let mut deduplicated_files = Vec::new();
+fn deduplicate_files(mut files: ResolvedFiles) -> ResolvedFiles {
+    // Sort by path; for identical paths, prefer Root over Nested; place errors after files
+    files.sort_by(|a, b| match (a, b) {
+        (Ok(a_file), Ok(b_file)) => a_file.cmp(b_file),
+        (Ok(_), Err(_)) => Ordering::Less,
+        (Err(_), Ok(_)) => Ordering::Greater,
+        (Err(_), Err(_)) => Ordering::Equal,
+    });
 
-    for file_result in files {
-        if let Ok(resolved_file) = file_result {
-            if resolved_file.is_root() {
-                let path = resolved_file.path().to_path_buf();
-                if seen_paths.insert(path) {
-                    deduplicated_files.push(file_result.clone());
-                }
-            }
-        }
-    }
+    files.dedup_by(|a, b| match (a, b) {
+        (Ok(a_file), Ok(b_file)) => a_file.path() == b_file.path(),
+        _ => false,
+    });
 
-    for file_result in files {
-        match file_result {
-            Ok(resolved_file) if !resolved_file.is_root() => {
-                let path = resolved_file.path().to_path_buf();
-                if seen_paths.insert(path) {
-                    deduplicated_files.push(file_result.clone());
-                }
-            }
-            Err(_) => deduplicated_files.push(file_result.clone()),
-            _ => {}
-        }
-    }
-
-    deduplicated_files
+    files
 }
 
 struct PythonFilesVisitorBuilder<'s, 'config> {
@@ -763,7 +749,14 @@ impl PartialOrd for ResolvedFile {
 
 impl Ord for ResolvedFile {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.path().cmp(other.path())
+        match self.path().cmp(other.path()) {
+            Ordering::Equal => match (self.is_root(), other.is_root()) {
+                (true, false) => Ordering::Less,
+                (false, true) => Ordering::Greater,
+                _ => Ordering::Equal,
+            },
+            ord => ord,
+        }
     }
 }
 
