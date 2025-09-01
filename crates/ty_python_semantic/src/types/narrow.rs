@@ -616,6 +616,11 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     }
 
     fn evaluate_expr_in(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
+        tracing::debug!(
+            "evaluate_expr_in:\n lhs_ty = {:?},\n rhs_ty = {:?}",
+            lhs_ty,
+            rhs_ty
+        );
         if lhs_ty.is_single_valued(self.db) || lhs_ty.is_union_of_single_valued(self.db) {
             if let Type::StringLiteral(string_literal) = rhs_ty {
                 Some(UnionType::from_elements(
@@ -633,6 +638,100 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             } else {
                 None
             }
+        } else if lhs_ty.is_union_with_single_valued(self.db) {
+            // If the LHS is a union that contains at least one single-valued arm, we narrow the
+            // single-valued portion from the RHS values, and keep non-single-valued arms unchanged.
+            let rhs_values: Option<Type> = if let Type::StringLiteral(string_literal) = rhs_ty {
+                Some(UnionType::from_elements(
+                    self.db,
+                    string_literal
+                        .iter_each_char(self.db)
+                        .map(Type::StringLiteral),
+                ))
+            } else if let Some(tuple_spec) = rhs_ty.tuple_instance_spec(self.db) {
+                Some(UnionType::from_elements(self.db, tuple_spec.all_elements()))
+            } else {
+                None
+            };
+
+            let Some(rhs_values) = rhs_values else {
+                return None;
+            };
+
+            let mut builder = UnionBuilder::new(self.db);
+
+            // Add the narrowed values from the RHS first, to keep literals before broader types.
+            builder = builder.add(rhs_values);
+
+            if let Some(lhs_union) = lhs_ty.into_union() {
+                for element in lhs_union.elements(self.db) {
+                    // Keep only the non-single-valued portion of the original type.
+                    if !element.is_single_valued(self.db) && !element.is_literal_string() {
+                        builder = builder.add(*element);
+                    }
+                }
+            }
+            Some(builder.build())
+        } else {
+            None
+        }
+    }
+
+    fn evaluate_expr_not_in(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
+        // Build the set of values that are considered "members" coming from RHS.
+        let rhs_values: Option<Type> = if let Type::StringLiteral(string_literal) = rhs_ty {
+            Some(UnionType::from_elements(
+                self.db,
+                string_literal
+                    .iter_each_char(self.db)
+                    .map(Type::StringLiteral),
+            ))
+        } else if let Some(tuple_spec) = rhs_ty.tuple_instance_spec(self.db) {
+            Some(UnionType::from_elements(self.db, tuple_spec.all_elements()))
+        } else {
+            None
+        };
+        let Some(rhs_values) = rhs_values else {
+            return None;
+        };
+
+        if lhs_ty.is_single_valued(self.db) || lhs_ty.is_union_of_single_valued(self.db) {
+            // Exclude the RHS values from the entire (single-valued) LHS domain.
+            let complement = IntersectionBuilder::new(self.db)
+                .add_positive(lhs_ty)
+                .add_negative(rhs_values)
+                .build();
+            Some(complement)
+        } else if lhs_ty.is_union_with_single_valued(self.db) {
+            // Split LHS into single-valued portion and the rest. Exclude RHS values from the
+            // single-valued portion, keep the rest intact.
+            let mut single_builder = UnionBuilder::new(self.db);
+            let mut rest_builder = UnionBuilder::new(self.db);
+
+            if let Some(lhs_union) = lhs_ty.into_union() {
+                for element in lhs_union.elements(self.db) {
+                    if element.is_single_valued(self.db) || element.is_literal_string() {
+                        single_builder = single_builder.add(*element);
+                    } else {
+                        rest_builder = rest_builder.add(*element);
+                    }
+                }
+            }
+
+            let single_union = single_builder.build();
+            let rest_union = rest_builder.build();
+
+            let narrowed_single = IntersectionBuilder::new(self.db)
+                .add_positive(single_union)
+                .add_negative(rhs_values)
+                .build();
+
+            // Keep order: first literal complement, then broader arms.
+            let result = UnionBuilder::new(self.db)
+                .add(narrowed_single)
+                .add(rest_union)
+                .build();
+            Some(result)
         } else {
             None
         }
@@ -660,9 +759,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             ast::CmpOp::Eq => self.evaluate_expr_eq(lhs_ty, rhs_ty),
             ast::CmpOp::NotEq => self.evaluate_expr_ne(lhs_ty, rhs_ty),
             ast::CmpOp::In => self.evaluate_expr_in(lhs_ty, rhs_ty),
-            ast::CmpOp::NotIn => self
-                .evaluate_expr_in(lhs_ty, rhs_ty)
-                .map(|ty| ty.negate(self.db)),
+            ast::CmpOp::NotIn => self.evaluate_expr_not_in(lhs_ty, rhs_ty),
             _ => None,
         }
     }
