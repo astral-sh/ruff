@@ -721,6 +721,13 @@ impl<'db> FunctionType<'db> {
         self.literal(db).has_known_decorator(db, decorator)
     }
 
+    /// Returns true if this method is decorated with `@classmethod`, or if it is implicitly a
+    /// classmethod.
+    pub(crate) fn is_classmethod(self, db: &'db dyn Db) -> bool {
+        self.has_known_decorator(db, FunctionDecorators::CLASSMETHOD)
+            || self.name(db) == "__init_subclass__"
+    }
+
     /// If the implementation of this function is deprecated, returns the `@warnings.deprecated`.
     ///
     /// Checking if an overload is deprecated requires deeper call analysis.
