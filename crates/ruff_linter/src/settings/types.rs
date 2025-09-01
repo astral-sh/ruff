@@ -574,11 +574,11 @@ impl TryFrom<String> for RequiredVersion {
 
 #[cfg(feature = "schemars")]
 impl schemars::JsonSchema for RequiredVersion {
-    fn schema_name() -> String {
-        "RequiredVersion".to_string()
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        "RequiredVersion".into()
     }
 
-    fn json_schema(generator: &mut schemars::r#gen::SchemaGenerator) -> schemars::schema::Schema {
+    fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
         generator.subschema_for::<String>()
     }
 }
