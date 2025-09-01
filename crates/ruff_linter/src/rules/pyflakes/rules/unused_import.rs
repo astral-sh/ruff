@@ -576,6 +576,22 @@ fn fix_by_reexporting<'a>(
     Ok(Fix::safe_edits(head, tail).isolate(isolation))
 }
 
+/// Returns an iterator over bindings to import statements that appear unused.
+///
+/// The stable behavior is to return those bindings to imports
+/// satisfying the following properties:
+///
+/// - they are not shadowed
+/// - they are not `global`, not `nonlocal`, and not explicit exports (i.e. `import foo as foo`)
+/// - they have no references, according to the semantic model
+///
+/// Under preview, there is a more refined analysis performed
+/// in the case where all bindings shadowed by a given import
+/// binding (including the binding itself) are of a simple form:
+/// they are required to be un-aliased imports or submodule imports.
+///
+/// This alternative analysis is described in the documentation for
+/// [`unused_imports_from_binding`].
 fn unused_imports_in_scope<'a, 'b>(
     semantic: &'a SemanticModel<'b>,
     scope: &'a Scope,
@@ -650,6 +666,45 @@ impl<'a, 'b> MarkedBindings<'a, 'b> {
     }
 }
 
+/// Returns a `Vec` of bindings to unused import statements that
+/// are shadowed by a given binding.
+///
+/// Beginning with the collection of all bindings shadowed by
+/// the given one, we iterate over references to the module.
+/// Associated to each reference, we attempt to build a [`QualifiedName`]
+/// corresponding to an iterated attribute access (e.g. `a.b.foo`).
+/// We then determine the closest matching import statement to that
+/// qualified name, and mark it as used.
+///
+/// For example, given the following module:
+///
+/// ```python
+/// import a
+/// import a.b
+/// import a.b.c
+///
+/// __all__ = ["a"]
+///
+/// a.b.foo()
+/// ```
+///
+/// The function below expects to receive the binding to
+/// `import a.b` and will return the vector with
+/// a single member corresponding to the binding created by
+/// `import a.b.c`.
+///
+/// The qualified name associated to the reference from the
+/// dunder all export is `"a"` and the qualified name associated
+/// to the reference in the last line is `"a.b.foo"`. The closest
+/// matches are `import a` and `import a.b`, respectively, leaving
+/// `import a.b.c` unused.
+///
+/// For a precise definition of "closest match" see [`best_match`]
+/// and [`rank_matches`].
+///
+/// Note: if any reference comes from something other than
+/// a `Name` or a dunder all expression, then we return just
+/// the original binding, thus reverting the stable behavior.
 fn unused_imports_from_binding<'a, 'b>(
     semantic: &'a SemanticModel<'b>,
     id: BindingId,
@@ -665,7 +720,11 @@ fn unused_imports_from_binding<'a, 'b>(
     for ref_id in binding.references() {
         let resolved_reference = semantic.reference(ref_id);
         if !marked_dunder_all && resolved_reference.in_dunder_all_definition() {
-            let first = binding.as_any_import().unwrap().qualified_name().segments()[0];
+            let first = binding
+                .as_any_import()
+                .expect("Binding to be an import binding")
+                .qualified_name()
+                .segments()[0];
             mark_uses_of_qualified_name(&mut marked, &QualifiedName::user_defined(first));
             marked_dunder_all = true;
             continue;
@@ -676,7 +735,7 @@ fn unused_imports_from_binding<'a, 'b>(
             return vec![binding];
         };
         let Some(prototype) = expand_to_qualified_name_attribute(semantic, expr_id) else {
-            continue;
+            return vec![binding];
         };
 
         mark_uses_of_qualified_name(&mut marked, &prototype);
@@ -737,7 +796,7 @@ fn mark_uses_of_qualified_name(marked: &mut MarkedBindings, prototype: &Qualifie
     }
 }
 
-fn rank_match(binding: &Binding, prototype: &QualifiedName) -> (usize, std::cmp::Reverse<usize>) {
+fn rank_matches(binding: &Binding, prototype: &QualifiedName) -> (usize, std::cmp::Reverse<usize>) {
     let Some(import) = binding.as_any_import() else {
         unreachable!()
     };
@@ -757,6 +816,6 @@ fn best_match<'a, 'b, 'c>(
 ) -> Option<&'b Binding<'c>> {
     unused
         .iter()
-        .max_by_key(|binding| rank_match(binding, prototype))
+        .max_by_key(|binding| rank_matches(binding, prototype))
         .map(|v| &**v)
 }
