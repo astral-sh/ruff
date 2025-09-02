@@ -592,6 +592,22 @@ impl<'db> ScopeInference<'db> {
         if self.is_cycle_callback() {
             union = union.add(div);
         }
+        // Here, we use the dynamic type `Divergent` to detect divergent type inference and ensure that we obtain finite results.
+        // For example, consider the following recursive function:
+        // ```py
+        // def div(n: int):
+        //     if n == 0:
+        //         return None
+        //     else:
+        //         return (div(n-1),)
+        // ```
+        // If we try to infer the return type of this function naively, we will get `tuple[tuple[tuple[...] | None] | None] | None`, which never converges.
+        // So, when we detect a cycle, we set the cycle initial type to `Divergent`. Then the type obtained in the first cycle is `tuple[Divergent] | None`.
+        // Next, if there is a type containing `Divergent`, we replace it with the `Divergent` type itself.
+        // All types containing `Divergent` are flattened in the next cycle, resulting in a convergence of the return type in finite cycles.
+        // 0th: Divergent
+        // 1st: tuple[Divergent] | None => Divergent | None
+        // 2nd: tuple[Divergent | None] | None => Divergent | None
         let mut union_add = |ty: Type<'db>| {
             if ty == div {
                 // `Divergent` appearing in a union does not mean true divergence, so it can be removed.
