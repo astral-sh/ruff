@@ -2882,7 +2882,7 @@ impl<'db> ClassLiteral<'db> {
                         // `self.SOME_CONSTANT: Final = 1`, infer the type from the value
                         // on the right-hand side.
 
-                        let inferred_ty = infer_expression_type(db, index.expression(value));
+                        let inferred_ty = infer_expression_type(db, index.expression(value), true);
                         return Place::bound(inferred_ty).with_qualifiers(all_qualifiers);
                     }
 
@@ -2968,6 +2968,7 @@ impl<'db> ClassLiteral<'db> {
                                 let inferred_ty = infer_expression_type(
                                     db,
                                     index.expression(assign.value(&module)),
+                                    true,
                                 );
 
                                 union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
@@ -2995,6 +2996,7 @@ impl<'db> ClassLiteral<'db> {
                                 let iterable_ty = infer_expression_type(
                                     db,
                                     index.expression(for_stmt.iterable(&module)),
+                                    true,
                                 );
                                 // TODO: Potential diagnostics resulting from the iterable are currently not reported.
                                 let inferred_ty =
@@ -3025,6 +3027,7 @@ impl<'db> ClassLiteral<'db> {
                                 let context_ty = infer_expression_type(
                                     db,
                                     index.expression(with_item.context_expr(&module)),
+                                    true,
                                 );
                                 let inferred_ty = if with_item.is_async() {
                                     context_ty.aenter(db)
@@ -3058,6 +3061,7 @@ impl<'db> ClassLiteral<'db> {
                                 let iterable_ty = infer_expression_type(
                                     db,
                                     index.expression(comprehension.iterable(&module)),
+                                    true,
                                 );
                                 // TODO: Potential diagnostics resulting from the iterable are currently not reported.
                                 let inferred_ty =

@@ -709,7 +709,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             return None;
         }
 
-        let inference = infer_expression_types(self.db, expression);
+        let inference = infer_expression_types(self.db, expression, false);
 
         let comparator_tuples = std::iter::once(&**left)
             .chain(comparators)
@@ -799,7 +799,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         expression: Expression<'db>,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
-        let inference = infer_expression_types(self.db, expression);
+        let inference = infer_expression_types(self.db, expression, false);
 
         let callable_ty = inference.expression_type(&*expr_call.func);
 
@@ -921,7 +921,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         let subject = place_expr(subject.node_ref(self.db, self.module))?;
         let place = self.expect_place(&subject);
 
-        let ty = infer_same_file_expression_type(self.db, cls, self.module).to_instance(self.db)?;
+        let ty = infer_same_file_expression_type(self.db, cls, self.module, false)
+            .to_instance(self.db)?;
 
         Some(NarrowingConstraints::from_iter([(place, ty)]))
     }
@@ -934,7 +935,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         let subject = place_expr(subject.node_ref(self.db, self.module))?;
         let place = self.expect_place(&subject);
 
-        let ty = infer_same_file_expression_type(self.db, value, self.module);
+        let ty = infer_same_file_expression_type(self.db, value, self.module, false);
         Some(NarrowingConstraints::from_iter([(place, ty)]))
     }
 
@@ -963,7 +964,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         expression: Expression<'db>,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
-        let inference = infer_expression_types(self.db, expression);
+        let inference = infer_expression_types(self.db, expression, false);
         let mut sub_constraints = expr_bool_op
             .values
             .iter()

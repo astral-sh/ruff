@@ -48,7 +48,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
             "Unpacking target must be a list or tuple expression"
         );
 
-        let value_type = infer_expression_types(self.db(), value.expression())
+        let value_type = infer_expression_types(self.db(), value.expression(), false)
             .expression_type(value.expression().node_ref(self.db(), self.module()));
 
         let value_type = match value.kind() {

@@ -182,7 +182,7 @@ impl<'db> DunderAllNamesCollector<'db> {
     ///
     /// This function panics if `expr` was not marked as a standalone expression during semantic indexing.
     fn standalone_expression_type(&self, expr: &ast::Expr) -> Type<'db> {
-        infer_expression_types(self.db, self.index.expression(expr)).expression_type(expr)
+        infer_expression_types(self.db, self.index.expression(expr), false).expression_type(expr)
     }
 
     /// Evaluate the given expression and return its truthiness.
