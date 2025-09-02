@@ -1,14 +1,10 @@
-use ruff_diagnostics::{Edit, Fix};
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::ExprCall;
-use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::importer::ImportRequest;
 use crate::preview::is_fix_os_path_dirname_enabled;
-use crate::rules::flake8_use_pathlib::helpers::{
-    has_unknown_keywords_or_starred_expr, is_pathlib_path_call,
-};
+use crate::rules::flake8_use_pathlib::helpers::check_os_pathlib_single_arg_calls;
 use crate::{FixAvailability, Violation};
 
 /// ## What it does
@@ -77,43 +73,14 @@ pub(crate) fn os_path_dirname(checker: &Checker, call: &ExprCall, segments: &[&s
     if segments != ["os", "path", "dirname"] {
         return;
     }
-    if call.arguments.len() != 1 {
-        return;
-    }
 
-    let Some(path) = call.arguments.find_argument_value("p", 0) else {
-        return;
-    };
-
-    let range = call.range();
-    let path_code = checker.locator().slice(path.range());
-
-    let mut diagnostic = checker.report_diagnostic(OsPathDirname, call.func.range());
-
-    if has_unknown_keywords_or_starred_expr(&call.arguments, &["p"]) {
-        return;
-    }
-
-    if !is_fix_os_path_dirname_enabled(checker.settings()) {
-        return;
-    }
-
-    diagnostic.try_set_fix(|| {
-        let (import_edit, binding) = checker.importer().get_or_import_symbol(
-            &ImportRequest::import("pathlib", "Path"),
-            call.start(),
-            checker.semantic(),
-        )?;
-
-        let replacement = if is_pathlib_path_call(checker, path) {
-            format!("{path_code}.parent")
-        } else {
-            format!("{binding}({path_code}).parent")
-        };
-
-        Ok(Fix::unsafe_edits(
-            Edit::range_replacement(replacement, range),
-            [import_edit],
-        ))
-    });
+    check_os_pathlib_single_arg_calls(
+        checker,
+        call,
+        "parent",
+        "p",
+        is_fix_os_path_dirname_enabled(checker.settings()),
+        OsPathDirname,
+        Some(Applicability::Unsafe),
+    );
 }
