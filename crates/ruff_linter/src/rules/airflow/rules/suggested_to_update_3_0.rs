@@ -157,6 +157,9 @@ fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, argum
         ["airflow", .., "DAG" | "dag"] => {
             diagnostic_for_argument(checker, arguments, "sla_miss_callback", None);
         }
+        ["airflow", "timetables", "datasets", "DatasetOrTimeSchedule"] => {
+            diagnostic_for_argument(checker, arguments, "datasets", Some("assets"));
+        }
         segments => {
             if is_airflow_builtin_or_provider(segments, "operators", "Operator") {
                 diagnostic_for_argument(checker, arguments, "sla", None);
