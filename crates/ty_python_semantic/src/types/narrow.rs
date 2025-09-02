@@ -22,7 +22,6 @@ use itertools::Itertools;
 use ruff_python_ast as ast;
 use ruff_python_ast::{BoolOp, ExprBoolOp};
 use rustc_hash::FxHashMap;
-use std::cell::LazyCell;
 use std::collections::hash_map::Entry;
 
 use super::UnionType;
@@ -709,8 +708,6 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             // and that requires cross-symbol constraints, which we don't support yet.
             return None;
         }
-        // Performance optimization: deferring type inference for an expression until it is actually needed.
-        let inference = LazyCell::new(|| infer_expression_types(self.db, expression));
 
         let comparator_tuples = std::iter::once(&**left)
             .chain(comparators)
@@ -726,6 +723,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     if let Some(left_place) = place_expr(left) {
                         let op = if is_positive { *op } else { op.negate() };
 
+                        let inference = infer_expression_types(self.db, expression);
                         let lhs_ty = inference.expression_type(left);
                         let rhs_ty = inference.expression_type(right);
 
@@ -761,6 +759,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                         op == &ast::CmpOp::IsNot
                     };
 
+                    let inference = infer_expression_types(self.db, expression);
                     let rhs_ty = inference.expression_type(right);
                     let Type::ClassLiteral(rhs_class) = rhs_ty else {
                         continue;
