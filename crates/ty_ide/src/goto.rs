@@ -16,7 +16,7 @@ use ty_python_semantic::HasDefinition;
 use ty_python_semantic::ImportAliasResolution;
 use ty_python_semantic::ResolvedDefinition;
 use ty_python_semantic::types::definitions_for_keyword_argument;
-use ty_python_semantic::types::{Type, call_signature_details, find_active_signature_from_details};
+use ty_python_semantic::types::{Type, call_signature_details};
 use ty_python_semantic::{
     HasType, SemanticModel, definitions_for_imported_symbol, definitions_for_name,
 };
@@ -437,24 +437,16 @@ impl GotoTarget<'_> {
             //
             // Prefer the function impl over the callable so that its docstrings win if defined.
             GotoTarget::Call { callable, call } => {
-                let call_definitions = definitions_for_callable(db, file, call);
-                let expr_definitions = definitions_for_expression(db, file, callable);
+                let mut definitions = definitions_for_callable(db, file, call);
+                let expr_definitions =
+                    definitions_for_expression(db, file, callable).unwrap_or_default();
+                definitions.extend(expr_definitions);
 
-                tracing::trace!(
-                    "GotoTarget::Call got {} call defs and {} expr defs",
-                    call_definitions.as_ref().map(Vec::len).unwrap_or_default(),
-                    expr_definitions.as_ref().map(Vec::len).unwrap_or_default(),
-                );
-
-                let definitions = match (expr_definitions, call_definitions) {
-                    (Some(mut expr), Some(mut call)) => {
-                        call.append(&mut expr);
-                        call
-                    }
-                    (Some(defs), None) | (None, Some(defs)) => defs,
-                    (None, None) => return None,
-                };
-                Some(DefinitionsOrTargets::Definitions(definitions))
+                if definitions.is_empty() {
+                    None
+                } else {
+                    Some(DefinitionsOrTargets::Definitions(definitions))
+                }
             }
 
             _ => None,
@@ -801,22 +793,14 @@ fn definitions_for_callable<'db>(
     db: &'db dyn crate::Db,
     file: ruff_db::files::File,
     call: &ExprCall,
-) -> Option<Vec<ResolvedDefinition<'db>>> {
+) -> Vec<ResolvedDefinition<'db>> {
     let model = SemanticModel::new(db, file);
     // Attempt to refine to a specific call
-    let mut signature_info = call_signature_details(db, &model, call);
-    if let Some(active) = find_active_signature_from_details(&signature_info) {
-        Some(vec![ResolvedDefinition::Definition(
-            signature_info.remove(active).definition?,
-        )])
-    } else {
-        Some(
-            signature_info
-                .into_iter()
-                .filter_map(|signature| Some(ResolvedDefinition::Definition(signature.definition?)))
-                .collect(),
-        )
-    }
+    let signature_info = call_signature_details(db, &model, call);
+    signature_info
+        .into_iter()
+        .filter_map(|signature| signature.definition.map(ResolvedDefinition::Definition))
+        .collect()
 }
 
 /// Shared helper to map and convert resolved definitions into navigation targets.
