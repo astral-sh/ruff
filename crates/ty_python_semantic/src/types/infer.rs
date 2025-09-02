@@ -83,7 +83,7 @@ use crate::semantic_index::definition::{
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::narrowing_constraints::ConstraintKey;
-use crate::semantic_index::place::{PlaceExpr, PlaceExprRef};
+use crate::semantic_index::place::{PlaceExpr, PlaceExprRef, ScopedPlaceId};
 use crate::semantic_index::scope::{
     FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId, ScopeKind,
 };
@@ -137,7 +137,7 @@ use crate::types::{
 use crate::unpack::{EvaluationMode, Unpack, UnpackPosition};
 use crate::util::diagnostics::format_enumeration;
 use crate::util::subscript::{PyIndex, PySlice};
-use crate::{Db, FxOrderSet, Program};
+use crate::{Db, FxOrderSet, Program, db};
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
@@ -6795,37 +6795,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         expr: PlaceExprRef,
         expr_ref: ast::ExprRef,
     ) -> (Place<'db>, Option<ScopedUseId>) {
+        if expr_ref
+            .as_name_expr()
+            .is_some_and(|name| name.is_invalid())
+        {
+            return (Place::Unbound, None);
+        }
+
         let db = self.db();
         let scope = self.scope();
-        let file_scope_id = scope.file_scope_id(db);
-        let place_table = self.index.place_table(file_scope_id);
-        let use_def = self.index.use_def_map(file_scope_id);
-
-        // If we're inferring types of deferred expressions, look them up from end-of-scope.
-        if self.is_deferred() {
-            let place = if let Some(place_id) = place_table.place_id(expr) {
-                place_from_bindings(db, use_def.all_reachable_bindings(place_id))
-            } else {
-                assert!(
-                    self.deferred_state.in_string_annotation(),
-                    "Expected the place table to create a place for every valid PlaceExpr node"
-                );
-                Place::Unbound
-            };
-            (place, None)
+        let is_deferred = self.is_deferred();
+        let deferred_state = self.deferred_state;
+        let use_id = if is_deferred {
+            None
         } else {
-            if expr_ref
-                .as_name_expr()
-                .is_some_and(|name| name.is_invalid())
-            {
-                return (Place::Unbound, None);
-            }
+            Some(expr_ref.scoped_use_id(db, scope))
+        };
 
-            let use_id = expr_ref.scoped_use_id(db, scope);
-            let place = place_from_bindings(db, use_def.bindings_at_use(use_id));
+        let place_table = self.index.place_table(scope.file_scope_id(db));
+        let place_id = place_table.place_id(expr);
 
-            (place, Some(use_id))
-        }
+        infer_local_place_load(db, scope, deferred_state, place_id, use_id)
     }
 
     /// Infer the type of a place expression from definitions, assuming a load context.
@@ -11296,6 +11286,60 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     }
 }
 
+fn infer_local_place_load_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &(Place<'db>, Option<ScopedUseId>),
+    _count: u32,
+    _scope: ScopeId<'db>,
+    _deferred_state: DeferredExpressionState,
+    _place_id: Option<ScopedPlaceId>,
+    _use_id: Option<ScopedUseId>,
+) -> salsa::CycleRecoveryAction<(Place<'db>, Option<ScopedUseId>)> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn infer_local_place_load_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _scope: ScopeId<'db>,
+    _deferred_state: DeferredExpressionState,
+    _place_id: Option<ScopedPlaceId>,
+    _use_id: Option<ScopedUseId>,
+) -> (Place<'db>, Option<ScopedUseId>) {
+    (Place::Unbound, None)
+}
+
+#[salsa::tracked(cycle_fn=infer_local_place_load_cycle_recover, cycle_initial=infer_local_place_load_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+fn infer_local_place_load<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    deferred_state: DeferredExpressionState,
+    place_id: Option<ScopedPlaceId>,
+    use_id: Option<ScopedUseId>,
+) -> (Place<'db>, Option<ScopedUseId>) {
+    let file_scope_id = scope.file_scope_id(db);
+    let index = semantic_index(db, scope.file(db));
+    let use_def = index.use_def_map(file_scope_id);
+
+    if let Some(use_id) = use_id {
+        // Non-deferred load
+        let place = place_from_bindings(db, use_def.bindings_at_use(use_id));
+
+        (place, Some(use_id))
+    } else {
+        // If we're inferring types of deferred expressions, look them up from end-of-scope.
+        let place = if let Some(place_id) = place_id {
+            place_from_bindings(db, use_def.all_reachable_bindings(place_id))
+        } else {
+            assert!(
+                deferred_state.in_string_annotation(),
+                "Expected the place table to create a place for every valid PlaceExpr node"
+            );
+            Place::Unbound
+        };
+        (place, None)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum GenericContextError {
     /// It's invalid to subscript `Generic` or `Protocol` with this type
@@ -11320,7 +11364,7 @@ impl GenericContextError {
 }
 
 /// The deferred state of a specific expression in an inference region.
-#[derive(Default, Debug, Clone, Copy)]
+#[derive(Default, Debug, Clone, Copy, Hash, PartialEq, Eq)]
 enum DeferredExpressionState {
     /// The expression is not deferred.
     #[default]

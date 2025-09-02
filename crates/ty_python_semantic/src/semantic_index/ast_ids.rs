@@ -42,7 +42,7 @@ fn ast_ids<'db>(db: &'db dyn Db, scope: ScopeId) -> &'db AstIds {
 
 /// Uniquely identifies a use of a name in a [`crate::semantic_index::FileScopeId`].
 #[newtype_index]
-#[derive(get_size2::GetSize)]
+#[derive(get_size2::GetSize, salsa::Update)]
 pub struct ScopedUseId;
 
 pub trait HasScopedUseId {
