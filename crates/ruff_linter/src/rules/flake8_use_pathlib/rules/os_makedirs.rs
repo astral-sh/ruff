@@ -6,7 +6,9 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use crate::preview::is_fix_os_makedirs_enabled;
-use crate::rules::flake8_use_pathlib::helpers::{has_unknown_keywords_or_starred_expr, is_optional_bool_literal, is_pathlib_path_call};
+use crate::rules::flake8_use_pathlib::helpers::{
+    has_unknown_keywords_or_starred_expr, is_optional_bool_literal, is_pathlib_path_call,
+};
 use crate::{FixAvailability, Violation};
 
 /// ## What it does
