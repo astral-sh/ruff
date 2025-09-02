@@ -1410,31 +1410,38 @@ pub fn is_empty_f_string(expr: &ast::ExprFString) -> bool {
     fn inner(expr: &Expr) -> bool {
         match expr {
             Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => value.is_empty(),
-            Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => value.is_empty(),
+            // Confusingly, `bool(f"{b""}") == True` even though
+            // `bool(b"") == False`. This is because `f"{b""}"`
+            // evaluates as the string `'b""'` of length 3.
+            Expr::BytesLiteral(_) => false,
             Expr::FString(ast::ExprFString { value, .. }) => {
-                value
-                    .elements()
-                    .all(|f_string_element| match f_string_element {
-                        InterpolatedStringElement::Literal(
-                            ast::InterpolatedStringLiteralElement { value, .. },
-                        ) => value.is_empty(),
-                        InterpolatedStringElement::Interpolation(ast::InterpolatedElement {
-                            expression,
-                            ..
-                        }) => inner(expression),
-                    })
+                is_empty_interpolated_elements(value.elements())
             }
             _ => false,
         }
     }
 
+    fn is_empty_interpolated_elements<'a>(
+        mut elements: impl Iterator<Item = &'a InterpolatedStringElement>,
+    ) -> bool {
+        elements.all(|element| match element {
+            InterpolatedStringElement::Literal(ast::InterpolatedStringLiteralElement {
+                value,
+                ..
+            }) => value.is_empty(),
+            InterpolatedStringElement::Interpolation(f_string) => {
+                f_string.debug_text.is_none()
+                    && f_string.conversion.is_none()
+                    && f_string.format_spec.is_none()
+                    && inner(&f_string.expression)
+            }
+        })
+    }
+
     expr.value.iter().all(|part| match part {
         ast::FStringPart::Literal(string_literal) => string_literal.is_empty(),
         ast::FStringPart::FString(f_string) => {
-            f_string.elements.iter().all(|element| match element {
-                InterpolatedStringElement::Literal(string_literal) => string_literal.is_empty(),
-                InterpolatedStringElement::Interpolation(f_string) => inner(&f_string.expression),
-            })
+            is_empty_interpolated_elements(f_string.elements.iter())
         }
     })
 }

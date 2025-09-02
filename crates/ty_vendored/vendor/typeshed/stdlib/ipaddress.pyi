@@ -257,7 +257,7 @@ class _BaseNetwork(_IPAddressBase, Generic[_A]):
 
         """
 
-    def hosts(self) -> Iterator[_A]:
+    def hosts(self) -> Iterator[_A] | list[_A]:
         """Generate Iterator over usable hosts in a network.
 
         This is like __iter__ except it doesn't return the network

@@ -120,7 +120,7 @@ help: Rewrite `f` as a `def`
 61 | class Scope:
 note: This is an unsafe fix and may change runtime behavior
 
-E731 Do not assign a `lambda` expression, use a `def`
+E731 [*] Do not assign a `lambda` expression, use a `def`
   --> E731.py:73:9
    |
 71 |     x: Callable[[int], int]
@@ -142,7 +142,7 @@ help: Rewrite `x` as a `def`
 77 |     return x
 note: This is a display-only fix and is likely to be incorrect
 
-E731 Do not assign a `lambda` expression, use a `def`
+E731 [*] Do not assign a `lambda` expression, use a `def`
   --> E731.py:75:9
    |
 73 |         x = lambda: 1

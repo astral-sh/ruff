@@ -212,6 +212,12 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::TypeAlias(_), _) => Ordering::Less,
         (_, Type::TypeAlias(_)) => Ordering::Greater,
 
+        (Type::TypedDict(left), Type::TypedDict(right)) => {
+            left.defining_class().cmp(&right.defining_class())
+        }
+        (Type::TypedDict(_), _) => Ordering::Less,
+        (_, Type::TypedDict(_)) => Ordering::Greater,
+
         (Type::Union(_), _) | (_, Type::Union(_)) => {
             unreachable!("our type representation does not permit nested unions");
         }
@@ -243,12 +249,6 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
 
             unreachable!("Two equal, normalized intersections should share the same Salsa ID")
         }
-
-        (Type::TypedDict(left), Type::TypedDict(right)) => {
-            left.defining_class().cmp(&right.defining_class())
-        }
-        (Type::TypedDict(_), _) => Ordering::Less,
-        (_, Type::TypedDict(_)) => Ordering::Greater,
     }
 }
 

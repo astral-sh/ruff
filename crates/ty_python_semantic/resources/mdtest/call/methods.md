@@ -462,6 +462,22 @@ reveal_type(C.f2(1))  # revealed: str
 reveal_type(C().f2(1))  # revealed: str
 ```
 
+### `__init_subclass__`
+
+The [`__init_subclass__`] method is implicitly a classmethod:
+
+```py
+class Base:
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        cls.custom_attribute: int = 0
+
+class Derived(Base):
+    pass
+
+reveal_type(Derived.custom_attribute)  # revealed: int
+```
+
 ## `@staticmethod`
 
 ### Basic
@@ -571,3 +587,4 @@ reveal_type(C().f2(1))  # revealed: str
 ```
 
 [functions and methods]: https://docs.python.org/3/howto/descriptor.html#functions-and-methods
+[`__init_subclass__`]: https://docs.python.org/3/reference/datamodel.html#object.__init_subclass__

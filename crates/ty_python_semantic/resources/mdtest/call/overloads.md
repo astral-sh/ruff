@@ -290,16 +290,10 @@ from overloaded import A, f
 
 def _(x: int, y: A | int):
     reveal_type(f(x))  # revealed: int
-    # TODO: revealed: int
-    # TODO: no error
-    # error: [no-matching-overload]
-    reveal_type(f(*(x,)))  # revealed: Unknown
+    reveal_type(f(*(x,)))  # revealed: int
 
     reveal_type(f(y))  # revealed: A | int
-    # TODO: revealed: A | int
-    # TODO: no error
-    # error: [no-matching-overload]
-    reveal_type(f(*(y,)))  # revealed: Unknown
+    reveal_type(f(*(y,)))  # revealed: A | int
 ```
 
 ### Generics (PEP 695)
@@ -328,16 +322,10 @@ from overloaded import B, f
 
 def _(x: int, y: B | int):
     reveal_type(f(x))  # revealed: int
-    # TODO: revealed: int
-    # TODO: no error
-    # error: [no-matching-overload]
-    reveal_type(f(*(x,)))  # revealed: Unknown
+    reveal_type(f(*(x,)))  # revealed: int
 
     reveal_type(f(y))  # revealed: B | int
-    # TODO: revealed: B | int
-    # TODO: no error
-    # error: [no-matching-overload]
-    reveal_type(f(*(y,)))  # revealed: Unknown
+    reveal_type(f(*(y,)))  # revealed: B | int
 ```
 
 ### Expanding `bool`
@@ -1236,21 +1224,14 @@ def _(integer: int, string: str, any: Any, list_any: list[Any]):
     reveal_type(f(*(integer, string)))  # revealed: int
 
     reveal_type(f(string, integer))  # revealed: int
-    # TODO: revealed: int
-    # TODO: no error
-    # error: [no-matching-overload]
-    reveal_type(f(*(string, integer)))  # revealed: Unknown
+    reveal_type(f(*(string, integer)))  # revealed: int
 
     # This matches the second overload and is _not_ the case of ambiguous overload matching.
     reveal_type(f(string, any))  # revealed: Any
-    # TODO: Any
-    reveal_type(f(*(string, any)))  # revealed: tuple[str, Any]
+    reveal_type(f(*(string, any)))  # revealed: Any
 
     reveal_type(f(string, list_any))  # revealed: list[Any]
-    # TODO: revealed: list[Any]
-    # TODO: no error
-    # error: [no-matching-overload]
-    reveal_type(f(*(string, list_any)))  # revealed: Unknown
+    reveal_type(f(*(string, list_any)))  # revealed: list[Any]
 ```
 
 ### Generic `self`

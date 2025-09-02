@@ -569,7 +569,7 @@ impl<'db> FunctionLiteral<'db> {
             if overloads.is_empty() {
                 return CallableSignature::single(type_mappings.iter().fold(
                     implementation.signature(db, inherited_generic_context),
-                    |ty, mapping| ty.apply_type_mapping(db, mapping),
+                    |sig, mapping| sig.apply_type_mapping(db, mapping),
                 ));
             }
         }
@@ -577,7 +577,7 @@ impl<'db> FunctionLiteral<'db> {
         CallableSignature::from_overloads(overloads.iter().map(|overload| {
             type_mappings.iter().fold(
                 overload.signature(db, inherited_generic_context),
-                |ty, mapping| ty.apply_type_mapping(db, mapping),
+                |sig, mapping| sig.apply_type_mapping(db, mapping),
             )
         }))
     }
@@ -602,7 +602,7 @@ impl<'db> FunctionLiteral<'db> {
         type_mappings.iter().fold(
             self.last_definition(db)
                 .signature(db, inherited_generic_context),
-            |ty, mapping| ty.apply_type_mapping(db, mapping),
+            |sig, mapping| sig.apply_type_mapping(db, mapping),
         )
     }
 
@@ -719,6 +719,16 @@ impl<'db> FunctionType<'db> {
     /// conditions.
     pub(crate) fn has_known_decorator(self, db: &dyn Db, decorator: FunctionDecorators) -> bool {
         self.literal(db).has_known_decorator(db, decorator)
+    }
+
+    /// Returns true if this method is decorated with `@classmethod`, or if it is implicitly a
+    /// classmethod.
+    pub(crate) fn is_classmethod(self, db: &'db dyn Db) -> bool {
+        self.has_known_decorator(db, FunctionDecorators::CLASSMETHOD)
+            || matches!(
+                self.name(db).as_str(),
+                "__init_subclass__" | "__class_getitem__"
+            )
     }
 
     /// If the implementation of this function is deprecated, returns the `@warnings.deprecated`.

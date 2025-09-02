@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-ERA001 Found commented-out code
+ERA001 [*] Found commented-out code
  --> RUF100_5.py:7:5
   |
 5 |     # "key1": 123,  # noqa: ERA001
@@ -20,7 +20,7 @@ help: Remove commented-out code
 9 | 
 note: This is a display-only fix and is likely to be incorrect
 
-ERA001 Found commented-out code
+ERA001 [*] Found commented-out code
   --> RUF100_5.py:11:1
    |
 11 | #import os  # noqa: E501

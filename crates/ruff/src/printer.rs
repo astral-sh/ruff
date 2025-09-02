@@ -30,8 +30,6 @@ bitflags! {
         const SHOW_VIOLATIONS = 1 << 0;
         /// Whether to show a summary of the fixed violations when emitting diagnostics.
         const SHOW_FIX_SUMMARY = 1 << 1;
-        /// Whether to show a diff of each fixed violation when emitting diagnostics.
-        const SHOW_FIX_DIFF = 1 << 2;
     }
 }
 
@@ -260,9 +258,9 @@ impl Printer {
             OutputFormat::Concise | OutputFormat::Full => {
                 TextEmitter::default()
                     .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
-                    .with_show_fix_diff(self.flags.intersects(Flags::SHOW_FIX_DIFF))
+                    .with_show_fix_diff(self.format == OutputFormat::Full && preview)
                     .with_show_source(self.format == OutputFormat::Full)
-                    .with_unsafe_fixes(self.unsafe_fixes)
+                    .with_fix_applicability(self.unsafe_fixes.required_applicability())
                     .with_preview(preview)
                     .emit(writer, &diagnostics.inner, &context)?;
 
@@ -464,7 +462,7 @@ impl Printer {
             TextEmitter::default()
                 .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
                 .with_show_source(preview)
-                .with_unsafe_fixes(self.unsafe_fixes)
+                .with_fix_applicability(self.unsafe_fixes.required_applicability())
                 .emit(writer, &diagnostics.inner, &context)?;
         }
         writer.flush()?;

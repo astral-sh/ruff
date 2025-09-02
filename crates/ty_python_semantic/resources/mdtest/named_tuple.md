@@ -78,10 +78,7 @@ reveal_type(Person.id)  # revealed: property
 reveal_type(Person.name)  # revealed: property
 reveal_type(Person.age)  # revealed: property
 
-# TODO... the error is correct, but this is not the friendliest error message
-# for assigning to a read-only property :-)
-#
-# error: [invalid-assignment] "Invalid assignment to data descriptor attribute `id` on type `Person` with custom `__set__` method"
+# error: [invalid-assignment] "Cannot assign to read-only property `id` on object of type `Person`"
 alice.id = 42
 # error: [invalid-assignment]
 bob.age = None
@@ -221,10 +218,7 @@ james = SuperUser(0, "James", 42, "Jimmy")
 # on the subclass
 james.name = "Robert"
 
-# TODO: the error is correct (can't assign to the read-only property inherited from the superclass)
-# but the error message could be friendlier :-)
-#
-# error: [invalid-assignment] "Invalid assignment to data descriptor attribute `nickname` on type `SuperUser` with custom `__set__` method"
+# error: [invalid-assignment] "Cannot assign to read-only property `nickname` on object of type `SuperUser`"
 james.nickname = "Bob"
 ```
 

@@ -119,13 +119,19 @@ impl<'db> GenericContext<'db> {
         binding_context: Definition<'db>,
         type_params_node: &ast::TypeParams,
     ) -> Self {
-        let variables: FxOrderSet<_> = type_params_node
-            .iter()
-            .filter_map(|type_param| {
-                Self::variable_from_type_param(db, index, binding_context, type_param)
-            })
-            .collect();
-        Self::new(db, variables)
+        let variables = type_params_node.iter().filter_map(|type_param| {
+            Self::variable_from_type_param(db, index, binding_context, type_param)
+        });
+
+        Self::from_typevar_instances(db, variables)
+    }
+
+    /// Creates a generic context from a list of `BoundTypeVarInstance`s.
+    pub(crate) fn from_typevar_instances(
+        db: &'db dyn Db,
+        type_params: impl IntoIterator<Item = BoundTypeVarInstance<'db>>,
+    ) -> Self {
+        Self::new(db, type_params.into_iter().collect::<FxOrderSet<_>>())
     }
 
     fn variable_from_type_param(
@@ -365,12 +371,12 @@ impl<'db> GenericContext<'db> {
     }
 
     pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        let variables: FxOrderSet<_> = self
+        let variables = self
             .variables(db)
             .iter()
-            .map(|bound_typevar| bound_typevar.normalized_impl(db, visitor))
-            .collect();
-        Self::new(db, variables)
+            .map(|bound_typevar| bound_typevar.normalized_impl(db, visitor));
+
+        Self::from_typevar_instances(db, variables)
     }
 
     fn heap_size((variables,): &(FxOrderSet<BoundTypeVarInstance<'db>>,)) -> usize {

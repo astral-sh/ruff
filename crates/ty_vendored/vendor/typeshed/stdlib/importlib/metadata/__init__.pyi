@@ -579,7 +579,7 @@ class Distribution(_distribution_parent):
             """Return the 'Name' metadata for the distribution package."""
     if sys.version_info >= (3, 13):
         @property
-        def origin(self) -> types.SimpleNamespace: ...
+        def origin(self) -> types.SimpleNamespace | None: ...
 
 class DistributionFinder(MetaPathFinder):
     """

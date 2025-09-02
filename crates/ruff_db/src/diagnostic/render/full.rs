@@ -58,7 +58,7 @@ impl<'a> FullRenderer<'a> {
                 writeln!(f, "{}", renderer.render(diag.to_annotate()))?;
             }
 
-            if self.config.show_fix_diff {
+            if self.config.show_fix_diff && diag.has_applicable_fix(self.config) {
                 if let Some(diff) = Diff::from_diagnostic(diag, &stylesheet, self.resolver) {
                     write!(f, "{diff}")?;
                 }
@@ -697,6 +697,8 @@ print()
     fn notebook_output_with_diff() {
         let (mut env, diagnostics) = create_notebook_diagnostics(DiagnosticFormat::Full);
         env.show_fix_diff(true);
+        env.fix_applicability(Applicability::DisplayOnly);
+
         insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r"
         error[unused-import][*]: `os` imported but unused
          --> notebook.ipynb:cell 1:2:8
@@ -726,7 +728,7 @@ print()
         2 | 
         3 | print('hello world')
 
-        error[unused-variable]: Local variable `x` is assigned to but never used
+        error[unused-variable][*]: Local variable `x` is assigned to but never used
          --> notebook.ipynb:cell 3:4:5
           |
         2 | def foo():
@@ -749,6 +751,7 @@ print()
     fn notebook_output_with_diff_spanning_cells() {
         let (mut env, mut diagnostics) = create_notebook_diagnostics(DiagnosticFormat::Full);
         env.show_fix_diff(true);
+        env.fix_applicability(Applicability::DisplayOnly);
 
         // Move all of the edits from the later diagnostics to the first diagnostic to simulate a
         // single diagnostic with edits in different cells.
@@ -761,7 +764,7 @@ print()
         *fix = Fix::unsafe_edits(edits.remove(0), edits);
 
         insta::assert_snapshot!(env.render(&diagnostic), @r"
-        error[unused-import]: `os` imported but unused
+        error[unused-import][*]: `os` imported but unused
          --> notebook.ipynb:cell 1:2:8
           |
         1 | # cell 1
@@ -924,6 +927,7 @@ line 10
         env.add("example.py", contents);
         env.format(DiagnosticFormat::Full);
         env.show_fix_diff(true);
+        env.fix_applicability(Applicability::DisplayOnly);
 
         let mut diagnostic = env.err().primary("example.py", "3", "3", "label").build();
         diagnostic.help("Start of diff:");
@@ -936,7 +940,7 @@ line 10
         )));
 
         insta::assert_snapshot!(env.render(&diagnostic), @r"
-        error[test-diagnostic]: main diagnostic message
+        error[test-diagnostic][*]: main diagnostic message
          --> example.py:3:1
           |
         1 | line 1

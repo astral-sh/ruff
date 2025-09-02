@@ -260,6 +260,11 @@ def f(cond: bool) -> int:
 
 <!-- snapshot-diagnostics -->
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ```py
 # error: [invalid-return-type]
 def f() -> int:
@@ -279,6 +284,18 @@ T = TypeVar("T")
 
 # error: [invalid-return-type]
 def m(x: T) -> T: ...
+
+class A[T]: ...
+
+def f() -> A[int]:
+    class A[T]: ...
+    return A[int]()  # error: [invalid-return-type]
+
+class B: ...
+
+def g() -> B:
+    class B: ...
+    return B()  # error: [invalid-return-type]
 ```
 
 ## Invalid return type in stub file

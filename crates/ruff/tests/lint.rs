@@ -5830,3 +5830,33 @@ nested_optional: Optional[Optional[Optional[str]]] = None
     ",
     );
 }
+
+#[test]
+fn show_fixes_in_full_output_with_preview_enabled() {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args(["check", "--no-cache", "--output-format", "full"])
+            .args(["--select", "F401"])
+            .arg("--preview")
+            .arg("-")
+            .pass_stdin("import math"),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    F401 [*] `math` imported but unused
+     --> -:1:8
+      |
+    1 | import math
+      |        ^^^^
+      |
+    help: Remove unused import: `math`
+      - import math
+
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    ",
+    );
+}

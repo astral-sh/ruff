@@ -17,10 +17,10 @@ use crate::{
     place::{Boundness, Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations},
     semantic_index::{definition::Definition, use_def_map},
     types::{
-        BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, FindLegacyTypeVarsVisitor,
-        HasRelationToVisitor, IsDisjointVisitor, KnownFunction, MaterializationKind,
-        NormalizedVisitor, PropertyInstanceType, Signature, Type, TypeMapping, TypeQualifiers,
-        TypeRelation, VarianceInferable,
+        ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral,
+        FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, KnownFunction,
+        MaterializationKind, NormalizedVisitor, PropertyInstanceType, Signature, Type, TypeMapping,
+        TypeQualifiers, TypeRelation, VarianceInferable,
         constraints::{Constraints, IteratorConstraintsExtension},
         signatures::{Parameter, Parameters},
     },
@@ -282,7 +282,12 @@ impl<'db> ProtocolInterface<'db> {
                 .map(|(name, data)| {
                     (
                         name.clone(),
-                        data.apply_type_mapping(db, type_mapping).normalized(db),
+                        data.apply_type_mapping_impl(
+                            db,
+                            type_mapping,
+                            &ApplyTypeMappingVisitor::default(),
+                        )
+                        .normalized(db),
                     )
                 })
                 .collect::<BTreeMap<_, _>>(),
@@ -354,9 +359,14 @@ impl<'db> ProtocolMemberData<'db> {
         }
     }
 
-    fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: &TypeMapping<'a, 'db>) -> Self {
+    fn apply_type_mapping_impl<'a>(
+        &self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
         Self {
-            kind: self.kind.apply_type_mapping(db, type_mapping),
+            kind: self.kind.apply_type_mapping_impl(db, type_mapping, visitor),
             qualifiers: self.qualifiers,
         }
     }
@@ -444,16 +454,21 @@ impl<'db> ProtocolMemberKind<'db> {
         }
     }
 
-    fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: &TypeMapping<'a, 'db>) -> Self {
+    fn apply_type_mapping_impl<'a>(
+        &self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
         match self {
-            ProtocolMemberKind::Method(callable) => {
-                ProtocolMemberKind::Method(callable.apply_type_mapping(db, type_mapping))
-            }
-            ProtocolMemberKind::Property(property) => {
-                ProtocolMemberKind::Property(property.apply_type_mapping(db, type_mapping))
-            }
+            ProtocolMemberKind::Method(callable) => ProtocolMemberKind::Method(
+                callable.apply_type_mapping_impl(db, type_mapping, visitor),
+            ),
+            ProtocolMemberKind::Property(property) => ProtocolMemberKind::Property(
+                property.apply_type_mapping_impl(db, type_mapping, visitor),
+            ),
             ProtocolMemberKind::Other(ty) => {
-                ProtocolMemberKind::Other(ty.apply_type_mapping(db, type_mapping))
+                ProtocolMemberKind::Other(ty.apply_type_mapping_impl(db, type_mapping, visitor))
             }
         }
     }
@@ -560,7 +575,8 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                 db,
                 matches!(
                     other.to_meta_type(db).member(db, self.name).place,
-                    Place::Type(_, Boundness::Bound)
+                    Place::Type(ty, Boundness::Bound)
+                    if ty.is_assignable_to(db, CallableType::single(db, Signature::dynamic(Type::any())))
                 ),
             ),
             // TODO: consider the types of the attribute on `other` for property members

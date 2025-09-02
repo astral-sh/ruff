@@ -396,6 +396,8 @@ RUF037 [*] Unnecessary empty iterable within a deque call
 111 | # https://github.com/astral-sh/ruff/issues/20050
 112 | deque(f"{""}")  # RUF037
     | ^^^^^^^^^^^^^^
+113 |
+114 | deque(f"{b""}")
     |
 help: Replace with `deque()`
 109 | deque(t"{""}") # OK
@@ -403,3 +405,6 @@ help: Replace with `deque()`
 111 | # https://github.com/astral-sh/ruff/issues/20050
     - deque(f"{""}")  # RUF037
 112 + deque()  # RUF037
+113 | 
+114 | deque(f"{b""}")
+115 | deque(f"{""=}")

@@ -1,0 +1,40 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: descriptor_protocol.md - Descriptor protocol - Special descriptors - Properties with no setters
+mdtest path: crates/ty_python_semantic/resources/mdtest/descriptor_protocol.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | class DontAssignToMe:
+2 |     @property
+3 |     def immutable(self): ...
+4 | 
+5 | # error: [invalid-assignment]
+6 | DontAssignToMe().immutable = "the properties, they are a-changing"
+```
+
+# Diagnostics
+
+```
+error[invalid-assignment]: Cannot assign to read-only property `immutable` on object of type `DontAssignToMe`
+ --> src/mdtest_snippet.py:3:9
+  |
+1 | class DontAssignToMe:
+2 |     @property
+3 |     def immutable(self): ...
+  |         --------- Property `DontAssignToMe.immutable` defined here with no setter
+4 |
+5 | # error: [invalid-assignment]
+6 | DontAssignToMe().immutable = "the properties, they are a-changing"
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^ Attempted assignment to `DontAssignToMe.immutable` here
+  |
+info: rule `invalid-assignment` is enabled by default
+
+```
