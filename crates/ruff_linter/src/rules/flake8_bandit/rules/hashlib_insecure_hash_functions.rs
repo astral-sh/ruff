@@ -137,9 +137,9 @@ fn detect_insecure_hashlib_calls(
 
             // `hashlib.new` accepts mixed lowercase and uppercase names for hash
             // functions.
-            if matches!(
-                hash_func_name.to_ascii_lowercase().as_str(),
-                "md4" | "md5" | "sha" | "sha1"
+            if !matches!(
+                hash_func_name.to_ascii_lowercase().trim(),
+                "sha256" | "sha512"
             ) {
                 checker.report_diagnostic(
                     HashlibInsecureHashFunction {
