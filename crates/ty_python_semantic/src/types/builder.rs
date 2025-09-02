@@ -241,9 +241,22 @@ impl<'db> UnionBuilder<'db> {
 
     /// Collapse the union to a single type: `object`.
     fn collapse_to_object(&mut self) {
+        let divergent = self.elements.iter().find_map(|elem| {
+            let UnionElement::Type(ty) = elem else {
+                return None;
+            };
+            if ty.has_divergent_type(self.db) {
+                Some(*ty)
+            } else {
+                None
+            }
+        });
         self.elements.clear();
         self.elements
             .push(UnionElement::Type(Type::object(self.db)));
+        if let Some(divergent) = divergent {
+            self.elements.push(UnionElement::Type(divergent));
+        }
     }
 
     /// Adds a type to this union.
@@ -964,11 +977,18 @@ impl<'db> InnerIntersectionBuilder<'db> {
                         return;
                     }
                     // same rule, reverse order
-                    if new_positive.is_subtype_of(db, *existing_positive) {
+                    if new_positive.is_subtype_of(db, *existing_positive)
+                        && !existing_positive.has_divergent_type(db)
+                    {
                         to_remove.push(index);
                     }
                     // A & B = Never    if A and B are disjoint
-                    if new_positive.is_disjoint_from(db, *existing_positive) {
+                    if new_positive.is_disjoint_from(db, *existing_positive)
+                        && self
+                            .positive
+                            .iter()
+                            .all(|existing_positive| !existing_positive.has_divergent_type(db))
+                    {
                         *self = Self::default();
                         self.positive.insert(Type::Never);
                         return;

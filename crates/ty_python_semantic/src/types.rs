@@ -10799,4 +10799,72 @@ pub(crate) mod tests {
                 .is_todo()
         );
     }
+
+    #[test]
+    fn divergent_type() {
+        let db = setup_db();
+
+        let div = Type::Dynamic(DynamicType::Divergent);
+
+        let union = UnionType::from_elements(&db, [Type::unknown(), div]);
+        assert_eq!(union.display(&db).to_string(), "Unknown | Divergent");
+
+        let union = UnionType::from_elements(&db, [div, Type::unknown()]);
+        assert_eq!(union.display(&db).to_string(), "Divergent");
+
+        let union = UnionType::from_elements(&db, [div, KnownClass::Object.to_instance(&db)]);
+        assert_eq!(union.display(&db).to_string(), "object | Divergent");
+
+        let union = UnionType::from_elements(&db, [KnownClass::Object.to_instance(&db), div]);
+        assert_eq!(union.display(&db).to_string(), "object | Divergent");
+
+        let union = UnionType::from_elements(
+            &db,
+            [
+                KnownClass::Object.to_instance(&db),
+                KnownClass::List.to_specialized_instance(&db, [div]),
+            ],
+        );
+        assert_eq!(union.display(&db).to_string(), "object | list[Divergent]");
+
+        let union = UnionType::from_elements(
+            &db,
+            [
+                KnownClass::Object.to_instance(&db),
+                KnownClass::List.to_specialized_instance(&db, [div]),
+                KnownClass::Int.to_instance(&db),
+            ],
+        );
+        assert_eq!(union.display(&db).to_string(), "object | list[Divergent]");
+
+        let intersection = IntersectionBuilder::new(&db)
+            .add_positive(Type::Never)
+            .add_positive(div)
+            .build();
+        assert_eq!(intersection.display(&db).to_string(), "Never & Divergent");
+
+        let intersection = IntersectionBuilder::new(&db)
+            .add_positive(div)
+            .add_positive(Type::Never)
+            .build();
+        assert_eq!(intersection.display(&db).to_string(), "Divergent & Never");
+
+        let intersection = IntersectionBuilder::new(&db)
+            .add_positive(KnownClass::List.to_specialized_instance(&db, [div]))
+            .add_positive(Type::Never)
+            .build();
+        assert_eq!(
+            intersection.display(&db).to_string(),
+            "list[Divergent] & Never"
+        );
+
+        let intersection = IntersectionBuilder::new(&db)
+            .add_positive(KnownClass::Int.to_instance(&db))
+            .add_positive(KnownClass::List.to_specialized_instance(&db, [div]))
+            .build();
+        assert_eq!(
+            intersection.display(&db).to_string(),
+            "int & list[Divergent]"
+        );
+    }
 }
