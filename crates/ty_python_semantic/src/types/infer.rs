@@ -140,34 +140,6 @@ use crate::util::diagnostics::format_enumeration;
 use crate::util::subscript::{PyIndex, PySlice};
 use crate::{Db, FxOrderSet, Program};
 
-pub(crate) fn divergence_safe_todo<'db>(
-    db: &'db dyn Db,
-    msg: &'static str,
-    types: impl IntoIterator<Item = Type<'db>>,
-) -> Type<'db> {
-    let _ = msg;
-    let mut builder = IntersectionBuilder::new(db).add_positive(todo_type!(msg));
-    for ty in types {
-        if ty.has_divergent_type(db) {
-            builder = builder.add_positive(ty);
-        }
-    }
-    builder.build()
-}
-
-fn divergence_safe_unknown<'db>(
-    db: &'db dyn Db,
-    types: impl IntoIterator<Item = Type<'db>>,
-) -> Type<'db> {
-    let mut builder = IntersectionBuilder::new(db).add_positive(Type::unknown());
-    for ty in types {
-        if ty.has_divergent_type(db) {
-            builder = builder.add_positive(ty);
-        }
-    }
-    builder.build()
-}
-
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
 /// scope.
@@ -3570,7 +3542,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         if let Some(node) = node {
                             report_invalid_exception_caught(&self.context, node, element);
                         }
-                        divergence_safe_unknown(self.db(), [element])
+                        Type::unknown()
                     },
                 );
             }
@@ -3616,7 +3588,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if let Some(node) = node {
                 report_invalid_exception_caught(&self.context, node, node_ty);
             }
-            divergence_safe_unknown(self.db(), [node_ty])
+            Type::unknown()
         };
 
         if is_star {
@@ -4970,7 +4942,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.infer_binary_expression_type(assignment.into(), false, target_type, value_type, op)
                 .unwrap_or_else(|| {
                     report_unsupported_augmented_op(&mut self.context);
-                    divergence_safe_unknown(self.db(), [target_type, value_type])
+                    Type::unknown()
                 })
         };
 
@@ -7653,7 +7625,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         add_inferred_python_version_hint_to_diagnostic(db, &mut diag, "resolving types");
                     }
                 }
-                divergence_safe_unknown(db, [left_ty, right_ty])
+                Type::unknown()
             })
     }
 
@@ -8182,7 +8154,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             | ast::CmpOp::Is
                             | ast::CmpOp::IsNot => KnownClass::Bool.to_instance(builder.db()),
                             // Other operators can return arbitrary types
-                            _ => divergence_safe_unknown(builder.db(), [left_ty, right_ty]),
+                            _ => Type::unknown(),
                         }
                     });
 
@@ -8831,10 +8803,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // TODO: Consider comparing the prefixes of the tuples, since that could give a comparison
         // result regardless of how long the variable-length tuple is.
         let (TupleSpec::Fixed(left), TupleSpec::Fixed(right)) = (left, right) else {
-            return Ok(divergence_safe_unknown(
-                self.db(),
-                left.all_elements().chain(right.all_elements()).copied(),
-            ));
+            return Ok(Type::unknown());
         };
 
         let left_iter = left.elements().copied();
@@ -9065,11 +9034,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // but we need to make sure we avoid emitting a diagnostic if one positive element has a `__getitem__`
             // method but another does not. This means `infer_subscript_expression_types`
             // needs to return a `Result` rather than eagerly emitting diagnostics.
-            (Type::Intersection(_), _) => Some(divergence_safe_todo(
-                db,
-                "Subscript expressions on intersections",
-                [value_ty, slice_ty],
-            )),
+            (Type::Intersection(_), _) => {
+                Some(todo_type!("Subscript expressions on intersections"))
+            }
 
             // Ex) Given `("a", "b", "c", "d")[1]`, return `"b"`
             (Type::NominalInstance(nominal), Type::IntLiteral(i64_int)) => nominal
@@ -9085,7 +9052,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             tuple.len().display_minimum(),
                             i64_int,
                         );
-                        divergence_safe_unknown(db, [value_ty])
+                        Type::unknown()
                     })
                 }),
 
@@ -9103,7 +9070,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             Type::heterogeneous_tuple(db, new_elements)
                         } else {
                             report_slice_step_size_zero(context, value_node.into());
-                            divergence_safe_unknown(self.db(), [value_ty, slice_ty])
+                            Type::unknown()
                         }
                     }
                     TupleSpec::Variable(_) => {
@@ -9144,7 +9111,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         Type::string_literal(db, &literal)
                     } else {
                         report_slice_step_size_zero(context, value_node.into());
-                        divergence_safe_unknown(self.db(), [slice_ty])
+                        Type::unknown()
                     }
                 }),
 
@@ -9180,7 +9147,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         Type::bytes_literal(db, &new_bytes)
                     } else {
                         report_slice_step_size_zero(context, value_node.into());
-                        divergence_safe_unknown(self.db(), [slice_ty])
+                        Type::unknown()
                     }
                 }),
 
@@ -9217,11 +9184,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             (Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(_)), _) => {
                 // TODO: emit a diagnostic
-                Some(divergence_safe_todo(
-                    db,
-                    "doubly-specialized typing.Protocol",
-                    [value_ty, slice_ty],
-                ))
+                Some(todo_type!("doubly-specialized typing.Protocol"))
             }
 
             (Type::SpecialForm(SpecialFormType::Generic), typevars) => Some(
@@ -9234,28 +9197,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             (Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(_)), _) => {
                 // TODO: emit a diagnostic
-                Some(divergence_safe_todo(
-                    db,
-                    "doubly-specialized typing.Generic",
-                    [value_ty, slice_ty],
-                ))
+                Some(todo_type!("doubly-specialized typing.Generic"))
             }
 
             (Type::SpecialForm(SpecialFormType::Unpack), _) => {
                 Some(Type::Dynamic(DynamicType::TodoUnpack))
             }
-            (Type::SpecialForm(special_form), _) if special_form.class().is_special_form() => Some(
-                divergence_safe_todo(db, "Inference of subscript on special form", [slice_ty]),
-            ),
+            (Type::SpecialForm(special_form), _) if special_form.class().is_special_form() => {
+                Some(todo_type!("Inference of subscript on special form"))
+            }
 
             (Type::KnownInstance(known_instance), _)
                 if known_instance.class().is_special_form() =>
             {
-                Some(divergence_safe_todo(
-                    db,
-                    "Inference of subscript on special form",
-                    [slice_ty],
-                ))
+                Some(todo_type!("Inference of subscript on special form"))
             }
 
             _ => None,
@@ -9416,7 +9371,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        divergence_safe_unknown(self.db(), [value_ty, slice_ty])
+        Type::unknown()
     }
 
     fn legacy_generic_class_context(

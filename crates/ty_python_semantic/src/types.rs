@@ -57,7 +57,7 @@ pub use crate::types::ide_support::{
     definitions_for_attribute, definitions_for_imported_symbol, definitions_for_keyword_argument,
     definitions_for_name, find_active_signature_from_details, inlay_hint_function_argument_details,
 };
-use crate::types::infer::{divergence_safe_todo, infer_unpack_types};
+use crate::types::infer::infer_unpack_types;
 use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
 use crate::types::signatures::{Parameter, ParameterForm, Parameters, walk_signature};
@@ -5037,11 +5037,7 @@ impl<'db> Type<'db> {
         let special_case = match self {
             Type::NominalInstance(nominal) => nominal.tuple_spec(db),
             Type::GenericAlias(alias) if alias.origin(db).is_tuple(db) => {
-                Some(Cow::Owned(TupleSpec::homogeneous(divergence_safe_todo(
-                    db,
-                    "*tuple[] annotations",
-                    [self],
-                ))))
+                Some(Cow::Owned(TupleSpec::homogeneous(todo_type!("*tuple[] annotations"))))
             }
             Type::StringLiteral(string_literal_ty) => {
                 let string_literal = string_literal_ty.value(db);
@@ -5554,11 +5550,7 @@ impl<'db> Type<'db> {
             }
             Type::TypeVar(bound_typevar) => Some(Type::TypeVar(bound_typevar.to_instance(db)?)),
             Type::TypeAlias(alias) => alias.value_type(db).to_instance(db),
-            Type::Intersection(_) => Some(divergence_safe_todo(
-                db,
-                "Type::Intersection.to_instance",
-                [self],
-            )),
+            Type::Intersection(_) => Some(todo_type!("Type::Intersection.to_instance")),
             Type::BooleanLiteral(_)
             | Type::BytesLiteral(_)
             | Type::EnumLiteral(_)
