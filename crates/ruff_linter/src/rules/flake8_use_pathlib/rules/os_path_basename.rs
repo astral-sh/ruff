@@ -42,7 +42,7 @@ use crate::{FixAvailability, Violation};
 /// ## Fix Safety
 /// This rule's fix is always marked as unsafe because the replacement is not always semantically
 /// equivalent to the original code. In particular, `pathlib` performs path normalization,
-/// which can alter the result compared to `os.path.basename`. For example:
+/// which can alter the result compared to `os.path.basename`. For example, this normalization:
 ///
 /// - Collapses consecutive slashes (e.g., `"a//b"` → `"a/b"`).
 /// - Removes trailing slashes (e.g., `"a/b/"` → `"a/b"`).
