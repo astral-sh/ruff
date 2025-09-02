@@ -138,10 +138,10 @@ pub(crate) fn os_chmod(checker: &Checker, call: &ExprCall, segments: &[&str]) {
                     }
                     ArgOrKeyword::Keyword(kw) if kw.arg.as_deref() == Some("follow_symlinks") => {
                         if let Some(bl) = kw.value.as_boolean_literal_expr() {
-                            if !bl.value {
-                                Some("follow_symlinks=False".to_string())
-                            } else {
+                            if bl.value {
                                 None
+                            } else {
+                                Some("follow_symlinks=False".to_string())
                             }
                         } else {
                             Some(format!("follow_symlinks={}", locator.slice(&kw.value)))
