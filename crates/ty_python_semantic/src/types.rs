@@ -8984,7 +8984,7 @@ impl<'db> BoundMethodType<'db> {
         inference.infer_return_type(db, Type::BoundMethod(self))
     }
 
-    #[salsa::tracked]
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     fn class_definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
         let definition_scope = self.function(db).definition(db).scope(db);
         let index = semantic_index(db, definition_scope.file(db));
