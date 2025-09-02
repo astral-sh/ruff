@@ -469,6 +469,22 @@ class MyOtherClass:
         3 | x = MyClass(0)
           |     ^^^^^^^
           |
+
+        info[goto-definition]: Definition
+         --> mymodule.py:3:9
+          |
+        2 | class MyClass:
+        3 |     def __init__(self, val):
+          |         ^^^^^^^^
+        4 |         self.val = val
+          |
+        info: Source
+         --> main.py:3:5
+          |
+        2 | from mymodule import MyClass
+        3 | x = MyClass(0)
+          |     ^^^^^^^
+          |
         ");
     }
 
