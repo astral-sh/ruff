@@ -5959,7 +5959,6 @@ impl<'db> Type<'db> {
             Type::StringLiteral(_) | Type::LiteralString => KnownClass::Str.to_class_literal(db),
             Type::Dynamic(dynamic) => SubclassOfType::from(db, SubclassOfInner::Dynamic(dynamic)),
             // TODO intersections
-            // TODO divergence safety
             Type::Intersection(_) => SubclassOfType::from(
                 db,
                 SubclassOfInner::try_from_type(db, todo_type!("Intersection meta-type"))

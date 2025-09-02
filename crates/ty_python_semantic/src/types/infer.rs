@@ -83,7 +83,7 @@ use crate::semantic_index::definition::{
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::narrowing_constraints::ConstraintKey;
-use crate::semantic_index::place::{PlaceExpr, PlaceExprRef, ScopedPlaceId};
+use crate::semantic_index::place::{PlaceExpr, PlaceExprRef};
 use crate::semantic_index::scope::{
     FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId, ScopeKind,
 };
@@ -168,18 +168,6 @@ fn scope_cycle_recover<'db>(
 
 fn scope_cycle_initial<'db>(_db: &'db dyn Db, scope: ScopeId<'db>) -> ScopeInference<'db> {
     ScopeInference::cycle_fallback(scope)
-}
-
-#[salsa::tracked]
-fn function_place<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Option<ScopedPlaceId> {
-    if let NodeWithScopeKind::Function(func) = scope.node(db) {
-        let file = scope.file(db);
-        let index = semantic_index(db, file);
-        let module = parsed_module(db, file).load(db);
-        Some(index.expect_single_definition(func.node(&module)).place(db))
-    } else {
-        None
-    }
 }
 
 /// Infer all types for a [`Definition`] (including sub-expressions).
