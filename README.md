@@ -68,6 +68,11 @@ of [FastAPI](https://github.com/tiangolo/fastapi):
 > Ruff is so fast that sometimes I add an intentional bug in the code just to confirm it's actually
 > running and checking the code.
 
+[**Raúl M. Uñate**](https://www.linkedin.com/in/raul-mauricio-unate-castro/), creator
+of [Orionis Framework](https://github.com/orionis-framework/framework):
+
+> Ruff has been with me since the very first line of code in the framework. The peace of mind and confidence it brings to every step of development are truly unmatched.
+
 [**Nick Schrock**](https://twitter.com/schrockn/status/1612615862904827904), founder of [Elementl](https://www.elementl.com/),
 co-creator of [GraphQL](https://graphql.org/):
 
