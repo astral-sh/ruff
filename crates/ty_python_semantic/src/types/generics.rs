@@ -941,6 +941,7 @@ impl<'db> PartialSpecialization<'_, 'db> {
 pub(crate) struct SpecializationBuilder<'db> {
     db: &'db dyn Db,
     types: FxHashMap<BoundTypeVarInstance<'db>, Type<'db>>,
+    constraints: ConstraintSet<'db>,
 }
 
 impl<'db> SpecializationBuilder<'db> {
@@ -948,6 +949,7 @@ impl<'db> SpecializationBuilder<'db> {
         Self {
             db,
             types: FxHashMap::default(),
+            constraints: ConstraintSet::always_satisfiable(db),
         }
     }
 
@@ -974,6 +976,9 @@ impl<'db> SpecializationBuilder<'db> {
         formal: Type<'db>,
         actual: Type<'db>,
     ) -> Result<(), SpecializationError<'db>> {
+        self.constraints
+            .intersect(self.db, formal.when_assignable_to(self.db, actual));
+
         if formal == actual {
             return Ok(());
         }

@@ -1573,8 +1573,67 @@ impl<'db> Type<'db> {
             // no other type is a subtype of or assignable to `Never`.
             (_, Type::Never) => C::unsatisfiable(db),
 
-            // TODO: Infer specializations here
-            (Type::TypeVar(_), _) | (_, Type::TypeVar(_)) => C::unsatisfiable(db),
+            // For an inferable typevar, there must be _some_ specialization that satisfies the
+            // relation.
+            (Type::TypeVar(bound_typevar), _) => {
+                match bound_typevar.typevar(db).bound_or_constraints(db) {
+                    // Verify that the upper bound satisfies the relation. (If it does, than any
+                    // subtype of the upper bound will too.)
+                    None => {
+                        let bound = Type::object(db);
+                        C::constrain_typevar(db, bound_typevar, Type::Never, bound).and(db, || {
+                            bound.has_relation_to_impl(db, target, relation, visitor)
+                        })
+                    }
+                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                        C::constrain_typevar(db, bound_typevar, Type::Never, bound).and(db, || {
+                            bound.has_relation_to_impl(db, target, relation, visitor)
+                        })
+                    }
+
+                    // Verify that some constraint satisfies the relation. (Note that constrained
+                    // typevars must specialize to _exactly_ one of the constraints, not to a
+                    // _subtype_ of one.)
+                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        constraints.elements(db).iter().when_any(db, |constraint| {
+                            C::constrain_typevar(db, bound_typevar, *constraint, *constraint)
+                                .and(db, || {
+                                    constraint.has_relation_to_impl(db, target, relation, visitor)
+                                })
+                        })
+                    }
+                }
+            }
+
+            (_, Type::TypeVar(bound_typevar)) => {
+                match bound_typevar.typevar(db).bound_or_constraints(db) {
+                    // Verify that the upper bound satisfies the relation. (If it does, than any
+                    // subtype of the upper bound will too.)
+                    None => {
+                        let bound = Type::object(db);
+                        C::constrain_typevar(db, bound_typevar, Type::Never, bound).and(db, || {
+                            self.has_relation_to_impl(db, bound, relation, visitor)
+                        })
+                    }
+                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                        C::constrain_typevar(db, bound_typevar, Type::Never, bound).and(db, || {
+                            self.has_relation_to_impl(db, bound, relation, visitor)
+                        })
+                    }
+
+                    // Verify that some constraint satisfies the relation. (Note that constrained
+                    // typevars must specialize to _exactly_ one of the constraints, not to a
+                    // _subtype_ of one.)
+                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        constraints.elements(db).iter().when_any(db, |constraint| {
+                            C::constrain_typevar(db, bound_typevar, *constraint, *constraint)
+                                .and(db, || {
+                                    self.has_relation_to_impl(db, *constraint, relation, visitor)
+                                })
+                        })
+                    }
+                }
+            }
 
             // Note that the definition of `Type::AlwaysFalsy` depends on the return value of `__bool__`.
             // If `__bool__` always returns True or False, it can be treated as a subtype of `AlwaysTruthy` or `AlwaysFalsy`, respectively.
