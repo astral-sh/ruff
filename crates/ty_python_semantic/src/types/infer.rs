@@ -9636,7 +9636,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let diagnostics = context.finish();
 
-        let extra = (!diagnostics.is_empty() || cycle_fallback || scope.is_function_or_lambda(db))
+        let extra = (!diagnostics.is_empty() || cycle_fallback || scope.is_non_lambda_function(db))
             .then(|| {
                 let returnees = returnees
                     .into_iter()

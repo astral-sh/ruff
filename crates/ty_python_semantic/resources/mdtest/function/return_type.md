@@ -286,6 +286,11 @@ def h(x: int, y: str):
 
 reveal_type(h(1, "a"))  # revealed: int | str | None
 
+lambda_func = lambda: 1
+# TODO: lambda function type inference
+# Should be `Literal[1]`
+reveal_type(lambda_func())  # revealed: Unknown
+
 def generator():
     yield 1
     yield 2
