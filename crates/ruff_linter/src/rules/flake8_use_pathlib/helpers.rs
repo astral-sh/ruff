@@ -53,7 +53,6 @@ pub(crate) fn is_pure_path_subclass_with_preview(
 /// We check functions that take only 1 argument,  this does not apply to functions
 /// with `dir_fd` argument, because `dir_fd` is not supported by pathlib,
 /// so check if it's set to non-default values
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn check_os_pathlib_single_arg_calls(
     checker: &Checker,
     call: &ExprCall,
