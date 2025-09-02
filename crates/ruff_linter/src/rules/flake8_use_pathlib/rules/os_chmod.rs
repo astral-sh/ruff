@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Applicability, Edit, Fix};
-use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{ArgOrKeyword, ExprCall};
 use ruff_text_size::Ranged;
 
@@ -105,7 +105,7 @@ pub(crate) fn os_chmod(checker: &Checker, call: &ExprCall, segments: &[&str]) {
         return;
     }
 
-    let (Some(path_arg), Some(mode_arg)) =
+    let (Some(path_arg), Some(_)) =
         (path_arg, call.arguments.find_argument_value("mode", 1))
     else {
         return;
@@ -130,24 +130,18 @@ pub(crate) fn os_chmod(checker: &Checker, call: &ExprCall, segments: &[&str]) {
                 .arguments_source_order()
                 .filter_map(|arg| match arg {
                     ArgOrKeyword::Arg(expr) if expr.range() == path_arg.range() => None,
-                    ArgOrKeyword::Arg(expr) if expr.range() == mode_arg.range() => {
-                        Some(locator.slice(expr.range()).to_string())
-                    }
-                    ArgOrKeyword::Keyword(kw) if kw.arg.as_deref() == Some("mode") => {
-                        Some(format!("mode={}", locator.slice(&kw.value)))
-                    }
-                    ArgOrKeyword::Keyword(kw) if kw.arg.as_deref() == Some("follow_symlinks") => {
-                        if let Some(bl) = kw.value.as_boolean_literal_expr() {
-                            if bl.value {
-                                None
-                            } else {
-                                Some("follow_symlinks=False".to_string())
+                    ArgOrKeyword::Arg(expr) => Some(locator.slice(expr.range()).to_string()),
+                    ArgOrKeyword::Keyword(kw) => match kw.arg.as_deref() {
+                        Some("mode") => Some(format!("mode={}", locator.slice(&kw.value))),
+                        Some("follow_symlinks") => {
+                            match kw.value.as_boolean_literal_expr() {
+                                Some(bl) if !bl.value => Some("follow_symlinks=False".to_string()),
+                                Some(_) => None,
+                                None => Some(format!("follow_symlinks={}", locator.slice(&kw.value))),
                             }
-                        } else {
-                            Some(format!("follow_symlinks={}", locator.slice(&kw.value)))
                         }
-                    }
-                    _ => None,
+                        _ => None,
+                    },
                 }),
             ", ",
         );
