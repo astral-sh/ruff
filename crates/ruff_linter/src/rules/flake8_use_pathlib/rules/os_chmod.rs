@@ -8,7 +8,7 @@ use crate::importer::ImportRequest;
 use crate::preview::is_fix_os_chmod_enabled;
 use crate::rules::flake8_use_pathlib::helpers::{
     has_unknown_keywords_or_starred_expr, is_file_descriptor, is_keyword_only_argument_non_default,
-    is_pathlib_path_call,
+    is_optional_bool_literal, is_pathlib_path_call,
 };
 use crate::{FixAvailability, Violation};
 
@@ -78,10 +78,9 @@ pub(crate) fn os_chmod(checker: &Checker, call: &ExprCall, segments: &[&str]) {
     //           0     1          2               3
     // os.chmod(path, mode, *, dir_fd=None, follow_symlinks=True)
     // ```
-    if call
-        .arguments
-        .find_argument_value("path", 0)
-        .is_some_and(|expr| is_file_descriptor(expr, checker.semantic()))
+    let path_arg = call.arguments.find_argument_value("path", 0);
+
+    if path_arg.is_some_and(|expr| is_file_descriptor(expr, checker.semantic()))
         || is_keyword_only_argument_non_default(&call.arguments, "dir_fd")
     {
         return;
@@ -94,10 +93,6 @@ pub(crate) fn os_chmod(checker: &Checker, call: &ExprCall, segments: &[&str]) {
         return;
     }
 
-    let Some(path) = call.arguments.find_argument_value("path", 0) else {
-        return;
-    };
-
     if !is_fix_os_chmod_enabled(checker.settings()) {
         return;
     }
@@ -109,10 +104,12 @@ pub(crate) fn os_chmod(checker: &Checker, call: &ExprCall, segments: &[&str]) {
         return;
     }
 
-    if let Some(expr) = call.arguments.find_argument_value("follow_symlinks", 3) {
-        if expr.as_boolean_literal_expr().is_none() {
-            return;
-        }
+    let Some(path) = path_arg else {
+        return;
+    };
+
+    if !is_optional_bool_literal(&call.arguments, "follow_symlinks", 3) {
+        return;
     }
 
     diagnostic.try_set_fix(|| {
@@ -122,18 +119,13 @@ pub(crate) fn os_chmod(checker: &Checker, call: &ExprCall, segments: &[&str]) {
             checker.semantic(),
         )?;
 
-        let applicability = if checker.comment_ranges().intersects(range) {
-            Applicability::Unsafe
-        } else {
-            Applicability::Safe
-        };
-
         let locator = checker.locator();
-
-        let mode = call.arguments.find_argument("mode", 1);
-        let follow_symlinks = call.arguments.find_argument("follow_symlinks", 3);
-
         let path_code = locator.slice(path.range());
+
+        let (mode, follow_symlinks) = (
+            call.arguments.find_argument("mode", 1),
+            call.arguments.find_argument("follow_symlinks", 3),
+        );
 
         let args = |arg: &ArgOrKeyword| match arg {
             ArgOrKeyword::Arg(expr) => locator.slice(expr),
@@ -160,6 +152,12 @@ pub(crate) fn os_chmod(checker: &Checker, call: &ExprCall, segments: &[&str]) {
             format!("{path_code}.chmod({chmod_args})")
         } else {
             format!("{binding}({path_code}).chmod({chmod_args})")
+        };
+
+        let applicability = if checker.comment_ranges().intersects(range) {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
         };
 
         Ok(Fix::applicable_edits(
