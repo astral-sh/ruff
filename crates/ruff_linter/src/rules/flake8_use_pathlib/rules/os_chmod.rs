@@ -105,7 +105,9 @@ pub(crate) fn os_chmod(checker: &Checker, call: &ExprCall, segments: &[&str]) {
         return;
     }
 
-    let Some(path) = path_arg else {
+    let (Some(path_arg), Some(mode_arg)) =
+        (path_arg, call.arguments.find_argument_value("mode", 1))
+    else {
         return;
     };
 
@@ -121,35 +123,36 @@ pub(crate) fn os_chmod(checker: &Checker, call: &ExprCall, segments: &[&str]) {
         )?;
 
         let locator = checker.locator();
-        let path_code = locator.slice(path.range());
+        let path_code = locator.slice(path_arg.range());
 
-        let (mode, follow_symlinks) = (
-            call.arguments.find_argument("mode", 1),
-            call.arguments.find_argument("follow_symlinks", 3),
+        let chmod_args = itertools::join(
+            call.arguments
+                .arguments_source_order()
+                .filter_map(|arg| match arg {
+                    ArgOrKeyword::Arg(expr) if expr.range() == path_arg.range() => None,
+                    ArgOrKeyword::Arg(expr) if expr.range() == mode_arg.range() => {
+                        Some(locator.slice(expr.range()).to_string())
+                    }
+                    ArgOrKeyword::Keyword(kw) if kw.arg.as_deref() == Some("mode") => {
+                        Some(format!("mode={}", locator.slice(&kw.value)))
+                    }
+                    ArgOrKeyword::Keyword(kw) if kw.arg.as_deref() == Some("follow_symlinks") => {
+                        if let Some(bl) = kw.value.as_boolean_literal_expr() {
+                            if !bl.value {
+                                Some("follow_symlinks=False".to_string())
+                            } else {
+                                None
+                            }
+                        } else {
+                            Some(format!("follow_symlinks={}", locator.slice(&kw.value)))
+                        }
+                    }
+                    _ => None,
+                }),
+            ", ",
         );
 
-        let args = |arg: &ArgOrKeyword| match arg {
-            ArgOrKeyword::Arg(expr) => locator.slice(expr),
-            ArgOrKeyword::Keyword(keyword) => locator.slice(&keyword.value),
-        };
-
-        let follow_symlinks_is_false = |arg: &ArgOrKeyword| {
-            let expr = match arg {
-                ArgOrKeyword::Arg(e) => e,
-                ArgOrKeyword::Keyword(k) => &k.value,
-            };
-            expr.as_boolean_literal_expr().is_some_and(|bl| !bl.value)
-        };
-
-        let chmod_args = match (mode, follow_symlinks) {
-            (Some(m), Some(f)) if follow_symlinks_is_false(&f) => {
-                format!("{}, follow_symlinks=False", args(&m))
-            }
-            (Some(arg), _) | (_, Some(arg)) => args(&arg).to_string(),
-            _ => String::new(),
-        };
-
-        let replacement = if is_pathlib_path_call(checker, path) {
+        let replacement = if is_pathlib_path_call(checker, path_arg) {
             format!("{path_code}.chmod({chmod_args})")
         } else {
             format!("{binding}({path_code}).chmod({chmod_args})")
