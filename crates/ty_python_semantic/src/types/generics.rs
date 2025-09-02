@@ -19,7 +19,7 @@ use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
     IsEquivalentVisitor, KnownClass, KnownInstanceType, MaterializationKind, NormalizedVisitor,
     Type, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind,
-    TypeVarVariance, UnionBuilder, UnionType, binding_type, declaration_type,
+    TypeVarVariance, UnionType, binding_type, declaration_type,
 };
 use crate::{Db, FxOrderSet};
 
@@ -1114,26 +1114,30 @@ impl<'db> SpecializationBuilder<'db> {
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                         // If the type is assignable to _all_ of the constraints, then we
                         // specialize the typevar to the type itself. If the type is assignable to
-                        // some but not all of them, we specialize the type to the union of the
-                        // constraints that it was assignable to. Otherwise it's a specialization
-                        // error.
-                        let mut builder = UnionBuilder::new(self.db);
+                        // some but not all of them, we specialize the typevar to the "smallest"
+                        // constraint that the type is assignable to. Otherwise it's a
+                        // specialization error.
                         let mut when_all_assignable = ConstraintSet::from(true);
-                        let mut any_assignable = false;
+                        let mut smallest_assignable = None;
                         for constraint in constraints.elements(self.db) {
                             let when_assignable: ConstraintSet =
                                 ty.when_assignable_to(self.db, *constraint);
                             if when_assignable.is_always_satisfied() {
-                                builder = builder.add(*constraint);
-                                any_assignable = true;
+                                // If the type is assignable to this constraint individually. We
+                                // only track the smallest such constraint.
+                                if let Some(existing) = smallest_assignable.replace(*constraint) {
+                                    if existing.is_assignable_to(self.db, *constraint) {
+                                        smallest_assignable.replace(existing);
+                                    }
+                                }
                             }
                             when_all_assignable.intersect(self.db, &when_assignable);
                         }
 
                         if when_all_assignable.is_always_satisfied() {
                             self.add_type_mapping(bound_typevar, ty);
-                        } else if any_assignable {
-                            self.add_type_mapping(bound_typevar, builder.build());
+                        } else if let Some(smallest_assignable) = smallest_assignable {
+                            self.add_type_mapping(bound_typevar, smallest_assignable);
                         } else {
                             return Err(SpecializationError::MismatchedConstraint {
                                 bound_typevar,
