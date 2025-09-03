@@ -78,8 +78,4 @@ _ = t"{dict(map(lambda v: (v, v**2), nums))}"
 
 # See https://github.com/astral-sh/ruff/issues/20198
 # No error: lambda contains `yield`, so map() should not be rewritten
-base = 0
-gens = map(lambda x: (yield base + x), [1, 2, 3])
-for gen in gens:
-    _ = [*gen]
-    base += 20
+map(lambda x: (yield x), [1, 2, 3])

@@ -123,8 +123,8 @@ pub(crate) fn unnecessary_map(checker: &Checker, call: &ast::ExprCall) {
     };
 
     // If the lambda body contains a `yield` or `yield from`, rewriting `map(lambda ...)` to a
-    // generator or comprehension changes the semantics or is outright invalid syntax
-    // (e.g., `yield` is not allowed inside a generator expression). In such cases, skip.
+    // generator expression or any comprehension is invalid Python syntax
+    // (e.g., `yield` is not allowed inside generator or comprehension expressions). In such cases, skip.
     if lambda_contains_yield(&lambda.body) {
         return;
     }
