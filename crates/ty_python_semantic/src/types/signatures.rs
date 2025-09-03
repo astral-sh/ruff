@@ -15,15 +15,26 @@ use std::{collections::HashMap, slice::Iter};
 use itertools::EitherOrBoth;
 use smallvec::{SmallVec, smallvec_inline};
 
+use super::{
+    DynamicType, FunctionDecorators, KnownInstanceType, Type, definition_expression_type,
+    infer_definition_types, nearest_enclosing_class, semantic_index,
+};
 use super::{DynamicType, Type, TypeVarVariance, definition_expression_type};
+use super::{DynamicType, Type, definition_expression_type};
 use crate::semantic_index::definition::Definition;
+use crate::semantic_index::definition::Definition;
+use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::types::constraints::{ConstraintSet, Constraints, IteratorConstraintsExtension};
+use crate::types::generics::GenericContext;
+use crate::types::generics::GenericContext;
 use crate::types::generics::{GenericContext, walk_generic_context};
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, FindLegacyTypeVarsVisitor,
     HasRelationToVisitor, IsEquivalentVisitor, KnownClass, MaterializationKind, NormalizedVisitor,
     TypeMapping, TypeRelation, VarianceInferable, todo_type,
 };
+use crate::types::{ClassLiteral, TypeMapping, TypeVarInstance, todo_type};
+use crate::types::{ClassLiteral, TypeMapping, TypeVarInstance, todo_type};
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
 
@@ -1165,16 +1176,57 @@ impl<'db> Parameters<'db> {
                 },
             )
         });
-        let positional_or_keyword = args.iter().map(|arg| {
-            Parameter::from_node_and_kind(
-                db,
-                definition,
-                &arg.parameter,
-                ParameterKind::PositionalOrKeyword {
-                    name: arg.parameter.name.id.clone(),
-                    default_type: default_type(arg),
-                },
-            )
+        let function_is_method = if matches!(definition.kind(db), DefinitionKind::Function(_)) {
+            let scope = definition.scope(db);
+            let index = semantic_index(db, scope.file(db));
+            nearest_enclosing_class(db, index, scope).is_some()
+        } else {
+            false
+        };
+        let classmethod = if let DefinitionKind::Function(f) = definition.kind(db) {
+            if f.name.id() == "__new__" {
+                true
+            } else {
+                let result = infer_definition_types(db, definition);
+                match result.declaration_type(definition).inner_type() {
+                    Type::FunctionLiteral(t) => {
+                        t.decorators(db).contains(FunctionDecorators::CLASSMETHOD)
+                    }
+                    _ => false,
+                }
+            }
+        } else {
+            false
+        };
+        let positional_or_keyword = args.iter().enumerate().map(|(index, arg)| {
+            if index == 0
+                && function_is_method
+                && arg.parameter.annotation().is_none()
+                // TODO: Handle type of cls
+                && !classmethod
+            {
+                let implicit_annotation = Type::KnownInstance(KnownInstanceType::TypingSelf)
+                    .in_type_expression(db, definition.scope(db))
+                    .unwrap();
+                Parameter {
+                    annotated_type: Some(implicit_annotation),
+                    kind: ParameterKind::PositionalOrKeyword {
+                        name: arg.parameter.name.id.clone(),
+                        default_type: default_type(arg),
+                    },
+                    form: ParameterForm::Value,
+                }
+            } else {
+                Parameter::from_node_and_kind(
+                    db,
+                    definition,
+                    &arg.parameter,
+                    ParameterKind::PositionalOrKeyword {
+                        name: arg.parameter.name.id.clone(),
+                        default_type: default_type(arg),
+                    },
+                )
+            }
         });
         let variadic = vararg.as_ref().map(|arg| {
             Parameter::from_node_and_kind(
