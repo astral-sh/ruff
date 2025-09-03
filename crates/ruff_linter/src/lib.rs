@@ -5,7 +5,6 @@
 //!
 //! [Ruff]: https://github.com/astral-sh/ruff
 
-pub use locator::Locator;
 pub use noqa::generate_noqa_edits;
 #[cfg(feature = "clap")]
 pub use registry::clap_completion::RuleParser;
@@ -15,6 +14,7 @@ pub use rule_selector::clap_completion::RuleSelectorParser;
 pub use rules::pycodestyle::rules::IOError;
 
 pub(crate) use ruff_diagnostics::{Applicability, Edit, Fix};
+pub use ruff_source_file::Locator;
 pub use violation::{AlwaysFixableViolation, FixAvailability, Violation, ViolationMetadata};
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -31,7 +31,6 @@ pub mod fs;
 mod importer;
 pub mod line_width;
 pub mod linter;
-mod locator;
 pub mod logging;
 pub mod message;
 mod noqa;

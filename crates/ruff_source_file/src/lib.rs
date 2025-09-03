@@ -10,6 +10,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 
 pub use crate::line_index::{LineIndex, OneIndexed, PositionEncoding};
 pub use crate::line_ranges::LineRanges;
+pub use crate::locator::Locator;
 pub use crate::newlines::{
     Line, LineEnding, NewlineWithTrailingNewline, UniversalNewlineIterator, UniversalNewlines,
     find_newline,
@@ -17,6 +18,7 @@ pub use crate::newlines::{
 
 mod line_index;
 mod line_ranges;
+mod locator;
 mod newlines;
 
 /// Gives access to the source code of a file and allows mapping between [`TextSize`] and [`LineColumn`].
