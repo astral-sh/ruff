@@ -306,7 +306,7 @@ impl Matcher {
                 }
             }
             ParsedAssertion::Revealed(expected_type) => {
-                let expected_type = discard_todo_metadata(&expected_type);
+                let expected_type = discard_todo_metadata(expected_type);
                 let expected_reveal_type_message = format!("`{expected_type}`");
 
                 let diagnostic_matches_reveal = |diagnostic: &Diagnostic| {
