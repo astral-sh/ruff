@@ -7899,26 +7899,23 @@ impl<'db> ContextManagerError<'db> {
         let db = context.db();
 
         // Helper function to analyze union members for specific method issues
-        let analyze_union_method_issues = |method_name: &str| -> Vec<Type<'db>> {
-            if let Type::Union(union) = context_expression_type {
-                let mut missing_method = Vec::new();
+        let analyze_union_method_issues = |union: UnionType, method_name: &str| -> Vec<Type<'db>> {
+            let mut missing_method = Vec::new();
 
-                for element in union.elements(db) {
-                    let member_lookup = element.member_lookup_with_policy(
-                        db,
-                        method_name.into(),
-                        MemberLookupPolicy::default() | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-                    );
+            for element in union.elements(db) {
+                let member_lookup = element.member_lookup_with_policy(
+                    db,
+                    method_name.into(),
+                    MemberLookupPolicy::default() | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                );
 
-                    match member_lookup.place {
-                        Place::Unbound => missing_method.push(*element),
-                    }
+                match member_lookup.place {
+                    Place::Unbound => missing_method.push(*element),
+                    Place::Type(_, _) => (),
                 }
-
-                missing_method
-            } else {
-                Vec::new()
             }
+
+            missing_method
         };
 
         let format_call_dunder_error = |call_dunder_error: &CallDunderError<'db>, name: &str| {
@@ -7926,15 +7923,15 @@ impl<'db> ContextManagerError<'db> {
                 CallDunderError::MethodNotAvailable => format!("it does not implement `{name}`"),
                 CallDunderError::PossiblyUnbound(_) => {
                     // For unions, provide more specific information about which members lack the method
-                    if let Type::Union(_) = context_expression_type {
-                        let missing_method = analyze_union_method_issues(name);
+                    if let Type::Union(union) = context_expression_type {
+                        let missing_method = analyze_union_method_issues(union, name);
                         if !missing_method.is_empty() {
                             let missing_types: Vec<_> = missing_method
                                 .iter()
                                 .map(|t| t.display(db).to_string())
                                 .collect();
                             return format!(
-                                "the method `{name}` of `{}` {} possibly unbound",
+                                "the method `{name}` of `{}` {} unbound",
                                 missing_types.join("` and `"),
                                 if missing_types.len() == 1 {
                                     "is"
@@ -7947,6 +7944,9 @@ impl<'db> ContextManagerError<'db> {
 
                     format!("the method `{name}` is possibly unbound")
                 }
+                // TODO: Use more specific error messages for the different error cases.
+                //  E.g. hint toward the union variant that doesn't correctly implement enter,
+                //  distinguish between a not callable `__enter__` attribute and a wrong signature.
                 CallDunderError::CallError(_, _) => {
                     format!("it does not correctly implement `{name}`")
                 }
@@ -7960,9 +7960,9 @@ impl<'db> ContextManagerError<'db> {
             match (error_a, error_b) {
                 (CallDunderError::PossiblyUnbound(_), CallDunderError::PossiblyUnbound(_)) => {
                     // For unions, provide more specific information about which members lack the methods
-                    if let Type::Union(_) = context_expression_type {
-                        let missing_enter = analyze_union_method_issues(name_a);
-                        let missing_exit = analyze_union_method_issues(name_b);
+                    if let Type::Union(union) = context_expression_type {
+                        let missing_enter = analyze_union_method_issues(union, name_a);
+                        let missing_exit = analyze_union_method_issues(union, name_b);
 
                         // Find union members that are missing both methods
                         let missing_both: Vec<_> = missing_enter
@@ -7973,7 +7973,7 @@ impl<'db> ContextManagerError<'db> {
 
                         if !missing_both.is_empty() {
                             return format!(
-                                "the methods `{name_a}` and `{name_b}` of `{}` are possibly unbound",
+                                "the methods `{name_a}` and `{name_b}` of `{}` are unbound",
                                 missing_both.join("` and `")
                             );
                         }
@@ -7988,9 +7988,9 @@ impl<'db> ContextManagerError<'db> {
                 }
                 (_, _) => {
                     // For mixed error cases with unions, provide detailed information about which members have issues
-                    if let Type::Union(_) = context_expression_type {
-                        let missing_enter = analyze_union_method_issues(name_a);
-                        let missing_exit = analyze_union_method_issues(name_b);
+                    if let Type::Union(union) = context_expression_type {
+                        let missing_enter = analyze_union_method_issues(union, name_a);
+                        let missing_exit = analyze_union_method_issues(union, name_b);
 
                         let mut parts = Vec::new();
 
@@ -8000,7 +8000,7 @@ impl<'db> ContextManagerError<'db> {
                                 .map(|t| t.display(db).to_string())
                                 .collect();
                             parts.push(format!(
-                                "the method `{name_a}` of `{}` {} possibly unbound",
+                                "the method `{name_a}` of `{}` {} unbound",
                                 missing_types.join("` and `"),
                                 if missing_types.len() == 1 {
                                     "is"
@@ -8016,7 +8016,7 @@ impl<'db> ContextManagerError<'db> {
                                 .map(|t| t.display(db).to_string())
                                 .collect();
                             parts.push(format!(
-                                "the method `{name_b}` of `{}` {} possibly unbound",
+                                "the method `{name_b}` of `{}` {} unbound",
                                 missing_types.join("` and `"),
                                 if missing_types.len() == 1 {
                                     "is"
