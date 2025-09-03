@@ -413,13 +413,13 @@ To see the kinds and types of the protocol members, you can use the debugging ai
 from ty_extensions import reveal_protocol_interface
 from typing import SupportsIndex, SupportsAbs, ClassVar, Iterator
 
-# error: [revealed-type] "Revealed protocol interface: `{"method_member": MethodMember(`(self) -> bytes`), "x": AttributeMember(`int`), "y": PropertyMember { getter: `def y(self) -> str` }, "z": PropertyMember { getter: `def z(self) -> int`, setter: `def z(self, z: int) -> None` }}`"
+# revealed: {"method_member": MethodMember(`(self) -> bytes`), "x": AttributeMember(`int`), "y": PropertyMember { getter: `def y(self) -> str` }, "z": PropertyMember { getter: `def z(self) -> int`, setter: `def z(self, z: int) -> None` }}
 reveal_protocol_interface(Foo)
-# error: [revealed-type] "Revealed protocol interface: `{"__index__": MethodMember(`(self) -> int`)}`"
+# revealed: {"__index__": MethodMember(`(self) -> int`)}
 reveal_protocol_interface(SupportsIndex)
-# error: [revealed-type] "Revealed protocol interface: `{"__abs__": MethodMember(`(self) -> Unknown`)}`"
+# revealed: {"__abs__": MethodMember(`(self) -> Unknown`)}
 reveal_protocol_interface(SupportsAbs)
-# error: [revealed-type] "Revealed protocol interface: `{"__iter__": MethodMember(`(self) -> Iterator[Unknown]`), "__next__": MethodMember(`(self) -> Unknown`)}`"
+# revealed: {"__iter__": MethodMember(`(self) -> Iterator[Unknown]`), "__next__": MethodMember(`(self) -> Unknown`)}
 reveal_protocol_interface(Iterator)
 
 # error: [invalid-argument-type] "Invalid argument to `reveal_protocol_interface`: Only protocol classes can be passed to `reveal_protocol_interface`"
@@ -439,9 +439,9 @@ do not implement any special handling for generic aliases passed to the function
 reveal_type(get_protocol_members(SupportsAbs[int]))  # revealed: frozenset[str]
 reveal_type(get_protocol_members(Iterator[int]))  # revealed: frozenset[str]
 
-# error: [revealed-type] "Revealed protocol interface: `{"__abs__": MethodMember(`(self) -> int`)}`"
+# revealed: {"__abs__": MethodMember(`(self) -> int`)}
 reveal_protocol_interface(SupportsAbs[int])
-# error: [revealed-type] "Revealed protocol interface: `{"__iter__": MethodMember(`(self) -> Iterator[int]`), "__next__": MethodMember(`(self) -> int`)}`"
+# revealed: {"__iter__": MethodMember(`(self) -> Iterator[int]`), "__next__": MethodMember(`(self) -> int`)}
 reveal_protocol_interface(Iterator[int])
 
 class BaseProto(Protocol):
@@ -450,16 +450,16 @@ class BaseProto(Protocol):
 class SubProto(BaseProto, Protocol):
     def member(self) -> bool: ...
 
-# error: [revealed-type] "Revealed protocol interface: `{"member": MethodMember(`(self) -> int`)}`"
+# revealed: {"member": MethodMember(`(self) -> int`)}
 reveal_protocol_interface(BaseProto)
 
-# error: [revealed-type] "Revealed protocol interface: `{"member": MethodMember(`(self) -> bool`)}`"
+# revealed: {"member": MethodMember(`(self) -> bool`)}
 reveal_protocol_interface(SubProto)
 
 class ProtoWithClassVar(Protocol):
     x: ClassVar[int]
 
-# error: [revealed-type] "Revealed protocol interface: `{"x": AttributeMember(`int`; ClassVar)}`"
+# revealed: {"x": AttributeMember(`int`; ClassVar)}
 reveal_protocol_interface(ProtoWithClassVar)
 
 class ProtocolWithDefault(Protocol):
@@ -468,7 +468,7 @@ class ProtocolWithDefault(Protocol):
 # We used to incorrectly report this as having an `x: Literal[0]` member;
 # declared types should take priority over inferred types for protocol interfaces!
 #
-# error: [revealed-type] "Revealed protocol interface: `{"x": AttributeMember(`int`)}`"
+# revealed: {"x": AttributeMember(`int`)}
 reveal_protocol_interface(ProtocolWithDefault)
 ```
 
@@ -2474,7 +2474,7 @@ class Foo(Protocol):
 from stub import Foo
 from ty_extensions import reveal_protocol_interface
 
-# error: [revealed-type] "Revealed protocol interface: `{"x": AttributeMember(`int`; ClassVar)}`"
+# revealed: {"x": AttributeMember(`int`; ClassVar)}
 reveal_protocol_interface(Foo)
 ```
 

@@ -133,9 +133,6 @@ pub(crate) trait Constraints<'db>: Clone + Sized {
     }
 
     // This is here so that we can easily print constraint sets when debugging.
-    // TODO: Add a ty_extensions function to reveal constraint sets so that this is no longer dead
-    // code, and so that we verify the contents of our rendering.
-    #[expect(dead_code)]
     fn display(&self, db: &'db dyn Db) -> impl Display;
 }
 
@@ -345,34 +342,6 @@ impl<'db> ConstraintSet<'db> {
             }
         }
     }
-
-    // This is here so that we can easily print constraint sets when debugging.
-    // TODO: Add a ty_extensions function to reveal constraint sets so that this is no longer dead
-    // code, and so that we verify the contents of our rendering.
-    #[expect(dead_code)]
-    pub(crate) fn display(&self, db: &'db dyn Db) -> impl Display {
-        struct DisplayConstraintSet<'a, 'db> {
-            set: &'a ConstraintSet<'db>,
-            db: &'db dyn Db,
-        }
-
-        impl Display for DisplayConstraintSet<'_, '_> {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                if self.set.clauses.is_empty() {
-                    return f.write_str("0");
-                }
-                for (i, clause) in self.set.clauses.iter().enumerate() {
-                    if i > 0 {
-                        f.write_str(" ∨ ")?;
-                    }
-                    clause.display(self.db).fmt(f)?;
-                }
-                Ok(())
-            }
-        }
-
-        DisplayConstraintSet { set: self, db }
-    }
 }
 
 impl<'db> Constraints<'db> for ConstraintSet<'db> {
@@ -411,7 +380,27 @@ impl<'db> Constraints<'db> for ConstraintSet<'db> {
     }
 
     fn display(&self, db: &'db dyn Db) -> impl Display {
-        self.display(db)
+        struct DisplayConstraintSet<'a, 'db> {
+            set: &'a ConstraintSet<'db>,
+            db: &'db dyn Db,
+        }
+
+        impl Display for DisplayConstraintSet<'_, '_> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                if self.set.clauses.is_empty() {
+                    return f.write_str("0");
+                }
+                for (i, clause) in self.set.clauses.iter().enumerate() {
+                    if i > 0 {
+                        f.write_str(" ∨ ")?;
+                    }
+                    clause.display(self.db).fmt(f)?;
+                }
+                Ok(())
+            }
+        }
+
+        DisplayConstraintSet { set: self, db }
     }
 }
 
