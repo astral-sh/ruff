@@ -9249,7 +9249,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                     }
 
-                    match ty.try_call(db, &CallArguments::positional([value_ty, slice_ty])) {
+                    match ty.try_call(db, &CallArguments::positional([slice_ty])) {
                         Ok(bindings) => return bindings.return_type(db),
                         Err(CallError(_, bindings)) => {
                             if let Some(builder) =
