@@ -79,8 +79,8 @@ use crate::types::visitor::any_over_type;
 use crate::types::{
     BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, ClassType,
     DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
-    IsEquivalentVisitor, KnownClass, MaterializationKind, NormalizedVisitor, SpecialFormType,
-    Truthiness, Type, TypeMapping, TypeRelation, UnionBuilder, all_members, walk_type_mapping,
+    IsEquivalentVisitor, KnownClass, NormalizedVisitor, SpecialFormType, Truthiness, Type,
+    TypeMapping, TypeRelation, UnionBuilder, all_members, walk_type_mapping,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -626,8 +626,6 @@ pub struct FunctionType<'db> {
     /// of a specialized generic class).
     #[returns(deref)]
     type_mappings: Box<[TypeMapping<'db, 'db>]>,
-
-    materialization_kind: Option<MaterializationKind>,
 }
 
 // The Salsa heap is tracked separately.
@@ -654,12 +652,7 @@ impl<'db> FunctionType<'db> {
         let literal = self
             .literal(db)
             .with_inherited_generic_context(db, inherited_generic_context);
-        Self::new(
-            db,
-            literal,
-            self.type_mappings(db),
-            self.materialization_kind(db),
-        )
+        Self::new(db, literal, self.type_mappings(db))
     }
 
     pub(crate) fn with_type_mapping<'a>(
@@ -673,12 +666,7 @@ impl<'db> FunctionType<'db> {
             .cloned()
             .chain(std::iter::once(type_mapping.to_owned()))
             .collect();
-        Self::new(
-            db,
-            self.literal(db),
-            type_mappings,
-            self.materialization_kind(db),
-        )
+        Self::new(db, self.literal(db), type_mappings)
     }
 
     pub(crate) fn with_dataclass_transformer_params(
@@ -694,12 +682,7 @@ impl<'db> FunctionType<'db> {
             .with_dataclass_transformer_params(db, params);
         let literal =
             FunctionLiteral::new(db, last_definition, literal.inherited_generic_context(db));
-        Self::new(
-            db,
-            literal,
-            self.type_mappings(db),
-            self.materialization_kind(db),
-        )
+        Self::new(db, literal, self.type_mappings(db))
     }
 
     /// Returns the [`File`] in which this function is defined.
@@ -971,12 +954,7 @@ impl<'db> FunctionType<'db> {
             .iter()
             .map(|mapping| mapping.normalized_impl(db, visitor))
             .collect();
-        Self::new(
-            db,
-            self.literal(db).normalized_impl(db, visitor),
-            mappings,
-            self.materialization_kind(db),
-        )
+        Self::new(db, self.literal(db).normalized_impl(db, visitor), mappings)
     }
 }
 
