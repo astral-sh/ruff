@@ -131,8 +131,6 @@ def _(x: bool):
         reveal_type(x)  # revealed: Literal[False]
 ```
 
-<!-- TODO: Add enum tests -->
-<!--
 ## `in` for enums
 
 ```py
@@ -145,9 +143,11 @@ class Color(Enum):
 
 def _(x: Color):
     if x in (Color.RED, Color.GREEN):
-        reveal_type(x)  # revealed: Literal[Color.RED, Color.GREEN]
+        # TODO should be `Literal[Color.RED, Color.GREEN]`
+        reveal_type(x)  # revealed: Color
     else:
-        reveal_type(x)  # revealed: Literal[Color.BLUE]
+        # TODO should be `Literal[Color.BLUE]`
+        reveal_type(x)  # revealed: Color
 ```
 
 ## Union with enum and `int`
@@ -162,10 +162,11 @@ class Status(Enum):
 
 def test(x: Status | int):
     if x in (Status.PENDING, Status.APPROVED):
+        # TODO should be `Literal[Status.PENDING, Status.APPROVED] | int`
         # int is included because custom __eq__ methods could make
         # an int equal to Status.PENDING or Status.APPROVED, so we can't eliminate it
-        reveal_type(x)  # revealed: Literal[Status.PENDING, Status.APPROVED] | int
+        reveal_type(x)  # revealed: Status | int
     else:
-        reveal_type(x)  # revealed: Literal[Status.REJECTED] | int
+        # TODO should be `Literal[Status.REJECTED] | int`
+        reveal_type(x)  # revealed: Status | int
 ```
--->
