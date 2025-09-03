@@ -718,10 +718,15 @@ class Invariant[T]:
 
     def push(self, obj: T) -> None: ...
 
+    attr: T
+
 def capybara(top: Top[Invariant[Any]], bottom: Bottom[Invariant[Any]]) -> None:
     reveal_type(top.get)  # revealed: bound method Top[Invariant[Any]].get() -> object
     reveal_type(top.push)  # revealed: bound method Top[Invariant[Any]].push(obj: Never) -> None
 
     reveal_type(bottom.get)  # revealed: bound method Bottom[Invariant[Any]].get() -> Never
     reveal_type(bottom.push)  # revealed: bound method Bottom[Invariant[Any]].push(obj: object) -> None
+
+    reveal_type(top.attr)  # revealed: object
+    reveal_type(bottom.attr)  # revealed: Never
 ```
