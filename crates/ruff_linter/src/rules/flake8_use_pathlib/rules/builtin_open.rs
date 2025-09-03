@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{Expr, ExprBooleanLiteral, ExprCall};
+use ruff_python_ast::{ArgOrKeyword, Expr, ExprBooleanLiteral, ExprCall};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -87,6 +87,8 @@ pub(crate) fn builtin_open(checker: &Checker, call: &ExprCall, segments: &[&str]
     // ```text
     // Path.open(mode='r', buffering=-1, encoding=None, errors=None, newline=None)
     // ```
+    let file_arg = call.arguments.find_argument_value("file", 0);
+
     if call
         .arguments
         .find_argument_value("closefd", 6)
@@ -97,10 +99,7 @@ pub(crate) fn builtin_open(checker: &Checker, call: &ExprCall, segments: &[&str]
             )
         })
         || is_argument_non_default(&call.arguments, "opener", 7)
-        || call
-            .arguments
-            .find_argument_value("file", 0)
-            .is_some_and(|expr| is_file_descriptor(expr, checker.semantic()))
+        || file_arg.is_some_and(|expr| is_file_descriptor(expr, checker.semantic()))
     {
         return;
     }
@@ -112,7 +111,7 @@ pub(crate) fn builtin_open(checker: &Checker, call: &ExprCall, segments: &[&str]
     let range = call.range();
     let mut diagnostic = checker.report_diagnostic(BuiltinOpen, call.func.range());
 
-    let Some(file) = call.arguments.find_argument_value("file", 0) else {
+    let Some(file) = file_arg else {
         return;
     };
 
@@ -146,19 +145,44 @@ pub(crate) fn builtin_open(checker: &Checker, call: &ExprCall, segments: &[&str]
         let locator = checker.locator();
         let file_code = locator.slice(file.range());
 
-        let (mode, buffering, encoding, errors, newline) = (
-            call.arguments.find_argument("mode", 1),
-            call.arguments.find_argument("buffering", 2),
-            call.arguments.find_argument("encoding", 3),
-            call.arguments.find_argument("errors", 4),
-            call.arguments.find_argument("newline", 5),
-        );
+        let args = |i: usize, arg: ArgOrKeyword| {
+            let clean_expr = |expr: &Expr, s: &str| match expr {
+                Expr::StringLiteral(_) | Expr::TString(_) | Expr::FString(_) => s.to_string(),
+                _ => s.replace(char::is_whitespace, ""),
+            };
+
+            match arg {
+                ArgOrKeyword::Arg(expr) => {
+                    if expr.range() == file.range() {
+                        None
+                    } else if i == 6 || i == 7 {
+                        // skip `closefd` and `opener`
+                        None
+                    } else {
+                        let s = locator.slice(expr.range());
+                        Some(clean_expr(expr, s))
+                    }
+                }
+                ArgOrKeyword::Keyword(kw) => match kw.arg.as_deref() {
+                    Some(arg)
+                        if matches!(
+                            arg,
+                            "mode" | "buffering" | "encoding" | "errors" | "newline"
+                        ) =>
+                    {
+                        let s = locator.slice(&kw.value);
+                        Some(format!("{arg}={}", clean_expr(&kw.value, s)))
+                    }
+                    _ => None,
+                },
+            }
+        };
 
         let open_args = itertools::join(
-            [mode, buffering, encoding, errors, newline]
-                .into_iter()
-                .flatten()
-                .map(|arg| locator.slice(arg).to_string()),
+            call.arguments
+                .arguments_source_order()
+                .enumerate()
+                .filter_map(|(i, arg)| args(i, arg)),
             ", ",
         );
 
