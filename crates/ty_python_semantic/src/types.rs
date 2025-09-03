@@ -4158,7 +4158,9 @@ impl<'db> Type<'db> {
                 )
                 .into(),
 
-                Some(KnownFunction::RevealWhenAssignableTo) => Binding::single(
+                Some(
+                    KnownFunction::RevealWhenAssignableTo | KnownFunction::RevealWhenSubtypeOf,
+                ) => Binding::single(
                     self,
                     Signature::new(
                         Parameters::new([

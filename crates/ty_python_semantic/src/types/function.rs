@@ -1184,6 +1184,8 @@ pub enum KnownFunction {
     RevealProtocolInterface,
     /// `ty_extensions.reveal_when_assignable_to`
     RevealWhenAssignableTo,
+    /// `ty_extensions.reveal_when_subtype_of`
+    RevealWhenSubtypeOf,
 }
 
 impl KnownFunction {
@@ -1250,6 +1252,7 @@ impl KnownFunction {
             | Self::HasMember
             | Self::RevealProtocolInterface
             | Self::RevealWhenAssignableTo
+            | Self::RevealWhenSubtypeOf
             | Self::AllMembers => module.is_ty_extensions(),
             Self::ImportModule => module.is_importlib(),
         }
@@ -1569,6 +1572,30 @@ impl KnownFunction {
                 }
             }
 
+            KnownFunction::RevealWhenSubtypeOf => {
+                let [Some(ty_a), Some(ty_b)] = overload.parameter_types() else {
+                    return;
+                };
+                let constraints = ty_a.when_subtype_of::<ConstraintSet>(db, *ty_b);
+                let Some(builder) =
+                    context.report_diagnostic(DiagnosticId::RevealedType, Severity::Info)
+                else {
+                    return;
+                };
+                let mut diag = builder.into_diagnostic("Subtyping holds");
+                let span = context.span(call_expression);
+                if constraints.is_always_satisfied(db) {
+                    diag.annotate(Annotation::primary(span).message("always"));
+                } else if constraints.is_never_satisfied(db) {
+                    diag.annotate(Annotation::primary(span).message("never"));
+                } else {
+                    diag.annotate(
+                        Annotation::primary(span)
+                            .message(format_args!("when {}", constraints.display(db))),
+                    );
+                }
+            }
+
             _ => {}
         }
     }
@@ -1630,6 +1657,7 @@ pub(crate) mod tests {
                 | KnownFunction::HasMember
                 | KnownFunction::RevealProtocolInterface
                 | KnownFunction::RevealWhenAssignableTo
+                | KnownFunction::RevealWhenSubtypeOf
                 | KnownFunction::AllMembers => KnownModule::TyExtensions,
 
                 KnownFunction::ImportModule => KnownModule::ImportLib,
