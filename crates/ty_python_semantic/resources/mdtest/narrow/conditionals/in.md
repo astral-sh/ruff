@@ -92,3 +92,106 @@ if (x := f()) in (1,):
 else:
     reveal_type(x)  # revealed: Literal[2, 3]
 ```
+
+## Union with `Literal`, `None` and `int`
+
+```py
+from typing import Literal
+
+def test(x: Literal["a", "b", "c"] | None | int = None):
+    if x in ("a", "b"):
+        # int is included because custom __eq__ methods could make
+        # an int equal to "a" or "b", so we can't eliminate it
+        reveal_type(x)  # revealed: Literal["a", "b"] | int
+    else:
+        reveal_type(x)  # revealed: Literal["c"] | None | int
+```
+
+## Direct `not in` conditional
+
+```py
+from typing import Literal
+
+def test(x: Literal["a", "b", "c"] | None | int = None):
+    if x not in ("a", "c"):
+        # int is included because custom __eq__ methods could make
+        # an int equal to "a" or "b", so we can't eliminate it
+        reveal_type(x)  # revealed: Literal["b"] | None | int
+    else:
+        reveal_type(x)  # revealed: Literal["a", "c"] | int
+```
+
+## bool
+
+```py
+def _(x: bool):
+    if x in (True,):
+        reveal_type(x)  # revealed: Literal[True]
+    else:
+        reveal_type(x)  # revealed: Literal[False]
+
+def _(x: bool | str):
+    if x in (False,):
+        # `str` remains due to possible custom __eq__ methods on a subclass
+        reveal_type(x)  # revealed: Literal[False] | str
+    else:
+        reveal_type(x)  # revealed: Literal[True] | str
+```
+
+## LiteralString
+
+```py
+from typing_extensions import LiteralString
+
+def _(x: LiteralString):
+    if x in ("a", "b", "c"):
+        reveal_type(x)  # revealed: Literal["a", "b", "c"]
+    else:
+        reveal_type(x)  # revealed: LiteralString & ~Literal["a"] & ~Literal["b"] & ~Literal["c"]
+
+def _(x: LiteralString | int):
+    if x in ("a", "b", "c"):
+        reveal_type(x)  # revealed: Literal["a", "b", "c"] | int
+    else:
+        reveal_type(x)  # revealed: (LiteralString & ~Literal["a"] & ~Literal["b"] & ~Literal["c"]) | int
+```
+
+## enums
+
+```py
+from enum import Enum
+
+class Color(Enum):
+    RED = "red"
+    GREEN = "green"
+    BLUE = "blue"
+
+def _(x: Color):
+    if x in (Color.RED, Color.GREEN):
+        # TODO should be `Literal[Color.RED, Color.GREEN]`
+        reveal_type(x)  # revealed: Color
+    else:
+        # TODO should be `Literal[Color.BLUE]`
+        reveal_type(x)  # revealed: Color
+```
+
+## Union with enum and `int`
+
+```py
+from enum import Enum
+
+class Status(Enum):
+    PENDING = 1
+    APPROVED = 2
+    REJECTED = 3
+
+def test(x: Status | int):
+    if x in (Status.PENDING, Status.APPROVED):
+        # TODO should be `Literal[Status.PENDING, Status.APPROVED] | int`
+        # int is included because custom __eq__ methods could make
+        # an int equal to Status.PENDING or Status.APPROVED, so we can't eliminate it
+        reveal_type(x)  # revealed: Status | int
+    else:
+        # TODO should be `Literal[Status.REJECTED] | int`
+        reveal_type(x)  # revealed: Status | int
+```
