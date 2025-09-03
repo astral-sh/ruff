@@ -1397,10 +1397,13 @@ impl<'db> CallableBinding<'db> {
             for expanded_arguments in &expanded_argument_lists {
                 let mut argument_forms = ArgumentForms::new(expanded_arguments.len());
 
-                // The spec mentions that each expanded argument list should re-evaluate from step
-                // 2 which is the type checking step but we're re-evaluating from step 1. The tldr
-                // is that it allows ty to match the correct overload in case a variadic argument
-                // would expand into different number of arguments with each expansion. Refer to
+                // The spec mentions that each expanded argument list should be re-evaluated from
+                // step 2 but we need to re-evaluate from step 1 because our step 1 does more than
+                // what the spec mentions. Step 1 of the spec means only "eliminate impossible
+                // overloads due to arity mismatch" while our step 1 (`match_parameters`) also
+                // includes "match arguments to the parameters". This is important because it
+                // allows us to correctly handle cases involving a variadic argument that could
+                // expand into different number of arguments with each expansion. Refer to
                 // https://github.com/astral-sh/ty/issues/735 for more details.
                 for overload in &mut self.overloads {
                     // Clear the state of all overloads before re-evaluating from step 1
@@ -1947,7 +1950,7 @@ impl ArgumentForms {
                 self.values[index] = *other_form;
             }
 
-            // Update global conflicting form (true takes precedence)
+            // Update the conflicting form (true takes precedence)
             self.conflicting[index] |= *other_conflict;
         }
     }
