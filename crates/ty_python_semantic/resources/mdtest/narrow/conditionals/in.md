@@ -121,7 +121,7 @@ def test(x: Literal["a", "b", "c"] | None | int = None):
         reveal_type(x)  # revealed: Literal["a", "c"] | int
 ```
 
-## `in` for `bool`
+## bool
 
 ```py
 def _(x: bool):
@@ -129,9 +129,34 @@ def _(x: bool):
         reveal_type(x)  # revealed: Literal[True]
     else:
         reveal_type(x)  # revealed: Literal[False]
+
+def _(x: bool | str):
+    if x in (False,):
+        # `str` remains due to possible custom __eq__ methods on a subclass
+        reveal_type(x)  # revealed: Literal[False] | str
+    else:
+        reveal_type(x)  # revealed: Literal[True] | str
 ```
 
-## `in` for enums
+## LiteralString
+
+```py
+from typing_extensions import LiteralString
+
+def _(x: LiteralString):
+    if x in ("a", "b", "c"):
+        reveal_type(x)  # revealed: Literal["a", "b", "c"]
+    else:
+        reveal_type(x)  # revealed: LiteralString & ~Literal["a"] & ~Literal["b"] & ~Literal["c"]
+
+def _(x: LiteralString | int):
+    if x in ("a", "b", "c"):
+        reveal_type(x)  # revealed: Literal["a", "b", "c"] | int
+    else:
+        reveal_type(x)  # revealed: (LiteralString & ~Literal["a"] & ~Literal["b"] & ~Literal["c"]) | int
+```
+
+## enums
 
 ```py
 from enum import Enum

@@ -637,7 +637,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             if let Some(lhs_union) = lhs_ty.into_union() {
                 for element in lhs_union.elements(self.db) {
                     // Keep only the non-single-valued portion of the original type.
-                    if !element.is_single_valued(self.db) && !element.is_literal_string() {
+                    if !element.is_single_valued(self.db)
+                        && !element.is_literal_string()
+                        && !element.is_bool(self.db)
+                    {
                         builder = builder.add(*element);
                     }
                 }
@@ -669,7 +672,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
             if let Some(lhs_union) = lhs_ty.into_union() {
                 for element in lhs_union.elements(self.db) {
-                    if element.is_single_valued(self.db) || element.is_literal_string() {
+                    if element.is_single_valued(self.db)
+                        || element.is_literal_string()
+                        || element.is_bool(self.db)
+                    {
                         single_builder = single_builder.add(*element);
                     } else {
                         rest_builder = rest_builder.add(*element);
