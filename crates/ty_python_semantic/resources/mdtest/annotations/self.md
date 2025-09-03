@@ -42,6 +42,7 @@ class Shape:
 
 reveal_type(Shape().nested_type())  # revealed: list[Shape]
 reveal_type(Shape().nested_func())  # revealed: Shape
+reveal_type(Shape().implicit_self())  # revealed: Shape
 
 class Circle(Shape):
     def set_scale(self: Self, scale: float) -> Self:
