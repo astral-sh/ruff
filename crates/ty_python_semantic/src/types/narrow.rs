@@ -709,26 +709,30 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             return None;
         }
 
+        let inference = infer_expression_types(self.db, expression);
+
         let comparator_tuples = std::iter::once(&**left)
             .chain(comparators)
             .tuple_windows::<(&ruff_python_ast::Expr, &ruff_python_ast::Expr)>();
         let mut constraints = NarrowingConstraints::default();
 
+        let mut last_rhs_ty: Option<Type> = None;
+
         for (op, (left, right)) in std::iter::zip(&**ops, comparator_tuples) {
+            let lhs_ty = last_rhs_ty.unwrap_or_else(|| inference.expression_type(left));
+            let rhs_ty = inference.expression_type(right);
+            last_rhs_ty = Some(rhs_ty);
+
             match left {
                 ast::Expr::Name(_)
                 | ast::Expr::Attribute(_)
                 | ast::Expr::Subscript(_)
                 | ast::Expr::Named(_) => {
-                    if let Some(left_place) = place_expr(left) {
+                    if let Some(left) = place_expr(left) {
                         let op = if is_positive { *op } else { op.negate() };
 
-                        let inference = infer_expression_types(self.db, expression);
-                        let lhs_ty = inference.expression_type(left);
-                        let rhs_ty = inference.expression_type(right);
-
                         if let Some(ty) = self.evaluate_expr_compare_op(lhs_ty, rhs_ty, op) {
-                            let place = self.expect_place(&left_place);
+                            let place = self.expect_place(&left);
                             constraints.insert(place, ty);
                         }
                     }
@@ -745,6 +749,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                             node_index: _,
                         },
                 }) if keywords.is_empty() => {
+                    let Type::ClassLiteral(rhs_class) = rhs_ty else {
+                        continue;
+                    };
+
                     let target = match &**args {
                         [first] => match place_expr(first) {
                             Some(target) => target,
@@ -757,12 +765,6 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                         op == &ast::CmpOp::Is
                     } else {
                         op == &ast::CmpOp::IsNot
-                    };
-
-                    let inference = infer_expression_types(self.db, expression);
-                    let rhs_ty = inference.expression_type(right);
-                    let Type::ClassLiteral(rhs_class) = rhs_ty else {
-                        continue;
                     };
 
                     // `else`-branch narrowing for `if type(x) is Y` can only be done
