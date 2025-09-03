@@ -1,5 +1,6 @@
-use crate::Violation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+
+use crate::Violation;
 
 /// ## What it does
 /// Checks for uses of `yield from` in async functions.
