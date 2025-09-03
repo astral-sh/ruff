@@ -80,35 +80,27 @@ impl<'db> SubclassOfType<'db> {
         subclass_of.is_dynamic()
     }
 
-    pub(super) fn materialize(
-        self,
-        db: &'db dyn Db,
-        materialization_kind: MaterializationKind,
-    ) -> Type<'db> {
-        match self.subclass_of {
-            SubclassOfInner::Dynamic(_) => match materialization_kind {
-                MaterializationKind::Top => KnownClass::Type.to_instance(db),
-                MaterializationKind::Bottom => Type::Never,
-            },
-            SubclassOfInner::Class(_) => Type::SubclassOf(self),
-        }
-    }
-
     pub(super) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
-    ) -> Self {
+    ) -> Type<'db> {
         match self.subclass_of {
-            SubclassOfInner::Class(class) => Self {
+            SubclassOfInner::Class(class) => Type::SubclassOf(Self {
                 subclass_of: SubclassOfInner::Class(class.apply_type_mapping_impl(
                     db,
                     type_mapping,
                     visitor,
                 )),
+            }),
+            SubclassOfInner::Dynamic(_) => match type_mapping {
+                TypeMapping::Materialize(materialization_kind) => match materialization_kind {
+                    MaterializationKind::Top => KnownClass::Type.to_instance(db),
+                    MaterializationKind::Bottom => Type::Never,
+                },
+                _ => Type::SubclassOf(self),
             },
-            SubclassOfInner::Dynamic(_) => self,
         }
     }
 

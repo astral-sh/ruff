@@ -856,11 +856,7 @@ impl<'db> FunctionType<'db> {
     /// would depend on the function's AST and rerun for every change in that file.
     #[salsa::tracked(returns(ref), cycle_fn=signature_cycle_recover, cycle_initial=signature_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn signature(self, db: &'db dyn Db) -> CallableSignature<'db> {
-        let sig = self.literal(db).signature(db, self.type_mappings(db));
-        match self.materialization_kind(db) {
-            None => sig,
-            Some(materialization_kind) => sig.materialize(db, materialization_kind),
-        }
+        self.literal(db).signature(db, self.type_mappings(db))
     }
 
     /// Typed externally-visible signature of the last overload or implementation of this function.
@@ -895,19 +891,6 @@ impl<'db> FunctionType<'db> {
         self_instance: Type<'db>,
     ) -> BoundMethodType<'db> {
         BoundMethodType::new(db, self, self_instance)
-    }
-
-    pub(crate) fn materialize(
-        self,
-        db: &'db dyn Db,
-        materialization_kind: MaterializationKind,
-    ) -> Self {
-        Self::new(
-            db,
-            self.literal(db),
-            self.type_mappings(db),
-            Some(materialization_kind),
-        )
     }
 
     pub(crate) fn has_relation_to_impl<C: Constraints<'db>>(

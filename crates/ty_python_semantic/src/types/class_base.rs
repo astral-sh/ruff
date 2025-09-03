@@ -302,13 +302,11 @@ impl<'db> ClassBase<'db> {
     }
 
     fn materialize(self, db: &'db dyn Db, kind: MaterializationKind) -> Self {
-        match self {
-            ClassBase::Class(class) => Self::Class(class.materialize(db, kind)),
-            ClassBase::Dynamic(_)
-            | ClassBase::Generic
-            | ClassBase::Protocol
-            | ClassBase::TypedDict => self,
-        }
+        self.apply_type_mapping_impl(
+            db,
+            &TypeMapping::Materialize(kind),
+            &ApplyTypeMappingVisitor::default(),
+        )
     }
 
     pub(super) fn has_cyclic_mro(self, db: &'db dyn Db) -> bool {
