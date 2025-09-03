@@ -3,10 +3,8 @@ use std::sync::{LazyLock, Mutex};
 use super::TypeVarVariance;
 use super::{
     BoundTypeVarInstance, IntersectionBuilder, MemberLookupPolicy, Mro, MroError, MroIterator,
-    SpecialFormType, SubclassOfType, Truthiness, Type, TypeQualifiers,
-    class_base::ClassBase,
-    function::{FunctionDecorators, FunctionType},
-    infer_expression_type, infer_unpack_types,
+    SpecialFormType, SubclassOfType, Truthiness, Type, TypeQualifiers, class_base::ClassBase,
+    function::FunctionType, infer_expression_type, infer_unpack_types,
 };
 use crate::FxOrderMap;
 use crate::module_resolver::KnownModule;
@@ -1257,10 +1255,7 @@ pub(super) enum MethodDecorator {
 
 impl MethodDecorator {
     fn try_from_fn_type(db: &dyn Db, fn_type: FunctionType) -> Result<Self, ()> {
-        match (
-            fn_type.is_classmethod(db),
-            fn_type.has_known_decorator(db, FunctionDecorators::STATICMETHOD),
-        ) {
+        match (fn_type.is_classmethod(db), fn_type.is_staticmethod(db)) {
             (true, true) => Err(()), // A method can't be static and class method at the same time.
             (true, false) => Ok(Self::ClassMethod),
             (false, true) => Ok(Self::StaticMethod),

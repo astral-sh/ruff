@@ -290,8 +290,7 @@ impl<'db> Bindings<'db> {
                                 }
                                 _ => {}
                             }
-                        } else if function.has_known_decorator(db, FunctionDecorators::STATICMETHOD)
-                        {
+                        } else if function.is_staticmethod(db) {
                             overload.set_return_type(Type::FunctionLiteral(function));
                         } else if let [Some(first), _] = overload.parameter_types() {
                             if first.is_none(db) {
