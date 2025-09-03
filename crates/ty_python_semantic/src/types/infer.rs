@@ -532,7 +532,8 @@ impl<'db> ScopeInference<'db> {
     }
 
     fn fallback_type(&self) -> Option<Type<'db>> {
-        self.is_cycle_callback().then_some(Type::Never)
+        self.is_cycle_callback()
+            .then_some(Type::Dynamic(DynamicType::Divergent))
     }
 
     /// Returns the inferred return type of this function body (union of all possible return types),
@@ -559,8 +560,8 @@ impl<'db> ScopeInference<'db> {
 
         let mut union = UnionBuilder::new(db);
         let div = Type::Dynamic(DynamicType::Divergent);
-        if self.is_cycle_callback() {
-            union = union.add(div);
+        if let Some(fallback_type) = self.fallback_type() {
+            union = union.add(fallback_type);
         }
         // Here, we use the dynamic type `Divergent` to detect divergent type inference and ensure that we obtain finite results.
         // For example, consider the following recursive function:
