@@ -42,7 +42,6 @@ class Shape:
 
 reveal_type(Shape().nested_type())  # revealed: list[Shape]
 reveal_type(Shape().nested_func())  # revealed: Shape
-reveal_type(Shape().implicit_self())  # revealed: Shape
 
 class Circle(Shape):
     def set_scale(self: Self, scale: float) -> Self:
@@ -54,6 +53,37 @@ class Outer:
         def foo(self: Self) -> Self:
             reveal_type(self)  # revealed: Self@foo
             return self
+```
+
+## Detection of Self
+
+The first argument in method is assumed to have type `typing.Self`.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import Self
+
+class A:
+    def implicit_self(self) -> Self:
+        # TODO: first argument in a method should be considered as "typing.Self"
+        reveal_type(self)  # revealed: Unknown
+        return self
+
+    def foo(self) -> int:
+        def first_arg_is_not_self(a: int) -> int:
+            return a
+        return first_arg_is_not_self(1)
+    # TODO: Make sure cls is not considered as "typing.Self". Don't know how to test this
+    @classmethod
+    def bar(cls) -> int:
+        return 1
+
+reveal_type(A().implicit_self())  # revealed: A
+reveal_type(A.implicit_self)  # revealed: def implicit_self(self) -> Self
 ```
 
 ## typing_extensions
