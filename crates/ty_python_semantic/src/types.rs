@@ -1905,6 +1905,10 @@ impl<'db> Type<'db> {
         }
 
         match (self, other) {
+            // The `Divergent` type is a special type that is not equivalent to other kinds of dynamic types,
+            // which prevents `Divergent` from being eliminated during union reduction.
+            (Type::Dynamic(_), Type::Dynamic(DynamicType::Divergent))
+            | (Type::Dynamic(DynamicType::Divergent), Type::Dynamic(_)) => C::unsatisfiable(db),
             (Type::Dynamic(_), Type::Dynamic(_)) => C::always_satisfiable(db),
 
             (Type::SubclassOf(first), Type::SubclassOf(second)) => {
@@ -10797,65 +10801,41 @@ pub(crate) mod tests {
 
         let div = Type::Dynamic(DynamicType::Divergent);
 
+        // The `Divergent` type must not be eliminated in union with other dynamic types,
+        // as this would prevent detection of divergent type inference using `Divergent`.
         let union = UnionType::from_elements(&db, [Type::unknown(), div]);
         assert_eq!(union.display(&db).to_string(), "Unknown | Divergent");
 
         let union = UnionType::from_elements(&db, [div, Type::unknown()]);
-        assert_eq!(union.display(&db).to_string(), "Divergent");
+        assert_eq!(union.display(&db).to_string(), "Divergent | Unknown");
 
+        let union = UnionType::from_elements(&db, [div, Type::unknown(), todo_type!("1")]);
+        assert_eq!(union.display(&db).to_string(), "Divergent | Unknown");
+
+        assert!(div.is_equivalent_to(&db, div));
+        assert!(!div.is_equivalent_to(&db, Type::unknown()));
+        assert!(!Type::unknown().is_equivalent_to(&db, div));
+
+        // The `object` type has a good convergence property, that is, its union with all other types is `object`.
+        // (e.g. `object | tuple[Divergent] == object`, `object | tuple[object] == object`)
+        // So we can safely eliminate `Divergent`.
         let union = UnionType::from_elements(&db, [div, KnownClass::Object.to_instance(&db)]);
-        assert_eq!(union.display(&db).to_string(), "object | Divergent");
+        assert_eq!(union.display(&db).to_string(), "object");
 
         let union = UnionType::from_elements(&db, [KnownClass::Object.to_instance(&db), div]);
-        assert_eq!(union.display(&db).to_string(), "object | Divergent");
+        assert_eq!(union.display(&db).to_string(), "object");
 
-        let union = UnionType::from_elements(
-            &db,
-            [
-                KnownClass::Object.to_instance(&db),
-                KnownClass::List.to_specialized_instance(&db, [div]),
-            ],
-        );
-        assert_eq!(union.display(&db).to_string(), "object | list[Divergent]");
-
-        let union = UnionType::from_elements(
-            &db,
-            [
-                KnownClass::Object.to_instance(&db),
-                KnownClass::List.to_specialized_instance(&db, [div]),
-                KnownClass::Int.to_instance(&db),
-            ],
-        );
-        assert_eq!(union.display(&db).to_string(), "object | list[Divergent]");
-
+        // The same can be said about intersections for the `Never` type.
         let intersection = IntersectionBuilder::new(&db)
             .add_positive(Type::Never)
             .add_positive(div)
             .build();
-        assert_eq!(intersection.display(&db).to_string(), "Never & Divergent");
+        assert_eq!(intersection.display(&db).to_string(), "Never");
 
         let intersection = IntersectionBuilder::new(&db)
             .add_positive(div)
             .add_positive(Type::Never)
             .build();
-        assert_eq!(intersection.display(&db).to_string(), "Divergent & Never");
-
-        let intersection = IntersectionBuilder::new(&db)
-            .add_positive(KnownClass::List.to_specialized_instance(&db, [div]))
-            .add_positive(Type::Never)
-            .build();
-        assert_eq!(
-            intersection.display(&db).to_string(),
-            "list[Divergent] & Never"
-        );
-
-        let intersection = IntersectionBuilder::new(&db)
-            .add_positive(KnownClass::Int.to_instance(&db))
-            .add_positive(KnownClass::List.to_specialized_instance(&db, [div]))
-            .build();
-        assert_eq!(
-            intersection.display(&db).to_string(),
-            "int & list[Divergent]"
-        );
+        assert_eq!(intersection.display(&db).to_string(), "Never");
     }
 }

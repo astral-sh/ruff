@@ -352,6 +352,15 @@ def call_divergent(x: int):
 # TODO: it would be better to reveal `tuple[Divergent | None, int]`
 reveal_type(call_divergent(1))  # revealed: Divergent
 
+def tuple_obj(cond: bool):
+    if cond:
+        x = object()
+    else:
+        x = tuple_obj(cond)
+    return (x,)
+
+reveal_type(tuple_obj(True))  # revealed: tuple[object]
+
 def get_non_empty(node):
     for child in node.children:
         node = get_non_empty(child)
