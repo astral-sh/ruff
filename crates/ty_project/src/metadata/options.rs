@@ -1055,6 +1055,21 @@ pub enum OutputFormat {
     ///
     /// This may use color when printing to a `tty`.
     Concise,
+    /// Print diagnostics in the JSON format expected by GitLab [Code Quality] reports.
+    ///
+    /// [Code Quality]: https://docs.gitlab.com/ci/testing/code_quality/#code-quality-report-format
+    Gitlab,
+}
+
+impl OutputFormat {
+    /// Returns `true` if this format is intended for users to read directly, in contrast to
+    /// machine-readable or structured formats.
+    ///
+    /// This can be used to check whether information beyond the diagnostics, such as a header or
+    /// `Found N diagnostics` footer, should be included.
+    pub const fn is_human_readable(&self) -> bool {
+        matches!(self, OutputFormat::Full | OutputFormat::Concise)
+    }
 }
 
 impl From<OutputFormat> for DiagnosticFormat {
@@ -1062,6 +1077,7 @@ impl From<OutputFormat> for DiagnosticFormat {
         match value {
             OutputFormat::Full => Self::Full,
             OutputFormat::Concise => Self::Concise,
+            OutputFormat::Gitlab => Self::Gitlab,
         }
     }
 }

@@ -7,12 +7,22 @@ use ruff_python_parser::{Token, TokenAt, TokenKind};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_python_semantic::{Completion, NameKind, SemanticModel};
 
-use crate::Db;
 use crate::docstring::Docstring;
 use crate::find_node::covering_node;
 use crate::goto::DefinitionsOrTargets;
+use crate::{Db, all_symbols};
 
-pub fn completion(db: &dyn Db, file: File, offset: TextSize) -> Vec<DetailedCompletion<'_>> {
+#[derive(Clone, Debug, Default)]
+pub struct CompletionSettings {
+    pub auto_import: bool,
+}
+
+pub fn completion<'db>(
+    db: &'db dyn Db,
+    settings: &CompletionSettings,
+    file: File,
+    offset: TextSize,
+) -> Vec<DetailedCompletion<'db>> {
     let parsed = parsed_module(db, file).load(db);
 
     let Some(target_token) = CompletionTargetTokens::find(&parsed, offset) else {
@@ -37,14 +47,31 @@ pub fn completion(db: &dyn Db, file: File, offset: TextSize) -> Vec<DetailedComp
         CompletionTargetAst::Import { .. } | CompletionTargetAst::ImportViaFrom { .. } => {
             model.import_completions()
         }
-        CompletionTargetAst::Scoped { node } => model.scoped_completions(node),
+        CompletionTargetAst::Scoped { node, typed } => {
+            let mut completions = model.scoped_completions(node);
+            if settings.auto_import {
+                if let Some(typed) = typed {
+                    for symbol in all_symbols(db, typed) {
+                        completions.push(Completion {
+                            name: ast::name::Name::new(&symbol.symbol.name),
+                            ty: None,
+                            kind: symbol.symbol.kind.to_completion_kind(),
+                            builtin: false,
+                        });
+                    }
+                }
+            }
+            completions
+        }
     };
     completions.sort_by(compare_suggestions);
     completions.dedup_by(|c1, c2| c1.name == c2.name);
     completions
         .into_iter()
         .map(|completion| {
-            let definition = DefinitionsOrTargets::from_ty(db, completion.ty);
+            let definition = completion
+                .ty
+                .and_then(|ty| DefinitionsOrTargets::from_ty(db, ty));
             let documentation = definition.and_then(|def| def.docstring(db));
             DetailedCompletion {
                 inner: completion,
@@ -54,10 +81,12 @@ pub fn completion(db: &dyn Db, file: File, offset: TextSize) -> Vec<DetailedComp
         .collect()
 }
 
+#[derive(Clone, Debug)]
 pub struct DetailedCompletion<'db> {
     pub inner: Completion<'db>,
     pub documentation: Option<Docstring>,
 }
+
 impl<'db> std::ops::Deref for DetailedCompletion<'db> {
     type Target = Completion<'db>;
     fn deref(&self) -> &Self::Target {
@@ -258,16 +287,22 @@ impl<'t> CompletionTargetTokens<'t> {
                 }
             }
             CompletionTargetTokens::Generic { token } => {
-                let covering_node = covering_node(parsed.syntax().into(), token.range());
-                Some(CompletionTargetAst::Scoped {
-                    node: covering_node.node(),
-                })
+                let node = covering_node(parsed.syntax().into(), token.range()).node();
+                let typed = match node {
+                    ast::AnyNodeRef::ExprName(ast::ExprName { id, .. }) => {
+                        let name = id.as_str();
+                        if name.is_empty() { None } else { Some(name) }
+                    }
+                    _ => None,
+                };
+                Some(CompletionTargetAst::Scoped { node, typed })
             }
             CompletionTargetTokens::Unknown => {
                 let range = TextRange::empty(offset);
                 let covering_node = covering_node(parsed.syntax().into(), range);
                 Some(CompletionTargetAst::Scoped {
                     node: covering_node.node(),
+                    typed: None,
                 })
             }
         }
@@ -321,7 +356,16 @@ enum CompletionTargetAst<'t> {
     },
     /// A scoped scenario, where we want to list all items available in
     /// the most narrow scope containing the giving AST node.
-    Scoped { node: ast::AnyNodeRef<'t> },
+    Scoped {
+        /// The node with the smallest range that fully covers
+        /// the token under the cursor.
+        node: ast::AnyNodeRef<'t>,
+        /// The text that has been typed so far, if available.
+        ///
+        /// When not `None`, the typed text is guaranteed to be
+        /// non-empty.
+        typed: Option<&'t str>,
+    },
 }
 
 /// Returns a suffix of `tokens` corresponding to the `kinds` given.
@@ -505,7 +549,7 @@ mod tests {
     use crate::completion::{DetailedCompletion, completion};
     use crate::tests::{CursorTest, cursor_test};
 
-    use super::token_suffix_by_kinds;
+    use super::{CompletionSettings, token_suffix_by_kinds};
 
     #[test]
     fn token_suffixes_match() {
@@ -3014,6 +3058,24 @@ from os.<CURSOR>
     }
 
     #[test]
+    fn auto_import_with_submodule() {
+        let test = CursorTest::builder()
+            .source("main.py", "Abra<CURSOR>")
+            .source("package/__init__.py", "AbraKadabra = 1")
+            .build();
+
+        let settings = CompletionSettings { auto_import: true };
+        let expected = "AbraKadabra";
+        let completions = completion(&test.db, &settings, test.cursor.file, test.cursor.offset);
+        assert!(
+            completions
+                .iter()
+                .any(|completion| completion.name == expected),
+            "Expected completions to include `{expected}`"
+        );
+    }
+
+    #[test]
     fn regression_test_issue_642() {
         // Regression test for https://github.com/astral-sh/ty/issues/642
 
@@ -3031,6 +3093,10 @@ from os.<CURSOR>
         );
     }
 
+    // NOTE: The methods below are getting somewhat ridiculous.
+    // We should refactor this by converting to using a builder
+    // to set different modes. ---AG
+
     impl CursorTest {
         /// Returns all completions except for builtins.
         fn completions_without_builtins(&self) -> String {
@@ -3040,7 +3106,14 @@ from os.<CURSOR>
         fn completions_without_builtins_with_types(&self) -> String {
             self.completions_if_snapshot(
                 |c| !c.builtin,
-                |c| format!("{} :: {}", c.name, c.ty.display(&self.db)),
+                |c| {
+                    format!(
+                        "{} :: {}",
+                        c.name,
+                        c.ty.map(|ty| ty.display(&self.db).to_string())
+                            .unwrap_or_else(|| "Unavailable".to_string())
+                    )
+                },
             )
         }
 
@@ -3053,7 +3126,8 @@ from os.<CURSOR>
             predicate: impl Fn(&DetailedCompletion) -> bool,
             snapshot: impl Fn(&DetailedCompletion) -> String,
         ) -> String {
-            let completions = completion(&self.db, self.cursor.file, self.cursor.offset);
+            let settings = CompletionSettings::default();
+            let completions = completion(&self.db, &settings, self.cursor.file, self.cursor.offset);
             if completions.is_empty() {
                 return "<No completions found>".to_string();
             }
@@ -3076,7 +3150,8 @@ from os.<CURSOR>
 
         #[track_caller]
         fn assert_completions_include(&self, expected: &str) {
-            let completions = completion(&self.db, self.cursor.file, self.cursor.offset);
+            let settings = CompletionSettings::default();
+            let completions = completion(&self.db, &settings, self.cursor.file, self.cursor.offset);
 
             assert!(
                 completions
@@ -3088,7 +3163,8 @@ from os.<CURSOR>
 
         #[track_caller]
         fn assert_completions_do_not_include(&self, unexpected: &str) {
-            let completions = completion(&self.db, self.cursor.file, self.cursor.offset);
+            let settings = CompletionSettings::default();
+            let completions = completion(&self.db, &settings, self.cursor.file, self.cursor.offset);
 
             assert!(
                 completions

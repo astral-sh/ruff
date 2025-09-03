@@ -1,11 +1,12 @@
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::{ExprCall, PythonVersion};
+
 use crate::checkers::ast::Checker;
 use crate::preview::is_fix_os_readlink_enabled;
 use crate::rules::flake8_use_pathlib::helpers::{
     check_os_pathlib_single_arg_calls, is_keyword_only_argument_non_default,
 };
 use crate::{FixAvailability, Violation};
-use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{ExprCall, PythonVersion};
 
 /// ## What it does
 /// Checks for uses of `os.readlink`.
@@ -87,5 +88,6 @@ pub(crate) fn os_readlink(checker: &Checker, call: &ExprCall, segments: &[&str])
         "path",
         is_fix_os_readlink_enabled(checker.settings()),
         OsReadlink,
+        None,
     );
 }

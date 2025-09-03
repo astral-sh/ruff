@@ -13,6 +13,7 @@ use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor};
 use ruff_python_ast::{Expr, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 use ty_project::Db;
+use ty_python_semantic::CompletionKind;
 
 /// A compiled query pattern used for searching symbols.
 ///
@@ -281,6 +282,27 @@ impl SymbolKind {
             SymbolKind::TypeParameter => "TypeParameter",
             SymbolKind::Import => "Import",
         }
+    }
+
+    /// Maps this to a "completion" kind if a sensible mapping exists.
+    pub fn to_completion_kind(self) -> Option<CompletionKind> {
+        Some(match self {
+            SymbolKind::Module => CompletionKind::Module,
+            SymbolKind::Class => CompletionKind::Class,
+            SymbolKind::Method => CompletionKind::Method,
+            SymbolKind::Function => CompletionKind::Function,
+            SymbolKind::Variable => CompletionKind::Variable,
+            SymbolKind::Constant => CompletionKind::Constant,
+            SymbolKind::Property => CompletionKind::Property,
+            SymbolKind::Field => CompletionKind::Field,
+            SymbolKind::Constructor => CompletionKind::Constructor,
+            SymbolKind::Parameter => CompletionKind::Variable,
+            SymbolKind::TypeParameter => CompletionKind::TypeParameter,
+            // Not quite sure what to do with this one. I guess
+            // in theory the import should be "resolved" to its
+            // underlying kind, but that seems expensive.
+            SymbolKind::Import => return None,
+        })
     }
 }
 

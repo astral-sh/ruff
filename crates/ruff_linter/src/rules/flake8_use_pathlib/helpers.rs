@@ -60,6 +60,7 @@ pub(crate) fn check_os_pathlib_single_arg_calls(
     fn_argument: &str,
     fix_enabled: bool,
     violation: impl Violation,
+    applicability: Option<Applicability>,
 ) {
     if call.arguments.len() != 1 {
         return;
@@ -74,33 +75,39 @@ pub(crate) fn check_os_pathlib_single_arg_calls(
 
     let mut diagnostic = checker.report_diagnostic(violation, call.func.range());
 
-    if fix_enabled {
-        diagnostic.try_set_fix(|| {
-            let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                &ImportRequest::import("pathlib", "Path"),
-                call.start(),
-                checker.semantic(),
-            )?;
-
-            let applicability = if checker.comment_ranges().intersects(range) {
-                Applicability::Unsafe
-            } else {
-                Applicability::Safe
-            };
-
-            let replacement = if is_pathlib_path_call(checker, arg) {
-                format!("{arg_code}.{attr}")
-            } else {
-                format!("{binding}({arg_code}).{attr}")
-            };
-
-            Ok(Fix::applicable_edits(
-                Edit::range_replacement(replacement, range),
-                [import_edit],
-                applicability,
-            ))
-        });
+    if !fix_enabled {
+        return;
     }
+
+    diagnostic.try_set_fix(|| {
+        let (import_edit, binding) = checker.importer().get_or_import_symbol(
+            &ImportRequest::import("pathlib", "Path"),
+            call.start(),
+            checker.semantic(),
+        )?;
+
+        let replacement = if is_pathlib_path_call(checker, arg) {
+            format!("{arg_code}.{attr}")
+        } else {
+            format!("{binding}({arg_code}).{attr}")
+        };
+
+        let edit = Edit::range_replacement(replacement, range);
+
+        let fix = match applicability {
+            Some(Applicability::Unsafe) => Fix::unsafe_edits(edit, [import_edit]),
+            _ => {
+                let applicability = if checker.comment_ranges().intersects(range) {
+                    Applicability::Unsafe
+                } else {
+                    Applicability::Safe
+                };
+                Fix::applicable_edits(edit, [import_edit], applicability)
+            }
+        };
+
+        Ok(fix)
+    });
 }
 
 pub(crate) fn get_name_expr(expr: &Expr) -> Option<&ast::ExprName> {

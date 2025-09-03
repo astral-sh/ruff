@@ -739,7 +739,10 @@ impl<'db> FunctionType<'db> {
     /// classmethod.
     pub(crate) fn is_classmethod(self, db: &'db dyn Db) -> bool {
         self.has_known_decorator(db, FunctionDecorators::CLASSMETHOD)
-            || self.name(db) == "__init_subclass__"
+            || matches!(
+                self.name(db).as_str(),
+                "__init_subclass__" | "__class_getitem__"
+            )
     }
 
     /// If the implementation of this function is deprecated, returns the `@warnings.deprecated`.

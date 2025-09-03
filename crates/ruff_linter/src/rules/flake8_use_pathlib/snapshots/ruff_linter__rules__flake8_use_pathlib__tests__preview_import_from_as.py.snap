@@ -480,6 +480,7 @@ help: Replace with `Path(...).name`
 37 | xdirname(p)
 38 | xsamefile(p)
 39 | xsplitext(p)
+note: This is an unsafe fix and may change runtime behavior
 
 PTH120 [*] `os.path.dirname()` should be replaced by `Path.parent`
   --> import_from_as.py:36:1
@@ -507,6 +508,7 @@ help: Replace with `Path(...).parent`
 37 + pathlib.Path(p).parent
 38 | xsamefile(p)
 39 | xsplitext(p)
+note: This is an unsafe fix and may change runtime behavior
 
 PTH121 `os.path.samefile()` should be replaced by `Path.samefile()`
   --> import_from_as.py:37:1
