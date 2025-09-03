@@ -1,5 +1,5 @@
 use ruff_diagnostics::Applicability;
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::ExprCall;
 
 use crate::checkers::ast::Checker;
