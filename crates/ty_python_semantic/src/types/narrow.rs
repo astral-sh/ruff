@@ -475,146 +475,6 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         self.evaluate_simple_expr(&expr_named.target, is_positive)
     }
 
-    fn evaluate_expr_eq(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
-        // We can only narrow on equality checks against single-valued types.
-        if rhs_ty.is_single_valued(self.db) || rhs_ty.is_union_of_single_valued(self.db) {
-            // The fully-general (and more efficient) approach here would be to introduce a
-            // `NeverEqualTo` type that can wrap a single-valued type, and then simply return
-            // `~NeverEqualTo(rhs_ty)` here and let union/intersection builder sort it out. This is
-            // how we handle `AlwaysTruthy` and `AlwaysFalsy`. But this means we have to deal with
-            // this type everywhere, and possibly have it show up unsimplified in some cases, and
-            // so we instead prefer to just do the simplification here. (Another hybrid option that
-            // would be similar to this, but more efficient, would be to allow narrowing to return
-            // something that is not a type, and handle this not-a-type in `symbol_from_bindings`,
-            // instead of intersecting with a type.)
-
-            // Return `true` if it is possible for any two inhabitants of the given types to
-            // compare equal to each other; otherwise return `false`.
-            fn could_compare_equal<'db>(
-                db: &'db dyn Db,
-                left_ty: Type<'db>,
-                right_ty: Type<'db>,
-            ) -> bool {
-                if !left_ty.is_disjoint_from(db, right_ty) {
-                    // If types overlap, they have inhabitants in common; it's definitely possible
-                    // for an object to compare equal to itself.
-                    return true;
-                }
-                match (left_ty, right_ty) {
-                    // In order to be sure a union type cannot compare equal to another type, it
-                    // must be true that no element of the union can compare equal to that type.
-                    (Type::Union(union), _) => union
-                        .elements(db)
-                        .iter()
-                        .any(|ty| could_compare_equal(db, *ty, right_ty)),
-                    (_, Type::Union(union)) => union
-                        .elements(db)
-                        .iter()
-                        .any(|ty| could_compare_equal(db, left_ty, *ty)),
-                    // Boolean literals and int literals are disjoint, and single valued, and yet
-                    // `True == 1` and `False == 0`.
-                    (Type::BooleanLiteral(b), Type::IntLiteral(i))
-                    | (Type::IntLiteral(i), Type::BooleanLiteral(b)) => i64::from(b) == i,
-                    // Other than the above cases, two single-valued disjoint types cannot compare
-                    // equal.
-                    _ => !(left_ty.is_single_valued(db) && right_ty.is_single_valued(db)),
-                }
-            }
-
-            // Return `true` if `lhs_ty` consists only of `LiteralString` and types that cannot
-            // compare equal to `rhs_ty`.
-            fn can_narrow_to_rhs<'db>(
-                db: &'db dyn Db,
-                lhs_ty: Type<'db>,
-                rhs_ty: Type<'db>,
-            ) -> bool {
-                match lhs_ty {
-                    Type::Union(union) => union
-                        .elements(db)
-                        .iter()
-                        .all(|ty| can_narrow_to_rhs(db, *ty, rhs_ty)),
-                    // Either `rhs_ty` is a string literal, in which case we can narrow to it (no
-                    // other string literal could compare equal to it), or it is not a string
-                    // literal, in which case (given that it is single-valued), LiteralString
-                    // cannot compare equal to it.
-                    Type::LiteralString => true,
-                    _ => !could_compare_equal(db, lhs_ty, rhs_ty),
-                }
-            }
-
-            // Filter `ty` to just the types that cannot be equal to `rhs_ty`.
-            fn filter_to_cannot_be_equal<'db>(
-                db: &'db dyn Db,
-                ty: Type<'db>,
-                rhs_ty: Type<'db>,
-            ) -> Type<'db> {
-                match ty {
-                    Type::Union(union) => {
-                        union.map(db, |ty| filter_to_cannot_be_equal(db, *ty, rhs_ty))
-                    }
-                    // Treat `bool` as `Literal[True, False]`.
-                    Type::NominalInstance(instance)
-                        if instance.class(db).is_known(db, KnownClass::Bool) =>
-                    {
-                        UnionType::from_elements(
-                            db,
-                            [Type::BooleanLiteral(true), Type::BooleanLiteral(false)]
-                                .into_iter()
-                                .map(|ty| filter_to_cannot_be_equal(db, ty, rhs_ty)),
-                        )
-                    }
-                    // Treat enums as a union of their members.
-                    Type::NominalInstance(instance)
-                        if enum_metadata(db, instance.class(db).class_literal(db).0).is_some() =>
-                    {
-                        UnionType::from_elements(
-                            db,
-                            enum_member_literals(db, instance.class(db).class_literal(db).0, None)
-                                .expect("Calling `enum_member_literals` on an enum class")
-                                .map(|ty| filter_to_cannot_be_equal(db, ty, rhs_ty)),
-                        )
-                    }
-                    _ => {
-                        if ty.is_single_valued(db) && !could_compare_equal(db, ty, rhs_ty) {
-                            ty
-                        } else {
-                            Type::Never
-                        }
-                    }
-                }
-            }
-            Some(if can_narrow_to_rhs(self.db, lhs_ty, rhs_ty) {
-                rhs_ty
-            } else {
-                filter_to_cannot_be_equal(self.db, lhs_ty, rhs_ty).negate(self.db)
-            })
-        } else {
-            None
-        }
-    }
-
-    fn evaluate_expr_ne(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
-        match (lhs_ty, rhs_ty) {
-            (Type::NominalInstance(instance), Type::IntLiteral(i))
-                if instance.class(self.db).is_known(self.db, KnownClass::Bool) =>
-            {
-                if i == 0 {
-                    Some(Type::BooleanLiteral(false).negate(self.db))
-                } else if i == 1 {
-                    Some(Type::BooleanLiteral(true).negate(self.db))
-                } else {
-                    None
-                }
-            }
-            (_, Type::BooleanLiteral(b)) => Some(
-                UnionType::from_elements(self.db, [rhs_ty, Type::IntLiteral(i64::from(b))])
-                    .negate(self.db),
-            ),
-            _ if rhs_ty.is_single_valued(self.db) => Some(rhs_ty.negate(self.db)),
-            _ => None,
-        }
-    }
-
     fn evaluate_expr_in(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
         if lhs_ty.is_single_valued(self.db) || lhs_ty.is_union_of_single_valued(self.db) {
             rhs_ty
@@ -713,8 +573,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 }
             }
             ast::CmpOp::Is => Some(rhs_ty),
-            ast::CmpOp::Eq => self.evaluate_expr_eq(lhs_ty, rhs_ty),
-            ast::CmpOp::NotEq => self.evaluate_expr_ne(lhs_ty, rhs_ty),
+            ast::CmpOp::Eq => self.evaluate_expr_in(lhs_ty, rhs_ty),
+            ast::CmpOp::NotEq => self.evaluate_expr_not_in(lhs_ty, rhs_ty),
             ast::CmpOp::In => self.evaluate_expr_in(lhs_ty, rhs_ty),
             ast::CmpOp::NotIn => self.evaluate_expr_not_in(lhs_ty, rhs_ty),
             _ => None,
