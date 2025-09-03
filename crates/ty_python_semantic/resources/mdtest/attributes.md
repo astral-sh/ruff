@@ -326,6 +326,7 @@ class C:
         for _, self.y in TupleIterable():
             pass
 
+        # TODO: We should emit a diagnostic here
         for self.z in NonIterable():
             pass
 
