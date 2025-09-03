@@ -769,7 +769,15 @@ impl<'db> ClassType<'db> {
         let fallback_member_lookup = || {
             class_literal
                 .own_class_member(db, inherited_generic_context, specialization, name)
-                .map_type(|ty| ty.apply_optional_specialization(db, specialization))
+                .map_type(|ty| {
+                    let ty = ty.apply_optional_specialization(db, specialization);
+                    match specialization.map(|spec| spec.materialization_kind(db)) {
+                        Some(Some(materialization_kind)) => {
+                            ty.materialize(db, materialization_kind)
+                        }
+                        _ => ty,
+                    }
+                })
         };
 
         let synthesize_simple_tuple_method = |return_type| {

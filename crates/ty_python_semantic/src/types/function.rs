@@ -79,8 +79,8 @@ use crate::types::visitor::any_over_type;
 use crate::types::{
     BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, ClassType,
     DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
-    IsEquivalentVisitor, KnownClass, NormalizedVisitor, SpecialFormType, Truthiness, Type,
-    TypeMapping, TypeRelation, UnionBuilder, all_members, walk_type_mapping,
+    IsEquivalentVisitor, KnownClass, MaterializationKind, NormalizedVisitor, SpecialFormType,
+    Truthiness, Type, TypeMapping, TypeRelation, UnionBuilder, all_members, walk_type_mapping,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -626,6 +626,8 @@ pub struct FunctionType<'db> {
     /// of a specialized generic class).
     #[returns(deref)]
     type_mappings: Box<[TypeMapping<'db, 'db>]>,
+
+    materialization_kind: Option<MaterializationKind>,
 }
 
 // The Salsa heap is tracked separately.
@@ -652,7 +654,12 @@ impl<'db> FunctionType<'db> {
         let literal = self
             .literal(db)
             .with_inherited_generic_context(db, inherited_generic_context);
-        Self::new(db, literal, self.type_mappings(db))
+        Self::new(
+            db,
+            literal,
+            self.type_mappings(db),
+            self.materialization_kind(db),
+        )
     }
 
     pub(crate) fn with_type_mapping<'a>(
@@ -666,7 +673,12 @@ impl<'db> FunctionType<'db> {
             .cloned()
             .chain(std::iter::once(type_mapping.to_owned()))
             .collect();
-        Self::new(db, self.literal(db), type_mappings)
+        Self::new(
+            db,
+            self.literal(db),
+            type_mappings,
+            self.materialization_kind(db),
+        )
     }
 
     pub(crate) fn with_dataclass_transformer_params(
@@ -682,7 +694,12 @@ impl<'db> FunctionType<'db> {
             .with_dataclass_transformer_params(db, params);
         let literal =
             FunctionLiteral::new(db, last_definition, literal.inherited_generic_context(db));
-        Self::new(db, literal, self.type_mappings(db))
+        Self::new(
+            db,
+            literal,
+            self.type_mappings(db),
+            self.materialization_kind(db),
+        )
     }
 
     /// Returns the [`File`] in which this function is defined.
@@ -839,7 +856,11 @@ impl<'db> FunctionType<'db> {
     /// would depend on the function's AST and rerun for every change in that file.
     #[salsa::tracked(returns(ref), cycle_fn=signature_cycle_recover, cycle_initial=signature_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn signature(self, db: &'db dyn Db) -> CallableSignature<'db> {
-        self.literal(db).signature(db, self.type_mappings(db))
+        let sig = self.literal(db).signature(db, self.type_mappings(db));
+        match self.materialization_kind(db) {
+            None => sig,
+            Some(materialization_kind) => sig.materialize(db, materialization_kind),
+        }
     }
 
     /// Typed externally-visible signature of the last overload or implementation of this function.
@@ -874,6 +895,19 @@ impl<'db> FunctionType<'db> {
         self_instance: Type<'db>,
     ) -> BoundMethodType<'db> {
         BoundMethodType::new(db, self, self_instance)
+    }
+
+    pub(crate) fn materialize(
+        self,
+        db: &'db dyn Db,
+        materialization_kind: MaterializationKind,
+    ) -> Self {
+        Self::new(
+            db,
+            self.literal(db),
+            self.type_mappings(db),
+            Some(materialization_kind),
+        )
     }
 
     pub(crate) fn has_relation_to_impl<C: Constraints<'db>>(
@@ -954,7 +988,12 @@ impl<'db> FunctionType<'db> {
             .iter()
             .map(|mapping| mapping.normalized_impl(db, visitor))
             .collect();
-        Self::new(db, self.literal(db).normalized_impl(db, visitor), mappings)
+        Self::new(
+            db,
+            self.literal(db).normalized_impl(db, visitor),
+            mappings,
+            self.materialization_kind(db),
+        )
     }
 }
 

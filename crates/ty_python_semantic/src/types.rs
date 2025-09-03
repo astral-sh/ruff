@@ -820,7 +820,11 @@ impl<'db> Type<'db> {
     /// - In covariant position, it's replaced with `object`
     /// - In contravariant position, it's replaced with `Never`
     /// - In invariant position, it's replaced with an unresolved type variable
-    fn materialize(&self, db: &'db dyn Db, materialization_kind: MaterializationKind) -> Type<'db> {
+    pub(crate) fn materialize(
+        &self,
+        db: &'db dyn Db,
+        materialization_kind: MaterializationKind,
+    ) -> Type<'db> {
         match self {
             Type::Dynamic(_) => match materialization_kind {
                 MaterializationKind::Top => Type::object(db),
@@ -850,10 +854,14 @@ impl<'db> Type<'db> {
                 Type::PropertyInstance(property_instance.materialize(db, materialization_kind))
             }
 
-            Type::FunctionLiteral(_) | Type::BoundMethod(_) => {
+            Type::FunctionLiteral(_) => {
                 // TODO: Subtyping between function / methods with a callable accounts for the
                 // signature (parameters and return type), so we might need to do something here
                 *self
+            }
+
+            Type::BoundMethod(bound_method) => {
+                Type::BoundMethod(bound_method.materialize(db, materialization_kind))
             }
 
             Type::NominalInstance(instance) => instance.materialize(db, materialization_kind),
@@ -2792,7 +2800,14 @@ impl<'db> Type<'db> {
             }
 
             Type::GenericAlias(alias) => {
-                Some(ClassType::from(*alias).class_member(db, name, policy))
+                let attr = Some(ClassType::from(*alias).class_member(db, name, policy));
+                println!("Get name {}", name);
+                match alias.specialization(db).materialization_kind(db) {
+                    None => attr,
+                    Some(materialization_kind) => {
+                        attr.map(|attr| attr.materialize(db, materialization_kind))
+                    }
+                }
             }
 
             Type::SubclassOf(subclass_of_ty) => {
@@ -8915,6 +8930,18 @@ impl<'db> BoundMethodType<'db> {
                     .self_instance(db)
                     .is_equivalent_to_impl(db, self.self_instance(db), visitor)
             })
+    }
+
+    pub(crate) fn materialize(
+        self,
+        db: &'db dyn Db,
+        materialization_kind: MaterializationKind,
+    ) -> Self {
+        Self::new(
+            db,
+            self.function(db).materialize(db, materialization_kind),
+            self.self_instance(db).materialize(db, materialization_kind),
+        )
     }
 }
 

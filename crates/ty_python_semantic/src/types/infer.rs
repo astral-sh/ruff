@@ -2786,6 +2786,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.db(),
             function_literal,
             type_mappings,
+            None,
         ));
         self.undecorated_type = Some(inferred_ty);
 

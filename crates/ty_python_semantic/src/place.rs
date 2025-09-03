@@ -10,8 +10,8 @@ use crate::semantic_index::{
 };
 use crate::semantic_index::{DeclarationWithConstraint, global_scope, use_def_map};
 use crate::types::{
-    DynamicType, KnownClass, Truthiness, Type, TypeAndQualifiers, TypeQualifiers, UnionBuilder,
-    UnionType, binding_type, declaration_type, todo_type,
+    DynamicType, KnownClass, MaterializationKind, Truthiness, Type, TypeAndQualifiers,
+    TypeQualifiers, UnionBuilder, UnionType, binding_type, declaration_type, todo_type,
 };
 use crate::{Db, FxOrderSet, Program, resolve_module};
 
@@ -612,6 +612,14 @@ impl<'db> PlaceAndQualifiers<'db> {
             place: self.place.map_type(f),
             qualifiers: self.qualifiers,
         }
+    }
+
+    pub(crate) fn materialize(
+        self,
+        db: &'db dyn Db,
+        materialization_kind: MaterializationKind,
+    ) -> PlaceAndQualifiers<'db> {
+        self.map_type(|ty| ty.materialize(db, materialization_kind))
     }
 
     /// Transform place and qualifiers into a [`LookupResult`],
