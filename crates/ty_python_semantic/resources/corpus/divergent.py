@@ -34,3 +34,25 @@ def f(cond: bool):
     return result
 
 reveal_type(f(True))
+
+class Foo:
+    def value(self):
+        return 1
+
+def unwrap(value):
+    if isinstance(value, Foo):
+        foo = value
+        return foo.value()
+    elif type(value) is tuple:
+        length = len(value)
+        if length == 0:
+            return ()
+        elif length == 1:
+            return (unwrap(value[0]),)
+        else:
+            result = []
+            for item in value:
+                result.append(unwrap(item))
+            return tuple(result)
+    else:
+        raise TypeError()
