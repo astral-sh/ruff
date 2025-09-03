@@ -146,27 +146,28 @@ static FREQTRADE: std::sync::LazyLock<Benchmark<'static>> = std::sync::LazyLock:
     )
 });
 
-static PANDAS: std::sync::LazyLock<Benchmark<'static>> = std::sync::LazyLock::new(|| {
-    Benchmark::new(
-        RealWorldProject {
-            name: "pandas",
-            repository: "https://github.com/pandas-dev/pandas",
-            commit: "5909621e2267eb67943a95ef5e895e8484c53432",
-            paths: vec![SystemPath::new("pandas")],
-            dependencies: vec![
-                "numpy",
-                "types-python-dateutil",
-                "types-pytz",
-                "types-PyMySQL",
-                "types-setuptools",
-                "pytest",
-            ],
-            max_dep_date: "2025-06-17",
-            python_version: PythonVersion::PY312,
-        },
-        3000,
-    )
-});
+// Temporarily disabled, see https://github.com/astral-sh/ty/issues/1111
+// static PANDAS: std::sync::LazyLock<Benchmark<'static>> = std::sync::LazyLock::new(|| {
+//     Benchmark::new(
+//         RealWorldProject {
+//             name: "pandas",
+//             repository: "https://github.com/pandas-dev/pandas",
+//             commit: "5909621e2267eb67943a95ef5e895e8484c53432",
+//             paths: vec![SystemPath::new("pandas")],
+//             dependencies: vec![
+//                 "numpy",
+//                 "types-python-dateutil",
+//                 "types-pytz",
+//                 "types-PyMySQL",
+//                 "types-setuptools",
+//                 "pytest",
+//             ],
+//             max_dep_date: "2025-06-17",
+//             python_version: PythonVersion::PY312,
+//         },
+//         3000,
+//     )
+// });
 
 static PYDANTIC: std::sync::LazyLock<Benchmark<'static>> = std::sync::LazyLock::new(|| {
     Benchmark::new(
@@ -251,7 +252,7 @@ fn small(bencher: Bencher, benchmark: &Benchmark) {
     run_single_threaded(bencher, benchmark);
 }
 
-#[bench(args=[&*COLOUR_SCIENCE, &*PANDAS, &*STATIC_FRAME], sample_size=1, sample_count=3)]
+#[bench(args=[&*COLOUR_SCIENCE, /*&*PANDAS,*/ &*STATIC_FRAME], sample_size=1, sample_count=3)]
 fn medium(bencher: Bencher, benchmark: &Benchmark) {
     run_single_threaded(bencher, benchmark);
 }
