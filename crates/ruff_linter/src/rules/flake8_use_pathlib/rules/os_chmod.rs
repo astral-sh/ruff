@@ -124,22 +124,27 @@ pub(crate) fn os_chmod(checker: &Checker, call: &ExprCall, segments: &[&str]) {
         let locator = checker.locator();
         let path_code = locator.slice(path_arg.range());
 
+        let args = |arg: ArgOrKeyword| match arg {
+            ArgOrKeyword::Arg(expr) => {
+                if expr.range() == path_arg.range() {
+                    None
+                } else {
+                    Some(locator.slice(expr.range()).to_string())
+                }
+            }
+            ArgOrKeyword::Keyword(kw) => match kw.arg.as_deref() {
+                Some("mode") => Some(format!("mode={}", locator.slice(&kw.value))),
+                Some("follow_symlinks") => match kw.value.as_boolean_literal_expr() {
+                    Some(bl) if !bl.value => Some("follow_symlinks=False".to_string()),
+                    Some(_) => None,
+                    None => Some(format!("follow_symlinks={}", locator.slice(&kw.value))),
+                },
+                _ => None,
+            },
+        };
+
         let chmod_args = itertools::join(
-            call.arguments
-                .arguments_source_order()
-                .filter_map(|arg| match arg {
-                    ArgOrKeyword::Arg(expr) if expr.range() == path_arg.range() => None,
-                    ArgOrKeyword::Arg(expr) => Some(locator.slice(expr.range()).to_string()),
-                    ArgOrKeyword::Keyword(kw) => match kw.arg.as_deref() {
-                        Some("mode") => Some(format!("mode={}", locator.slice(&kw.value))),
-                        Some("follow_symlinks") => match kw.value.as_boolean_literal_expr() {
-                            Some(bl) if !bl.value => Some("follow_symlinks=False".to_string()),
-                            Some(_) => None,
-                            None => Some(format!("follow_symlinks={}", locator.slice(&kw.value))),
-                        },
-                        _ => None,
-                    },
-                }),
+            call.arguments.arguments_source_order().filter_map(args),
             ", ",
         );
 
