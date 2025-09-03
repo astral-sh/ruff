@@ -115,7 +115,7 @@ from typing import Literal
 def test(x: Literal["a", "b", "c"] | None | int = None):
     if x not in ("a", "c"):
         # int is included because custom __eq__ methods could make
-        # an int equal to "a" or "b", so we can't eliminate it
+        # an int equal to "a" or "c", so we can't eliminate it
         reveal_type(x)  # revealed: Literal["b"] | None | int
     else:
         reveal_type(x)  # revealed: Literal["a", "c"] | int
