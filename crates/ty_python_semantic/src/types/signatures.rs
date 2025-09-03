@@ -15,10 +15,11 @@ use std::{collections::HashMap, slice::Iter};
 use itertools::{EitherOrBoth, Itertools};
 use smallvec::{SmallVec, smallvec_inline};
 
-use super::{DynamicType, Type, TypeVarVariance, definition_expression_type};
+use super::{DynamicType, Type, definition_expression_type};
 use crate::semantic_index::definition::Definition;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::generics::{GenericContext, walk_generic_context};
+use crate::types::variance::TypeVarVariance;
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, FindLegacyTypeVarsVisitor,
     HasRelationToVisitor, IsEquivalentVisitor, KnownClass, MaterializationKind, NormalizedVisitor,
@@ -1219,6 +1220,17 @@ impl<'db> Parameters<'db> {
         }
 
         let positional_or_keyword = pos_or_keyword_iter.map(|arg| {
+            Parameter::from_node_and_kind(
+                db,
+                definition,
+                &arg.parameter,
+                ParameterKind::PositionalOrKeyword {
+                    name: arg.parameter.name.id.clone(),
+                    default_type: default_type(arg),
+                },
+            )
+        });
+        let positional_or_keyword = args.iter().map(|arg| {
             Parameter::from_node_and_kind(
                 db,
                 definition,
