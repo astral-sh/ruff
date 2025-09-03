@@ -188,20 +188,20 @@ static PYDANTIC: std::sync::LazyLock<Benchmark<'static>> = std::sync::LazyLock::
     )
 });
 
-static SYMPY: std::sync::LazyLock<Benchmark<'static>> = std::sync::LazyLock::new(|| {
-    Benchmark::new(
-        RealWorldProject {
-            name: "sympy",
-            repository: "https://github.com/sympy/sympy",
-            commit: "22fc107a94eaabc4f6eb31470b39db65abb7a394",
-            paths: vec![SystemPath::new("sympy")],
-            dependencies: vec!["mpmath"],
-            max_dep_date: "2025-06-17",
-            python_version: PythonVersion::PY312,
-        },
-        13000,
-    )
-});
+// static SYMPY: std::sync::LazyLock<Benchmark<'static>> = std::sync::LazyLock::new(|| {
+//     Benchmark::new(
+//         RealWorldProject {
+//             name: "sympy",
+//             repository: "https://github.com/sympy/sympy",
+//             commit: "22fc107a94eaabc4f6eb31470b39db65abb7a394",
+//             paths: vec![SystemPath::new("sympy")],
+//             dependencies: vec!["mpmath"],
+//             max_dep_date: "2025-06-17",
+//             python_version: PythonVersion::PY312,
+//         },
+//         13000,
+//     )
+// });
 
 static TANJUN: std::sync::LazyLock<Benchmark<'static>> = std::sync::LazyLock::new(|| {
     Benchmark::new(
@@ -255,10 +255,10 @@ fn medium(bencher: Bencher, benchmark: &Benchmark) {
     run_single_threaded(bencher, benchmark);
 }
 
-#[bench(args=[&*SYMPY], sample_size=1, sample_count=2)]
-fn large(bencher: Bencher, benchmark: &Benchmark) {
-    run_single_threaded(bencher, benchmark);
-}
+// #[bench(args=[&*SYMPY], sample_size=1, sample_count=2)]
+// fn large(bencher: Bencher, benchmark: &Benchmark) {
+//     run_single_threaded(bencher, benchmark);
+// }
 
 #[bench(args=[&*PYDANTIC], sample_size=3, sample_count=8)]
 fn multithreaded(bencher: Bencher, benchmark: &Benchmark) {
