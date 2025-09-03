@@ -19,3 +19,13 @@ spack  # slow, success, but mypy-primer hangs processing the output
 spark  # too many iterations
 steam.py  # hangs (single threaded)
 streamlit  # too many iterations (uses packaging)
+core  # stack overflow
+sympy  # timeout, see https://github.com/astral-sh/ty/issues/1111
+scipy  # timeout, see https://github.com/astral-sh/ty/issues/1111
+pywin32  # timeout, see https://github.com/astral-sh/ty/issues/1111
+pycryptodome  # timeout, see https://github.com/astral-sh/ty/issues/1111
+prefect  # timeout, see https://github.com/astral-sh/ty/issues/1111
+parso  # timeout, see https://github.com/astral-sh/ty/issues/1111
+pandas  # timeout, see https://github.com/astral-sh/ty/issues/1111
+apprise  # timeout, see https://github.com/astral-sh/ty/issues/1111
+aiohttp  # timeout, see https://github.com/astral-sh/ty/issues/1111
