@@ -3029,7 +3029,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return None;
         }
 
-        if func_type.is_class_method(self.db()) {
+        if func_type.is_classmethod(self.db()) {
             // TODO: set the type for `cls` argument
             return None;
         } else if func_type.has_known_decorator(self.db(), FunctionDecorators::STATICMETHOD) {

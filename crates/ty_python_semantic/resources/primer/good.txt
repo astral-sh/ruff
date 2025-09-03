@@ -13,6 +13,7 @@ alerta
 antidote
 anyio
 apprise
+artigraph
 async-utils
 asynq
 attrs

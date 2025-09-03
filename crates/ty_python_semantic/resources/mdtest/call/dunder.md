@@ -201,7 +201,6 @@ class C:
         return str(key)
 
     def f(self):
-        # TODO: Give a type assinament error instead of a shadowing error
         # error: [invalid-assignment] "Implicit shadowing of function `__getitem__`"
         self.__getitem__ = None
 

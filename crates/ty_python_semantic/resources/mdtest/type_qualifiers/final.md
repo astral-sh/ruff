@@ -88,6 +88,7 @@ class C:
         self.FINAL_C: Final[int] = 1
         self.FINAL_D: Final = 1
         self.FINAL_E: Final
+        # TODO: Should not be an error
         # error: [invalid-assignment] "Cannot assign to final attribute `FINAL_E` on type `Self@__init__`"
         self.FINAL_E = 1
 
