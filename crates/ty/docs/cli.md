@@ -60,8 +60,9 @@ over all configuration files.</p>
 </dd><dt id="ty-check--output-format"><a href="#ty-check--output-format"><code>--output-format</code></a> <i>output-format</i></dt><dd><p>The format to use for printing diagnostic messages</p>
 <p>Possible values:</p>
 <ul>
-<li><code>full</code>:  Print diagnostics verbosely, with context and helpful hints [default]</li>
+<li><code>full</code>:  Print diagnostics verbosely, with context and helpful hints (default)</li>
 <li><code>concise</code>:  Print diagnostics concisely, one per line</li>
+<li><code>gitlab</code>:  Print diagnostics in the JSON format expected by GitLab Code Quality reports</li>
 </ul></dd><dt id="ty-check--project"><a href="#ty-check--project"><code>--project</code></a> <i>project</i></dt><dd><p>Run the command within the given project directory.</p>
 <p>All <code>pyproject.toml</code> files will be discovered by walking up the directory tree from the given project directory, as will the project's virtual environment (<code>.venv</code>) unless the <code>venv-path</code> option is set.</p>
 <p>Other command-line arguments (such as relative paths) will be resolved relative to the current working directory.</p>
