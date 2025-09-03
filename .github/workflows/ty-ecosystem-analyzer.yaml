@@ -69,6 +69,7 @@ jobs:
           ecosystem-analyzer \
             --repository ruff \
             diff \
+            --profile=release \
             --projects-old ruff/projects_old.txt \
             --projects-new ruff/projects_new.txt \
             --old old_commit \
