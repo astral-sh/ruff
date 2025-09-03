@@ -120,3 +120,52 @@ def test(x: Literal["a", "b", "c"] | None | int = None):
     else:
         reveal_type(x)  # revealed: Literal["a", "c"] | int
 ```
+
+## `in` for `bool`
+
+```py
+def _(x: bool):
+    if x in (True,):
+        reveal_type(x)  # revealed: Literal[True]
+    else:
+        reveal_type(x)  # revealed: Literal[False]
+```
+
+<!-- TODO: Add enum tests -->
+<!--
+## `in` for enums
+
+```py
+from enum import Enum
+
+class Color(Enum):
+    RED = "red"
+    GREEN = "green"
+    BLUE = "blue"
+
+def _(x: Color):
+    if x in (Color.RED, Color.GREEN):
+        reveal_type(x)  # revealed: Literal[Color.RED, Color.GREEN]
+    else:
+        reveal_type(x)  # revealed: Literal[Color.BLUE]
+```
+
+## Union with enum and `int`
+
+```py
+from enum import Enum
+
+class Status(Enum):
+    PENDING = 1
+    APPROVED = 2
+    REJECTED = 3
+
+def test(x: Status | int):
+    if x in (Status.PENDING, Status.APPROVED):
+        # int is included because custom __eq__ methods could make
+        # an int equal to Status.PENDING or Status.APPROVED, so we can't eliminate it
+        reveal_type(x)  # revealed: Literal[Status.PENDING, Status.APPROVED] | int
+    else:
+        reveal_type(x)  # revealed: Literal[Status.REJECTED] | int
+```
+-->
