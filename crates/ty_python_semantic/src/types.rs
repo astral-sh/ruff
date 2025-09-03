@@ -7899,10 +7899,9 @@ impl<'db> ContextManagerError<'db> {
         let db = context.db();
 
         // Helper function to analyze union members for specific method issues
-        let analyze_union_method_issues = |method_name: &str| -> (Vec<Type<'db>>, Vec<Type<'db>>) {
+        let analyze_union_method_issues = |method_name: &str| -> Vec<Type<'db>> {
             if let Type::Union(union) = context_expression_type {
                 let mut missing_method = Vec::new();
-                let mut has_method = Vec::new();
 
                 for element in union.elements(db) {
                     let member_lookup = element.member_lookup_with_policy(
@@ -7913,13 +7912,12 @@ impl<'db> ContextManagerError<'db> {
 
                     match member_lookup.place {
                         Place::Unbound => missing_method.push(*element),
-                        Place::Type(_, _) => has_method.push(*element),
                     }
                 }
 
-                (missing_method, has_method)
+                missing_method
             } else {
-                (Vec::new(), Vec::new())
+                Vec::new()
             }
         };
 
@@ -7929,7 +7927,7 @@ impl<'db> ContextManagerError<'db> {
                 CallDunderError::PossiblyUnbound(_) => {
                     // For unions, provide more specific information about which members lack the method
                     if let Type::Union(_) = context_expression_type {
-                        let (missing_method, _) = analyze_union_method_issues(name);
+                        let missing_method = analyze_union_method_issues(name);
                         if !missing_method.is_empty() {
                             let missing_types: Vec<_> = missing_method
                                 .iter()
@@ -7963,8 +7961,8 @@ impl<'db> ContextManagerError<'db> {
                 (CallDunderError::PossiblyUnbound(_), CallDunderError::PossiblyUnbound(_)) => {
                     // For unions, provide more specific information about which members lack the methods
                     if let Type::Union(_) = context_expression_type {
-                        let (missing_enter, _) = analyze_union_method_issues(name_a);
-                        let (missing_exit, _) = analyze_union_method_issues(name_b);
+                        let missing_enter = analyze_union_method_issues(name_a);
+                        let missing_exit = analyze_union_method_issues(name_b);
 
                         // Find union members that are missing both methods
                         let missing_both: Vec<_> = missing_enter
@@ -7991,8 +7989,8 @@ impl<'db> ContextManagerError<'db> {
                 (_, _) => {
                     // For mixed error cases with unions, provide detailed information about which members have issues
                     if let Type::Union(_) = context_expression_type {
-                        let (missing_enter, _) = analyze_union_method_issues(name_a);
-                        let (missing_exit, _) = analyze_union_method_issues(name_b);
+                        let missing_enter = analyze_union_method_issues(name_a);
+                        let missing_exit = analyze_union_method_issues(name_b);
 
                         let mut parts = Vec::new();
 
