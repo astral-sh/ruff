@@ -70,7 +70,7 @@ from airflow.timetables.datasets import DatasetOrTimeSchedule
 from airflow.utils.dag_parsing_context import get_parsing_context
 
 # airflow.timetables.datasets
-DatasetOrTimeSchedule()
+DatasetOrTimeSchedule(datasets=[])
 
 # airflow.utils.dag_parsing_context
 get_parsing_context()
