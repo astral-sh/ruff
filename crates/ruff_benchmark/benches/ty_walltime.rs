@@ -188,6 +188,7 @@ static PYDANTIC: std::sync::LazyLock<Benchmark<'static>> = std::sync::LazyLock::
     )
 });
 
+// Temporarily disabled, see https://github.com/astral-sh/ty/issues/1111
 // static SYMPY: std::sync::LazyLock<Benchmark<'static>> = std::sync::LazyLock::new(|| {
 //     Benchmark::new(
 //         RealWorldProject {
