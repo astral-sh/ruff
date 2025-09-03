@@ -470,8 +470,6 @@ struct Returnee {
 /// The inferred types for a scope region.
 #[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct ScopeInference<'db> {
-    scope: ScopeId<'db>,
-
     /// The types of every expression in this region.
     expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
 
@@ -497,8 +495,9 @@ struct ScopeInferenceExtra {
 
 impl<'db> ScopeInference<'db> {
     fn cycle_fallback(scope: ScopeId<'db>) -> Self {
+        let _ = scope;
+
         Self {
-            scope,
             extra: Some(Box::new(ScopeInferenceExtra {
                 cycle_fallback: true,
                 ..ScopeInferenceExtra::default()
@@ -541,9 +540,20 @@ impl<'db> ScopeInference<'db> {
     /// In the case of methods, the return type of the superclass method is further unioned.
     /// If there is no superclass method and this method is not `final`, it will be unioned with `Unknown`.
     pub(crate) fn infer_return_type(&self, db: &'db dyn Db, callee_ty: Type<'db>) -> Type<'db> {
+        let scope = match callee_ty {
+            Type::FunctionLiteral(function) => {
+                function.literal(db).last_definition(db).body_scope(db)
+            }
+            Type::BoundMethod(method) => method
+                .function(db)
+                .literal(db)
+                .last_definition(db)
+                .body_scope(db),
+            _ => return Type::none(db),
+        };
         // TODO: coroutine function type inference
         // TODO: generator function type inference
-        if self.scope.is_coroutine_function(db) || self.scope.is_generator_function(db) {
+        if scope.is_coroutine_function(db) || scope.is_generator_function(db) {
             return Type::unknown();
         }
 
@@ -602,7 +612,7 @@ impl<'db> ScopeInference<'db> {
             });
             union_add(ty);
         }
-        let use_def = use_def_map(db, self.scope);
+        let use_def = use_def_map(db, scope);
         if use_def.can_implicitly_return_none(db) {
             union_add(Type::none(db));
         }
@@ -9652,11 +9662,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         expressions.shrink_to_fit();
 
-        ScopeInference {
-            scope,
-            expressions,
-            extra,
-        }
+        ScopeInference { expressions, extra }
     }
 }
 
