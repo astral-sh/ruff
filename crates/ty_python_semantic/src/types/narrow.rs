@@ -615,24 +615,88 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         }
     }
 
+    // TODO `expr_in` and `expr_not_in` should perhaps be unified with `expr_eq` and `expr_ne`,
+    // since `eq` and `ne` are equivalent to `in` and `not in` with only one element in the RHS.
     fn evaluate_expr_in(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
         if lhs_ty.is_single_valued(self.db) || lhs_ty.is_union_of_single_valued(self.db) {
-            if let Type::StringLiteral(string_literal) = rhs_ty {
-                Some(UnionType::from_elements(
-                    self.db,
-                    string_literal
-                        .iter_each_char(self.db)
-                        .map(Type::StringLiteral),
-                ))
-            } else if let Some(tuple_spec) = rhs_ty.tuple_instance_spec(self.db) {
-                // N.B. Strictly speaking this is unsound, since a tuple subclass might override `__contains__`
-                // but we'd still apply the narrowing here. This seems unlikely, however, and narrowing is
-                // generally unsound in numerous ways anyway (attribute narrowing, subscript, narrowing,
-                // narrowing of globals, etc.). So this doesn't seem worth worrying about too much.
-                Some(UnionType::from_elements(self.db, tuple_spec.all_elements()))
-            } else {
-                None
+            rhs_ty
+                .try_iterate(self.db)
+                .ok()
+                .map(|iterable| iterable.homogeneous_element_type(self.db))
+        } else if lhs_ty.is_union_with_single_valued(self.db) {
+            let rhs_values = rhs_ty
+                .try_iterate(self.db)
+                .ok()?
+                .homogeneous_element_type(self.db);
+
+            let mut builder = UnionBuilder::new(self.db);
+
+            // Add the narrowed values from the RHS first, to keep literals before broader types.
+            builder = builder.add(rhs_values);
+
+            if let Some(lhs_union) = lhs_ty.into_union() {
+                for element in lhs_union.elements(self.db) {
+                    // Keep only the non-single-valued portion of the original type.
+                    if !element.is_single_valued(self.db)
+                        && !element.is_literal_string()
+                        && !element.is_bool(self.db)
+                    {
+                        builder = builder.add(*element);
+                    }
+                }
             }
+            Some(builder.build())
+        } else {
+            None
+        }
+    }
+
+    fn evaluate_expr_not_in(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
+        let rhs_values = rhs_ty
+            .try_iterate(self.db)
+            .ok()?
+            .homogeneous_element_type(self.db);
+
+        if lhs_ty.is_single_valued(self.db) || lhs_ty.is_union_of_single_valued(self.db) {
+            // Exclude the RHS values from the entire (single-valued) LHS domain.
+            let complement = IntersectionBuilder::new(self.db)
+                .add_positive(lhs_ty)
+                .add_negative(rhs_values)
+                .build();
+            Some(complement)
+        } else if lhs_ty.is_union_with_single_valued(self.db) {
+            // Split LHS into single-valued portion and the rest. Exclude RHS values from the
+            // single-valued portion, keep the rest intact.
+            let mut single_builder = UnionBuilder::new(self.db);
+            let mut rest_builder = UnionBuilder::new(self.db);
+
+            if let Some(lhs_union) = lhs_ty.into_union() {
+                for element in lhs_union.elements(self.db) {
+                    if element.is_single_valued(self.db)
+                        || element.is_literal_string()
+                        || element.is_bool(self.db)
+                    {
+                        single_builder = single_builder.add(*element);
+                    } else {
+                        rest_builder = rest_builder.add(*element);
+                    }
+                }
+            }
+
+            let single_union = single_builder.build();
+            let rest_union = rest_builder.build();
+
+            let narrowed_single = IntersectionBuilder::new(self.db)
+                .add_positive(single_union)
+                .add_negative(rhs_values)
+                .build();
+
+            // Keep order: first literal complement, then broader arms.
+            let result = UnionBuilder::new(self.db)
+                .add(narrowed_single)
+                .add(rest_union)
+                .build();
+            Some(result)
         } else {
             None
         }
@@ -660,9 +724,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             ast::CmpOp::Eq => self.evaluate_expr_eq(lhs_ty, rhs_ty),
             ast::CmpOp::NotEq => self.evaluate_expr_ne(lhs_ty, rhs_ty),
             ast::CmpOp::In => self.evaluate_expr_in(lhs_ty, rhs_ty),
-            ast::CmpOp::NotIn => self
-                .evaluate_expr_in(lhs_ty, rhs_ty)
-                .map(|ty| ty.negate(self.db)),
+            ast::CmpOp::NotIn => self.evaluate_expr_not_in(lhs_ty, rhs_ty),
             _ => None,
         }
     }

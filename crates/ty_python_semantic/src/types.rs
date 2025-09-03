@@ -1054,6 +1054,16 @@ impl<'db> Type<'db> {
             || self.is_literal_string()
     }
 
+    pub(crate) fn is_union_with_single_valued(&self, db: &'db dyn Db) -> bool {
+        self.into_union().is_some_and(|union| {
+            union
+                .elements(db)
+                .iter()
+                .any(|ty| ty.is_single_valued(db) || ty.is_bool(db) || ty.is_literal_string())
+        }) || self.is_bool(db)
+            || self.is_literal_string()
+    }
+
     pub(crate) fn into_string_literal(self) -> Option<StringLiteralType<'db>> {
         match self {
             Type::StringLiteral(string_literal) => Some(string_literal),
@@ -9952,14 +9962,6 @@ impl<'db> StringLiteralType<'db> {
     /// The length of the string, as would be returned by Python's `len()`.
     pub(crate) fn python_len(self, db: &'db dyn Db) -> usize {
         self.value(db).chars().count()
-    }
-
-    /// Return an iterator over each character in the string literal.
-    /// as would be returned by Python's `iter()`.
-    pub(crate) fn iter_each_char(self, db: &'db dyn Db) -> impl Iterator<Item = Self> {
-        self.value(db)
-            .chars()
-            .map(|c| StringLiteralType::new(db, c.to_string().into_boxed_str()))
     }
 }
 
