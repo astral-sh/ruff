@@ -617,39 +617,15 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
     fn evaluate_expr_in(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
         if lhs_ty.is_single_valued(self.db) || lhs_ty.is_union_of_single_valued(self.db) {
-            if let Type::StringLiteral(string_literal) = rhs_ty {
-                Some(UnionType::from_elements(
-                    self.db,
-                    string_literal
-                        .iter_each_char(self.db)
-                        .map(Type::StringLiteral),
-                ))
-            } else if let Some(tuple_spec) = rhs_ty.tuple_instance_spec(self.db) {
-                // N.B. Strictly speaking this is unsound, since a tuple subclass might override `__contains__`
-                // but we'd still apply the narrowing here. This seems unlikely, however, and narrowing is
-                // generally unsound in numerous ways anyway (attribute narrowing, subscript, narrowing,
-                // narrowing of globals, etc.). So this doesn't seem worth worrying about too much.
-                Some(UnionType::from_elements(self.db, tuple_spec.all_elements()))
-            } else {
-                None
-            }
+            rhs_ty
+                .try_iterate(self.db)
+                .ok()
+                .map(|iterable| iterable.homogeneous_element_type(self.db))
         } else if lhs_ty.is_union_with_single_valued(self.db) {
-            // If the LHS is a union that contains at least one single-valued arm, we narrow the
-            // single-valued portion from the RHS values, and keep non-single-valued arms unchanged.
-            let rhs_values: Option<Type> = if let Type::StringLiteral(string_literal) = rhs_ty {
-                Some(UnionType::from_elements(
-                    self.db,
-                    string_literal
-                        .iter_each_char(self.db)
-                        .map(Type::StringLiteral),
-                ))
-            } else if let Some(tuple_spec) = rhs_ty.tuple_instance_spec(self.db) {
-                Some(UnionType::from_elements(self.db, tuple_spec.all_elements()))
-            } else {
-                None
-            };
-
-            let rhs_values = rhs_values?;
+            let rhs_values = rhs_ty
+                .try_iterate(self.db)
+                .ok()?
+                .homogeneous_element_type(self.db);
 
             let mut builder = UnionBuilder::new(self.db);
 
@@ -671,20 +647,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     }
 
     fn evaluate_expr_not_in(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
-        // Build the set of values that are considered "members" coming from RHS.
-        let rhs_values: Option<Type> = if let Type::StringLiteral(string_literal) = rhs_ty {
-            Some(UnionType::from_elements(
-                self.db,
-                string_literal
-                    .iter_each_char(self.db)
-                    .map(Type::StringLiteral),
-            ))
-        } else if let Some(tuple_spec) = rhs_ty.tuple_instance_spec(self.db) {
-            Some(UnionType::from_elements(self.db, tuple_spec.all_elements()))
-        } else {
-            None
-        };
-        let rhs_values = rhs_values?;
+        let rhs_values = rhs_ty
+            .try_iterate(self.db)
+            .ok()?
+            .homogeneous_element_type(self.db);
 
         if lhs_ty.is_single_valued(self.db) || lhs_ty.is_union_of_single_valued(self.db) {
             // Exclude the RHS values from the entire (single-valued) LHS domain.
