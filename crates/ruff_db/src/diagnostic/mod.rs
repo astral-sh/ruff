@@ -1,7 +1,7 @@
 use std::{fmt::Formatter, path::Path, sync::Arc};
 
 use ruff_diagnostics::{Applicability, Fix};
-use ruff_source_file::{LineColumn, SourceCode, SourceFile};
+use ruff_source_file::{LineColumn, SourceCode, SourceFile, SourceFileBuilder};
 
 use ruff_annotate_snippets::Level as AnnotateLevel;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -504,9 +504,12 @@ impl Diagnostic {
     /// Panics if either diagnostic has no primary span, if the span has no range, or if its file is
     /// not a `SourceFile`.
     pub fn ruff_start_ordering(&self, other: &Self) -> std::cmp::Ordering {
-        (self.expect_ruff_source_file(), self.expect_range().start()).cmp(&(
+        fn start_or_zero(range: Option<TextRange>) -> TextSize {
+            range.map(|r| r.start()).unwrap_or_default()
+        }
+        (self.expect_ruff_source_file(), start_or_zero(self.range())).cmp(&(
             other.expect_ruff_source_file(),
-            other.expect_range().start(),
+            start_or_zero(other.range()),
         ))
     }
 }
@@ -1208,6 +1211,14 @@ impl From<SourceFile> for Span {
     fn from(file: SourceFile) -> Self {
         let file = UnifiedFile::Ruff(file);
         Span { file, range: None }
+    }
+}
+
+impl From<&Path> for Span {
+    fn from(path: &Path) -> Self {
+        Span::from(
+            SourceFileBuilder::new(path.to_str().unwrap_or_default(), "".to_owned()).finish(),
+        )
     }
 }
 
