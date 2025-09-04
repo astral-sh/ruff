@@ -7,10 +7,10 @@ use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for membership tests on empty collections (such as `list`, `tuple`, `set` or `dict`).
+/// Checks for membership tests on empty collections (such as `list`, `tuple`, `set`, or `dict`).
 ///
 /// ## Why is this bad?
-/// If the collection is always empty, the check is unnecessary, and can be removed.
+/// If the collection is always empty, the check is unnecessary and can be removed.
 ///
 /// ## Example
 ///
