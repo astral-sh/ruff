@@ -19,7 +19,8 @@ use crate::types::string_annotation::{
     RAW_STRING_TYPE_ANNOTATION,
 };
 use crate::types::{
-    DynamicType, LintDiagnosticGuard, Protocol, ProtocolInstanceType, SubclassOfInner, binding_type,
+    ClassType, DynamicType, LintDiagnosticGuard, Protocol, ProtocolInstanceType, SubclassOfInner,
+    binding_type,
 };
 use crate::types::{SpecialFormType, Type, protocol_class::ProtocolClass};
 use crate::util::diagnostics::format_enumeration;
@@ -2088,7 +2089,7 @@ pub(super) fn report_implicit_return_type(
     range: impl Ranged,
     expected_ty: Type,
     has_empty_body: bool,
-    enclosing_class_of_method: Option<ClassLiteral>,
+    enclosing_class_of_method: Option<ClassType>,
     no_return: bool,
 ) {
     let Some(builder) = context.report_lint(&INVALID_RETURN_TYPE, range) else {
@@ -2122,7 +2123,7 @@ pub(super) fn report_implicit_return_type(
     let Some(class) = enclosing_class_of_method else {
         return;
     };
-    if class.iter_mro(db, None).contains(&ClassBase::Protocol) {
+    if class.iter_mro(db).contains(&ClassBase::Protocol) {
         diagnostic.info(format_args!(
             "Class `{}` has `typing.Protocol` in its MRO, but it is not a protocol class",
             class.name(db)

@@ -92,7 +92,7 @@ use crate::semantic_index::{
     ApplicableConstraints, EnclosingSnapshotResult, SemanticIndex, place_table, semantic_index,
 };
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
-use crate::types::class::{CodeGeneratorKind, FieldKind, MetaclassErrorKind};
+use crate::types::class::{CodeGeneratorKind, FieldKind, MetaclassErrorKind, MethodDecorator};
 use crate::types::diagnostic::{
     self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS,
     CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, DUPLICATE_KW_ONLY, INCONSISTENT_MRO,
@@ -2415,7 +2415,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// is a class scope OR the immediate parent scope is an annotation scope
     /// and the grandparent scope is a class scope. This means it has different
     /// behaviour to the [`nearest_enclosing_class`] function.
-    fn class_context_of_current_method(&self) -> Option<ClassLiteral<'db>> {
+    fn class_context_of_current_method(&self) -> Option<ClassType<'db>> {
         let current_scope_id = self.scope().file_scope_id(self.db());
         let current_scope = self.index.scope(current_scope_id);
         if current_scope.kind() != ScopeKind::Function {
@@ -2440,7 +2440,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let class_stmt = class_scope.node().as_class(self.module())?;
         let class_definition = self.index.expect_single_definition(class_stmt);
-        binding_type(self.db(), class_definition).into_class_literal()
+        binding_type(self.db(), class_definition).to_class_type(self.db())
     }
 
     /// If the current scope is a (non-lambda) function, return that function's AST node.
@@ -7177,26 +7177,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let first_parameter_name = first_parameter.name();
 
-        let function_decorators = FunctionDecorators::from_decorator_types(
-            self.db(),
-            self.function_decorator_types(current_function),
-        );
+        let function_definition = self.index.expect_single_definition(current_function);
+        let Type::FunctionLiteral(function_type) = binding_type(self.db(), function_definition)
+        else {
+            return;
+        };
 
-        let attribute_exists = if function_decorators.contains(FunctionDecorators::CLASSMETHOD) {
-            if function_decorators.contains(FunctionDecorators::STATICMETHOD) {
-                return;
-            }
-            !Type::instance(self.db(), class.default_specialization(self.db()))
+        let attribute_exists = match MethodDecorator::try_from_fn_type(self.db(), function_type) {
+            Ok(MethodDecorator::ClassMethod) => !Type::instance(self.db(), class)
                 .class_member(self.db(), id.clone())
                 .place
-                .is_unbound()
-        } else if !function_decorators.contains(FunctionDecorators::STATICMETHOD) {
-            !Type::instance(self.db(), class.default_specialization(self.db()))
+                .is_unbound(),
+            Ok(MethodDecorator::None) => !Type::instance(self.db(), class)
                 .member(self.db(), id)
                 .place
-                .is_unbound()
-        } else {
-            false
+                .is_unbound(),
+            Ok(MethodDecorator::StaticMethod) | Err(()) => false,
         };
 
         if attribute_exists {
