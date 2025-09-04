@@ -37,6 +37,10 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// nums.discard(123)
 /// ```
 ///
+/// ## Fix safety
+/// The fix is always marked as unsafe because it can change the error behavior of a program, as
+/// `set.remove()` raises `KeyError` when the item doesn't exist, while `set.discard()` silently does nothing.
+///
 /// ## References
 /// - [Python documentation: `set.discard()`](https://docs.python.org/3/library/stdtypes.html?highlight=list#frozenset.discard)
 #[derive(ViolationMetadata)]
