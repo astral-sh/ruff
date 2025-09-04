@@ -36,8 +36,15 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///     return x
 /// ```
 ///
+/// ## See also
+///
+/// This rule applies only to unpacked assignments. For regular assignments, see
+/// [`unused-variable`][F841].
+///
 /// ## Options
 /// - `lint.dummy-variable-rgx`
+///
+/// [F841]: https://docs.astral.sh/ruff/rules/unused-variable/
 #[derive(ViolationMetadata)]
 pub(crate) struct UnusedUnpackedVariable {
     pub name: String,
