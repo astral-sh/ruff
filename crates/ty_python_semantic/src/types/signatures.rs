@@ -12,7 +12,7 @@
 
 use std::{collections::HashMap, slice::Iter};
 
-use itertools::EitherOrBoth;
+use itertools::{EitherOrBoth, Itertools};
 use smallvec::{SmallVec, smallvec_inline};
 
 use super::{DynamicType, Type, TypeVarVariance, definition_expression_type};
@@ -1181,23 +1181,54 @@ impl<'db> Parameters<'db> {
             range: _,
             node_index: _,
         } = parameters;
+
         let default_type = |param: &ast::ParameterWithDefault| {
             param
                 .default()
                 .map(|default| definition_expression_type(db, definition, default))
         };
-        let positional_only = posonlyargs.iter().map(|arg| {
-            Parameter::from_node_and_kind(
-                db,
-                definition,
-                &arg.parameter,
-                ParameterKind::PositionalOnly {
-                    name: Some(arg.parameter.name.id.clone()),
-                    default_type: default_type(arg),
-                },
-            )
-        });
-        let positional_or_keyword = args.iter().map(|arg| {
+
+        let mut positional_only: Vec<Parameter> = posonlyargs
+            .iter()
+            .map(|arg| {
+                Parameter::from_node_and_kind(
+                    db,
+                    definition,
+                    &arg.parameter,
+                    ParameterKind::PositionalOnly {
+                        name: Some(arg.parameter.name.id.clone()),
+                        default_type: default_type(arg),
+                    },
+                )
+            })
+            .collect();
+
+        let mut pos_or_keyword_iter = args.iter();
+
+        // If there are no PEP-570 positional-only parameters, check for the legacy PEP-484 convention
+        // for denoting positional-only parameters (parameters that start with `__` and do not end with `__`)
+        if positional_only.is_empty() {
+            positional_only.extend(
+                pos_or_keyword_iter
+                    .by_ref()
+                    .peeking_take_while(|param| {
+                        param.name().starts_with("__") && !param.name().ends_with("__")
+                    })
+                    .map(|param| {
+                        Parameter::from_node_and_kind(
+                            db,
+                            definition,
+                            &param.parameter,
+                            ParameterKind::PositionalOnly {
+                                name: Some(param.parameter.name.id.clone()),
+                                default_type: default_type(param),
+                            },
+                        )
+                    }),
+            );
+        }
+
+        let positional_or_keyword = pos_or_keyword_iter.map(|arg| {
             Parameter::from_node_and_kind(
                 db,
                 definition,
@@ -1208,6 +1239,7 @@ impl<'db> Parameters<'db> {
                 },
             )
         });
+
         let variadic = vararg.as_ref().map(|arg| {
             Parameter::from_node_and_kind(
                 db,
@@ -1218,6 +1250,7 @@ impl<'db> Parameters<'db> {
                 },
             )
         });
+
         let keyword_only = kwonlyargs.iter().map(|arg| {
             Parameter::from_node_and_kind(
                 db,
@@ -1229,6 +1262,7 @@ impl<'db> Parameters<'db> {
                 },
             )
         });
+
         let keywords = kwarg.as_ref().map(|arg| {
             Parameter::from_node_and_kind(
                 db,
@@ -1239,8 +1273,10 @@ impl<'db> Parameters<'db> {
                 },
             )
         });
+
         Self::new(
             positional_only
+                .into_iter()
                 .chain(positional_or_keyword)
                 .chain(variadic)
                 .chain(keyword_only)
