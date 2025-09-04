@@ -253,4 +253,23 @@ reveal_type(D().instance_method)
 reveal_type(D.class_method)
 ```
 
+## Test
+
+```py
+from ty_extensions import generic_context
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class C(Generic[T]):
+    def method(self, u: int) -> int:
+        return u
+
+    def generic_method(self, t: T, u: U) -> U:
+        return u
+
+reveal_type(generic_context(C.method))  # revealed: tuple[Self@method]
+```
+
 [self attribute]: https://typing.python.org/en/latest/spec/generics.html#use-in-attribute-annotations
