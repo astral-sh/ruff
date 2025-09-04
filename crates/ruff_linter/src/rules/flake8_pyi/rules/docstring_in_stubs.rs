@@ -3,6 +3,7 @@ use ruff_python_ast::{ExprStringLiteral, Stmt};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::docstrings::extraction::docstring_from;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -41,10 +42,7 @@ impl AlwaysFixableViolation for DocstringInStub {
 
 /// PYI021
 pub(crate) fn docstring_in_stubs(checker: &Checker, body: &[Stmt]) {
-    let docstring = match &body[0] {
-        Stmt::Expr(expr) => expr.value.as_string_literal_expr(),
-        _ => None,
-    };
+    let docstring = docstring_from(body);
 
     let Some(docstring_range) = docstring.map(ExprStringLiteral::range) else {
         return;
