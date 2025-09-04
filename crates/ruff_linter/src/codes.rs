@@ -1137,7 +1137,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Refurb, "105") => (RuleGroup::Stable, rules::refurb::rules::PrintEmptyString),
         (Refurb, "110") => (RuleGroup::Preview, rules::refurb::rules::IfExpInsteadOfOrOperator),
         (Refurb, "113") => (RuleGroup::Preview, rules::refurb::rules::RepeatedAppend),
-        (Refurb, "116") => (RuleGroup::Preview, rules::refurb::rules::FStringNumberFormat),
+        (Refurb, "116") => (RuleGroup::Stable, rules::refurb::rules::FStringNumberFormat),
         (Refurb, "118") => (RuleGroup::Preview, rules::refurb::rules::ReimplementedOperator),
         (Refurb, "122") => (RuleGroup::Stable, rules::refurb::rules::ForLoopWrites),
         (Refurb, "129") => (RuleGroup::Stable, rules::refurb::rules::ReadlinesInFor),
