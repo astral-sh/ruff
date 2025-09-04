@@ -71,6 +71,8 @@ impl SemanticSyntaxChecker {
                         // test_err import_from_star
                         // def f():
                         //     from module import *
+                        // test_ok import_from_star
+                        // from module import *
                         Self::add_error(
                             ctx,
                             SemanticSyntaxErrorKind::UndefinedLocalWithNestedImportStarUsage(
