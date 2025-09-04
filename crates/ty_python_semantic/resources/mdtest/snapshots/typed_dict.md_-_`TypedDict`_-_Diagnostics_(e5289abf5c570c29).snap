@@ -37,6 +37,14 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/typed_dict.md
 23 | 
 24 | def write_to_non_literal_string_key(person: Person, str_key: str):
 25 |     person[str_key] = "Alice"  # error: [invalid-key]
+26 | from typing_extensions import ReadOnly
+27 | 
+28 | class Employee(TypedDict):
+29 |     id: ReadOnly[int]
+30 |     name: str
+31 | 
+32 | def write_to_readonly_key(employee: Employee):
+33 |     employee["id"] = 42  # error: [invalid-assignment]
 ```
 
 # Diagnostics
@@ -127,7 +135,22 @@ error[invalid-key]: Cannot access `Person` with a key of type `str`. Only string
 24 | def write_to_non_literal_string_key(person: Person, str_key: str):
 25 |     person[str_key] = "Alice"  # error: [invalid-key]
    |            ^^^^^^^
+26 | from typing_extensions import ReadOnly
    |
 info: rule `invalid-key` is enabled by default
+
+```
+
+```
+error[invalid-assignment]: Can not assign to key "id" on TypedDict `Employee`
+  --> src/mdtest_snippet.py:33:5
+   |
+32 | def write_to_readonly_key(employee: Employee):
+33 |     employee["id"] = 42  # error: [invalid-assignment]
+   |     -------- ^^^^ key is marked read-only
+   |     |
+   |     TypedDict `Employee`
+   |
+info: rule `invalid-assignment` is enabled by default
 
 ```

@@ -589,6 +589,11 @@ impl<'db> PlaceAndQualifiers<'db> {
         self.qualifiers.contains(TypeQualifiers::NOT_REQUIRED)
     }
 
+    /// Returns `true` if the place has a `ReadOnly` type qualifier.
+    pub(crate) fn is_read_only(&self) -> bool {
+        self.qualifiers.contains(TypeQualifiers::READ_ONLY)
+    }
+
     /// Returns `Some(…)` if the place is qualified with `typing.Final` without a specified type.
     pub(crate) fn is_bare_final(&self) -> Option<TypeQualifiers> {
         match self {
