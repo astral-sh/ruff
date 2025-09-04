@@ -118,7 +118,7 @@ pub(crate) trait VarianceInferable<'db>: Sized {
     /// specify a non-covariant polarity. See `with_polarity` for more details.
     fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance;
 
-    /// Creates a `VarianceInferable` that applies `polarity`(see
+    /// Creates a `VarianceInferable` that applies `polarity` (see
     /// `TypeVarVariance::compose`) to the result of variance inference on the
     /// underlying value.
     ///
