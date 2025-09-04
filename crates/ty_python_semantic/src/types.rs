@@ -807,9 +807,18 @@ impl<'db> Type<'db> {
     /// More concretely, `T'`, the materialization of `T`, is the type `T` with all occurrences of
     /// the dynamic types (`Any`, `Unknown`, `Todo`) replaced as follows:
     ///
-    /// - In covariant position, it's replaced with `object`
+    /// - In covariant position, it's replaced with `object` (TODO: it should be the `TypeVar`'s upper
+    ///   bound, if any)
     /// - In contravariant position, it's replaced with `Never`
-    /// - In invariant position, it's replaced with an unresolved type variable
+    /// - In invariant position, we replace the object with a special form recording that it's the top
+    ///   or bottom materialization.
+    ///
+    /// This is implemented as a type mapping. Some specific objects have `materialize()` or
+    /// `materialize_impl()` methods. The rule of thumb is:
+    ///
+    /// - `materialize()` calls `apply_type_mapping()` (or `apply_type_mapping_impl()`)
+    /// - `materialize_impl()` gets called from `apply_type_mapping()` or from another
+    ///   `materialize_impl()`
     pub(crate) fn materialize(
         &self,
         db: &'db dyn Db,
