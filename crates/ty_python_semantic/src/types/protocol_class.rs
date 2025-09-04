@@ -539,7 +539,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         self.qualifiers
     }
 
-    fn ty(&self) -> Type<'db> {
+    pub(super) fn ty(&self) -> Type<'db> {
         match &self.kind {
             ProtocolMemberKind::Method(callable) => Type::Callable(*callable),
             ProtocolMemberKind::Property(property) => Type::PropertyInstance(*property),
