@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.12.12
+
+### Preview features
+
+- Show fixes by default ([#19919](https://github.com/astral-sh/ruff/pull/19919))
+- \[`airflow`\] Convert `DatasetOrTimeSchedule(datasets=...)` to `AssetOrTimeSchedule(assets=...)` (`AIR311`) ([#20202](https://github.com/astral-sh/ruff/pull/20202))
+- \[`airflow`\] Improve the `AIR002` error message ([#20173](https://github.com/astral-sh/ruff/pull/20173))
+- \[`airflow`\] Move `airflow.operators.postgres_operator.Mapping` from `AIR302` to `AIR301` ([#20172](https://github.com/astral-sh/ruff/pull/20172))
+- \[`flake8-async`\] Implement `blocking-input` rule (`ASYNC250`) ([#20122](https://github.com/astral-sh/ruff/pull/20122))
+- \[`flake8-use-pathlib`\] Make `PTH119` and `PTH120` fixes unsafe because they can change behavior ([#20118](https://github.com/astral-sh/ruff/pull/20118))
+- \[`pylint`\] Add U+061C to `PLE2502` ([#20106](https://github.com/astral-sh/ruff/pull/20106))
+- \[`ruff`\] Fix false negative for empty f-strings in `deque` calls (`RUF037`) ([#20109](https://github.com/astral-sh/ruff/pull/20109))
+
+### Bug fixes
+
+- Less confidently mark f-strings as empty when inferring truthiness ([#20152](https://github.com/astral-sh/ruff/pull/20152))
+- \[`fastapi`\] Fix false positive for paths with spaces around parameters (`FAST003`) ([#20077](https://github.com/astral-sh/ruff/pull/20077))
+- \[`flake8-comprehensions`\] Skip `C417` when lambda contains `yield`/`yield from` ([#20201](https://github.com/astral-sh/ruff/pull/20201))
+- \[`perflint`\] Handle tuples in dictionary comprehensions (`PERF403`) ([#19934](https://github.com/astral-sh/ruff/pull/19934))
+
+### Rule changes
+
+- \[`pycodestyle`\] Preserve return type annotation for `ParamSpec` (`E731`) ([#20108](https://github.com/astral-sh/ruff/pull/20108))
+
+### Documentation
+
+- \[`pyupgrade`\] Add fix safety section to docs (`UP029`) ([#17490](https://github.com/astral-sh/ruff/pull/17490))
+- \[`refurb`\] Add fix safety section (`FURB105`) ([#17499](https://github.com/astral-sh/ruff/pull/17499))
+
+### Other changes
+
+- Fix mdtest ignore python code blocks ([#20139](https://github.com/astral-sh/ruff/pull/20139))
+- Split LICENSE addendum by derivation type ([#20222](https://github.com/astral-sh/ruff/pull/20222))
+
 ## 0.12.11
 
 ### Preview features
