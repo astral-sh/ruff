@@ -26,13 +26,7 @@
 
 ### Documentation
 
-- \[`pyupgrade`\] Add fix safety section to docs (`UP029`) ([#17490](https://github.com/astral-sh/ruff/pull/17490))
-- \[`refurb`\] Add fix safety section (`FURB105`) ([#17499](https://github.com/astral-sh/ruff/pull/17499))
-
-### Other changes
-
-- Fix mdtest ignore python code blocks ([#20139](https://github.com/astral-sh/ruff/pull/20139))
-- Split LICENSE addendum by derivation type ([#20222](https://github.com/astral-sh/ruff/pull/20222))
+- Add fix safety sections to docs ([#17490](https://github.com/astral-sh/ruff/pull/17490),[#17499](https://github.com/astral-sh/ruff/pull/17499))
 
 ## 0.12.11
 
