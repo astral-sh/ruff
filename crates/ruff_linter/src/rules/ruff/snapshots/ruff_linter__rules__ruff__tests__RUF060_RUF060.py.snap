@@ -173,7 +173,7 @@ RUF060 Unnecessary membership test on empty collection
 17 | b'c' in b""
    | ^^^^^^^^^^^
 18 | "b" in f""
-19 | b"a" in bytearray()
+19 | "b" in f"" ""
    |
 
 RUF060 Unnecessary membership test on empty collection
@@ -183,8 +183,8 @@ RUF060 Unnecessary membership test on empty collection
 17 | b'c' in b""
 18 | "b" in f""
    | ^^^^^^^^^^
-19 | b"a" in bytearray()
-20 | b"a" in bytes()
+19 | "b" in f"" ""
+20 | b"a" in bytearray()
    |
 
 RUF060 Unnecessary membership test on empty collection
@@ -192,62 +192,73 @@ RUF060 Unnecessary membership test on empty collection
    |
 17 | b'c' in b""
 18 | "b" in f""
-19 | b"a" in bytearray()
-   | ^^^^^^^^^^^^^^^^^^^
-20 | b"a" in bytes()
-21 | 1 in frozenset()
+19 | "b" in f"" ""
+   | ^^^^^^^^^^^^^
+20 | b"a" in bytearray()
+21 | b"a" in bytes()
    |
 
 RUF060 Unnecessary membership test on empty collection
   --> RUF060.py:20:1
    |
 18 | "b" in f""
-19 | b"a" in bytearray()
-20 | b"a" in bytes()
-   | ^^^^^^^^^^^^^^^
-21 | 1 in frozenset()
-22 | 1 in set(set())
+19 | "b" in f"" ""
+20 | b"a" in bytearray()
+   | ^^^^^^^^^^^^^^^^^^^
+21 | b"a" in bytes()
+22 | 1 in frozenset()
    |
 
 RUF060 Unnecessary membership test on empty collection
   --> RUF060.py:21:1
    |
-19 | b"a" in bytearray()
-20 | b"a" in bytes()
-21 | 1 in frozenset()
-   | ^^^^^^^^^^^^^^^^
-22 | 1 in set(set())
-23 | 2 in frozenset([])
+19 | "b" in f"" ""
+20 | b"a" in bytearray()
+21 | b"a" in bytes()
+   | ^^^^^^^^^^^^^^^
+22 | 1 in frozenset()
+23 | 1 in set(set())
    |
 
 RUF060 Unnecessary membership test on empty collection
   --> RUF060.py:22:1
    |
-20 | b"a" in bytes()
-21 | 1 in frozenset()
-22 | 1 in set(set())
-   | ^^^^^^^^^^^^^^^
-23 | 2 in frozenset([])
-24 | '' in set("")
+20 | b"a" in bytearray()
+21 | b"a" in bytes()
+22 | 1 in frozenset()
+   | ^^^^^^^^^^^^^^^^
+23 | 1 in set(set())
+24 | 2 in frozenset([])
    |
 
 RUF060 Unnecessary membership test on empty collection
   --> RUF060.py:23:1
    |
-21 | 1 in frozenset()
-22 | 1 in set(set())
-23 | 2 in frozenset([])
-   | ^^^^^^^^^^^^^^^^^^
-24 | '' in set("")
+21 | b"a" in bytes()
+22 | 1 in frozenset()
+23 | 1 in set(set())
+   | ^^^^^^^^^^^^^^^
+24 | 2 in frozenset([])
+25 | '' in set("")
    |
 
 RUF060 Unnecessary membership test on empty collection
   --> RUF060.py:24:1
    |
-22 | 1 in set(set())
-23 | 2 in frozenset([])
-24 | '' in set("")
+22 | 1 in frozenset()
+23 | 1 in set(set())
+24 | 2 in frozenset([])
+   | ^^^^^^^^^^^^^^^^^^
+25 | '' in set("")
+   |
+
+RUF060 Unnecessary membership test on empty collection
+  --> RUF060.py:25:1
+   |
+23 | 1 in set(set())
+24 | 2 in frozenset([])
+25 | '' in set("")
    | ^^^^^^^^^^^^^
-25 |
-26 | # OK
+26 |
+27 | # OK
    |

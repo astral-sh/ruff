@@ -16,6 +16,7 @@ _ not in ()
 "a" in ""
 b'c' in b""
 "b" in f""
+"b" in f"" ""
 b"a" in bytearray()
 b"a" in bytes()
 1 in frozenset()
@@ -35,6 +36,7 @@ _ not in ('a')
 "a" in "x"
 b'c' in b"x"
 "b" in f"x"
+"b" in f"" "x"
 b"a" in bytearray([2])
 b"a" in bytes("a", "utf-8")
 1 in frozenset("c")
