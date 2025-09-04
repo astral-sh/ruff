@@ -1546,54 +1546,60 @@ impl<'db> CallableBinding<'db> {
             }
         }
 
-        let top_materialized_argument_type =
-            Type::heterogeneous_tuple(db, top_materialized_argument_types);
+        if !top_materialized_argument_types.is_empty() {
+            let top_materialized_argument_type =
+                Type::heterogeneous_tuple(db, top_materialized_argument_types);
 
-        // A flag to indicate whether we've found the overload that makes the remaining overloads
-        // unmatched for the given argument types.
-        let mut filter_remaining_overloads = false;
+            // A flag to indicate whether we've found the overload that makes the remaining overloads
+            // unmatched for the given argument types.
+            let mut filter_remaining_overloads = false;
 
-        for (upto, current_index) in matching_overload_indexes.iter().enumerate() {
-            if filter_remaining_overloads {
-                self.overloads[*current_index].mark_as_unmatched_overload();
-                continue;
-            }
-            let mut parameter_types = Vec::with_capacity(arguments.len());
-            for argument_index in 0..arguments.len() {
-                // The parameter types at the current argument index.
-                let mut current_parameter_types = vec![];
-                for overload_index in &matching_overload_indexes[..=upto] {
-                    let overload = &self.overloads[*overload_index];
-                    for parameter_index in &overload.argument_matches[argument_index].parameters {
-                        if !participating_parameter_indexes.contains(parameter_index) {
-                            // This parameter doesn't participate in the filtering process.
-                            continue;
-                        }
-                        // TODO: For an unannotated `self` / `cls` parameter, the type should be
-                        // `typing.Self` / `type[typing.Self]`
-                        let mut parameter_type = overload.signature.parameters()[*parameter_index]
-                            .annotated_type()
-                            .unwrap_or(Type::unknown());
-                        if let Some(specialization) = overload.specialization {
-                            parameter_type =
-                                parameter_type.apply_specialization(db, specialization);
-                        }
-                        if let Some(inherited_specialization) = overload.inherited_specialization {
-                            parameter_type =
-                                parameter_type.apply_specialization(db, inherited_specialization);
-                        }
-                        current_parameter_types.push(parameter_type);
-                    }
-                }
-                if current_parameter_types.is_empty() {
+            for (upto, current_index) in matching_overload_indexes.iter().enumerate() {
+                if filter_remaining_overloads {
+                    self.overloads[*current_index].mark_as_unmatched_overload();
                     continue;
                 }
-                parameter_types.push(UnionType::from_elements(db, current_parameter_types));
-            }
-            if top_materialized_argument_type
-                .is_assignable_to(db, Type::heterogeneous_tuple(db, parameter_types))
-            {
-                filter_remaining_overloads = true;
+                let mut parameter_types = Vec::with_capacity(arguments.len());
+                for argument_index in 0..arguments.len() {
+                    // The parameter types at the current argument index.
+                    let mut current_parameter_types = vec![];
+                    for overload_index in &matching_overload_indexes[..=upto] {
+                        let overload = &self.overloads[*overload_index];
+                        for parameter_index in &overload.argument_matches[argument_index].parameters
+                        {
+                            if !participating_parameter_indexes.contains(parameter_index) {
+                                // This parameter doesn't participate in the filtering process.
+                                continue;
+                            }
+                            // TODO: For an unannotated `self` / `cls` parameter, the type should be
+                            // `typing.Self` / `type[typing.Self]`
+                            let mut parameter_type = overload.signature.parameters()
+                                [*parameter_index]
+                                .annotated_type()
+                                .unwrap_or(Type::unknown());
+                            if let Some(specialization) = overload.specialization {
+                                parameter_type =
+                                    parameter_type.apply_specialization(db, specialization);
+                            }
+                            if let Some(inherited_specialization) =
+                                overload.inherited_specialization
+                            {
+                                parameter_type = parameter_type
+                                    .apply_specialization(db, inherited_specialization);
+                            }
+                            current_parameter_types.push(parameter_type);
+                        }
+                    }
+                    if current_parameter_types.is_empty() {
+                        continue;
+                    }
+                    parameter_types.push(UnionType::from_elements(db, current_parameter_types));
+                }
+                if top_materialized_argument_type
+                    .is_assignable_to(db, Type::heterogeneous_tuple(db, parameter_types))
+                {
+                    filter_remaining_overloads = true;
+                }
             }
         }
 
