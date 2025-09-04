@@ -574,7 +574,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pyupgrade, "046") => (RuleGroup::Stable, rules::pyupgrade::rules::NonPEP695GenericClass),
         (Pyupgrade, "047") => (RuleGroup::Stable, rules::pyupgrade::rules::NonPEP695GenericFunction),
         (Pyupgrade, "049") => (RuleGroup::Stable, rules::pyupgrade::rules::PrivateTypeParameter),
-        (Pyupgrade, "050") => (RuleGroup::Preview, rules::pyupgrade::rules::UselessClassMetaclassType),
+        (Pyupgrade, "050") => (RuleGroup::Stable, rules::pyupgrade::rules::UselessClassMetaclassType),
 
         // pydocstyle
         (Pydocstyle, "100") => (RuleGroup::Stable, rules::pydocstyle::rules::UndocumentedPublicModule),
