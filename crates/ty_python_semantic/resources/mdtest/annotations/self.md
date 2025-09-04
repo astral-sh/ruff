@@ -30,9 +30,7 @@ class Shape:
 
     def nested_func_without_enclosing_binding(self):
         def inner(x: Self):
-            # TODO: revealed: Self@nested_func_without_enclosing_binding
-            # (The outer method binds an implicit `Self`)
-            reveal_type(x)  # revealed: Self@inner
+            reveal_type(x)  # revealed: Self@nested_func_without_enclosing_binding
         inner(self)
 
     def implicit_self(self) -> Self:
@@ -82,8 +80,10 @@ class A:
     def bar(cls) -> int:
         return 1
 
-reveal_type(A().implicit_self())  # revealed: A
-reveal_type(A.implicit_self)  # revealed: def implicit_self(self) -> Self
+# TODO: revealed: A
+# Requires implicit in method body detection
+reveal_type(A().implicit_self())  # revealed: Unknown
+reveal_type(A.implicit_self)  # revealed: def implicit_self(self) -> Self@implicit_self
 ```
 
 ## typing_extensions
