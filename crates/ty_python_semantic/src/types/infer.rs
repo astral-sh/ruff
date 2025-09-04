@@ -125,6 +125,7 @@ use crate::types::typed_dict::{
     validate_typed_dict_key_assignment,
 };
 use crate::types::unpacker::{UnpackResult, Unpacker};
+use crate::types::visitor::any_over_type;
 use crate::types::{
     CallDunderError, CallableType, ClassLiteral, ClassType, DataclassParams, DynamicType,
     IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, LintDiagnosticGuard,
@@ -9275,41 +9276,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let typevars: Result<FxOrderSet<_>, GenericContextError> = typevars
             .iter()
-            .map(|typevar| match typevar {
-                Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => bind_typevar(
-                    self.db(),
-                    self.module(),
-                    self.index,
-                    self.scope().file_scope_id(self.db()),
-                    self.typevar_binding_context,
-                    *typevar,
-                )
-                .ok_or(GenericContextError::InvalidArgument),
-                Type::Dynamic(DynamicType::TodoUnpack) => Err(GenericContextError::NotYetSupported),
-                Type::NominalInstance(nominal)
-                    if matches!(
+            .map(|typevar| {
+                if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = typevar {
+                    bind_typevar(
+                        self.db(),
+                        self.module(),
+                        self.index,
+                        self.scope().file_scope_id(self.db()),
+                        self.typevar_binding_context,
+                        *typevar,
+                    )
+                    .ok_or(GenericContextError::InvalidArgument)
+                } else if any_over_type(self.db(), *typevar, &|ty| match ty {
+                    Type::Dynamic(DynamicType::TodoUnpack) => true,
+                    Type::NominalInstance(nominal) => matches!(
                         nominal.class(self.db()).known(self.db()),
                         Some(KnownClass::TypeVarTuple | KnownClass::ParamSpec)
-                    ) =>
-                {
+                    ),
+                    _ => false,
+                }) {
                     Err(GenericContextError::NotYetSupported)
-                }
-                Type::Union(union)
-                    if union
-                        .elements(self.db())
-                        .iter()
-                        .any(|element| match element {
-                            Type::Dynamic(DynamicType::TodoUnpack) => true,
-                            Type::NominalInstance(nominal) => matches!(
-                                nominal.class(self.db()).known(self.db()),
-                                Some(KnownClass::TypeVarTuple | KnownClass::ParamSpec)
-                            ),
-                            _ => false,
-                        }) =>
-                {
-                    Err(GenericContextError::NotYetSupported)
-                }
-                _ => {
+                } else {
                     if let Some(builder) =
                         self.context.report_lint(&INVALID_ARGUMENT_TYPE, value_node)
                     {
@@ -11284,32 +11271,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     // `Callable[]`.
                     return None;
                 }
-                match self.infer_name_load(name) {
-                    Type::Dynamic(DynamicType::TodoPEP695ParamSpec) => {
-                        return Some(Parameters::todo());
-                    }
-                    Type::NominalInstance(nominal)
-                        if nominal
-                            .class(self.db())
-                            .is_known(self.db(), KnownClass::ParamSpec) =>
-                    {
-                        return Some(Parameters::todo());
-                    }
-                    Type::Union(union)
-                        if union
-                            .elements(self.db())
-                            .iter()
-                            .any(|element| match element {
-                                Type::Dynamic(DynamicType::TodoPEP695ParamSpec) => true,
-                                Type::NominalInstance(nominal) => nominal
-                                    .class(self.db())
-                                    .is_known(self.db(), KnownClass::ParamSpec),
-                                _ => false,
-                            }) =>
-                    {
-                        return Some(Parameters::todo());
-                    }
-                    _ => {}
+                if any_over_type(self.db(), self.infer_name_load(name), &|ty| match ty {
+                    Type::Dynamic(DynamicType::TodoPEP695ParamSpec) => true,
+                    Type::NominalInstance(nominal) => nominal
+                        .class(self.db())
+                        .is_known(self.db(), KnownClass::ParamSpec),
+                    _ => false,
+                }) {
+                    return Some(Parameters::todo());
                 }
             }
             _ => {}
