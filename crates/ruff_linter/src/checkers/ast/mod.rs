@@ -3266,6 +3266,11 @@ impl<'a> LintContext<'a> {
     pub(crate) const fn settings(&self) -> &LinterSettings {
         self.settings
     }
+
+    #[cfg(any(feature = "test-rules", test))]
+    pub(crate) const fn source_file(&self) -> &SourceFile {
+        &self.source_file
+    }
 }
 
 /// An abstraction for mutating a diagnostic.

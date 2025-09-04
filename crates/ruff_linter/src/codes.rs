@@ -1080,6 +1080,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "950") => (RuleGroup::Stable, rules::ruff::rules::RedirectedToTestRule),
         #[cfg(any(feature = "test-rules", test))]
         (Ruff, "960") => (RuleGroup::Removed, rules::ruff::rules::RedirectedFromPrefixTestRule),
+        #[cfg(any(feature = "test-rules", test))]
+        (Ruff, "990") => (RuleGroup::Preview, rules::ruff::rules::PanicyTestRule),
 
 
         // flake8-django
