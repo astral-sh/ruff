@@ -122,6 +122,10 @@ impl TypedDictAssignmentKind {
             Self::Constructor => &INVALID_ARGUMENT_TYPE,
         }
     }
+
+    const fn is_subscript(self) -> bool {
+        matches!(self, Self::Subscript)
+    }
 }
 
 /// Validates assignment of a value to a specific key on a `TypedDict`.
@@ -152,6 +156,29 @@ pub(super) fn validate_typed_dict_key_assignment<'db, 'ast>(
         );
         return false;
     };
+
+    if assignment_kind.is_subscript() && item.is_read_only() {
+        if let Some(builder) =
+            context.report_lint(assignment_kind.diagnostic_type(), key_node.into())
+        {
+            let typed_dict_ty = Type::TypedDict(typed_dict);
+            let typed_dict_d = typed_dict_ty.display(db);
+
+            let mut diagnostic = builder.into_diagnostic(format_args!(
+                "Can not assign to key \"{key}\" on TypedDict `{typed_dict_d}`",
+            ));
+
+            diagnostic.set_primary_message(format_args!("key is marked read-only"));
+
+            diagnostic.annotate(
+                context
+                    .secondary(typed_dict_node.into())
+                    .message(format_args!("TypedDict `{typed_dict_d}`")),
+            );
+        }
+
+        return false;
+    }
 
     // Key exists, check if value type is assignable to declared type
     if value_ty.is_assignable_to(db, item.declared_ty) {
