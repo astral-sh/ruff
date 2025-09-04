@@ -122,8 +122,8 @@ pub(crate) trait VarianceInferable<'db>: Sized {
     /// `TypeVarVariance::compose`) to the result of variance inference on the
     /// underlying value.
     ///
-    /// In some cases, we need to apply a polarity to the recursive call, in
-    /// which you can with `ty.with_polarity(polarity).variance_of(typevar)`.
+    /// In some cases, we need to apply a polarity to the recursive call.
+    /// You can do this with `ty.with_polarity(polarity).variance_of(typevar)`.
     /// Generally, this will be whenever the type occurs in argument-position,
     /// in which case you will want `TypeVarVariance::Contravariant`, or
     /// `TypeVarVariance::Invariant` if the value(s) being annotated is known to
