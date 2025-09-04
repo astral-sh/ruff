@@ -364,9 +364,14 @@ impl<'db> Signature<'db> {
         definition: Definition<'db>,
         function_node: &ast::StmtFunctionDef,
         is_generator: bool,
+        has_implicitly_positional_first_parameter: bool,
     ) -> Self {
-        let parameters =
-            Parameters::from_parameters(db, definition, function_node.parameters.as_ref());
+        let parameters = Parameters::from_parameters(
+            db,
+            definition,
+            function_node.parameters.as_ref(),
+            has_implicitly_positional_first_parameter,
+        );
         let return_ty = function_node.returns.as_ref().map(|returns| {
             let plain_return_ty = definition_expression_type(db, definition, returns.as_ref())
                 .apply_type_mapping(
@@ -1171,6 +1176,7 @@ impl<'db> Parameters<'db> {
         db: &'db dyn Db,
         definition: Definition<'db>,
         parameters: &ast::Parameters,
+        has_implicitly_positional_first_parameter: bool,
     ) -> Self {
         let ast::Parameters {
             posonlyargs,
@@ -1188,43 +1194,36 @@ impl<'db> Parameters<'db> {
                 .map(|default| definition_expression_type(db, definition, default))
         };
 
-        let mut positional_only: Vec<Parameter> = posonlyargs
-            .iter()
-            .map(|arg| {
-                Parameter::from_node_and_kind(
-                    db,
-                    definition,
-                    &arg.parameter,
-                    ParameterKind::PositionalOnly {
-                        name: Some(arg.parameter.name.id.clone()),
-                        default_type: default_type(arg),
-                    },
-                )
-            })
-            .collect();
+        let pos_only_param = |param: &ast::ParameterWithDefault| {
+            Parameter::from_node_and_kind(
+                db,
+                definition,
+                &param.parameter,
+                ParameterKind::PositionalOnly {
+                    name: Some(param.parameter.name.id.clone()),
+                    default_type: default_type(param),
+                },
+            )
+        };
+
+        let mut positional_only: Vec<Parameter> = posonlyargs.iter().map(pos_only_param).collect();
 
         let mut pos_or_keyword_iter = args.iter();
 
         // If there are no PEP-570 positional-only parameters, check for the legacy PEP-484 convention
         // for denoting positional-only parameters (parameters that start with `__` and do not end with `__`)
         if positional_only.is_empty() {
+            if has_implicitly_positional_first_parameter {
+                positional_only.extend(pos_or_keyword_iter.by_ref().next().map(pos_only_param));
+            }
+
             positional_only.extend(
                 pos_or_keyword_iter
                     .by_ref()
                     .peeking_take_while(|param| {
                         param.name().starts_with("__") && !param.name().ends_with("__")
                     })
-                    .map(|param| {
-                        Parameter::from_node_and_kind(
-                            db,
-                            definition,
-                            &param.parameter,
-                            ParameterKind::PositionalOnly {
-                                name: Some(param.parameter.name.id.clone()),
-                                default_type: default_type(param),
-                            },
-                        )
-                    }),
+                    .map(pos_only_param),
             );
         }
 

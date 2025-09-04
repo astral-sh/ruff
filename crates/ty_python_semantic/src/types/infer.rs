@@ -2417,29 +2417,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// behaviour to the [`nearest_enclosing_class`] function.
     fn class_context_of_current_method(&self) -> Option<ClassType<'db>> {
         let current_scope_id = self.scope().file_scope_id(self.db());
-        let current_scope = self.index.scope(current_scope_id);
-        if current_scope.kind() != ScopeKind::Function {
-            return None;
-        }
-        let parent_scope_id = current_scope.parent()?;
-        let parent_scope = self.index.scope(parent_scope_id);
-
-        let class_scope = match parent_scope.kind() {
-            ScopeKind::Class => parent_scope,
-            ScopeKind::TypeParams => {
-                let class_scope_id = parent_scope.parent()?;
-                let potentially_class_scope = self.index.scope(class_scope_id);
-
-                match potentially_class_scope.kind() {
-                    ScopeKind::Class => potentially_class_scope,
-                    _ => return None,
-                }
-            }
-            _ => return None,
-        };
-
-        let class_stmt = class_scope.node().as_class(self.module())?;
-        let class_definition = self.index.expect_single_definition(class_stmt);
+        let class_definition = self.index.class_definition_of_method(current_scope_id)?;
         binding_type(self.db(), class_definition).to_class_type(self.db())
     }
 

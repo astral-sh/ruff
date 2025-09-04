@@ -332,6 +332,39 @@ impl<'db> SemanticIndex<'db> {
         Some(&self.scopes[self.parent_scope_id(scope_id)?])
     }
 
+    /// Return the [`Definition`] of the class enclosing this method, given the
+    /// method's body scope, or `None` if it is not a method.
+    pub(crate) fn class_definition_of_method(
+        &self,
+        function_body_scope: FileScopeId,
+    ) -> Option<Definition<'db>> {
+        let current_scope = self.scope(function_body_scope);
+        if current_scope.kind() != ScopeKind::Function {
+            return None;
+        }
+        let parent_scope_id = current_scope.parent()?;
+        let parent_scope = self.scope(parent_scope_id);
+
+        let class_scope = match parent_scope.kind() {
+            ScopeKind::Class => parent_scope,
+            ScopeKind::TypeParams => {
+                let class_scope_id = parent_scope.parent()?;
+                let potentially_class_scope = self.scope(class_scope_id);
+
+                match potentially_class_scope.kind() {
+                    ScopeKind::Class => potentially_class_scope,
+                    _ => return None,
+                }
+            }
+            _ => return None,
+        };
+
+        class_scope
+            .node()
+            .as_class_ref()
+            .map(|node_ref| self.expect_single_definition(node_ref))
+    }
+
     fn is_scope_reachable(&self, db: &'db dyn Db, scope_id: FileScopeId) -> bool {
         self.parent_scope_id(scope_id)
             .is_none_or(|parent_scope_id| {

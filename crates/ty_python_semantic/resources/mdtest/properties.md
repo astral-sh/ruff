@@ -146,7 +146,7 @@ class C:
     @property
     def attr(self) -> int:
         return 1
-    # error: [invalid-argument-type] "Argument to bound method `setter` is incorrect: Expected `(Any, Any, /) -> None`, found `def attr(self) -> None`"
+    # error: [invalid-argument-type] "Argument to bound method `setter` is incorrect: Expected `(Any, Any, /) -> None`, found `def attr(self, /) -> None`"
     @attr.setter
     def attr(self) -> None:
         pass
@@ -156,7 +156,7 @@ class C:
 
 ```py
 class C:
-    # error: [invalid-argument-type] "Argument to class `property` is incorrect: Expected `((Any, /) -> Any) | None`, found `def attr(self, x: int) -> int`"
+    # error: [invalid-argument-type] "Argument to class `property` is incorrect: Expected `((Any, /) -> Any) | None`, found `def attr(self, /, x: int) -> int`"
     @property
     def attr(self, x: int) -> int:
         return 1
@@ -294,10 +294,10 @@ Properties also have `fget` and `fset` attributes that can be used to retrieve t
 and setter functions, respectively.
 
 ```py
-reveal_type(attr_property.fget)  # revealed: def attr(self) -> int
+reveal_type(attr_property.fget)  # revealed: def attr(self, /) -> int
 reveal_type(attr_property.fget(c))  # revealed: int
 
-reveal_type(attr_property.fset)  # revealed: def attr(self, value: str) -> None
+reveal_type(attr_property.fset)  # revealed: def attr(self, /, value: str) -> None
 reveal_type(attr_property.fset(c, "a"))  # revealed: None
 
 # error: [invalid-argument-type]

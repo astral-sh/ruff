@@ -236,6 +236,22 @@ impl<'db> OverloadLiteral<'db> {
         self.has_known_decorator(db, FunctionDecorators::OVERLOAD)
     }
 
+    /// Returns true if this overload is decorated with `@staticmethod`, or if it is implicitly a
+    /// staticmethod.
+    pub(crate) fn is_staticmethod(self, db: &dyn Db) -> bool {
+        self.has_known_decorator(db, FunctionDecorators::STATICMETHOD) || self.name(db) == "__new__"
+    }
+
+    /// Returns true if this overload is decorated with `@classmethod`, or if it is implicitly a
+    /// classmethod.
+    pub(crate) fn is_classmethod(self, db: &dyn Db) -> bool {
+        self.has_known_decorator(db, FunctionDecorators::CLASSMETHOD)
+            || matches!(
+                self.name(db).as_str(),
+                "__init_subclass__" | "__class_getitem__"
+            )
+    }
+
     fn node<'ast>(
         self,
         db: &dyn Db,
@@ -329,13 +345,15 @@ impl<'db> OverloadLiteral<'db> {
         let module = parsed_module(db, self.file(db)).load(db);
         let function_stmt_node = scope.node(db).expect_function(&module);
         let definition = self.definition(db);
+        let index = semantic_index(db, scope.file(db));
         let generic_context = function_stmt_node.type_params.as_ref().map(|type_params| {
-            let index = semantic_index(db, scope.file(db));
             GenericContext::from_type_params(db, index, definition, type_params)
         });
-
-        let index = semantic_index(db, scope.file(db));
         let is_generator = scope.file_scope_id(db).is_generator_function(index);
+        let has_implicitly_positional_first_parameter = !self.is_staticmethod(db)
+            && index
+                .class_definition_of_method(scope.file_scope_id(db))
+                .is_some();
 
         Signature::from_function(
             db,
@@ -344,6 +362,7 @@ impl<'db> OverloadLiteral<'db> {
             definition,
             function_stmt_node,
             is_generator,
+            has_implicitly_positional_first_parameter,
         )
     }
 
@@ -713,17 +732,15 @@ impl<'db> FunctionType<'db> {
     /// Returns true if this method is decorated with `@classmethod`, or if it is implicitly a
     /// classmethod.
     pub(crate) fn is_classmethod(self, db: &'db dyn Db) -> bool {
-        self.has_known_decorator(db, FunctionDecorators::CLASSMETHOD)
-            || matches!(
-                self.name(db).as_str(),
-                "__init_subclass__" | "__class_getitem__"
-            )
+        self.iter_overloads_and_implementation(db)
+            .any(|overload| overload.is_classmethod(db))
     }
 
     /// Returns true if this method is decorated with `@staticmethod`, or if it is implicitly a
     /// static method.
     pub(crate) fn is_staticmethod(self, db: &'db dyn Db) -> bool {
-        self.has_known_decorator(db, FunctionDecorators::STATICMETHOD) || self.name(db) == "__new__"
+        self.iter_overloads_and_implementation(db)
+            .any(|overload| overload.is_staticmethod(db))
     }
 
     /// If the implementation of this function is deprecated, returns the `@warnings.deprecated`.

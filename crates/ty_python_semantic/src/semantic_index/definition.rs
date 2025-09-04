@@ -1134,6 +1134,12 @@ impl From<&ast::StmtClassDef> for DefinitionNodeKey {
     }
 }
 
+impl From<&AstNodeRef<ast::StmtClassDef>> for DefinitionNodeKey {
+    fn from(node_ref: &AstNodeRef<ast::StmtClassDef>) -> Self {
+        Self(NodeKey::from_node_ref(node_ref))
+    }
+}
+
 impl From<&ast::StmtTypeAlias> for DefinitionNodeKey {
     fn from(node: &ast::StmtTypeAlias) -> Self {
         Self(NodeKey::from_node(node))

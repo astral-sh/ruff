@@ -47,8 +47,8 @@ info: First overload defined here
 7 |     def bar(self, x: str) -> str: ...
   |
 info: Possible overloads for bound method `bar`:
-info:   (self, x: int) -> int
-info:   (self, x: str) -> str
+info:   (self, /, x: int) -> int
+info:   (self, /, x: str) -> str
 info: Overload implementation defined here
  --> src/mdtest_snippet.py:8:9
   |

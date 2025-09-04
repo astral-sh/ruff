@@ -401,18 +401,19 @@ impl NodeWithScopeKind {
         &self,
         module: &'ast ParsedModuleRef,
     ) -> &'ast ast::StmtClassDef {
-        match self {
-            Self::Class(class) => class.node(module),
-            _ => panic!("expected class"),
-        }
+        self.as_class(module).expect("expected class")
     }
 
     pub(crate) fn as_class<'ast>(
         &self,
         module: &'ast ParsedModuleRef,
     ) -> Option<&'ast ast::StmtClassDef> {
+        self.as_class_ref().map(|class| class.node(module))
+    }
+
+    pub(crate) fn as_class_ref(&self) -> Option<&AstNodeRef<ast::StmtClassDef>> {
         match self {
-            Self::Class(class) => Some(class.node(module)),
+            Self::Class(class) => Some(class),
             _ => None,
         }
     }

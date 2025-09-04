@@ -1116,7 +1116,7 @@ The generated methods have the following signatures:
 ```py
 reveal_type(Person.__init__)  # revealed: (self: Person, name: str, age: int | None = None) -> None
 
-reveal_type(Person.__repr__)  # revealed: def __repr__(self) -> str
+reveal_type(Person.__repr__)  # revealed: def __repr__(self, /) -> str
 
 reveal_type(Person.__eq__)  # revealed: def __eq__(self, value: object, /) -> bool
 ```
