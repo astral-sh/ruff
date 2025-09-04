@@ -11,7 +11,7 @@ use log::{debug, warn};
 use rayon::prelude::*;
 use rustc_hash::FxHashMap;
 
-use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId};
+use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Span};
 use ruff_db::panic::catch_unwind;
 use ruff_linter::package::PackageRoot;
 use ruff_linter::registry::Rule;
@@ -204,7 +204,8 @@ fn lint_path(
                 ruff_db::diagnostic::Severity::Fatal,
                 message,
             );
-            diagnostic.annotate(Annotation::primary(path.into()));
+            let span = Span::from(SourceFileBuilder::new(path.to_string_lossy(), "").finish());
+            diagnostic.annotate(Annotation::primary(span));
             Ok(Diagnostics::new(vec![diagnostic], FxHashMap::default()))
         }
     }

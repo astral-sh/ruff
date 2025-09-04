@@ -13,7 +13,7 @@ use log::{error, warn};
 use notify::{RecursiveMode, Watcher, recommended_watcher};
 
 use args::{GlobalConfigArgs, ServerCommand};
-use ruff_db::diagnostic::Severity;
+use ruff_db::diagnostic::{Diagnostic, Severity};
 use ruff_linter::logging::{LogLevel, set_up_logging};
 use ruff_linter::settings::flags::FixMode;
 use ruff_linter::settings::types::OutputFormat;
@@ -445,11 +445,13 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
         }
 
         if !cli.exit_zero {
-            let mut max_severity = Severity::Info;
-            for diagnostic in &diagnostics.inner {
-                max_severity = max_severity.max(diagnostic.severity());
-            }
-            if max_severity == Severity::Fatal {
+            let max_severity = diagnostics
+                .inner
+                .iter()
+                .map(Diagnostic::severity)
+                .max()
+                .unwrap_or(Severity::Info);
+            if max_severity.is_fatal() {
                 let message = "Panic during linting indicates a bug in Ruff. If you could open an issue at:
 
 https://github.com/astral-sh/ruff/issues/new?title=%5BLinter%20panic%5D
@@ -457,6 +459,7 @@ https://github.com/astral-sh/ruff/issues/new?title=%5BLinter%20panic%5D
 ...with the relevant file contents, the `pyproject.toml` settings, and the stack trace above, we'd be very appreciative!
 ";
                 error!("{message}");
+                return Ok(ExitStatus::Error);
             }
             if cli.diff {
                 // If we're printing a diff, we always want to exit non-zero if there are
