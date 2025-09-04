@@ -526,16 +526,6 @@ impl<'db> PropertyInstanceType<'db> {
             ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
         }
     }
-
-    fn materialize(self, db: &'db dyn Db, materialization_kind: MaterializationKind) -> Self {
-        Self::new(
-            db,
-            self.getter(db)
-                .map(|ty| ty.materialize(db, materialization_kind)),
-            self.setter(db)
-                .map(|ty| ty.materialize(db, materialization_kind)),
-        )
-    }
 }
 
 bitflags! {
@@ -778,14 +768,22 @@ impl<'db> Type<'db> {
     /// most general form of the type that is fully static.
     #[must_use]
     pub(crate) fn top_materialization(&self, db: &'db dyn Db) -> Type<'db> {
-        self.materialize(db, MaterializationKind::Top)
+        self.materialize(
+            db,
+            MaterializationKind::Top,
+            &ApplyTypeMappingVisitor::default(),
+        )
     }
 
     /// Returns the bottom materialization (or lower bound materialization) of this type, which is
     /// the most specific form of the type that is fully static.
     #[must_use]
     pub(crate) fn bottom_materialization(&self, db: &'db dyn Db) -> Type<'db> {
-        self.materialize(db, MaterializationKind::Bottom)
+        self.materialize(
+            db,
+            MaterializationKind::Bottom,
+            &ApplyTypeMappingVisitor::default(),
+        )
     }
 
     /// If this type is an instance type where the class has a tuple spec, returns the tuple spec.
@@ -817,103 +815,25 @@ impl<'db> Type<'db> {
     /// More concretely, `T'`, the materialization of `T`, is the type `T` with all occurrences of
     /// the dynamic types (`Any`, `Unknown`, `Todo`) replaced as follows:
     ///
-    /// - In covariant position, it's replaced with `object`
+    /// - In covariant position, it's replaced with `object` (TODO: it should be the `TypeVar`'s upper
+    ///   bound, if any)
     /// - In contravariant position, it's replaced with `Never`
-    /// - In invariant position, it's replaced with an unresolved type variable
-    fn materialize(&self, db: &'db dyn Db, materialization_kind: MaterializationKind) -> Type<'db> {
-        match self {
-            Type::Dynamic(_) => match materialization_kind {
-                MaterializationKind::Top => Type::object(db),
-                MaterializationKind::Bottom => Type::Never,
-            },
-
-            Type::Never
-            | Type::WrapperDescriptor(_)
-            | Type::MethodWrapper(_)
-            | Type::DataclassDecorator(_)
-            | Type::DataclassTransformer(_)
-            | Type::ModuleLiteral(_)
-            | Type::IntLiteral(_)
-            | Type::BooleanLiteral(_)
-            | Type::StringLiteral(_)
-            | Type::LiteralString
-            | Type::BytesLiteral(_)
-            | Type::EnumLiteral(_)
-            | Type::SpecialForm(_)
-            | Type::KnownInstance(_)
-            | Type::AlwaysFalsy
-            | Type::AlwaysTruthy
-            | Type::ClassLiteral(_)
-            | Type::BoundSuper(_) => *self,
-
-            Type::PropertyInstance(property_instance) => {
-                Type::PropertyInstance(property_instance.materialize(db, materialization_kind))
-            }
-
-            Type::FunctionLiteral(_) | Type::BoundMethod(_) => {
-                // TODO: Subtyping between function / methods with a callable accounts for the
-                // signature (parameters and return type), so we might need to do something here
-                *self
-            }
-
-            Type::NominalInstance(instance) => instance.materialize(db, materialization_kind),
-            Type::GenericAlias(generic_alias) => {
-                Type::GenericAlias(generic_alias.materialize(db, materialization_kind))
-            }
-            Type::Callable(callable_type) => {
-                Type::Callable(callable_type.materialize(db, materialization_kind))
-            }
-            Type::SubclassOf(subclass_of_type) => {
-                subclass_of_type.materialize(db, materialization_kind)
-            }
-            Type::ProtocolInstance(protocol_instance_type) => {
-                // TODO: Add tests for this once subtyping/assignability is implemented for
-                // protocols. It _might_ require changing the logic here because:
-                //
-                // > Subtyping for protocol instances involves taking account of the fact that
-                // > read-only property members, and method members, on protocols act covariantly;
-                // > write-only property members act contravariantly; and read/write attribute
-                // > members on protocols act invariantly
-                Type::ProtocolInstance(protocol_instance_type.materialize(db, materialization_kind))
-            }
-            Type::Union(union_type) => {
-                union_type.map(db, |ty| ty.materialize(db, materialization_kind))
-            }
-            Type::Intersection(intersection_type) => IntersectionBuilder::new(db)
-                .positive_elements(
-                    intersection_type
-                        .positive(db)
-                        .iter()
-                        .map(|ty| ty.materialize(db, materialization_kind)),
-                )
-                .negative_elements(
-                    intersection_type
-                        .negative(db)
-                        .iter()
-                        .map(|ty| ty.materialize(db, materialization_kind.flip())),
-                )
-                .build(),
-            Type::TypeVar(bound_typevar) => {
-                Type::TypeVar(bound_typevar.materialize(db, materialization_kind))
-            }
-            Type::NonInferableTypeVar(bound_typevar) => {
-                Type::NonInferableTypeVar(bound_typevar.materialize(db, materialization_kind))
-            }
-            Type::TypeIs(type_is) => {
-                // TODO(jelle): this seems wrong, should be invariant?
-                type_is.with_type(
-                    db,
-                    type_is
-                        .return_type(db)
-                        .materialize(db, materialization_kind),
-                )
-            }
-            Type::TypedDict(_) => {
-                // TODO: Materialization of gradual TypedDicts
-                *self
-            }
-            Type::TypeAlias(alias) => alias.value_type(db).materialize(db, materialization_kind),
-        }
+    /// - In invariant position, we replace the object with a special form recording that it's the top
+    ///   or bottom materialization.
+    ///
+    /// This is implemented as a type mapping. Some specific objects have `materialize()` or
+    /// `materialize_impl()` methods. The rule of thumb is:
+    ///
+    /// - `materialize()` calls `apply_type_mapping()` (or `apply_type_mapping_impl()`)
+    /// - `materialize_impl()` gets called from `apply_type_mapping()` or from another
+    ///   `materialize_impl()`
+    pub(crate) fn materialize(
+        &self,
+        db: &'db dyn Db,
+        materialization_kind: MaterializationKind,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Type<'db> {
+        self.apply_type_mapping_impl(db, &TypeMapping::Materialize(materialization_kind), visitor)
     }
 
     pub(crate) const fn into_class_literal(self) -> Option<ClassLiteral<'db>> {
@@ -2792,7 +2712,17 @@ impl<'db> Type<'db> {
             }
 
             Type::GenericAlias(alias) => {
-                Some(ClassType::from(*alias).class_member(db, name, policy))
+                let attr = Some(ClassType::from(*alias).class_member(db, name, policy));
+                match alias.specialization(db).materialization_kind(db) {
+                    None => attr,
+                    Some(materialization_kind) => attr.map(|attr| {
+                        attr.materialize(
+                            db,
+                            materialization_kind,
+                            &ApplyTypeMappingVisitor::default(),
+                        )
+                    }),
+                }
             }
 
             Type::SubclassOf(subclass_of_ty) => {
@@ -6011,7 +5941,11 @@ impl<'db> Type<'db> {
             self.apply_type_mapping(db, &TypeMapping::Specialization(specialization));
         match specialization.materialization_kind(db) {
             None => new_specialization,
-            Some(materialization_kind) => new_specialization.materialize(db, materialization_kind),
+            Some(materialization_kind) => new_specialization.materialize(
+                db,
+                materialization_kind,
+                &ApplyTypeMappingVisitor::default(),
+            ),
         }
     }
 
@@ -6046,6 +5980,9 @@ impl<'db> Type<'db> {
                 }
                 TypeMapping::PromoteLiterals | TypeMapping::BindLegacyTypevars(_) |
                 TypeMapping::MarkTypeVarsInferable(_) => self,
+                TypeMapping::Materialize(materialization_kind)  => {
+                Type::TypeVar(bound_typevar.materialize_impl(db, *materialization_kind, visitor))
+            }
             }
 
             Type::NonInferableTypeVar(bound_typevar) => match type_mapping {
@@ -6066,6 +6003,8 @@ impl<'db> Type<'db> {
                 TypeMapping::BindLegacyTypevars(_) |
                 TypeMapping::BindSelf(_)
                     => self,
+                TypeMapping::Materialize(materialization_kind)  => Type::NonInferableTypeVar(bound_typevar.materialize_impl(db, *materialization_kind, visitor))
+
             }
 
             Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => match type_mapping {
@@ -6076,7 +6015,8 @@ impl<'db> Type<'db> {
                 TypeMapping::PartialSpecialization(_) |
                 TypeMapping::PromoteLiterals |
                 TypeMapping::BindSelf(_) |
-                TypeMapping::MarkTypeVarsInferable(_) => self,
+                TypeMapping::MarkTypeVarsInferable(_) |
+                TypeMapping::Materialize(_) => self,
             }
 
             Type::FunctionLiteral(function) => {
@@ -6093,6 +6033,13 @@ impl<'db> Type<'db> {
                 instance.apply_type_mapping_impl(db, type_mapping, visitor),
 
             Type::ProtocolInstance(instance) => {
+                // TODO: Add tests for materialization once subtyping/assignability is implemented for
+                // protocols. It _might_ require changing the logic here because:
+                //
+                // > Subtyping for protocol instances involves taking account of the fact that
+                // > read-only property members, and method members, on protocols act covariantly;
+                // > write-only property members act contravariantly; and read/write attribute
+                // > members on protocols act invariantly
                 Type::ProtocolInstance(instance.apply_type_mapping_impl(db, type_mapping, visitor))
             }
 
@@ -6132,9 +6079,7 @@ impl<'db> Type<'db> {
                 Type::TypedDict(typed_dict.apply_type_mapping_impl(db, type_mapping, visitor))
             }
 
-            Type::SubclassOf(subclass_of) => Type::SubclassOf(
-                subclass_of.apply_type_mapping_impl(db, type_mapping, visitor),
-            ),
+            Type::SubclassOf(subclass_of) => subclass_of.apply_type_mapping_impl(db, type_mapping, visitor),
 
             Type::PropertyInstance(property) => {
                 Type::PropertyInstance(property.apply_type_mapping_impl(db, type_mapping, visitor))
@@ -6149,13 +6094,18 @@ impl<'db> Type<'db> {
                     builder =
                         builder.add_positive(positive.apply_type_mapping_impl(db, type_mapping, visitor));
                 }
+                let flipped_mapping = match type_mapping {
+                    TypeMapping::Materialize(materialization_kind) => &TypeMapping::Materialize(materialization_kind.flip()),
+                    _ => type_mapping,
+                };
                 for negative in intersection.negative(db) {
                     builder =
-                        builder.add_negative(negative.apply_type_mapping_impl(db, type_mapping, visitor));
+                        builder.add_negative(negative.apply_type_mapping_impl(db, flipped_mapping, visitor));
                 }
                 builder.build()
             }
 
+            // TODO(jelle): Materialize should be handled differently, since TypeIs is invariant
             Type::TypeIs(type_is) => type_is.with_type(db, type_is.return_type(db).apply_type_mapping(db, type_mapping)),
 
             Type::TypeAlias(alias) => {
@@ -6173,13 +6123,26 @@ impl<'db> Type<'db> {
                 TypeMapping::PartialSpecialization(_) |
                 TypeMapping::BindLegacyTypevars(_) |
                 TypeMapping::BindSelf(_) |
-                TypeMapping::MarkTypeVarsInferable(_) => self,
+                TypeMapping::MarkTypeVarsInferable(_) |
+                TypeMapping::Materialize(_) => self,
                 TypeMapping::PromoteLiterals => self.literal_fallback_instance(db)
                     .expect("literal type should have fallback instance type"),
             }
 
-            Type::Dynamic(_)
-            | Type::Never
+            Type::Dynamic(_) => match type_mapping {
+                TypeMapping::Specialization(_) |
+                TypeMapping::PartialSpecialization(_) |
+                TypeMapping::BindLegacyTypevars(_) |
+                TypeMapping::BindSelf(_) |
+                TypeMapping::MarkTypeVarsInferable(_) |
+                TypeMapping::PromoteLiterals => self,
+                TypeMapping::Materialize(materialization_kind) => match materialization_kind {
+                    MaterializationKind::Top => Type::object(db),
+                    MaterializationKind::Bottom => Type::Never,
+                }
+            }
+
+            Type::Never
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy
             | Type::WrapperDescriptor(_)
@@ -6692,6 +6655,8 @@ pub enum TypeMapping<'a, 'db> {
     BindSelf(Type<'db>),
     /// Marks the typevars that are bound by a generic class or function as inferable.
     MarkTypeVarsInferable(BindingContext<'db>),
+    /// Create the top or bottom materialization of a type.
+    Materialize(MaterializationKind),
 }
 
 fn walk_type_mapping<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -6711,7 +6676,8 @@ fn walk_type_mapping<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
         }
         TypeMapping::PromoteLiterals
         | TypeMapping::BindLegacyTypevars(_)
-        | TypeMapping::MarkTypeVarsInferable(_) => {}
+        | TypeMapping::MarkTypeVarsInferable(_)
+        | TypeMapping::Materialize(_) => {}
     }
 }
 
@@ -6731,6 +6697,9 @@ impl<'db> TypeMapping<'_, 'db> {
             TypeMapping::BindSelf(self_type) => TypeMapping::BindSelf(*self_type),
             TypeMapping::MarkTypeVarsInferable(binding_context) => {
                 TypeMapping::MarkTypeVarsInferable(*binding_context)
+            }
+            TypeMapping::Materialize(materialization_kind) => {
+                TypeMapping::Materialize(*materialization_kind)
             }
         }
     }
@@ -6752,6 +6721,9 @@ impl<'db> TypeMapping<'_, 'db> {
             }
             TypeMapping::MarkTypeVarsInferable(binding_context) => {
                 TypeMapping::MarkTypeVarsInferable(*binding_context)
+            }
+            TypeMapping::Materialize(materialization_kind) => {
+                TypeMapping::Materialize(*materialization_kind)
             }
         }
     }
@@ -7443,7 +7415,12 @@ impl<'db> TypeVarInstance<'db> {
         )
     }
 
-    fn materialize(self, db: &'db dyn Db, materialization_kind: MaterializationKind) -> Self {
+    fn materialize_impl(
+        self,
+        db: &'db dyn Db,
+        materialization_kind: MaterializationKind,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
         Self::new(
             db,
             self.name(db),
@@ -7452,26 +7429,32 @@ impl<'db> TypeVarInstance<'db> {
                 .and_then(|bound_or_constraints| match bound_or_constraints {
                     TypeVarBoundOrConstraintsEvaluation::Eager(bound_or_constraints) => Some(
                         bound_or_constraints
-                            .materialize(db, materialization_kind)
+                            .materialize_impl(db, materialization_kind, visitor)
                             .into(),
                     ),
-                    TypeVarBoundOrConstraintsEvaluation::LazyUpperBound => self
-                        .lazy_bound(db)
-                        .map(|bound| bound.materialize(db, materialization_kind).into()),
+                    TypeVarBoundOrConstraintsEvaluation::LazyUpperBound => {
+                        self.lazy_bound(db).map(|bound| {
+                            bound
+                                .materialize_impl(db, materialization_kind, visitor)
+                                .into()
+                        })
+                    }
                     TypeVarBoundOrConstraintsEvaluation::LazyConstraints => {
                         self.lazy_constraints(db).map(|constraints| {
-                            constraints.materialize(db, materialization_kind).into()
+                            constraints
+                                .materialize_impl(db, materialization_kind, visitor)
+                                .into()
                         })
                     }
                 }),
             self.explicit_variance(db),
             self._default(db).and_then(|default| match default {
                 TypeVarDefaultEvaluation::Eager(ty) => {
-                    Some(ty.materialize(db, materialization_kind).into())
+                    Some(ty.materialize(db, materialization_kind, visitor).into())
                 }
                 TypeVarDefaultEvaluation::Lazy => self
                     .lazy_default(db)
-                    .map(|ty| ty.materialize(db, materialization_kind).into()),
+                    .map(|ty| ty.materialize(db, materialization_kind, visitor).into()),
             }),
             self.kind(db),
         )
@@ -7655,10 +7638,16 @@ impl<'db> BoundTypeVarInstance<'db> {
         )
     }
 
-    fn materialize(self, db: &'db dyn Db, materialization_kind: MaterializationKind) -> Self {
+    fn materialize_impl(
+        self,
+        db: &'db dyn Db,
+        materialization_kind: MaterializationKind,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
         Self::new(
             db,
-            self.typevar(db).materialize(db, materialization_kind),
+            self.typevar(db)
+                .materialize_impl(db, materialization_kind, visitor),
             self.binding_context(db),
         )
     }
@@ -7745,18 +7734,23 @@ impl<'db> TypeVarBoundOrConstraints<'db> {
         }
     }
 
-    fn materialize(self, db: &'db dyn Db, materialization_kind: MaterializationKind) -> Self {
+    fn materialize_impl(
+        self,
+        db: &'db dyn Db,
+        materialization_kind: MaterializationKind,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
         match self {
-            TypeVarBoundOrConstraints::UpperBound(bound) => {
-                TypeVarBoundOrConstraints::UpperBound(bound.materialize(db, materialization_kind))
-            }
+            TypeVarBoundOrConstraints::UpperBound(bound) => TypeVarBoundOrConstraints::UpperBound(
+                bound.materialize(db, materialization_kind, visitor),
+            ),
             TypeVarBoundOrConstraints::Constraints(constraints) => {
                 TypeVarBoundOrConstraints::Constraints(UnionType::new(
                     db,
                     constraints
                         .elements(db)
                         .iter()
-                        .map(|ty| ty.materialize(db, materialization_kind))
+                        .map(|ty| ty.materialize(db, materialization_kind, visitor))
                         .collect::<Vec<_>>()
                         .into_boxed_slice(),
                 ))
@@ -8985,14 +8979,6 @@ impl<'db> CallableType<'db> {
             self.signatures(db).bind_self(db, None),
             false,
         ))
-    }
-
-    fn materialize(self, db: &'db dyn Db, materialization_kind: MaterializationKind) -> Self {
-        CallableType::new(
-            db,
-            self.signatures(db).materialize(db, materialization_kind),
-            self.is_function_like(db),
-        )
     }
 
     /// Create a callable type which represents a fully-static "bottom" callable.

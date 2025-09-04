@@ -802,17 +802,6 @@ impl<'db> IntersectionBuilder<'db> {
         self
     }
 
-    pub(crate) fn negative_elements<I, T>(mut self, elements: I) -> Self
-    where
-        I: IntoIterator<Item = T>,
-        T: Into<Type<'db>>,
-    {
-        for element in elements {
-            self = self.add_negative(element.into());
-        }
-        self
-    }
-
     pub(crate) fn build(mut self) -> Type<'db> {
         // Avoid allocating the UnionBuilder unnecessarily if we have just one intersection:
         if self.intersections.len() == 1 {
