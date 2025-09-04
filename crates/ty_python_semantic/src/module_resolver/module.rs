@@ -330,6 +330,8 @@ pub enum KnownModule {
     UnittestMock,
     #[cfg(test)]
     Uuid,
+    #[cfg(test)]
+    UnderscoreSsl,
     Warnings,
 }
 
@@ -355,6 +357,8 @@ impl KnownModule {
             Self::UnittestMock => "unittest.mock",
             #[cfg(test)]
             Self::Uuid => "uuid",
+            #[cfg(test)]
+            Self::UnderscoreSsl => "_ssl",
             Self::Templatelib => "string.templatelib",
         }
     }

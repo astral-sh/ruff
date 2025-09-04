@@ -64,6 +64,8 @@ pub(crate) enum Ty {
     /// where the class has `Any` in its MRO
     UnittestMockInstance,
     UnittestMockLiteral,
+    /// A custom `TypedDict`, imported from the `_ssl` module
+    TypedDict(&'static str),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -236,6 +238,15 @@ impl Ty {
                     returns.map(|ty| ty.into_type(db)),
                 ),
             ),
+            Ty::TypedDict(name) => {
+                let ty = known_module_symbol(db, KnownModule::UnderscoreSsl, name)
+                    .place
+                    .expect_type()
+                    .to_instance(db)
+                    .expect("Class type should be convertible to instance");
+                assert!(ty.is_typed_dict());
+                ty
+            }
         }
     }
 }
@@ -314,6 +325,8 @@ fn arbitrary_core_type(g: &mut Gen, fully_static: bool) -> Ty {
             class: "int",
             method: "bit_length",
         },
+        Ty::TypedDict("_Cipher"),
+        Ty::TypedDict("_CertInfo"),
     ];
     let types = if fully_static {
         &types[fully_static_index..]

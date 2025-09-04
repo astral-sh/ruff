@@ -1460,11 +1460,6 @@ impl<'db> Type<'db> {
                     .has_relation_to_impl(db, right, relation, visitor)
             }
 
-            (Type::TypedDict(_), _) | (_, Type::TypedDict(_)) => {
-                // TODO: Implement assignability and subtyping for TypedDict
-                C::from_bool(db, relation.is_assignability())
-            }
-
             // In general, a TypeVar `T` is not a subtype of a type `S` unless one of the two conditions is satisfied:
             // 1. `T` is a bound TypeVar and `T`'s upper bound is a subtype of `S`.
             //    TypeVars without an explicit upper bound are treated as having an implicit upper bound of `object`.
@@ -1815,6 +1810,16 @@ impl<'db> Type<'db> {
                 .map(|class| class.metaclass_instance_type(db))
                 .unwrap_or_else(|| KnownClass::Type.to_instance(db))
                 .has_relation_to_impl(db, target, relation, visitor),
+
+            (Type::TypedDict(left), Type::TypedDict(right)) if left == right => {
+                // TODO: Implement structural assignability and subtyping for TypedDict
+                C::always_satisfiable(db)
+            }
+
+            (Type::TypedDict(_), _) | (_, Type::TypedDict(_)) => {
+                // TODO: Implement structural assignability and subtyping for TypedDict
+                C::from_bool(db, relation.is_assignability())
+            }
 
             // For example: `Type::SpecialForm(SpecialFormType::Type)` is a subtype of `Type::NominalInstance(_SpecialForm)`,
             // because `Type::SpecialForm(SpecialFormType::Type)` is a set with exactly one runtime value in it
