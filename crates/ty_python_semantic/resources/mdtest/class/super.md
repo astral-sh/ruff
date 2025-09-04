@@ -193,7 +193,7 @@ reveal_type(super(B, B()).a1)  # revealed: bound method B.a1() -> Unknown
 reveal_type(super(B, B()).a2)  # revealed: bound method type[B].a2() -> Unknown
 
 # A.__dict__["a1"].__get__(None, B)
-reveal_type(super(B, B).a1)  # revealed: def a1(self, /) -> Unknown
+reveal_type(super(B, B).a1)  # revealed: def a1(self) -> Unknown
 # A.__dict__["a2"].__get__(None, B)
 reveal_type(super(B, B).a2)  # revealed: bound method <class 'B'>.a2() -> Unknown
 ```

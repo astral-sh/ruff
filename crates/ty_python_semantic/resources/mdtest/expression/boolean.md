@@ -108,7 +108,7 @@ class VariadicTupleSubclassWithDunderBoolOverride(tuple[int, ...]):
         return True
 
 reveal_type(bool(VariadicTupleSubclassWithDunderBoolOverride((1,))))  # revealed: Literal[True]
-reveal_type(VariadicTupleSubclassWithDunderBoolOverride.__bool__)  # revealed: def __bool__(self, /) -> Literal[True]
+reveal_type(VariadicTupleSubclassWithDunderBoolOverride.__bool__)  # revealed: def __bool__(self) -> Literal[True]
 
 # revealed: bound method VariadicTupleSubclassWithDunderBoolOverride.__bool__() -> Literal[True]
 reveal_type(VariadicTupleSubclassWithDunderBoolOverride().__bool__)
@@ -120,7 +120,7 @@ class EmptyTupleSubclassWithDunderBoolOverride(tuple[()]):
         return True
 
 reveal_type(bool(EmptyTupleSubclassWithDunderBoolOverride(())))  # revealed: Literal[True]
-reveal_type(EmptyTupleSubclassWithDunderBoolOverride.__bool__)  # revealed: def __bool__(self, /) -> Literal[True]
+reveal_type(EmptyTupleSubclassWithDunderBoolOverride.__bool__)  # revealed: def __bool__(self) -> Literal[True]
 
 # revealed: bound method EmptyTupleSubclassWithDunderBoolOverride.__bool__() -> Literal[True]
 reveal_type(EmptyTupleSubclassWithDunderBoolOverride().__bool__)

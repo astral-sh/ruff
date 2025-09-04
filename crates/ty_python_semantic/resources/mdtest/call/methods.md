@@ -32,11 +32,11 @@ the latter case, it returns a *bound method* object:
 ```py
 from inspect import getattr_static
 
-reveal_type(getattr_static(C, "f"))  # revealed: def f(self, /, x: int) -> str
+reveal_type(getattr_static(C, "f"))  # revealed: def f(self, x: int) -> str
 
 reveal_type(getattr_static(C, "f").__get__)  # revealed: <method-wrapper `__get__` of `f`>
 
-reveal_type(getattr_static(C, "f").__get__(None, C))  # revealed: def f(self, /, x: int) -> str
+reveal_type(getattr_static(C, "f").__get__(None, C))  # revealed: def f(self, x: int) -> str
 reveal_type(getattr_static(C, "f").__get__(C(), C))  # revealed: bound method C.f(x: int) -> str
 ```
 
@@ -44,7 +44,7 @@ In conclusion, this is why we see the following two types when accessing the `f`
 class object `C` and on an instance `C()`:
 
 ```py
-reveal_type(C.f)  # revealed: def f(self, /, x: int) -> str
+reveal_type(C.f)  # revealed: def f(self, x: int) -> str
 reveal_type(C().f)  # revealed: bound method C.f(x: int) -> str
 ```
 
@@ -56,7 +56,7 @@ via `__func__`):
 bound_method = C().f
 
 reveal_type(bound_method.__self__)  # revealed: C
-reveal_type(bound_method.__func__)  # revealed: def f(self, /, x: int) -> str
+reveal_type(bound_method.__func__)  # revealed: def f(self, x: int) -> str
 ```
 
 When we call the bound method, the `instance` is implicitly passed as the first argument (`self`):
@@ -411,7 +411,7 @@ class C:
     @classmethod
     def f(cls): ...
 
-reveal_type(getattr_static(C, "f"))  # revealed: def f(cls, /) -> Unknown
+reveal_type(getattr_static(C, "f"))  # revealed: def f(cls) -> Unknown
 reveal_type(getattr_static(C, "f").__get__)  # revealed: <method-wrapper `__get__` of `f`>
 ```
 
