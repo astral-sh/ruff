@@ -69,7 +69,7 @@ use crate::package::PackageRoot;
 use crate::preview::is_undefined_export_in_dunder_init_enabled;
 use crate::registry::Rule;
 use crate::rules::pyflakes::rules::{
-    LateFutureImport, ReturnOutsideFunction, YieldOutsideFunction,
+    LateFutureImport, MultipleStarredExpressions, ReturnOutsideFunction, YieldOutsideFunction,
 };
 use crate::rules::pylint::rules::{AwaitOutsideAsync, LoadBeforeGlobalDeclaration};
 use crate::rules::{flake8_pyi, flake8_type_checking, pyflakes, pyupgrade};
@@ -666,6 +666,12 @@ impl SemanticSyntaxContext for Checker<'_> {
             SemanticSyntaxErrorKind::AwaitOutsideAsyncFunction(_) => {
                 if self.is_rule_enabled(Rule::AwaitOutsideAsync) {
                     self.report_diagnostic(AwaitOutsideAsync, error.range);
+                }
+            }
+            SemanticSyntaxErrorKind::MultipleStarredExpressions => {
+                // F622
+                if self.is_rule_enabled(Rule::MultipleStarredExpressions) {
+                    self.report_diagnostic(MultipleStarredExpressions, error.range);
                 }
             }
             SemanticSyntaxErrorKind::ReboundComprehensionVariable

@@ -104,6 +104,22 @@ impl SemanticSyntaxChecker {
                         *range,
                     );
                 }
+                for target in targets {
+                    let mut count = 0;
+                    Self::multiple_star_expression(target, ctx, &mut count);
+                    if count > 1 {
+                        // test_err multiple_starred_assignment_target
+                        // (*a, *b) = (1, 2)
+                        // [*a, *b] = (1, 2)
+                        // (*a, *b, c) = (1, 2, 3)
+                        // [*a, *b, c] = (1, 2, 3)
+                        Self::add_error(
+                            ctx,
+                            SemanticSyntaxErrorKind::MultipleStarredExpressions,
+                            target.range(),
+                        );
+                    }
+                }
 
                 // test_ok assign_stmt_starred_expr_value
                 // _ = 4
@@ -356,6 +372,23 @@ impl SemanticSyntaxChecker {
                 SemanticSyntaxErrorKind::InvalidStarExpression,
                 expr.range(),
             );
+        }
+    }
+    fn multiple_star_expression<Ctx: SemanticSyntaxContext>(
+        expr: &Expr,
+        ctx: &Ctx,
+        count: &mut usize,
+    ) {
+        match expr {
+            Expr::Starred(_) => {
+                *count += 1;
+            }
+            Expr::Tuple(ast::ExprTuple { elts, .. }) | Expr::List(ast::ExprList { elts, .. }) => {
+                for elt in elts {
+                    Self::multiple_star_expression(elt, ctx, count);
+                }
+            }
+            _ => {}
         }
     }
 
@@ -989,6 +1022,9 @@ impl Display for SemanticSyntaxError {
             SemanticSyntaxErrorKind::AnnotatedNonlocal(name) => {
                 write!(f, "annotated name `{name}` can't be nonlocal")
             }
+            SemanticSyntaxErrorKind::MultipleStarredExpressions => {
+                write!(f, "Two starred expressions in assignment")
+            }
         }
     }
 }
@@ -1217,7 +1253,10 @@ pub enum SemanticSyntaxErrorKind {
     /// to be very rare and not worth the additional complexity to detect.
     ///
     /// [#111123]: https://github.com/python/cpython/issues/111123
-    LoadBeforeGlobalDeclaration { name: String, start: TextSize },
+    LoadBeforeGlobalDeclaration {
+        name: String,
+        start: TextSize,
+    },
 
     /// Represents the use of a `nonlocal` variable before its `nonlocal` declaration.
     ///
@@ -1235,7 +1274,10 @@ pub enum SemanticSyntaxErrorKind {
     /// ## Known Issues
     ///
     /// See [`LoadBeforeGlobalDeclaration`][Self::LoadBeforeGlobalDeclaration].
-    LoadBeforeNonlocalDeclaration { name: String, start: TextSize },
+    LoadBeforeNonlocalDeclaration {
+        name: String,
+        start: TextSize,
+    },
 
     /// Represents the use of a starred expression in an invalid location, such as a `return` or
     /// `yield` statement.
@@ -1346,6 +1388,7 @@ pub enum SemanticSyntaxErrorKind {
 
     /// Represents a type annotation on a variable that's been declared nonlocal
     AnnotatedNonlocal(String),
+    MultipleStarredExpressions,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
