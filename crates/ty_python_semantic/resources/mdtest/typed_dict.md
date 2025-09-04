@@ -128,6 +128,9 @@ Person({"name": "Alice"})
 accepts_person({"name": "Alice"})
 # TODO: this should be an error, similar to the above
 house.owner = {"name": "Alice"}
+a_person: Person
+# TODO: this should be an error, similar to the above
+a_person = {"name": "Alice"}
 ```
 
 All of these have an invalid type for the `name` field:
@@ -144,6 +147,9 @@ Person({"name": None, "age": 30})
 accepts_person({"name": None, "age": 30})
 # TODO: this should be an error, similar to the above
 house.owner = {"name": None, "age": 30}
+a_person: Person
+# TODO: this should be an error, similar to the above
+a_person = {"name": None, "age": 30}
 ```
 
 All of these have an extra field that is not defined in the `TypedDict`:
@@ -160,6 +166,9 @@ Person({"name": "Alice", "age": 30, "extra": True})
 accepts_person({"name": "Alice", "age": 30, "extra": True})
 # TODO: this should be an error
 house.owner = {"name": "Alice", "age": 30, "extra": True}
+# TODO: this should be an error
+a_person: Person
+a_person = {"name": "Alice", "age": 30, "extra": True}
 ```
 
 ## Type ignore compatibility issues
@@ -242,8 +251,9 @@ invalid_extra = OptionalPerson(name="George", extra=True)
 
 ## `Required` and `NotRequired`
 
-You can have fine-grained control over field requirements using `Required` and `NotRequired`
-qualifiers, which override the class-level `total=` setting:
+You can have fine-grained control over keys using `Required` and `NotRequired` qualifiers. These
+qualifiers override the class-level `total` setting, which sets the default (`total=True` means that
+all keys are required by default, `total=False` means that all keys are non-required by default):
 
 ```py
 from typing_extensions import TypedDict, Required, NotRequired
@@ -444,6 +454,12 @@ class Person(TypedDict, total=False):
     id: ReadOnly[Required[int]]
     name: str
     age: int | None
+
+alice: Person = {"id": 1, "name": "Alice", "age": 30}
+alice["age"] = 31  # okay
+
+# TODO: this should be an error
+alice["id"] = 2
 ```
 
 ## Methods on `TypedDict`
@@ -762,6 +778,38 @@ from typing import TypedDict
 
 # error: [invalid-type-form] "The special form `typing.TypedDict` is not allowed in type expressions."
 x: TypedDict = {"name": "Alice"}
+```
+
+### `dict`-subclass inhabitants
+
+Values that inhabit a `TypedDict` type must be instances of `dict` itself, not a subclass:
+
+```py
+from typing import TypedDict
+
+class MyDict(dict):
+    pass
+
+class Person(TypedDict):
+    name: str
+    age: int | None
+
+# TODO: this should be an error
+x: Person = MyDict({"name": "Alice", "age": 30})
+```
+
+### Cannot be used in `isinstance` tests
+
+```py
+from typing import TypedDict
+
+class Person(TypedDict):
+    name: str
+    age: int | None
+
+def _(obj: object) -> bool:
+    # TODO: this should be an error
+    return isinstance(obj, Person)
 ```
 
 ## Diagnostics
