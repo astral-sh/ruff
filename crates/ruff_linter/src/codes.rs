@@ -1053,7 +1053,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "064") => (RuleGroup::Preview, rules::ruff::rules::NonOctalPermissions),
         (Ruff, "100") => (RuleGroup::Stable, rules::ruff::rules::UnusedNOQA),
         (Ruff, "101") => (RuleGroup::Stable, rules::ruff::rules::RedirectedNOQA),
-        (Ruff, "102") => (RuleGroup::Preview, rules::ruff::rules::InvalidRuleCode),
+        (Ruff, "102") => (RuleGroup::Stable, rules::ruff::rules::InvalidRuleCode),
 
         (Ruff, "200") => (RuleGroup::Stable, rules::ruff::rules::InvalidPyprojectToml),
         #[cfg(any(feature = "test-rules", test))]
