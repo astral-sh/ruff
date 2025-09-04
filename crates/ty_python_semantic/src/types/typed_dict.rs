@@ -61,6 +61,7 @@ impl<'db> TypedDictType<'db> {
         type_mapping: &TypeMapping<'a, 'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
+        // TODO: Materialization of gradual TypedDicts needs more logic
         Self {
             defining_class: self
                 .defining_class

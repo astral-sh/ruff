@@ -58,18 +58,6 @@ impl<'db> CallableSignature<'db> {
         self.overloads.iter()
     }
 
-    pub(super) fn materialize(
-        &self,
-        db: &'db dyn Db,
-        materialization_kind: MaterializationKind,
-    ) -> Self {
-        Self::from_overloads(
-            self.overloads
-                .iter()
-                .map(|signature| signature.materialize(db, materialization_kind)),
-        )
-    }
-
     pub(crate) fn normalized_impl(
         &self,
         db: &'db dyn Db,
@@ -414,21 +402,6 @@ impl<'db> Signature<'db> {
         self
     }
 
-    fn materialize(&self, db: &'db dyn Db, materialization_kind: MaterializationKind) -> Self {
-        Self {
-            generic_context: self.generic_context,
-            inherited_generic_context: self.inherited_generic_context,
-            definition: self.definition,
-            // Parameters are at contravariant position, so the variance is flipped.
-            parameters: self.parameters.materialize(db, materialization_kind.flip()),
-            return_ty: Some(
-                self.return_ty
-                    .unwrap_or(Type::unknown())
-                    .materialize(db, materialization_kind),
-            ),
-        }
-    }
-
     pub(crate) fn normalized_impl(
         &self,
         db: &'db dyn Db,
@@ -469,13 +442,19 @@ impl<'db> Signature<'db> {
         type_mapping: &TypeMapping<'a, 'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
+        let flipped_mapping = match type_mapping {
+            TypeMapping::Materialize(materialization_kind) => {
+                &TypeMapping::Materialize(materialization_kind.flip())
+            }
+            _ => type_mapping,
+        };
         Self {
             generic_context: self.generic_context,
             inherited_generic_context: self.inherited_generic_context,
             definition: self.definition,
             parameters: self
                 .parameters
-                .apply_type_mapping_impl(db, type_mapping, visitor),
+                .apply_type_mapping_impl(db, flipped_mapping, visitor),
             return_ty: self
                 .return_ty
                 .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, visitor)),
@@ -1088,17 +1067,6 @@ impl<'db> Parameters<'db> {
         }
     }
 
-    fn materialize(&self, db: &'db dyn Db, materialization_kind: MaterializationKind) -> Self {
-        if self.is_gradual {
-            Parameters::object(db)
-        } else {
-            Parameters::new(
-                self.iter()
-                    .map(|parameter| parameter.materialize(db, materialization_kind)),
-            )
-        }
-    }
-
     pub(crate) fn as_slice(&self) -> &[Parameter<'db>] {
         self.value.as_slice()
     }
@@ -1254,13 +1222,27 @@ impl<'db> Parameters<'db> {
         type_mapping: &TypeMapping<'a, 'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
-        Self {
-            value: self
-                .value
-                .iter()
-                .map(|param| param.apply_type_mapping_impl(db, type_mapping, visitor))
-                .collect(),
-            is_gradual: self.is_gradual,
+        match type_mapping {
+            // Note that we've already flipped the materialization in Signature.apply_type_mapping_impl(),
+            // so the "top" materialization here is the bottom materialization of the whole Signature.
+            // It might make sense to flip the materialization here instead.
+            TypeMapping::Materialize(MaterializationKind::Top) if self.is_gradual => {
+                Parameters::object(db)
+            }
+            // TODO: This is wrong, the empty Parameters is not a subtype of all materializations.
+            // The bottom materialization is not currently representable and implementing it
+            // properly requires extending the Parameters struct.
+            TypeMapping::Materialize(MaterializationKind::Bottom) if self.is_gradual => {
+                Parameters::empty()
+            }
+            _ => Self {
+                value: self
+                    .value
+                    .iter()
+                    .map(|param| param.apply_type_mapping_impl(db, type_mapping, visitor))
+                    .collect(),
+                is_gradual: self.is_gradual,
+            },
         }
     }
 
@@ -1423,18 +1405,6 @@ impl<'db> Parameter<'db> {
     pub(crate) fn type_form(mut self) -> Self {
         self.form = ParameterForm::Type;
         self
-    }
-
-    fn materialize(&self, db: &'db dyn Db, materialization_kind: MaterializationKind) -> Self {
-        Self {
-            annotated_type: Some(
-                self.annotated_type
-                    .unwrap_or(Type::unknown())
-                    .materialize(db, materialization_kind),
-            ),
-            kind: self.kind.clone(),
-            form: self.form,
-        }
     }
 
     fn apply_type_mapping_impl<'a>(
