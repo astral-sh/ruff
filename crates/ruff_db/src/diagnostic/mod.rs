@@ -501,13 +501,18 @@ impl Diagnostic {
 
     /// Returns the ordering of diagnostics based on the start of their ranges, if they have any.
     ///
-    /// Panics if either diagnostic has no primary span, if the span has no range, or if its file is
-    /// not a `SourceFile`.
+    /// Panics if either diagnostic has no primary span, or if its file is not a `SourceFile`.
     pub fn ruff_start_ordering(&self, other: &Self) -> std::cmp::Ordering {
-        (self.expect_ruff_source_file(), self.expect_range().start()).cmp(&(
+        let a = (
+            self.expect_ruff_source_file(),
+            self.range().map(|r| r.start()),
+        );
+        let b = (
             other.expect_ruff_source_file(),
-            other.expect_range().start(),
-        ))
+            other.range().map(|r| r.start()),
+        );
+
+        a.cmp(&b)
     }
 }
 
