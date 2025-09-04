@@ -69,9 +69,7 @@ reveal_type(bound_method(1))  # revealed: str
 When we call the function object itself, we need to pass the `instance` explicitly:
 
 ```py
-# error: [invalid-argument-type]
-# error: [missing-argument]
-C.f(1)
+C.f(1)  # error: [missing-argument]
 
 reveal_type(C.f(C(), 1))  # revealed: str
 ```

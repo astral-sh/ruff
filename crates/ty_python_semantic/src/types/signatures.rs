@@ -15,29 +15,29 @@ use std::{collections::HashMap, slice::Iter};
 use itertools::{EitherOrBoth, Itertools};
 use smallvec::{SmallVec, smallvec_inline};
 
-use super::TypeVarVariance;
 use super::{
-    DynamicType, Type, definition_expression_type, infer_definition_types, semantic_index,
+    DynamicType, Type, TypeVarVariance, definition_expression_type, infer_definition_types,
+    semantic_index,
 };
 use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::types::constraints::{ConstraintSet, Constraints, IteratorConstraintsExtension};
 use crate::types::function::FunctionType;
-use crate::types::generics::GenericContext;
-use crate::types::generics::walk_generic_context;
+use crate::types::generics::{GenericContext, walk_generic_context};
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, FindLegacyTypeVarsVisitor,
     HasRelationToVisitor, IsEquivalentVisitor, KnownClass, MaterializationKind, NormalizedVisitor,
     SpecialFormType, TypeMapping, TypeRelation, VarianceInferable, todo_type,
 };
 use crate::{Db, FxOrderSet};
+use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{self as ast, name::Name};
 
 fn infer_method_type<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> Option<FunctionType<'db>> {
-    let scope_id = definition.scope(db);
-    let file = scope_id.file(db);
+    let class_scope_id = definition.scope(db);
+    let file = class_scope_id.file(db);
     let index = semantic_index(db, file);
 
     let method_scope = index.scope(scope_id.file_scope_id(db));
@@ -45,8 +45,13 @@ fn infer_method_type<'db>(
     let parent_scope_id = method_scope.parent()?;
     let parent_scope = index.scope(parent_scope_id);
     parent_scope.node().as_class()?;
+    let DefinitionKind::Function(func_def) = definition.kind(db) else {
+        return None;
+    };
+    let class_scope = index.scope(class_scope_id.file_scope_id(db));
+    class_scope.node().as_class(&module)?;
 
-    let method_definition = index.expect_single_definition(method);
+    let method_definition = index.expect_single_definition(func_def.node(&module));
     let func_type = infer_definition_types(db, method_definition)
         .declaration_type(method_definition)
         .inner_type()
@@ -390,6 +395,7 @@ impl<'db> Signature<'db> {
             function_node.parameters.as_ref(),
             has_implicitly_positional_first_parameter,
         );
+
         let return_ty = function_node.returns.as_ref().map(|returns| {
             let plain_return_ty = definition_expression_type(db, definition, returns.as_ref())
                 .apply_type_mapping(
@@ -1244,41 +1250,29 @@ impl<'db> Parameters<'db> {
                     .map(pos_only_param),
             );
         }
-        let function_is_method = if matches!(definition.kind(db), DefinitionKind::Function(_)) {
-            let scope = definition.scope(db);
-            let index = semantic_index(db, scope.file(db));
-            let current_scope = index.scope(scope.file_scope_id(db));
-            // class_context_of_current_method(db, index, scope).is_some()
-            current_scope.kind().is_class()
-        } else {
-            false
-        };
-        let classmethod = if let DefinitionKind::Function(f) = definition.kind(db) {
-            if matches!(f.name.id().as_str(), "__new__" | "__class_getitem__") {
-                true
-            } else {
-                let result = infer_definition_types(db, definition);
-                match result.declaration_type(definition).inner_type() {
-                    Type::FunctionLiteral(t) => {
-                        t.decorators(db).contains(FunctionDecorators::CLASSMETHOD)
-                    }
-                    _ => false,
-                }
-            }
-        } else {
-            false
-        };
         let method_type = infer_method_type(db, definition);
+        let is_method = method_type.is_some();
         let is_classmethod = method_type.is_some_and(|f| f.is_classmethod(db));
         let is_staticmethod = method_type.is_some_and(|f| f.is_staticmethod(db));
 
         let positional_or_keyword = args.iter().map(|arg| {
             // TODO(https://github.com/astral-sh/ty/issues/159): Also set the type for `cls` argument
-            if !is_staticmethod
+            // eprintln!(
+            //     "arg {}: pos: {:?}, is_static: {}, is_class: {}, anno: {:?}",
+            //     arg.name().id.as_str(),
+            //     parameters.index(arg.name().id()),
+            //     is_staticmethod,
+            //     is_classmethod,
+            //     arg.parameter.annotation()
+            // );
+            // dbg!(is_method);
+            if is_method
+                && !is_staticmethod
                 && !is_classmethod
                 && arg.parameter.annotation().is_none()
                 && parameters.index(arg.name().id()) == Some(0)
             {
+                eprintln!("arg {} is self", arg.name().id.as_str());
                 let implicit_annotation = Type::SpecialForm(SpecialFormType::TypingSelf)
                     .in_type_expression(db, definition.scope(db), Some(definition))
                     .ok();
@@ -1292,6 +1286,7 @@ impl<'db> Parameters<'db> {
                     form: ParameterForm::Value,
                 }
             } else {
+                eprintln!("arg {} is not self", arg.name().id.as_str());
                 Parameter::from_node_and_kind(
                     db,
                     definition,
