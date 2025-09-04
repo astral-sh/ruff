@@ -174,10 +174,10 @@ impl ClassInfoConstraintFunction {
     fn generate_constraint<'db>(self, db: &'db dyn Db, classinfo: Type<'db>) -> Option<Type<'db>> {
         let constraint_fn = |class: ClassLiteral<'db>| match self {
             ClassInfoConstraintFunction::IsInstance => {
-                Type::instance(db, class.default_specialization(db))
+                Type::instance(db, class.top_materialization(db))
             }
             ClassInfoConstraintFunction::IsSubclass => {
-                SubclassOfType::from(db, class.default_specialization(db))
+                SubclassOfType::from(db, class.top_materialization(db))
             }
         };
 
