@@ -29,10 +29,10 @@ use crate::types::typed_dict::typed_dict_params_from_class_def;
 use crate::types::{
     ApplyTypeMappingVisitor, Binding, BoundSuperError, BoundSuperType, CallableType,
     DataclassParams, DeprecatedInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
-    IsEquivalentVisitor, KnownInstanceType, ManualPEP695TypeAliasType, NormalizedVisitor,
-    PropertyInstanceType, StringLiteralType, TypeAliasType, TypeMapping, TypeRelation,
-    TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, TypedDictParams, UnionBuilder,
-    VarianceInferable, declaration_type, infer_definition_types,
+    IsEquivalentVisitor, KnownInstanceType, ManualPEP695TypeAliasType, MaterializationKind,
+    NormalizedVisitor, PropertyInstanceType, StringLiteralType, TypeAliasType, TypeMapping,
+    TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, TypedDictParams,
+    UnionBuilder, VarianceInferable, declaration_type, infer_definition_types,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet, Program,
@@ -1467,6 +1467,18 @@ impl<'db> ClassLiteral<'db> {
         self.apply_specialization(db, |generic_context| {
             specialization
                 .unwrap_or_else(|| generic_context.default_specialization(db, self.known(db)))
+        })
+    }
+
+    pub(crate) fn top_materialization(self, db: &'db dyn Db) -> ClassType<'db> {
+        self.apply_specialization(db, |generic_context| {
+            generic_context
+                .default_specialization(db, self.known(db))
+                .materialize_impl(
+                    db,
+                    MaterializationKind::Top,
+                    &ApplyTypeMappingVisitor::default(),
+                )
         })
     }
 
