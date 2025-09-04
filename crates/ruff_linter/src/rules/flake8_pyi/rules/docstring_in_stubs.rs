@@ -1,7 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::ExprStringLiteral;
-use ruff_python_semantic::Definition;
-use ruff_python_semantic::NodeId;
+use ruff_python_ast::{ExprStringLiteral, Stmt};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -42,30 +40,23 @@ impl AlwaysFixableViolation for DocstringInStub {
 }
 
 /// PYI021
-pub(crate) fn docstring_in_stubs(
-    checker: &Checker,
-    definition: &Definition,
-    docstring: Option<&ExprStringLiteral>,
-) {
+pub(crate) fn docstring_in_stubs(checker: &Checker, body: &[Stmt]) {
+    let docstring = match &body[0] {
+        Stmt::Expr(expr) => expr.value.as_string_literal_expr(),
+        _ => None,
+    };
+
     let Some(docstring_range) = docstring.map(ExprStringLiteral::range) else {
         return;
     };
 
-    let statements = match definition {
-        Definition::Module(module) => module.python_ast,
-        Definition::Member(member) => member.body(),
-    };
-
-    let edit = if statements.len() == 1 {
+    let edit = if body.len() == 1 {
         Edit::range_replacement("...".to_string(), docstring_range)
     } else {
         Edit::range_deletion(docstring_range)
     };
 
-    // Hard coding to 0 for POC for interaction with PIE790
-    // At the moment it removes the `...` its up for debate whether it should remove the
-    // docstring instead.
-    let isolation_level = Checker::isolation(Some(NodeId::from_u32(0)));
+    let isolation_level = Checker::isolation(checker.semantic().current_statement_id());
     let fix = Fix::unsafe_edit(edit).isolate(isolation_level);
 
     checker
