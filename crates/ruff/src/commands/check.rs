@@ -6,12 +6,13 @@ use std::time::Instant;
 use anyhow::Result;
 use colored::Colorize;
 use ignore::Error;
-use log::{debug, error, warn};
+use log::{debug, warn};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
+use ruff_db::files::File;
 use rustc_hash::FxHashMap;
 
-use ruff_db::diagnostic::Diagnostic;
+use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Span};
 use ruff_db::panic::catch_unwind;
 use ruff_linter::package::PackageRoot;
 use ruff_linter::registry::Rule;
@@ -193,21 +194,19 @@ fn lint_path(
     match result {
         Ok(inner) => inner,
         Err(error) => {
-            let message = r"This indicates a bug in Ruff. If you could open an issue at:
-
-    https://github.com/astral-sh/ruff/issues/new?title=%5BLinter%20panic%5D
-
-...with the relevant file contents, the `pyproject.toml` settings, and the following stack trace, we'd be very appreciative!
-";
-
-            error!(
-                "{}{}{} {message}\n{error}",
+            let message = format!(
+                "{}{}{}\n{error}",
                 "Panicked while linting ".bold(),
                 fs::relativize_path(path).bold(),
                 ":".bold()
             );
-
-            Ok(Diagnostics::default())
+            let mut diagnostic = Diagnostic::new(
+                DiagnosticId::Panic,
+                ruff_db::diagnostic::Severity::Fatal,
+                message,
+            );
+            diagnostic.annotate(Annotation::primary(path.into()));
+            Ok(Diagnostics::new(vec![diagnostic], FxHashMap::default()))
         }
     }
 }
