@@ -748,9 +748,11 @@ impl<'db> ClassType<'db> {
                 .map_type(|ty| {
                     let ty = ty.apply_optional_specialization(db, specialization);
                     match specialization.map(|spec| spec.materialization_kind(db)) {
-                        Some(Some(materialization_kind)) => {
-                            ty.materialize(db, materialization_kind)
-                        }
+                        Some(Some(materialization_kind)) => ty.materialize(
+                            db,
+                            materialization_kind,
+                            &ApplyTypeMappingVisitor::default(),
+                        ),
                         _ => ty,
                     }
                 })

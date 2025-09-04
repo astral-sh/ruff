@@ -590,9 +590,11 @@ impl<'db> Specialization<'db> {
         let new_specialization = self.apply_type_mapping(db, &TypeMapping::Specialization(other));
         match other.materialization_kind(db) {
             None => new_specialization,
-            Some(materialization_kind) => {
-                new_specialization.materialize_impl(db, materialization_kind)
-            }
+            Some(materialization_kind) => new_specialization.materialize_impl(
+                db,
+                materialization_kind,
+                &ApplyTypeMappingVisitor::default(),
+            ),
         }
     }
 
@@ -611,7 +613,7 @@ impl<'db> Specialization<'db> {
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         if let TypeMapping::Materialize(materialization_kind) = type_mapping {
-            return self.materialize_impl(db, *materialization_kind);
+            return self.materialize_impl(db, *materialization_kind, visitor);
         }
         let types: Box<[_]> = self
             .types(db)
@@ -693,6 +695,7 @@ impl<'db> Specialization<'db> {
         self,
         db: &'db dyn Db,
         materialization_kind: MaterializationKind,
+        visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         // The top and bottom materializations are fully static types already, so materializing them
         // further does nothing.
@@ -710,14 +713,17 @@ impl<'db> Specialization<'db> {
                     TypeVarVariance::Bivariant => {
                         // With bivariance, all specializations are subtypes of each other,
                         // so any materialization is acceptable.
-                        vartype.materialize(db, MaterializationKind::Top)
+                        vartype.materialize(db, MaterializationKind::Top, visitor)
                     }
-                    TypeVarVariance::Covariant => vartype.materialize(db, materialization_kind),
+                    TypeVarVariance::Covariant => {
+                        vartype.materialize(db, materialization_kind, visitor)
+                    }
                     TypeVarVariance::Contravariant => {
-                        vartype.materialize(db, materialization_kind.flip())
+                        vartype.materialize(db, materialization_kind.flip(), visitor)
                     }
                     TypeVarVariance::Invariant => {
-                        let top_materialization = vartype.materialize(db, MaterializationKind::Top);
+                        let top_materialization =
+                            vartype.materialize(db, MaterializationKind::Top, visitor);
                         if !vartype.is_equivalent_to(db, top_materialization) {
                             has_dynamic_invariant_typevar = true;
                         }
@@ -731,7 +737,7 @@ impl<'db> Specialization<'db> {
             tuple.apply_type_mapping_impl(
                 db,
                 &TypeMapping::Materialize(materialization_kind),
-                &ApplyTypeMappingVisitor::default(),
+                visitor,
             )
         });
         let new_materialization_kind = if has_dynamic_invariant_typevar {
