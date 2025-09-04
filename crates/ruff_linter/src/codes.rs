@@ -830,7 +830,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Pyi, "056") => (RuleGroup::Stable, rules::flake8_pyi::rules::UnsupportedMethodCallOnAll),
         (Flake8Pyi, "058") => (RuleGroup::Stable, rules::flake8_pyi::rules::GeneratorReturnFromIterMethod),
         (Flake8Pyi, "057") => (RuleGroup::Stable, rules::flake8_pyi::rules::ByteStringUsage),
-        (Flake8Pyi, "059") => (RuleGroup::Preview, rules::flake8_pyi::rules::GenericNotLastBaseClass),
+        (Flake8Pyi, "059") => (RuleGroup::Stable, rules::flake8_pyi::rules::GenericNotLastBaseClass),
         (Flake8Pyi, "061") => (RuleGroup::Preview, rules::flake8_pyi::rules::RedundantNoneLiteral),
         (Flake8Pyi, "062") => (RuleGroup::Stable, rules::flake8_pyi::rules::DuplicateLiteralMember),
         (Flake8Pyi, "063") => (RuleGroup::Stable, rules::flake8_pyi::rules::Pep484StylePositionalOnlyParameter),
