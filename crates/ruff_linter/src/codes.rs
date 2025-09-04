@@ -1160,7 +1160,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Refurb, "167") => (RuleGroup::Stable, rules::refurb::rules::RegexFlagAlias),
         (Refurb, "168") => (RuleGroup::Stable, rules::refurb::rules::IsinstanceTypeNone),
         (Refurb, "169") => (RuleGroup::Stable, rules::refurb::rules::TypeNoneComparison),
-        (Refurb, "171") => (RuleGroup::Preview, rules::refurb::rules::SingleItemMembershipTest),
+        (Refurb, "171") => (RuleGroup::Stable, rules::refurb::rules::SingleItemMembershipTest),
         (Refurb, "177") => (RuleGroup::Stable, rules::refurb::rules::ImplicitCwd),
         (Refurb, "180") => (RuleGroup::Preview, rules::refurb::rules::MetaClassABCMeta),
         (Refurb, "181") => (RuleGroup::Stable, rules::refurb::rules::HashlibDigestHex),
