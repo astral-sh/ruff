@@ -154,7 +154,7 @@ from ty_extensions import generic_context
 legacy.m("string", None)  # error: [invalid-argument-type]
 reveal_type(legacy.m)  # revealed: bound method Legacy[int].m[S](x: int, y: S@m) -> S@m
 reveal_type(generic_context(Legacy))  # revealed: tuple[T@Legacy]
-reveal_type(generic_context(legacy.m))  # revealed: tuple[S@m]
+reveal_type(generic_context(legacy.m))  # revealed: tuple[Self@m, S@m]
 ```
 
 With PEP 695 syntax, it is clearer that the method uses a separate typevar:
@@ -165,6 +165,10 @@ class C[T]:
         return y
 
 c: C[int] = C()
+reveal_type(c)  # revealed: C[Unknown]
+# reveal_type(c) # revealed: C[Unknown]
+# TODO: Next line fails. The reason is the reveal type above
+# error: 13 [invalid-argument-type] "Argument to bound method `m` is incorrect: Expected `Self@m`, found `C[Unknown]`"
 reveal_type(c.m(1, "string"))  # revealed: Literal["string"]
 ```
 

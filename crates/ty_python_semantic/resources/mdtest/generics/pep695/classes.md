@@ -388,6 +388,7 @@ class C[T]:
 
     def __init__[S](self, x: T, y: S) -> None: ...
 
+# TODO: need to handle self in __init__ call.
 reveal_type(C(1, 1))  # revealed: C[int]
 reveal_type(C(1, "string"))  # revealed: C[int]
 reveal_type(C(1, True))  # revealed: C[int]
@@ -504,16 +505,16 @@ class C[T]:
     def cannot_shadow_class_typevar[T](self, t: T): ...
 
 reveal_type(generic_context(C))  # revealed: tuple[T@C]
-reveal_type(generic_context(C.method))  # revealed: None
+reveal_type(generic_context(C.method))  # revealed: tuple[Self@method]
 reveal_type(generic_context(C.generic_method))  # revealed: tuple[U@generic_method]
 reveal_type(generic_context(C[int]))  # revealed: None
-reveal_type(generic_context(C[int].method))  # revealed: None
+reveal_type(generic_context(C[int].method))  # revealed: tuple[Self@method]
 reveal_type(generic_context(C[int].generic_method))  # revealed: tuple[U@generic_method]
 
 c: C[int] = C[int]()
 reveal_type(c.generic_method(1, "string"))  # revealed: Literal["string"]
 reveal_type(generic_context(c))  # revealed: None
-reveal_type(generic_context(c.method))  # revealed: None
+reveal_type(generic_context(c.method))  # revealed: tuple[Self@method]
 reveal_type(generic_context(c.generic_method))  # revealed: tuple[U@generic_method]
 ```
 
