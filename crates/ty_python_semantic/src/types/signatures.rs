@@ -1223,6 +1223,9 @@ impl<'db> Parameters<'db> {
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         match type_mapping {
+            // Note that we've already flipped the materialization in Signature.apply_type_mapping_impl(),
+            // so the "top" materialization here is the bottom materialization of the whole Signature.
+            // It might make sense to flip the materialization here instead.
             TypeMapping::Materialize(MaterializationKind::Top) if self.is_gradual => {
                 Parameters::object(db)
             }
