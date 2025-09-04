@@ -9294,6 +9294,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 {
                     Err(GenericContextError::NotYetSupported)
                 }
+                Type::Union(union)
+                    if union
+                        .elements(self.db())
+                        .iter()
+                        .any(|element| match element {
+                            Type::Dynamic(DynamicType::TodoUnpack) => true,
+                            Type::NominalInstance(nominal) => matches!(
+                                nominal.class(self.db()).known(self.db()),
+                                Some(KnownClass::TypeVarTuple | KnownClass::ParamSpec)
+                            ),
+                            _ => false,
+                        }) =>
+                {
+                    Err(GenericContextError::NotYetSupported)
+                }
                 _ => {
                     if let Some(builder) =
                         self.context.report_lint(&INVALID_ARGUMENT_TYPE, value_node)
@@ -11277,6 +11292,20 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         if nominal
                             .class(self.db())
                             .is_known(self.db(), KnownClass::ParamSpec) =>
+                    {
+                        return Some(Parameters::todo());
+                    }
+                    Type::Union(union)
+                        if union
+                            .elements(self.db())
+                            .iter()
+                            .any(|element| match element {
+                                Type::Dynamic(DynamicType::TodoPEP695ParamSpec) => true,
+                                Type::NominalInstance(nominal) => nominal
+                                    .class(self.db())
+                                    .is_known(self.db(), KnownClass::ParamSpec),
+                                _ => false,
+                            }) =>
                     {
                         return Some(Parameters::todo());
                     }
