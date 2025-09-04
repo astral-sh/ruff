@@ -69,7 +69,7 @@ use crate::package::PackageRoot;
 use crate::preview::is_undefined_export_in_dunder_init_enabled;
 use crate::registry::Rule;
 use crate::rules::pyflakes::rules::{
-    LateFutureImport, ReturnOutsideFunction, UndefinedLocalWithNestedImportStarUsage,
+    LateFutureImport, MultipleStarredExpressions, ReturnOutsideFunction, UndefinedLocalWithNestedImportStarUsage,
     YieldOutsideFunction,
 };
 use crate::rules::pylint::rules::{
@@ -683,6 +683,12 @@ impl SemanticSyntaxContext for Checker<'_> {
                 // PLE1700
                 if self.is_rule_enabled(Rule::YieldFromInAsyncFunction) {
                     self.report_diagnostic(YieldFromInAsyncFunction, error.range);
+                }
+            }
+            SemanticSyntaxErrorKind::MultipleStarredExpressions => {
+                // F622
+                if self.is_rule_enabled(Rule::MultipleStarredExpressions) {
+                    self.report_diagnostic(MultipleStarredExpressions, error.range);
                 }
             }
             SemanticSyntaxErrorKind::ReboundComprehensionVariable
