@@ -1285,6 +1285,8 @@ pub(crate) enum FieldKind<'db> {
     TypedDict {
         /// Whether this field is required
         is_required: bool,
+        /// Whether this field is marked read-only
+        is_read_only: bool,
     },
 }
 
@@ -1306,7 +1308,14 @@ impl Field<'_> {
             FieldKind::Dataclass {
                 init, default_ty, ..
             } => default_ty.is_none() && *init,
-            FieldKind::TypedDict { is_required } => *is_required,
+            FieldKind::TypedDict { is_required, .. } => *is_required,
+        }
+    }
+
+    pub(crate) const fn is_read_only(&self) -> bool {
+        match &self.kind {
+            FieldKind::TypedDict { is_read_only, .. } => *is_read_only,
+            _ => false,
         }
     }
 }
@@ -2278,8 +2287,36 @@ impl<'db> ClassLiteral<'db> {
             (CodeGeneratorKind::TypedDict, "__setitem__") => {
                 let fields = self.fields(db, specialization, field_policy);
 
-                // Add (key type, value type) overloads for all TypedDict items ("fields"):
-                let overloads = fields.iter().map(|(name, field)| {
+                // Add (key type, value type) overloads for all TypedDict items ("fields") that are not read-only:
+
+                let mut writeable_fields = fields
+                    .iter()
+                    .filter(|(_, field)| !field.is_read_only())
+                    .peekable();
+
+                if writeable_fields.peek().is_none() {
+                    // If there are no writeable fields, synthesize a `__setitem__` that takes
+                    // a `key` of type `Never` to signal that no keys are accepted. This leads
+                    // to slightly more user-friendly error messages compared to returning an
+                    // empty overload set.
+                    return Some(Type::Callable(CallableType::new(
+                        db,
+                        CallableSignature::single(Signature::new(
+                            Parameters::new([
+                                Parameter::positional_only(Some(Name::new_static("self")))
+                                    .with_annotated_type(instance_ty),
+                                Parameter::positional_only(Some(Name::new_static("key")))
+                                    .with_annotated_type(Type::Never),
+                                Parameter::positional_only(Some(Name::new_static("value")))
+                                    .with_annotated_type(Type::any()),
+                            ]),
+                            Some(Type::none(db)),
+                        )),
+                        true,
+                    )));
+                }
+
+                let overloads = writeable_fields.map(|(name, field)| {
                     let key_type = Type::StringLiteral(StringLiteralType::new(db, name.as_str()));
 
                     Signature::new(
@@ -2682,7 +2719,11 @@ impl<'db> ClassLiteral<'db> {
                                 .expect("TypedDictParams should be available for CodeGeneratorKind::TypedDict")
                                 .contains(TypedDictParams::TOTAL)
                         };
-                        FieldKind::TypedDict { is_required }
+
+                        FieldKind::TypedDict {
+                            is_required,
+                            is_read_only: attr.is_read_only(),
+                        }
                     }
                 };
 

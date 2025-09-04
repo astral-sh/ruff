@@ -444,8 +444,7 @@ def _(person: Person, unknown_key: Any):
 
 ## `ReadOnly`
 
-`ReadOnly` is not supported yet, but this test makes sure that we do not emit any false positive
-diagnostics:
+Assignments to keys that are marked `ReadOnly` will produce an error:
 
 ```py
 from typing_extensions import TypedDict, ReadOnly, Required
@@ -458,8 +457,24 @@ class Person(TypedDict, total=False):
 alice: Person = {"id": 1, "name": "Alice", "age": 30}
 alice["age"] = 31  # okay
 
-# TODO: this should be an error
+# error: [invalid-assignment] "Can not assign to key "id" on TypedDict `Person`: key is marked read-only"
 alice["id"] = 2
+```
+
+This also works if all fields on a `TypedDict` are `ReadOnly`, in which case we synthesize a
+`__setitem__` method with a `key` type of `Never`:
+
+```py
+class Config(TypedDict):
+    host: ReadOnly[str]
+    port: ReadOnly[int]
+
+config: Config = {"host": "localhost", "port": 8080}
+
+# error: [invalid-assignment] "Can not assign to key "host" on TypedDict `Config`: key is marked read-only"
+config["host"] = "127.0.0.1"
+# error: [invalid-assignment] "Can not assign to key "port" on TypedDict `Config`: key is marked read-only"
+config["port"] = 80
 ```
 
 ## Methods on `TypedDict`
@@ -844,6 +859,19 @@ def write_to_non_existing_key(person: Person):
 
 def write_to_non_literal_string_key(person: Person, str_key: str):
     person[str_key] = "Alice"  # error: [invalid-key]
+```
+
+Assignment to `ReadOnly` keys:
+
+```py
+from typing_extensions import ReadOnly
+
+class Employee(TypedDict):
+    id: ReadOnly[int]
+    name: str
+
+def write_to_readonly_key(employee: Employee):
+    employee["id"] = 42  # error: [invalid-assignment]
 ```
 
 ## Import aliases
