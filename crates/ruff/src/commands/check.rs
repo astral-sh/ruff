@@ -9,10 +9,9 @@ use ignore::Error;
 use log::{debug, warn};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
-use ruff_db::files::File;
 use rustc_hash::FxHashMap;
 
-use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Span};
+use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId};
 use ruff_db::panic::catch_unwind;
 use ruff_linter::package::PackageRoot;
 use ruff_linter::registry::Rule;
