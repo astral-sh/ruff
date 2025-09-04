@@ -319,6 +319,9 @@ pub fn check_path(
                         &context,
                     );
                 }
+                Rule::PanicyTestRule => {
+                    test_rules::PanicyTestRule::diagnostic(locator, comment_ranges, &context);
+                }
                 _ => unreachable!("All test rules must have an implementation"),
             }
         }
