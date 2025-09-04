@@ -1046,7 +1046,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "056") => (RuleGroup::Preview, rules::ruff::rules::FalsyDictGetFallback),
         (Ruff, "057") => (RuleGroup::Stable, rules::ruff::rules::UnnecessaryRound),
         (Ruff, "058") => (RuleGroup::Stable, rules::ruff::rules::StarmapZip),
-        (Ruff, "059") => (RuleGroup::Preview, rules::ruff::rules::UnusedUnpackedVariable),
+        (Ruff, "059") => (RuleGroup::Stable, rules::ruff::rules::UnusedUnpackedVariable),
         (Ruff, "060") => (RuleGroup::Preview, rules::ruff::rules::InEmptyCollection),
         (Ruff, "061") => (RuleGroup::Preview, rules::ruff::rules::LegacyFormPytestRaises),
         (Ruff, "063") => (RuleGroup::Preview, rules::ruff::rules::AccessAnnotationsFromClassDict),
