@@ -421,12 +421,11 @@ pub(crate) fn nearest_enclosing_class<'db>(
     db: &'db dyn Db,
     semantic: &SemanticIndex<'db>,
     scope: ScopeId,
-    parsed: &ParsedModuleRef,
 ) -> Option<ClassLiteral<'db>> {
     semantic
         .ancestor_scopes(scope.file_scope_id(db))
         .find_map(|(_, ancestor_scope)| {
-            let class = ancestor_scope.node().as_class(parsed)?;
+            let class = ancestor_scope.node().as_class()?;
             let definition = semantic.expect_single_definition(class);
             infer_definition_types(db, definition)
                 .declaration_type(definition)
@@ -2430,7 +2429,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if !current_scope.kind().is_non_lambda_function() {
             return None;
         }
-        current_scope.node().as_function(self.module())
+        current_scope
+            .node()
+            .as_function()
+            .map(|node_ref| node_ref.node(self.module()))
     }
 
     fn function_decorator_types<'a>(

@@ -159,7 +159,6 @@ pub(crate) fn attribute_scopes<'db, 's>(
     class_body_scope: ScopeId<'db>,
 ) -> impl Iterator<Item = FileScopeId> + use<'s, 'db> {
     let file = class_body_scope.file(db);
-    let module = parsed_module(db, file).load(db);
     let index = semantic_index(db, file);
     let class_scope_id = class_body_scope.file_scope_id(db);
 
@@ -175,7 +174,7 @@ pub(crate) fn attribute_scopes<'db, 's>(
                 (child_scope_id, scope)
             };
 
-        function_scope.node().as_function(&module)?;
+        function_scope.node().as_function()?;
         Some(function_scope_id)
     })
 }
@@ -361,7 +360,7 @@ impl<'db> SemanticIndex<'db> {
 
         class_scope
             .node()
-            .as_class_ref()
+            .as_class()
             .map(|node_ref| self.expect_single_definition(node_ref))
     }
 

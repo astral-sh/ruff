@@ -265,7 +265,7 @@ impl<'db> OverloadLiteral<'db> {
             the function is defined."
         );
 
-        self.body_scope(db).node(db).expect_function(module)
+        self.body_scope(db).node(db).expect_function().node(module)
     }
 
     /// Returns the [`FileRange`] of the function's name.
@@ -274,7 +274,8 @@ impl<'db> OverloadLiteral<'db> {
             self.file(db),
             self.body_scope(db)
                 .node(db)
-                .expect_function(module)
+                .expect_function()
+                .node(module)
                 .name
                 .range,
         )
@@ -290,9 +291,8 @@ impl<'db> OverloadLiteral<'db> {
     /// over-invalidation.
     fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         let body_scope = self.body_scope(db);
-        let module = parsed_module(db, self.file(db)).load(db);
         let index = semantic_index(db, body_scope.file(db));
-        index.expect_single_definition(body_scope.node(db).expect_function(&module))
+        index.expect_single_definition(body_scope.node(db).expect_function())
     }
 
     /// Returns the overload immediately before this one in the AST. Returns `None` if there is no
@@ -306,7 +306,8 @@ impl<'db> OverloadLiteral<'db> {
         let use_id = self
             .body_scope(db)
             .node(db)
-            .expect_function(&module)
+            .expect_function()
+            .node(&module)
             .name
             .scoped_use_id(db, scope);
 
@@ -399,7 +400,7 @@ impl<'db> OverloadLiteral<'db> {
 
         let scope = self.body_scope(db);
         let module = parsed_module(db, self.file(db)).load(db);
-        let function_stmt_node = scope.node(db).expect_function(&module);
+        let function_stmt_node = scope.node(db).expect_function().node(&module);
         let definition = self.definition(db);
         let index = semantic_index(db, scope.file(db));
         let generic_context = function_stmt_node.type_params.as_ref().map(|type_params| {
@@ -435,7 +436,7 @@ impl<'db> OverloadLiteral<'db> {
         let span = Span::from(function_scope.file(db));
         let node = function_scope.node(db);
         let module = parsed_module(db, self.file(db)).load(db);
-        let func_def = node.as_function(&module)?;
+        let func_def = node.as_function()?.node(&module);
         let range = parameter_index
             .and_then(|parameter_index| {
                 func_def
@@ -455,7 +456,7 @@ impl<'db> OverloadLiteral<'db> {
         let span = Span::from(function_scope.file(db));
         let node = function_scope.node(db);
         let module = parsed_module(db, self.file(db)).load(db);
-        let func_def = node.as_function(&module)?;
+        let func_def = node.as_function()?.node(&module);
         let return_type_range = func_def.returns.as_ref().map(|returns| returns.range());
         let mut signature = func_def.name.range.cover(func_def.parameters.range);
         if let Some(return_type_range) = return_type_range {
