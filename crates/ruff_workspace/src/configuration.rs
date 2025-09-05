@@ -257,12 +257,6 @@ impl Configuration {
         conflicting_import_settings(&isort, &flake8_import_conventions)?;
 
         let future_annotations = lint.future_annotations.unwrap_or_default();
-        if lint_preview.is_disabled() && future_annotations {
-            warn_user_once!(
-                "The `lint.future-annotations` setting will have no effect \
-                    because `preview` is disabled"
-            );
-        }
 
         Ok(Settings {
             cache_dir: self
