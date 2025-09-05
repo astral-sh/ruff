@@ -51,7 +51,6 @@ impl<'db> SemanticModel<'db> {
                 Completion {
                     name: Name::new(module.name(self.db).as_str()),
                     ty: Some(ty),
-                    kind: None,
                     builtin,
                 }
             })
@@ -166,7 +165,6 @@ impl<'db> SemanticModel<'db> {
             completions.push(Completion {
                 name,
                 ty: Some(ty),
-                kind: None,
                 builtin,
             });
         }
@@ -181,10 +179,12 @@ impl<'db> SemanticModel<'db> {
         let mut completions = vec![];
         for submodule in module.all_submodules(self.db) {
             let ty = Type::module_literal(self.db, self.file, *submodule);
+            let Some(base) = submodule.name(self.db).components().next_back() else {
+                continue;
+            };
             completions.push(Completion {
-                name: Name::new(submodule.name(self.db).as_str()),
+                name: Name::new(base),
                 ty: Some(ty),
-                kind: None,
                 builtin,
             });
         }
@@ -199,7 +199,6 @@ impl<'db> SemanticModel<'db> {
             .map(|member| Completion {
                 name: member.name,
                 ty: Some(member.ty),
-                kind: None,
                 builtin: false,
             })
             .collect()
@@ -236,7 +235,6 @@ impl<'db> SemanticModel<'db> {
                     .map(|member| Completion {
                         name: member.name,
                         ty: Some(member.ty),
-                        kind: None,
                         builtin: false,
                     }),
             );
@@ -293,15 +291,6 @@ pub struct Completion<'db> {
     /// an unimported symbol. In that case, computing the
     /// type of all such symbols could be quite expensive.
     pub ty: Option<Type<'db>>,
-    /// The "kind" of this completion.
-    ///
-    /// When this is set, it takes priority over any kind
-    /// inferred from `ty`.
-    ///
-    /// Usually this is set when `ty` is `None`, since it
-    /// may be cheaper to compute at scale. (e.g., For
-    /// unimported symbol completions.)
-    pub kind: Option<CompletionKind>,
     /// Whether this suggestion came from builtins or not.
     ///
     /// At time of writing (2025-06-26), this information
@@ -309,96 +298,6 @@ pub struct Completion<'db> {
     /// use it mainly in tests so that we can write less
     /// noisy tests.
     pub builtin: bool,
-}
-
-impl<'db> Completion<'db> {
-    /// Returns the "kind" of this completion.
-    ///
-    /// This is meant to be a very general classification of this completion.
-    /// Typically, this is communicated from the LSP server to a client, and
-    /// the client uses this information to help improve the UX (perhaps by
-    /// assigning an icon of some kind to the completion).
-    pub fn kind(&self, db: &'db dyn Db) -> Option<CompletionKind> {
-        fn imp<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<CompletionKind> {
-            Some(match ty {
-                Type::FunctionLiteral(_)
-                | Type::DataclassDecorator(_)
-                | Type::WrapperDescriptor(_)
-                | Type::DataclassTransformer(_)
-                | Type::Callable(_) => CompletionKind::Function,
-                Type::BoundMethod(_) | Type::KnownBoundMethod(_) => CompletionKind::Method,
-                Type::ModuleLiteral(_) => CompletionKind::Module,
-                Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => {
-                    CompletionKind::Class
-                }
-                // This is a little weird for "struct." I'm mostly interpreting
-                // "struct" here as a more general "object." ---AG
-                Type::NominalInstance(_)
-                | Type::PropertyInstance(_)
-                | Type::BoundSuper(_)
-                | Type::TypedDict(_) => CompletionKind::Struct,
-                Type::IntLiteral(_)
-                | Type::BooleanLiteral(_)
-                | Type::TypeIs(_)
-                | Type::StringLiteral(_)
-                | Type::LiteralString
-                | Type::BytesLiteral(_) => CompletionKind::Value,
-                Type::EnumLiteral(_) => CompletionKind::Enum,
-                Type::ProtocolInstance(_) => CompletionKind::Interface,
-                Type::NonInferableTypeVar(_) | Type::TypeVar(_) => CompletionKind::TypeParameter,
-                Type::Union(union) => union.elements(db).iter().find_map(|&ty| imp(db, ty))?,
-                Type::Intersection(intersection) => {
-                    intersection.iter_positive(db).find_map(|ty| imp(db, ty))?
-                }
-                Type::Dynamic(_)
-                | Type::Never
-                | Type::SpecialForm(_)
-                | Type::KnownInstance(_)
-                | Type::AlwaysTruthy
-                | Type::AlwaysFalsy => return None,
-                Type::TypeAlias(alias) => imp(db, alias.value_type(db))?,
-            })
-        }
-        self.kind.or_else(|| self.ty.and_then(|ty| imp(db, ty)))
-    }
-}
-
-/// The "kind" of a completion.
-///
-/// This is taken directly from the LSP completion specification:
-/// <https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#completionItemKind>
-///
-/// The idea here is that `Completion::kind` defines the mapping to this from
-/// `Type` (and possibly other information), which might be interesting and
-/// contentious. Then the outer edges map this to the LSP types, which is
-/// expected to be mundane and boring.
-#[derive(Clone, Copy, Debug)]
-pub enum CompletionKind {
-    Text,
-    Method,
-    Function,
-    Constructor,
-    Field,
-    Variable,
-    Class,
-    Interface,
-    Module,
-    Property,
-    Unit,
-    Value,
-    Enum,
-    Keyword,
-    Snippet,
-    Color,
-    File,
-    Reference,
-    Folder,
-    EnumMember,
-    Constant,
-    Struct,
-    Event,
-    Operator,
-    TypeParameter,
 }
 
 pub trait HasType {

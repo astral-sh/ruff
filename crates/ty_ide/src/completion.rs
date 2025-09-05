@@ -2,15 +2,182 @@ use std::cmp::Ordering;
 
 use ruff_db::files::File;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
+use ruff_db::source::source_text;
 use ruff_python_ast as ast;
+use ruff_python_ast::name::Name;
+use ruff_python_codegen::Stylist;
+use ruff_python_importer::Edit;
 use ruff_python_parser::{Token, TokenAt, TokenKind};
+use ruff_source_file::LineIndex;
 use ruff_text_size::{Ranged, TextRange, TextSize};
-use ty_python_semantic::{Completion, NameKind, SemanticModel};
+use ty_python_semantic::{
+    Completion as SemanticCompletion, ModuleName, NameKind, SemanticModel, types::Type,
+};
 
 use crate::docstring::Docstring;
 use crate::find_node::covering_node;
 use crate::goto::DefinitionsOrTargets;
+use crate::importer::{ImportRequest, Importer};
 use crate::{Db, all_symbols};
+
+#[derive(Clone, Debug)]
+pub struct Completion<'db> {
+    /// The label shown to the user for this suggestion.
+    pub name: Name,
+    /// The text that should be inserted at the cursor
+    /// when the completion is selected.
+    ///
+    /// When this is not set, `name` is used.
+    pub insert: Option<Box<str>>,
+    /// The type of this completion, if available.
+    ///
+    /// Generally speaking, this is always available
+    /// *unless* this was a completion corresponding to
+    /// an unimported symbol. In that case, computing the
+    /// type of all such symbols could be quite expensive.
+    pub ty: Option<Type<'db>>,
+    /// The "kind" of this completion.
+    ///
+    /// When this is set, it takes priority over any kind
+    /// inferred from `ty`.
+    ///
+    /// Usually this is set when `ty` is `None`, since it
+    /// may be cheaper to compute at scale. (e.g., For
+    /// unimported symbol completions.)
+    ///
+    /// Callers should use `Completion::kind` to get the
+    /// kind, which will take type information into account
+    /// if this kind is not present.
+    pub kind: Option<CompletionKind>,
+    /// The name of the module that this completion comes from.
+    ///
+    /// This is generally only present when this is a completion
+    /// suggestion for an unimported symbol.
+    pub module_name: Option<&'db ModuleName>,
+    /// An import statement to insert (or ensure is already
+    /// present) when this completion is selected.
+    pub import: Option<Edit>,
+    /// Whether this suggestion came from builtins or not.
+    ///
+    /// At time of writing (2025-06-26), this information
+    /// doesn't make it into the LSP response. Instead, we
+    /// use it mainly in tests so that we can write less
+    /// noisy tests.
+    pub builtin: bool,
+    /// The documentation associated with this item, if
+    /// available.
+    pub documentation: Option<Docstring>,
+}
+
+impl<'db> Completion<'db> {
+    fn from_semantic_completion(
+        db: &'db dyn Db,
+        semantic: SemanticCompletion<'db>,
+    ) -> Completion<'db> {
+        let definition = semantic
+            .ty
+            .and_then(|ty| DefinitionsOrTargets::from_ty(db, ty));
+        let documentation = definition.and_then(|def| def.docstring(db));
+        Completion {
+            name: semantic.name,
+            insert: None,
+            ty: semantic.ty,
+            kind: None,
+            module_name: None,
+            import: None,
+            builtin: semantic.builtin,
+            documentation,
+        }
+    }
+
+    /// Returns the "kind" of this completion.
+    ///
+    /// This is meant to be a very general classification of this completion.
+    /// Typically, this is communicated from the LSP server to a client, and
+    /// the client uses this information to help improve the UX (perhaps by
+    /// assigning an icon of some kind to the completion).
+    pub fn kind(&self, db: &'db dyn Db) -> Option<CompletionKind> {
+        fn imp<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<CompletionKind> {
+            Some(match ty {
+                Type::FunctionLiteral(_)
+                | Type::DataclassDecorator(_)
+                | Type::WrapperDescriptor(_)
+                | Type::DataclassTransformer(_)
+                | Type::Callable(_) => CompletionKind::Function,
+                Type::BoundMethod(_) | Type::KnownBoundMethod(_) => CompletionKind::Method,
+                Type::ModuleLiteral(_) => CompletionKind::Module,
+                Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => {
+                    CompletionKind::Class
+                }
+                // This is a little weird for "struct." I'm mostly interpreting
+                // "struct" here as a more general "object." ---AG
+                Type::NominalInstance(_)
+                | Type::PropertyInstance(_)
+                | Type::BoundSuper(_)
+                | Type::TypedDict(_) => CompletionKind::Struct,
+                Type::IntLiteral(_)
+                | Type::BooleanLiteral(_)
+                | Type::TypeIs(_)
+                | Type::StringLiteral(_)
+                | Type::LiteralString
+                | Type::BytesLiteral(_) => CompletionKind::Value,
+                Type::EnumLiteral(_) => CompletionKind::Enum,
+                Type::ProtocolInstance(_) => CompletionKind::Interface,
+                Type::NonInferableTypeVar(_) | Type::TypeVar(_) => CompletionKind::TypeParameter,
+                Type::Union(union) => union.elements(db).iter().find_map(|&ty| imp(db, ty))?,
+                Type::Intersection(intersection) => {
+                    intersection.iter_positive(db).find_map(|ty| imp(db, ty))?
+                }
+                Type::Dynamic(_)
+                | Type::Never
+                | Type::SpecialForm(_)
+                | Type::KnownInstance(_)
+                | Type::AlwaysTruthy
+                | Type::AlwaysFalsy => return None,
+                Type::TypeAlias(alias) => imp(db, alias.value_type(db))?,
+            })
+        }
+        self.kind.or_else(|| self.ty.and_then(|ty| imp(db, ty)))
+    }
+}
+
+/// The "kind" of a completion.
+///
+/// This is taken directly from the LSP completion specification:
+/// <https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#completionItemKind>
+///
+/// The idea here is that `Completion::kind` defines the mapping to this from
+/// `Type` (and possibly other information), which might be interesting and
+/// contentious. Then the outer edges map this to the LSP types, which is
+/// expected to be mundane and boring.
+#[derive(Clone, Copy, Debug)]
+pub enum CompletionKind {
+    Text,
+    Method,
+    Function,
+    Constructor,
+    Field,
+    Variable,
+    Class,
+    Interface,
+    Module,
+    Property,
+    Unit,
+    Value,
+    Enum,
+    Keyword,
+    Snippet,
+    Color,
+    File,
+    Reference,
+    Folder,
+    EnumMember,
+    Constant,
+    Struct,
+    Event,
+    Operator,
+    TypeParameter,
+}
 
 #[derive(Clone, Debug, Default)]
 pub struct CompletionSettings {
@@ -22,7 +189,7 @@ pub fn completion<'db>(
     settings: &CompletionSettings,
     file: File,
     offset: TextSize,
-) -> Vec<DetailedCompletion<'db>> {
+) -> Vec<Completion<'db>> {
     let parsed = parsed_module(db, file).load(db);
 
     let Some(target_token) = CompletionTargetTokens::find(&parsed, offset) else {
@@ -33,64 +200,73 @@ pub fn completion<'db>(
     };
 
     let model = SemanticModel::new(db, file);
-    let mut completions = match target {
-        CompletionTargetAst::ObjectDot { expr } => model.attribute_completions(expr),
+    let (semantic_completions, typed_for_unimported) = match target {
+        CompletionTargetAst::ObjectDot { expr } => (model.attribute_completions(expr), None),
         CompletionTargetAst::ObjectDotInImport { import, name } => {
-            model.import_submodule_completions(import, name)
+            (model.import_submodule_completions(import, name), None)
         }
         CompletionTargetAst::ObjectDotInImportFrom { import } => {
-            model.from_import_submodule_completions(import)
+            (model.from_import_submodule_completions(import), None)
         }
         CompletionTargetAst::ImportFrom { import, name } => {
-            model.from_import_completions(import, name)
+            (model.from_import_completions(import, name), None)
         }
         CompletionTargetAst::Import { .. } | CompletionTargetAst::ImportViaFrom { .. } => {
-            model.import_completions()
+            (model.import_completions(), None)
         }
-        CompletionTargetAst::Scoped { node, typed } => {
-            let mut completions = model.scoped_completions(node);
-            if settings.auto_import {
-                if let Some(typed) = typed {
-                    for symbol in all_symbols(db, typed) {
-                        completions.push(Completion {
-                            name: ast::name::Name::new(&symbol.symbol.name),
-                            ty: None,
-                            kind: symbol.symbol.kind.to_completion_kind(),
-                            builtin: false,
-                        });
-                    }
-                }
-            }
-            completions
-        }
+        CompletionTargetAst::Scoped { node, typed } => (model.scoped_completions(node), typed),
     };
-    completions.sort_by(compare_suggestions);
-    completions.dedup_by(|c1, c2| c1.name == c2.name);
-    completions
+    let mut completions: Vec<Completion<'_>> = semantic_completions
         .into_iter()
-        .map(|completion| {
-            let definition = completion
-                .ty
-                .and_then(|ty| DefinitionsOrTargets::from_ty(db, ty));
-            let documentation = definition.and_then(|def| def.docstring(db));
-            DetailedCompletion {
-                inner: completion,
-                documentation,
-            }
-        })
-        .collect()
+        .map(|c| Completion::from_semantic_completion(db, c))
+        .collect();
+
+    if settings.auto_import {
+        if let Some(typed) = typed_for_unimported {
+            add_unimported_completions(db, file, &parsed, typed, &mut completions);
+        }
+    }
+    completions.sort_by(compare_suggestions);
+    completions.dedup_by(|c1, c2| (&c1.name, c1.module_name) == (&c2.name, c2.module_name));
+    completions
 }
 
-#[derive(Clone, Debug)]
-pub struct DetailedCompletion<'db> {
-    pub inner: Completion<'db>,
-    pub documentation: Option<Docstring>,
-}
+/// Adds completions not in scope that matched the `typed` text.
+///
+/// The completions returned will auto-insert import statements
+/// when selected into `File`.
+fn add_unimported_completions<'db>(
+    db: &'db dyn Db,
+    file: File,
+    parsed: &ParsedModuleRef,
+    typed: &str,
+    completions: &mut Vec<Completion<'db>>,
+) {
+    let source = source_text(db, file);
+    let line_index = LineIndex::from_source_text(source.as_str());
+    let stylist = Stylist::from_tokens(parsed.tokens(), source.as_str());
+    let importer = Importer::new(db, &stylist, file, source.as_str(), line_index, &*parsed);
 
-impl<'db> std::ops::Deref for DetailedCompletion<'db> {
-    type Target = Completion<'db>;
-    fn deref(&self) -> &Self::Target {
-        &self.inner
+    for symbol in all_symbols(db, typed) {
+        let request =
+            ImportRequest::import_from(symbol.module.name(db).as_str(), &symbol.symbol.name);
+        // BREADCRUMBS: `all_symbols` doesn't account for glob
+        // imports. Bah. It seems like we could be clever about
+        // that.
+        //
+        // BREADCRUMBS: I think what's next is beefing up the
+        // importer to work better.
+        let import_action = importer.import(request);
+        completions.push(Completion {
+            name: ast::name::Name::new(&symbol.symbol.name),
+            insert: Some(import_action.symbol_text().into()),
+            ty: None,
+            kind: symbol.symbol.kind.to_completion_kind(),
+            module_name: Some(symbol.module.name(db)),
+            import: import_action.import().cloned(),
+            builtin: false,
+            documentation: None,
+        });
     }
 }
 
@@ -546,7 +722,7 @@ mod tests {
     use insta::assert_snapshot;
     use ruff_python_parser::{Mode, ParseOptions, TokenKind, Tokens};
 
-    use crate::completion::{DetailedCompletion, completion};
+    use crate::completion::{Completion, completion};
     use crate::tests::{CursorTest, cursor_test};
 
     use super::{CompletionSettings, token_suffix_by_kinds};
@@ -3117,14 +3293,14 @@ from os.<CURSOR>
             )
         }
 
-        fn completions_if(&self, predicate: impl Fn(&DetailedCompletion) -> bool) -> String {
+        fn completions_if(&self, predicate: impl Fn(&Completion) -> bool) -> String {
             self.completions_if_snapshot(predicate, |c| c.name.as_str().to_string())
         }
 
         fn completions_if_snapshot(
             &self,
-            predicate: impl Fn(&DetailedCompletion) -> bool,
-            snapshot: impl Fn(&DetailedCompletion) -> String,
+            predicate: impl Fn(&Completion) -> bool,
+            snapshot: impl Fn(&Completion) -> String,
         ) -> String {
             let settings = CompletionSettings::default();
             let completions = completion(&self.db, &settings, self.cursor.file, self.cursor.offset);

@@ -14,6 +14,7 @@ mod goto_definition;
 mod goto_references;
 mod goto_type_definition;
 mod hover;
+mod importer;
 mod inlay_hints;
 mod markup;
 mod references;
@@ -26,7 +27,7 @@ mod symbols;
 mod workspace_symbols;
 
 pub use all_symbols::{AllSymbolInfo, all_symbols};
-pub use completion::{CompletionSettings, completion};
+pub use completion::{Completion, CompletionKind, CompletionSettings, completion};
 pub use doc_highlights::document_highlights;
 pub use document_symbols::document_symbols;
 pub use goto::{goto_declaration, goto_definition, goto_type_definition};
@@ -294,8 +295,12 @@ mod tests {
     use ruff_db::Db;
     use ruff_db::diagnostic::{Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig};
     use ruff_db::files::{File, FileRootKind, system_path_to_file};
+    use ruff_db::parsed::{ParsedModuleRef, parsed_module};
+    use ruff_db::source::{SourceText, source_text};
     use ruff_db::system::{DbWithWritableSystem, SystemPath, SystemPathBuf};
+    use ruff_python_codegen::Stylist;
     use ruff_python_trivia::textwrap::dedent;
+    use ruff_source_file::LineIndex;
     use ruff_text_size::TextSize;
     use ty_project::ProjectMetadata;
     use ty_python_semantic::{
@@ -350,11 +355,17 @@ mod tests {
         }
     }
 
-    /// The file and offset into that file containing
-    /// a `<CURSOR>` marker.
+    /// The file, offset into that file containing a `<CURSOR>` marker.
+    ///
+    /// (Along with other information about that file, such as the
+    /// parsed AST.)
     pub(super) struct Cursor {
         pub(super) file: File,
         pub(super) offset: TextSize,
+        pub(super) parsed: ParsedModuleRef,
+        pub(super) source: SourceText,
+        pub(super) line_index: LineIndex,
+        pub(super) stylist: Stylist<'static>,
     }
 
     #[derive(Default)]
@@ -371,8 +382,20 @@ mod tests {
                 SystemPathBuf::from("/"),
             ));
 
-            let mut cursor: Option<Cursor> = None;
+            let search_paths = SearchPathSettings::new(vec![SystemPathBuf::from("/")])
+                .to_search_paths(db.system(), db.vendored())
+                .expect("Valid search path settings");
 
+            Program::from_settings(
+                &db,
+                ProgramSettings {
+                    python_version: PythonVersionWithSource::default(),
+                    python_platform: PythonPlatform::default(),
+                    search_paths,
+                },
+            );
+
+            let mut cursor: Option<Cursor> = None;
             for &Source {
                 ref path,
                 ref contents,
@@ -405,22 +428,21 @@ mod tests {
                         cursor.is_none(),
                         "found more than one source that contains `<CURSOR>`"
                     );
-                    cursor = Some(Cursor { file, offset });
+                    let source = source_text(&db, file);
+                    let parsed = parsed_module(&db, file).load(&db);
+                    let line_index = LineIndex::from_source_text(source.as_str());
+                    let stylist =
+                        Stylist::from_tokens(parsed.tokens(), source.as_str()).into_owned();
+                    cursor = Some(Cursor {
+                        file,
+                        offset,
+                        parsed,
+                        source,
+                        line_index,
+                        stylist,
+                    });
                 }
             }
-
-            let search_paths = SearchPathSettings::new(vec![SystemPathBuf::from("/")])
-                .to_search_paths(db.system(), db.vendored())
-                .expect("Valid search path settings");
-
-            Program::from_settings(
-                &db,
-                ProgramSettings {
-                    python_version: PythonVersionWithSource::default(),
-                    python_platform: PythonPlatform::default(),
-                    search_paths,
-                },
-            );
 
             let mut insta_settings = insta::Settings::clone_current();
             insta_settings.add_filter(r#"\\(\w\w|\s|\.|")"#, "/$1");

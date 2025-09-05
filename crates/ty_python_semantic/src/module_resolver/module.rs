@@ -203,7 +203,9 @@ fn all_submodule_names_for_package<'db>(
                 })
                 .filter_map(|entry| {
                     let stem = entry.path().file_stem()?;
-                    let name = ModuleName::new(stem)?;
+                    let mut name = module.name(db).clone();
+                    name.extend(&ModuleName::new(stem)?);
+
                     let (kind, file) = if entry.file_type().is_directory() {
                         (
                             ModuleKind::Package,
@@ -239,7 +241,9 @@ fn all_submodule_names_for_package<'db>(
             })
             .filter_map(|entry| {
                 let stem = entry.path().file_stem()?;
-                let name = ModuleName::new(stem)?;
+                let mut name = module.name(db).clone();
+                name.extend(&ModuleName::new(stem)?);
+
                 let (kind, file) = if entry.file_type().is_directory() {
                     (
                         ModuleKind::Package,
