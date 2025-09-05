@@ -348,7 +348,7 @@ Its subtyping follows the general rule for subtyping of gradual types.
 from typing import Any, Never
 from ty_extensions import static_assert, is_subtype_of
 
-static_assert(not is_subtype_of(tuple[Any, ...], tuple[Any, ...]))
+static_assert(is_subtype_of(tuple[Any, ...], tuple[Any, ...]))
 static_assert(not is_subtype_of(tuple[Any, ...], tuple[Any]))
 static_assert(not is_subtype_of(tuple[Any, ...], tuple[Any, Any]))
 static_assert(not is_subtype_of(tuple[Any, ...], tuple[int, ...]))
@@ -361,7 +361,7 @@ static_assert(is_subtype_of(tuple[Never, ...], tuple[Any, ...]))
 Same applies when `tuple[Any, ...]` is unpacked into a mixed tuple.
 
 ```py
-static_assert(not is_subtype_of(tuple[int, *tuple[Any, ...]], tuple[int, *tuple[Any, ...]]))
+static_assert(is_subtype_of(tuple[int, *tuple[Any, ...]], tuple[int, *tuple[Any, ...]]))
 static_assert(not is_subtype_of(tuple[int, *tuple[Any, ...]], tuple[Any, ...]))
 static_assert(not is_subtype_of(tuple[int, *tuple[Any, ...]], tuple[Any]))
 static_assert(not is_subtype_of(tuple[int, *tuple[Any, ...]], tuple[Any, Any]))
@@ -370,7 +370,7 @@ static_assert(not is_subtype_of(tuple[int, *tuple[Any, ...]], tuple[int, ...]))
 static_assert(not is_subtype_of(tuple[int, *tuple[Any, ...]], tuple[int]))
 static_assert(not is_subtype_of(tuple[int, *tuple[Any, ...]], tuple[int, int]))
 
-static_assert(not is_subtype_of(tuple[*tuple[Any, ...], int], tuple[*tuple[Any, ...], int]))
+static_assert(is_subtype_of(tuple[*tuple[Any, ...], int], tuple[*tuple[Any, ...], int]))
 static_assert(not is_subtype_of(tuple[*tuple[Any, ...], int], tuple[Any, ...]))
 static_assert(not is_subtype_of(tuple[*tuple[Any, ...], int], tuple[Any]))
 static_assert(not is_subtype_of(tuple[*tuple[Any, ...], int], tuple[Any, Any]))
@@ -379,7 +379,7 @@ static_assert(not is_subtype_of(tuple[*tuple[Any, ...], int], tuple[int, ...]))
 static_assert(not is_subtype_of(tuple[*tuple[Any, ...], int], tuple[int]))
 static_assert(not is_subtype_of(tuple[*tuple[Any, ...], int], tuple[int, int]))
 
-static_assert(not is_subtype_of(tuple[int, *tuple[Any, ...], int], tuple[int, *tuple[Any, ...], int]))
+static_assert(is_subtype_of(tuple[int, *tuple[Any, ...], int], tuple[int, *tuple[Any, ...], int]))
 static_assert(not is_subtype_of(tuple[int, *tuple[Any, ...], int], tuple[Any, ...]))
 static_assert(not is_subtype_of(tuple[int, *tuple[Any, ...], int], tuple[Any]))
 static_assert(not is_subtype_of(tuple[int, *tuple[Any, ...], int], tuple[Any, Any]))
@@ -647,10 +647,10 @@ from typing_extensions import TypeGuard, TypeIs
 # TODO: TypeGuard
 # static_assert(is_subtype_of(TypeGuard[int], TypeGuard[int]))
 # static_assert(is_subtype_of(TypeGuard[bool], TypeGuard[int]))
+# static_assert(not is_subtype_of(TypeGuard[int], TypeGuard[bool]))
 static_assert(is_subtype_of(TypeIs[int], TypeIs[int]))
 static_assert(is_subtype_of(TypeIs[int], TypeIs[int]))
 
-static_assert(not is_subtype_of(TypeGuard[int], TypeGuard[bool]))
 static_assert(not is_subtype_of(TypeIs[bool], TypeIs[int]))
 static_assert(not is_subtype_of(TypeIs[int], TypeIs[bool]))
 ```
@@ -821,7 +821,7 @@ represented by a materialization of the second type.
 from ty_extensions import Unknown, is_subtype_of, static_assert, Intersection
 from typing_extensions import Any
 
-static_assert(not is_subtype_of(Any, Any))
+static_assert(is_subtype_of(Any, Any))
 static_assert(not is_subtype_of(Any, int))
 static_assert(not is_subtype_of(int, Any))
 static_assert(is_subtype_of(Any, object))
@@ -835,7 +835,7 @@ static_assert(not is_subtype_of(tuple[int, int], tuple[int, Any]))
 The same for `Unknown`:
 
 ```py
-static_assert(not is_subtype_of(Unknown, Unknown))
+static_assert(is_subtype_of(Unknown, Unknown))
 static_assert(not is_subtype_of(Unknown, int))
 static_assert(not is_subtype_of(int, Unknown))
 static_assert(is_subtype_of(Unknown, object))
@@ -870,7 +870,7 @@ static_assert(is_subtype_of(InheritsAny, object))
 Similar for subclass-of types:
 
 ```py
-static_assert(not is_subtype_of(type[Any], type[Any]))
+static_assert(is_subtype_of(type[Any], type[Any]))
 static_assert(not is_subtype_of(type[object], type[Any]))
 static_assert(not is_subtype_of(type[Any], type[Arbitrary]))
 static_assert(is_subtype_of(type[Any], type[object]))

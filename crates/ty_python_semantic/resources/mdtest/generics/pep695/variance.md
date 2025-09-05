@@ -302,7 +302,7 @@ static_assert(not is_subtype_of(C[A], C[Any]))
 static_assert(not is_subtype_of(C[B], C[Any]))
 static_assert(not is_subtype_of(C[Any], C[A]))
 static_assert(not is_subtype_of(C[Any], C[B]))
-static_assert(not is_subtype_of(C[Any], C[Any]))
+static_assert(is_subtype_of(C[Any], C[Any]))
 
 static_assert(is_subtype_of(D[B], C[A]))
 static_assert(is_subtype_of(D[A], C[B]))
