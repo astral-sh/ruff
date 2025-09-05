@@ -137,9 +137,7 @@ impl<'db> SubclassOfType<'db> {
         visitor: &HasRelationToVisitor<'db, C>,
     ) -> C {
         match (self.subclass_of, other.subclass_of) {
-            (SubclassOfInner::Dynamic(_), SubclassOfInner::Dynamic(_)) => {
-                C::from_bool(db, relation.is_assignability())
-            }
+            (SubclassOfInner::Dynamic(_), SubclassOfInner::Dynamic(_)) => C::always_satisfiable(db),
             (SubclassOfInner::Dynamic(_), SubclassOfInner::Class(other_class)) => {
                 C::from_bool(db, other_class.is_object(db) || relation.is_assignability())
             }

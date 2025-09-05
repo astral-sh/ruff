@@ -1129,55 +1129,6 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Return `true` if subtyping is always reflexive for this type; `T <: T` is always true for
-    /// any `T` of this type.
-    ///
-    /// This is true for fully static types, but also for some types that may not be fully static.
-    /// For example, a `ClassLiteral` may inherit `Any`, but its subtyping is still reflexive.
-    ///
-    /// This method may have false negatives, but it should not have false positives. It should be
-    /// a cheap shallow check, not an exhaustive recursive check.
-    fn subtyping_is_always_reflexive(self) -> bool {
-        match self {
-            Type::Never
-            | Type::FunctionLiteral(..)
-            | Type::BoundMethod(_)
-            | Type::WrapperDescriptor(_)
-            | Type::MethodWrapper(_)
-            | Type::DataclassDecorator(_)
-            | Type::DataclassTransformer(_)
-            | Type::ModuleLiteral(..)
-            | Type::IntLiteral(_)
-            | Type::BooleanLiteral(_)
-            | Type::StringLiteral(_)
-            | Type::LiteralString
-            | Type::BytesLiteral(_)
-            | Type::EnumLiteral(_)
-            | Type::SpecialForm(_)
-            | Type::KnownInstance(_)
-            | Type::AlwaysFalsy
-            | Type::AlwaysTruthy
-            | Type::PropertyInstance(_)
-            // might inherit `Any`, but subtyping is still reflexive
-            | Type::ClassLiteral(_)
-             => true,
-            Type::Dynamic(_)
-            | Type::NominalInstance(_)
-            | Type::ProtocolInstance(_)
-            | Type::GenericAlias(_)
-            | Type::SubclassOf(_)
-            | Type::Union(_)
-            | Type::Intersection(_)
-            | Type::Callable(_)
-            | Type::NonInferableTypeVar(_)
-            | Type::TypeVar(_)
-            | Type::BoundSuper(_)
-            | Type::TypeIs(_)
-            | Type::TypedDict(_)
-            | Type::TypeAlias(_) => false,
-        }
-    }
-
     pub(crate) fn into_callable(self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
             Type::Callable(_) => Some(self),
@@ -1334,27 +1285,26 @@ impl<'db> Type<'db> {
         relation: TypeRelation,
         visitor: &HasRelationToVisitor<'db, C>,
     ) -> C {
-        // Subtyping implies assignability, so if subtyping is reflexive and the two types are
-        // equal, it is both a subtype and assignable. Assignability is always reflexive.
-        //
         // Note that we could do a full equivalence check here, but that would be both expensive
         // and unnecessary. This early return is only an optimisation.
-        if (relation.is_assignability() || self.subtyping_is_always_reflexive()) && self == target {
+        if self == target {
             return C::always_satisfiable(db);
         }
 
         match (self, target) {
+            // `Never` is the bottom type, the empty set.
+            // It is a subtype of all other types.
+            (Type::Never, _) => C::always_satisfiable(db),
+
+            (Type::Dynamic(_), Type::Dynamic(_)) => C::always_satisfiable(db),
+
             // Everything is a subtype of `object`.
             (_, Type::NominalInstance(instance)) if instance.is_object(db) => {
                 C::always_satisfiable(db)
             }
 
-            // `Never` is the bottom type, the empty set.
-            // It is a subtype of all other types.
-            (Type::Never, _) => C::always_satisfiable(db),
-
-            // Dynamic is only a subtype of `object` and only a supertype of `Never`; both were
-            // handled above. It's always assignable, though.
+            // Dynamic is only a subtype of `object` and itself, and only a supertype of `Never` and itself;
+            // both were handled above. It's always assignable, though.
             (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => {
                 C::from_bool(db, relation.is_assignability())
             }
