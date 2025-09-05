@@ -1134,12 +1134,6 @@ impl From<&ast::StmtClassDef> for DefinitionNodeKey {
     }
 }
 
-impl From<&AstNodeRef<ast::StmtClassDef>> for DefinitionNodeKey {
-    fn from(node_ref: &AstNodeRef<ast::StmtClassDef>) -> Self {
-        Self(NodeKey::from_node_ref(node_ref))
-    }
-}
-
 impl From<&ast::StmtTypeAlias> for DefinitionNodeKey {
     fn from(node: &ast::StmtTypeAlias) -> Self {
         Self(NodeKey::from_node(node))
@@ -1230,5 +1224,14 @@ impl From<&ast::TypeParamParamSpec> for DefinitionNodeKey {
 impl From<&ast::TypeParamTypeVarTuple> for DefinitionNodeKey {
     fn from(value: &ast::TypeParamTypeVarTuple) -> Self {
         Self(NodeKey::from_node(value))
+    }
+}
+
+impl<T> From<&AstNodeRef<T>> for DefinitionNodeKey
+where
+    for<'a> &'a T: Into<DefinitionNodeKey>,
+{
+    fn from(value: &AstNodeRef<T>) -> Self {
+        Self(NodeKey::from_node_ref(value))
     }
 }
