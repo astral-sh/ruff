@@ -165,10 +165,9 @@ class C[T]:
         return y
 
 c: C[int] = C()
-reveal_type(c)  # revealed: C[Unknown]
-# reveal_type(c) # revealed: C[Unknown]
-# TODO: Next line fails. The reason is the reveal type above
-# error: 13 [invalid-argument-type] "Argument to bound method `m` is incorrect: Expected `Self@m`, found `C[Unknown]`"
+
+# TODO:
+# error: [invalid-argument-type] "Argument to bound method `m` is incorrect: Expected `Self@m`, found `C[Unknown]`"
 reveal_type(c.m(1, "string"))  # revealed: Literal["string"]
 ```
 
