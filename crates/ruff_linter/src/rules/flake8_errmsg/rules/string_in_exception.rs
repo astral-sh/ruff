@@ -13,9 +13,6 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## What it does
 /// Checks for the use of string literals in exception constructors.
 ///
-/// In [preview], this rule checks for byte string literals in
-/// exception constructors.
-///
 /// ## Why is this bad?
 /// Python includes the `raise` in the default traceback (and formatters
 /// like Rich and IPython do too).
@@ -50,8 +47,6 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///     raise RuntimeError(msg)
 /// RuntimeError: 'Some value' is incorrect
 /// ```
-///
-/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct RawStringInException;
 
