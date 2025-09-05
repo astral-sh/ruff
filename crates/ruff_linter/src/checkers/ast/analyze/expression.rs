@@ -666,6 +666,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::BlockingOpenCallInAsyncFunction) {
                 flake8_async::rules::blocking_open_call(checker, call);
             }
+            if checker.is_rule_enabled(Rule::BlockingPathMethodInAsyncFunction) {
+                flake8_async::rules::blocking_os_path(checker, call);
+            }
             if checker.any_rule_enabled(&[
                 Rule::CreateSubprocessInAsyncFunction,
                 Rule::RunProcessInAsyncFunction,

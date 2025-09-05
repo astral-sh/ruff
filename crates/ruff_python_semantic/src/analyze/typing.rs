@@ -891,7 +891,7 @@ impl TypeChecker for IoBaseChecker {
 pub struct PathlibPathChecker;
 
 impl PathlibPathChecker {
-    fn is_pathlib_path_constructor(semantic: &SemanticModel, expr: &Expr) -> bool {
+    pub fn is_pathlib_path_constructor(semantic: &SemanticModel, expr: &Expr) -> bool {
         let Some(qualified_name) = semantic.resolve_qualified_name(expr) else {
             return false;
         };
