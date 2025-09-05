@@ -165,7 +165,7 @@ pub(super) fn validate_typed_dict_key_assignment<'db, 'ast>(
             let typed_dict_d = typed_dict_ty.display(db);
 
             let mut diagnostic = builder.into_diagnostic(format_args!(
-                "Can not assign to key \"{key}\" on TypedDict `{typed_dict_d}`",
+                "Cannot assign to key \"{key}\" on TypedDict `{typed_dict_d}`",
             ));
 
             diagnostic.set_primary_message(format_args!("key is marked read-only"));
