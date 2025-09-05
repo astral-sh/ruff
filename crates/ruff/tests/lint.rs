@@ -4855,32 +4855,15 @@ fn nested_implicit_namespace_package() -> Result<()> {
         .arg("--select")
         .arg("INP")
         .current_dir(&tempdir)
-        , @r"
-    success: true
-    exit_code: 0
+        , @r###"
+    success: false
+    exit_code: 1
     ----- stdout -----
-    All checks passed!
+    foo/bar/baz/__init__.py:1:1: INP001 File `foo/bar/baz/__init__.py` declares a package, but is nested under an implicit namespace package. Add an `__init__.py` to `foo/bar`.
+    Found 1 error.
 
     ----- stderr -----
-    ");
-
-    insta::with_settings!({filters => vec![(r"\\", "/")]}, {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-            .args(STDIN_BASE_OPTIONS)
-            .arg("--select")
-            .arg("INP")
-            .arg("--preview")
-            .current_dir(&tempdir)
-            , @r"
-        success: false
-        exit_code: 1
-        ----- stdout -----
-        foo/bar/baz/__init__.py:1:1: INP001 File `foo/bar/baz/__init__.py` declares a package, but is nested under an implicit namespace package. Add an `__init__.py` to `foo/bar`.
-        Found 1 error.
-
-        ----- stderr -----
-        ");
-    });
+    "###);
 
     Ok(())
 }
