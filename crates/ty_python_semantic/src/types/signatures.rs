@@ -45,7 +45,7 @@ fn infer_method_type<'db>(
         return None;
     };
     let class_scope = index.scope(class_scope_id.file_scope_id(db));
-    class_scope.node().as_class(&module)?;
+    class_scope.node().as_class()?;
 
     let method_definition = index.expect_single_definition(func_def.node(&module));
     let func_type = infer_definition_types(db, method_definition)
@@ -382,8 +382,12 @@ impl<'db> Signature<'db> {
         is_generator: bool,
         has_implicitly_positional_first_parameter: bool,
     ) -> Self {
-        let parameters =
-            Parameters::from_parameters(db, definition, function_node.parameters.as_ref());
+        let parameters = Parameters::from_parameters(
+            db,
+            definition,
+            function_node.parameters.as_ref(),
+            has_implicitly_positional_first_parameter,
+        );
 
         let return_ty = function_node.returns.as_ref().map(|returns| {
             let plain_return_ty = definition_expression_type(db, definition, returns.as_ref())
@@ -1218,42 +1222,42 @@ impl<'db> Parameters<'db> {
                     .map(pos_only_param),
             );
         }
-      
+
         let method_type = infer_method_type(db, definition);
         let is_method = method_type.is_some();
         let is_classmethod = method_type.is_some_and(|f| f.is_classmethod(db));
         let is_staticmethod = method_type.is_some_and(|f| f.is_staticmethod(db));
 
         let positional_or_keyword = pos_or_keyword_iter.map(|arg| {
-          if is_method
+            if is_method
                 && !is_staticmethod
                 && !is_classmethod
                 && arg.parameter.annotation().is_none()
                 && parameters.index(arg.name().id()) == Some(0)
             {
-              let implicit_annotation = Type::SpecialForm(SpecialFormType::TypingSelf)
-                  .in_type_expression(db, definition.scope(db), Some(definition))
-                  .ok();
-              Parameter {
-                  annotated_type: implicit_annotation,
-                  synthetic_annotation: true,
-                  kind: ParameterKind::PositionalOrKeyword {
-                      name: arg.parameter.name.id.clone(),
-                      default_type: default_type(arg),
-                  },
-                  form: ParameterForm::Value,
-              }
+                let implicit_annotation = Type::SpecialForm(SpecialFormType::TypingSelf)
+                    .in_type_expression(db, definition.scope(db), Some(definition))
+                    .ok();
+                Parameter {
+                    annotated_type: implicit_annotation,
+                    synthetic_annotation: true,
+                    kind: ParameterKind::PositionalOrKeyword {
+                        name: arg.parameter.name.id.clone(),
+                        default_type: default_type(arg),
+                    },
+                    form: ParameterForm::Value,
+                }
             } else {
-              Parameter::from_node_and_kind(
-                  db,
-                  definition,
-                  &arg.parameter,
-                  ParameterKind::PositionalOrKeyword {
-                      name: arg.parameter.name.id.clone(),
-                      default_type: default_type(arg),
-                  },
-              )
-          }
+                Parameter::from_node_and_kind(
+                    db,
+                    definition,
+                    &arg.parameter,
+                    ParameterKind::PositionalOrKeyword {
+                        name: arg.parameter.name.id.clone(),
+                        default_type: default_type(arg),
+                    },
+                )
+            }
         });
 
         let variadic = vararg.as_ref().map(|arg| {

@@ -75,15 +75,23 @@ class A:
         def first_arg_is_not_self(a: int) -> int:
             return a
         return first_arg_is_not_self(1)
-    # TODO: Make sure cls is not considered as "typing.Self". Don't know how to test this
-    @classmethod
-    def bar(cls) -> int:
-        return 1
 
-# TODO: revealed: A
-# Requires implicit in method body detection
-reveal_type(A().implicit_self())  # revealed: Unknown
-reveal_type(A.implicit_self)  # revealed: def implicit_self(self) -> Self@implicit_self
+    @classmethod
+    def bar(cls): ...
+    @staticmethod
+    def static(x): ...
+
+a = A()
+# TODO: Should reveal Self@implicit_self. Requires implicit self in method body(https://github.com/astral-sh/ruff/pull/18473)
+reveal_type(a.implicit_self())  # revealed: Unknown
+reveal_type(a.implicit_self)  # revealed: bound method A.implicit_self() -> A
+```
+
+If the method is a class or static method then first argument is not self:
+
+```py
+A.bar()
+a.static(1)
 ```
 
 ## typing_extensions
@@ -251,25 +259,6 @@ class D(C): ...
 reveal_type(D().instance_method)
 # revealed: bound method <class 'D'>.class_method() -> D
 reveal_type(D.class_method)
-```
-
-## Test
-
-```py
-from ty_extensions import generic_context
-from typing import Generic, TypeVar
-
-T = TypeVar("T")
-U = TypeVar("U")
-
-class C(Generic[T]):
-    def method(self, u: int) -> int:
-        return u
-
-    def generic_method(self, t: T, u: U) -> U:
-        return u
-
-reveal_type(generic_context(C.method))  # revealed: tuple[Self@method]
 ```
 
 [self attribute]: https://typing.python.org/en/latest/spec/generics.html#use-in-attribute-annotations

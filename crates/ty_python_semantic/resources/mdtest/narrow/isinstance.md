@@ -357,8 +357,10 @@ class Invariant[T]:
 def _(x: object):
     if isinstance(x, Invariant):
         reveal_type(x)  # revealed: Top[Invariant[Unknown]]
+        # error: [invalid-argument-type] "Argument to bound method `get` is incorrect: Expected `Self@get`, found `Top[Invariant[Unknown]]`"
         reveal_type(x.get())  # revealed: object
         # error: [invalid-argument-type] "Argument to bound method `push` is incorrect: Expected `Never`, found `Literal[42]`"
+        # error: [invalid-argument-type] "Argument to bound method `push` is incorrect: Expected `Self@push`, found `Top[Invariant[Unknown]]`"
         x.push(42)
 ```
 
