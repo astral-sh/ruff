@@ -196,7 +196,8 @@ impl<'a, 'b> YieldTracker<'a, 'b> {
 
         if let Some(scope) = self.scopes.last_mut() {
             if continuing.is_empty() {
-                // All branches return - but only mark as returned if coverage is exhaustive
+                // If branches are exhaustive and all return, subsequent code is
+                // return guarded
                 scope.returned = is_exhaustive;
             } else {
                 scope.yield_count = *continuing.iter().max().unwrap();
@@ -208,12 +209,10 @@ impl<'a, 'b> YieldTracker<'a, 'b> {
         let parent_scope = *self.scopes.last().unwrap();
         let mut branch_counts = Vec::new();
 
-        // Main if branch
         self.enter_scope(parent_scope);
         self.visit_body(&if_stmt.body);
         branch_counts.push(self.exit_scope());
 
-        // elif/else branches
         for clause in &if_stmt.elif_else_clauses {
             self.enter_scope(parent_scope);
             self.visit_body(&clause.body);
@@ -242,10 +241,18 @@ impl<'a, 'b> YieldTracker<'a, 'b> {
             .cases
             .iter()
             .any(|case| case.pattern.is_wildcard());
+
         self.handle_mutually_exclusive_branches(case_counts, has_wildcard);
     }
 
     fn handle_try_statement(&mut self, try_stmt: &'a ast::StmtTry) {
+        // Try-Except-Else-Finally control flow is complex because:
+        // 1. Try block executes first
+        // 2. If try raises an exception, one except handler may execute
+        // 3. If try completes normally (no exception), else block executes
+        // 4. Finally block ALWAYS executes, even when we encountered return
+        // We need to handle returning and non-returning cases
+
         let parent_scope = *self.scopes.last().unwrap();
 
         self.enter_scope(parent_scope);
@@ -303,7 +310,7 @@ impl<'a, 'b> YieldTracker<'a, 'b> {
         self.visit_body(&try_stmt.finalbody);
         let _ = self.exit_scope(); // Handle with the continuing branches
 
-        // Continuing brancehs
+        // Continuing branches
         let max_continuing = continuing.into_iter().max().unwrap_or(0);
         let maybe_continuing_finally_scope =
             YieldScope::from(max_continuing, false, parent_scope.nested_in_loop);
