@@ -8,8 +8,10 @@ use std::error::Error;
 use anyhow::Result;
 use libcst_native as cst;
 
+use ruff_diagnostics::Edit;
 use ruff_python_ast::{self as ast, Expr, ModModule, Stmt};
 use ruff_python_codegen::Stylist;
+use ruff_python_importer::Insertion;
 use ruff_python_parser::{Parsed, Tokens};
 use ruff_python_semantic::{
     ImportedName, MemberNameImport, ModuleNameImport, NameImport, SemanticModel,
@@ -17,14 +19,10 @@ use ruff_python_semantic::{
 use ruff_python_trivia::textwrap::indent;
 use ruff_text_size::{Ranged, TextSize};
 
-use crate::Edit;
 use crate::Locator;
 use crate::cst::matchers::{match_aliases, match_import_from, match_statement};
 use crate::fix;
 use crate::fix::codemods::CodegenStylist;
-use crate::importer::insertion::Insertion;
-
-mod insertion;
 
 pub(crate) struct Importer<'a> {
     /// The Python AST to which we are adding imports.
@@ -507,7 +505,7 @@ impl<'a> Importer<'a> {
 
     /// Add an import statement to an existing `TYPE_CHECKING` block.
     fn add_to_type_checking_block(&self, content: &str, at: TextSize) -> Edit {
-        Insertion::start_of_block(at, self.locator, self.stylist, self.tokens).into_edit(content)
+        Insertion::start_of_block(at, self.source, self.stylist, self.tokens).into_edit(content)
     }
 
     /// Return the import statement that precedes the given position, if any.
