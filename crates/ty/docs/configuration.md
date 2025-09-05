@@ -144,7 +144,7 @@ If left unspecified, ty will try to detect common project layouts and initialize
 * if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path
 * otherwise, default to `.` (flat layout)
 
-Besides, if a `./tests` directory exists and is not a package (i.e. it does not contain an `__init__.py` file),
+Besides, if a `./python` or `./tests` directory exists and is not a package (i.e. it does not contain an `__init__.py` or `__init__.pyi` file),
 it will also be included in the first party search path.
 
 **Default value**: `null`

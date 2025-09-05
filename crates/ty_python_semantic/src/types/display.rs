@@ -200,15 +200,15 @@ impl ClassDisplay<'_> {
 
             match ancestor_scope.kind() {
                 ScopeKind::Class => {
-                    if let Some(class_def) = node.as_class(&module_ast) {
-                        name_parts.push(class_def.name.as_str().to_string());
+                    if let Some(class_def) = node.as_class() {
+                        name_parts.push(class_def.node(&module_ast).name.as_str().to_string());
                     }
                 }
                 ScopeKind::Function => {
-                    if let Some(function_def) = node.as_function(&module_ast) {
+                    if let Some(function_def) = node.as_function() {
                         name_parts.push(format!(
                             "<locals of function '{}'>",
-                            function_def.name.as_str()
+                            function_def.node(&module_ast).name.as_str()
                         ));
                     }
                 }

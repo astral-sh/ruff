@@ -5649,7 +5649,7 @@ impl<'db> Type<'db> {
                 SpecialFormType::TypingSelf => {
                     let module = parsed_module(db, scope_id.file(db)).load(db);
                     let index = semantic_index(db, scope_id.file(db));
-                    let Some(class) = nearest_enclosing_class(db, index, scope_id, &module) else {
+                    let Some(class) = nearest_enclosing_class(db, index, scope_id) else {
                         return Err(InvalidTypeExpressionError {
                             fallback_type: Type::unknown(),
                             invalid_expressions: smallvec::smallvec_inline![
@@ -6551,6 +6551,7 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             }
             Type::GenericAlias(generic_alias) => generic_alias.variance_of(db, typevar),
             Type::Callable(callable_type) => callable_type.signatures(db).variance_of(db, typevar),
+            // A type variable is always covariant in itself.
             Type::TypeVar(other_typevar) | Type::NonInferableTypeVar(other_typevar)
                 if other_typevar == typevar =>
             {
@@ -6560,11 +6561,19 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             Type::ProtocolInstance(protocol_instance_type) => {
                 protocol_instance_type.variance_of(db, typevar)
             }
+            // unions are covariant in their disjuncts
             Type::Union(union_type) => union_type
                 .elements(db)
                 .iter()
                 .map(|ty| ty.variance_of(db, typevar))
                 .collect(),
+
+            // Products are covariant in their conjuncts. For negative
+            // conjuncts, they're contravariant. To see this, suppose we have
+            // `B` a subtype of `A`. A value of type `~B` could be some non-`B`
+            // `A`, and so is not assignable to `~A`. On the other hand, a value
+            // of type `~A` excludes all `A`s, and thus all `B`s, and so _is_
+            // assignable to `~B`.
             Type::Intersection(intersection_type) => intersection_type
                 .positive(db)
                 .iter()
@@ -9355,9 +9364,7 @@ fn walk_pep_695_type_alias<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 impl<'db> PEP695TypeAliasType<'db> {
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         let scope = self.rhs_scope(db);
-        let module = parsed_module(db, scope.file(db)).load(db);
-        let type_alias_stmt_node = scope.node(db).expect_type_alias(&module);
-
+        let type_alias_stmt_node = scope.node(db).expect_type_alias();
         semantic_index(db, scope.file(db)).expect_single_definition(type_alias_stmt_node)
     }
 
@@ -9365,9 +9372,9 @@ impl<'db> PEP695TypeAliasType<'db> {
     pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
         let scope = self.rhs_scope(db);
         let module = parsed_module(db, scope.file(db)).load(db);
-        let type_alias_stmt_node = scope.node(db).expect_type_alias(&module);
+        let type_alias_stmt_node = scope.node(db).expect_type_alias();
         let definition = self.definition(db);
-        definition_expression_type(db, definition, &type_alias_stmt_node.value)
+        definition_expression_type(db, definition, &type_alias_stmt_node.node(&module).value)
     }
 
     fn normalized_impl(self, _db: &'db dyn Db, _visitor: &NormalizedVisitor<'db>) -> Self {

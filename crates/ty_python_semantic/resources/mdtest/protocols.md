@@ -413,13 +413,13 @@ To see the kinds and types of the protocol members, you can use the debugging ai
 from ty_extensions import reveal_protocol_interface
 from typing import SupportsIndex, SupportsAbs, ClassVar, Iterator
 
-# revealed: {"method_member": MethodMember(`(self) -> bytes`), "x": AttributeMember(`int`), "y": PropertyMember { getter: `def y(self) -> str` }, "z": PropertyMember { getter: `def z(self) -> int`, setter: `def z(self, z: int) -> None` }}
+# revealed: {"method_member": MethodMember(`(self, /) -> bytes`), "x": AttributeMember(`int`), "y": PropertyMember { getter: `def y(self, /) -> str` }, "z": PropertyMember { getter: `def z(self, /) -> int`, setter: `def z(self, /, z: int) -> None` }}
 reveal_protocol_interface(Foo)
-# revealed: {"__index__": MethodMember(`(self) -> int`)}
+# revealed: {"__index__": MethodMember(`(self, /) -> int`)}
 reveal_protocol_interface(SupportsIndex)
-# revealed: {"__abs__": MethodMember(`(self) -> Unknown`)}
+# revealed: {"__abs__": MethodMember(`(self, /) -> Unknown`)}
 reveal_protocol_interface(SupportsAbs)
-# revealed: {"__iter__": MethodMember(`(self) -> Iterator[Unknown]`), "__next__": MethodMember(`(self) -> Unknown`)}
+# revealed: {"__iter__": MethodMember(`(self, /) -> Iterator[Unknown]`), "__next__": MethodMember(`(self, /) -> Unknown`)}
 reveal_protocol_interface(Iterator)
 
 # error: [invalid-argument-type] "Invalid argument to `reveal_protocol_interface`: Only protocol classes can be passed to `reveal_protocol_interface`"
@@ -439,9 +439,9 @@ do not implement any special handling for generic aliases passed to the function
 reveal_type(get_protocol_members(SupportsAbs[int]))  # revealed: frozenset[str]
 reveal_type(get_protocol_members(Iterator[int]))  # revealed: frozenset[str]
 
-# revealed: {"__abs__": MethodMember(`(self) -> int`)}
+# revealed: {"__abs__": MethodMember(`(self, /) -> int`)}
 reveal_protocol_interface(SupportsAbs[int])
-# revealed: {"__iter__": MethodMember(`(self) -> Iterator[int]`), "__next__": MethodMember(`(self) -> int`)}
+# revealed: {"__iter__": MethodMember(`(self, /) -> Iterator[int]`), "__next__": MethodMember(`(self, /) -> int`)}
 reveal_protocol_interface(Iterator[int])
 
 class BaseProto(Protocol):
@@ -450,10 +450,10 @@ class BaseProto(Protocol):
 class SubProto(BaseProto, Protocol):
     def member(self) -> bool: ...
 
-# revealed: {"member": MethodMember(`(self) -> int`)}
+# revealed: {"member": MethodMember(`(self, /) -> int`)}
 reveal_protocol_interface(BaseProto)
 
-# revealed: {"member": MethodMember(`(self) -> bool`)}
+# revealed: {"member": MethodMember(`(self, /) -> bool`)}
 reveal_protocol_interface(SubProto)
 
 class ProtoWithClassVar(Protocol):
@@ -1767,13 +1767,38 @@ class Foo(Protocol):
     def method(self) -> str: ...
 
 def f(x: Foo):
-    reveal_type(type(x).method)  # revealed: def method(self) -> str
+    reveal_type(type(x).method)  # revealed: def method(self, /) -> str
 
 class Bar:
     def __init__(self):
         self.method = lambda: "foo"
 
 f(Bar())  # error: [invalid-argument-type]
+```
+
+Some protocols use the old convention (specified in PEP-484) for denoting positional-only
+parameters. This is supported by ty:
+
+```py
+class HasPosOnlyDunders:
+    def __invert__(self, /) -> "HasPosOnlyDunders":
+        return self
+
+    def __lt__(self, other, /) -> bool:
+        return True
+
+class SupportsLessThan(Protocol):
+    def __lt__(self, __other) -> bool: ...
+
+class Invertable(Protocol):
+    # `self` and `cls` are always implicitly positional-only for methods defined in `Protocol`
+    # classes, even if no parameters in the method use the PEP-484 convention.
+    def __invert__(self) -> object: ...
+
+static_assert(is_assignable_to(HasPosOnlyDunders, SupportsLessThan))
+static_assert(is_assignable_to(HasPosOnlyDunders, Invertable))
+static_assert(is_assignable_to(str, SupportsLessThan))
+static_assert(is_assignable_to(int, Invertable))
 ```
 
 ## Equivalence of protocols with method or property members

@@ -12,7 +12,7 @@
 
 use std::{collections::HashMap, slice::Iter};
 
-use itertools::EitherOrBoth;
+use itertools::{EitherOrBoth, Itertools};
 use smallvec::{SmallVec, smallvec_inline};
 
 use super::{
@@ -380,6 +380,7 @@ impl<'db> Signature<'db> {
         definition: Definition<'db>,
         function_node: &ast::StmtFunctionDef,
         is_generator: bool,
+        has_implicitly_positional_first_parameter: bool,
     ) -> Self {
         let parameters =
             Parameters::from_parameters(db, definition, function_node.parameters.as_ref());
@@ -1168,6 +1169,7 @@ impl<'db> Parameters<'db> {
         db: &'db dyn Db,
         definition: Definition<'db>,
         parameters: &ast::Parameters,
+        has_implicitly_positional_first_parameter: bool,
     ) -> Self {
         let ast::Parameters {
             posonlyargs,
@@ -1178,60 +1180,82 @@ impl<'db> Parameters<'db> {
             range: _,
             node_index: _,
         } = parameters;
+
         let default_type = |param: &ast::ParameterWithDefault| {
             param
                 .default()
                 .map(|default| definition_expression_type(db, definition, default))
         };
-        let positional_only = posonlyargs.iter().map(|arg| {
+
+        let pos_only_param = |param: &ast::ParameterWithDefault| {
             Parameter::from_node_and_kind(
                 db,
                 definition,
-                &arg.parameter,
+                &param.parameter,
                 ParameterKind::PositionalOnly {
-                    name: Some(arg.parameter.name.id.clone()),
-                    default_type: default_type(arg),
+                    name: Some(param.parameter.name.id.clone()),
+                    default_type: default_type(param),
                 },
             )
-        });
+        };
 
+        let mut positional_only: Vec<Parameter> = posonlyargs.iter().map(pos_only_param).collect();
+
+        let mut pos_or_keyword_iter = args.iter();
+
+        // If there are no PEP-570 positional-only parameters, check for the legacy PEP-484 convention
+        // for denoting positional-only parameters (parameters that start with `__` and do not end with `__`)
+        if positional_only.is_empty() {
+            let pos_or_keyword_iter = pos_or_keyword_iter.by_ref();
+
+            if has_implicitly_positional_first_parameter {
+                positional_only.extend(pos_or_keyword_iter.next().map(pos_only_param));
+            }
+
+            positional_only.extend(
+                pos_or_keyword_iter
+                    .peeking_take_while(|param| param.uses_pep_484_positional_only_convention())
+                    .map(pos_only_param),
+            );
+        }
+      
         let method_type = infer_method_type(db, definition);
         let is_method = method_type.is_some();
         let is_classmethod = method_type.is_some_and(|f| f.is_classmethod(db));
         let is_staticmethod = method_type.is_some_and(|f| f.is_staticmethod(db));
 
-        let positional_or_keyword = args.iter().map(|arg| {
-            // TODO(https://github.com/astral-sh/ty/issues/159): Also set the type for `cls` argument
-            if is_method
+        let positional_or_keyword = pos_or_keyword_iter.map(|arg| {
+          if is_method
                 && !is_staticmethod
                 && !is_classmethod
                 && arg.parameter.annotation().is_none()
                 && parameters.index(arg.name().id()) == Some(0)
             {
-                let implicit_annotation = Type::SpecialForm(SpecialFormType::TypingSelf)
-                    .in_type_expression(db, definition.scope(db), Some(definition))
-                    .ok();
-                Parameter {
-                    annotated_type: implicit_annotation,
-                    synthetic_annotation: true,
-                    kind: ParameterKind::PositionalOrKeyword {
-                        name: arg.parameter.name.id.clone(),
-                        default_type: default_type(arg),
-                    },
-                    form: ParameterForm::Value,
-                }
+              let implicit_annotation = Type::SpecialForm(SpecialFormType::TypingSelf)
+                  .in_type_expression(db, definition.scope(db), Some(definition))
+                  .ok();
+              Parameter {
+                  annotated_type: implicit_annotation,
+                  synthetic_annotation: true,
+                  kind: ParameterKind::PositionalOrKeyword {
+                      name: arg.parameter.name.id.clone(),
+                      default_type: default_type(arg),
+                  },
+                  form: ParameterForm::Value,
+              }
             } else {
-                Parameter::from_node_and_kind(
-                    db,
-                    definition,
-                    &arg.parameter,
-                    ParameterKind::PositionalOrKeyword {
-                        name: arg.parameter.name.id.clone(),
-                        default_type: default_type(arg),
-                    },
-                )
-            }
+              Parameter::from_node_and_kind(
+                  db,
+                  definition,
+                  &arg.parameter,
+                  ParameterKind::PositionalOrKeyword {
+                      name: arg.parameter.name.id.clone(),
+                      default_type: default_type(arg),
+                  },
+              )
+          }
         });
+
         let variadic = vararg.as_ref().map(|arg| {
             Parameter::from_node_and_kind(
                 db,
@@ -1242,6 +1266,7 @@ impl<'db> Parameters<'db> {
                 },
             )
         });
+
         let keyword_only = kwonlyargs.iter().map(|arg| {
             Parameter::from_node_and_kind(
                 db,
@@ -1253,6 +1278,7 @@ impl<'db> Parameters<'db> {
                 },
             )
         });
+
         let keywords = kwarg.as_ref().map(|arg| {
             Parameter::from_node_and_kind(
                 db,
@@ -1263,8 +1289,10 @@ impl<'db> Parameters<'db> {
                 },
             )
         });
+
         Self::new(
             positional_only
+                .into_iter()
                 .chain(positional_or_keyword)
                 .chain(variadic)
                 .chain(keyword_only)
