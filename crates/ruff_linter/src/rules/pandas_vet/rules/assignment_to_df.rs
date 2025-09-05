@@ -6,7 +6,7 @@ use crate::{Violation, checkers::ast::Checker};
 
 /// ## Removed
 ///
-/// This rule has been Removed.
+/// This rule has been removed as it's highly opinionated and overly strict in most cases.
 ///
 /// ## What it does
 /// Checks for assignments to the variable `df`.
