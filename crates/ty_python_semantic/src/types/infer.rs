@@ -1191,14 +1191,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             default_ty: Some(_)
                         }
                     ) {
-                        field_with_default_encountered = Some(field_name);
+                        field_with_default_encountered =
+                            Some((field_name, field.single_declaration));
                     } else if let Some(field_with_default) = field_with_default_encountered.as_ref()
                     {
                         report_namedtuple_field_without_default_after_field_with_default(
                             &self.context,
                             class,
-                            self.index,
-                            &field_name,
+                            &(field_name, field.single_declaration),
                             field_with_default,
                         );
                     }
