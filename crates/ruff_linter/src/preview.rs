@@ -207,11 +207,6 @@ pub(crate) const fn is_safe_super_call_with_parameters_fix_enabled(
     settings.preview.is_enabled()
 }
 
-// https://github.com/astral-sh/ruff/pull/19100
-pub(crate) const fn is_add_future_annotations_imports_enabled(settings: &LinterSettings) -> bool {
-    settings.preview.is_enabled()
-}
-
 // https://github.com/astral-sh/ruff/pull/19851
 pub(crate) const fn is_maxsplit_without_separator_fix_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
