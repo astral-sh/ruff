@@ -20,7 +20,6 @@ help: Combine `with` statements
 4 | 
 5 | # SIM117
 6 | with A():
-note: This is an unsafe fix and may change runtime behavior
 
 SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
   --> SIM117.py:7:1
@@ -46,7 +45,6 @@ help: Combine `with` statements
 10 | 
 11 | # SIM117
 12 | with A() as a:
-note: This is an unsafe fix and may change runtime behavior
 
 SIM117 Use a single `with` statement with multiple contexts instead of nested `with` statements
   --> SIM117.py:13:1
@@ -84,7 +82,6 @@ help: Combine `with` statements
 22 | 
 23 | # OK
 24 | with A() as a:
-note: This is an unsafe fix and may change runtime behavior
 
 SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
   --> SIM117.py:47:1
@@ -107,7 +104,6 @@ help: Combine `with` statements
 49 | 
 50 | while True:
 51 |     # SIM117
-note: This is an unsafe fix and may change runtime behavior
 
 SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
   --> SIM117.py:53:5
@@ -144,7 +140,6 @@ help: Combine `with` statements
 64 | "this for some reason")
 65 | 
 66 | # SIM117
-note: This is an unsafe fix and may change runtime behavior
 
 SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
   --> SIM117.py:68:1
@@ -171,7 +166,6 @@ help: Combine `with` statements
 73 | 
 74 | # SIM117
 75 | with A() as a:
-note: This is an unsafe fix and may change runtime behavior
 
 SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
   --> SIM117.py:76:1
@@ -203,7 +197,6 @@ help: Combine `with` statements
 81 | 
 82 | # SIM117
 83 | with (
-note: This is an unsafe fix and may change runtime behavior
 
 SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
   --> SIM117.py:84:1
@@ -237,7 +230,6 @@ help: Combine `with` statements
 90 | 
 91 | # SIM117 (auto-fixable)
 92 | with A("01ß9💣2ℝ8901ß9💣2ℝ8901ß9💣2ℝ89") as a:
-note: This is an unsafe fix and may change runtime behavior
 
 SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
   --> SIM117.py:95:1
@@ -260,7 +252,6 @@ help: Combine `with` statements
 97 | 
 98 | # SIM117 (not auto-fixable too long)
 99 | with A("01ß9💣2ℝ8901ß9💣2ℝ8901ß9💣2ℝ890") as a:
-note: This is an unsafe fix and may change runtime behavior
 
 SIM117 Use a single `with` statement with multiple contexts instead of nested `with` statements
    --> SIM117.py:100:1
@@ -319,7 +310,6 @@ help: Combine `with` statements
 136 | 
 137 | # Allow cascading for some statements.
 138 | import anyio
-note: This is an unsafe fix and may change runtime behavior
 
 SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
    --> SIM117.py:163:1
@@ -339,4 +329,3 @@ help: Combine `with` statements
     -         pass
 163 + async with asyncio.timeout(1), A(), B():
 164 +     pass
-note: This is an unsafe fix and may change runtime behavior
