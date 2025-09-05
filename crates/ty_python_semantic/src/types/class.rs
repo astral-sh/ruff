@@ -1403,7 +1403,7 @@ impl<'db> ClassLiteral<'db> {
         let scope = self.body_scope(db);
         let file = scope.file(db);
         let parsed = parsed_module(db, file).load(db);
-        let class_def_node = scope.node(db).expect_class(&parsed);
+        let class_def_node = scope.node(db).expect_class().node(&parsed);
         class_def_node.type_params.as_ref().map(|type_params| {
             let index = semantic_index(db, scope.file(db));
             let definition = index.expect_single_definition(class_def_node);
@@ -1445,14 +1445,13 @@ impl<'db> ClassLiteral<'db> {
     /// query depends on the AST of another file (bad!).
     fn node<'ast>(self, db: &'db dyn Db, module: &'ast ParsedModuleRef) -> &'ast ast::StmtClassDef {
         let scope = self.body_scope(db);
-        scope.node(db).expect_class(module)
+        scope.node(db).expect_class().node(module)
     }
 
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         let body_scope = self.body_scope(db);
-        let module = parsed_module(db, body_scope.file(db)).load(db);
         let index = semantic_index(db, body_scope.file(db));
-        index.expect_single_definition(body_scope.node(db).expect_class(&module))
+        index.expect_single_definition(body_scope.node(db).expect_class())
     }
 
     pub(crate) fn apply_specialization(
@@ -2870,8 +2869,8 @@ impl<'db> ClassLiteral<'db> {
         let class_table = place_table(db, class_body_scope);
 
         let is_valid_scope = |method_scope: ScopeId<'db>| {
-            if let Some(method_def) = method_scope.node(db).as_function(&module) {
-                let method_name = method_def.name.as_str();
+            if let Some(method_def) = method_scope.node(db).as_function() {
+                let method_name = method_def.node(&module).name.as_str();
                 if let Place::Type(Type::FunctionLiteral(method_type), _) =
                     class_symbol(db, class_body_scope, method_name).place
                 {
@@ -2946,20 +2945,22 @@ impl<'db> ClassLiteral<'db> {
             }
 
             // The attribute assignment inherits the reachability of the method which contains it
-            let is_method_reachable =
-                if let Some(method_def) = method_scope.node(db).as_function(&module) {
-                    let method = index.expect_single_definition(method_def);
-                    let method_place = class_table.symbol_id(&method_def.name).unwrap();
-                    class_map
-                        .all_reachable_symbol_bindings(method_place)
-                        .find_map(|bind| {
-                            (bind.binding.is_defined_and(|def| def == method))
-                                .then(|| class_map.binding_reachability(db, &bind))
-                        })
-                        .unwrap_or(Truthiness::AlwaysFalse)
-                } else {
-                    Truthiness::AlwaysFalse
-                };
+            let is_method_reachable = if let Some(method_def) = method_scope.node(db).as_function()
+            {
+                let method = index.expect_single_definition(method_def);
+                let method_place = class_table
+                    .symbol_id(&method_def.node(&module).name)
+                    .unwrap();
+                class_map
+                    .all_reachable_symbol_bindings(method_place)
+                    .find_map(|bind| {
+                        (bind.binding.is_defined_and(|def| def == method))
+                            .then(|| class_map.binding_reachability(db, &bind))
+                    })
+                    .unwrap_or(Truthiness::AlwaysFalse)
+            } else {
+                Truthiness::AlwaysFalse
+            };
             if is_method_reachable.is_always_false() {
                 continue;
             }
@@ -3323,7 +3324,7 @@ impl<'db> ClassLiteral<'db> {
     pub(super) fn header_range(self, db: &'db dyn Db) -> TextRange {
         let class_scope = self.body_scope(db);
         let module = parsed_module(db, class_scope.file(db)).load(db);
-        let class_node = class_scope.node(db).expect_class(&module);
+        let class_node = class_scope.node(db).expect_class().node(&module);
         let class_name = &class_node.name;
         TextRange::new(
             class_name.start(),
@@ -4784,8 +4785,7 @@ impl KnownClass {
                 //   2. The first parameter of the current function (typically `self` or `cls`)
                 match overload.parameter_types() {
                     [] => {
-                        let Some(enclosing_class) =
-                            nearest_enclosing_class(db, index, scope, module)
+                        let Some(enclosing_class) = nearest_enclosing_class(db, index, scope)
                         else {
                             BoundSuperError::UnavailableImplicitArguments
                                 .report_diagnostic(context, call_expression.into());

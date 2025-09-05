@@ -172,7 +172,7 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
                 // Inspect all ancestor function scopes by walking bottom up and infer the function's type.
                 let mut function_scope_tys = index
                     .ancestor_scopes(scope_id)
-                    .filter_map(|(_, scope)| scope.node().as_function(self.module()))
+                    .filter_map(|(_, scope)| scope.node().as_function())
                     .map(|node| binding_type(self.db, index.expect_single_definition(node)))
                     .filter_map(Type::into_function_literal);
 

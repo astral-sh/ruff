@@ -1227,3 +1227,12 @@ impl From<&ast::TypeParamTypeVarTuple> for DefinitionNodeKey {
         Self(NodeKey::from_node(value))
     }
 }
+
+impl<T> From<&AstNodeRef<T>> for DefinitionNodeKey
+where
+    for<'a> &'a T: Into<DefinitionNodeKey>,
+{
+    fn from(value: &AstNodeRef<T>) -> Self {
+        Self(NodeKey::from_node_ref(value))
+    }
+}
