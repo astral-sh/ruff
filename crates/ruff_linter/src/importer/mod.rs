@@ -6,7 +6,7 @@
 use std::error::Error;
 
 use anyhow::Result;
-use libcst_native::{ImportAlias, Name as cstName, NameOrAttribute};
+use libcst_native as cst;
 
 use ruff_python_ast::{self as ast, Expr, ModModule, Stmt};
 use ruff_python_codegen::Stylist;
@@ -472,8 +472,8 @@ impl<'a> Importer<'a> {
         let mut statement = match_statement(self.locator.slice(stmt))?;
         let import_from = match_import_from(&mut statement)?;
         let aliases = match_aliases(import_from)?;
-        aliases.push(ImportAlias {
-            name: NameOrAttribute::N(Box::new(cstName {
+        aliases.push(cst::ImportAlias {
+            name: cst::NameOrAttribute::N(Box::new(cst::Name {
                 value: member,
                 lpar: vec![],
                 rpar: vec![],
