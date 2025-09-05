@@ -708,7 +708,7 @@ mod tests {
 
         create_dir(project_dir.join("mypackage"));
 
-        let paths = vec![project_dir.clone()];
+        let paths = vec![project_dir];
 
         assert_eq!(match_sources(&paths, ""), None);
     }
