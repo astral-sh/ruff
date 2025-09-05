@@ -227,11 +227,6 @@ pub(crate) const fn is_assert_raises_exception_call_enabled(settings: &LinterSet
     settings.preview.is_enabled()
 }
 
-// https://github.com/astral-sh/ruff/pull/19100
-pub(crate) const fn is_add_future_annotations_imports_enabled(settings: &LinterSettings) -> bool {
-    settings.preview.is_enabled()
-}
-
 // https://github.com/astral-sh/ruff/pull/19390
 pub(crate) const fn is_trailing_comma_type_params_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
