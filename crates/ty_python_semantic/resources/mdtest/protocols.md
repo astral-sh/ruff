@@ -2033,7 +2033,6 @@ class P4(Protocol):
     @z.setter
     def z(self, value: int) -> None: ...
 
-# error: [static-assert-error]
 static_assert(is_equivalent_to(P1, P2))
 
 # TODO: should pass
@@ -2047,7 +2046,6 @@ differently ordered unions:
 class A: ...
 class B: ...
 
-# error: [static-assert-error]
 static_assert(is_equivalent_to(A | B | P1, P2 | B | A))
 
 # TODO: should pass

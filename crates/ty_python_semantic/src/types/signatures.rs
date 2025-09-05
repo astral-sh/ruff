@@ -49,7 +49,7 @@ fn infer_method_type<'db>(
         return None;
     };
     let class_scope = index.scope(class_scope_id.file_scope_id(db));
-    class_scope.node().as_class(&module)?;
+    class_scope.node().as_class()?;
 
     let method_definition = index.expect_single_definition(func_def.node(&module));
     let func_type = infer_definition_types(db, method_definition)
@@ -1255,8 +1255,7 @@ impl<'db> Parameters<'db> {
         let is_classmethod = method_type.is_some_and(|f| f.is_classmethod(db));
         let is_staticmethod = method_type.is_some_and(|f| f.is_staticmethod(db));
 
-        let positional_or_keyword = args.iter().map(|arg| {
-            // TODO(https://github.com/astral-sh/ty/issues/159): Also set the type for `cls` argument
+        let positional_or_keyword = pos_or_keyword_iter.map(|arg| {
             if is_method
                 && !is_staticmethod
                 && !is_classmethod
