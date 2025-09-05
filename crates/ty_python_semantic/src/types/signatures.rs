@@ -1202,22 +1202,12 @@ impl<'db> Parameters<'db> {
 
         let positional_or_keyword = args.iter().map(|arg| {
             // TODO(https://github.com/astral-sh/ty/issues/159): Also set the type for `cls` argument
-            // eprintln!(
-            //     "arg {}: pos: {:?}, is_static: {}, is_class: {}, anno: {:?}",
-            //     arg.name().id.as_str(),
-            //     parameters.index(arg.name().id()),
-            //     is_staticmethod,
-            //     is_classmethod,
-            //     arg.parameter.annotation()
-            // );
-            // dbg!(is_method);
             if is_method
                 && !is_staticmethod
                 && !is_classmethod
                 && arg.parameter.annotation().is_none()
                 && parameters.index(arg.name().id()) == Some(0)
             {
-                eprintln!("arg {} is self", arg.name().id.as_str());
                 let implicit_annotation = Type::SpecialForm(SpecialFormType::TypingSelf)
                     .in_type_expression(db, definition.scope(db), Some(definition))
                     .ok();
@@ -1231,7 +1221,6 @@ impl<'db> Parameters<'db> {
                     form: ParameterForm::Value,
                 }
             } else {
-                eprintln!("arg {} is not self", arg.name().id.as_str());
                 Parameter::from_node_and_kind(
                     db,
                     definition,

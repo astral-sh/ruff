@@ -299,7 +299,7 @@ type A = list[Union["A", str]]
 def f(x: A):
     reveal_type(x)  # revealed: list[A | str]
     for item in x:
-        reveal_type(item)  # revealed: list[A | str] | str
+        reveal_type(item)  # revealed: list[Any | str] | str
 ```
 
 #### With new-style union
@@ -310,7 +310,7 @@ type A = list["A" | str]
 def f(x: A):
     reveal_type(x)  # revealed: list[A | str]
     for item in x:
-        reveal_type(item)  # revealed: list[A | str] | str
+        reveal_type(item)  # revealed: list[Any | str] | str
 ```
 
 #### With Optional
@@ -323,5 +323,5 @@ type A = list[Optional[Union["A", str]]]
 def f(x: A):
     reveal_type(x)  # revealed: list[A | str | None]
     for item in x:
-        reveal_type(item)  # revealed: list[A | str | None] | str | None
+        reveal_type(item)  # revealed: list[Any | str | None] | str | None
 ```
