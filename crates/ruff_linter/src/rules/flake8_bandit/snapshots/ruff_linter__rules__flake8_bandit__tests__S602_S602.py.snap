@@ -124,4 +124,6 @@ S602 `subprocess` call with `shell=True` identified, security issue
 19 | Popen([var_string], shell=True)
 20 | Popen([var_string, ""], shell=True)
    | ^^^^^
+21 |
+22 | # Check dict display with only double-starred expressions can be falsey.
    |

@@ -18,3 +18,7 @@ var_string = "true"
 Popen(var_string, shell=True)
 Popen([var_string], shell=True)
 Popen([var_string, ""], shell=True)
+
+# Check dict display with only double-starred expressions can be falsey.
+Popen("true", shell={**{}})
+Popen("true", shell={**{**{}}})

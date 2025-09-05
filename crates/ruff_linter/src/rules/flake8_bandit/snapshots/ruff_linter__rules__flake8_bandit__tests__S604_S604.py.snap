@@ -6,4 +6,6 @@ S604 Function call with `shell=True` parameter identified, security issue
   |
 5 | foo(shell=True)
   | ^^^
+6 |
+7 | foo(shell={**{}})
   |
