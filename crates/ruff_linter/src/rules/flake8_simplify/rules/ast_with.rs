@@ -44,15 +44,8 @@ use crate::{FixAvailability, Violation};
 ///     pass
 /// ```
 ///
-/// ## Fix safety
-///
-/// This fix is marked as always unsafe unless [preview] mode is enabled, in which case it is always
-/// marked as safe. Note that the fix is unavailable if it would remove comments (in either case).
-///
 /// ## References
 /// - [Python documentation: The `with` statement](https://docs.python.org/3/reference/compound_stmts.html#the-with-statement)
-///
-/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct MultipleWithStatements;
 
