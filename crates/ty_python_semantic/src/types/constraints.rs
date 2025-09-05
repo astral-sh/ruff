@@ -81,7 +81,7 @@ use crate::Db;
 use crate::types::{BoundTypeVarInstance, IntersectionType, Type, UnionType};
 
 /// Encodes the constraints under which a type property (e.g. assignability) holds.
-pub(crate) trait Constraints<'db>: Clone + Sized {
+pub(crate) trait Constraints<'db>: Clone + Sized + std::fmt::Debug {
     /// Returns a constraint set that never holds
     fn unsatisfiable(db: &'db dyn Db) -> Self;
 

@@ -27,8 +27,7 @@ use crate::types::class::{ClassType, KnownClass};
 use crate::types::constraints::{Constraints, IteratorConstraintsExtension};
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
-    IsDisjointVisitor, IsEquivalentVisitor, NormalizedVisitor, Type, TypeMapping, TypeRelation,
-    UnionBuilder, UnionType,
+    IsDisjointVisitor, NormalizedVisitor, Type, TypeMapping, TypeRelation, UnionBuilder, UnionType,
 };
 use crate::util::subscript::{Nth, OutOfBoundsError, PyIndex, PySlice, StepSizeZeroError};
 use crate::{Db, FxOrderSet, Program};
@@ -264,16 +263,6 @@ impl<'db> TupleType<'db> {
             .has_relation_to_impl(db, other.tuple(db), relation, visitor)
     }
 
-    pub(crate) fn is_equivalent_to_impl<C: Constraints<'db>>(
-        self,
-        db: &'db dyn Db,
-        other: Self,
-        visitor: &IsEquivalentVisitor<'db, C>,
-    ) -> C {
-        self.tuple(db)
-            .is_equivalent_to_impl(db, other.tuple(db), visitor)
-    }
-
     pub(crate) fn is_single_valued(self, db: &'db dyn Db) -> bool {
         self.tuple(db).is_single_valued(db)
     }
@@ -466,21 +455,6 @@ impl<'db> FixedLengthTuple<Type<'db>> {
                 })
             }
         }
-    }
-
-    fn is_equivalent_to_impl<C: Constraints<'db>>(
-        &self,
-        db: &'db dyn Db,
-        other: &Self,
-        visitor: &IsEquivalentVisitor<'db, C>,
-    ) -> C {
-        C::from_bool(db, self.0.len() == other.0.len()).and(db, || {
-            (self.0.iter())
-                .zip(&other.0)
-                .when_all(db, |(self_ty, other_ty)| {
-                    self_ty.is_equivalent_to_impl(db, *other_ty, visitor)
-                })
-        })
     }
 
     fn is_single_valued(&self, db: &'db dyn Db) -> bool {
@@ -871,36 +845,6 @@ impl<'db> VariableLengthTuple<Type<'db>> {
             }
         }
     }
-
-    fn is_equivalent_to_impl<C: Constraints<'db>>(
-        &self,
-        db: &'db dyn Db,
-        other: &Self,
-        visitor: &IsEquivalentVisitor<'db, C>,
-    ) -> C {
-        self.variable
-            .is_equivalent_to_impl(db, other.variable, visitor)
-            .and(db, || {
-                (self.prenormalized_prefix_elements(db, None))
-                    .zip_longest(other.prenormalized_prefix_elements(db, None))
-                    .when_all(db, |pair| match pair {
-                        EitherOrBoth::Both(self_ty, other_ty) => {
-                            self_ty.is_equivalent_to_impl(db, other_ty, visitor)
-                        }
-                        EitherOrBoth::Left(_) | EitherOrBoth::Right(_) => C::unsatisfiable(db),
-                    })
-            })
-            .and(db, || {
-                (self.prenormalized_suffix_elements(db, None))
-                    .zip_longest(other.prenormalized_suffix_elements(db, None))
-                    .when_all(db, |pair| match pair {
-                        EitherOrBoth::Both(self_ty, other_ty) => {
-                            self_ty.is_equivalent_to_impl(db, other_ty, visitor)
-                        }
-                        EitherOrBoth::Left(_) | EitherOrBoth::Right(_) => C::unsatisfiable(db),
-                    })
-            })
-    }
 }
 
 impl<'db> PyIndex<'db> for &VariableLengthTuple<Type<'db>> {
@@ -1089,25 +1033,6 @@ impl<'db> Tuple<Type<'db>> {
             }
             Tuple::Variable(self_tuple) => {
                 self_tuple.has_relation_to_impl(db, other, relation, visitor)
-            }
-        }
-    }
-
-    fn is_equivalent_to_impl<C: Constraints<'db>>(
-        &self,
-        db: &'db dyn Db,
-        other: &Self,
-        visitor: &IsEquivalentVisitor<'db, C>,
-    ) -> C {
-        match (self, other) {
-            (Tuple::Fixed(self_tuple), Tuple::Fixed(other_tuple)) => {
-                self_tuple.is_equivalent_to_impl(db, other_tuple, visitor)
-            }
-            (Tuple::Variable(self_tuple), Tuple::Variable(other_tuple)) => {
-                self_tuple.is_equivalent_to_impl(db, other_tuple, visitor)
-            }
-            (Tuple::Fixed(_), Tuple::Variable(_)) | (Tuple::Variable(_), Tuple::Fixed(_)) => {
-                C::unsatisfiable(db)
             }
         }
     }

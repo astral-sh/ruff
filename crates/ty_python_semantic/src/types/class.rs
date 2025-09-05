@@ -27,10 +27,10 @@ use crate::types::typed_dict::typed_dict_params_from_class_def;
 use crate::types::{
     ApplyTypeMappingVisitor, Binding, BoundSuperError, BoundSuperType, CallableType,
     DataclassParams, DeprecatedInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
-    IsEquivalentVisitor, KnownInstanceType, ManualPEP695TypeAliasType, MaterializationKind,
-    NormalizedVisitor, PropertyInstanceType, StringLiteralType, TypeAliasType, TypeMapping,
-    TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, TypedDictParams,
-    UnionBuilder, VarianceInferable, declaration_type, infer_definition_types,
+    KnownInstanceType, ManualPEP695TypeAliasType, MaterializationKind, NormalizedVisitor,
+    PropertyInstanceType, StringLiteralType, TypeAliasType, TypeMapping, TypeRelation,
+    TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, TypedDictParams, UnionBuilder,
+    VarianceInferable, declaration_type, infer_definition_types,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet, Program,
@@ -582,33 +582,6 @@ impl<'db> ClassType<'db> {
                 }
             }
         })
-    }
-
-    pub(super) fn is_equivalent_to_impl<C: Constraints<'db>>(
-        self,
-        db: &'db dyn Db,
-        other: ClassType<'db>,
-        visitor: &IsEquivalentVisitor<'db, C>,
-    ) -> C {
-        if self == other {
-            return C::always_satisfiable(db);
-        }
-
-        match (self, other) {
-            // A non-generic class is never equivalent to a generic class.
-            // Two non-generic classes are only equivalent if they are equal (handled above).
-            (ClassType::NonGeneric(_), _) | (_, ClassType::NonGeneric(_)) => C::unsatisfiable(db),
-
-            (ClassType::Generic(this), ClassType::Generic(other)) => {
-                C::from_bool(db, this.origin(db) == other.origin(db)).and(db, || {
-                    this.specialization(db).is_equivalent_to_impl(
-                        db,
-                        other.specialization(db),
-                        visitor,
-                    )
-                })
-            }
-        }
     }
 
     /// Return the metaclass of this class, or `type[Unknown]` if the metaclass cannot be inferred.

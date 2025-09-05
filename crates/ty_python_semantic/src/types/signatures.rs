@@ -21,8 +21,8 @@ use crate::types::constraints::{ConstraintSet, Constraints, IteratorConstraintsE
 use crate::types::generics::{GenericContext, walk_generic_context};
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, FindLegacyTypeVarsVisitor,
-    HasRelationToVisitor, IsEquivalentVisitor, KnownClass, MaterializationKind, NormalizedVisitor,
-    TypeMapping, TypeRelation, VarianceInferable, todo_type,
+    HasRelationToVisitor, KnownClass, MaterializationKind, NormalizedVisitor, TypeMapping,
+    TypeRelation, VarianceInferable, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -195,31 +195,6 @@ impl<'db> CallableSignature<'db> {
                     visitor,
                 )
             }),
-        }
-    }
-
-    /// Check whether this callable type is equivalent to another callable type.
-    ///
-    /// See [`Type::is_equivalent_to`] for more details.
-    pub(crate) fn is_equivalent_to_impl<C: Constraints<'db>>(
-        &self,
-        db: &'db dyn Db,
-        other: &Self,
-        visitor: &IsEquivalentVisitor<'db, C>,
-    ) -> C {
-        match (self.overloads.as_slice(), other.overloads.as_slice()) {
-            ([self_signature], [other_signature]) => {
-                // Common case: both callable types contain a single signature, use the custom
-                // equivalence check instead of delegating it to the subtype check.
-                self_signature.is_equivalent_to_impl(db, other_signature, visitor)
-            }
-            (_, _) => {
-                if self == other {
-                    return C::always_satisfiable(db);
-                }
-                self.is_subtype_of_impl::<C>(db, other)
-                    .and(db, || other.is_subtype_of_impl(db, self))
-            }
         }
     }
 }
@@ -517,91 +492,6 @@ impl<'db> Signature<'db> {
         }
     }
 
-    /// Return `true` if `self` has exactly the same set of possible static materializations as
-    /// `other` (if `self` represents the same set of possible sets of possible runtime objects as
-    /// `other`).
-    pub(crate) fn is_equivalent_to_impl<C: Constraints<'db>>(
-        &self,
-        db: &'db dyn Db,
-        other: &Signature<'db>,
-        visitor: &IsEquivalentVisitor<'db, C>,
-    ) -> C {
-        let mut result = C::always_satisfiable(db);
-        let mut check_types = |self_type: Option<Type<'db>>, other_type: Option<Type<'db>>| {
-            let self_type = self_type.unwrap_or(Type::unknown());
-            let other_type = other_type.unwrap_or(Type::unknown());
-            !result
-                .intersect(db, self_type.is_equivalent_to_impl(db, other_type, visitor))
-                .is_never_satisfied(db)
-        };
-
-        if self.parameters.is_gradual() != other.parameters.is_gradual() {
-            return C::unsatisfiable(db);
-        }
-
-        if self.parameters.len() != other.parameters.len() {
-            return C::unsatisfiable(db);
-        }
-
-        if !check_types(self.return_ty, other.return_ty) {
-            return result;
-        }
-
-        for (self_parameter, other_parameter) in self.parameters.iter().zip(&other.parameters) {
-            match (self_parameter.kind(), other_parameter.kind()) {
-                (
-                    ParameterKind::PositionalOnly {
-                        default_type: self_default,
-                        ..
-                    },
-                    ParameterKind::PositionalOnly {
-                        default_type: other_default,
-                        ..
-                    },
-                ) if self_default.is_some() == other_default.is_some() => {}
-
-                (
-                    ParameterKind::PositionalOrKeyword {
-                        name: self_name,
-                        default_type: self_default,
-                    },
-                    ParameterKind::PositionalOrKeyword {
-                        name: other_name,
-                        default_type: other_default,
-                    },
-                ) if self_default.is_some() == other_default.is_some()
-                    && self_name == other_name => {}
-
-                (ParameterKind::Variadic { .. }, ParameterKind::Variadic { .. }) => {}
-
-                (
-                    ParameterKind::KeywordOnly {
-                        name: self_name,
-                        default_type: self_default,
-                    },
-                    ParameterKind::KeywordOnly {
-                        name: other_name,
-                        default_type: other_default,
-                    },
-                ) if self_default.is_some() == other_default.is_some()
-                    && self_name == other_name => {}
-
-                (ParameterKind::KeywordVariadic { .. }, ParameterKind::KeywordVariadic { .. }) => {}
-
-                _ => return C::unsatisfiable(db),
-            }
-
-            if !check_types(
-                self_parameter.annotated_type(),
-                other_parameter.annotated_type(),
-            ) {
-                return result;
-            }
-        }
-
-        result
-    }
-
     /// Implementation of subtyping and assignability for signature.
     fn has_relation_to_impl<C: Constraints<'db>>(
         &self,
@@ -701,8 +591,15 @@ impl<'db> Signature<'db> {
         }
 
         // If either of the parameter lists is gradual (`...`), then it is assignable to and from
-        // any other parameter list, but not a subtype or supertype of any other parameter list.
-        if self.parameters.is_gradual() || other.parameters.is_gradual() {
+        // any other parameter list, but only a subtype or supertype of another parameter list if
+        // that parameter list is also gradual.
+        if self.parameters.is_gradual() {
+            return if other.parameters.is_gradual() {
+                C::always_satisfiable(db)
+            } else {
+                C::from_bool(db, relation.is_assignability())
+            };
+        } else if other.parameters.is_gradual() {
             return C::from_bool(db, relation.is_assignability());
         }
 

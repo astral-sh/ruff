@@ -188,10 +188,6 @@ pub(crate) type HasRelationToVisitor<'db, C> =
 pub(crate) type IsDisjointVisitor<'db, C> = PairVisitor<'db, IsDisjoint, C>;
 pub(crate) struct IsDisjoint;
 
-/// A [`PairVisitor`] that is used in `is_equivalent` methods.
-pub(crate) type IsEquivalentVisitor<'db, C> = PairVisitor<'db, IsEquivalent, C>;
-pub(crate) struct IsEquivalent;
-
 /// A [`CycleDetector`] that is used in `find_legacy_typevars` methods.
 pub(crate) type FindLegacyTypeVarsVisitor<'db> = CycleDetector<FindLegacyTypeVars, Type<'db>, ()>;
 pub(crate) struct FindLegacyTypeVars;
@@ -1422,9 +1418,15 @@ impl<'db> Type<'db> {
             // no other type is a subtype of or assignable to `Never`.
             (_, Type::Never) => C::unsatisfiable(db),
 
-            (Type::Union(union), _) => union.elements(db).iter().when_all(db, |&elem_ty| {
-                elem_ty.has_relation_to_impl(db, target, relation, visitor)
-            }),
+            (Type::Union(union), _) => union
+                .elements(db)
+                .iter()
+                .when_all(db, |&elem_ty| {
+                    elem_ty.has_relation_to_impl(db, target, relation, visitor)
+                })
+                .or(db, || {
+                    C::from_bool(db, self.normalized(db) == target.normalized(db))
+                }),
 
             (_, Type::Union(union)) => union.elements(db).iter().when_any(db, |&elem_ty| {
                 self.has_relation_to_impl(db, elem_ty, relation, visitor)
@@ -1465,7 +1467,7 @@ impl<'db> Type<'db> {
             (left, Type::AlwaysTruthy) => C::from_bool(db, left.bool(db).is_always_true()),
             // Currently, the only supertype of `AlwaysFalsy` and `AlwaysTruthy` is the universal set (object instance).
             (Type::AlwaysFalsy | Type::AlwaysTruthy, _) => {
-                target.when_equivalent_to(db, Type::object(db))
+                C::from_bool(db, target.is_equivalent_to(db, Type::object(db)))
             }
 
             // These clauses handle type variants that include function literals. A function
@@ -1602,13 +1604,16 @@ impl<'db> Type<'db> {
 
             (Type::Callable(_), _) => C::unsatisfiable(db),
 
-            (Type::BoundSuper(_), Type::BoundSuper(_)) => self.when_equivalent_to(db, target),
+            (Type::BoundSuper(_), Type::BoundSuper(_)) => visitor
+                .visit((self, target, relation), || {
+                    self.when_equivalent_to_impl(db, target, visitor)
+                }),
             (Type::BoundSuper(_), _) => KnownClass::Super
                 .to_instance(db)
                 .has_relation_to_impl(db, target, relation, visitor),
 
             // `Literal[<class 'C'>]` is a subtype of `type[B]` if `C` is a subclass of `B`,
-            // since `type[B]` describes all possible runtime subclasses of the class object `B`.
+            // since `type[B]` describes all possible runtiexime subclasses of the class object `B`.
             (Type::ClassLiteral(class), Type::SubclassOf(target_subclass_ty)) => target_subclass_ty
                 .subclass_of()
                 .into_class()
@@ -1740,95 +1745,31 @@ impl<'db> Type<'db> {
     }
 
     fn when_equivalent_to<C: Constraints<'db>>(self, db: &'db dyn Db, other: Type<'db>) -> C {
-        self.is_equivalent_to_impl(
-            db,
-            other,
-            &IsEquivalentVisitor::new(C::always_satisfiable(db)),
-        )
+        let visitor = HasRelationToVisitor::new(C::always_satisfiable(db));
+        self.when_equivalent_to_impl(db, other, &visitor)
     }
 
-    pub(crate) fn is_equivalent_to_impl<C: Constraints<'db>>(
+    fn when_equivalent_to_impl<C: Constraints<'db>>(
         self,
         db: &'db dyn Db,
         other: Type<'db>,
-        visitor: &IsEquivalentVisitor<'db, C>,
+        visitor: &HasRelationToVisitor<'db, C>,
     ) -> C {
-        if self == other {
-            return C::always_satisfiable(db);
-        }
-
-        match (self, other) {
-            (Type::Dynamic(_), Type::Dynamic(_)) => C::always_satisfiable(db),
-
-            (Type::SubclassOf(first), Type::SubclassOf(second)) => {
-                match (first.subclass_of(), second.subclass_of()) {
-                    (first, second) if first == second => C::always_satisfiable(db),
-                    (SubclassOfInner::Dynamic(_), SubclassOfInner::Dynamic(_)) => {
-                        C::always_satisfiable(db)
-                    }
-                    _ => C::unsatisfiable(db),
-                }
-            }
-
-            (Type::TypeAlias(self_alias), _) => {
-                let self_alias_ty = self_alias.value_type(db).normalized(db);
-                visitor.visit((self_alias_ty, other), || {
-                    self_alias_ty.is_equivalent_to_impl(db, other, visitor)
-                })
-            }
-
-            (_, Type::TypeAlias(other_alias)) => {
-                let other_alias_ty = other_alias.value_type(db).normalized(db);
-                visitor.visit((self, other_alias_ty), || {
-                    self.is_equivalent_to_impl(db, other_alias_ty, visitor)
-                })
-            }
-
-            (Type::NominalInstance(first), Type::NominalInstance(second)) => {
-                first.is_equivalent_to_impl(db, second, visitor)
-            }
-
-            (Type::Union(first), Type::Union(second)) => {
-                first.is_equivalent_to_impl(db, second, visitor)
-            }
-
-            (Type::Intersection(first), Type::Intersection(second)) => {
-                first.is_equivalent_to_impl(db, second, visitor)
-            }
-
-            (Type::FunctionLiteral(self_function), Type::FunctionLiteral(target_function)) => {
-                self_function.is_equivalent_to_impl(db, target_function, visitor)
-            }
-            (Type::BoundMethod(self_method), Type::BoundMethod(target_method)) => {
-                self_method.is_equivalent_to_impl(db, target_method, visitor)
-            }
-            (Type::MethodWrapper(self_method), Type::MethodWrapper(target_method)) => {
-                self_method.is_equivalent_to_impl(db, target_method, visitor)
-            }
-            (Type::Callable(first), Type::Callable(second)) => {
-                first.is_equivalent_to_impl(db, second, visitor)
-            }
-
-            (Type::ProtocolInstance(first), Type::ProtocolInstance(second)) => {
-                first.is_equivalent_to_impl(db, second, visitor)
-            }
-            (Type::ProtocolInstance(protocol), nominal @ Type::NominalInstance(n))
-            | (nominal @ Type::NominalInstance(n), Type::ProtocolInstance(protocol)) => {
-                C::from_bool(db, n.is_object(db) && protocol.normalized(db) == nominal)
-            }
-            // An instance of an enum class is equivalent to an enum literal of that class,
-            // if that enum has only has one member.
-            (Type::NominalInstance(instance), Type::EnumLiteral(literal))
-            | (Type::EnumLiteral(literal), Type::NominalInstance(instance)) => {
-                if literal.enum_class_instance(db) != Type::NominalInstance(instance) {
-                    return C::unsatisfiable(db);
-                }
-
-                let class_literal = instance.class(db).class_literal(db).0;
-                C::from_bool(db, is_single_member_enum(db, class_literal))
-            }
-            _ => C::unsatisfiable(db),
-        }
+        let self_relation = self.has_relation_to_impl(db, other, TypeRelation::Subtyping, visitor);
+        // println!(
+        //     "{}, {}, {}",
+        //     self.display(db),
+        //     other.display(db),
+        //     self_relation.display(db)
+        // );
+        let other_relation = other.has_relation_to_impl(db, self, TypeRelation::Subtyping, visitor);
+        // println!(
+        //     "{}, {}, {}",
+        //     other.display(db),
+        //     self.display(db),
+        //     other_relation.display(db)
+        // );
+        self_relation.and(db, || other_relation)
     }
 
     /// Return true if this type and `other` have no common elements.
@@ -8855,21 +8796,6 @@ impl<'db> BoundMethodType<'db> {
                 )
             })
     }
-
-    fn is_equivalent_to_impl<C: Constraints<'db>>(
-        self,
-        db: &'db dyn Db,
-        other: Self,
-        visitor: &IsEquivalentVisitor<'db, C>,
-    ) -> C {
-        self.function(db)
-            .is_equivalent_to_impl(db, other.function(db), visitor)
-            .and(db, || {
-                other
-                    .self_instance(db)
-                    .is_equivalent_to_impl(db, self.self_instance(db), visitor)
-            })
-    }
 }
 
 /// This type represents the set of all callable objects with a certain, possibly overloaded,
@@ -9002,25 +8928,6 @@ impl<'db> CallableType<'db> {
         self.signatures(db)
             .has_relation_to_impl(db, other.signatures(db), relation, visitor)
     }
-
-    /// Check whether this callable type is equivalent to another callable type.
-    ///
-    /// See [`Type::is_equivalent_to`] for more details.
-    fn is_equivalent_to_impl<C: Constraints<'db>>(
-        self,
-        db: &'db dyn Db,
-        other: Self,
-        visitor: &IsEquivalentVisitor<'db, C>,
-    ) -> C {
-        if self == other {
-            return C::always_satisfiable(db);
-        }
-
-        C::from_bool(db, self.is_function_like(db) == other.is_function_like(db)).and(db, || {
-            self.signatures(db)
-                .is_equivalent_to_impl(db, other.signatures(db), visitor)
-        })
-    }
 }
 
 /// Represents a specific instance of `types.MethodWrapperType`
@@ -9086,44 +8993,6 @@ impl<'db> MethodWrapperKind<'db> {
                 MethodWrapperKind::FunctionTypeDunderCall(self_function),
                 MethodWrapperKind::FunctionTypeDunderCall(other_function),
             ) => self_function.has_relation_to_impl(db, other_function, relation, visitor),
-
-            (MethodWrapperKind::PropertyDunderGet(_), MethodWrapperKind::PropertyDunderGet(_))
-            | (MethodWrapperKind::PropertyDunderSet(_), MethodWrapperKind::PropertyDunderSet(_))
-            | (MethodWrapperKind::StrStartswith(_), MethodWrapperKind::StrStartswith(_)) => {
-                C::from_bool(db, self == other)
-            }
-
-            (
-                MethodWrapperKind::FunctionTypeDunderGet(_)
-                | MethodWrapperKind::FunctionTypeDunderCall(_)
-                | MethodWrapperKind::PropertyDunderGet(_)
-                | MethodWrapperKind::PropertyDunderSet(_)
-                | MethodWrapperKind::StrStartswith(_),
-                MethodWrapperKind::FunctionTypeDunderGet(_)
-                | MethodWrapperKind::FunctionTypeDunderCall(_)
-                | MethodWrapperKind::PropertyDunderGet(_)
-                | MethodWrapperKind::PropertyDunderSet(_)
-                | MethodWrapperKind::StrStartswith(_),
-            ) => C::unsatisfiable(db),
-        }
-    }
-
-    fn is_equivalent_to_impl<C: Constraints<'db>>(
-        self,
-        db: &'db dyn Db,
-        other: Self,
-        visitor: &IsEquivalentVisitor<'db, C>,
-    ) -> C {
-        match (self, other) {
-            (
-                MethodWrapperKind::FunctionTypeDunderGet(self_function),
-                MethodWrapperKind::FunctionTypeDunderGet(other_function),
-            ) => self_function.is_equivalent_to_impl(db, other_function, visitor),
-
-            (
-                MethodWrapperKind::FunctionTypeDunderCall(self_function),
-                MethodWrapperKind::FunctionTypeDunderCall(other_function),
-            ) => self_function.is_equivalent_to_impl(db, other_function, visitor),
 
             (MethodWrapperKind::PropertyDunderGet(_), MethodWrapperKind::PropertyDunderGet(_))
             | (MethodWrapperKind::PropertyDunderSet(_), MethodWrapperKind::PropertyDunderSet(_))
@@ -9640,14 +9509,6 @@ impl<'db> UnionType<'db> {
         }
     }
 
-    /// Create a new union type with the elements normalized.
-    ///
-    /// See [`Type::normalized`] for more details.
-    #[must_use]
-    pub(crate) fn normalized(self, db: &'db dyn Db) -> Type<'db> {
-        self.normalized_impl(db, &NormalizedVisitor::default())
-    }
-
     pub(crate) fn normalized_impl(
         self,
         db: &'db dyn Db,
@@ -9663,32 +9524,6 @@ impl<'db> UnionType<'db> {
                 UnionBuilder::add,
             )
             .build()
-    }
-
-    pub(crate) fn is_equivalent_to_impl<C: Constraints<'db>>(
-        self,
-        db: &'db dyn Db,
-        other: Self,
-        _visitor: &IsEquivalentVisitor<'db, C>,
-    ) -> C {
-        if self == other {
-            return C::always_satisfiable(db);
-        }
-
-        let self_elements = self.elements(db);
-        let other_elements = other.elements(db);
-
-        if self_elements.len() != other_elements.len() {
-            return C::unsatisfiable(db);
-        }
-
-        let sorted_self = self.normalized(db);
-
-        if sorted_self == Type::Union(other) {
-            return C::always_satisfiable(db);
-        }
-
-        C::from_bool(db, sorted_self == other.normalized(db))
     }
 }
 
@@ -9734,15 +9569,6 @@ impl<'db> IntersectionType<'db> {
             .build()
     }
 
-    /// Return a new `IntersectionType` instance with the positive and negative types sorted
-    /// according to a canonical ordering, and other normalizations applied to each element as applicable.
-    ///
-    /// See [`Type::normalized`] for more details.
-    #[must_use]
-    pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
-        self.normalized_impl(db, &NormalizedVisitor::default())
-    }
-
     pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         fn normalized_set<'db>(
             db: &'db dyn Db,
@@ -9763,40 +9589,6 @@ impl<'db> IntersectionType<'db> {
             normalized_set(db, self.positive(db), visitor),
             normalized_set(db, self.negative(db), visitor),
         )
-    }
-
-    /// Return `true` if `self` represents exactly the same set of possible runtime objects as `other`
-    pub(crate) fn is_equivalent_to_impl<C: Constraints<'db>>(
-        self,
-        db: &'db dyn Db,
-        other: Self,
-        _visitor: &IsEquivalentVisitor<'db, C>,
-    ) -> C {
-        if self == other {
-            return C::always_satisfiable(db);
-        }
-
-        let self_positive = self.positive(db);
-        let other_positive = other.positive(db);
-
-        if self_positive.len() != other_positive.len() {
-            return C::unsatisfiable(db);
-        }
-
-        let self_negative = self.negative(db);
-        let other_negative = other.negative(db);
-
-        if self_negative.len() != other_negative.len() {
-            return C::unsatisfiable(db);
-        }
-
-        let sorted_self = self.normalized(db);
-
-        if sorted_self == other {
-            return C::always_satisfiable(db);
-        }
-
-        C::from_bool(db, sorted_self == other.normalized(db))
     }
 
     /// Returns an iterator over the positive elements of the intersection. If

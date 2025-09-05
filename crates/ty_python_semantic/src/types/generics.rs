@@ -16,9 +16,9 @@ use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
-    IsEquivalentVisitor, KnownClass, KnownInstanceType, MaterializationKind, NormalizedVisitor,
-    Type, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarVariance,
-    UnionType, binding_type, declaration_type,
+    KnownClass, KnownInstanceType, MaterializationKind, NormalizedVisitor, Type, TypeMapping,
+    TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarVariance, UnionType,
+    binding_type, declaration_type,
 };
 use crate::{Db, FxOrderSet};
 
@@ -805,7 +805,9 @@ impl<'db> Specialization<'db> {
             {
                 match relation {
                     TypeRelation::Assignability => continue,
-                    TypeRelation::Subtyping => return C::unsatisfiable(db),
+                    TypeRelation::Subtyping => {
+                        return C::from_bool(db, self_type.is_dynamic() && other_type.is_dynamic());
+                    }
                 }
             }
 
@@ -835,58 +837,6 @@ impl<'db> Specialization<'db> {
             };
             if result.intersect(db, compatible).is_never_satisfied(db) {
                 return result;
-            }
-        }
-
-        result
-    }
-
-    pub(crate) fn is_equivalent_to_impl<C: Constraints<'db>>(
-        self,
-        db: &'db dyn Db,
-        other: Specialization<'db>,
-        visitor: &IsEquivalentVisitor<'db, C>,
-    ) -> C {
-        if self.materialization_kind(db) != other.materialization_kind(db) {
-            return C::unsatisfiable(db);
-        }
-        let generic_context = self.generic_context(db);
-        if generic_context != other.generic_context(db) {
-            return C::unsatisfiable(db);
-        }
-
-        let mut result = C::always_satisfiable(db);
-        for ((bound_typevar, self_type), other_type) in (generic_context.variables(db).into_iter())
-            .zip(self.types(db))
-            .zip(other.types(db))
-        {
-            // Equivalence of each type in the specialization depends on the variance of the
-            // corresponding typevar:
-            //   - covariant: verify that self_type == other_type
-            //   - contravariant: verify that other_type == self_type
-            //   - invariant: verify that self_type == other_type
-            //   - bivariant: skip, can't make equivalence false
-            let compatible = match bound_typevar.variance(db) {
-                TypeVarVariance::Invariant
-                | TypeVarVariance::Covariant
-                | TypeVarVariance::Contravariant => {
-                    self_type.is_equivalent_to_impl(db, *other_type, visitor)
-                }
-                TypeVarVariance::Bivariant => C::always_satisfiable(db),
-            };
-            if result.intersect(db, compatible).is_never_satisfied(db) {
-                return result;
-            }
-        }
-
-        match (self.tuple_inner(db), other.tuple_inner(db)) {
-            (Some(_), None) | (None, Some(_)) => return C::unsatisfiable(db),
-            (None, None) => {}
-            (Some(self_tuple), Some(other_tuple)) => {
-                let compatible = self_tuple.is_equivalent_to_impl(db, other_tuple, visitor);
-                if result.intersect(db, compatible).is_never_satisfied(db) {
-                    return result;
-                }
             }
         }
 

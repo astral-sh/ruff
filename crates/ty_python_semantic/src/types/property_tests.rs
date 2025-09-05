@@ -173,16 +173,16 @@ mod stable {
         forall types s, t. s.is_assignable_to(db, union(db, [s, t])) && t.is_assignable_to(db, union(db, [s, t]))
     );
 
-    // Only `Never` is a subtype of `Any`.
+    // Only `Never`/`Any` are subtypes of `Any`.
     type_property_test!(
         only_never_is_subtype_of_any, db,
-        forall types s. !s.is_equivalent_to(db, Type::Never) => !s.is_subtype_of(db, Type::any())
+        forall types s. !s.is_equivalent_to(db, Type::Never) => s.is_dynamic() || !s.is_subtype_of(db, Type::any())
     );
 
-    // Only `object` is a supertype of `Any`.
+    // Only `object`/`Any` are supertypes of `Any`.
     type_property_test!(
         only_object_is_supertype_of_any, db,
-        forall types t. !t.is_equivalent_to(db, Type::object(db)) => !Type::any().is_subtype_of(db, t)
+        forall types t. !t.is_equivalent_to(db, Type::object(db)) => t.is_dynamic() || !Type::any().is_subtype_of(db, t)
     );
 
     // Equivalence is commutative.

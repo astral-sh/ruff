@@ -13,8 +13,7 @@ use crate::types::protocol_class::walk_protocol_interface;
 use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
     ApplyTypeMappingVisitor, ClassBase, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
-    IsDisjointVisitor, IsEquivalentVisitor, NormalizedVisitor, TypeMapping, TypeRelation,
-    VarianceInferable,
+    IsDisjointVisitor, NormalizedVisitor, TypeMapping, TypeRelation, VarianceInferable,
 };
 use crate::{Db, FxOrderSet};
 
@@ -278,24 +277,6 @@ impl<'db> NominalInstanceType<'db> {
         }
     }
 
-    pub(super) fn is_equivalent_to_impl<C: Constraints<'db>>(
-        self,
-        db: &'db dyn Db,
-        other: Self,
-        visitor: &IsEquivalentVisitor<'db, C>,
-    ) -> C {
-        match (self.0, other.0) {
-            (
-                NominalInstanceInner::ExactTuple(tuple1),
-                NominalInstanceInner::ExactTuple(tuple2),
-            ) => tuple1.is_equivalent_to_impl(db, tuple2, visitor),
-            (NominalInstanceInner::NonTuple(class1), NominalInstanceInner::NonTuple(class2)) => {
-                class1.is_equivalent_to_impl(db, class2, visitor)
-            }
-            _ => C::unsatisfiable(db),
-        }
-    }
-
     pub(super) fn is_disjoint_from_impl<C: Constraints<'db>>(
         self,
         db: &'db dyn Db,
@@ -485,13 +466,6 @@ impl<'db> ProtocolInstanceType<'db> {
     /// Return a "normalized" version of this `Protocol` type.
     ///
     /// See [`Type::normalized`] for more details.
-    pub(super) fn normalized(self, db: &'db dyn Db) -> Type<'db> {
-        self.normalized_impl(db, &NormalizedVisitor::default())
-    }
-
-    /// Return a "normalized" version of this `Protocol` type.
-    ///
-    /// See [`Type::normalized`] for more details.
     pub(super) fn normalized_impl(
         self,
         db: &'db dyn Db,
@@ -524,32 +498,21 @@ impl<'db> ProtocolInstanceType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        _relation: TypeRelation,
+        relation: TypeRelation,
         visitor: &HasRelationToVisitor<'db, C>,
     ) -> C {
         other
             .inner
             .interface(db)
             .is_sub_interface_of(db, self.inner.interface(db), visitor)
-    }
-
-    /// Return `true` if this protocol type is equivalent to the protocol `other`.
-    ///
-    /// TODO: consider the types of the members as well as their existence
-    pub(super) fn is_equivalent_to_impl<C: Constraints<'db>>(
-        self,
-        db: &'db dyn Db,
-        other: Self,
-        _visitor: &IsEquivalentVisitor<'db, C>,
-    ) -> C {
-        if self == other {
-            return C::always_satisfiable(db);
-        }
-        let self_normalized = self.normalized(db);
-        if self_normalized == Type::ProtocolInstance(other) {
-            return C::always_satisfiable(db);
-        }
-        C::from_bool(db, self_normalized == other.normalized(db))
+            .or(db, || {
+                Type::object(db).has_relation_to_impl(
+                    db,
+                    Type::ProtocolInstance(other),
+                    relation,
+                    visitor,
+                )
+            })
     }
 
     /// Return `true` if this protocol type is disjoint from the protocol `other`.
