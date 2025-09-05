@@ -40,6 +40,13 @@ use crate::{Fix, FixAvailability, Violation};
 /// [`lint.flake8-type-checking.runtime-evaluated-decorators`] settings to mark them
 /// as such.
 ///
+/// If [`lint.future-annotations`] is set to `true`, `from __future__ import
+/// annotations` will be added if doing so would enable an import to be
+/// moved into an `if TYPE_CHECKING:` block. This takes precedence over the
+/// [`lint.flake8-type-checking.quote-annotations`] setting described above if
+/// both settings are enabled.
+///
+///
 /// ## Example
 /// ```python
 /// from __future__ import annotations
@@ -70,12 +77,6 @@ use crate::{Fix, FixAvailability, Violation};
 /// When [preview](https://docs.astral.sh/ruff/preview/) is enabled,
 /// the criterion for determining whether an import is first-party
 /// is stricter, which could affect whether this lint is triggered vs [`TC001`](https://docs.astral.sh/ruff/rules/typing-only-third-party-import/). See [this FAQ section](https://docs.astral.sh/ruff/faq/#how-does-ruff-determine-which-of-my-imports-are-first-party-third-party-etc) for more details.
-///
-/// If [`lint.future-annotations`] is set to `true`, `from __future__ import
-/// annotations` will be added if doing so would enable an import to be moved into an `if
-/// TYPE_CHECKING:` block. This takes precedence over the
-/// [`lint.flake8-type-checking.quote-annotations`] setting described above if both settings are
-/// enabled.
 ///
 /// ## Options
 /// - `lint.flake8-type-checking.quote-annotations`
@@ -128,6 +129,12 @@ impl Violation for TypingOnlyFirstPartyImport {
 /// [`lint.flake8-type-checking.runtime-evaluated-decorators`] settings to mark them
 /// as such.
 ///
+/// If [`lint.future-annotations`] is set to `true`, `from __future__ import
+/// annotations` will be added if doing so would enable an import to be
+/// moved into an `if TYPE_CHECKING:` block. This takes precedence over the
+/// [`lint.flake8-type-checking.quote-annotations`] setting described above if
+/// both settings are enabled.
+///
 /// ## Example
 /// ```python
 /// from __future__ import annotations
@@ -157,12 +164,6 @@ impl Violation for TypingOnlyFirstPartyImport {
 /// When [preview](https://docs.astral.sh/ruff/preview/) is enabled,
 /// the criterion for determining whether an import is first-party
 /// is stricter, which could affect whether this lint is triggered vs [`TC001`](https://docs.astral.sh/ruff/rules/typing-only-first-party-import/). See [this FAQ section](https://docs.astral.sh/ruff/faq/#how-does-ruff-determine-which-of-my-imports-are-first-party-third-party-etc) for more details.
-///
-/// If [`lint.future-annotations`] is set to `true`, `from __future__ import
-/// annotations` will be added if doing so would enable an import to be moved into an `if
-/// TYPE_CHECKING:` block. This takes precedence over the
-/// [`lint.flake8-type-checking.quote-annotations`] setting described above if both settings are
-/// enabled.
 ///
 /// ## Options
 /// - `lint.flake8-type-checking.quote-annotations`
@@ -215,6 +216,12 @@ impl Violation for TypingOnlyThirdPartyImport {
 /// [`lint.flake8-type-checking.runtime-evaluated-decorators`] settings to mark them
 /// as such.
 ///
+/// If [`lint.future-annotations`] is set to `true`, `from __future__ import
+/// annotations` will be added if doing so would enable an import to be
+/// moved into an `if TYPE_CHECKING:` block. This takes precedence over the
+/// [`lint.flake8-type-checking.quote-annotations`] setting described above if
+/// both settings are enabled.
+///
 /// ## Example
 /// ```python
 /// from __future__ import annotations
@@ -239,15 +246,6 @@ impl Violation for TypingOnlyThirdPartyImport {
 /// def func(path: Path) -> str:
 ///     return str(path)
 /// ```
-///
-/// ## Preview
-///
-/// When [preview](https://docs.astral.sh/ruff/preview/) is enabled, if
-/// [`lint.future-annotations`] is set to `true`, `from __future__ import
-/// annotations` will be added if doing so would enable an import to be moved into an `if
-/// TYPE_CHECKING:` block. This takes precedence over the
-/// [`lint.flake8-type-checking.quote-annotations`] setting described above if both settings are
-/// enabled.
 ///
 /// ## Options
 /// - `lint.flake8-type-checking.quote-annotations`
