@@ -155,7 +155,7 @@ def yield_in_finally():
     else:
         return
     finally:
-        yield
+        yield # RUF062
 
 
 # (16) Invalid: No returning except accumulates yields
@@ -168,7 +168,7 @@ def yield_in_no_return_except():
     else:
         yield
         return
-    yield
+    yield # RUF062
 
 
 # (17) Invalid: Return only in exception
@@ -178,7 +178,7 @@ def no_return_guarding_yield():
         yield
     except:
         return
-    yield
+    yield # RUF062
 
 # (18) Invalid: No returning except accumulates yields
 @contextlib.contextmanager
@@ -190,12 +190,12 @@ def multiple_yields_in_return_guarded_except():
         return
     except ZeroDivisionError:
         yield # valid
-        yield # invalid
+        yield # # RUF062
         return
     except IndexError:
         yield # valid
         pass
-    yield # invalid because of IndexError branch
+    yield # RUF062 -- Invalid yield because of IndexError branch
 
 # (19) Invalid: yield in finally runs after except despite return
 @contextlib.contextmanager
@@ -208,7 +208,7 @@ def multiple_yields_in_returning_except():
         yield
         return
     finally:
-        yield # invalid, runs after ZeroDivisionError except
+        yield # RUF062, runs after ZeroDivisionError except
 
 # (20) Invalid: multiple yields in match arm
 @contextlib.contextmanager
@@ -216,7 +216,7 @@ def returning_match_case(variable):
     match variable:
         case "a":
             yield # valid
-            yield # invalid
+            yield # RUF062
             return
         case "b":
             pass
@@ -231,10 +231,10 @@ def fully_illegal_match(variable):
     yield # valid
     match variable:
         case "a":
-            yield # invalid
+            yield # RUF062
             return
         case "b":
-            yield # invalid
+            yield # RUF062
 
 # (22) Invalid: multiple yields in terminating branch
 @contextlib.contextmanager
@@ -243,7 +243,7 @@ def multiple_yields_in_terminating_branch():
         pass
     except RuntimeError:
         yield # valid
-        yield # invalid
+        yield # RUF062
         return
     except ValueError:
         yield # valid
@@ -255,11 +255,11 @@ def multiple_yields_in_terminating_branch():
 def fully_illegal_try():
     yield # valid
     try:
-        yield # invalid, 23
+        yield # RUF062
     except ValueError:
-        yield # invalid, 23
+        yield # RUF062
         return
-    yield # invalid, 23
+    yield # RUF062
 
 
 # (24) Invalid: preceeding yield makes all try/except yields illegal; except returns
@@ -269,7 +269,7 @@ def fully_illegal_try_except_returns():
     try:
         pass
     except ValueError:
-        yield # invalid, 24
+        yield # RUF062
         return
 
 # (25) Invalid: preceeding yield makes all try/except yields illegal
@@ -279,7 +279,7 @@ def fully_illegal_try_except():
     try:
         pass
     except ValueError:
-        yield # invalid, 25
+        yield # RUF062
 
 # (26) Invalid: preceeding yield makes all try/except yields illegal; finally returns
 @contextlib.contextmanager
@@ -290,7 +290,7 @@ def fully_illegal_try_except_finally_returns():
     except ValueError:
         return
     finally:
-        yield # invalid, 26
+        yield # RUF062
         return
 
 

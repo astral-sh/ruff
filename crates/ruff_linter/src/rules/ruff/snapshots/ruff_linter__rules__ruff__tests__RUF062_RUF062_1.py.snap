@@ -151,7 +151,7 @@ RUF062 Function decorated with `contextlib.contextmanager` may yield more than o
     |
 156 |         return
 157 |     finally:
-158 |         yield
+158 |         yield # RUF062
     |         ^^^^^
     |
 
@@ -160,7 +160,7 @@ RUF062 Function decorated with `contextlib.contextmanager` may yield more than o
     |
 169 |         yield
 170 |         return
-171 |     yield
+171 |     yield # RUF062
     |     ^^^^^
     |
 
@@ -169,7 +169,7 @@ RUF062 Function decorated with `contextlib.contextmanager` may yield more than o
     |
 179 |     except:
 180 |         return
-181 |     yield
+181 |     yield # RUF062
     |     ^^^^^
 182 |
 183 | # (18) Invalid: No returning except accumulates yields
@@ -180,7 +180,7 @@ RUF062 Function decorated with `contextlib.contextmanager` may yield more than o
     |
 191 |     except ZeroDivisionError:
 192 |         yield # valid
-193 |         yield # invalid
+193 |         yield # # RUF062
     |         ^^^^^
 194 |         return
 195 |     except IndexError:
@@ -191,7 +191,7 @@ RUF062 Function decorated with `contextlib.contextmanager` may yield more than o
     |
 196 |         yield # valid
 197 |         pass
-198 |     yield # invalid because of IndexError branch
+198 |     yield # RUF062 -- Invalid yield because of IndexError branch
     |     ^^^^^
 199 |
 200 | # (19) Invalid: yield in finally runs after except despite return
@@ -202,7 +202,7 @@ RUF062 Function decorated with `contextlib.contextmanager` may yield more than o
     |
 209 |         return
 210 |     finally:
-211 |         yield # invalid, runs after ZeroDivisionError except
+211 |         yield # RUF062, runs after ZeroDivisionError except
     |         ^^^^^
 212 |
 213 | # (20) Invalid: multiple yields in match arm
@@ -213,8 +213,103 @@ RUF062 Function decorated with `contextlib.contextmanager` may yield more than o
     |
 217 |         case "a":
 218 |             yield # valid
-219 |             yield # invalid
+219 |             yield # RUF062
     |             ^^^^^
 220 |             return
 221 |         case "b":
+    |
+
+RUF062 Function decorated with `contextlib.contextmanager` may yield more than once
+   --> RUF062_1.py:234:13
+    |
+232 |     match variable:
+233 |         case "a":
+234 |             yield # RUF062
+    |             ^^^^^
+235 |             return
+236 |         case "b":
+    |
+
+RUF062 Function decorated with `contextlib.contextmanager` may yield more than once
+   --> RUF062_1.py:237:13
+    |
+235 |             return
+236 |         case "b":
+237 |             yield # RUF062
+    |             ^^^^^
+238 |
+239 | # (22) Invalid: multiple yields in terminating branch
+    |
+
+RUF062 Function decorated with `contextlib.contextmanager` may yield more than once
+   --> RUF062_1.py:246:9
+    |
+244 |     except RuntimeError:
+245 |         yield # valid
+246 |         yield # RUF062
+    |         ^^^^^
+247 |         return
+248 |     except ValueError:
+    |
+
+RUF062 Function decorated with `contextlib.contextmanager` may yield more than once
+   --> RUF062_1.py:258:9
+    |
+256 |     yield # valid
+257 |     try:
+258 |         yield # RUF062
+    |         ^^^^^
+259 |     except ValueError:
+260 |         yield # RUF062
+    |
+
+RUF062 Function decorated with `contextlib.contextmanager` may yield more than once
+   --> RUF062_1.py:260:9
+    |
+258 |         yield # RUF062
+259 |     except ValueError:
+260 |         yield # RUF062
+    |         ^^^^^
+261 |         return
+262 |     yield # RUF062
+    |
+
+RUF062 Function decorated with `contextlib.contextmanager` may yield more than once
+   --> RUF062_1.py:262:5
+    |
+260 |         yield # RUF062
+261 |         return
+262 |     yield # RUF062
+    |     ^^^^^
+    |
+
+RUF062 Function decorated with `contextlib.contextmanager` may yield more than once
+   --> RUF062_1.py:272:9
+    |
+270 |         pass
+271 |     except ValueError:
+272 |         yield # RUF062
+    |         ^^^^^
+273 |         return
+    |
+
+RUF062 Function decorated with `contextlib.contextmanager` may yield more than once
+   --> RUF062_1.py:282:9
+    |
+280 |         pass
+281 |     except ValueError:
+282 |         yield # RUF062
+    |         ^^^^^
+283 |
+284 | # (26) Invalid: preceeding yield makes all try/except yields illegal; finally returns
+    |
+
+RUF062 Function decorated with `contextlib.contextmanager` may yield more than once
+   --> RUF062_1.py:293:9
+    |
+291 |         return
+292 |     finally:
+293 |         yield # RUF062
+    |         ^^^^^
+294 |         return
     |
