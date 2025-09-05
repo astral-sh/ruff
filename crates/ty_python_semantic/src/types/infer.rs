@@ -422,12 +422,11 @@ pub(crate) fn nearest_enclosing_class<'db>(
     db: &'db dyn Db,
     semantic: &SemanticIndex<'db>,
     scope: ScopeId,
-    parsed: &ParsedModuleRef,
 ) -> Option<ClassLiteral<'db>> {
     semantic
         .ancestor_scopes(scope.file_scope_id(db))
         .find_map(|(_, ancestor_scope)| {
-            let class = ancestor_scope.node().as_class(parsed)?;
+            let class = ancestor_scope.node().as_class()?;
             let definition = semantic.expect_single_definition(class);
             infer_definition_types(db, definition)
                 .declaration_type(definition)
@@ -2418,29 +2417,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// behaviour to the [`nearest_enclosing_class`] function.
     fn class_context_of_current_method(&self) -> Option<ClassType<'db>> {
         let current_scope_id = self.scope().file_scope_id(self.db());
-        let current_scope = self.index.scope(current_scope_id);
-        if current_scope.kind() != ScopeKind::Function {
-            return None;
-        }
-        let parent_scope_id = current_scope.parent()?;
-        let parent_scope = self.index.scope(parent_scope_id);
-
-        let class_scope = match parent_scope.kind() {
-            ScopeKind::Class => parent_scope,
-            ScopeKind::TypeParams => {
-                let class_scope_id = parent_scope.parent()?;
-                let potentially_class_scope = self.index.scope(class_scope_id);
-
-                match potentially_class_scope.kind() {
-                    ScopeKind::Class => potentially_class_scope,
-                    _ => return None,
-                }
-            }
-            _ => return None,
-        };
-
-        let class_stmt = class_scope.node().as_class(self.module())?;
-        let class_definition = self.index.expect_single_definition(class_stmt);
+        let class_definition = self.index.class_definition_of_method(current_scope_id)?;
         binding_type(self.db(), class_definition).to_class_type(self.db())
     }
 
@@ -2453,7 +2430,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if !current_scope.kind().is_non_lambda_function() {
             return None;
         }
-        current_scope.node().as_function(self.module())
+        current_scope
+            .node()
+            .as_function()
+            .map(|node_ref| node_ref.node(self.module()))
     }
 
     fn function_decorator_types<'a>(
