@@ -457,7 +457,7 @@ class Person(TypedDict, total=False):
 alice: Person = {"id": 1, "name": "Alice", "age": 30}
 alice["age"] = 31  # okay
 
-# error: [invalid-assignment] "Can not assign to key "id" on TypedDict `Person`: key is marked read-only"
+# error: [invalid-assignment] "Cannot assign to key "id" on TypedDict `Person`: key is marked read-only"
 alice["id"] = 2
 ```
 
@@ -471,9 +471,9 @@ class Config(TypedDict):
 
 config: Config = {"host": "localhost", "port": 8080}
 
-# error: [invalid-assignment] "Can not assign to key "host" on TypedDict `Config`: key is marked read-only"
+# error: [invalid-assignment] "Cannot assign to key "host" on TypedDict `Config`: key is marked read-only"
 config["host"] = "127.0.0.1"
-# error: [invalid-assignment] "Can not assign to key "port" on TypedDict `Config`: key is marked read-only"
+# error: [invalid-assignment] "Cannot assign to key "port" on TypedDict `Config`: key is marked read-only"
 config["port"] = 80
 ```
 
