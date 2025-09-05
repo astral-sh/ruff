@@ -4,7 +4,6 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::preview::is_ignore_init_files_in_useless_alias_enabled;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -74,9 +73,7 @@ pub(crate) fn useless_import_alias(checker: &Checker, alias: &Alias) {
     }
 
     // A re-export in __init__.py is probably intentional.
-    if checker.path().ends_with("__init__.py")
-        && is_ignore_init_files_in_useless_alias_enabled(checker.settings())
-    {
+    if checker.path().ends_with("__init__.py") {
         return;
     }
 
