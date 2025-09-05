@@ -66,7 +66,7 @@ impl TypingReference {
             }
 
             // prefer `from __future__ import annotations` to quoting
-            if settings.future_annotations()
+            if settings.future_annotations
                 && !reference.in_typing_only_annotation()
                 && reference.in_runtime_evaluated_annotation()
             {
