@@ -1,6 +1,9 @@
 use bitflags::bitflags;
+use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
+use ruff_db::parsed::parsed_module;
 use ruff_python_ast::Arguments;
 use ruff_python_ast::{self as ast, AnyNodeRef, StmtClassDef, name::Name};
+use ruff_text_size::Ranged;
 
 use super::class::{ClassType, CodeGeneratorKind, Field};
 use super::context::InferContext;
@@ -157,6 +160,22 @@ pub(super) fn validate_typed_dict_key_assignment<'db, 'ast>(
         return false;
     };
 
+    let add_item_definition_subdiagnostic = |diagnostic: &mut Diagnostic, message| {
+        if let Some(declaration) = item.single_declaration {
+            let file = declaration.file(db);
+            let module = parsed_module(db, file).load(db);
+
+            let mut sub = SubDiagnostic::new(SubDiagnosticSeverity::Info, "Item declaration");
+            sub.annotate(
+                Annotation::secondary(
+                    Span::from(file).with_range(declaration.full_range(db, &module).range()),
+                )
+                .message(message),
+            );
+            diagnostic.sub(sub);
+        }
+    };
+
     if assignment_kind.is_subscript() && item.is_read_only() {
         if let Some(builder) =
             context.report_lint(assignment_kind.diagnostic_type(), key_node.into())
@@ -175,6 +194,8 @@ pub(super) fn validate_typed_dict_key_assignment<'db, 'ast>(
                     .secondary(typed_dict_node.into())
                     .message(format_args!("TypedDict `{typed_dict_d}`")),
             );
+
+            add_item_definition_subdiagnostic(&mut diagnostic, "Read-only item declared here");
         }
 
         return false;
@@ -211,6 +232,8 @@ pub(super) fn validate_typed_dict_key_assignment<'db, 'ast>(
                 .secondary(key_node.into())
                 .message(format_args!("key has declared type `{item_type_d}`")),
         );
+
+        add_item_definition_subdiagnostic(&mut diagnostic, "Item declared here");
     }
 
     false
