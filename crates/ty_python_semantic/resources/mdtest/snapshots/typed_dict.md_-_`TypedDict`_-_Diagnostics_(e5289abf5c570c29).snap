@@ -108,6 +108,16 @@ error[invalid-assignment]: Invalid assignment to key "age" with declared type `i
 20 |
 21 | def write_to_non_existing_key(person: Person):
    |
+info: Item declaration
+ --> src/mdtest_snippet.py:5:5
+  |
+3 | class Person(TypedDict):
+4 |     name: str
+5 |     age: int | None
+  |     --------------- Item declared here
+6 |
+7 | def access_invalid_literal_string_key(person: Person):
+  |
 info: rule `invalid-assignment` is enabled by default
 
 ```
@@ -150,6 +160,14 @@ error[invalid-assignment]: Cannot assign to key "id" on TypedDict `Employee`
    |     -------- ^^^^ key is marked read-only
    |     |
    |     TypedDict `Employee`
+   |
+info: Item declaration
+  --> src/mdtest_snippet.py:29:5
+   |
+28 | class Employee(TypedDict):
+29 |     id: ReadOnly[int]
+   |     ----------------- Read-only item declared here
+30 |     name: str
    |
 info: rule `invalid-assignment` is enabled by default
 

@@ -1283,6 +1283,9 @@ pub(crate) struct Field<'db> {
     pub(crate) declared_ty: Type<'db>,
     /// Kind-specific metadata for this field
     pub(crate) kind: FieldKind<'db>,
+    /// The original declaration of this field, if there is exactly one.
+    /// This field is used for backreferences in diagnostics.
+    pub(crate) single_declaration: Option<Definition<'db>>,
 }
 
 impl Field<'_> {
@@ -2666,7 +2669,9 @@ impl<'db> ClassLiteral<'db> {
 
             let symbol = table.symbol(symbol_id);
 
-            let attr = place_from_declarations(db, declarations).ignore_conflicting_declarations();
+            let result = place_from_declarations(db, declarations.clone());
+            let single_declaration = result.single_declaration;
+            let attr = result.ignore_conflicting_declarations();
             if attr.is_class_var() {
                 continue;
             }
@@ -2728,6 +2733,7 @@ impl<'db> ClassLiteral<'db> {
                 let mut field = Field {
                     declared_ty: attr_ty.apply_optional_specialization(db, specialization),
                     kind,
+                    single_declaration,
                 };
 
                 // Check if this is a KW_ONLY sentinel and mark subsequent fields as keyword-only
