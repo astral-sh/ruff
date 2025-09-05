@@ -108,9 +108,30 @@ impl std::iter::FromIterator<Self> for TypeVarVariance {
 }
 
 pub(crate) trait VarianceInferable<'db>: Sized {
+    /// The variance of `typevar` in `self`
+    ///
+    /// Generally, one will implement this by traversing any types within `self`
+    /// in which `typevar` could occur, and calling `variance_of` recursively on
+    /// them.
+    ///
+    /// Sometimes the recursive calls will be in positions where you need to
+    /// specify a non-covariant polarity. See `with_polarity` for more details.
     fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance;
 
-    fn with_polarity(self, polarity: TypeVarVariance) -> WithPolarity<Self> {
+    /// Creates a `VarianceInferable` that applies `polarity` (see
+    /// `TypeVarVariance::compose`) to the result of variance inference on the
+    /// underlying value.
+    ///
+    /// In some cases, we need to apply a polarity to the recursive call.
+    /// You can do this with `ty.with_polarity(polarity).variance_of(typevar)`.
+    /// Generally, this will be whenever the type occurs in argument-position,
+    /// in which case you will want `TypeVarVariance::Contravariant`, or
+    /// `TypeVarVariance::Invariant` if the value(s) being annotated is known to
+    /// be mutable, such as `T` in `list[T]`. See the [typing spec][typing-spec]
+    /// for more details.
+    ///
+    /// [typing-spec]: https://typing.python.org/en/latest/spec/generics.html#variance
+    fn with_polarity(self, polarity: TypeVarVariance) -> impl VarianceInferable<'db> {
         WithPolarity {
             variance_inferable: self,
             polarity,
