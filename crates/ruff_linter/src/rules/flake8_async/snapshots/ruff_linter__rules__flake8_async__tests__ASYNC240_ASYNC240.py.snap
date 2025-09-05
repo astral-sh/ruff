@@ -1,0 +1,206 @@
+---
+source: crates/ruff_linter/src/rules/flake8_async/mod.rs
+---
+ASYNC240 Async functions should not use pathlib.Path or os.path methods, use trio.Path or anyio.path
+  --> ASYNC240.py:15:5
+   |
+13 |     file = "file.txt"
+14 |
+15 |     os.path.abspath(file) # ASYNC240
+   |     ^^^^^^^^^^^^^^^
+16 |     os.path.exists(file) # ASYNC240
+   |
+
+ASYNC240 Async functions should not use pathlib.Path or os.path methods, use trio.Path or anyio.path
+  --> ASYNC240.py:16:5
+   |
+15 |     os.path.abspath(file) # ASYNC240
+16 |     os.path.exists(file) # ASYNC240
+   |     ^^^^^^^^^^^^^^
+17 |
+18 | ## Various pathlib.Path cases:
+   |
+
+ASYNC240 Async functions should not use pathlib.Path or os.path methods, use trio.Path or anyio.path
+  --> ASYNC240.py:29:12
+   |
+28 | async def pathlib_path_in_foo():
+29 |     path = Path("src/my_text.txt") # ASYNC240
+   |            ^^^^
+30 |     path.absolute() # ASYNC240
+31 |     path.exists() # ASYNC240
+   |
+
+ASYNC240 Async functions should not use pathlib.Path or os.path methods, use trio.Path or anyio.path
+  --> ASYNC240.py:30:5
+   |
+28 | async def pathlib_path_in_foo():
+29 |     path = Path("src/my_text.txt") # ASYNC240
+30 |     path.absolute() # ASYNC240
+   |     ^^^^^^^^^^^^^
+31 |     path.exists() # ASYNC240
+32 |     with path.open() as f: # ASYNC240
+   |
+
+ASYNC240 Async functions should not use pathlib.Path or os.path methods, use trio.Path or anyio.path
+  --> ASYNC240.py:31:5
+   |
+29 |     path = Path("src/my_text.txt") # ASYNC240
+30 |     path.absolute() # ASYNC240
+31 |     path.exists() # ASYNC240
+   |     ^^^^^^^^^^^
+32 |     with path.open() as f: # ASYNC240
+33 |         ...
+   |
+
+ASYNC240 Async functions should not use pathlib.Path or os.path methods, use trio.Path or anyio.path
+  --> ASYNC240.py:32:10
+   |
+30 |     path.absolute() # ASYNC240
+31 |     path.exists() # ASYNC240
+32 |     with path.open() as f: # ASYNC240
+   |          ^^^^^^^^^
+33 |         ...
+   |
+
+ASYNC240 Async functions should not use pathlib.Path or os.path methods, use trio.Path or anyio.path
+  --> ASYNC240.py:38:12
+   |
+36 |     import pathlib
+37 |
+38 |     path = pathlib.Path("src/my_text.txt") # ASYNC240
+   |            ^^^^^^^^^^^^
+39 |     path.absolute() # ASYNC240
+40 |     path.exists() # ASYNC240
+   |
+
+ASYNC240 Async functions should not use pathlib.Path or os.path methods, use trio.Path or anyio.path
+  --> ASYNC240.py:39:5
+   |
+38 |     path = pathlib.Path("src/my_text.txt") # ASYNC240
+39 |     path.absolute() # ASYNC240
+   |     ^^^^^^^^^^^^^
+40 |     path.exists() # ASYNC240
+   |
+
+ASYNC240 Async functions should not use pathlib.Path or os.path methods, use trio.Path or anyio.path
+  --> ASYNC240.py:40:5
+   |
+38 |     path = pathlib.Path("src/my_text.txt") # ASYNC240
+39 |     path.absolute() # ASYNC240
+40 |     path.exists() # ASYNC240
+   |     ^^^^^^^^^^^
+41 |
+42 | async def aliased_path_in_foo():
+   |
+
+ASYNC240 Async functions should not use pathlib.Path or os.path methods, use trio.Path or anyio.path
+  --> ASYNC240.py:45:12
+   |
+43 |     from pathlib import Path as PathAlias
+44 |
+45 |     path = PathAlias("src/my_text.txt") # ASYNC240
+   |            ^^^^^^^^^
+46 |     path.absolute() # ASYNC240
+47 |     path.exists() # ASYNC240
+   |
+
+ASYNC240 Async functions should not use pathlib.Path or os.path methods, use trio.Path or anyio.path
+  --> ASYNC240.py:46:5
+   |
+45 |     path = PathAlias("src/my_text.txt") # ASYNC240
+46 |     path.absolute() # ASYNC240
+   |     ^^^^^^^^^^^^^
+47 |     path.exists() # ASYNC240
+   |
+
+ASYNC240 Async functions should not use pathlib.Path or os.path methods, use trio.Path or anyio.path
+  --> ASYNC240.py:47:5
+   |
+45 |     path = PathAlias("src/my_text.txt") # ASYNC240
+46 |     path.absolute() # ASYNC240
+47 |     path.exists() # ASYNC240
+   |     ^^^^^^^^^^^
+48 |
+49 | global_path = Path("src/my_text.txt")
+   |
+
+ASYNC240 Async functions should not use pathlib.Path or os.path methods, use trio.Path or anyio.path
+  --> ASYNC240.py:52:5
+   |
+51 | async def global_path_in_foo():
+52 |     global_path.absolute() # ASYNC240
+   |     ^^^^^^^^^^^^^^^^^^^^
+53 |     global_path.exists() # ASYNC240
+   |
+
+ASYNC240 Async functions should not use pathlib.Path or os.path methods, use trio.Path or anyio.path
+  --> ASYNC240.py:53:5
+   |
+51 | async def global_path_in_foo():
+52 |     global_path.absolute() # ASYNC240
+53 |     global_path.exists() # ASYNC240
+   |     ^^^^^^^^^^^^^^^^^^
+54 |
+55 | def path_as_simple_parameter_type(path: Path):
+   |
+
+ASYNC240 Async functions should not use pathlib.Path or os.path methods, use trio.Path or anyio.path
+  --> ASYNC240.py:60:5
+   |
+59 | async def path_as_simple_parameter_type(path: Path):
+60 |     path.absolute() # ASYNC240
+   |     ^^^^^^^^^^^^^
+61 |     path.exists() # ASYNC240
+   |
+
+ASYNC240 Async functions should not use pathlib.Path or os.path methods, use trio.Path or anyio.path
+  --> ASYNC240.py:61:5
+   |
+59 | async def path_as_simple_parameter_type(path: Path):
+60 |     path.absolute() # ASYNC240
+61 |     path.exists() # ASYNC240
+   |     ^^^^^^^^^^^
+62 |
+63 | async def path_as_union_parameter_type(path: Path | None):
+   |
+
+ASYNC240 Async functions should not use pathlib.Path or os.path methods, use trio.Path or anyio.path
+  --> ASYNC240.py:64:5
+   |
+63 | async def path_as_union_parameter_type(path: Path | None):
+64 |     path.absolute() # ASYNC240
+   |     ^^^^^^^^^^^^^
+65 |     path.exists() # ASYNC240
+   |
+
+ASYNC240 Async functions should not use pathlib.Path or os.path methods, use trio.Path or anyio.path
+  --> ASYNC240.py:65:5
+   |
+63 | async def path_as_union_parameter_type(path: Path | None):
+64 |     path.absolute() # ASYNC240
+65 |     path.exists() # ASYNC240
+   |     ^^^^^^^^^^^
+66 |
+67 | async def path_as_optional_parameter_type(path: Optional[Path]):
+   |
+
+ASYNC240 Async functions should not use pathlib.Path or os.path methods, use trio.Path or anyio.path
+  --> ASYNC240.py:68:5
+   |
+67 | async def path_as_optional_parameter_type(path: Optional[Path]):
+68 |     path.absolute() # ASYNC240
+   |     ^^^^^^^^^^^^^
+69 |     path.exists() # ASYNC240
+   |
+
+ASYNC240 Async functions should not use pathlib.Path or os.path methods, use trio.Path or anyio.path
+  --> ASYNC240.py:69:5
+   |
+67 | async def path_as_optional_parameter_type(path: Optional[Path]):
+68 |     path.absolute() # ASYNC240
+69 |     path.exists() # ASYNC240
+   |     ^^^^^^^^^^^
+70 |
+71 | ## Valid cases using trio/anyio:
+   |
