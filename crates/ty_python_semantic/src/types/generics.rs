@@ -457,55 +457,44 @@ fn is_subtype_in_invariant_position<'db, C: Constraints<'db>>(
     let derived_bottom = derived_type.bottom_materialization(db);
     let base_top = base_type.top_materialization(db);
     let base_bottom = base_type.bottom_materialization(db);
+
+    let is_subtype_of = |derived: Type<'db>, base: Type<'db>| {
+        derived.has_relation_to_impl(db, base, TypeRelation::Subtyping, visitor)
+    };
     match (derived_materialization, base_materialization) {
         // `Derived` is a subtype of `Base` if the range of materializations covered by `Derived`
         // is a subset of the range covered by `Base`.
-        (MaterializationKind::Top, MaterializationKind::Top) => base_bottom
-            .has_relation_to_impl(db, derived_bottom, TypeRelation::Subtyping, visitor)
-            .and(db, || {
-                derived_top.has_relation_to_impl(db, base_top, TypeRelation::Subtyping, visitor)
-            }),
+        (MaterializationKind::Top, MaterializationKind::Top) => {
+            is_subtype_of(base_bottom, derived_bottom)
+                .and(db, || is_subtype_of(derived_top, base_top))
+        }
         // One bottom is a subtype of another if it covers a strictly larger set of materializations.
-        (MaterializationKind::Bottom, MaterializationKind::Bottom) => derived_bottom
-            .has_relation_to_impl(db, base_bottom, TypeRelation::Subtyping, visitor)
-            .and(db, || {
-                base_top.has_relation_to_impl(db, derived_top, TypeRelation::Subtyping, visitor)
-            }),
+        (MaterializationKind::Bottom, MaterializationKind::Bottom) => {
+            is_subtype_of(derived_bottom, base_bottom)
+                .and(db, || is_subtype_of(base_top, derived_top))
+        }
         // The bottom materialization of `Derived` is a subtype of the top materialization
         // of `Base` if there is some type that is both within the
         // range of types covered by derived and within the range covered by base, because if such a type
         // exists, it's a subtype of `Top[base]` and a supertype of `Bottom[derived]`.
-        (MaterializationKind::Bottom, MaterializationKind::Top) => (base_bottom
-            .has_relation_to_impl(db, derived_bottom, TypeRelation::Subtyping, visitor)
-            .and(db, || {
-                derived_bottom.has_relation_to_impl(db, base_top, TypeRelation::Subtyping, visitor)
-            }))
-        .or(db, || {
-            base_bottom
-                .has_relation_to_impl(db, derived_top, TypeRelation::Subtyping, visitor)
-                .and(db, || {
-                    derived_top.has_relation_to_impl(db, base_top, TypeRelation::Subtyping, visitor)
-                })
-                .or(db, || {
-                    base_top
-                        .has_relation_to_impl(db, derived_top, TypeRelation::Subtyping, visitor)
-                        .and(db, || {
-                            derived_bottom.has_relation_to_impl(
-                                db,
-                                base_top,
-                                TypeRelation::Subtyping,
-                                visitor,
-                            )
-                        })
-                })
-        }),
+        (MaterializationKind::Bottom, MaterializationKind::Top) => {
+            (is_subtype_of(base_bottom, derived_bottom)
+                .and(db, || is_subtype_of(derived_bottom, base_top)))
+            .or(db, || {
+                is_subtype_of(base_bottom, derived_top)
+                    .and(db, || is_subtype_of(derived_top, base_top))
+                    .or(db, || {
+                        is_subtype_of(base_top, derived_top)
+                            .and(db, || is_subtype_of(derived_bottom, base_top))
+                    })
+            })
+        }
         // A top materialization is a subtype of a bottom materialization only if both original
         // un-materialized types are the same fully static type.
-        (MaterializationKind::Top, MaterializationKind::Bottom) => derived_top
-            .has_relation_to_impl(db, base_bottom, TypeRelation::Subtyping, visitor)
-            .and(db, || {
-                base_top.has_relation_to_impl(db, derived_bottom, TypeRelation::Subtyping, visitor)
-            }),
+        (MaterializationKind::Top, MaterializationKind::Bottom) => {
+            is_subtype_of(derived_top, base_bottom)
+                .and(db, || is_subtype_of(base_top, derived_bottom))
+        }
     }
 }
 
