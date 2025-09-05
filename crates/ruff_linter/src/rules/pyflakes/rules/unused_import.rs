@@ -60,6 +60,10 @@ use crate::{Applicability, Fix, FixAvailability, Violation};
 /// to remove third-party and standard library imports -- the fix is unsafe because the module's
 /// interface changes.
 ///
+/// See [this FAQ section](https://docs.astral.sh/ruff/faq/#how-does-ruff-determine-which-of-my-imports-are-first-party-third-party-etc)
+/// for more details on how Ruff
+/// determines whether an import is first or third-party.
+///
 /// ## Example
 ///
 /// ```python
