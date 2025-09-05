@@ -483,10 +483,10 @@ fn is_subtype_in_invariant_position<'db, C: Constraints<'db>>(
             .or(db, || {
                 is_subtype_of(base_bottom, derived_top)
                     .and(db, || is_subtype_of(derived_top, base_top))
-                    .or(db, || {
-                        is_subtype_of(base_top, derived_top)
-                            .and(db, || is_subtype_of(derived_bottom, base_top))
-                    })
+            })
+            .or(db, || {
+                is_subtype_of(base_top, derived_top)
+                    .and(db, || is_subtype_of(derived_bottom, base_top))
             })
         }
         // A top materialization is a subtype of a bottom materialization only if both original
