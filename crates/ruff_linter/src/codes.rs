@@ -334,7 +334,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Async, "109") => (RuleGroup::Stable, rules::flake8_async::rules::AsyncFunctionWithTimeout),
         (Flake8Async, "110") => (RuleGroup::Stable, rules::flake8_async::rules::AsyncBusyWait),
         (Flake8Async, "115") => (RuleGroup::Stable, rules::flake8_async::rules::AsyncZeroSleep),
-        (Flake8Async, "116") => (RuleGroup::Preview, rules::flake8_async::rules::LongSleepNotForever),
+        (Flake8Async, "116") => (RuleGroup::Stable, rules::flake8_async::rules::LongSleepNotForever),
         (Flake8Async, "210") => (RuleGroup::Stable, rules::flake8_async::rules::BlockingHttpCallInAsyncFunction),
         (Flake8Async, "212") => (RuleGroup::Preview, rules::flake8_async::rules::BlockingHttpCallHttpxInAsyncFunction),
         (Flake8Async, "220") => (RuleGroup::Stable, rules::flake8_async::rules::CreateSubprocessInAsyncFunction),
@@ -574,7 +574,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pyupgrade, "046") => (RuleGroup::Stable, rules::pyupgrade::rules::NonPEP695GenericClass),
         (Pyupgrade, "047") => (RuleGroup::Stable, rules::pyupgrade::rules::NonPEP695GenericFunction),
         (Pyupgrade, "049") => (RuleGroup::Stable, rules::pyupgrade::rules::PrivateTypeParameter),
-        (Pyupgrade, "050") => (RuleGroup::Preview, rules::pyupgrade::rules::UselessClassMetaclassType),
+        (Pyupgrade, "050") => (RuleGroup::Stable, rules::pyupgrade::rules::UselessClassMetaclassType),
 
         // pydocstyle
         (Pydocstyle, "100") => (RuleGroup::Stable, rules::pydocstyle::rules::UndocumentedPublicModule),
@@ -830,7 +830,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Pyi, "056") => (RuleGroup::Stable, rules::flake8_pyi::rules::UnsupportedMethodCallOnAll),
         (Flake8Pyi, "058") => (RuleGroup::Stable, rules::flake8_pyi::rules::GeneratorReturnFromIterMethod),
         (Flake8Pyi, "057") => (RuleGroup::Stable, rules::flake8_pyi::rules::ByteStringUsage),
-        (Flake8Pyi, "059") => (RuleGroup::Preview, rules::flake8_pyi::rules::GenericNotLastBaseClass),
+        (Flake8Pyi, "059") => (RuleGroup::Stable, rules::flake8_pyi::rules::GenericNotLastBaseClass),
         (Flake8Pyi, "061") => (RuleGroup::Stable, rules::flake8_pyi::rules::RedundantNoneLiteral),
         (Flake8Pyi, "062") => (RuleGroup::Stable, rules::flake8_pyi::rules::DuplicateLiteralMember),
         (Flake8Pyi, "063") => (RuleGroup::Stable, rules::flake8_pyi::rules::Pep484StylePositionalOnlyParameter),
@@ -956,7 +956,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8UsePathlib, "207") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::Glob),
         (Flake8UsePathlib, "208") => (RuleGroup::Stable, rules::flake8_use_pathlib::violations::OsListdir),
         (Flake8UsePathlib, "210") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::InvalidPathlibWithSuffix),
-        (Flake8UsePathlib, "211") => (RuleGroup::Preview, rules::flake8_use_pathlib::rules::OsSymlink),
+        (Flake8UsePathlib, "211") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::OsSymlink),
 
         // flake8-logging-format
         (Flake8LoggingFormat, "001") => (RuleGroup::Stable, rules::flake8_logging_format::violations::LoggingStringFormat),
@@ -1046,7 +1046,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "056") => (RuleGroup::Preview, rules::ruff::rules::FalsyDictGetFallback),
         (Ruff, "057") => (RuleGroup::Stable, rules::ruff::rules::UnnecessaryRound),
         (Ruff, "058") => (RuleGroup::Stable, rules::ruff::rules::StarmapZip),
-        (Ruff, "059") => (RuleGroup::Preview, rules::ruff::rules::UnusedUnpackedVariable),
+        (Ruff, "059") => (RuleGroup::Stable, rules::ruff::rules::UnusedUnpackedVariable),
         (Ruff, "060") => (RuleGroup::Preview, rules::ruff::rules::InEmptyCollection),
         (Ruff, "061") => (RuleGroup::Preview, rules::ruff::rules::LegacyFormPytestRaises),
         (Ruff, "063") => (RuleGroup::Preview, rules::ruff::rules::AccessAnnotationsFromClassDict),
