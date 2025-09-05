@@ -328,7 +328,7 @@ impl<'db> Bindings<'db> {
                                     _ => {}
                                 }
                             } else if function
-                                .has_known_decorators(db, FunctionDecorators::STATICMETHOD)
+                                .has_known_decorator(db, FunctionDecorators::STATICMETHOD)
                             {
                                 overload.set_return_type(*function_ty);
                             } else {

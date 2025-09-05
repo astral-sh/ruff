@@ -11,7 +11,6 @@ use crate::semantic_index::place::ScopedPlaceId;
 use crate::semantic_index::{SemanticIndex, place_table};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::report_undeclared_protocol_member;
-use crate::types::function::FunctionDecorators;
 use crate::types::visitor::any_over_type;
 use crate::types::{
     ClassType, InstanceFallbackShadowsNonDataDescriptor, MemberLookupPolicy, todo_type,
@@ -728,10 +727,7 @@ fn cached_protocol_interface<'db>(
                     ProtocolMemberKind::Method(callable)
                 }
                 Type::FunctionLiteral(function)
-                    if function.has_known_decorators(
-                        db,
-                        FunctionDecorators::STATICMETHOD | FunctionDecorators::CLASSMETHOD,
-                    ) =>
+                    if function.is_staticmethod(db) || function.is_classmethod(db) =>
                 {
                     ProtocolMemberKind::Other(todo_type!(
                         "classmethod and staticmethod protocol members"
