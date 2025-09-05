@@ -249,25 +249,30 @@ impl<'db> ConstraintSet<'db> {
         db: &'db dyn Db,
         constraint: Satisfiable<AtomicConstraint<'db>>,
     ) {
-        match constraint {
-            // ... ∪ 0 = ...
-            Satisfiable::Never => {}
-            // ... ∪ 1 = 1
-            Satisfiable::Always => {
-                self.clauses.clear();
-                self.clauses.push(ConstraintClause::always());
-            }
-            // Otherwise wrap the constraint into a singleton clause and use the logic below to add
-            // it.
-            Satisfiable::Constrained(constraint) => {
-                self.union_clause(db, ConstraintClause::singleton(constraint));
-            }
-        }
+        self.union_clause(
+            db,
+            constraint.map(|constraint| ConstraintClause::singleton(constraint)),
+        );
     }
 
     /// Updates this set to be the union of itself and a clause. To maintain the invariants of this
     /// type, we must simplify this clause against all existing clauses, if possible.
-    fn union_clause(&mut self, db: &'db dyn Db, mut clause: ConstraintClause<'db>) {
+    fn union_clause(&mut self, db: &'db dyn Db, clause: Satisfiable<ConstraintClause<'db>>) {
+        let mut clause = match clause {
+            // If the new constraint can always be satisfied, that causes this whole set to be
+            // always satisfied too.
+            Satisfiable::Always => {
+                self.clauses.clear();
+                self.clauses.push(ConstraintClause::always());
+                return;
+            }
+
+            // If the new clause can never satisfied, then the set does not change.
+            Satisfiable::Never => return,
+
+            Satisfiable::Constrained(clause) => clause,
+        };
+
         // Naively, we would just append the new clause to the set's list of clauses. But that
         // doesn't ensure that the clauses are simplified with respect to each other. So instead,
         // we iterate through the list of existing clauses, and try to simplify the new clause
@@ -319,7 +324,7 @@ impl<'db> ConstraintSet<'db> {
     /// Updates this set to be the union of itself and another set.
     fn union_set(&mut self, db: &'db dyn Db, other: Self) {
         for clause in other.clauses {
-            self.union_clause(db, clause);
+            self.union_clause(db, Satisfiable::Constrained(clause));
         }
     }
 
@@ -330,15 +335,7 @@ impl<'db> ConstraintSet<'db> {
         let self_clauses = std::mem::take(&mut self.clauses);
         for self_clause in &self_clauses {
             for other_clause in &other.clauses {
-                match self_clause.intersect_clause(db, other_clause) {
-                    Satisfiable::Never => continue,
-                    Satisfiable::Always => {
-                        self.clauses.clear();
-                        self.clauses.push(ConstraintClause::always());
-                        return;
-                    }
-                    Satisfiable::Constrained(clause) => self.union_clause(db, clause),
-                }
+                self.union_clause(db, self_clause.intersect_clause(db, other_clause));
             }
         }
     }
@@ -435,6 +432,25 @@ impl<'db> ConstraintClause<'db> {
         }
     }
 
+    /// Returns a clause that is the intersection of an iterator of constraints.
+    fn from_constraints(
+        db: &'db dyn Db,
+        constraints: impl IntoIterator<Item = AtomicConstraint<'db>>,
+    ) -> Satisfiable<Self> {
+        let mut result = Self::always();
+        for constraint in constraints {
+            if result.intersect_constraint(db, Satisfiable::Constrained(&constraint))
+                == Satisfiable::Never
+            {
+                return Satisfiable::Never;
+            }
+        }
+        if result.is_always() {
+            return Satisfiable::Always;
+        }
+        Satisfiable::Constrained(result)
+    }
+
     /// Returns whether this constraint is always satisfiable.
     fn is_always(&self) -> bool {
         self.constraints.is_empty()
@@ -445,8 +461,20 @@ impl<'db> ConstraintClause<'db> {
     fn intersect_constraint(
         &mut self,
         db: &'db dyn Db,
-        constraint: &AtomicConstraint<'db>,
+        constraint: Satisfiable<&AtomicConstraint<'db>>,
     ) -> Satisfiable<()> {
+        let constraint = match constraint {
+            // If the new constraint cannot be satisfied, that causes this whole clause to be
+            // unsatisfiable too.
+            Satisfiable::Never => return Satisfiable::Never,
+
+            // If the new constraint can always satisfied, then the clause does not change. It was
+            // not always satisfiable before, and so it still isn't.
+            Satisfiable::Always => return Satisfiable::Constrained(()),
+
+            Satisfiable::Constrained(constraint) => constraint,
+        };
+
         // If the clause does not already contain a constraint for this typevar, we just insert the
         // new constraint into the clause and return.
         let index = match (self.constraints)
@@ -496,7 +524,7 @@ impl<'db> ConstraintClause<'db> {
         // Add each `other` constraint in turn. Short-circuit if the result ever becomes 0.
         let mut result = self.clone();
         for constraint in &other.constraints {
-            match result.intersect_constraint(db, constraint) {
+            match result.intersect_constraint(db, Satisfiable::Constrained(constraint)) {
                 Satisfiable::Never => return Satisfiable::Never,
                 Satisfiable::Always | Satisfiable::Constrained(()) => {}
             }
@@ -1121,6 +1149,440 @@ impl<'db> AtomicConstraint<'db> {
     }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct ConstrainedTypeVar<'db> {
+    typevar: BoundTypeVarInstance<'db>,
+    constraint: NewConstraint<'db>,
+}
+
+impl<'db> ConstrainedTypeVar<'db> {
+    /// Adds the negation of this atomic constraint to a constraint set.
+    fn negate_into(&self, db: &'db dyn Db, set: &mut ConstraintSet<'db>) {
+        self.constraint.negate_into(db, self.typevar, set);
+    }
+
+    /// Returns the intersection of this atomic constraint and another.
+    ///
+    /// Panics if the two constraints have different typevars.
+    fn intersect(&self, db: &'db dyn Db, other: &Self) -> Simplifiable<Self> {
+        debug_assert_eq!(self.typevar, other.typevar);
+        self.constraint
+            .intersect(db, &other.constraint)
+            .map(|constraint| constraint.constrain(self.typevar))
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum NewConstraint<'db> {
+    Range(RangeConstraint<'db>),
+    NotEquivalent(NotEquivalentConstraint<'db>),
+    NotComparable(NotComparableConstraint<'db>),
+}
+
+impl<'db> NewConstraint<'db> {
+    fn constrain(self, typevar: BoundTypeVarInstance<'db>) -> ConstrainedTypeVar<'db> {
+        ConstrainedTypeVar {
+            typevar,
+            constraint: self,
+        }
+    }
+
+    fn intersect(
+        &self,
+        db: &'db dyn Db,
+        other: &NewConstraint<'db>,
+    ) -> Simplifiable<NewConstraint<'db>> {
+        match (self, other) {
+            (NewConstraint::Range(left), NewConstraint::Range(right)) => {
+                left.intersect_range(db, right)
+            }
+
+            (NewConstraint::Range(range), NewConstraint::NotEquivalent(not_equivalent))
+            | (NewConstraint::NotEquivalent(not_equivalent), NewConstraint::Range(range)) => {
+                range.intersect_not_equivalent(db, not_equivalent)
+            }
+
+            (NewConstraint::Range(range), NewConstraint::NotComparable(not_comparable))
+            | (NewConstraint::NotComparable(not_comparable), NewConstraint::Range(range)) => {
+                range.intersect_not_comparable(db, not_comparable)
+            }
+
+            (NewConstraint::NotEquivalent(left), NewConstraint::NotEquivalent(right)) => {
+                left.intersect_not_equivalent(db, right)
+            }
+
+            (
+                NewConstraint::NotEquivalent(not_equivalent),
+                NewConstraint::NotComparable(not_comparable),
+            )
+            | (
+                NewConstraint::NotComparable(not_comparable),
+                NewConstraint::NotEquivalent(not_equivalent),
+            ) => not_equivalent.intersect_not_comparable(db, not_comparable),
+
+            (NewConstraint::NotComparable(left), NewConstraint::NotComparable(right)) => {
+                left.intersect_not_comparable(db, right)
+            }
+        }
+    }
+
+    fn negate_into(
+        &self,
+        db: &'db dyn Db,
+        typevar: BoundTypeVarInstance<'db>,
+        set: &mut ConstraintSet<'db>,
+    ) {
+        match self {
+            NewConstraint::Range(constraint) => constraint.negate_into(db, typevar, set),
+            NewConstraint::NotEquivalent(constraint) => constraint.negate_into(db, typevar, set),
+            NewConstraint::NotComparable(constraint) => constraint.negate_into(db, typevar, set),
+        }
+    }
+
+    fn display(&self, db: &'db dyn Db, typevar: impl Display) -> impl Display {
+        struct DisplayNewConstraint<'a, 'db, D> {
+            constraint: &'a NewConstraint<'db>,
+            typevar: D,
+            db: &'db dyn Db,
+        }
+
+        impl<D: Display> Display for DisplayNewConstraint<'_, '_, D> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                match self.constraint {
+                    NewConstraint::Range(constraint) => {
+                        constraint.display(self.db, &self.typevar).fmt(f)
+                    }
+                    NewConstraint::NotEquivalent(constraint) => {
+                        constraint.display(self.db, &self.typevar).fmt(f)
+                    }
+                    NewConstraint::NotComparable(constraint) => {
+                        constraint.display(self.db, &self.typevar).fmt(f)
+                    }
+                }
+            }
+        }
+
+        DisplayNewConstraint {
+            constraint: self,
+            typevar,
+            db,
+        }
+    }
+}
+
+impl<'db> Satisfiable<NewConstraint<'db>> {
+    fn constrain(self, typevar: BoundTypeVarInstance<'db>) -> Satisfiable<ConstrainedTypeVar<'db>> {
+        self.map(|constraint| constraint.constrain(typevar))
+    }
+}
+
+impl<'db> Simplifiable<NewConstraint<'db>> {
+    fn constrain(
+        self,
+        typevar: BoundTypeVarInstance<'db>,
+    ) -> Simplifiable<ConstrainedTypeVar<'db>> {
+        self.map(|constraint| constraint.constrain(typevar))
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct RangeConstraint<'db> {
+    lower: Type<'db>,
+    upper: Type<'db>,
+}
+
+impl<'db> RangeConstraint<'db> {
+    /// Returns a new range constraint.
+    ///
+    /// Panics if `lower` and `upper` are not both fully static.
+    fn new(db: &'db dyn Db, lower: Type<'db>, upper: Type<'db>) -> Satisfiable<NewConstraint<'db>> {
+        debug_assert_eq!(lower, lower.bottom_materialization(db));
+        debug_assert_eq!(upper, upper.top_materialization(db));
+
+        // If `lower ≰ upper`, then the constraint cannot be satisfied, since there is no type that
+        // is both greater than `lower`, and less than `upper`.
+        if !lower.is_subtype_of(db, upper) {
+            return Satisfiable::Never;
+        }
+
+        // If the requested constraint is `Never ≤ T ≤ object`, then the typevar can be specialized
+        // to _any_ type, and the constraint does nothing.
+        if lower.is_never() && upper.is_object(db) {
+            return Satisfiable::Always;
+        }
+
+        Satisfiable::Constrained(NewConstraint::Range(RangeConstraint { lower, upper }))
+    }
+
+    fn intersect_range(
+        &self,
+        db: &'db dyn Db,
+        other: &RangeConstraint<'db>,
+    ) -> Simplifiable<NewConstraint<'db>> {
+        // (s₁ ≤ α ≤ t₁) ∧ (s₂ ≤ α ≤ t₂) = (s₁ ∪ s₂) ≤ α (t₁ ∩ t₂)
+        Simplifiable::from_one(RangeConstraint::new(
+            db,
+            UnionType::from_elements(db, [self.lower, other.lower]),
+            IntersectionType::from_elements(db, [self.upper, other.upper]),
+        ))
+    }
+
+    fn intersect_not_equivalent(
+        &self,
+        db: &'db dyn Db,
+        other: &NotEquivalentConstraint<'db>,
+    ) -> Simplifiable<NewConstraint<'db>> {
+        // If the range constraint says that the typevar must be equivalent to some type, and the
+        // not-equivalent type says that it must not, we have a contradiction.
+        if self.lower.is_equivalent_to(db, self.upper) && self.lower.is_equivalent_to(db, other.ty)
+        {
+            return Simplifiable::NeverSatisfiable;
+        }
+
+        // Otherwise the result cannot be simplified.
+        Simplifiable::NotSimplified(
+            NewConstraint::Range(self.clone()),
+            NewConstraint::NotEquivalent(other.clone()),
+        )
+    }
+
+    fn intersect_not_comparable(
+        &self,
+        _db: &'db dyn Db,
+        other: &NotComparableConstraint<'db>,
+    ) -> Simplifiable<NewConstraint<'db>> {
+        // A range constraint and a not-comparable constraint cannot be simplified.
+        Simplifiable::NotSimplified(
+            NewConstraint::Range(self.clone()),
+            NewConstraint::NotComparable(other.clone()),
+        )
+    }
+
+    fn negate_into(
+        &self,
+        db: &'db dyn Db,
+        typevar: BoundTypeVarInstance<'db>,
+        set: &mut ConstraintSet<'db>,
+    ) {
+        // Lower bound:
+        // ¬(s ≤ α) = ((α ≤ s) ∧ α ≠ s) ∨ (a ≁ s)
+        set.union_clause(
+            db,
+            ConstraintClause::from_constraints(
+                db,
+                [
+                    RangeConstraint::new(db, Type::Never, self.lower).constrain(typevar),
+                    NotEquivalentConstraint::new(db, self.lower).constrain(typevar),
+                ],
+            ),
+        );
+        set.union_constraint(
+            db,
+            NotComparableConstraint::new(db, self.lower).constrain(typevar),
+        );
+
+        // Upper bound:
+        // ¬(α ≤ t) = ((t ≤ α) ∧ α ≠ t) ∨ (a ≁ t)
+        set.union_clause(
+            db,
+            ConstraintClause::from_constraints(
+                db,
+                [
+                    RangeConstraint::new(db, self.upper, Type::object(db)).constrain(typevar),
+                    NotEquivalentConstraint::new(db, self.upper).constrain(typevar),
+                ],
+            ),
+        );
+        set.union_constraint(
+            db,
+            NotComparableConstraint::new(db, self.upper).constrain(typevar),
+        );
+    }
+
+    fn display(&self, db: &'db dyn Db, typevar: impl Display) -> impl Display {
+        struct DisplayRangeConstraint<'a, 'db, D> {
+            constraint: &'a RangeConstraint<'db>,
+            typevar: D,
+            db: &'db dyn Db,
+        }
+
+        impl<D: Display> Display for DisplayRangeConstraint<'_, '_, D> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str("(")?;
+                if !self.constraint.lower.is_never() {
+                    write!(f, "{} ≤ ", self.constraint.lower.display(self.db))?;
+                }
+                self.typevar.fmt(f)?;
+                if !self.constraint.upper.is_object(self.db) {
+                    write!(f, " ≤ {}", self.constraint.upper.display(self.db))?;
+                }
+                f.write_str(")")
+            }
+        }
+
+        DisplayRangeConstraint {
+            constraint: self,
+            typevar,
+            db,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct NotEquivalentConstraint<'db> {
+    ty: Type<'db>,
+}
+
+impl<'db> NotEquivalentConstraint<'db> {
+    /// Returns a new not-equivalent constraint.
+    ///
+    /// Panics if `ty` is not fully static.
+    fn new(db: &'db dyn Db, ty: Type<'db>) -> Satisfiable<NewConstraint<'db>> {
+        debug_assert_eq!(ty, ty.bottom_materialization(db));
+        Satisfiable::Constrained(NewConstraint::NotEquivalent(NotEquivalentConstraint { ty }))
+    }
+
+    fn intersect_not_equivalent(
+        &self,
+        db: &'db dyn Db,
+        other: &NotEquivalentConstraint<'db>,
+    ) -> Simplifiable<NewConstraint<'db>> {
+        if self.ty.is_equivalent_to(db, other.ty) {
+            return Simplifiable::Simplified(NewConstraint::NotEquivalent(self.clone()));
+        }
+        Simplifiable::NotSimplified(
+            NewConstraint::NotEquivalent(self.clone()),
+            NewConstraint::NotEquivalent(other.clone()),
+        )
+    }
+
+    fn intersect_not_comparable(
+        &self,
+        db: &'db dyn Db,
+        other: &NotComparableConstraint<'db>,
+    ) -> Simplifiable<NewConstraint<'db>> {
+        // (α ≠ t) ∧ (a ≁ t) = a ≁ t
+        if self.ty.is_equivalent_to(db, other.ty) {
+            return Simplifiable::Simplified(NewConstraint::NotComparable(other.clone()));
+        }
+        Simplifiable::NotSimplified(
+            NewConstraint::NotEquivalent(self.clone()),
+            NewConstraint::NotComparable(other.clone()),
+        )
+    }
+
+    fn negate_into(
+        &self,
+        db: &'db dyn Db,
+        typevar: BoundTypeVarInstance<'db>,
+        set: &mut ConstraintSet<'db>,
+    ) {
+        // Not equivalent:
+        // ¬(α ≠ t) = (t ≤ α ≤ t)
+        set.union_constraint(
+            db,
+            RangeConstraint::new(db, self.ty, self.ty).constrain(typevar),
+        );
+    }
+
+    fn display(&self, db: &'db dyn Db, typevar: impl Display) -> impl Display {
+        struct DisplayNotEquivalentConstraint<'a, 'db, D> {
+            constraint: &'a NotEquivalentConstraint<'db>,
+            typevar: D,
+            db: &'db dyn Db,
+        }
+
+        impl<D: Display> Display for DisplayNotEquivalentConstraint<'_, '_, D> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(
+                    f,
+                    "({} ≠ {})",
+                    self.typevar,
+                    self.constraint.ty.display(self.db)
+                )
+            }
+        }
+
+        DisplayNotEquivalentConstraint {
+            constraint: self,
+            typevar,
+            db,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct NotComparableConstraint<'db> {
+    ty: Type<'db>,
+}
+
+impl<'db> NotComparableConstraint<'db> {
+    /// Returns a new not-comparable constraint.
+    ///
+    /// Panics if `ty` is not fully static.
+    fn new(db: &'db dyn Db, ty: Type<'db>) -> Satisfiable<NewConstraint<'db>> {
+        debug_assert_eq!(ty, ty.bottom_materialization(db));
+        Satisfiable::Constrained(NewConstraint::NotComparable(NotComparableConstraint { ty }))
+    }
+
+    fn intersect_not_comparable(
+        &self,
+        db: &'db dyn Db,
+        other: &NotComparableConstraint<'db>,
+    ) -> Simplifiable<NewConstraint<'db>> {
+        if self.ty.is_equivalent_to(db, other.ty) {
+            return Simplifiable::Simplified(NewConstraint::NotComparable(other.clone()));
+        }
+        Simplifiable::NotSimplified(
+            NewConstraint::NotComparable(self.clone()),
+            NewConstraint::NotComparable(other.clone()),
+        )
+    }
+
+    fn negate_into(
+        &self,
+        db: &'db dyn Db,
+        typevar: BoundTypeVarInstance<'db>,
+        set: &mut ConstraintSet<'db>,
+    ) {
+        // Not comparable:
+        // ¬(α ≁ t) = (t ≤ α) ∨ (α ≤ t)
+        set.union_constraint(
+            db,
+            RangeConstraint::new(db, Type::Never, self.ty).constrain(typevar),
+        );
+        set.union_constraint(
+            db,
+            RangeConstraint::new(db, self.ty, Type::object(db)).constrain(typevar),
+        );
+    }
+
+    fn display(&self, db: &'db dyn Db, typevar: impl Display) -> impl Display {
+        struct DisplayNotComparableConstraint<'a, 'db, D> {
+            constraint: &'a NotComparableConstraint<'db>,
+            typevar: D,
+            db: &'db dyn Db,
+        }
+
+        impl<D: Display> Display for DisplayNotComparableConstraint<'_, '_, D> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(
+                    f,
+                    "({} ≁ {})",
+                    self.typevar,
+                    self.constraint.ty.display(self.db)
+                )
+            }
+        }
+
+        DisplayNotComparableConstraint {
+            constraint: self,
+            typevar,
+            db,
+        }
+    }
+}
+
 /// Wraps a constraint (or clause, or set), while using distinct variants to represent when the
 /// constraint is never satisfiable or always satisfiable.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -1128,6 +1590,16 @@ enum Satisfiable<T> {
     Never,
     Always,
     Constrained(T),
+}
+
+impl<T> Satisfiable<T> {
+    fn map<U>(self, f: impl FnOnce(T) -> U) -> Satisfiable<U> {
+        match self {
+            Satisfiable::Never => Satisfiable::Never,
+            Satisfiable::Always => Satisfiable::Always,
+            Satisfiable::Constrained(t) => Satisfiable::Constrained(f(t)),
+        }
+    }
 }
 
 /// The result of trying to simplify two constraints (or clauses, or sets). Like [`Satisfiable`],
@@ -1147,6 +1619,15 @@ impl<T> Simplifiable<T> {
             Satisfiable::Never => Simplifiable::NeverSatisfiable,
             Satisfiable::Always => Simplifiable::AlwaysSatisfiable,
             Satisfiable::Constrained(constraint) => Simplifiable::Simplified(constraint),
+        }
+    }
+
+    fn map<U>(self, mut f: impl FnMut(T) -> U) -> Simplifiable<U> {
+        match self {
+            Simplifiable::NeverSatisfiable => Simplifiable::NeverSatisfiable,
+            Simplifiable::AlwaysSatisfiable => Simplifiable::AlwaysSatisfiable,
+            Simplifiable::Simplified(t) => Simplifiable::Simplified(f(t)),
+            Simplifiable::NotSimplified(t1, t2) => Simplifiable::NotSimplified(f(t1), f(t2)),
         }
     }
 }
