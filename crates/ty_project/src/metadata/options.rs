@@ -259,6 +259,19 @@ impl Options {
                 vec![project_root.to_path_buf()]
             };
 
+            let python = project_root.join("python");
+            if system.is_directory(&python) {
+                // If a `./python` directory exists, include it as a source root. This is the recommended layout
+                // maturin-based rust/python projects [1].
+                //
+                // https://github.com/PyO3/maturin/blob/979fe1db42bb9e58bc150fa6fc45360b377288bf/README.md?plain=1#L88-L99
+                tracing::debug!(
+                    "Including `./python` in `environment.root` because a `./python` directory exists"
+                );
+
+                roots.push(python);
+            }
+
             // Considering pytest test discovery conventions,
             // we also include the `tests` directory if it exists and is not a package.
             let tests_dir = project_root.join("tests");
