@@ -1178,11 +1178,6 @@ impl<'db> Parameters<'db> {
         parameters: &ast::Parameters,
         has_implicitly_positional_first_parameter: bool,
     ) -> Self {
-        fn uses_pep_484_positional_only_convention(param: &ast::ParameterWithDefault) -> bool {
-            let name = param.name();
-            name.starts_with("__") && !name.ends_with("__")
-        }
-
         let ast::Parameters {
             posonlyargs,
             args,
@@ -1220,30 +1215,15 @@ impl<'db> Parameters<'db> {
         if positional_only.is_empty() {
             let pos_or_keyword_iter = pos_or_keyword_iter.by_ref();
 
+            if has_implicitly_positional_first_parameter {
+                positional_only.extend(pos_or_keyword_iter.next().map(pos_only_param));
+            }
+
             positional_only.extend(
                 pos_or_keyword_iter
-                    .peeking_take_while(|param| uses_pep_484_positional_only_convention(param))
+                    .peeking_take_while(|param| param.uses_pep_484_positional_only_convention())
                     .map(pos_only_param),
             );
-
-            if has_implicitly_positional_first_parameter
-                && positional_only.is_empty()
-                && args
-                    .get(1)
-                    .is_some_and(uses_pep_484_positional_only_convention)
-            {
-                // `self` or `cls` in a method is implicitly positional-only
-                // iff the next parameter uses the PEP-484 convention.
-                //
-                // TODO: should it also always be implicitly positional-only if the method definition
-                // is in a `Protocol` class? --Alex
-                positional_only.extend(pos_or_keyword_iter.next().map(pos_only_param));
-                positional_only.extend(
-                    pos_or_keyword_iter
-                        .peeking_take_while(|param| uses_pep_484_positional_only_convention(param))
-                        .map(pos_only_param),
-                );
-            }
         }
 
         let positional_or_keyword = pos_or_keyword_iter.map(|arg| {

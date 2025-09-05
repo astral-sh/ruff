@@ -55,7 +55,7 @@ use bitflags::bitflags;
 use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity, Span};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast, ParameterWithDefault};
 use ruff_text_size::Ranged;
 
 use crate::module_resolver::{KnownModule, file_to_module};
@@ -63,7 +63,7 @@ use crate::place::{Boundness, Place, place_from_bindings};
 use crate::semantic_index::ast_ids::HasScopedUseId;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::ScopeId;
-use crate::semantic_index::semantic_index;
+use crate::semantic_index::{FileScopeId, SemanticIndex, semantic_index};
 use crate::types::call::{Binding, CallArguments};
 use crate::types::constraints::{ConstraintSet, Constraints};
 use crate::types::context::InferContext;
@@ -80,7 +80,7 @@ use crate::types::{
     BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, ClassType,
     DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
     IsEquivalentVisitor, KnownClass, NormalizedVisitor, SpecialFormType, Truthiness, Type,
-    TypeMapping, TypeRelation, UnionBuilder, all_members, walk_type_mapping,
+    TypeMapping, TypeRelation, UnionBuilder, all_members, binding_type, walk_type_mapping,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -341,6 +341,62 @@ impl<'db> OverloadLiteral<'db> {
         db: &'db dyn Db,
         inherited_generic_context: Option<GenericContext<'db>>,
     ) -> Signature<'db> {
+        /// `self` or `cls` can be implicitly positional-only if:
+        /// - It is a method AND
+        /// - No parameters in the method use PEP-570 syntax AND
+        /// - It is not a `@staticmethod` AND
+        /// - `self`/`cls` is not explicitly positional-only using the PEP-484 convention AND
+        /// - Either the next parameter after `self`/`cls` uses the PEP-484 convention,
+        ///   or the enclosing class is a `Protocol` class
+        fn has_implicitly_positional_only_first_param<'db>(
+            db: &'db dyn Db,
+            literal: OverloadLiteral<'db>,
+            node: &ast::StmtFunctionDef,
+            scope: FileScopeId,
+            index: &SemanticIndex,
+        ) -> bool {
+            let parameters = &node.parameters;
+
+            if !parameters.posonlyargs.is_empty() {
+                return false;
+            }
+
+            let Some(first_param) = parameters.args.first() else {
+                return false;
+            };
+
+            if first_param.uses_pep_484_positional_only_convention() {
+                return false;
+            }
+
+            if literal.is_staticmethod(db) {
+                return false;
+            }
+
+            let Some(class_definition) = index.class_definition_of_method(scope) else {
+                return false;
+            };
+
+            // `self` and `cls` are always positional-only if the next parameter uses the
+            // PEP-484 convention.
+            if parameters
+                .args
+                .get(1)
+                .is_some_and(ParameterWithDefault::uses_pep_484_positional_only_convention)
+            {
+                return true;
+            }
+
+            // If there isn't any parameter other than `self`/`cls`,
+            // or there is but it isn't using the PEP-484 convention,
+            // then `self`/`cls` are only implicitly positional-only if
+            // it is a protocol class.
+            let class_type = binding_type(db, class_definition);
+            class_type
+                .to_class_type(db)
+                .is_some_and(|class| class.is_protocol(db))
+        }
+
         let scope = self.body_scope(db);
         let module = parsed_module(db, self.file(db)).load(db);
         let function_stmt_node = scope.node(db).expect_function(&module);
@@ -349,11 +405,15 @@ impl<'db> OverloadLiteral<'db> {
         let generic_context = function_stmt_node.type_params.as_ref().map(|type_params| {
             GenericContext::from_type_params(db, index, definition, type_params)
         });
-        let is_generator = scope.file_scope_id(db).is_generator_function(index);
-        let has_implicitly_positional_first_parameter = !self.is_staticmethod(db)
-            && index
-                .class_definition_of_method(scope.file_scope_id(db))
-                .is_some();
+        let file_scope_id = scope.file_scope_id(db);
+        let is_generator = file_scope_id.is_generator_function(index);
+        let has_implicitly_positional_first_parameter = has_implicitly_positional_only_first_param(
+            db,
+            self,
+            function_stmt_node,
+            file_scope_id,
+            index,
+        );
 
         Signature::from_function(
             db,
