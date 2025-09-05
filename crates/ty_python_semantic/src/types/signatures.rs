@@ -395,7 +395,6 @@ impl<'db> Signature<'db> {
             function_node.parameters.as_ref(),
             has_implicitly_positional_first_parameter,
         );
-
         let return_ty = function_node.returns.as_ref().map(|returns| {
             let plain_return_ty = definition_expression_type(db, definition, returns.as_ref())
                 .apply_type_mapping(
