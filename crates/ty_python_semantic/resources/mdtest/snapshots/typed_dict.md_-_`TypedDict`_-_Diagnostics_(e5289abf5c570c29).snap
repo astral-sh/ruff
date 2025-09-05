@@ -142,7 +142,7 @@ info: rule `invalid-key` is enabled by default
 ```
 
 ```
-error[invalid-assignment]: Can not assign to key "id" on TypedDict `Employee`
+error[invalid-assignment]: Cannot assign to key "id" on TypedDict `Employee`
   --> src/mdtest_snippet.py:33:5
    |
 32 | def write_to_readonly_key(employee: Employee):
