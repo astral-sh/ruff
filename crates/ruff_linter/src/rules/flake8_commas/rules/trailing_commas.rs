@@ -5,8 +5,6 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
 use crate::checkers::ast::LintContext;
-use crate::preview::is_trailing_comma_type_params_enabled;
-use crate::settings::LinterSettings;
 use crate::{AlwaysFixableViolation, Violation};
 use crate::{Edit, Fix};
 
@@ -298,7 +296,7 @@ pub(crate) fn trailing_commas(
         }
 
         // Update the comma context stack.
-        let context = update_context(token, prev, prev_prev, &mut stack, lint_context.settings());
+        let context = update_context(token, prev, prev_prev, &mut stack);
 
         check_token(token, prev, prev_prev, context, locator, lint_context);
 
@@ -417,7 +415,6 @@ fn update_context(
     prev: SimpleToken,
     prev_prev: SimpleToken,
     stack: &mut Vec<Context>,
-    settings: &LinterSettings,
 ) -> Context {
     let new_context = match token.ty {
         TokenType::OpeningBracket => match (prev.ty, prev_prev.ty) {
@@ -427,19 +424,11 @@ fn update_context(
             }
             _ => Context::new(ContextType::Tuple),
         },
-        TokenType::OpeningSquareBracket if is_trailing_comma_type_params_enabled(settings) => {
-            match (prev.ty, prev_prev.ty) {
-                (TokenType::Named, TokenType::Def | TokenType::Class | TokenType::Type) => {
-                    Context::new(ContextType::TypeParameters)
-                }
-                (TokenType::ClosingBracket | TokenType::Named | TokenType::String, _) => {
-                    Context::new(ContextType::Subscript)
-                }
-                _ => Context::new(ContextType::List),
+        TokenType::OpeningSquareBracket => match (prev.ty, prev_prev.ty) {
+            (TokenType::Named, TokenType::Def | TokenType::Class | TokenType::Type) => {
+                Context::new(ContextType::TypeParameters)
             }
-        }
-        TokenType::OpeningSquareBracket => match prev.ty {
-            TokenType::ClosingBracket | TokenType::Named | TokenType::String => {
+            (TokenType::ClosingBracket | TokenType::Named | TokenType::String, _) => {
                 Context::new(ContextType::Subscript)
             }
             _ => Context::new(ContextType::List),
