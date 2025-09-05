@@ -186,7 +186,7 @@ impl<'a, 'b> YieldTracker<'a, 'b> {
 
     fn handle_mutually_exclusive_branches(
         &mut self,
-        branch_results: Vec<(usize, bool)>,
+        branch_results: &[(usize, bool)],
         is_exhaustive: bool,
     ) {
         let continuing: Vec<_> = branch_results
@@ -224,7 +224,7 @@ impl<'a, 'b> YieldTracker<'a, 'b> {
             .last()
             .is_some_and(|clause| clause.test.is_none());
 
-        self.handle_mutually_exclusive_branches(branch_counts, has_else);
+        self.handle_mutually_exclusive_branches(&branch_counts, has_else);
     }
 
     fn handle_match_stmt(&mut self, match_stmt: &'a ast::StmtMatch) {
@@ -242,7 +242,7 @@ impl<'a, 'b> YieldTracker<'a, 'b> {
             .iter()
             .any(|case| case.pattern.is_wildcard());
 
-        self.handle_mutually_exclusive_branches(case_counts, has_wildcard);
+        self.handle_mutually_exclusive_branches(&case_counts, has_wildcard);
     }
 
     fn handle_try_statement(&mut self, try_stmt: &'a ast::StmtTry) {
