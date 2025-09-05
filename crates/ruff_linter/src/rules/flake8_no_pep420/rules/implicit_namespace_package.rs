@@ -57,7 +57,6 @@ impl Violation for ImplicitNamespacePackage {
 }
 
 /// INP001
-#[expect(clippy::too_many_arguments)]
 pub(crate) fn implicit_namespace_package(
     path: &Path,
     package: Option<PackageRoot<'_>>,
