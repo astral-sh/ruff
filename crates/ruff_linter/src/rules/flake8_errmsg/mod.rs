@@ -9,7 +9,6 @@ mod tests {
     use anyhow::Result;
 
     use crate::registry::Rule;
-    use crate::settings::types::PreviewMode;
     use crate::test::test_path;
     use crate::{assert_diagnostics, settings};
 
