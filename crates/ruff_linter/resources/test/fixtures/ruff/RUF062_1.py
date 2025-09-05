@@ -293,6 +293,30 @@ def fully_illegal_try_except_finally_returns():
         yield # RUF062
         return
 
+# (27) Invalid: yield from in loop
+@contextlib.contextmanager
+def invalid_yield_from_in_loop():
+    for i in range(3):
+        yield from [i]  # RUF062
+
+# (28) Invalid: yield after invalid yield in loop
+@contextlib.contextmanager
+def invalid_loop_and_after():
+    for i in range(2):
+        yield i  # RUF062
+    yield "after loop"  # RUF062
 
 
+# (29) Invalid: invalid with stacked decorators
+@contextlib.contextmanager
+@staticmethod
+def invalid_stacked_decorators():
+    yield "value"
+    yield "value"  # RUF062
 
+# (30) Invalid: invalid with stacked decorators
+@staticmethod
+@contextlib.contextmanager
+def invalid_stacked_decorators_reverse():
+    yield "value"
+    yield "value"  # RUF062

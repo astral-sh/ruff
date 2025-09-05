@@ -392,3 +392,17 @@ def multiple_returning_excepts():
         pass
     yield
 
+# (33) Valid: The yield in the generator should not interfere
+@contextlib.contextmanager
+def valid_with_generator_expr():
+    gen = (yield x for x in range(3))
+    while x := next(gen):
+        pass
+    yield "actual context manager yield"
+
+# (34) Valid: The yield in the lambda should not interfere
+@contextlib.contextmanager
+def valid_with_lambda_yield():
+    func = lambda: (yield "lambda yield")
+    func()
+    yield "context manager yield"

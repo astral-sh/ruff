@@ -321,6 +321,9 @@ impl<'a> SourceOrderVisitor<'a> for YieldTracker<'a, '_> {
                     self.emit_violation_at_range(expr.range());
                 }
             }
+            Expr::Lambda(_) | Expr::Generator(_) => {
+                // Yields in generators or lambdas don't yield the contextmanager
+            }
             _ => source_order::walk_expr(self, expr),
         }
     }
