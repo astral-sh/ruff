@@ -148,3 +148,14 @@ reveal_type(A())  # revealed: Unknown
 # error: [call-non-callable] "Object of type `GenericAlias` is not callable"
 reveal_type(B[int]())  # revealed: Unknown
 ```
+
+## Recursive Truthiness
+
+Make sure we handle cycles correctly when computing the truthiness of a generic type alias:
+
+```py
+type X[T: X] = T
+
+def check(x: X):
+    assert x
+```
