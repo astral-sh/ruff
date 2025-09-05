@@ -287,6 +287,20 @@ def _(x: C):
     reveal_type(x)  # revealed: () -> C | None
 ```
 
+### Recursive relation in invariant position
+
+```py
+from typing import Any, Callable
+
+type JsonValue = None | JsonDict
+type JsonDict = dict[str, JsonValue]
+type JsonSchemaExtraCallable = Callable[[JsonDict], None] | Callable[[JsonDict, type[Any]], None]
+
+def _update_class_schema(json_schema: dict[str, Any], json_schema_extra: JsonSchemaExtraCallable) -> None:
+    if isinstance(json_schema_extra, dict):
+        json_schema.update(json_schema_extra)
+```
+
 ### Union inside generic
 
 #### With old-style union

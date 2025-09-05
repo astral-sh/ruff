@@ -451,6 +451,7 @@ fn is_subtype_in_invariant_position<'db, C: Constraints<'db>>(
     derived_materialization: MaterializationKind,
     base_type: &Type<'db>,
     base_materialization: MaterializationKind,
+    visitor: &HasRelationToVisitor<'db, C>,
 ) -> C {
     let derived_top = derived_type.top_materialization(db);
     let derived_bottom = derived_type.bottom_materialization(db);
@@ -459,37 +460,52 @@ fn is_subtype_in_invariant_position<'db, C: Constraints<'db>>(
     match (derived_materialization, base_materialization) {
         // `Derived` is a subtype of `Base` if the range of materializations covered by `Derived`
         // is a subset of the range covered by `Base`.
-        (MaterializationKind::Top, MaterializationKind::Top) => C::from_bool(
-            db,
-            base_bottom.is_subtype_of(db, derived_bottom)
-                && derived_top.is_subtype_of(db, base_top),
-        ),
+        (MaterializationKind::Top, MaterializationKind::Top) => base_bottom
+            .has_relation_to_impl(db, derived_bottom, TypeRelation::Subtyping, visitor)
+            .and(db, || {
+                derived_top.has_relation_to_impl(db, base_top, TypeRelation::Subtyping, visitor)
+            }),
         // One bottom is a subtype of another if it covers a strictly larger set of materializations.
-        (MaterializationKind::Bottom, MaterializationKind::Bottom) => C::from_bool(
-            db,
-            derived_bottom.is_subtype_of(db, base_bottom)
-                && base_top.is_subtype_of(db, derived_top),
-        ),
+        (MaterializationKind::Bottom, MaterializationKind::Bottom) => derived_bottom
+            .has_relation_to_impl(db, base_bottom, TypeRelation::Subtyping, visitor)
+            .and(db, || {
+                base_top.has_relation_to_impl(db, derived_top, TypeRelation::Subtyping, visitor)
+            }),
         // The bottom materialization of `Derived` is a subtype of the top materialization
         // of `Base` if there is some type that is both within the
         // range of types covered by derived and within the range covered by base, because if such a type
         // exists, it's a subtype of `Top[base]` and a supertype of `Bottom[derived]`.
-        (MaterializationKind::Bottom, MaterializationKind::Top) => C::from_bool(
-            db,
-            (base_bottom.is_subtype_of(db, derived_bottom)
-                && derived_bottom.is_subtype_of(db, base_top))
-                || (base_bottom.is_subtype_of(db, derived_top)
-                    && derived_top.is_subtype_of(db, base_top)
-                    || (base_top.is_subtype_of(db, derived_top)
-                        && derived_bottom.is_subtype_of(db, base_top))),
-        ),
+        (MaterializationKind::Bottom, MaterializationKind::Top) => (base_bottom
+            .has_relation_to_impl(db, derived_bottom, TypeRelation::Subtyping, visitor)
+            .and(db, || {
+                derived_bottom.has_relation_to_impl(db, base_top, TypeRelation::Subtyping, visitor)
+            }))
+        .or(db, || {
+            base_bottom
+                .has_relation_to_impl(db, derived_top, TypeRelation::Subtyping, visitor)
+                .and(db, || {
+                    derived_top.has_relation_to_impl(db, base_top, TypeRelation::Subtyping, visitor)
+                })
+                .or(db, || {
+                    base_top
+                        .has_relation_to_impl(db, derived_top, TypeRelation::Subtyping, visitor)
+                        .and(db, || {
+                            derived_bottom.has_relation_to_impl(
+                                db,
+                                base_top,
+                                TypeRelation::Subtyping,
+                                visitor,
+                            )
+                        })
+                })
+        }),
         // A top materialization is a subtype of a bottom materialization only if both original
         // un-materialized types are the same fully static type.
-        (MaterializationKind::Top, MaterializationKind::Bottom) => C::from_bool(
-            db,
-            derived_top.is_subtype_of(db, base_bottom)
-                && base_top.is_subtype_of(db, derived_bottom),
-        ),
+        (MaterializationKind::Top, MaterializationKind::Bottom) => derived_top
+            .has_relation_to_impl(db, base_bottom, TypeRelation::Subtyping, visitor)
+            .and(db, || {
+                base_top.has_relation_to_impl(db, derived_bottom, TypeRelation::Subtyping, visitor)
+            }),
     }
 }
 
@@ -503,23 +519,32 @@ fn has_relation_in_invariant_position<'db, C: Constraints<'db>>(
     base_type: &Type<'db>,
     base_materialization: Option<MaterializationKind>,
     relation: TypeRelation,
+    visitor: &HasRelationToVisitor<'db, C>,
 ) -> C {
     match (derived_materialization, base_materialization, relation) {
         // Top and bottom materializations are fully static types, so subtyping
         // is the same as assignability.
-        (Some(derived_mat), Some(base_mat), _) => {
-            is_subtype_in_invariant_position(db, derived_type, derived_mat, base_type, base_mat)
-        }
+        (Some(derived_mat), Some(base_mat), _) => is_subtype_in_invariant_position(
+            db,
+            derived_type,
+            derived_mat,
+            base_type,
+            base_mat,
+            visitor,
+        ),
         // Subtyping between invariant type parameters without a top/bottom materialization involved
         // is equivalence
-        (None, None, TypeRelation::Subtyping) => {
-            C::from_bool(db, derived_type.is_equivalent_to(db, *base_type))
-        }
-        (None, None, TypeRelation::Assignability) => C::from_bool(
-            db,
-            derived_type.is_assignable_to(db, *base_type)
-                && base_type.is_assignable_to(db, *derived_type),
-        ),
+        (None, None, TypeRelation::Subtyping) => derived_type.when_equivalent_to(db, *base_type),
+        (None, None, TypeRelation::Assignability) => derived_type
+            .has_relation_to_impl(db, *base_type, TypeRelation::Assignability, visitor)
+            .and(db, || {
+                base_type.has_relation_to_impl(
+                    db,
+                    *derived_type,
+                    TypeRelation::Assignability,
+                    visitor,
+                )
+            }),
         // For gradual types, A <: B (subtyping) is defined as Top[A] <: Bottom[B]
         (None, Some(base_mat), TypeRelation::Subtyping) => is_subtype_in_invariant_position(
             db,
@@ -527,6 +552,7 @@ fn has_relation_in_invariant_position<'db, C: Constraints<'db>>(
             MaterializationKind::Top,
             base_type,
             base_mat,
+            visitor,
         ),
         (Some(derived_mat), None, TypeRelation::Subtyping) => is_subtype_in_invariant_position(
             db,
@@ -534,6 +560,7 @@ fn has_relation_in_invariant_position<'db, C: Constraints<'db>>(
             derived_mat,
             base_type,
             MaterializationKind::Bottom,
+            visitor,
         ),
         // And A <~ B (assignability) is Bottom[A] <: Top[B]
         (None, Some(base_mat), TypeRelation::Assignability) => is_subtype_in_invariant_position(
@@ -542,6 +569,7 @@ fn has_relation_in_invariant_position<'db, C: Constraints<'db>>(
             MaterializationKind::Bottom,
             base_type,
             base_mat,
+            visitor,
         ),
         (Some(derived_mat), None, TypeRelation::Assignability) => is_subtype_in_invariant_position(
             db,
@@ -549,6 +577,7 @@ fn has_relation_in_invariant_position<'db, C: Constraints<'db>>(
             derived_mat,
             base_type,
             MaterializationKind::Top,
+            visitor,
         ),
     }
 }
@@ -805,6 +834,7 @@ impl<'db> Specialization<'db> {
                     other_type,
                     other_materialization_kind,
                     relation,
+                    visitor,
                 ),
                 TypeVarVariance::Covariant => {
                     self_type.has_relation_to_impl(db, *other_type, relation, visitor)
