@@ -215,7 +215,7 @@ impl<'a, 'b> YieldTracker<'a, 'b> {
         };
 
         if let Some(scope) = self.scopes.last_mut() {
-            scope.yield_count += else_count;
+            scope.yield_count = else_count;
             if else_returns || loop_returns {
                 scope.returned = true;
             }
