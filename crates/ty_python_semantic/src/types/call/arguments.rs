@@ -202,10 +202,25 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                     for subtype in &expanded_types {
                         let mut new_expanded_types = pre_expanded_types.to_vec();
                         new_expanded_types[index] = Some(*subtype);
-                        expanded_arguments.push(CallArguments::new(
-                            self.arguments.clone(),
-                            new_expanded_types,
-                        ));
+
+                        // Update the arguments list to handle variadic argument expansion
+                        let mut new_arguments = self.arguments.clone();
+                        if let Argument::Variadic(_) = self.arguments[index] {
+                            // If the argument corresponding to this type is variadic, we need to
+                            // update the tuple length because expanding could change the length.
+                            // For example, in `tuple[int] | tuple[int, int]`, the length of the
+                            // first type is 1, while the length of the second type is 2.
+                            if let Some(expanded_type) = new_expanded_types[index] {
+                                let length = expanded_type
+                                    .try_iterate(db)
+                                    .map(|tuple| tuple.len())
+                                    .unwrap_or(TupleLength::unknown());
+                                new_arguments[index] = Argument::Variadic(length);
+                            }
+                        }
+
+                        expanded_arguments
+                            .push(CallArguments::new(new_arguments, new_expanded_types));
                     }
                 }
 
