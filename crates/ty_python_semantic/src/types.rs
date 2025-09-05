@@ -5322,9 +5322,8 @@ impl<'db> Type<'db> {
         //    fallback to `object.__init__`, since it will indeed check that no arguments are
         //    passed.
         //
-        // Note that we currently ignore `__new__` return type, since we do not yet support `Self`
-        // and most builtin classes use it as return type annotation. We always return the instance
-        // type.
+        // `Self` return type is specialized to the instance type.
+        // Explicit return types override the default instance type.
 
         // Lookup `__new__` method in the MRO up to, but not including, `object`. Also, we must
         // avoid `__new__` on `type` since per descriptor protocol, if `__new__` is not defined on
@@ -5349,34 +5348,43 @@ impl<'db> Type<'db> {
             }
         });
 
-        // Construct an instance type that we can use to look up the `__init__` instance method.
-        // This performs the same logic as `Type::to_instance`, except for generic class literals.
-        // TODO: we should use the actual return type of `__new__` to determine the instance type
-        let init_ty = self_type
-            .to_instance(db)
-            .expect("type should be convertible to instance type");
-
-        let init_call_outcome = if new_call_outcome.is_none()
-            || !init_ty
-                .member_lookup_with_policy(
-                    db,
-                    "__init__".into(),
-                    MemberLookupPolicy::NO_INSTANCE_FALLBACK
-                        | MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
-                )
-                .place
-                .is_unbound()
-        {
-            Some(init_ty.try_call_dunder(db, "__init__", argument_types))
-        } else {
-            None
-        };
-
         // Note that we use `self` here, not `self_type`, so that if constructor argument inference
         // fails, we fail back to the default specialization.
         let instance_ty = self
             .to_instance(db)
             .expect("type should be convertible to instance type");
+
+        // Check if __new__ explicitly returns a different type than the instance.
+        // Per Python semantics, if __new__ returns a non-instance type, __init__
+        // should not be called on the result. This check must be done before
+        // deciding whether to call __init__.
+        let new_return_type =
+            extract_new_return_type_override(new_call_outcome.as_ref(), instance_ty, db);
+
+        // Determine whether to call __init__ based on __new__ return type.
+        // If __new__ returns a non-instance type, we should not call __init__.
+        let should_call_init = should_invoke_init(new_return_type.as_ref(), instance_ty, db);
+
+        // Construct an instance type that we can use to look up the `__init__` instance method.
+        // Always use instance_ty, not new_return_type, since __init__ is called on the instance
+        let init_ty = instance_ty;
+
+        let init_call_outcome = if should_call_init
+            && (new_call_outcome.is_none()
+                || !init_ty
+                    .member_lookup_with_policy(
+                        db,
+                        "__init__".into(),
+                        MemberLookupPolicy::NO_INSTANCE_FALLBACK
+                            | MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+                    )
+                    .place
+                    .is_unbound())
+        {
+            Some(init_ty.try_call_dunder(db, "__init__", argument_types))
+        } else {
+            None
+        };
 
         match (generic_origin, new_call_outcome, init_call_outcome) {
             // All calls are successful or not called at all
@@ -5429,21 +5437,28 @@ impl<'db> Type<'db> {
                         )
                     })
                     .unwrap_or(instance_ty);
-                Ok(specialized)
+
+                // Use explicit return type if available, otherwise the specialized instance
+                let final_type = new_return_type.unwrap_or(specialized);
+                
+                Ok(final_type)
             }
 
-            (None, None | Some(Ok(_)), None | Some(Ok(_))) => Ok(instance_ty),
+            (None, None | Some(Ok(_)), None | Some(Ok(_))) => {
+                Ok(new_return_type.unwrap_or(instance_ty))
+            }
 
             (_, None | Some(Ok(_)), Some(Err(error))) => {
-                // no custom `__new__` or it was called and succeeded, but `__init__` failed.
-                Err(ConstructorCallError::Init(instance_ty, error))
+                // No custom `__new__` or successful `__new__` call, but `__init__` failed
+                let result_type = new_return_type.unwrap_or(instance_ty);
+                Err(ConstructorCallError::Init(result_type, error))
             }
             (_, Some(Err(error)), None | Some(Ok(_))) => {
-                // custom `__new__` was called and failed, but init is ok
+                // `__new__` call failed, but `__init__` is ok
                 Err(ConstructorCallError::New(instance_ty, error))
             }
             (_, Some(Err(new_error)), Some(Err(init_error))) => {
-                // custom `__new__` was called and failed, and `__init__` is also not ok
+                // Both `__new__` and `__init__` calls failed
                 Err(ConstructorCallError::NewAndInit(
                     instance_ty,
                     new_error,
@@ -6771,6 +6786,99 @@ pub enum KnownInstanceType<'db> {
 
     /// A single instance of `dataclasses.Field`
     Field(FieldInstance<'db>),
+}
+
+/// Extracts __new__ return type override.
+/// Returns None for default instance type, Some(type) for explicit override.
+/// Handles Self and `NamedTuple` None returns.
+fn extract_new_return_type_override<'db>(
+    new_call_outcome: Option<&Result<Bindings<'db>, DunderNewCallError<'db>>>,
+    instance_ty: Type<'db>,
+    db: &'db dyn Db,
+) -> Option<Type<'db>> {
+    new_call_outcome
+        .and_then(|outcome| outcome.as_ref().ok())
+        .and_then(|bindings| {
+            let ret_type = bindings.return_type(db);
+
+            // Self returns instance type
+            if let Type::TypeVar(tv) = ret_type {
+                if tv.typevar(db).is_self(db) {
+                    return None; // No override needed
+                }
+            }
+
+            // Skip unknown (unresolved annotations) - treat as no annotation
+            if ret_type.is_unknown() {
+                return None;
+            }
+            
+            // Skip Any - classes inheriting from Any should still return their instance type
+            if matches!(ret_type, Type::Dynamic(DynamicType::Any)) {
+                return None;
+            }
+
+            // Special case: NamedTuple's synthesized __new__ returns None but should
+            // be treated as returning the instance type. This is a quirk of how
+            // NamedTuple is implemented in our type system.
+            if ret_type.is_none(db) {
+                // Check if the class or any of its base classes is a NamedTuple
+                if let Type::NominalInstance(inst) = instance_ty {
+                    let (class_literal, _) = inst.class(db).class_literal(db);
+                    // Check if this class itself is a NamedTuple
+                    if class::CodeGeneratorKind::NamedTuple.matches(db, class_literal) {
+                        return None; // Use instance type for NamedTuple
+                    }
+                    // Check if any base class is a NamedTuple
+                    for base_class in class_literal.iter_mro(db, None) {
+                        if let ClassBase::Class(base_type) = base_class {
+                            let (base_literal, _) = base_type.class_literal(db);
+                            if class::CodeGeneratorKind::NamedTuple.matches(db, base_literal) {
+                                return None; // Use instance type for NamedTuple subclass
+                            }
+                        }
+                    }
+                }
+                // For other classes, None return type means None
+                return Some(ret_type);
+            }
+
+            // Use explicit return type
+            Some(ret_type)
+        })
+}
+
+/// Determines whether to call __init__ based on __new__ return type.
+/// Python calls __init__ only if __new__ returns an instance of the class.
+fn should_invoke_init<'db>(
+    new_return_type: Option<&Type<'db>>,
+    instance_ty: Type<'db>,
+    db: &'db dyn Db,
+) -> bool {
+    new_return_type.is_none() || {
+        if let Some(ret_type) = new_return_type {
+            // Per Python typing spec (https://typing.python.org/en/latest/spec/constructors.html):
+            // "For purposes of this test, an explicit return type of Any (or a union containing Any)
+            // should be treated as a type that is not an instance of the class being constructed."
+            if matches!(ret_type, Type::Dynamic(DynamicType::Any)) {
+                return false;
+            }
+
+            // Check if union contains Any - treat as not an instance
+            if let Type::Union(union) = ret_type {
+                for element in union.elements(db) {
+                    if matches!(element, Type::Dynamic(DynamicType::Any)) {
+                        return false;
+                    }
+                }
+            }
+
+            // Otherwise, __init__ is only called if __new__ returns the class (or a subclass)
+            ret_type.is_assignable_to(db, instance_ty)
+        } else {
+            true
+        }
+    }
 }
 
 fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
