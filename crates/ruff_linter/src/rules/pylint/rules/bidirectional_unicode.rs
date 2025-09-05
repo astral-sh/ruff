@@ -1,11 +1,9 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_source_file::Line;
 
-use crate::{
-    Violation, checkers::ast::LintContext, preview::is_bidi_forbid_arabic_letter_mark_enabled,
-};
+use crate::{Violation, checkers::ast::LintContext};
 
-const BIDI_UNICODE: [char; 10] = [
+const BIDI_UNICODE: [char; 11] = [
     '\u{202A}', //{LEFT-TO-RIGHT EMBEDDING}
     '\u{202B}', //{RIGHT-TO-LEFT EMBEDDING}
     '\u{202C}', //{POP DIRECTIONAL FORMATTING}
@@ -19,6 +17,7 @@ const BIDI_UNICODE: [char; 10] = [
     // https://peps.python.org/pep-0672/
     // so the list above might not be complete
     '\u{200F}', //{RIGHT-TO-LEFT MARK}
+    '\u{061C}', //{ARABIC LETTER MARK}
                 // We don't use
                 //   "\u200E" # \n{LEFT-TO-RIGHT MARK}
                 // as this is the default for latin files and can't be used
@@ -62,12 +61,7 @@ impl Violation for BidirectionalUnicode {
 
 /// PLE2502
 pub(crate) fn bidirectional_unicode(line: &Line, context: &LintContext) {
-    if line.contains(BIDI_UNICODE)
-        || (is_bidi_forbid_arabic_letter_mark_enabled(context.settings())
-            && line.contains(
-                '\u{061C}', //{ARABIC LETTER MARK}
-            ))
-    {
+    if line.contains(BIDI_UNICODE) {
         context.report_diagnostic(BidirectionalUnicode, line.full_range());
     }
 }
