@@ -44,6 +44,7 @@ use crate::types::constraints::{
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{INVALID_AWAIT, INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
 pub use crate::types::display::DisplaySettings;
+use crate::types::display::TupleSpecialization;
 use crate::types::enums::{enum_metadata, is_single_member_enum};
 use crate::types::function::{
     DataclassTransformerParams, FunctionSpans, FunctionType, KnownFunction,
@@ -839,6 +840,13 @@ impl<'db> Type<'db> {
     pub(crate) const fn into_class_literal(self) -> Option<ClassLiteral<'db>> {
         match self {
             Type::ClassLiteral(class_type) => Some(class_type),
+            _ => None,
+        }
+    }
+
+    pub(crate) const fn into_type_alias(self) -> Option<TypeAliasType<'db>> {
+        match self {
+            Type::KnownInstance(KnownInstanceType::TypeAliasType(type_alias)) => Some(type_alias),
             _ => None,
         }
     }
@@ -5572,6 +5580,12 @@ impl<'db> Type<'db> {
             }),
 
             Type::KnownInstance(known_instance) => match known_instance {
+                KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(alias))
+                    if alias.is_specialized(db) =>
+                {
+                    // Note that the RHS of a type alias statement is required to be in type-form.
+                    Ok(alias.value_type(db))
+                }
                 KnownInstanceType::TypeAliasType(alias) => Ok(Type::TypeAlias(*alias)),
                 KnownInstanceType::TypeVar(typevar) => {
                     let module = parsed_module(db, scope_id.file(db)).load(db);
@@ -6828,10 +6842,13 @@ impl<'db> KnownInstanceType<'db> {
         }
     }
 
-    const fn class(self) -> KnownClass {
+    fn class(self, db: &'db dyn Db) -> KnownClass {
         match self {
             Self::SubscriptedProtocol(_) | Self::SubscriptedGeneric(_) => KnownClass::SpecialForm,
             Self::TypeVar(_) => KnownClass::TypeVar,
+            Self::TypeAliasType(TypeAliasType::PEP695(alias)) if alias.is_specialized(db) => {
+                KnownClass::GenericAlias
+            }
             Self::TypeAliasType(_) => KnownClass::TypeAliasType,
             Self::Deprecated(_) => KnownClass::Deprecated,
             Self::Field(_) => KnownClass::Field,
@@ -6839,7 +6856,7 @@ impl<'db> KnownInstanceType<'db> {
     }
 
     fn to_meta_type(self, db: &'db dyn Db) -> Type<'db> {
-        self.class().to_class_literal(db)
+        self.class(db).to_class_literal(db)
     }
 
     /// Return the instance type which this type is a subtype of.
@@ -6848,12 +6865,12 @@ impl<'db> KnownInstanceType<'db> {
     /// `typing.TypeAliasType`, so `KnownInstanceType::TypeAliasType(_).instance_fallback(db)`
     /// returns `Type::NominalInstance(NominalInstanceType { class: <typing.TypeAliasType> })`.
     fn instance_fallback(self, db: &dyn Db) -> Type<'_> {
-        self.class().to_instance(db)
+        self.class(db).to_instance(db)
     }
 
     /// Return `true` if this symbol is an instance of `class`.
     fn is_instance_of(self, db: &dyn Db, class: ClassType) -> bool {
-        self.class().is_subclass_of(db, class)
+        self.class(db).is_subclass_of(db, class)
     }
 
     /// Return the repr of the symbol at runtime
@@ -6873,6 +6890,16 @@ impl<'db> KnownInstanceType<'db> {
                     KnownInstanceType::SubscriptedGeneric(generic_context) => {
                         f.write_str("typing.Generic")?;
                         generic_context.display(self.db).fmt(f)
+                    }
+                    KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(alias)) => {
+                        if let Some(specialization) = alias.specialization(self.db) {
+                            f.write_str(alias.name(self.db))?;
+                            specialization
+                                .display_short(self.db, TupleSpecialization::No)
+                                .fmt(f)
+                        } else {
+                            f.write_str("typing.TypeAliasType")
+                        }
                     }
                     KnownInstanceType::TypeAliasType(_) => f.write_str("typing.TypeAliasType"),
                     // This is a legacy `TypeVar` _outside_ of any generic class or function, so we render
@@ -9347,6 +9374,8 @@ pub struct PEP695TypeAliasType<'db> {
     pub name: ast::name::Name,
 
     rhs_scope: ScopeId<'db>,
+
+    specialization: Option<Specialization<'db>>,
 }
 
 // The Salsa heap is tracked separately.
@@ -9375,11 +9404,76 @@ impl<'db> PEP695TypeAliasType<'db> {
         let type_alias_stmt_node = scope.node(db).expect_type_alias();
         let definition = self.definition(db);
         definition_expression_type(db, definition, &type_alias_stmt_node.node(&module).value)
+            .apply_optional_specialization(db, self.specialization(db))
+    }
+
+    pub(crate) fn apply_specialization(
+        self,
+        db: &'db dyn Db,
+        f: impl FnOnce(GenericContext<'db>) -> Specialization<'db>,
+    ) -> PEP695TypeAliasType<'db> {
+        match self.generic_context(db) {
+            None => self,
+
+            Some(generic_context) => {
+                // Note that at runtime, a specialized type alias is an instance of `typing.GenericAlias`.
+                // However, the `GenericAlias` type in ty is heavily special cased to refer to specialized
+                // class literals, so we instead represent specialized type aliases as instances of
+                // `typing.TypeAliasType` internally, and pass the specialization through to the value type,
+                // except when resolving to an instance of the type alias, or its display representation.
+                let specialization = f(generic_context);
+                PEP695TypeAliasType::new(
+                    db,
+                    self.name(db),
+                    self.rhs_scope(db),
+                    Some(specialization),
+                )
+            }
+        }
+    }
+
+    pub(crate) fn is_specialized(self, db: &'db dyn Db) -> bool {
+        self.specialization(db).is_some()
+    }
+
+    #[salsa::tracked(cycle_fn=generic_context_cycle_recover, cycle_initial=generic_context_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
+        let scope = self.rhs_scope(db);
+        let file = scope.file(db);
+        let parsed = parsed_module(db, file).load(db);
+        let type_alias_stmt_node = scope.node(db).expect_type_alias();
+
+        type_alias_stmt_node
+            .node(&parsed)
+            .type_params
+            .as_ref()
+            .map(|type_params| {
+                let index = semantic_index(db, scope.file(db));
+                let definition = index.expect_single_definition(type_alias_stmt_node);
+                GenericContext::from_type_params(db, index, definition, type_params)
+            })
     }
 
     fn normalized_impl(self, _db: &'db dyn Db, _visitor: &NormalizedVisitor<'db>) -> Self {
         self
     }
+}
+
+#[allow(clippy::ref_option, clippy::trivially_copy_pass_by_ref)]
+fn generic_context_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &Option<GenericContext<'db>>,
+    _count: u32,
+    _self: PEP695TypeAliasType<'db>,
+) -> salsa::CycleRecoveryAction<Option<GenericContext<'db>>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn generic_context_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _self: PEP695TypeAliasType<'db>,
+) -> Option<GenericContext<'db>> {
+    None
 }
 
 fn value_type_cycle_recover<'db>(
@@ -9486,6 +9580,13 @@ impl<'db> TypeAliasType<'db> {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.value_type(db),
             TypeAliasType::ManualPEP695(type_alias) => type_alias.value(db),
+        }
+    }
+
+    pub(crate) fn into_pep_695_type_alias(self) -> Option<PEP695TypeAliasType<'db>> {
+        match self {
+            TypeAliasType::PEP695(type_alias) => Some(type_alias),
+            TypeAliasType::ManualPEP695(_) => None,
         }
     }
 }
