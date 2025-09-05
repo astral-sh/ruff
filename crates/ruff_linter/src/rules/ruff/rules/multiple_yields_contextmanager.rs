@@ -167,7 +167,8 @@ impl<'a, 'b> YieldTracker<'a, 'b> {
         let (loop_count, loop_returns) = self.exit_scope();
 
         let (else_count, else_returns) = if loop_returns {
-            (loop_count, false) // else doesn't add additional yields if loop returns
+            // if loop returns, else doesn't execute (neither returns)
+            (loop_count, false)
         } else {
             // Else clause only runs if loop doesn't return or break
             let else_parent = YieldScope::from(loop_count, false, parent_scope.nested_in_loop);
@@ -196,8 +197,7 @@ impl<'a, 'b> YieldTracker<'a, 'b> {
 
         if let Some(scope) = self.scopes.last_mut() {
             if continuing.is_empty() {
-                // If branches are exhaustive and all return, subsequent code is
-                // return guarded
+                // Exhaustive return branches guard subsequent code
                 scope.returned = is_exhaustive;
             } else {
                 scope.yield_count = *continuing.iter().max().unwrap();
@@ -279,7 +279,6 @@ impl<'a, 'b> YieldTracker<'a, 'b> {
             YieldScope::from(else_count, else_returns, normal_path_at_try.nested_in_loop)
         };
 
-        // Max returning branches; max non-returning branches
         let (mut continuing, mut returning) = except_counts.into_iter().fold(
             (Vec::new(), Vec::new()),
             |(mut continuing, mut returning), (count, returns)| {
@@ -300,7 +299,8 @@ impl<'a, 'b> YieldTracker<'a, 'b> {
 
         let n_continuing = continuing.len();
 
-        // Handle finally for terminating and non-terminating control flow branches
+        // We need to process finally block twice:
+        // once for returning and once for continuing branches
 
         // Terminating branches
         let max_returning = returning.into_iter().max().unwrap_or(0);
@@ -320,7 +320,6 @@ impl<'a, 'b> YieldTracker<'a, 'b> {
 
         if let Some(scope) = self.scopes.last_mut() {
             scope.yield_count = continuing_finally_count;
-            // Finally returns or all other previous branches return
             scope.returned = continuing_finally_returns || n_continuing == 0;
         }
     }
@@ -338,7 +337,8 @@ impl<'a> SourceOrderVisitor<'a> for YieldTracker<'a, '_> {
                 }
             }
             Expr::Lambda(_) | Expr::Generator(_) => {
-                // Yields in generators or lambdas don't yield the contextmanager
+                // Yields in generators or lambdas create separate execution contexts
+                // and don't affect the contextmanager's yield count
             }
             _ => source_order::walk_expr(self, expr),
         }
@@ -372,7 +372,6 @@ impl<'a> SourceOrderVisitor<'a> for YieldTracker<'a, '_> {
             }
 
             ast::Stmt::FunctionDef(nested) => {
-                // Don't traverse into nested functions
                 function_def_visit_sourceorder_except_body(nested, self);
             }
 
