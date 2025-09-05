@@ -86,7 +86,6 @@ mod tests {
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
                 future_annotations: true,
-                preview: PreviewMode::Enabled,
                 // also enable quoting annotations to check the interaction. the future import
                 // should take precedence.
                 flake8_type_checking: super::settings::Settings {
