@@ -62,6 +62,11 @@ impl Edit {
         self.content.as_deref()
     }
 
+    /// Returns the range of this edit.
+    pub fn range(&self) -> TextRange {
+        self.range
+    }
+
     pub fn into_content(self) -> Option<Box<str>> {
         self.content
     }

@@ -170,7 +170,7 @@ fn cmp_fix(name1: &str, name2: &str, fix1: &Fix, fix2: &Fix) -> std::cmp::Orderi
 mod tests {
     use ruff_diagnostics::SourceMarker;
     use ruff_source_file::SourceFileBuilder;
-    use ruff_text_size::{Ranged, TextSize};
+    use ruff_text_size::TextSize;
 
     use crate::fix::{FixResult, apply_fixes};
     use crate::rules::pycodestyle::rules::MissingNewlineAtEndOfFile;

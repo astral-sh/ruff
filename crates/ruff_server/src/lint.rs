@@ -26,7 +26,7 @@ use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_parser::ParseOptions;
 use ruff_source_file::LineIndex;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::TextRange;
 
 /// This is serialized on the diagnostic `data` field.
 #[derive(Serialize, Deserialize, Debug, Clone)]

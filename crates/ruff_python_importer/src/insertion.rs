@@ -1,4 +1,5 @@
 //! Insert statements into Python code.
+
 use std::ops::Add;
 
 use ruff_python_ast::Stmt;
@@ -7,11 +8,10 @@ use ruff_python_codegen::Stylist;
 use ruff_python_parser::{TokenKind, Tokens};
 use ruff_python_trivia::is_python_whitespace;
 use ruff_python_trivia::{PythonWhitespace, textwrap::indent};
-use ruff_source_file::{LineRanges, UniversalNewlineIterator};
+use ruff_source_file::{LineRanges, Locator, UniversalNewlineIterator};
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::Edit;
-use crate::Locator;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum Placement<'a> {
@@ -25,7 +25,7 @@ pub(super) enum Placement<'a> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct Insertion<'a> {
+pub struct Insertion<'a> {
     /// The content to add before the insertion.
     prefix: &'a str,
     /// The location at which to insert.
@@ -50,7 +50,7 @@ impl<'a> Insertion<'a> {
     ///
     /// The insertion returned will begin at the start of the `import os` statement, and will
     /// include a trailing newline.
-    pub(super) fn start_of_file(
+    pub fn start_of_file(
         body: &[Stmt],
         locator: &Locator,
         stylist: &Stylist,
@@ -111,7 +111,7 @@ impl<'a> Insertion<'a> {
     /// in this case is the line after `import math`, and will include a trailing newline.
     ///
     /// The statement itself is assumed to be at the top-level of the module.
-    pub(super) fn end_of_statement(
+    pub fn end_of_statement(
         stmt: &Stmt,
         locator: &Locator,
         stylist: &Stylist,
@@ -149,7 +149,7 @@ impl<'a> Insertion<'a> {
     /// include a trailing newline.
     ///
     /// The block itself is assumed to be at the top-level of the module.
-    pub(super) fn start_of_block(
+    pub fn start_of_block(
         mut location: TextSize,
         locator: &Locator<'a>,
         stylist: &Stylist,
@@ -220,7 +220,7 @@ impl<'a> Insertion<'a> {
     }
 
     /// Convert this [`Insertion`] into an [`Edit`] that inserts the given content.
-    pub(super) fn into_edit(self, content: &str) -> Edit {
+    pub fn into_edit(self, content: &str) -> Edit {
         let Insertion {
             prefix,
             location,
@@ -229,18 +229,18 @@ impl<'a> Insertion<'a> {
         } = self;
         let content = format!("{prefix}{content}{suffix}");
         Edit::insertion(
+            location,
             match placement {
                 Placement::Indented(indentation) if !indentation.is_empty() => {
                     indent(&content, indentation).to_string()
                 }
                 _ => content,
             },
-            location,
         )
     }
 
     /// Returns `true` if this [`Insertion`] is inline.
-    pub(super) fn is_inline(&self) -> bool {
+    pub fn is_inline(&self) -> bool {
         matches!(self.placement, Placement::Inline)
     }
 
@@ -323,7 +323,7 @@ mod tests {
     use ruff_source_file::LineEnding;
     use ruff_text_size::TextSize;
 
-    use crate::Locator;
+    use ruff_source_file::Locator;
 
     use super::Insertion;
 
