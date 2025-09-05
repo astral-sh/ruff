@@ -406,3 +406,15 @@ def valid_with_lambda_yield():
     func = lambda: (yield "lambda yield")
     func()
     yield "context manager yield"
+
+# (35) Valid: The yield in the lambda should not interfere
+@contextlib.contextmanager
+def invalid_match_all_cases_return(value):
+    match value:
+        case "a":
+            yield "from a"
+            return
+        case "b":
+            yield "from b"
+            return
+    yield "valid, only reached if no case matches"

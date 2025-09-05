@@ -156,44 +156,6 @@ impl<'a, 'b> YieldTracker<'a, 'b> {
         }
     }
 
-    fn handle_if_stmt(&mut self, if_stmt: &'a ast::StmtIf) {
-        let parent_scope = *self.scopes.last().unwrap();
-        let mut branch_counts = Vec::new();
-
-        // Main if branch
-        self.enter_scope(parent_scope);
-        self.visit_body(&if_stmt.body);
-        branch_counts.push(self.exit_scope());
-
-        // elif/else branches
-        for clause in &if_stmt.elif_else_clauses {
-            self.enter_scope(parent_scope);
-            self.visit_body(&clause.body);
-            branch_counts.push(self.exit_scope());
-        }
-
-        let has_else = if_stmt
-            .elif_else_clauses
-            .last()
-            .is_some_and(|clause| clause.test.is_none());
-
-        let continuing: Vec<_> = branch_counts
-            .iter()
-            .filter_map(|(count, returns)| if *returns { None } else { Some(*count) })
-            .collect();
-
-        // Update parent scope with
-        if let Some(scope) = self.scopes.last_mut() {
-            if continuing.is_empty() {
-                // If all branches return, check if else branch is among these.
-                // Otherwise, returns are circumvented if all conditions are false
-                scope.returned = has_else;
-            } else {
-                scope.yield_count = *continuing.iter().max().unwrap();
-            }
-        }
-    }
-
     fn handle_loop(&mut self, body: &'a [ast::Stmt], orelse: &'a [ast::Stmt]) {
         let parent_scope = *self.scopes.last().unwrap();
 
@@ -222,24 +184,65 @@ impl<'a, 'b> YieldTracker<'a, 'b> {
         }
     }
 
+    fn handle_mutually_exclusive_branches(
+        &mut self,
+        branch_results: Vec<(usize, bool)>,
+        is_exhaustive: bool,
+    ) {
+        let continuing: Vec<_> = branch_results
+            .iter()
+            .filter_map(|(count, returns)| if *returns { None } else { Some(*count) })
+            .collect();
+
+        if let Some(scope) = self.scopes.last_mut() {
+            if continuing.is_empty() {
+                // All branches return - but only mark as returned if coverage is exhaustive
+                scope.returned = is_exhaustive;
+            } else {
+                scope.yield_count = *continuing.iter().max().unwrap();
+            }
+        }
+    }
+
+    fn handle_if_stmt(&mut self, if_stmt: &'a ast::StmtIf) {
+        let parent_scope = *self.scopes.last().unwrap();
+        let mut branch_counts = Vec::new();
+
+        // Main if branch
+        self.enter_scope(parent_scope);
+        self.visit_body(&if_stmt.body);
+        branch_counts.push(self.exit_scope());
+
+        // elif/else branches
+        for clause in &if_stmt.elif_else_clauses {
+            self.enter_scope(parent_scope);
+            self.visit_body(&clause.body);
+            branch_counts.push(self.exit_scope());
+        }
+
+        let has_else = if_stmt
+            .elif_else_clauses
+            .last()
+            .is_some_and(|clause| clause.test.is_none());
+
+        self.handle_mutually_exclusive_branches(branch_counts, has_else);
+    }
+
     fn handle_match_stmt(&mut self, match_stmt: &'a ast::StmtMatch) {
         let parent_scope = *self.scopes.last().unwrap();
         let mut case_counts = Vec::new();
+
         for case in &match_stmt.cases {
             self.enter_scope(parent_scope);
             self.visit_match_case(case);
             case_counts.push(self.exit_scope());
         }
 
-        let max_non_return_case_branch = case_counts
-            .into_iter()
-            .map(|(counts, returns)| if returns { 0 } else { counts })
-            .max()
-            .unwrap_or(parent_scope.yield_count);
-
-        if let Some(scope) = self.scopes.last_mut() {
-            scope.yield_count = max_non_return_case_branch;
-        }
+        let has_wildcard = match_stmt
+            .cases
+            .iter()
+            .any(|case| case.pattern.is_wildcard());
+        self.handle_mutually_exclusive_branches(case_counts, has_wildcard);
     }
 
     fn handle_try_statement(&mut self, try_stmt: &'a ast::StmtTry) {
