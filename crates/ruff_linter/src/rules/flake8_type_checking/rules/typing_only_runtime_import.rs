@@ -11,12 +11,10 @@ use crate::checkers::ast::{Checker, DiagnosticGuard};
 use crate::codes::Rule;
 use crate::fix;
 use crate::importer::ImportedMembers;
-use crate::preview::is_full_path_match_source_strategy_enabled;
 use crate::rules::flake8_type_checking::helpers::{
     TypingReference, filter_contained, quote_annotation,
 };
 use crate::rules::flake8_type_checking::imports::ImportBinding;
-use crate::rules::isort::categorize::MatchSourceStrategy;
 use crate::rules::isort::{ImportSection, ImportType, categorize};
 use crate::{Fix, FixAvailability, Violation};
 
@@ -67,10 +65,6 @@ use crate::{Fix, FixAvailability, Violation};
 ///
 ///
 /// ## Preview
-/// When [preview](https://docs.astral.sh/ruff/preview/) is enabled,
-/// the criterion for determining whether an import is first-party
-/// is stricter, which could affect whether this lint is triggered vs [`TC001`](https://docs.astral.sh/ruff/rules/typing-only-third-party-import/). See [this FAQ section](https://docs.astral.sh/ruff/faq/#how-does-ruff-determine-which-of-my-imports-are-first-party-third-party-etc) for more details.
-///
 /// If [`lint.future-annotations`] is set to `true`, `from __future__ import
 /// annotations` will be added if doing so would enable an import to be moved into an `if
 /// TYPE_CHECKING:` block. This takes precedence over the
@@ -154,10 +148,6 @@ impl Violation for TypingOnlyFirstPartyImport {
 /// ```
 ///
 /// ## Preview
-/// When [preview](https://docs.astral.sh/ruff/preview/) is enabled,
-/// the criterion for determining whether an import is first-party
-/// is stricter, which could affect whether this lint is triggered vs [`TC001`](https://docs.astral.sh/ruff/rules/typing-only-first-party-import/). See [this FAQ section](https://docs.astral.sh/ruff/faq/#how-does-ruff-determine-which-of-my-imports-are-first-party-third-party-etc) for more details.
-///
 /// If [`lint.future-annotations`] is set to `true`, `from __future__ import
 /// annotations` will be added if doing so would enable an import to be moved into an `if
 /// TYPE_CHECKING:` block. This takes precedence over the
@@ -347,13 +337,6 @@ pub(crate) fn typing_only_runtime_import(
         let source_name = import.source_name().join(".");
 
         // Categorize the import, using coarse-grained categorization.
-        let match_source_strategy =
-            if is_full_path_match_source_strategy_enabled(checker.settings()) {
-                MatchSourceStrategy::FullPath
-            } else {
-                MatchSourceStrategy::Root
-            };
-
         let import_type = match categorize(
             &source_name,
             qualified_name.is_unresolved_import(),
@@ -365,7 +348,6 @@ pub(crate) fn typing_only_runtime_import(
             checker.settings().isort.no_sections,
             &checker.settings().isort.section_order,
             &checker.settings().isort.default_section,
-            match_source_strategy,
         ) {
             ImportSection::Known(ImportType::LocalFolder | ImportType::FirstParty) => {
                 ImportType::FirstParty
