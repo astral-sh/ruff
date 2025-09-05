@@ -100,6 +100,7 @@ mod tests {
     #[test_case(Rule::UnnecessaryBuiltinImport, Path::new("UP029.py"))]
     #[test_case(Rule::UnnecessaryClassParentheses, Path::new("UP039.py"))]
     #[test_case(Rule::UnnecessaryDefaultTypeArgs, Path::new("UP043.py"))]
+    #[test_case(Rule::UnnecessaryDefaultTypeArgs, Path::new("UP043.pyi"))]
     #[test_case(Rule::UnnecessaryEncodeUTF8, Path::new("UP012.py"))]
     #[test_case(Rule::UnnecessaryFutureImport, Path::new("UP010_0.py"))]
     #[test_case(Rule::UnnecessaryFutureImport, Path::new("UP010_1.py"))]
