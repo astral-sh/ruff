@@ -195,22 +195,28 @@ impl<'a, 'b> YieldTracker<'a, 'b> {
     }
 
     fn handle_loop(&mut self, body: &'a [ast::Stmt], orelse: &'a [ast::Stmt]) {
-        let mut parent_scope = *self.scopes.last().unwrap();
-        parent_scope.nested_in_loop = true;
+        let parent_scope = *self.scopes.last().unwrap();
 
-        self.enter_scope(parent_scope);
+        let mut loop_body_scope = parent_scope;
+        loop_body_scope.nested_in_loop = true;
+
+        self.enter_scope(loop_body_scope);
         self.visit_body(body);
-        let _ = self.exit_scope(); // Ignore - violations already reported in visit_expr
+        let (loop_count, loop_returns) = self.exit_scope();
 
-        // Else clause only runs if loop doesn't break
-        let else_parent = *self.scopes.last().unwrap();
-        self.enter_scope(else_parent);
-        self.visit_body(orelse);
-        let (else_count, else_returns) = self.exit_scope();
+        let (else_count, else_returns) = if loop_returns {
+            (loop_count, false) // else doesn't add additional yields if loop returns
+        } else {
+            // Else clause only runs if loop doesn't return or break
+            let else_parent = YieldScope::from(loop_count, false, parent_scope.nested_in_loop);
+            self.enter_scope(else_parent);
+            self.visit_body(orelse);
+            self.exit_scope()
+        };
 
         if let Some(scope) = self.scopes.last_mut() {
             scope.yield_count += else_count;
-            if else_returns {
+            if else_returns || loop_returns {
                 scope.returned = true;
             }
         }

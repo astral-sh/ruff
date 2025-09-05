@@ -190,7 +190,7 @@ def multiple_yields_in_return_guarded_except():
         return
     except ZeroDivisionError:
         yield # valid
-        yield # # RUF062
+        yield # RUF062
         return
     except IndexError:
         yield # valid
@@ -320,3 +320,12 @@ def invalid_stacked_decorators():
 def invalid_stacked_decorators_reverse():
     yield "value"
     yield "value"  # RUF062
+
+# (31) Invalid: yield in loop and else and after
+@contextlib.contextmanager
+def invalid_loop_else_and_after():
+    for i in range(5):
+        yield i  # RUF062
+    else:
+        yield "else"  # RUF062
+    yield "after"  # RUF062

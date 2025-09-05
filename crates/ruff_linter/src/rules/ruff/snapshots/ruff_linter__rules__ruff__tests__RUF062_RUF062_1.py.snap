@@ -180,7 +180,7 @@ RUF062 Function decorated with `contextlib.contextmanager` may yield more than o
     |
 191 |     except ZeroDivisionError:
 192 |         yield # valid
-193 |         yield # # RUF062
+193 |         yield # RUF062
     |         ^^^^^
 194 |         return
 195 |     except IndexError:
@@ -336,6 +336,15 @@ RUF062 Function decorated with `contextlib.contextmanager` may yield more than o
     |
 
 RUF062 Function decorated with `contextlib.contextmanager` may yield more than once
+   --> RUF062_1.py:307:5
+    |
+305 |     for i in range(2):
+306 |         yield i  # RUF062
+307 |     yield "after loop"  # RUF062
+    |     ^^^^^^^^^^^^^^^^^^
+    |
+
+RUF062 Function decorated with `contextlib.contextmanager` may yield more than once
    --> RUF062_1.py:315:5
     |
 313 | def invalid_stacked_decorators():
@@ -352,5 +361,37 @@ RUF062 Function decorated with `contextlib.contextmanager` may yield more than o
 320 | def invalid_stacked_decorators_reverse():
 321 |     yield "value"
 322 |     yield "value"  # RUF062
+    |     ^^^^^^^^^^^^^
+323 |
+324 | # (31) Invalid: yield in loop and else and after
+    |
+
+RUF062 Function decorated with `contextlib.contextmanager` may yield more than once
+   --> RUF062_1.py:328:9
+    |
+326 | def invalid_loop_else_and_after():
+327 |     for i in range(5):
+328 |         yield i  # RUF062
+    |         ^^^^^^^
+329 |     else:
+330 |         yield "else"  # RUF062
+    |
+
+RUF062 Function decorated with `contextlib.contextmanager` may yield more than once
+   --> RUF062_1.py:330:9
+    |
+328 |         yield i  # RUF062
+329 |     else:
+330 |         yield "else"  # RUF062
+    |         ^^^^^^^^^^^^
+331 |     yield "after"  # RUF062
+    |
+
+RUF062 Function decorated with `contextlib.contextmanager` may yield more than once
+   --> RUF062_1.py:331:5
+    |
+329 |     else:
+330 |         yield "else"  # RUF062
+331 |     yield "after"  # RUF062
     |     ^^^^^^^^^^^^^
     |
