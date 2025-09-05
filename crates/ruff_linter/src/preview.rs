@@ -195,11 +195,6 @@ pub(crate) const fn is_undefined_export_in_dunder_init_enabled(settings: &Linter
     settings.preview.is_enabled()
 }
 
-// https://github.com/astral-sh/ruff/pull/14236
-pub(crate) const fn is_allow_nested_roots_enabled(settings: &LinterSettings) -> bool {
-    settings.preview.is_enabled()
-}
-
 // https://github.com/astral-sh/ruff/pull/18208
 pub(crate) const fn is_multiple_with_statements_fix_safe_enabled(
     settings: &LinterSettings,

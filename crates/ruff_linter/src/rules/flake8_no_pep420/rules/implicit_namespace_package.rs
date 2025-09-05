@@ -65,7 +65,6 @@ pub(crate) fn implicit_namespace_package(
     comment_ranges: &CommentRanges,
     project_root: &Path,
     src: &[PathBuf],
-    allow_nested_roots: bool,
     context: &LintContext,
 ) {
     if package.is_none()
@@ -93,7 +92,7 @@ pub(crate) fn implicit_namespace_package(
             },
             TextRange::default(),
         );
-    } else if allow_nested_roots {
+    } else {
         if let Some(PackageRoot::Nested { path: root }) = package.as_ref() {
             if path.ends_with("__init__.py") {
                 // Identify the intermediary package that's missing the `__init__.py` file.
