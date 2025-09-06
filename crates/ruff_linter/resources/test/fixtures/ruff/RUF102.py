@@ -16,3 +16,5 @@ from collections import defaultdict  # noqa: INVALID100, INVALID200, F401
 from itertools import chain  # noqa: E402, INVALID300, F401
 # Test for mixed code types
 import json  # noqa: E402, INVALID400, V100
+# Test for rule redirects
+import pandas as pd  # noqa: TCH002

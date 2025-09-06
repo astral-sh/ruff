@@ -156,6 +156,7 @@ help: Remove the rule code
 16 + from itertools import chain  # noqa: E402, F401
 17 | # Test for mixed code types
 18 | import json  # noqa: E402, INVALID400, V100
+19 | # Test for rule redirects
 
 RUF102 [*] Invalid rule code in `# noqa`: INVALID400
   --> RUF102.py:18:28
@@ -164,6 +165,8 @@ RUF102 [*] Invalid rule code in `# noqa`: INVALID400
 17 | # Test for mixed code types
 18 | import json  # noqa: E402, INVALID400, V100
    |                            ^^^^^^^^^^
+19 | # Test for rule redirects
+20 | import pandas as pd  # noqa: TCH002
    |
 help: Remove the rule code
 15 | # Test for preserving valid codes when fixing
@@ -171,3 +174,5 @@ help: Remove the rule code
 17 | # Test for mixed code types
    - import json  # noqa: E402, INVALID400, V100
 18 + import json  # noqa: E402, V100
+19 | # Test for rule redirects
+20 | import pandas as pd  # noqa: TCH002
