@@ -122,3 +122,21 @@ ASYNC240 Async functions should not use pathlib.Path methods, use trio.Path or a
  99 |
 100 | async def path_as_union_parameter_type(path: Path | None):
     |
+
+ASYNC240 Async functions should not use pathlib.Path methods, use trio.Path or anyio.path
+   --> ASYNC240.py:101:5
+    |
+100 | async def path_as_union_parameter_type(path: Path | None):
+101 |     path.exists() # ASYNC240
+    |     ^^^^^^^^^^^
+102 |
+103 | async def path_as_optional_parameter_type(path: Optional[Path]):
+    |
+
+ASYNC240 Async functions should not use pathlib.Path methods, use trio.Path or anyio.path
+   --> ASYNC240.py:104:5
+    |
+103 | async def path_as_optional_parameter_type(path: Optional[Path]):
+104 |     path.exists() # ASYNC240
+    |     ^^^^^^^^^^^
+    |
