@@ -48,6 +48,13 @@ fn enclosing_generic_contexts<'db>(
                     .last_definition_signature(db)
                     .generic_context
             }
+            NodeWithScopeKind::TypeAlias(type_alias) => {
+                let definition = index.expect_single_definition(type_alias.node(module));
+                binding_type(db, definition)
+                    .into_type_alias()?
+                    .into_pep_695_type_alias()?
+                    .generic_context(db)
+            }
             _ => None,
         })
 }

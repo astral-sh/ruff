@@ -32,8 +32,8 @@ use crate::types::signatures::{Parameter, ParameterForm, Parameters};
 use crate::types::tuple::{Tuple, TupleLength, TupleType};
 use crate::types::{
     BoundMethodType, ClassLiteral, DataclassParams, FieldInstance, KnownClass, KnownInstanceType,
-    MethodWrapperKind, PropertyInstanceType, SpecialFormType, TypeMapping, UnionType,
-    WrapperDescriptorKind, enums, ide_support, todo_type,
+    MethodWrapperKind, PropertyInstanceType, SpecialFormType, TypeAliasType, TypeMapping,
+    UnionType, WrapperDescriptorKind, enums, ide_support, todo_type,
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, PythonVersion};
@@ -661,6 +661,13 @@ impl<'db> Bindings<'db> {
                                     Type::BoundMethod(bound_method) => {
                                         function_generic_context(bound_method.function(db))
                                     }
+
+                                    Type::KnownInstance(KnownInstanceType::TypeAliasType(
+                                        TypeAliasType::PEP695(alias),
+                                    )) => alias
+                                        .generic_context(db)
+                                        .map(|generic_context| generic_context.as_tuple(db))
+                                        .unwrap_or_else(|| Type::none(db)),
 
                                     _ => Type::none(db),
                                 });

@@ -188,7 +188,7 @@ T = TypeVar("T")
 IntAnd = TypeAliasType("IntAndT", tuple[int, T], type_params=(T,))
 
 def f(x: IntAnd[str]) -> None:
-    reveal_type(x)  # revealed: @Todo(Generic PEP-695 type alias)
+    reveal_type(x)  # revealed: @Todo(Generic manual PEP-695 type alias)
 ```
 
 ### Error cases
