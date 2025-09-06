@@ -63,3 +63,25 @@ rename(
 rename(file, "file_2.py", src_dir_fd=None, dst_dir_fd=None)
 
 rename(file, "file_2.py", src_dir_fd=1)
+
+def _():
+    import builtins
+
+    with builtins.open(file=file) as _: ...
+
+    with open(file, "r+", -1, None, None, None) as _: ...
+
+    with open(
+            file, mode="r+", buffering=-1,
+            encoding="utf-8", errors=None, newline=None,
+    ) as _: ...
+
+    with open(file, mode="r+", closefd=True, opener=None) as _: ...
+
+    # Only diagnostic
+    _x = ("r+", -1)
+    with open(file, *_x) as _: ...
+
+    with open(_file, "r+", unknown=True) as _: ...
+
+    with open(_file, "r+", closefd=False) as _: ...

@@ -305,6 +305,7 @@ PTH123 `open()` should be replaced by `Path.open()`
 33 |     fp.read()
 34 | open(p).close()
    |
+help: Replace with `Path.open()`
 
 PTH123 `open()` should be replaced by `Path.open()`
   --> full_name.py:34:1
@@ -316,6 +317,7 @@ PTH123 `open()` should be replaced by `Path.open()`
 35 | os.getcwdb(p)
 36 | os.path.join(p, *q)
    |
+help: Replace with `Path.open()`
 
 PTH109 `os.getcwd()` should be replaced by `Path.cwd()`
   --> full_name.py:35:1
@@ -360,6 +362,7 @@ PTH123 `open()` should be replaced by `Path.open()`
 47 | open(p, 'r', - 1, None, None, None, True, None)
 48 | open(p, 'r', - 1, None, None, None, False, opener)
    |
+help: Replace with `Path.open()`
 
 PTH123 `open()` should be replaced by `Path.open()`
   --> full_name.py:47:1
@@ -370,6 +373,7 @@ PTH123 `open()` should be replaced by `Path.open()`
    | ^^^^
 48 | open(p, 'r', - 1, None, None, None, False, opener)
    |
+help: Replace with `Path.open()`
 
 PTH123 `open()` should be replaced by `Path.open()`
   --> full_name.py:65:1
@@ -381,6 +385,7 @@ PTH123 `open()` should be replaced by `Path.open()`
 66 | byte_str = b"bar"
 67 | open(byte_str)
    |
+help: Replace with `Path.open()`
 
 PTH123 `open()` should be replaced by `Path.open()`
   --> full_name.py:67:1
@@ -392,6 +397,7 @@ PTH123 `open()` should be replaced by `Path.open()`
 68 |
 69 | def bytes_str_func() -> bytes:
    |
+help: Replace with `Path.open()`
 
 PTH123 `open()` should be replaced by `Path.open()`
   --> full_name.py:71:1
@@ -403,6 +409,7 @@ PTH123 `open()` should be replaced by `Path.open()`
 72 |
 73 | # https://github.com/astral-sh/ruff/issues/17693
    |
+help: Replace with `Path.open()`
 
 PTH109 `os.getcwd()` should be replaced by `Path.cwd()`
    --> full_name.py:108:1
