@@ -2282,6 +2282,13 @@ impl<'db> ClassLiteral<'db> {
                 }
                 None
             }
+            (CodeGeneratorKind::DataclassLike, "__slots__") => {
+                has_dataclass_param(DataclassParams::SLOTS).then(|| {
+                    let fields = self.fields(db, specialization, field_policy);
+                    let slots = fields.keys().map(|name| Type::string_literal(db, name));
+                    Type::heterogeneous_tuple(db, slots)
+                })
+            }
             (CodeGeneratorKind::TypedDict, "__setitem__") => {
                 let fields = self.fields(db, specialization, field_policy);
 
