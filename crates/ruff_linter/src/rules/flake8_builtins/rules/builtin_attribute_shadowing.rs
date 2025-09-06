@@ -128,10 +128,12 @@ pub(crate) fn builtin_attribute_shadowing(
                 .iter()
                 .map(|reference_id| checker.semantic().reference(*reference_id))
                 .filter(|reference| {
-                    checker
-                        .semantic()
-                        .first_non_type_parent_scope_id(reference.scope_id())
-                        == Some(scope_id)
+                    let reference_scope_id = reference.scope_id();
+                    reference_scope_id == scope_id
+                        || checker
+                            .semantic()
+                            .first_non_type_parent_scope_id(reference_scope_id)
+                            == Some(scope_id)
                 })
             {
                 checker.report_diagnostic(
