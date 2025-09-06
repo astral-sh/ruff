@@ -4,6 +4,7 @@ var = f"abc"[0]
 var = [1, 2, 3][0]
 var = (1, 2, 3)[0]
 var = b"abc"[0]
+var = [1, 2, 3][False]
 
 # Should not emit for valid access with slice
 var = "abc"[0:2]
@@ -15,6 +16,7 @@ var = [1, 2, 3][None:2]
 var = [1, 2, 3][0:None]
 var = [1, 2, 3][:2]
 var = [1, 2, 3][0:]
+var = [1, 2, 3][False:True:True]
 
 # Should emit for invalid access on strings
 var = "abc"["x"]
@@ -35,6 +37,7 @@ var = "abc"[1, 2]
 
 # Should emit for invalid access using string
 var = [1, 2]["x"]
+var = [1, 2][t"x"]
 
 # Should emit for invalid access using float
 var = [1, 2][0.25]
@@ -92,6 +95,12 @@ var = [1, 2, 3]["x":"y"]
 
 # Should emit once for repeated invalid access
 var = [1, 2, 3]["x"]["y"]["z"]
+
+# Should emit for invalid access using lambda
+var = [1, 2, 3][lambda: 0]
+
+# Should emit for invalid access using generator
+var = [1, 2, 3][(x for x in ())]
 
 # Cannot emit on invalid access using variable in index
 x = "x"
