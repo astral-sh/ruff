@@ -2282,6 +2282,15 @@ impl<'db> ClassLiteral<'db> {
                 }
                 None
             }
+            (CodeGeneratorKind::DataclassLike, "__slots__") => {
+                if has_dataclass_param(DataclassParams::SLOTS) {
+                    let field_count = self.fields(db, specialization, field_policy).len();
+                    let tuple_elements = vec![KnownClass::Str.to_instance(db); field_count];
+                    let tuple_type = Type::heterogeneous_tuple(db, tuple_elements);
+                    return Some(tuple_type);
+                }
+                None
+            }
             (CodeGeneratorKind::TypedDict, "__setitem__") => {
                 let fields = self.fields(db, specialization, field_policy);
 
