@@ -7969,32 +7969,41 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 }
                             ));
 
+                            let dunder_method_message = if let Some(dunder_method) = error.op.dunder() {
+                                format!("from dunder method `{dunder_method}` ")
+                            } else {
+                                String::new()
+                            };
+
                             if let Some(call_dunder_error) = error.call_dunder_error {
                                 match call_dunder_error {
                                     CallDunderError::CallError(call_error_kind, _) => {
                                         match call_error_kind {
                                             CallErrorKind::NotCallable => {
                                                 diagnostic.info(format_args!(
-                                                    "Operator '{}' is not callable on object of type '{error_left_ty_display}'",
-                                                    error.op
+                                                    "Operator '{}' {}is not callable on object of type '{error_left_ty_display}'",
+                                                    error.op,
+                                                    dunder_method_message
                                                 ));
                                             }
                                             CallErrorKind::BindingError => {
                                                 diagnostic.info(format_args!(
-                                                    "Operator '{}' on object of type '{error_left_ty_display}' cannot be used with object of type '{error_right_ty_display}'",
+                                                    "Operator '{}' {}on object of type '{error_left_ty_display}' cannot be used with object of type '{error_right_ty_display}'",
                                                     error.op,
+                                                    dunder_method_message
                                                 ));
                                             }
                                             CallErrorKind::PossiblyNotCallable => {
                                                 diagnostic.info(format_args!(
-                                                    "Operator '{}' is possibly not callable on object of type '{error_left_ty_display}'",
+                                                    "Operator '{}' {}is possibly not callable on object of type '{error_left_ty_display}'",
                                                     error.op,
+                                                    dunder_method_message
                                                 ));
                                             }
                                         }
                                     }
                                     CallDunderError::PossiblyUnbound(_) => diagnostic.info(
-                                        format_args!("Operator '{}' is possibly unbound on object of type '{error_left_ty_display}'", error.op),
+                                        format_args!("Operator '{}' {}is possibly unbound on object of type '{error_left_ty_display}'", error.op, dunder_method_message),
                                     ),
                                     CallDunderError::MethodNotAvailable => {}
                                 }

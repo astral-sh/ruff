@@ -2591,6 +2591,21 @@ impl CmpOp {
         }
     }
 
+    pub const fn dunder(&self) -> Option<&'static str> {
+        match self {
+            CmpOp::Eq => Some("__eq__"),
+            CmpOp::NotEq => Some("__ne__"),
+            CmpOp::Lt => Some("__lt__"),
+            CmpOp::LtE => Some("__le__"),
+            CmpOp::Gt => Some("__gt__"),
+            CmpOp::GtE => Some("__ge__"),
+            CmpOp::Is => None,
+            CmpOp::IsNot => None,
+            CmpOp::In => None,
+            CmpOp::NotIn => None,
+        }
+    }
+
     #[must_use]
     pub const fn negate(&self) -> Self {
         match self {

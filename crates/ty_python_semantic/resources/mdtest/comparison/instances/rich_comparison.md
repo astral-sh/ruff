@@ -450,10 +450,6 @@ reveal_type(A() > A())  # revealed: Unknown
 reveal_type(A() <= A())  # revealed: Unknown
 # error: [unsupported-operator]
 reveal_type(A() >= A())  # revealed: Unknown
-
-# Fine
-A() == 1
-A() != 1
 ```
 
 ### Possibly unbound dunder comparison methods

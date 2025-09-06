@@ -72,7 +72,7 @@ error[unsupported-operator]: Operator `==` is not supported for types `A` and `A
 22 | # error: [unsupported-operator]
 23 | reveal_type(A() != A())  # revealed: Unknown
    |
-info: Operator '==' on object of type 'A' cannot be used with object of type 'A'
+info: Operator '==' from dunder method `__eq__` on object of type 'A' cannot be used with object of type 'A'
 info: rule `unsupported-operator` is enabled by default
 
 ```
@@ -117,7 +117,7 @@ error[unsupported-operator]: Operator `!=` is not supported for types `A` and `A
 24 | # error: [unsupported-operator]
 25 | reveal_type(A() < A())  # revealed: Unknown
    |
-info: Operator '!=' on object of type 'A' cannot be used with object of type 'A'
+info: Operator '!=' from dunder method `__ne__` on object of type 'A' cannot be used with object of type 'A'
 info: rule `unsupported-operator` is enabled by default
 
 ```
@@ -163,7 +163,7 @@ error[unsupported-operator]: Operator `<` is not supported for types `A` and `A`
 26 | # error: [unsupported-operator]
 27 | reveal_type(A() > A())  # revealed: Unknown
    |
-info: Operator '<' on object of type 'A' cannot be used with object of type 'A'
+info: Operator '<' from dunder method `__lt__` on object of type 'A' cannot be used with object of type 'A'
 info: rule `unsupported-operator` is enabled by default
 
 ```
@@ -209,7 +209,7 @@ error[unsupported-operator]: Operator `>` is not supported for types `A` and `A`
 28 | # error: [unsupported-operator]
 29 | reveal_type(A() <= A())  # revealed: Unknown
    |
-info: Operator '>' on object of type 'A' cannot be used with object of type 'A'
+info: Operator '>' from dunder method `__gt__` on object of type 'A' cannot be used with object of type 'A'
 info: rule `unsupported-operator` is enabled by default
 
 ```
@@ -255,7 +255,7 @@ error[unsupported-operator]: Operator `<=` is not supported for types `A` and `A
 30 | # error: [unsupported-operator]
 31 | reveal_type(A() >= A())  # revealed: Unknown
    |
-info: Operator '<=' on object of type 'A' cannot be used with object of type 'A'
+info: Operator '<=' from dunder method `__le__` on object of type 'A' cannot be used with object of type 'A'
 info: rule `unsupported-operator` is enabled by default
 
 ```
@@ -297,7 +297,7 @@ error[unsupported-operator]: Operator `>=` is not supported for types `A` and `A
 31 | reveal_type(A() >= A())  # revealed: Unknown
    |             ^^^^^^^^^^
    |
-info: Operator '>=' on object of type 'A' cannot be used with object of type 'A'
+info: Operator '>=' from dunder method `__ge__` on object of type 'A' cannot be used with object of type 'A'
 info: rule `unsupported-operator` is enabled by default
 
 ```
