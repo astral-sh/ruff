@@ -1709,9 +1709,7 @@ class DefinitelyNotSubtype:
 
 static_assert(is_subtype_of(NominalSubtype, P))
 static_assert(not is_subtype_of(DefinitelyNotSubtype, P))
-
-# TODO: should pass
-static_assert(not is_subtype_of(NotSubtype, P))  # error: [static-assert-error]
+static_assert(not is_subtype_of(NotSubtype, P))
 ```
 
 A callable instance attribute is not sufficient for a type to satisfy a protocol with a method
@@ -1799,6 +1797,48 @@ static_assert(is_assignable_to(HasPosOnlyDunders, SupportsLessThan))
 static_assert(is_assignable_to(HasPosOnlyDunders, Invertable))
 static_assert(is_assignable_to(str, SupportsLessThan))
 static_assert(is_assignable_to(int, Invertable))
+```
+
+`None` is understood as hashable:
+
+```py
+from _typeshed import NoneType
+from typing import Hashable
+
+static_assert(is_subtype_of(NoneType, Hashable))
+```
+
+`str` does not actually constitute a valid subtype of `Container` from a structural perspective (its
+`__contains__` method only accepts `str`, not `object`), but it does have `Container[str]` in its
+MRO, so we say it is a subtype of `Container[str]` anyway. This isn't *particularly* principled but
+improves compatibility with other type checkers.
+
+```py
+from typing_extensions import Container, LiteralString, Literal
+from ty_extensions import is_subtype_of
+
+static_assert(is_subtype_of(str, Container[str]))
+static_assert(is_subtype_of(LiteralString, Container[str]))
+static_assert(is_subtype_of(Literal["foo"], Container[str]))
+```
+
+Because method members are always looked up on the meta-type of an object when testing assignability
+and subtyping, we understand that `IterableClass` here is a subtype of `Iterable` even though
+`Foo.__iter__` resolves to a type with the wrong signature:
+
+```py
+from typing import Iterator, Iterable
+from ty_extensions import static_assert, is_subtype_of, TypeOf
+
+class Meta(type):
+    def __iter__(self) -> Iterator[int]:
+        yield from range(42)
+
+class IterableClass(metaclass=Meta):
+    def __iter__(self) -> Iterator[str]:
+        yield from "abc"
+
+static_assert(is_subtype_of(TypeOf[IterableClass], Iterable[int]))
 ```
 
 ## Equivalence of protocols with method or property members
@@ -2013,24 +2053,24 @@ class Foo(Protocol):
 static_assert(is_subtype_of(Callable[[int], str], Foo))
 static_assert(is_assignable_to(Callable[[int], str], Foo))
 
-# TODO: these should pass
-static_assert(not is_subtype_of(Callable[[str], str], Foo))  # error: [static-assert-error]
-static_assert(not is_assignable_to(Callable[[str], str], Foo))  # error: [static-assert-error]
-static_assert(not is_subtype_of(Callable[[CallMeMaybe, int], str], Foo))  # error: [static-assert-error]
-static_assert(not is_assignable_to(Callable[[CallMeMaybe, int], str], Foo))  # error: [static-assert-error]
+static_assert(not is_subtype_of(Callable[[str], str], Foo))
+static_assert(not is_assignable_to(Callable[[str], str], Foo))
+static_assert(not is_subtype_of(Callable[[CallMeMaybe, int], str], Foo))
+static_assert(not is_assignable_to(Callable[[CallMeMaybe, int], str], Foo))
 
 def h(obj: Callable[[int], str], obj2: Foo, obj3: Callable[[str], str]):
     obj2 = obj
 
-    # TODO: we should emit [invalid-assignment] here because the signature of `obj3` is not assignable
-    # to the declared type of `obj2`
+    # error: [invalid-assignment] "Object of type `(str, /) -> str` is not assignable to `Foo`"
     obj2 = obj3
 
 def satisfies_foo(x: int) -> str:
     return "foo"
 
-static_assert(is_subtype_of(TypeOf[satisfies_foo], Foo))
 static_assert(is_assignable_to(TypeOf[satisfies_foo], Foo))
+
+# TODO: this should pass
+static_assert(is_subtype_of(TypeOf[satisfies_foo], Foo))  # error: [static-assert-error]
 ```
 
 ## Protocols are never singleton types, and are never single-valued types

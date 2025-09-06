@@ -1230,6 +1230,10 @@ impl<'db> Type<'db> {
 
             Type::TypeAlias(alias) => alias.value_type(db).into_callable(db),
 
+            Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderCall(function)) => {
+                Some(Type::Callable(function.into_callable_type(db)))
+            }
+
             Type::Never
             | Type::DataclassTransformer(_)
             | Type::AlwaysTruthy
@@ -3004,7 +3008,7 @@ impl<'db> Type<'db> {
                     Some((self, AttributeKind::NormalOrNonDataDescriptor))
                 } else {
                     Some((
-                        callable.bind_self(db),
+                        Type::Callable(callable.bind_self(db)),
                         AttributeKind::NormalOrNonDataDescriptor,
                     ))
                 };
@@ -3179,6 +3183,10 @@ impl<'db> Type<'db> {
         policy: InstanceFallbackShadowsNonDataDescriptor,
         member_policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
+        if name == "__call__" && self.is_callable_type() {
+            return Place::bound(self).into();
+        }
+
         let (
             PlaceAndQualifiers {
                 place: meta_attr,
@@ -3357,6 +3365,11 @@ impl<'db> Type<'db> {
                         })
                 }
             },
+            Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderCall(function))
+                if name == "__call__" =>
+            {
+                Place::bound(Type::Callable(function.into_callable_type(db))).into()
+            }
             Type::MethodWrapper(_) => KnownClass::MethodWrapperType
                 .to_instance(db)
                 .member_lookup_with_policy(db, name, policy),
@@ -8983,12 +8996,8 @@ impl<'db> CallableType<'db> {
         Self::single(db, Signature::unknown())
     }
 
-    pub(crate) fn bind_self(self, db: &'db dyn Db) -> Type<'db> {
-        Type::Callable(CallableType::new(
-            db,
-            self.signatures(db).bind_self(db, None),
-            false,
-        ))
+    pub(crate) fn bind_self(self, db: &'db dyn Db) -> CallableType<'db> {
+        CallableType::new(db, self.signatures(db).bind_self(db, None), false)
     }
 
     /// Create a callable type which represents a fully-static "bottom" callable.
