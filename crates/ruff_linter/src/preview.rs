@@ -11,11 +11,6 @@ pub(crate) const fn is_py314_support_enabled(settings: &LinterSettings) -> bool 
     settings.preview.is_enabled()
 }
 
-// https://github.com/astral-sh/ruff/pull/16565
-pub(crate) const fn is_full_path_match_source_strategy_enabled(settings: &LinterSettings) -> bool {
-    settings.preview.is_enabled()
-}
-
 // Rule-specific behavior
 
 // https://github.com/astral-sh/ruff/pull/15541
@@ -200,20 +195,6 @@ pub(crate) const fn is_allow_nested_roots_enabled(settings: &LinterSettings) -> 
     settings.preview.is_enabled()
 }
 
-// https://github.com/astral-sh/ruff/pull/18208
-pub(crate) const fn is_multiple_with_statements_fix_safe_enabled(
-    settings: &LinterSettings,
-) -> bool {
-    settings.preview.is_enabled()
-}
-
-// https://github.com/astral-sh/ruff/pull/18400
-pub(crate) const fn is_ignore_init_files_in_useless_alias_enabled(
-    settings: &LinterSettings,
-) -> bool {
-    settings.preview.is_enabled()
-}
-
 // https://github.com/astral-sh/ruff/pull/18572
 pub(crate) const fn is_optional_as_none_in_union_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
@@ -253,10 +234,5 @@ pub(crate) const fn is_trailing_comma_type_params_enabled(settings: &LinterSetti
 
 // https://github.com/astral-sh/ruff/pull/19851
 pub(crate) const fn is_maxsplit_without_separator_fix_enabled(settings: &LinterSettings) -> bool {
-    settings.preview.is_enabled()
-}
-
-// https://github.com/astral-sh/ruff/pull/20106
-pub(crate) const fn is_bidi_forbid_arabic_letter_mark_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }

@@ -22,6 +22,16 @@ PLE2502 Contains control characters that can permit obfuscated code
   |
 
 PLE2502 Contains control characters that can permit obfuscated code
+  --> bidirectional_unicode.py:8:1
+   |
+ 7 | # E2502
+ 8 | another = "x؜" * 50  #    "؜x" is assigned
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ 9 |
+10 | # E2502
+   |
+
+PLE2502 Contains control characters that can permit obfuscated code
   --> bidirectional_unicode.py:11:1
    |
 10 | # E2502

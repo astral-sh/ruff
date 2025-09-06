@@ -33,8 +33,8 @@ impl CallKind {
     }
 }
 
-/// ## Deprecation
-/// This rule was deprecated as using [PEP 604] syntax in `isinstance` and `issubclass` calls
+/// ## Removed
+/// This rule was removed as using [PEP 604] syntax in `isinstance` and `issubclass` calls
 /// isn't recommended practice, and it incorrectly suggests that other typing syntaxes like [PEP 695]
 /// would be supported by `isinstance` and `issubclass`. Using the [PEP 604] syntax
 /// is also slightly slower.

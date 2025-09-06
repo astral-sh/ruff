@@ -85,6 +85,7 @@ mod tests {
     #[test_case(Rule::InvalidAssertMessageLiteralArgument, Path::new("RUF040.py"))]
     #[test_case(Rule::UnnecessaryNestedLiteral, Path::new("RUF041.py"))]
     #[test_case(Rule::UnnecessaryNestedLiteral, Path::new("RUF041.pyi"))]
+    #[test_case(Rule::PytestRaisesAmbiguousPattern, Path::new("RUF043.py"))]
     #[test_case(Rule::UnnecessaryCastToInt, Path::new("RUF046.py"))]
     #[test_case(Rule::UnnecessaryCastToInt, Path::new("RUF046_CR.py"))]
     #[test_case(Rule::UnnecessaryCastToInt, Path::new("RUF046_LF.py"))]
@@ -535,7 +536,6 @@ mod tests {
     #[test_case(Rule::UnnecessaryRegularExpression, Path::new("RUF055_1.py"))]
     #[test_case(Rule::UnnecessaryRegularExpression, Path::new("RUF055_2.py"))]
     #[test_case(Rule::UnnecessaryRegularExpression, Path::new("RUF055_3.py"))]
-    #[test_case(Rule::PytestRaisesAmbiguousPattern, Path::new("RUF043.py"))]
     #[test_case(Rule::IndentedFormFeed, Path::new("RUF054.py"))]
     #[test_case(Rule::ImplicitClassVarInDataclass, Path::new("RUF045.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
