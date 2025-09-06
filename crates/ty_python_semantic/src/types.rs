@@ -181,7 +181,8 @@ fn definition_expression_type<'db>(
 pub(crate) type ApplyTypeMappingVisitor<'db> = TypeTransformer<'db, TypeMapping<'db, 'db>>;
 
 /// A [`PairVisitor`] that is used in `has_relation_to` methods.
-pub(crate) type HasRelationToVisitor<'db, C> = PairVisitor<'db, TypeRelation, C>;
+pub(crate) type HasRelationToVisitor<'db, C> =
+    CycleDetector<TypeRelation, (Type<'db>, Type<'db>, TypeRelation), C>;
 
 /// A [`PairVisitor`] that is used in `is_disjoint_from` methods.
 pub(crate) type IsDisjointVisitor<'db, C> = PairVisitor<'db, IsDisjoint, C>;
@@ -1359,13 +1360,13 @@ impl<'db> Type<'db> {
                 C::from_bool(db, relation.is_assignability())
             }
 
-            (Type::TypeAlias(self_alias), _) => visitor.visit((self, target), || {
+            (Type::TypeAlias(self_alias), _) => visitor.visit((self, target, relation), || {
                 self_alias
                     .value_type(db)
                     .has_relation_to_impl(db, target, relation, visitor)
             }),
 
-            (_, Type::TypeAlias(target_alias)) => visitor.visit((self, target), || {
+            (_, Type::TypeAlias(target_alias)) => visitor.visit((self, target, relation), || {
                 self.has_relation_to_impl(db, target_alias.value_type(db), relation, visitor)
             }),
 
@@ -1750,7 +1751,7 @@ impl<'db> Type<'db> {
             // `bool` is a subtype of `int`, because `bool` subclasses `int`,
             // which means that all instances of `bool` are also instances of `int`
             (Type::NominalInstance(self_instance), Type::NominalInstance(target_instance)) => {
-                visitor.visit((self, target), || {
+                visitor.visit((self, target, relation), || {
                     self_instance.has_relation_to_impl(db, target_instance, relation, visitor)
                 })
             }
@@ -8734,7 +8735,7 @@ impl<'db> ConstructorCallError<'db> {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 pub(crate) enum TypeRelation {
     Subtyping,
     Assignability,
