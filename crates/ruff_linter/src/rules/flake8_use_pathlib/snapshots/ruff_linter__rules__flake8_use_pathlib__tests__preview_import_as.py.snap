@@ -260,6 +260,7 @@ help: Replace with `Path(...).expanduser()`
 20 | bbb = foo_p.isdir(p)
 21 | bbbb = foo_p.isfile(p)
 22 | bbbbb = foo_p.islink(p)
+note: This is an unsafe fix and may change runtime behavior
 
 PTH112 [*] `os.path.isdir()` should be replaced by `Path.is_dir()`
   --> import_as.py:19:7
