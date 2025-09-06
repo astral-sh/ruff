@@ -88,6 +88,14 @@ pub(crate) trait Constraints<'db>: Clone + Sized {
     /// Returns a constraint set that always holds
     fn always_satisfiable(db: &'db dyn Db) -> Self;
 
+    /// Returns a constraint set that constraints a typevar to a particular range of types.
+    fn constrain_typevar(
+        db: &'db dyn Db,
+        typevar: BoundTypeVarInstance<'db>,
+        lower: Type<'db>,
+        upper: Type<'db>,
+    ) -> Self;
+
     /// Returns whether this constraint set never holds
     fn is_never_satisfied(&self, db: &'db dyn Db) -> bool;
 
@@ -110,6 +118,15 @@ pub(crate) trait Constraints<'db>: Clone + Sized {
         } else {
             Self::unsatisfiable(db)
         }
+    }
+
+    /// Returns a constraint set encoding that this constraint set implies another.
+    ///
+    /// In Boolean logic, `p → q` is usually translated into `¬p ∨ q`. However, we translate it
+    /// into the equivalent `¬p ∨ (p ∧ q)`. This ensures that the constraints under which `q` is
+    /// true are compatible with the assumptions introduced by `p`.
+    fn implies(self, db: &'db dyn Db, other: impl FnOnce() -> Self) -> Self {
+        self.clone().negate(db).or(db, || self.and(db, other))
     }
 
     /// Returns the intersection of this constraint set and another. The other constraint set is
@@ -236,6 +253,11 @@ impl<'db> ConstraintSet<'db> {
         }
     }
 
+    /// Returns the constraint set that is always satisfiable.
+    fn always() -> Self {
+        Self::singleton(ConstraintClause::always())
+    }
+
     /// Returns a constraint set that contains a single clause.
     fn singleton(clause: ConstraintClause<'db>) -> Self {
         Self {
@@ -350,7 +372,24 @@ impl<'db> Constraints<'db> for ConstraintSet<'db> {
     }
 
     fn always_satisfiable(_db: &'db dyn Db) -> Self {
-        Self::singleton(ConstraintClause::always())
+        Self::always()
+    }
+
+    fn constrain_typevar(
+        db: &'db dyn Db,
+        typevar: BoundTypeVarInstance<'db>,
+        lower: Type<'db>,
+        upper: Type<'db>,
+    ) -> Self {
+        let lower_bound = ConstraintBound::Closed(lower.bottom_materialization(db));
+        let upper_bound = ConstraintBound::Closed(upper.top_materialization(db));
+        match AtomicConstraint::new(db, typevar, lower_bound, upper_bound) {
+            Satisfiable::Never => Self::never(),
+            Satisfiable::Always => Self::always(),
+            Satisfiable::Constrained(constraint) => {
+                Self::singleton(ConstraintClause::singleton(constraint))
+            }
+        }
     }
 
     fn is_never_satisfied(&self, _db: &'db dyn Db) -> bool {

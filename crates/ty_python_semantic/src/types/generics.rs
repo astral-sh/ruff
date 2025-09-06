@@ -9,7 +9,7 @@ use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::{FileScopeId, NodeWithScopeKind};
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
-use crate::types::constraints::Constraints;
+use crate::types::constraints::{ConstraintSet, Constraints};
 use crate::types::infer::infer_definition_types;
 use crate::types::instance::{Protocol, ProtocolInstanceType};
 use crate::types::signatures::{Parameter, Parameters, Signature};
@@ -975,6 +975,7 @@ impl<'db> PartialSpecialization<'_, 'db> {
 pub(crate) struct SpecializationBuilder<'db> {
     db: &'db dyn Db,
     types: FxHashMap<BoundTypeVarInstance<'db>, Type<'db>>,
+    constraints: ConstraintSet<'db>,
 }
 
 impl<'db> SpecializationBuilder<'db> {
@@ -982,6 +983,7 @@ impl<'db> SpecializationBuilder<'db> {
         Self {
             db,
             types: FxHashMap::default(),
+            constraints: ConstraintSet::always_satisfiable(db),
         }
     }
 
@@ -1008,6 +1010,9 @@ impl<'db> SpecializationBuilder<'db> {
         formal: Type<'db>,
         actual: Type<'db>,
     ) -> Result<(), SpecializationError<'db>> {
+        self.constraints
+            .intersect(self.db, formal.when_assignable_to(self.db, actual));
+
         if formal == actual {
             return Ok(());
         }
@@ -1081,16 +1086,38 @@ impl<'db> SpecializationBuilder<'db> {
                         self.add_type_mapping(bound_typevar, ty);
                     }
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        // If the type is assignable to _all_ of the constraints, then we
+                        // specialize the typevar to the type itself. If the type is assignable to
+                        // some but not all of them, we specialize the typevar to the "smallest"
+                        // constraint that the type is assignable to. Otherwise it's a
+                        // specialization error.
+                        let mut when_all_assignable = ConstraintSet::always_satisfiable(self.db);
+                        let mut smallest_assignable = None;
                         for constraint in constraints.elements(self.db) {
-                            if ty.is_assignable_to(self.db, *constraint) {
-                                self.add_type_mapping(bound_typevar, *constraint);
-                                return Ok(());
+                            let when_assignable: ConstraintSet =
+                                ty.when_assignable_to(self.db, *constraint);
+                            if when_assignable.is_always_satisfied(self.db) {
+                                // If the type is assignable to this constraint individually. We
+                                // only track the smallest such constraint.
+                                if let Some(existing) = smallest_assignable.replace(*constraint) {
+                                    if existing.is_assignable_to(self.db, *constraint) {
+                                        smallest_assignable.replace(existing);
+                                    }
+                                }
                             }
+                            when_all_assignable.intersect(self.db, when_assignable);
                         }
-                        return Err(SpecializationError::MismatchedConstraint {
-                            bound_typevar,
-                            argument: ty,
-                        });
+
+                        if when_all_assignable.is_always_satisfied(self.db) {
+                            self.add_type_mapping(bound_typevar, ty);
+                        } else if let Some(smallest_assignable) = smallest_assignable {
+                            self.add_type_mapping(bound_typevar, smallest_assignable);
+                        } else {
+                            return Err(SpecializationError::MismatchedConstraint {
+                                bound_typevar,
+                                argument: ty,
+                            });
+                        }
                     }
                     _ => {
                         self.add_type_mapping(bound_typevar, ty);

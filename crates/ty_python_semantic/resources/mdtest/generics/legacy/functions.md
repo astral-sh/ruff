@@ -279,7 +279,7 @@ T = TypeVar("T", int, str)
 
 def same_constrained_types(t1: T, t2: T) -> T:
     # TODO: no error
-    # error: [unsupported-operator] "Operator `+` is unsupported between objects of type `T@same_constrained_types` and `T@same_constrained_types`"
+    # error: [invalid-return-type] "Return type does not match returned value: expected `T@same_constrained_types`, found `int | Unknown`"
     return t1 + t2
 ```
 
