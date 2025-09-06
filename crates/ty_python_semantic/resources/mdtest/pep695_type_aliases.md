@@ -287,6 +287,20 @@ def _(x: C):
     reveal_type(x)  # revealed: () -> C | None
 ```
 
+### Subtyping of materializations of cyclic aliases
+
+```py
+from ty_extensions import static_assert, is_subtype_of, Bottom, Top
+
+type JsonValue = None | JsonDict
+type JsonDict = dict[str, JsonValue]
+
+static_assert(is_subtype_of(Top[JsonDict], Top[JsonDict]))
+static_assert(is_subtype_of(Top[JsonDict], Bottom[JsonDict]))
+static_assert(is_subtype_of(Bottom[JsonDict], Bottom[JsonDict]))
+static_assert(is_subtype_of(Bottom[JsonDict], Top[JsonDict]))
+```
+
 ### Union inside generic
 
 #### With old-style union
