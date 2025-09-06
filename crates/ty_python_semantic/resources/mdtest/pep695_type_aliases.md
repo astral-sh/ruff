@@ -287,18 +287,18 @@ def _(x: C):
     reveal_type(x)  # revealed: () -> C | None
 ```
 
-### Recursive relation in invariant position
+### Subtyping of materializations of cyclic aliases
 
 ```py
-from typing import Any, Callable
+from ty_extensions import static_assert, is_subtype_of, Bottom, Top
 
 type JsonValue = None | JsonDict
 type JsonDict = dict[str, JsonValue]
-type JsonSchemaExtraCallable = Callable[[JsonDict], None] | Callable[[JsonDict, type[Any]], None]
 
-def _update_class_schema(json_schema: dict[str, Any], json_schema_extra: JsonSchemaExtraCallable) -> None:
-    if isinstance(json_schema_extra, dict):
-        json_schema.update(json_schema_extra)
+static_assert(is_subtype_of(Top[JsonDict], Top[JsonDict]))
+static_assert(is_subtype_of(Top[JsonDict], Bottom[JsonDict]))
+static_assert(is_subtype_of(Bottom[JsonDict], Bottom[JsonDict]))
+static_assert(is_subtype_of(Bottom[JsonDict], Top[JsonDict]))
 ```
 
 ### Union inside generic
