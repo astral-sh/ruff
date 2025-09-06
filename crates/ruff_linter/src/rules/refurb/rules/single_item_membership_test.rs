@@ -27,13 +27,11 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// ```
 ///
 /// ## Fix safety
+/// The fix is always marked as unsafe.
 ///
-/// When the right-hand side is a string, the fix is marked as unsafe.
-/// This is because `c in "a"` is true both when `c` is `"a"` and when `c` is the empty string,
-/// so the fix can change the behavior of your program in these cases.
-///
-/// Additionally, if there are comments within the fix's range,
-/// it will also be marked as unsafe.
+/// Converting `in`/`not in` against a single-item container to `==`/`!=` can
+/// change runtime behavior: `in` may consider identity (e.g., `NaN`), it always
+/// yields a `bool`, and comments within the replacement range may be removed.
 ///
 /// ## References
 /// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
@@ -100,12 +98,8 @@ pub(crate) fn single_item_membership_test(
         expr.range(),
     );
 
-    let applicability =
-        if right.is_string_literal_expr() || checker.comment_ranges().intersects(expr.range()) {
-            Applicability::Unsafe
-        } else {
-            Applicability::Safe
-        };
+    // All supported cases can change runtime behavior; mark as unsafe.
+    let applicability = Applicability::Unsafe;
 
     let fix = Fix::applicable_edit(edit, applicability);
 
