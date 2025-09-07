@@ -1397,6 +1397,9 @@ impl<'db> Type<'db> {
             (_, Type::NominalInstance(instance)) if instance.is_object(db) => {
                 C::always_satisfiable(db)
             }
+            (_, Type::ProtocolInstance(_)) if target.normalized(db).is_object(db) => {
+                C::always_satisfiable(db)
+            }
 
             // `Never` is the bottom type, the empty set.
             // It is a subtype of all other types.

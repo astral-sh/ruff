@@ -1024,6 +1024,38 @@ static_assert(not is_assignable_to(HasX, Foo))
 static_assert(not is_subtype_of(HasX, Foo))
 ```
 
+Since `object` defines a `__hash__` method, this means that the standard-library `Hashable` protocol
+is currently understood by ty as being equivalent to `object`, much like `SupportsStr` and
+`UniversalSet` above:
+
+```py
+from typing import Hashable
+
+static_assert(is_equivalent_to(object, Hashable))
+static_assert(is_assignable_to(object, Hashable))
+static_assert(is_subtype_of(object, Hashable))
+```
+
+This means that any type considered assignable to `object` (which is all types) is considered by ty
+to be assignable to `Hashable`. This avoids false positives on code like this:
+
+```py
+def takes_hashable_or_sequence(x: Hashable | list[Hashable]): ...
+
+takes_hashable_or_sequence(["foo"])  # fine
+takes_hashable_or_sequence(None)  # fine
+```
+
+but means that ty currently does not detect errors on code like this, which is flagged by other type
+checkers:
+
+```py
+def needs_something_hashable(x: Hashable):
+    hash(x)
+
+needs_something_hashable([])
+```
+
 ## Diagnostics for protocols with invalid attribute members
 
 This is a short appendix to the previous section with the `snapshot-diagnostics` directive enabled
