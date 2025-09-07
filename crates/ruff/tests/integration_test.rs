@@ -1545,6 +1545,22 @@ fn deprecated_direct_preview_enabled() {
 }
 
 #[test]
+fn deprecated_indirect_preview_enabled() {
+    // A deprecated rule selected by prefix should not be included in preview
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "RUF92", "--preview"])
+        .build();
+    assert_cmd_snapshot!(cmd, @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    ");
+}
+
+#[test]
 fn deprecated_multiple_direct_preview_enabled() {
     // Multiple deprecated rules selected by exact code should be included in preview
     // but a warning should be displayed
@@ -1561,21 +1577,6 @@ fn deprecated_multiple_direct_preview_enabled() {
       Cause: Selection of deprecated rules is not allowed when preview is enabled. Remove selection of:
     	- RUF920
     	- RUF921
-    ");
-}
-#[test]
-fn deprecated_indirect_preview_enabled() {
-    // A deprecated rule selected by prefix should not be included in preview
-    let mut cmd = RuffCheck::default()
-        .args(["--select", "RUF92", "--preview"])
-        .build();
-    assert_cmd_snapshot!(cmd, @r"
-    success: true
-    exit_code: 0
-    ----- stdout -----
-    All checks passed!
-
-    ----- stderr -----
     ");
 }
 
