@@ -176,18 +176,18 @@ def _(x: Color):
 ## Union with enum and `int`
 
 ```py
-# from enum import Enum
+from enum import Enum
 
-# class Status(Enum):
-#     PENDING = 1
-#     APPROVED = 2
-#     REJECTED = 3
+class Status(Enum):
+    PENDING = 1
+    APPROVED = 2
+    REJECTED = 3
 
-# def test(x: Status | int):
-#     if x in (Status.PENDING, Status.APPROVED):
-#         # int is included because custom __eq__ methods could make
-#         # an int equal to Status.PENDING or Status.APPROVED, so we can't eliminate it
-#         reveal_type(x)  # revealed: Literal[Status.PENDING, Status.APPROVED] | int
-#     else:
-#         reveal_type(x)  # revealed: Literal[Status.REJECTED] | int
+def test(x: Status | int):
+    if x in (Status.PENDING, Status.APPROVED):
+        # int is included because custom __eq__ methods could make
+        # an int equal to Status.PENDING or Status.APPROVED, so we can't eliminate it
+        reveal_type(x)  # revealed: Literal[Status.PENDING, Status.APPROVED] | int
+    else:
+        reveal_type(x)  # revealed: Literal[Status.REJECTED] | int
 ```

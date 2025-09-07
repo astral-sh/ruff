@@ -618,157 +618,379 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     // TODO `expr_in` and `expr_not_in` should perhaps be unified with `expr_eq` and `expr_ne`,
     // since `eq` and `ne` are equivalent to `in` and `not in` with only one element in the RHS.
     fn evaluate_expr_in(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
-        if lhs_ty.is_single_valued(self.db) || lhs_ty.is_union_of_single_valued(self.db) {
-            // Handle enum instances specially
-            if lhs_ty.is_enum_instance(self.db) {
-                if let Type::NominalInstance(instance) = lhs_ty {
-                    let enum_literals: Vec<Type<'db>> = enum_member_literals(
-                        self.db,
-                        instance.class(self.db).class_literal(self.db).0,
-                        None,
-                    )
-                    .expect("Calling `enum_member_literals` on an enum class")
-                    .collect();
+        // Handle string literals specially for string RHS
+        if let Type::StringLiteral(string_literal) = rhs_ty {
+            let chars: Vec<Type<'db>> = string_literal
+                .value(self.db)
+                .chars()
+                .map(|c| Type::string_literal(self.db, &c.to_string()))
+                .collect();
+            let char_union = UnionType::from_elements(self.db, chars);
 
-                    // Get the elements from the RHS iterable
-                    let rhs_elements = rhs_ty.try_iterate(self.db).ok()?;
+            return self.narrow_lhs_to_rhs_elements(lhs_ty, char_union);
+        }
 
-                    // Find enum literals that match any element in the RHS
-                    let mut matching_literals = Vec::new();
-                    for literal in enum_literals {
-                        // Check if this enum literal is in the RHS collection
-                        for element_type in rhs_elements.all_elements() {
-                            if literal.is_equivalent_to(self.db, *element_type) {
-                                matching_literals.push(literal);
-                                break;
+        let rhs_iterable = rhs_ty.try_iterate(self.db).ok()?;
+        let rhs_elements = rhs_iterable.homogeneous_element_type(self.db);
+        self.narrow_lhs_to_rhs_elements(lhs_ty, rhs_elements)
+    }
+
+    fn narrow_lhs_to_rhs_elements(
+        &mut self,
+        lhs_ty: Type<'db>,
+        rhs_elements: Type<'db>,
+    ) -> Option<Type<'db>> {
+        match lhs_ty {
+            // Handle pure enum instances
+            Type::NominalInstance(instance) if lhs_ty.is_enum_instance(self.db) => {
+                let enum_literals: Vec<Type<'db>> = enum_member_literals(
+                    self.db,
+                    instance.class(self.db).class_literal(self.db).0,
+                    None,
+                )
+                .expect("Calling `enum_member_literals` on an enum class")
+                .collect();
+
+                let mut matching_literals = Vec::new();
+                for literal in enum_literals {
+                    if self.type_could_be_in_elements(literal, rhs_elements) {
+                        matching_literals.push(literal);
+                    }
+                }
+
+                if matching_literals.is_empty() {
+                    Some(Type::Never)
+                } else {
+                    Some(UnionType::from_elements(self.db, matching_literals))
+                }
+            }
+
+            // Handle union types - only narrow literal types, keep broad types
+            Type::Union(union) => {
+                let mut result_builder = UnionBuilder::new(self.db);
+                let mut has_any_elements = false;
+
+                for element in union.elements(self.db) {
+                    match *element {
+                        // Handle enum instances in union
+                        Type::NominalInstance(instance) if element.is_enum_instance(self.db) => {
+                            let enum_literals: Vec<Type<'db>> = enum_member_literals(
+                                self.db,
+                                instance.class(self.db).class_literal(self.db).0,
+                                None,
+                            )
+                            .expect("Calling `enum_member_literals` on an enum class")
+                            .collect();
+
+                            for literal in enum_literals {
+                                if self.type_could_be_in_elements(literal, rhs_elements) {
+                                    result_builder = result_builder.add(literal);
+                                    has_any_elements = true;
+                                }
+                            }
+                        }
+
+                        // Handle literal types - narrow them to matching elements
+                        Type::StringLiteral(_)
+                        | Type::IntLiteral(_)
+                        | Type::BooleanLiteral(_)
+                        | Type::BytesLiteral(_)
+                        | Type::EnumLiteral(_) => {
+                            if self.type_could_be_in_elements(*element, rhs_elements) {
+                                result_builder = result_builder.add(*element);
+                                has_any_elements = true;
+                            }
+                        }
+
+                        // Handle LiteralString specially
+                        Type::LiteralString => {
+                            result_builder = result_builder.add(rhs_elements);
+                            has_any_elements = true;
+                        }
+
+                        // Handle bool type by expanding to literals
+                        Type::NominalInstance(instance)
+                            if instance.class(self.db).is_known(self.db, KnownClass::Bool) =>
+                        {
+                            let true_lit = Type::BooleanLiteral(true);
+                            let false_lit = Type::BooleanLiteral(false);
+
+                            if self.type_could_be_in_elements(true_lit, rhs_elements) {
+                                result_builder = result_builder.add(true_lit);
+                                has_any_elements = true;
+                            }
+                            if self.type_could_be_in_elements(false_lit, rhs_elements) {
+                                result_builder = result_builder.add(false_lit);
+                                has_any_elements = true;
+                            }
+                        }
+
+                        // Handle None - only include if it could be in RHS elements
+                        Type::NominalInstance(instance)
+                            if instance
+                                .class(self.db)
+                                .is_known(self.db, KnownClass::NoneType) =>
+                        {
+                            if self.type_could_be_in_elements(*element, rhs_elements) {
+                                result_builder = result_builder.add(*element);
+                                has_any_elements = true;
+                            }
+                        }
+
+                        // Keep broad types unchanged (like int, str, etc.) - but not singletons like None
+                        _ if !element.is_single_valued(self.db) => {
+                            result_builder = result_builder.add(*element);
+                            has_any_elements = true;
+                        }
+
+                        // For other single-valued types, only include if they could match
+                        _ => {
+                            if self.type_could_be_in_elements(*element, rhs_elements) {
+                                result_builder = result_builder.add(*element);
+                                has_any_elements = true;
                             }
                         }
                     }
+                }
 
-                    if matching_literals.is_empty() {
-                        return Some(Type::Never);
-                    } else {
-                        return Some(UnionType::from_elements(self.db, matching_literals));
-                    }
+                if has_any_elements {
+                    Some(result_builder.build())
+                } else {
+                    Some(Type::Never)
                 }
             }
-            rhs_ty
-                .try_iterate(self.db)
-                .ok()
-                .map(|iterable| iterable.homogeneous_element_type(self.db))
-        } else if lhs_ty.is_union_with_single_valued(self.db) {
-            let rhs_values = rhs_ty
-                .try_iterate(self.db)
-                .ok()?
-                .homogeneous_element_type(self.db);
 
-            let mut builder = UnionBuilder::new(self.db);
-
-            // Add the narrowed values from the RHS first, to keep literals before broader types.
-            builder = builder.add(rhs_values);
-
-            if let Some(lhs_union) = lhs_ty.into_union() {
-                for element in lhs_union.elements(self.db) {
-                    // Keep only the non-single-valued portion of the original type.
-                    if !element.is_single_valued(self.db)
-                        && !element.is_literal_string()
-                        && !element.is_bool(self.db)
-                    {
-                        builder = builder.add(*element);
-                    }
+            // For literal types, narrow to matching elements only
+            Type::StringLiteral(_)
+            | Type::IntLiteral(_)
+            | Type::BooleanLiteral(_)
+            | Type::BytesLiteral(_)
+            | Type::EnumLiteral(_) => {
+                if self.type_could_be_in_elements(lhs_ty, rhs_elements) {
+                    Some(lhs_ty)
+                } else {
+                    Some(Type::Never)
                 }
             }
-            Some(builder.build())
-        } else {
-            None
+
+            // For LiteralString, return intersection with RHS
+            Type::LiteralString => Some(rhs_elements),
+
+            // For bool, expand to boolean literals and check
+            Type::NominalInstance(instance)
+                if instance.class(self.db).is_known(self.db, KnownClass::Bool) =>
+            {
+                let mut result_builder = UnionBuilder::new(self.db);
+                let mut has_matches = false;
+
+                let true_lit = Type::BooleanLiteral(true);
+                let false_lit = Type::BooleanLiteral(false);
+
+                if self.type_could_be_in_elements(true_lit, rhs_elements) {
+                    result_builder = result_builder.add(true_lit);
+                    has_matches = true;
+                }
+                if self.type_could_be_in_elements(false_lit, rhs_elements) {
+                    result_builder = result_builder.add(false_lit);
+                    has_matches = true;
+                }
+
+                if has_matches {
+                    Some(result_builder.build())
+                } else {
+                    Some(Type::Never)
+                }
+            }
+
+            // For broad types (int, str, etc.), don't narrow - they stay the same
+            _ => None,
+        }
+    }
+
+    fn type_could_be_in_elements(&self, ty: Type<'db>, elements: Type<'db>) -> bool {
+        match elements {
+            Type::Union(union) => union.elements(self.db).iter().any(|elem| {
+                ty.is_equivalent_to(self.db, *elem) || !ty.is_disjoint_from(self.db, *elem)
+            }),
+            _ => ty.is_equivalent_to(self.db, elements) || !ty.is_disjoint_from(self.db, elements),
         }
     }
 
     fn evaluate_expr_not_in(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
-        let rhs_values = rhs_ty
-            .try_iterate(self.db)
-            .ok()?
-            .homogeneous_element_type(self.db);
+        // Handle string literals specially for string RHS
+        let rhs_elements = if let Type::StringLiteral(string_literal) = rhs_ty {
+            let chars: Vec<Type<'db>> = string_literal
+                .value(self.db)
+                .chars()
+                .map(|c| Type::string_literal(self.db, &c.to_string()))
+                .collect();
+            UnionType::from_elements(self.db, chars)
+        } else {
+            let rhs_iterable = rhs_ty.try_iterate(self.db).ok()?;
+            rhs_iterable.homogeneous_element_type(self.db)
+        };
 
-        if lhs_ty.is_single_valued(self.db) || lhs_ty.is_union_of_single_valued(self.db) {
-            // Handle enum instances specially
-            if lhs_ty.is_enum_instance(self.db) {
-                if let Type::NominalInstance(instance) = lhs_ty {
-                    let enum_literals: Vec<Type<'db>> = enum_member_literals(
-                        self.db,
-                        instance.class(self.db).class_literal(self.db).0,
-                        None,
-                    )
-                    .expect("Calling `enum_member_literals` on an enum class")
-                    .collect();
+        match lhs_ty {
+            // Handle pure enum instances
+            Type::NominalInstance(instance) if lhs_ty.is_enum_instance(self.db) => {
+                let enum_literals: Vec<Type<'db>> = enum_member_literals(
+                    self.db,
+                    instance.class(self.db).class_literal(self.db).0,
+                    None,
+                )
+                .expect("Calling `enum_member_literals` on an enum class")
+                .collect();
 
-                    // Get the elements from the RHS iterable
-                    let rhs_elements = rhs_ty.try_iterate(self.db).ok()?;
+                let mut non_matching_literals = Vec::new();
+                for literal in enum_literals {
+                    if !self.type_could_be_in_elements(literal, rhs_elements) {
+                        non_matching_literals.push(literal);
+                    }
+                }
 
-                    // Find enum literals that DON'T match any element in the RHS
-                    let mut non_matching_literals = Vec::new();
-                    for literal in enum_literals {
-                        let mut found_match = false;
-                        // Check if this enum literal is in the RHS collection
-                        for element_type in rhs_elements.all_elements() {
-                            if literal.is_equivalent_to(self.db, *element_type) {
-                                found_match = true;
-                                break;
+                if non_matching_literals.is_empty() {
+                    Some(Type::Never)
+                } else {
+                    Some(UnionType::from_elements(self.db, non_matching_literals))
+                }
+            }
+
+            // Handle union types
+            Type::Union(union) => {
+                let mut result_builder = UnionBuilder::new(self.db);
+
+                for element in union.elements(self.db) {
+                    match *element {
+                        // Handle enum instances in union
+                        Type::NominalInstance(instance) if element.is_enum_instance(self.db) => {
+                            let enum_literals: Vec<Type<'db>> = enum_member_literals(
+                                self.db,
+                                instance.class(self.db).class_literal(self.db).0,
+                                None,
+                            )
+                            .expect("Calling `enum_member_literals` on an enum class")
+                            .collect();
+
+                            for literal in enum_literals {
+                                if !self.type_could_be_in_elements(literal, rhs_elements) {
+                                    result_builder = result_builder.add(literal);
+                                }
                             }
                         }
-                        if !found_match {
-                            non_matching_literals.push(literal);
+
+                        // Handle literal types - remove matching ones
+                        Type::StringLiteral(_)
+                        | Type::IntLiteral(_)
+                        | Type::BooleanLiteral(_)
+                        | Type::BytesLiteral(_)
+                        | Type::EnumLiteral(_) => {
+                            if !self.type_could_be_in_elements(*element, rhs_elements) {
+                                result_builder = result_builder.add(*element);
+                            }
+                        }
+
+                        // Handle LiteralString specially with intersection
+                        Type::LiteralString => {
+                            let narrowed = IntersectionBuilder::new(self.db)
+                                .add_positive(*element)
+                                .add_negative(rhs_elements)
+                                .build();
+                            result_builder = result_builder.add(narrowed);
+                        }
+
+                        // Handle bool type by expanding to literals
+                        Type::NominalInstance(instance)
+                            if instance.class(self.db).is_known(self.db, KnownClass::Bool) =>
+                        {
+                            let true_lit = Type::BooleanLiteral(true);
+                            let false_lit = Type::BooleanLiteral(false);
+
+                            if !self.type_could_be_in_elements(true_lit, rhs_elements) {
+                                result_builder = result_builder.add(true_lit);
+                            }
+                            if !self.type_could_be_in_elements(false_lit, rhs_elements) {
+                                result_builder = result_builder.add(false_lit);
+                            }
+                        }
+
+                        // Handle None - only include if it couldn't be in RHS elements
+                        Type::NominalInstance(instance)
+                            if instance
+                                .class(self.db)
+                                .is_known(self.db, KnownClass::NoneType) =>
+                        {
+                            if !self.type_could_be_in_elements(*element, rhs_elements) {
+                                result_builder = result_builder.add(*element);
+                            }
+                        }
+
+                        // Keep broad types unchanged (like int, str, etc.) - but not singletons like None
+                        _ if !element.is_single_valued(self.db) => {
+                            result_builder = result_builder.add(*element);
+                        }
+
+                        // For other single-valued types, only include if they couldn't match
+                        _ => {
+                            if !self.type_could_be_in_elements(*element, rhs_elements) {
+                                result_builder = result_builder.add(*element);
+                            }
                         }
                     }
-
-                    if non_matching_literals.is_empty() {
-                        return Some(Type::Never);
-                    } else {
-                        return Some(UnionType::from_elements(self.db, non_matching_literals));
-                    }
                 }
-            }
-            // Exclude the RHS values from the entire (single-valued) LHS domain.
-            let complement = IntersectionBuilder::new(self.db)
-                .add_positive(lhs_ty)
-                .add_negative(rhs_values)
-                .build();
-            Some(complement)
-        } else if lhs_ty.is_union_with_single_valued(self.db) {
-            // Split LHS into single-valued portion and the rest. Exclude RHS values from the
-            // single-valued portion, keep the rest intact.
-            let mut single_builder = UnionBuilder::new(self.db);
-            let mut rest_builder = UnionBuilder::new(self.db);
 
-            if let Some(lhs_union) = lhs_ty.into_union() {
-                for element in lhs_union.elements(self.db) {
-                    if element.is_single_valued(self.db)
-                        || element.is_literal_string()
-                        || element.is_bool(self.db)
-                    {
-                        single_builder = single_builder.add(*element);
-                    } else {
-                        rest_builder = rest_builder.add(*element);
-                    }
+                Some(result_builder.build())
+            }
+
+            // For literal types, exclude if they match
+            Type::StringLiteral(_)
+            | Type::IntLiteral(_)
+            | Type::BooleanLiteral(_)
+            | Type::BytesLiteral(_)
+            | Type::EnumLiteral(_) => {
+                if self.type_could_be_in_elements(lhs_ty, rhs_elements) {
+                    Some(Type::Never)
+                } else {
+                    Some(lhs_ty)
                 }
             }
 
-            let single_union = single_builder.build();
-            let rest_union = rest_builder.build();
+            // For LiteralString, create intersection
+            Type::LiteralString => {
+                let complement = IntersectionBuilder::new(self.db)
+                    .add_positive(lhs_ty)
+                    .add_negative(rhs_elements)
+                    .build();
+                Some(complement)
+            }
 
-            let narrowed_single = IntersectionBuilder::new(self.db)
-                .add_positive(single_union)
-                .add_negative(rhs_values)
-                .build();
+            // For bool, expand to boolean literals and exclude matches
+            Type::NominalInstance(instance)
+                if instance.class(self.db).is_known(self.db, KnownClass::Bool) =>
+            {
+                let mut result_builder = UnionBuilder::new(self.db);
+                let mut has_non_matches = false;
 
-            // Keep order: first literal complement, then broader arms.
-            let result = UnionBuilder::new(self.db)
-                .add(narrowed_single)
-                .add(rest_union)
-                .build();
-            Some(result)
-        } else {
-            None
+                let true_lit = Type::BooleanLiteral(true);
+                let false_lit = Type::BooleanLiteral(false);
+
+                if !self.type_could_be_in_elements(true_lit, rhs_elements) {
+                    result_builder = result_builder.add(true_lit);
+                    has_non_matches = true;
+                }
+                if !self.type_could_be_in_elements(false_lit, rhs_elements) {
+                    result_builder = result_builder.add(false_lit);
+                    has_non_matches = true;
+                }
+
+                if has_non_matches {
+                    Some(result_builder.build())
+                } else {
+                    Some(Type::Never)
+                }
+            }
+
+            // For broad types, don't narrow - they stay the same
+            _ => None,
         }
     }
 

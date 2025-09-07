@@ -986,17 +986,6 @@ impl<'db> Type<'db> {
             || self.is_enum_instance(db)
     }
 
-    pub(crate) fn is_union_with_single_valued(&self, db: &'db dyn Db) -> bool {
-        self.into_union().is_some_and(|union| {
-            union
-                .elements(db)
-                .iter()
-                .any(|ty| ty.is_single_valued(db) || ty.is_bool(db) || ty.is_literal_string())
-        }) || self.is_bool(db)
-            || self.is_literal_string()
-            || self.is_enum_instance(db)
-    }
-
     pub(crate) fn into_string_literal(self) -> Option<StringLiteralType<'db>> {
         match self {
             Type::StringLiteral(string_literal) => Some(string_literal),
