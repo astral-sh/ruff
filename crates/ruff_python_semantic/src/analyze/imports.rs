@@ -156,3 +156,31 @@ pub fn is_site_sys_path_modification(stmt: &Stmt, semantic: &SemanticModel) -> b
     }
     false
 }
+
+/// Returns `true` if a [`Stmt`] is a PyGObject/GIRepository pre-import version
+/// selection, e.g.,
+/// ```python
+/// import gi
+///
+/// # either
+/// gi.require_version(...)
+/// gi.require_versions(...)
+///
+/// from gi.repository import ...
+/// ```
+pub fn is_gi_version_selection(stmt: &Stmt, semantic: &SemanticModel) -> bool {
+    let Stmt::Expr(ast::StmtExpr { value, .. }) = stmt else {
+        return false;
+    };
+    let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() else {
+        return false;
+    };
+    semantic
+        .resolve_qualified_name(func.as_ref())
+        .is_some_and(|qualified_name| {
+            matches!(
+                qualified_name.segments(),
+                ["gi", "require_version" | "require_versions"]
+            )
+        })
+}
