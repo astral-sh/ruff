@@ -1397,7 +1397,11 @@ impl<'db> Type<'db> {
             (_, Type::NominalInstance(instance)) if instance.is_object(db) => {
                 C::always_satisfiable(db)
             }
-            (_, Type::ProtocolInstance(_)) if target.normalized(db).is_object(db) => {
+            (_, Type::ProtocolInstance(target))
+                if Type::object(db)
+                    .satisfies_protocol(db, target, relation, visitor)
+                    .is_always_satisfied(db) =>
+            {
                 C::always_satisfiable(db)
             }
 
