@@ -83,6 +83,18 @@ def outer(flag: bool) -> None:
 
     x = C()
     inner()
+
+def outer(flag: bool) -> None:
+    if flag:
+        x = A()
+    else:
+        x = B()  # this binding of `x` is invisible to `inner`
+        return
+
+    def inner() -> None:
+        reveal_type(x)  # revealed: A | C
+    x = C()
+    inner()
 ```
 
 If a symbol is only conditionally bound, we do not raise any errors:

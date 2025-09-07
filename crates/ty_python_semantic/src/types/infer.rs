@@ -88,7 +88,7 @@ use crate::semantic_index::scope::{
 use crate::semantic_index::symbol::ScopedSymbolId;
 use crate::semantic_index::{
     ApplicableConstraints, ConsideredDefinitions, EnclosingSnapshotResult, SemanticIndex,
-    SnapshotCompleteness, place_table, semantic_index,
+    place_table, semantic_index,
 };
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::class::{CodeGeneratorKind, FieldKind, MetaclassErrorKind};
@@ -6774,8 +6774,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         })
                 };
 
-                let mut considered_definitions = ConsideredDefinitions::AllReachable(None);
-
                 // If the reference is in a nested eager scope, we need to look for the place at
                 // the point where the previous enclosing scope was defined, instead of at the end
                 // of the scope. (Note that the semantic index builder takes care of only
@@ -6794,10 +6792,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 ConstraintKey::NarrowingConstraint(constraint),
                             ));
                         }
-                        EnclosingSnapshotResult::FoundBindings(
-                            bindings,
-                            SnapshotCompleteness::Complete,
-                        ) => {
+                        EnclosingSnapshotResult::FoundBindings(bindings) => {
                             let place = place_from_bindings(db, bindings).map_type(|ty| {
                                 self.narrow_place_with_applicable_constraints(
                                     place_expr,
@@ -6810,13 +6805,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 ConstraintKey::NestedScope(file_scope_id),
                             ));
                             return place.into();
-                        }
-                        EnclosingSnapshotResult::FoundBindings(
-                            _,
-                            SnapshotCompleteness::Incomplete(_, snapshot),
-                        ) => {
-                            considered_definitions =
-                                ConsideredDefinitions::AllReachable(Some(snapshot));
                         }
                         // There are no visible bindings / constraint here.
                         // Don't fall back to non-eager place resolution.
@@ -6865,16 +6853,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // `nonlocal` variable, but we don't enforce that here. See the
                 // `ast::Stmt::AnnAssign` handling in `SemanticIndexBuilder::visit_stmt`.)
                 if enclosing_place.is_bound() || enclosing_place.is_declared() {
-                    let local_place_and_qualifiers =
-                        place(db, enclosing_scope_id, place_expr, considered_definitions).map_type(
-                            |ty| {
-                                self.narrow_place_with_applicable_constraints(
-                                    place_expr,
-                                    ty,
-                                    &constraint_keys,
-                                )
-                            },
-                        );
+                    let local_place_and_qualifiers = place(
+                        db,
+                        enclosing_scope_id,
+                        place_expr,
+                        ConsideredDefinitions::AllReachable,
+                    )
+                    .map_type(|ty| {
+                        self.narrow_place_with_applicable_constraints(
+                            place_expr,
+                            ty,
+                            &constraint_keys,
+                        )
+                    });
                     // We could have Place::Unbound here, despite the checks above, for example if
                     // this scope contains a `del` statement but no binding or declaration.
                     if let Place::Type(type_, boundness) = local_place_and_qualifiers.place {
@@ -6920,7 +6911,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     ConstraintKey::NarrowingConstraint(constraint),
                                 ));
                             }
-                            EnclosingSnapshotResult::FoundBindings(bindings, _) => {
+                            EnclosingSnapshotResult::FoundBindings(bindings) => {
                                 let place = place_from_bindings(db, bindings).map_type(|ty| {
                                     self.narrow_place_with_applicable_constraints(
                                         place_expr,

@@ -52,7 +52,6 @@ use crate::semantic_index::narrowing_constraints::{
 use crate::semantic_index::reachability_constraints::{
     ReachabilityConstraintsBuilder, ScopedReachabilityConstraintId,
 };
-use crate::semantic_index::use_def::SnapshotCompleteness;
 
 /// A newtype-index for a definition in a particular scope.
 #[newtype_index]
@@ -190,23 +189,16 @@ impl Declarations {
 #[derive(Clone, Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(super) enum EnclosingSnapshot {
     Constraint(ScopedNarrowingConstraint),
-    Bindings(Bindings, SnapshotCompleteness),
+    Bindings(Bindings),
 }
 
 impl EnclosingSnapshot {
     pub(super) fn finish(&mut self, reachability_constraints: &mut ReachabilityConstraintsBuilder) {
         match self {
             Self::Constraint(_) => {}
-            Self::Bindings(bindings, _) => {
+            Self::Bindings(bindings) => {
                 bindings.finish(reachability_constraints);
             }
-        }
-    }
-
-    pub(crate) fn bindings(&self) -> Option<&Bindings> {
-        match self {
-            Self::Constraint(_) => None,
-            Self::Bindings(bindings, _) => Some(bindings),
         }
     }
 }
@@ -224,12 +216,6 @@ pub(crate) struct Bindings {
     live_bindings: SmallVec<[LiveBinding; 2]>,
 }
 
-pub(crate) enum LiveBindingResult<'b> {
-    Found(&'b LiveBinding),
-    NotFound,
-    Shadowed,
-}
-
 impl Bindings {
     pub(super) fn unbound_narrowing_constraint(&self) -> ScopedNarrowingConstraint {
         self.unbound_narrowing_constraint
@@ -241,26 +227,6 @@ impl Bindings {
         for binding in &self.live_bindings {
             reachability_constraints.mark_used(binding.reachability_constraint);
         }
-    }
-
-    pub(super) fn len(&self) -> usize {
-        self.live_bindings.len()
-    }
-
-    pub(super) fn live_binding(&self, id: ScopedDefinitionId) -> LiveBindingResult<'_> {
-        self.live_bindings
-            .iter()
-            .find(|live_binding| live_binding.binding == id)
-            .map_or_else(
-                || {
-                    if self.live_bindings.last().is_some_and(|b| b.binding > id) {
-                        LiveBindingResult::Shadowed
-                    } else {
-                        LiveBindingResult::NotFound
-                    }
-                },
-                LiveBindingResult::Found,
-            )
     }
 }
 
@@ -342,7 +308,7 @@ impl Bindings {
         self.live_bindings.iter()
     }
 
-    fn merge(
+    pub(super) fn merge(
         &mut self,
         b: Self,
         narrowing_constraints: &mut NarrowingConstraintsBuilder,

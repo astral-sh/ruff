@@ -316,11 +316,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     nested_scope: popped_scope_id,
                     nested_laziness: ScopeLaziness::Eager,
                 };
-                let eager_snapshot = self.use_def_maps[enclosing_scope_id].snapshot_outer_state(
-                    enclosing_place_id,
-                    enclosing_scope_kind,
-                    enclosing_place,
-                );
+                let eager_snapshot = self.use_def_maps[enclosing_scope_id]
+                    .snapshot_enclosing_state(
+                        enclosing_place_id,
+                        enclosing_scope_kind,
+                        enclosing_place,
+                    );
                 self.enclosing_snapshots.insert(key, eager_snapshot);
             }
 
@@ -390,7 +391,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     nested_scope: popped_scope_id,
                     nested_laziness: ScopeLaziness::Lazy,
                 };
-                let lazy_snapshot = self.use_def_maps[enclosing_scope_id].snapshot_outer_state(
+                let lazy_snapshot = self.use_def_maps[enclosing_scope_id].snapshot_enclosing_state(
                     enclosed_symbol_id.into(),
                     enclosing_scope_kind,
                     enclosing_place.into(),
@@ -400,9 +401,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
-    /// Any lazy snapshots of the place that have been reassigned are no longer valid on their own, so mark as incomplete.
-    /// If there is no reassignment, the state of the symbol just before the closure definition is recorded as a complete lazy snapshot.
-    /// We have not yet tracked where the closure is actually referenced, but we can assume that the closure becomes referenceable after the closure is defined.
+    /// Any lazy snapshots of the place that have been reassigned are obsolete, so update them.
     /// ```py
     /// def outer() -> None:
     ///     x = None
@@ -416,41 +415,32 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     ///         reveal_type(x)  # revealed: None | Literal[1]
     ///
     ///     # Reassignment of `x` after the definition of `inner2`.
-    ///     # lazy snapshots of `x` for `inner2` is incomplete.
+    ///     # Update lazy snapshots of `x` for `inner2`.
     ///     x = 1
     ///
     ///     def inner() -> None:
     ///         # In this scope, `x = None` appears as being shadowed by `x = 1`.
     ///         reveal_type(x)  # revealed: Literal[1]
     ///
-    ///     # No reassignment of `x` after the definition of `inner`, so we can safely use a complete lazy snapshot for `inner`.
+    ///     # No reassignment of `x` after the definition of `inner`, so we can safely use a lazy snapshot for `inner` as is.
     ///     inner()
     ///     inner2()
     /// ```
-    fn check_lazy_snapshots(&mut self, popped_scope_id: FileScopeId) {
+    fn update_lazy_snapshots(&mut self, symbol: ScopedSymbolId) {
+        let current_scope = self.current_scope();
         for (key, snapshot_id) in &self.enclosing_snapshots {
             if let Some(enclosing_symbol) = key.enclosing_place.as_symbol() {
                 if key.nested_laziness.is_lazy()
-                    && (key.enclosing_scope == popped_scope_id
+                    && enclosing_symbol == symbol
+                    && self.place_tables[current_scope]
+                        .symbol(symbol)
+                        .is_reassigned()
+                    && (key.enclosing_scope == current_scope
                         || VisibleAncestorsIter::new(&self.scopes, key.enclosing_scope)
-                            .any(|(ancestor, _)| ancestor == popped_scope_id))
+                            .any(|(ancestor, _)| ancestor == current_scope))
                 {
-                    let name = self.place_tables[key.enclosing_scope]
-                        .symbol(enclosing_symbol)
-                        .name();
-                    let popped_place_table = &self.place_tables[popped_scope_id];
-                    if let Some(symbol_id) = popped_place_table.symbol_id(name) {
-                        if popped_place_table.symbol(symbol_id).is_reassigned()
-                            && !self.use_def_maps[popped_scope_id].bindings_are_unchanged(
-                                &self.use_def_maps[key.enclosing_scope],
-                                *snapshot_id,
-                                symbol_id,
-                            )
-                        {
-                            self.use_def_maps[key.enclosing_scope]
-                                .mark_snapshot_incomplete(*snapshot_id, enclosing_symbol);
-                        }
-                    }
+                    self.use_def_maps[key.enclosing_scope]
+                        .update_enclosing_snapshot(*snapshot_id, enclosing_symbol);
                 }
             }
         }
@@ -494,8 +484,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .scope_stack
             .pop()
             .expect("Root scope should be present");
-
-        self.check_lazy_snapshots(popped_scope_id);
 
         let children_end = self.scopes.next_index();
 
@@ -690,6 +678,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
         }
 
+        if category.is_binding() {
+            if let Some(id) = place.as_symbol() {
+                self.update_lazy_snapshots(id);
+            }
+        }
+
         let mut try_node_stack_manager = std::mem::take(&mut self.try_node_context_stack_manager);
         try_node_stack_manager.record_definition(self);
         self.try_node_context_stack_manager = try_node_stack_manager;
@@ -781,7 +775,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// Records that all remaining statements in the current block are unreachable.
     fn mark_unreachable(&mut self) {
         self.current_use_def_map_mut().mark_unreachable();
-        self.check_lazy_snapshots(self.current_scope());
     }
 
     /// Records a reachability constraint that always evaluates to "ambiguous".

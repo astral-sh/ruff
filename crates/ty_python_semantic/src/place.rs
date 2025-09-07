@@ -4,10 +4,10 @@ use crate::dunder_all::dunder_all_names;
 use crate::module_resolver::{KnownModule, file_to_module};
 use crate::semantic_index::definition::{Definition, DefinitionState};
 use crate::semantic_index::place::{PlaceExprRef, ScopedPlaceId};
-use crate::semantic_index::scope::{ScopeId, ScopeLaziness};
+use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{
     BindingWithConstraints, BindingWithConstraintsIterator, BoundnessAnalysis,
-    ConsideredDefinitions, DeclarationsIterator, EnclosingSnapshotResult, place_table,
+    ConsideredDefinitions, DeclarationsIterator, place_table,
 };
 use crate::semantic_index::{DeclarationWithConstraint, global_scope, use_def_map};
 use crate::types::{
@@ -294,7 +294,7 @@ pub(crate) fn explicit_global_symbol<'db>(
         global_scope(db, file),
         name,
         RequiresExplicitReExport::No,
-        ConsideredDefinitions::AllReachable(None),
+        ConsideredDefinitions::AllReachable,
     )
 }
 
@@ -711,7 +711,7 @@ fn place_by_id<'db>(
 
     let declarations = match considered_definitions {
         ConsideredDefinitions::EndOfScope => use_def.end_of_scope_declarations(place_id),
-        ConsideredDefinitions::AllReachable(_) => use_def.all_reachable_declarations(place_id),
+        ConsideredDefinitions::AllReachable => use_def.all_reachable_declarations(place_id),
     };
 
     let declared = place_from_declarations_impl(db, declarations, requires_explicit_reexport)
@@ -719,16 +719,7 @@ fn place_by_id<'db>(
 
     let all_considered_bindings = || match considered_definitions {
         ConsideredDefinitions::EndOfScope => use_def.end_of_scope_bindings(place_id),
-        ConsideredDefinitions::AllReachable(None) => use_def.all_reachable_bindings(place_id),
-        ConsideredDefinitions::AllReachable(Some(snapshot)) => {
-            if let EnclosingSnapshotResult::FoundBindings(bindings, _) =
-                use_def.enclosing_snapshot(snapshot, ScopeLaziness::Lazy)
-            {
-                bindings
-            } else {
-                use_def.all_reachable_bindings(place_id)
-            }
-        }
+        ConsideredDefinitions::AllReachable => use_def.all_reachable_bindings(place_id),
     };
 
     // If a symbol is undeclared, but qualified with `typing.Final`, we use the right-hand side
@@ -783,7 +774,7 @@ fn place_by_id<'db>(
                 // Place is possibly undeclared and (possibly) bound
                 Place::Type(inferred_ty, boundness) => Place::Type(
                     UnionType::from_elements(db, [inferred_ty, declared_ty]),
-                    if boundness_analysis.is_assume_bound() {
+                    if boundness_analysis == BoundnessAnalysis::AssumeBound {
                         Boundness::Bound
                     } else {
                         boundness
@@ -802,7 +793,7 @@ fn place_by_id<'db>(
             let boundness_analysis = bindings.boundness_analysis;
             let mut inferred = place_from_bindings_impl(db, bindings, requires_explicit_reexport);
 
-            if boundness_analysis.is_assume_bound() {
+            if boundness_analysis == BoundnessAnalysis::AssumeBound {
                 if let Place::Type(ty, Boundness::PossiblyUnbound) = inferred {
                     inferred = Place::Type(ty, Boundness::Bound);
                 }
@@ -1057,7 +1048,7 @@ fn place_from_bindings_impl<'db>(
         };
 
         let boundness = match boundness_analysis {
-            BoundnessAnalysis::AssumeBound(_) => Boundness::Bound,
+            BoundnessAnalysis::AssumeBound => Boundness::Bound,
             BoundnessAnalysis::BasedOnUnboundVisibility => match unbound_visibility() {
                 Some(Truthiness::AlwaysTrue) => {
                     unreachable!(
@@ -1265,7 +1256,7 @@ fn place_from_declarations_impl<'db>(
         };
 
         let boundness = match boundness_analysis {
-            BoundnessAnalysis::AssumeBound(_) => {
+            BoundnessAnalysis::AssumeBound => {
                 if all_declarations_definitely_reachable {
                     Boundness::Bound
                 } else {
