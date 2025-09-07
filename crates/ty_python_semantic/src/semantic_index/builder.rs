@@ -428,13 +428,18 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// ```
     fn update_lazy_snapshots(&mut self, symbol: ScopedSymbolId) {
         let current_scope = self.current_scope();
+        let current_place_table = &self.place_tables[current_scope];
+        let symbol = current_place_table.symbol(symbol);
+        if !symbol.is_reassigned() {
+            return;
+        }
         for (key, snapshot_id) in &self.enclosing_snapshots {
             if let Some(enclosing_symbol) = key.enclosing_place.as_symbol() {
+                let name = self.place_tables[key.enclosing_scope]
+                    .symbol(enclosing_symbol)
+                    .name();
                 if key.nested_laziness.is_lazy()
-                    && enclosing_symbol == symbol
-                    && self.place_tables[current_scope]
-                        .symbol(symbol)
-                        .is_reassigned()
+                    && symbol.name() == name
                     && (key.enclosing_scope == current_scope
                         || VisibleAncestorsIter::new(&self.scopes, key.enclosing_scope)
                             .any(|(ancestor, _)| ancestor == current_scope))
