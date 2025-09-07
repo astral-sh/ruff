@@ -1397,6 +1397,10 @@ impl<'db> Type<'db> {
             (_, Type::NominalInstance(instance)) if instance.is_object(db) => {
                 C::always_satisfiable(db)
             }
+
+            // Any structural types that are "supertypes of `object`"
+            // are in fact equivalent to `object`, and should therefore
+            // be treated equivalently to `object` when it comes to assignability/subtyping
             (_, Type::ProtocolInstance(target))
                 if Type::object(db)
                     .satisfies_protocol(db, target, relation, visitor)
