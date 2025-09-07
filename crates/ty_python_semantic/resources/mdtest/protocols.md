@@ -995,6 +995,10 @@ class SupportsStr(Protocol):
 
 static_assert(is_equivalent_to(SupportsStr, UniversalSet))
 static_assert(is_equivalent_to(SupportsStr, object))
+static_assert(is_subtype_of(SupportsStr, UniversalSet))
+static_assert(is_subtype_of(UniversalSet, SupportsStr))
+static_assert(is_assignable_to(UniversalSet, SupportsStr))
+static_assert(is_assignable_to(SupportsStr, UniversalSet))
 
 class SupportsClass(Protocol):
     @property
@@ -1003,6 +1007,11 @@ class SupportsClass(Protocol):
 static_assert(is_equivalent_to(SupportsClass, UniversalSet))
 static_assert(is_equivalent_to(SupportsClass, SupportsStr))
 static_assert(is_equivalent_to(SupportsClass, object))
+
+static_assert(is_subtype_of(SupportsClass, SupportsStr))
+static_assert(is_subtype_of(SupportsStr, SupportsClass))
+static_assert(is_assignable_to(SupportsStr, SupportsClass))
+static_assert(is_assignable_to(SupportsClass, SupportsStr))
 ```
 
 If a protocol contains members that are not defined on `object`, then that protocol will (like all
