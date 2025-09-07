@@ -1489,6 +1489,8 @@ fn deprecated_direct() {
 
 #[test]
 fn deprecated_multiple_direct() {
+    // Multiple deprecated rules selected by exact code should be included
+    // but a warning should be displayed
     let mut cmd = RuffCheck::default()
         .args(["--select", "RUF920", "--select", "RUF921"])
         .build();
