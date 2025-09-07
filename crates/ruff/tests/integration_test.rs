@@ -1516,16 +1516,10 @@ fn deprecated_indirect() {
     // since it is not a "direct" selection
     let mut cmd = RuffCheck::default().args(["--select", "RUF92"]).build();
     assert_cmd_snapshot!(cmd, @r"
-    success: false
-    exit_code: 1
+    success: true
+    exit_code: 0
     ----- stdout -----
-    RUF920 Hey this is a deprecated test rule.
-    --> -:1:1
-
-    RUF921 Hey this is another deprecated test rule.
-    --> -:1:1
-
-    Found 2 errors.
+    All checks passed!
 
     ----- stderr -----
     ");
