@@ -619,6 +619,39 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     // since `eq` and `ne` are equivalent to `in` and `not in` with only one element in the RHS.
     fn evaluate_expr_in(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
         if lhs_ty.is_single_valued(self.db) || lhs_ty.is_union_of_single_valued(self.db) {
+            // Handle enum instances specially
+            if lhs_ty.is_enum_instance(self.db) {
+                if let Type::NominalInstance(instance) = lhs_ty {
+                    let enum_literals: Vec<Type<'db>> = enum_member_literals(
+                        self.db,
+                        instance.class(self.db).class_literal(self.db).0,
+                        None,
+                    )
+                    .expect("Calling `enum_member_literals` on an enum class")
+                    .collect();
+
+                    // Get the elements from the RHS iterable
+                    let rhs_elements = rhs_ty.try_iterate(self.db).ok()?;
+
+                    // Find enum literals that match any element in the RHS
+                    let mut matching_literals = Vec::new();
+                    for literal in enum_literals {
+                        // Check if this enum literal is in the RHS collection
+                        for element_type in rhs_elements.all_elements() {
+                            if literal.is_equivalent_to(self.db, *element_type) {
+                                matching_literals.push(literal);
+                                break;
+                            }
+                        }
+                    }
+
+                    if matching_literals.is_empty() {
+                        return Some(Type::Never);
+                    } else {
+                        return Some(UnionType::from_elements(self.db, matching_literals));
+                    }
+                }
+            }
             rhs_ty
                 .try_iterate(self.db)
                 .ok()
@@ -658,6 +691,43 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             .homogeneous_element_type(self.db);
 
         if lhs_ty.is_single_valued(self.db) || lhs_ty.is_union_of_single_valued(self.db) {
+            // Handle enum instances specially
+            if lhs_ty.is_enum_instance(self.db) {
+                if let Type::NominalInstance(instance) = lhs_ty {
+                    let enum_literals: Vec<Type<'db>> = enum_member_literals(
+                        self.db,
+                        instance.class(self.db).class_literal(self.db).0,
+                        None,
+                    )
+                    .expect("Calling `enum_member_literals` on an enum class")
+                    .collect();
+
+                    // Get the elements from the RHS iterable
+                    let rhs_elements = rhs_ty.try_iterate(self.db).ok()?;
+
+                    // Find enum literals that DON'T match any element in the RHS
+                    let mut non_matching_literals = Vec::new();
+                    for literal in enum_literals {
+                        let mut found_match = false;
+                        // Check if this enum literal is in the RHS collection
+                        for element_type in rhs_elements.all_elements() {
+                            if literal.is_equivalent_to(self.db, *element_type) {
+                                found_match = true;
+                                break;
+                            }
+                        }
+                        if !found_match {
+                            non_matching_literals.push(literal);
+                        }
+                    }
+
+                    if non_matching_literals.is_empty() {
+                        return Some(Type::Never);
+                    } else {
+                        return Some(UnionType::from_elements(self.db, non_matching_literals));
+                    }
+                }
+            }
             // Exclude the RHS values from the entire (single-valued) LHS domain.
             let complement = IntersectionBuilder::new(self.db)
                 .add_positive(lhs_ty)

@@ -889,6 +889,16 @@ impl<'db> Type<'db> {
         matches!(self, Type::TypedDict(..))
     }
 
+    /// Return true if this type is an enum instance (not an enum literal).
+    pub(crate) fn is_enum_instance(&self, db: &'db dyn Db) -> bool {
+        match self {
+            Type::NominalInstance(instance) => {
+                enum_metadata(db, instance.class(db).class_literal(db).0).is_some()
+            }
+            _ => false,
+        }
+    }
+
     pub(crate) fn into_typed_dict(self) -> Option<TypedDictType<'db>> {
         match self {
             Type::TypedDict(typed_dict) => Some(typed_dict),
@@ -973,6 +983,7 @@ impl<'db> Type<'db> {
                 .all(|ty| ty.is_single_valued(db) || ty.is_bool(db) || ty.is_literal_string())
         }) || self.is_bool(db)
             || self.is_literal_string()
+            || self.is_enum_instance(db)
     }
 
     pub(crate) fn is_union_with_single_valued(&self, db: &'db dyn Db) -> bool {
@@ -983,6 +994,7 @@ impl<'db> Type<'db> {
                 .any(|ty| ty.is_single_valued(db) || ty.is_bool(db) || ty.is_literal_string())
         }) || self.is_bool(db)
             || self.is_literal_string()
+            || self.is_enum_instance(db)
     }
 
     pub(crate) fn into_string_literal(self) -> Option<StringLiteralType<'db>> {
