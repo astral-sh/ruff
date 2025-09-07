@@ -70,7 +70,40 @@ from airflow.timetables.datasets import DatasetOrTimeSchedule
 from airflow.utils.dag_parsing_context import get_parsing_context
 
 # airflow.timetables.datasets
-DatasetOrTimeSchedule()
+DatasetOrTimeSchedule(datasets=[])
 
 # airflow.utils.dag_parsing_context
 get_parsing_context()
+
+from airflow.decorators.base import (
+    DecoratedMappedOperator,
+    DecoratedOperator,
+    TaskDecorator,
+    get_unique_task_id,
+    task_decorator_factory,
+)
+
+# airflow.decorators.base
+DecoratedMappedOperator()
+DecoratedOperator()
+TaskDecorator()
+get_unique_task_id()
+task_decorator_factory()
+
+
+from airflow.models import Param
+
+# airflow.models
+Param()
+
+
+from airflow.sensors.base import (
+    BaseSensorOperator,
+    PokeReturnValue,
+    poke_mode_only,
+)
+
+# airflow.sensors.base
+BaseSensorOperator()
+PokeReturnValue()
+poke_mode_only()

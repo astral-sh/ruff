@@ -1,0 +1,29 @@
+---
+source: crates/ruff_linter/src/rules/flake8_async/mod.rs
+---
+ASYNC250 Blocking call to input() in async context
+ --> ASYNC250.py:7:9
+  |
+6 | async def foo():
+7 |     k = input()  # ASYNC250
+  |         ^^^^^
+8 |     input("hello world")  # ASYNC250
+  |
+
+ASYNC250 Blocking call to input() in async context
+ --> ASYNC250.py:8:5
+  |
+6 | async def foo():
+7 |     k = input()  # ASYNC250
+8 |     input("hello world")  # ASYNC250
+  |     ^^^^^
+  |
+
+ASYNC250 Blocking call to input() in async context
+  --> ASYNC250.py:21:5
+   |
+20 | async def foo():
+21 |     builtins.input("testing")  # ASYNC250
+   |     ^^^^^^^^^^^^^^
+22 |     fake.input("whatever")  # Ok
+   |

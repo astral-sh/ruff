@@ -11,8 +11,9 @@ use crate::semantic_index::{
 };
 use crate::semantic_index::{DeclarationWithConstraint, global_scope, use_def_map};
 use crate::types::{
-    DynamicType, KnownClass, Truthiness, Type, TypeAndQualifiers, TypeQualifiers, UnionBuilder,
-    UnionType, binding_type, declaration_type, todo_type,
+    ApplyTypeMappingVisitor, DynamicType, KnownClass, MaterializationKind, Truthiness, Type,
+    TypeAndQualifiers, TypeQualifiers, UnionBuilder, UnionType, binding_type, declaration_type,
+    todo_type,
 };
 use crate::{Db, FxOrderSet, Program, resolve_module};
 
@@ -135,6 +136,10 @@ impl<'db> Place<'db> {
 
             Place::Unbound => Place::Unbound,
         }
+    }
+
+    pub(crate) const fn is_definitely_bound(&self) -> bool {
+        matches!(self, Place::Type(_, Boundness::Bound))
     }
 }
 
@@ -482,6 +487,9 @@ type DeclaredTypeAndConflictingTypes<'db> = (
 pub(crate) struct PlaceFromDeclarationsResult<'db> {
     place_and_quals: PlaceAndQualifiers<'db>,
     conflicting_types: Option<Box<indexmap::set::Slice<Type<'db>>>>,
+    /// Contains `Some(declaration)` if the declared type originates from exactly one declaration.
+    /// This field is used for backreferences in diagnostics.
+    pub(crate) single_declaration: Option<Definition<'db>>,
 }
 
 impl<'db> PlaceFromDeclarationsResult<'db> {
@@ -492,6 +500,7 @@ impl<'db> PlaceFromDeclarationsResult<'db> {
         PlaceFromDeclarationsResult {
             place_and_quals,
             conflicting_types: Some(conflicting_types),
+            single_declaration: None,
         }
     }
 
@@ -506,21 +515,6 @@ impl<'db> PlaceFromDeclarationsResult<'db> {
         Option<Box<indexmap::set::Slice<Type<'db>>>>,
     ) {
         (self.place_and_quals, self.conflicting_types)
-    }
-}
-
-impl<'db> From<PlaceAndQualifiers<'db>> for PlaceFromDeclarationsResult<'db> {
-    fn from(place_and_quals: PlaceAndQualifiers<'db>) -> Self {
-        PlaceFromDeclarationsResult {
-            place_and_quals,
-            conflicting_types: None,
-        }
-    }
-}
-
-impl<'db> From<Place<'db>> for PlaceFromDeclarationsResult<'db> {
-    fn from(place: Place<'db>) -> Self {
-        PlaceFromDeclarationsResult::from(PlaceAndQualifiers::from(place))
     }
 }
 
@@ -585,6 +579,11 @@ impl<'db> PlaceAndQualifiers<'db> {
         self.qualifiers.contains(TypeQualifiers::NOT_REQUIRED)
     }
 
+    /// Returns `true` if the place has a `ReadOnly` type qualifier.
+    pub(crate) fn is_read_only(&self) -> bool {
+        self.qualifiers.contains(TypeQualifiers::READ_ONLY)
+    }
+
     /// Returns `Some(…)` if the place is qualified with `typing.Final` without a specified type.
     pub(crate) fn is_bare_final(&self) -> Option<TypeQualifiers> {
         match self {
@@ -609,6 +608,15 @@ impl<'db> PlaceAndQualifiers<'db> {
             place: self.place.map_type(f),
             qualifiers: self.qualifiers,
         }
+    }
+
+    pub(crate) fn materialize(
+        self,
+        db: &'db dyn Db,
+        materialization_kind: MaterializationKind,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> PlaceAndQualifiers<'db> {
+        self.map_type(|ty| ty.materialize(db, materialization_kind, visitor))
     }
 
     /// Transform place and qualifiers into a [`LookupResult`],
@@ -1198,6 +1206,8 @@ fn place_from_declarations_impl<'db>(
     let reachability_constraints = declarations.reachability_constraints;
     let boundness_analysis = declarations.boundness_analysis;
     let mut declarations = declarations.peekable();
+    let mut first_declaration = None;
+    let mut exactly_one_declaration = false;
 
     let is_non_exported = |declaration: Definition<'db>| {
         requires_explicit_reexport.is_yes() && !is_reexported(db, declaration)
@@ -1226,6 +1236,13 @@ fn place_from_declarations_impl<'db>(
 
             if is_non_exported(declaration) {
                 return None;
+            }
+
+            if first_declaration.is_none() {
+                first_declaration = Some(declaration);
+                exactly_one_declaration = true;
+            } else {
+                exactly_one_declaration = false;
             }
 
             let static_reachability =
@@ -1284,10 +1301,18 @@ fn place_from_declarations_impl<'db>(
         if let Some(conflicting) = conflicting {
             PlaceFromDeclarationsResult::conflict(place_and_quals, conflicting)
         } else {
-            place_and_quals.into()
+            PlaceFromDeclarationsResult {
+                place_and_quals,
+                conflicting_types: None,
+                single_declaration: first_declaration.filter(|_| exactly_one_declaration),
+            }
         }
     } else {
-        Place::Unbound.into()
+        PlaceFromDeclarationsResult {
+            place_and_quals: Place::Unbound.into(),
+            conflicting_types: None,
+            single_declaration: None,
+        }
     }
 }
 

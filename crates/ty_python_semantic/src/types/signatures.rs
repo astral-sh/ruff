@@ -12,16 +12,17 @@
 
 use std::{collections::HashMap, slice::Iter};
 
-use itertools::EitherOrBoth;
+use itertools::{EitherOrBoth, Itertools};
 use smallvec::{SmallVec, smallvec_inline};
 
 use super::{DynamicType, Type, TypeVarVariance, definition_expression_type};
 use crate::semantic_index::definition::Definition;
-use crate::types::constraints::{Constraints, IteratorConstraintsExtension};
+use crate::types::constraints::{ConstraintSet, Constraints, IteratorConstraintsExtension};
 use crate::types::generics::{GenericContext, walk_generic_context};
 use crate::types::{
-    BindingContext, BoundTypeVarInstance, HasRelationToVisitor, IsEquivalentVisitor, KnownClass,
-    NormalizedVisitor, TypeMapping, TypeRelation, VarianceInferable, todo_type,
+    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, FindLegacyTypeVarsVisitor,
+    HasRelationToVisitor, IsEquivalentVisitor, KnownClass, MaterializationKind, NormalizedVisitor,
+    TypeMapping, TypeRelation, VarianceInferable, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -57,14 +58,6 @@ impl<'db> CallableSignature<'db> {
         self.overloads.iter()
     }
 
-    pub(super) fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
-        Self::from_overloads(
-            self.overloads
-                .iter()
-                .map(|signature| signature.materialize(db, variance)),
-        )
-    }
-
     pub(crate) fn normalized_impl(
         &self,
         db: &'db dyn Db,
@@ -77,26 +70,28 @@ impl<'db> CallableSignature<'db> {
         )
     }
 
-    pub(crate) fn apply_type_mapping<'a>(
+    pub(crate) fn apply_type_mapping_impl<'a>(
         &self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         Self::from_overloads(
             self.overloads
                 .iter()
-                .map(|signature| signature.apply_type_mapping(db, type_mapping)),
+                .map(|signature| signature.apply_type_mapping_impl(db, type_mapping, visitor)),
         )
     }
 
-    pub(crate) fn find_legacy_typevars(
+    pub(crate) fn find_legacy_typevars_impl(
         &self,
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+        visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         for signature in &self.overloads {
-            signature.find_legacy_typevars(db, binding_context, typevars);
+            signature.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
         }
     }
 
@@ -117,7 +112,8 @@ impl<'db> CallableSignature<'db> {
     ///
     /// See [`Type::is_subtype_of`] for more details.
     pub(crate) fn is_subtype_of(&self, db: &'db dyn Db, other: &Self) -> bool {
-        self.is_subtype_of_impl(db, other)
+        self.is_subtype_of_impl::<ConstraintSet>(db, other)
+            .is_always_satisfied(db)
     }
 
     fn is_subtype_of_impl<C: Constraints<'db>>(&self, db: &'db dyn Db, other: &Self) -> C {
@@ -137,8 +133,9 @@ impl<'db> CallableSignature<'db> {
             db,
             other,
             TypeRelation::Assignability,
-            &HasRelationToVisitor::new(true),
+            &HasRelationToVisitor::new(ConstraintSet::always_satisfiable(db)),
         )
+        .is_always_satisfied(db)
     }
 
     pub(crate) fn has_relation_to_impl<C: Constraints<'db>>(
@@ -355,9 +352,14 @@ impl<'db> Signature<'db> {
         definition: Definition<'db>,
         function_node: &ast::StmtFunctionDef,
         is_generator: bool,
+        has_implicitly_positional_first_parameter: bool,
     ) -> Self {
-        let parameters =
-            Parameters::from_parameters(db, definition, function_node.parameters.as_ref());
+        let parameters = Parameters::from_parameters(
+            db,
+            definition,
+            function_node.parameters.as_ref(),
+            has_implicitly_positional_first_parameter,
+        );
         let return_ty = function_node.returns.as_ref().map(|returns| {
             let plain_return_ty = definition_expression_type(db, definition, returns.as_ref())
                 .apply_type_mapping(
@@ -405,21 +407,6 @@ impl<'db> Signature<'db> {
         self
     }
 
-    fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
-        Self {
-            generic_context: self.generic_context,
-            inherited_generic_context: self.inherited_generic_context,
-            definition: self.definition,
-            // Parameters are at contravariant position, so the variance is flipped.
-            parameters: self.parameters.materialize(db, variance.flip()),
-            return_ty: Some(
-                self.return_ty
-                    .unwrap_or(Type::unknown())
-                    .materialize(db, variance),
-            ),
-        }
-    }
-
     pub(crate) fn normalized_impl(
         &self,
         db: &'db dyn Db,
@@ -451,33 +438,51 @@ impl<'db> Signature<'db> {
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
     ) -> Self {
+        self.apply_type_mapping_impl(db, type_mapping, &ApplyTypeMappingVisitor::default())
+    }
+
+    pub(crate) fn apply_type_mapping_impl<'a>(
+        &self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        let flipped_mapping = match type_mapping {
+            TypeMapping::Materialize(materialization_kind) => {
+                &TypeMapping::Materialize(materialization_kind.flip())
+            }
+            _ => type_mapping,
+        };
         Self {
             generic_context: self.generic_context,
             inherited_generic_context: self.inherited_generic_context,
             definition: self.definition,
-            parameters: self.parameters.apply_type_mapping(db, type_mapping),
+            parameters: self
+                .parameters
+                .apply_type_mapping_impl(db, flipped_mapping, visitor),
             return_ty: self
                 .return_ty
-                .map(|ty| ty.apply_type_mapping(db, type_mapping)),
+                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, visitor)),
         }
     }
 
-    pub(crate) fn find_legacy_typevars(
+    pub(crate) fn find_legacy_typevars_impl(
         &self,
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+        visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         for param in &self.parameters {
             if let Some(ty) = param.annotated_type() {
-                ty.find_legacy_typevars(db, binding_context, typevars);
+                ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
             }
             if let Some(ty) = param.default_type() {
-                ty.find_legacy_typevars(db, binding_context, typevars);
+                ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
             }
         }
         if let Some(ty) = self.return_ty {
-            ty.find_legacy_typevars(db, binding_context, typevars);
+            ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
         }
     }
 
@@ -495,7 +500,11 @@ impl<'db> Signature<'db> {
         let mut parameters = Parameters::new(self.parameters().iter().skip(1).cloned());
         let mut return_ty = self.return_ty;
         if let Some(self_type) = self_type {
-            parameters = parameters.apply_type_mapping(db, &TypeMapping::BindSelf(self_type));
+            parameters = parameters.apply_type_mapping_impl(
+                db,
+                &TypeMapping::BindSelf(self_type),
+                &ApplyTypeMappingVisitor::default(),
+            );
             return_ty =
                 return_ty.map(|ty| ty.apply_type_mapping(db, &TypeMapping::BindSelf(self_type)));
         }
@@ -1063,17 +1072,6 @@ impl<'db> Parameters<'db> {
         }
     }
 
-    fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
-        if self.is_gradual {
-            Parameters::object(db)
-        } else {
-            Parameters::new(
-                self.iter()
-                    .map(|parameter| parameter.materialize(db, variance)),
-            )
-        }
-    }
-
     pub(crate) fn as_slice(&self) -> &[Parameter<'db>] {
         self.value.as_slice()
     }
@@ -1146,6 +1144,7 @@ impl<'db> Parameters<'db> {
         db: &'db dyn Db,
         definition: Definition<'db>,
         parameters: &ast::Parameters,
+        has_implicitly_positional_first_parameter: bool,
     ) -> Self {
         let ast::Parameters {
             posonlyargs,
@@ -1156,23 +1155,46 @@ impl<'db> Parameters<'db> {
             range: _,
             node_index: _,
         } = parameters;
+
         let default_type = |param: &ast::ParameterWithDefault| {
             param
                 .default()
                 .map(|default| definition_expression_type(db, definition, default))
         };
-        let positional_only = posonlyargs.iter().map(|arg| {
+
+        let pos_only_param = |param: &ast::ParameterWithDefault| {
             Parameter::from_node_and_kind(
                 db,
                 definition,
-                &arg.parameter,
+                &param.parameter,
                 ParameterKind::PositionalOnly {
-                    name: Some(arg.parameter.name.id.clone()),
-                    default_type: default_type(arg),
+                    name: Some(param.parameter.name.id.clone()),
+                    default_type: default_type(param),
                 },
             )
-        });
-        let positional_or_keyword = args.iter().map(|arg| {
+        };
+
+        let mut positional_only: Vec<Parameter> = posonlyargs.iter().map(pos_only_param).collect();
+
+        let mut pos_or_keyword_iter = args.iter();
+
+        // If there are no PEP-570 positional-only parameters, check for the legacy PEP-484 convention
+        // for denoting positional-only parameters (parameters that start with `__` and do not end with `__`)
+        if positional_only.is_empty() {
+            let pos_or_keyword_iter = pos_or_keyword_iter.by_ref();
+
+            if has_implicitly_positional_first_parameter {
+                positional_only.extend(pos_or_keyword_iter.next().map(pos_only_param));
+            }
+
+            positional_only.extend(
+                pos_or_keyword_iter
+                    .peeking_take_while(|param| param.uses_pep_484_positional_only_convention())
+                    .map(pos_only_param),
+            );
+        }
+
+        let positional_or_keyword = pos_or_keyword_iter.map(|arg| {
             Parameter::from_node_and_kind(
                 db,
                 definition,
@@ -1183,6 +1205,7 @@ impl<'db> Parameters<'db> {
                 },
             )
         });
+
         let variadic = vararg.as_ref().map(|arg| {
             Parameter::from_node_and_kind(
                 db,
@@ -1193,6 +1216,7 @@ impl<'db> Parameters<'db> {
                 },
             )
         });
+
         let keyword_only = kwonlyargs.iter().map(|arg| {
             Parameter::from_node_and_kind(
                 db,
@@ -1204,6 +1228,7 @@ impl<'db> Parameters<'db> {
                 },
             )
         });
+
         let keywords = kwarg.as_ref().map(|arg| {
             Parameter::from_node_and_kind(
                 db,
@@ -1214,8 +1239,10 @@ impl<'db> Parameters<'db> {
                 },
             )
         });
+
         Self::new(
             positional_only
+                .into_iter()
                 .chain(positional_or_keyword)
                 .chain(variadic)
                 .chain(keyword_only)
@@ -1223,14 +1250,33 @@ impl<'db> Parameters<'db> {
         )
     }
 
-    fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: &TypeMapping<'a, 'db>) -> Self {
-        Self {
-            value: self
-                .value
-                .iter()
-                .map(|param| param.apply_type_mapping(db, type_mapping))
-                .collect(),
-            is_gradual: self.is_gradual,
+    fn apply_type_mapping_impl<'a>(
+        &self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        match type_mapping {
+            // Note that we've already flipped the materialization in Signature.apply_type_mapping_impl(),
+            // so the "top" materialization here is the bottom materialization of the whole Signature.
+            // It might make sense to flip the materialization here instead.
+            TypeMapping::Materialize(MaterializationKind::Top) if self.is_gradual => {
+                Parameters::object(db)
+            }
+            // TODO: This is wrong, the empty Parameters is not a subtype of all materializations.
+            // The bottom materialization is not currently representable and implementing it
+            // properly requires extending the Parameters struct.
+            TypeMapping::Materialize(MaterializationKind::Bottom) if self.is_gradual => {
+                Parameters::empty()
+            }
+            _ => Self {
+                value: self
+                    .value
+                    .iter()
+                    .map(|param| param.apply_type_mapping_impl(db, type_mapping, visitor))
+                    .collect(),
+                is_gradual: self.is_gradual,
+            },
         }
     }
 
@@ -1395,24 +1441,17 @@ impl<'db> Parameter<'db> {
         self
     }
 
-    fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
-        Self {
-            annotated_type: Some(
-                self.annotated_type
-                    .unwrap_or(Type::unknown())
-                    .materialize(db, variance),
-            ),
-            kind: self.kind.clone(),
-            form: self.form,
-        }
-    }
-
-    fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: &TypeMapping<'a, 'db>) -> Self {
+    fn apply_type_mapping_impl<'a>(
+        &self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
         Self {
             annotated_type: self
                 .annotated_type
-                .map(|ty| ty.apply_type_mapping(db, type_mapping)),
-            kind: self.kind.apply_type_mapping(db, type_mapping),
+                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, visitor)),
+            kind: self.kind.apply_type_mapping_impl(db, type_mapping, visitor),
             form: self.form,
         }
     }
@@ -1616,24 +1655,29 @@ pub(crate) enum ParameterKind<'db> {
 }
 
 impl<'db> ParameterKind<'db> {
-    fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: &TypeMapping<'a, 'db>) -> Self {
+    fn apply_type_mapping_impl<'a>(
+        &self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
         match self {
             Self::PositionalOnly { default_type, name } => Self::PositionalOnly {
                 default_type: default_type
                     .as_ref()
-                    .map(|ty| ty.apply_type_mapping(db, type_mapping)),
+                    .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, visitor)),
                 name: name.clone(),
             },
             Self::PositionalOrKeyword { default_type, name } => Self::PositionalOrKeyword {
                 default_type: default_type
                     .as_ref()
-                    .map(|ty| ty.apply_type_mapping(db, type_mapping)),
+                    .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, visitor)),
                 name: name.clone(),
             },
             Self::KeywordOnly { default_type, name } => Self::KeywordOnly {
                 default_type: default_type
                     .as_ref()
-                    .map(|ty| ty.apply_type_mapping(db, type_mapping)),
+                    .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, visitor)),
                 name: name.clone(),
             },
             Self::Variadic { .. } | Self::KeywordVariadic { .. } => self.clone(),

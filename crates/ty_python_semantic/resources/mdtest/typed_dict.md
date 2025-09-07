@@ -128,6 +128,9 @@ Person({"name": "Alice"})
 accepts_person({"name": "Alice"})
 # TODO: this should be an error, similar to the above
 house.owner = {"name": "Alice"}
+a_person: Person
+# TODO: this should be an error, similar to the above
+a_person = {"name": "Alice"}
 ```
 
 All of these have an invalid type for the `name` field:
@@ -144,6 +147,9 @@ Person({"name": None, "age": 30})
 accepts_person({"name": None, "age": 30})
 # TODO: this should be an error, similar to the above
 house.owner = {"name": None, "age": 30}
+a_person: Person
+# TODO: this should be an error, similar to the above
+a_person = {"name": None, "age": 30}
 ```
 
 All of these have an extra field that is not defined in the `TypedDict`:
@@ -160,6 +166,9 @@ Person({"name": "Alice", "age": 30, "extra": True})
 accepts_person({"name": "Alice", "age": 30, "extra": True})
 # TODO: this should be an error
 house.owner = {"name": "Alice", "age": 30, "extra": True}
+# TODO: this should be an error
+a_person: Person
+a_person = {"name": "Alice", "age": 30, "extra": True}
 ```
 
 ## Type ignore compatibility issues
@@ -242,8 +251,9 @@ invalid_extra = OptionalPerson(name="George", extra=True)
 
 ## `Required` and `NotRequired`
 
-You can have fine-grained control over field requirements using `Required` and `NotRequired`
-qualifiers, which override the class-level `total=` setting:
+You can have fine-grained control over keys using `Required` and `NotRequired` qualifiers. These
+qualifiers override the class-level `total` setting, which sets the default (`total=True` means that
+all keys are required by default, `total=False` means that all keys are non-required by default):
 
 ```py
 from typing_extensions import TypedDict, Required, NotRequired
@@ -434,8 +444,7 @@ def _(person: Person, unknown_key: Any):
 
 ## `ReadOnly`
 
-`ReadOnly` is not supported yet, but this test makes sure that we do not emit any false positive
-diagnostics:
+Assignments to keys that are marked `ReadOnly` will produce an error:
 
 ```py
 from typing_extensions import TypedDict, ReadOnly, Required
@@ -444,25 +453,79 @@ class Person(TypedDict, total=False):
     id: ReadOnly[Required[int]]
     name: str
     age: int | None
+
+alice: Person = {"id": 1, "name": "Alice", "age": 30}
+alice["age"] = 31  # okay
+
+# error: [invalid-assignment] "Cannot assign to key "id" on TypedDict `Person`: key is marked read-only"
+alice["id"] = 2
+```
+
+This also works if all fields on a `TypedDict` are `ReadOnly`, in which case we synthesize a
+`__setitem__` method with a `key` type of `Never`:
+
+```py
+class Config(TypedDict):
+    host: ReadOnly[str]
+    port: ReadOnly[int]
+
+config: Config = {"host": "localhost", "port": 8080}
+
+# error: [invalid-assignment] "Cannot assign to key "host" on TypedDict `Config`: key is marked read-only"
+config["host"] = "127.0.0.1"
+# error: [invalid-assignment] "Cannot assign to key "port" on TypedDict `Config`: key is marked read-only"
+config["port"] = 80
 ```
 
 ## Methods on `TypedDict`
 
 ```py
 from typing import TypedDict
+from typing_extensions import NotRequired
 
 class Person(TypedDict):
     name: str
     age: int | None
+    extra: NotRequired[str]
 
 def _(p: Person) -> None:
     reveal_type(p.keys())  # revealed: dict_keys[str, object]
     reveal_type(p.values())  # revealed: dict_values[str, object]
 
-    reveal_type(p.setdefault("name", "Alice"))  # revealed: @Todo(Support for `TypedDict`)
+    # `get()` returns the field type for required keys (no None union)
+    reveal_type(p.get("name"))  # revealed: str
+    reveal_type(p.get("age"))  # revealed: int | None
 
-    reveal_type(p.get("name"))  # revealed: @Todo(Support for `TypedDict`)
-    reveal_type(p.get("name", "Unknown"))  # revealed: @Todo(Support for `TypedDict`)
+    # It doesn't matter if a default is specified:
+    reveal_type(p.get("name", "default"))  # revealed: str
+    reveal_type(p.get("age", 999))  # revealed: int | None
+
+    # `get()` can return `None` for non-required keys
+    reveal_type(p.get("extra"))  # revealed: str | None
+    reveal_type(p.get("extra", "default"))  # revealed: str
+
+    # The type of the default parameter can be anything:
+    reveal_type(p.get("extra", 0))  # revealed: str | Literal[0]
+
+    # We allow access to unknown keys (they could be set for a subtype of Person)
+    reveal_type(p.get("unknown"))  # revealed: Unknown | None
+    reveal_type(p.get("unknown", "default"))  # revealed: Unknown | Literal["default"]
+
+    # `pop()` only works on non-required fields
+    reveal_type(p.pop("extra"))  # revealed: str
+    reveal_type(p.pop("extra", "fallback"))  # revealed: str
+    # error: [invalid-argument-type] "Cannot pop required field 'name' from TypedDict `Person`"
+    reveal_type(p.pop("name"))  # revealed: Unknown
+
+    # Similar to above, the default parameter can be of any type:
+    reveal_type(p.pop("extra", 0))  # revealed: str | Literal[0]
+
+    # `setdefault()` always returns the field type
+    reveal_type(p.setdefault("name", "Alice"))  # revealed: str
+    reveal_type(p.setdefault("extra", "default"))  # revealed: str
+
+    # error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "extraz" - did you mean "extra"?"
+    reveal_type(p.setdefault("extraz", "value"))  # revealed: Unknown
 ```
 
 ## Unlike normal classes
@@ -732,6 +795,38 @@ from typing import TypedDict
 x: TypedDict = {"name": "Alice"}
 ```
 
+### `dict`-subclass inhabitants
+
+Values that inhabit a `TypedDict` type must be instances of `dict` itself, not a subclass:
+
+```py
+from typing import TypedDict
+
+class MyDict(dict):
+    pass
+
+class Person(TypedDict):
+    name: str
+    age: int | None
+
+# TODO: this should be an error
+x: Person = MyDict({"name": "Alice", "age": 30})
+```
+
+### Cannot be used in `isinstance` tests
+
+```py
+from typing import TypedDict
+
+class Person(TypedDict):
+    name: str
+    age: int | None
+
+def _(obj: object) -> bool:
+    # TODO: this should be an error
+    return isinstance(obj, Person)
+```
+
 ## Diagnostics
 
 <!-- snapshot-diagnostics -->
@@ -764,6 +859,19 @@ def write_to_non_existing_key(person: Person):
 
 def write_to_non_literal_string_key(person: Person, str_key: str):
     person[str_key] = "Alice"  # error: [invalid-key]
+```
+
+Assignment to `ReadOnly` keys:
+
+```py
+from typing_extensions import ReadOnly
+
+class Employee(TypedDict):
+    id: ReadOnly[int]
+    name: str
+
+def write_to_readonly_key(employee: Employee):
+    employee["id"] = 42  # error: [invalid-assignment]
 ```
 
 ## Import aliases

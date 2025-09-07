@@ -68,6 +68,78 @@ def _(flag: bool):
     reveal_type(foo())  # revealed: int
 ```
 
+## PEP-484 convention for positional-only parameters
+
+PEP 570, introduced in Python 3.8, added dedicated Python syntax for denoting positional-only
+parameters (the `/` in a function signature). However, functions implemented in C were able to have
+positional-only parameters prior to Python 3.8 (there was just no syntax for expressing this at the
+Python level).
+
+Stub files describing functions implemented in C nonetheless needed a way of expressing that certain
+parameters were positional-only. In the absence of dedicated Python syntax, PEP 484 described a
+convention that type checkers were expected to understand:
+
+> Some functions are designed to take their arguments only positionally, and expect their callers
+> never to use the argument’s name to provide that argument by keyword. All arguments with names
+> beginning with `__` are assumed to be positional-only, except if their names also end with `__`.
+
+While this convention is now redundant (following the implementation of PEP 570), many projects
+still continue to use the old convention, so it is supported by ty as well.
+
+```py
+def f(__x: int): ...
+
+f(1)
+# error: [missing-argument]
+# error: [unknown-argument]
+f(__x=1)
+```
+
+But not if they follow a non-positional-only parameter:
+
+```py
+def g(x: int, __y: str): ...
+
+g(x=1, __y="foo")
+```
+
+And also not if they both start and end with `__`:
+
+```py
+def h(__x__: str): ...
+
+h(__x__="foo")
+```
+
+And if *any* parameters use the new PEP-570 convention, the old convention does not apply:
+
+```py
+def i(x: str, /, __y: int): ...
+
+i("foo", __y=42)  # fine
+```
+
+And `self`/`cls` are implicitly positional-only:
+
+```py
+class C:
+    def method(self, __x: int): ...
+    @classmethod
+    def class_method(cls, __x: str): ...
+    # (the name of the first parameter is irrelevant;
+    # a staticmethod works the same as a free function in the global scope)
+    @staticmethod
+    def static_method(self, __x: int): ...
+
+# error: [missing-argument]
+# error: [unknown-argument]
+C().method(__x=1)
+# error: [missing-argument]
+# error: [unknown-argument]
+C.class_method(__x="1")
+C.static_method("x", __x=42)  # fine
+```
+
 ## Splatted arguments
 
 ### Unknown argument length
@@ -545,7 +617,7 @@ def _(args: str) -> None:
 
 This is a regression that was highlighted by the ecosystem check, which shows that we might need to
 rethink how we perform argument expansion during overload resolution. In particular, we might need
-to retry both `match_parameters` _and_ `check_types` for each expansion. Currently we only retry
+to retry both `match_parameters` *and* `check_types` for each expansion. Currently we only retry
 `check_types`.
 
 The issue is that argument expansion might produce a splatted value with a different arity than what

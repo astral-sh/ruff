@@ -12,12 +12,10 @@ E306 [*] Expected 1 blank line before a nested definition, found 0
 62 | # end
    |
 help: Add missing blank line
-
-ℹ Safe fix
-57 57 | # E306:3:5
-58 58 | def a():
-59 59 |     x = 1
-   60 |+
-60 61 |     def b():
-61 62 |         pass
-62 63 | # end
+57 | # E306:3:5
+58 | def a():
+59 |     x = 1
+60 + 
+61 |     def b():
+62 |         pass
+63 | # end

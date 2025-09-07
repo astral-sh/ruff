@@ -65,9 +65,6 @@ impl Violation for Airflow3SuggestedToMoveToProvider<'_> {
             replacement,
         } = self;
         match replacement {
-            ProviderReplacement::None => {
-                format!("`{deprecated}` is removed in Airflow 3.0")
-            }
             ProviderReplacement::AutoImport {
                 name: _,
                 module: _,
@@ -91,7 +88,6 @@ impl Violation for Airflow3SuggestedToMoveToProvider<'_> {
     fn fix_title(&self) -> Option<String> {
         let Airflow3SuggestedToMoveToProvider { replacement, .. } = self;
         match replacement {
-            ProviderReplacement::None => None,
             ProviderReplacement::AutoImport {
                 module,
                 name,
@@ -215,6 +211,12 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
                 version: "0.0.1",
             }
         }
+        ["airflow", "sensors", "bash", "BashSensor"] => ProviderReplacement::AutoImport {
+            module: "airflow.providers.standard.sensor.bash",
+            name: "BashSensor",
+            provider: "standard",
+            version: "0.0.1",
+        },
         [
             "airflow",
             "sensors",
@@ -242,6 +244,12 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             name: "FileSensor",
             provider: "standard",
             version: "0.0.2",
+        },
+        ["airflow", "sensors", "python", "PythonSensor"] => ProviderReplacement::AutoImport {
+            module: "airflow.providers.standard.sensors.python",
+            name: "PythonSensor",
+            provider: "standard",
+            version: "0.0.1",
         },
         [
             "airflow",
@@ -306,16 +314,6 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         ProviderReplacement::AutoImport { module, name, .. } => (module, *name),
         ProviderReplacement::SourceModuleMovedToProvider { module, name, .. } => {
             (module, name.as_str())
-        }
-        ProviderReplacement::None => {
-            checker.report_diagnostic(
-                Airflow3SuggestedToMoveToProvider {
-                    deprecated: qualified_name,
-                    replacement: replacement.clone(),
-                },
-                ranged.range(),
-            );
-            return;
         }
     };
 

@@ -6,10 +6,10 @@ use super::{
     add_inferred_python_version_hint_to_diagnostic,
 };
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
-use crate::semantic_index::SemanticIndex;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::place::{PlaceTable, ScopedPlaceId};
 use crate::suppression::FileSuppressionId;
+use crate::types::call::CallError;
 use crate::types::class::{DisjointBase, DisjointBaseKind, Field};
 use crate::types::function::KnownFunction;
 use crate::types::string_annotation::{
@@ -18,13 +18,16 @@ use crate::types::string_annotation::{
     RAW_STRING_TYPE_ANNOTATION,
 };
 use crate::types::{
-    DynamicType, LintDiagnosticGuard, Protocol, ProtocolInstanceType, SubclassOfInner, binding_type,
+    ClassType, DynamicType, LintDiagnosticGuard, Protocol, ProtocolInstanceType, SubclassOfInner,
+    binding_type,
 };
-use crate::types::{SpecialFormType, Type, protocol_class::ProtocolClassLiteral};
+use crate::types::{SpecialFormType, Type, protocol_class::ProtocolClass};
 use crate::util::diagnostics::format_enumeration;
-use crate::{Db, FxIndexMap, FxOrderMap, Module, ModuleName, Program, declare_lint};
+use crate::{
+    Db, DisplaySettings, FxIndexMap, FxOrderMap, Module, ModuleName, Program, declare_lint,
+};
 use itertools::Itertools;
-use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
+use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange};
@@ -1943,14 +1946,17 @@ pub(super) fn report_invalid_assignment(
     target_ty: Type,
     source_ty: Type,
 ) {
+    let settings =
+        DisplaySettings::from_possibly_ambiguous_type_pair(context.db(), target_ty, source_ty);
+
     report_invalid_assignment_with_message(
         context,
         node,
         target_ty,
         format_args!(
             "Object of type `{}` is not assignable to `{}`",
-            source_ty.display(context.db()),
-            target_ty.display(context.db()),
+            source_ty.display_with(context.db(), settings),
+            target_ty.display_with(context.db(), settings)
         ),
     );
 }
@@ -1974,6 +1980,45 @@ pub(super) fn report_invalid_attribute_assignment(
     );
 }
 
+pub(super) fn report_bad_dunder_set_call<'db>(
+    context: &InferContext<'db, '_>,
+    dunder_set_failure: &CallError<'db>,
+    attribute: &str,
+    object_type: Type<'db>,
+    target: &ast::ExprAttribute,
+) {
+    let Some(builder) = context.report_lint(&INVALID_ASSIGNMENT, target) else {
+        return;
+    };
+    let db = context.db();
+    if let Some(property) = dunder_set_failure.as_attempt_to_set_property_with_no_setter() {
+        let object_type = object_type.display(db);
+        let mut diagnostic = builder.into_diagnostic(format_args!(
+            "Cannot assign to read-only property `{attribute}` on object of type `{object_type}`",
+        ));
+        if let Some(file_range) = property
+            .getter(db)
+            .and_then(|getter| getter.definition(db))
+            .and_then(|definition| definition.focus_range(db))
+        {
+            diagnostic.annotate(Annotation::secondary(Span::from(file_range)).message(
+                format_args!("Property `{object_type}.{attribute}` defined here with no setter"),
+            ));
+            diagnostic.set_primary_message(format_args!(
+                "Attempted assignment to `{object_type}.{attribute}` here"
+            ));
+        }
+    } else {
+        // TODO: Here, it would be nice to emit an additional diagnostic
+        // that explains why the call failed
+        builder.into_diagnostic(format_args!(
+            "Invalid assignment to data descriptor attribute \
+            `{attribute}` on type `{}` with custom `__set__` method",
+            object_type.display(db)
+        ));
+    }
+}
+
 pub(super) fn report_invalid_return_type(
     context: &InferContext,
     object_range: impl Ranged,
@@ -1985,18 +2030,20 @@ pub(super) fn report_invalid_return_type(
         return;
     };
 
+    let settings =
+        DisplaySettings::from_possibly_ambiguous_type_pair(context.db(), expected_ty, actual_ty);
     let return_type_span = context.span(return_type_range);
 
     let mut diag = builder.into_diagnostic("Return type does not match returned value");
     diag.set_primary_message(format_args!(
         "expected `{expected_ty}`, found `{actual_ty}`",
-        expected_ty = expected_ty.display(context.db()),
-        actual_ty = actual_ty.display(context.db()),
+        expected_ty = expected_ty.display_with(context.db(), settings),
+        actual_ty = actual_ty.display_with(context.db(), settings),
     ));
     diag.annotate(
         Annotation::secondary(return_type_span).message(format_args!(
             "Expected `{expected_ty}` because of return type",
-            expected_ty = expected_ty.display(context.db()),
+            expected_ty = expected_ty.display_with(context.db(), settings),
         )),
     );
 }
@@ -2041,7 +2088,7 @@ pub(super) fn report_implicit_return_type(
     range: impl Ranged,
     expected_ty: Type,
     has_empty_body: bool,
-    enclosing_class_of_method: Option<ClassLiteral>,
+    enclosing_class_of_method: Option<ClassType>,
     no_return: bool,
 ) {
     let Some(builder) = context.report_lint(&INVALID_RETURN_TYPE, range) else {
@@ -2075,7 +2122,7 @@ pub(super) fn report_implicit_return_type(
     let Some(class) = enclosing_class_of_method else {
         return;
     };
-    if class.iter_mro(db, None).contains(&ClassBase::Protocol) {
+    if class.iter_mro(db).contains(&ClassBase::Protocol) {
         diagnostic.info(format_args!(
             "Class `{}` has `typing.Protocol` in its MRO, but it is not a protocol class",
             class.name(db)
@@ -2467,7 +2514,7 @@ pub(crate) fn add_type_expression_reference_link<'db, 'ctx>(
 pub(crate) fn report_runtime_check_against_non_runtime_checkable_protocol(
     context: &InferContext,
     call: &ast::ExprCall,
-    protocol: ProtocolClassLiteral,
+    protocol: ProtocolClass,
     function: KnownFunction,
 ) {
     let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, call) else {
@@ -2504,7 +2551,7 @@ pub(crate) fn report_runtime_check_against_non_runtime_checkable_protocol(
 pub(crate) fn report_attempted_protocol_instantiation(
     context: &InferContext,
     call: &ast::ExprCall,
-    protocol: ProtocolClassLiteral,
+    protocol: ProtocolClass,
 ) {
     let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, call) else {
         return;
@@ -2529,7 +2576,7 @@ pub(crate) fn report_attempted_protocol_instantiation(
 pub(crate) fn report_undeclared_protocol_member(
     context: &InferContext,
     definition: Definition,
-    protocol_class: ProtocolClassLiteral,
+    protocol_class: ProtocolClass,
     class_symbol_table: &PlaceTable,
 ) {
     /// We want to avoid suggesting an annotation for e.g. `x = None`,
@@ -2839,16 +2886,13 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
 pub(super) fn report_namedtuple_field_without_default_after_field_with_default<'db>(
     context: &InferContext<'db, '_>,
     class: ClassLiteral<'db>,
-    index: &'db SemanticIndex<'db>,
-    field_name: &str,
-    field_with_default: &str,
+    (field, field_def): &(Name, Option<Definition<'db>>),
+    (field_with_default, field_with_default_def): &(Name, Option<Definition<'db>>),
 ) {
     let db = context.db();
     let module = context.module();
 
-    let diagnostic_range = class
-        .first_declaration_of_name(db, field_name, index)
-        .and_then(|definition| definition.declaration.definition())
+    let diagnostic_range = field_def
         .map(|definition| definition.kind(db).full_range(module))
         .unwrap_or_else(|| class.header_range(db));
 
@@ -2860,13 +2904,11 @@ pub(super) fn report_namedtuple_field_without_default_after_field_with_default<'
     ));
 
     diagnostic.set_primary_message(format_args!(
-        "Field `{field_name}` defined here without a default value"
+        "Field `{field}` defined here without a default value",
     ));
 
-    let Some(field_with_default_range) = class
-        .first_binding_of_name(db, field_with_default, index)
-        .and_then(|definition| definition.binding.definition())
-        .map(|definition| definition.kind(db).full_range(module))
+    let Some(field_with_default_range) =
+        field_with_default_def.map(|definition| definition.kind(db).full_range(module))
     else {
         return;
     };
@@ -2885,7 +2927,7 @@ pub(super) fn report_namedtuple_field_without_default_after_field_with_default<'
         );
     } else {
         diagnostic.info(format_args!(
-            "Earlier field `{field_with_default}` was defined with a default value"
+            "Earlier field `{field_with_default}` was defined with a default value",
         ));
     }
 }
@@ -2901,6 +2943,21 @@ pub(crate) fn report_missing_typed_dict_key<'db>(
         let typed_dict_name = typed_dict_ty.display(db);
         builder.into_diagnostic(format_args!(
             "Missing required key '{missing_field}' in TypedDict `{typed_dict_name}` constructor",
+        ));
+    }
+}
+
+pub(crate) fn report_cannot_pop_required_field_on_typed_dict<'db>(
+    context: &InferContext<'db, '_>,
+    key_node: AnyNodeRef,
+    typed_dict_ty: Type<'db>,
+    field_name: &str,
+) {
+    let db = context.db();
+    if let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, key_node) {
+        let typed_dict_name = typed_dict_ty.display(db);
+        builder.into_diagnostic(format_args!(
+            "Cannot pop required field '{field_name}' from TypedDict `{typed_dict_name}`",
         ));
     }
 }

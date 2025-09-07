@@ -2669,7 +2669,7 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
             match scope.kind() {
                 ScopeKind::Class | ScopeKind::Lambda => return false,
                 ScopeKind::Function => {
-                    return scope.node().expect_function(self.module).is_async;
+                    return scope.node().expect_function().node(self.module).is_async;
                 }
                 ScopeKind::Comprehension
                 | ScopeKind::Module

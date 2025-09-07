@@ -31,6 +31,8 @@ mod azure;
 mod concise;
 mod full;
 #[cfg(feature = "serde")]
+mod gitlab;
+#[cfg(feature = "serde")]
 mod json;
 #[cfg(feature = "serde")]
 mod json_lines;
@@ -135,6 +137,10 @@ impl std::fmt::Display for DisplayDiagnostics<'_> {
             #[cfg(feature = "junit")]
             DiagnosticFormat::Junit => {
                 junit::JunitRenderer::new(self.resolver).render(f, self.diagnostics)?;
+            }
+            #[cfg(feature = "serde")]
+            DiagnosticFormat::Gitlab => {
+                gitlab::GitlabRenderer::new(self.resolver).render(f, self.diagnostics)?;
             }
         }
 
@@ -248,9 +254,7 @@ impl<'a> ResolvedDiagnostic<'a> {
             id,
             message: diag.inner.message.as_str().to_string(),
             annotations,
-            is_fixable: diag
-                .fix()
-                .is_some_and(|fix| fix.applies(config.fix_applicability)),
+            is_fixable: diag.has_applicable_fix(config),
         }
     }
 

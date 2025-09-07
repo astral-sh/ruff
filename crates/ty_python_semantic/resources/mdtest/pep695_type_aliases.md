@@ -120,6 +120,23 @@ def f(x: IntOrStr, y: str | bytes):
     reveal_type(z)  # revealed: (int & ~AlwaysFalsy) | str | bytes
 ```
 
+## Multiple layers of union aliases
+
+```py
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+
+type W = A | B
+type X = C | D
+type Y = W | X
+
+from ty_extensions import is_equivalent_to, static_assert
+
+static_assert(is_equivalent_to(Y, A | B | C | D))
+```
+
 ## `TypeAliasType` properties
 
 Two `TypeAliasType`s are distinct and disjoint, even if they refer to the same type
@@ -204,13 +221,37 @@ def f(x: OptNestedInt) -> None:
 ### Invalid self-referential
 
 ```py
-# TODO emit a diagnostic here
+# TODO emit a diagnostic on these two lines
 type IntOr = int | IntOr
+type OrInt = OrInt | int
 
-def f(x: IntOr):
+def f(x: IntOr, y: OrInt):
     reveal_type(x)  # revealed: int
+    reveal_type(y)  # revealed: int
     if not isinstance(x, int):
         reveal_type(x)  # revealed: Never
+    if not isinstance(y, int):
+        reveal_type(y)  # revealed: Never
+```
+
+### With legacy generic
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+type Alias = list["Alias"] | int
+
+class A(Generic[T]):
+    attr: T
+
+class B(A[Alias]):
+    pass
+
+def f(b: B):
+    reveal_type(b)  # revealed: B
+    reveal_type(b.attr)  # revealed: list[Alias] | int
 ```
 
 ### Mutually recursive
@@ -233,4 +274,68 @@ from ty_extensions import Intersection
 
 def h(x: Intersection[A, B]):
     reveal_type(x)  # revealed: tuple[B] | None
+```
+
+### Self-recursive callable type
+
+```py
+from typing import Callable
+
+type C = Callable[[], C | None]
+
+def _(x: C):
+    reveal_type(x)  # revealed: () -> C | None
+```
+
+### Subtyping of materializations of cyclic aliases
+
+```py
+from ty_extensions import static_assert, is_subtype_of, Bottom, Top
+
+type JsonValue = None | JsonDict
+type JsonDict = dict[str, JsonValue]
+
+static_assert(is_subtype_of(Top[JsonDict], Top[JsonDict]))
+static_assert(is_subtype_of(Top[JsonDict], Bottom[JsonDict]))
+static_assert(is_subtype_of(Bottom[JsonDict], Bottom[JsonDict]))
+static_assert(is_subtype_of(Bottom[JsonDict], Top[JsonDict]))
+```
+
+### Union inside generic
+
+#### With old-style union
+
+```py
+from typing import Union
+
+type A = list[Union["A", str]]
+
+def f(x: A):
+    reveal_type(x)  # revealed: list[A | str]
+    for item in x:
+        reveal_type(item)  # revealed: list[A | str] | str
+```
+
+#### With new-style union
+
+```py
+type A = list["A" | str]
+
+def f(x: A):
+    reveal_type(x)  # revealed: list[A | str]
+    for item in x:
+        reveal_type(item)  # revealed: list[A | str] | str
+```
+
+#### With Optional
+
+```py
+from typing import Optional, Union
+
+type A = list[Optional[Union["A", str]]]
+
+def f(x: A):
+    reveal_type(x)  # revealed: list[A | str | None]
+    for item in x:
+        reveal_type(item)  # revealed: list[A | str | None] | str | None
 ```

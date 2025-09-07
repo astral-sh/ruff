@@ -30,6 +30,18 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/function/return_type.md
 16 | 
 17 | # error: [invalid-return-type]
 18 | def m(x: T) -> T: ...
+19 | 
+20 | class A[T]: ...
+21 | 
+22 | def f() -> A[int]:
+23 |     class A[T]: ...
+24 |     return A[int]()  # error: [invalid-return-type]
+25 | 
+26 | class B: ...
+27 | 
+28 | def g() -> B:
+29 |     class B: ...
+30 |     return B()  # error: [invalid-return-type]
 ```
 
 # Diagnostics
@@ -91,9 +103,45 @@ error[invalid-return-type]: Function always implicitly returns `None`, which is 
 17 | # error: [invalid-return-type]
 18 | def m(x: T) -> T: ...
    |                ^
+19 |
+20 | class A[T]: ...
    |
 info: Consider changing the return annotation to `-> None` or adding a `return` statement
 info: Only functions in stub files, methods on protocol classes, or methods with `@abstractmethod` are permitted to have empty bodies
+info: rule `invalid-return-type` is enabled by default
+
+```
+
+```
+error[invalid-return-type]: Return type does not match returned value
+  --> src/mdtest_snippet.py:22:12
+   |
+20 | class A[T]: ...
+21 |
+22 | def f() -> A[int]:
+   |            ------ Expected `mdtest_snippet.A[int]` because of return type
+23 |     class A[T]: ...
+24 |     return A[int]()  # error: [invalid-return-type]
+   |            ^^^^^^^^ expected `mdtest_snippet.A[int]`, found `mdtest_snippet.<locals of function 'f'>.A[int]`
+25 |
+26 | class B: ...
+   |
+info: rule `invalid-return-type` is enabled by default
+
+```
+
+```
+error[invalid-return-type]: Return type does not match returned value
+  --> src/mdtest_snippet.py:28:12
+   |
+26 | class B: ...
+27 |
+28 | def g() -> B:
+   |            - Expected `mdtest_snippet.B` because of return type
+29 |     class B: ...
+30 |     return B()  # error: [invalid-return-type]
+   |            ^^^ expected `mdtest_snippet.B`, found `mdtest_snippet.<locals of function 'g'>.B`
+   |
 info: rule `invalid-return-type` is enabled by default
 
 ```

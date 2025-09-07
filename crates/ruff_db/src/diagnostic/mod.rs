@@ -349,6 +349,13 @@ impl Diagnostic {
         self.fix().is_some()
     }
 
+    /// Returns `true` if the diagnostic is [`fixable`](Diagnostic::fixable) and applies at the
+    /// configured applicability level.
+    pub fn has_applicable_fix(&self, config: &DisplayDiagnosticConfig) -> bool {
+        self.fix()
+            .is_some_and(|fix| fix.applies(config.fix_applicability))
+    }
+
     /// Returns the offset of the parent statement for this diagnostic if it exists.
     ///
     /// This is primarily used for checking noqa/secondary code suppressions.
@@ -494,13 +501,18 @@ impl Diagnostic {
 
     /// Returns the ordering of diagnostics based on the start of their ranges, if they have any.
     ///
-    /// Panics if either diagnostic has no primary span, if the span has no range, or if its file is
-    /// not a `SourceFile`.
+    /// Panics if either diagnostic has no primary span, or if its file is not a `SourceFile`.
     pub fn ruff_start_ordering(&self, other: &Self) -> std::cmp::Ordering {
-        (self.expect_ruff_source_file(), self.expect_range().start()).cmp(&(
+        let a = (
+            self.expect_ruff_source_file(),
+            self.range().map(|r| r.start()),
+        );
+        let b = (
             other.expect_ruff_source_file(),
-            other.expect_range().start(),
-        ))
+            other.range().map(|r| r.start()),
+        );
+
+        a.cmp(&b)
     }
 }
 
@@ -1435,6 +1447,11 @@ pub enum DiagnosticFormat {
     /// Print diagnostics in the format expected by JUnit.
     #[cfg(feature = "junit")]
     Junit,
+    /// Print diagnostics in the JSON format used by GitLab [Code Quality] reports.
+    ///
+    /// [Code Quality]: https://docs.gitlab.com/ci/testing/code_quality/#code-quality-report-format
+    #[cfg(feature = "serde")]
+    Gitlab,
 }
 
 /// A representation of the kinds of messages inside a diagnostic.

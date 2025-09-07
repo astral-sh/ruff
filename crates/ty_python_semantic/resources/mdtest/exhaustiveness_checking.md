@@ -281,12 +281,10 @@ def if_else_exhaustive(x: A[D] | B[E] | C[F]):
     elif isinstance(x, C):
         pass
     else:
-        # TODO: both of these are false positives (https://github.com/astral-sh/ty/issues/456)
-        no_diagnostic_here  # error: [unresolved-reference]
-        assert_never(x)  # error: [type-assertion-failure]
+        no_diagnostic_here
+        assert_never(x)
 
-# TODO: false-positive diagnostic (https://github.com/astral-sh/ty/issues/456)
-def if_else_exhaustive_no_assertion(x: A[D] | B[E] | C[F]) -> int:  # error: [invalid-return-type]
+def if_else_exhaustive_no_assertion(x: A[D] | B[E] | C[F]) -> int:
     if isinstance(x, A):
         return 0
     elif isinstance(x, B):

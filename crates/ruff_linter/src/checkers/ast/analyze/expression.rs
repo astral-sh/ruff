@@ -660,6 +660,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::BlockingHttpCallInAsyncFunction) {
                 flake8_async::rules::blocking_http_call(checker, call);
             }
+            if checker.is_rule_enabled(Rule::BlockingHttpCallHttpxInAsyncFunction) {
+                flake8_async::rules::blocking_http_call_httpx(checker, call);
+            }
             if checker.is_rule_enabled(Rule::BlockingOpenCallInAsyncFunction) {
                 flake8_async::rules::blocking_open_call(checker, call);
             }
@@ -669,6 +672,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 Rule::WaitForProcessInAsyncFunction,
             ]) {
                 flake8_async::rules::blocking_process_invocation(checker, call);
+            }
+            if checker.is_rule_enabled(Rule::BlockingInputInAsyncFunction) {
+                flake8_async::rules::blocking_input(checker, call);
             }
             if checker.is_rule_enabled(Rule::BlockingSleepInAsyncFunction) {
                 flake8_async::rules::blocking_sleep(checker, call);
@@ -1046,7 +1052,6 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 Rule::PyPath,
                 Rule::Glob,
                 Rule::OsListdir,
-                Rule::OsSymlink,
             ]) {
                 flake8_use_pathlib::rules::replaceable_by_pathlib(checker, call);
             }
@@ -1314,12 +1319,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 pylint::rules::yield_in_init(checker, expr);
             }
         }
-        Expr::YieldFrom(yield_from) => {
+        Expr::YieldFrom(_) => {
             if checker.is_rule_enabled(Rule::YieldInInit) {
                 pylint::rules::yield_in_init(checker, expr);
-            }
-            if checker.is_rule_enabled(Rule::YieldFromInAsyncFunction) {
-                pylint::rules::yield_from_in_async_function(checker, yield_from);
             }
         }
         Expr::FString(f_string_expr @ ast::ExprFString { value, .. }) => {

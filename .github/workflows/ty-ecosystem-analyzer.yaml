@@ -64,11 +64,12 @@ jobs:
 
           cd ..
 
-          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@27dd66d9e397d986ef9c631119ee09556eab8af9"
+          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@1f560d07d672effae250e3d271da53d96c5260ff"
 
           ecosystem-analyzer \
             --repository ruff \
             diff \
+            --profile=release \
             --projects-old ruff/projects_old.txt \
             --projects-new ruff/projects_new.txt \
             --old old_commit \
