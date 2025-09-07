@@ -84,3 +84,12 @@ def _(obj: MaybeWithSpam):
         # error: [possibly-unbound-attribute]
         reveal_type(obj.spam)  # revealed: int
 ```
+
+All attribute available on `object` are still available on these synthesized protocols:
+
+```py
+def f(x: object):
+    if hasattr(x, "__qualname__"):
+        reveal_type(x.__repr__)  # revealed: bound method object.__repr__() -> str
+        reveal_type(x.__str__)  # revealed: bound method object.__str__() -> str
+```

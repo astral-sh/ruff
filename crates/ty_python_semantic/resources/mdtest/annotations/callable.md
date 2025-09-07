@@ -392,9 +392,11 @@ from inspect import getattr_static
 
 def f_okay(c: Callable[[], None]):
     if hasattr(c, "__qualname__"):
-        c.__qualname__  # okay
-        # `hasattr` only guarantees that an attribute is readable.
-        # error: [invalid-assignment] "Object of type `Literal["my_callable"]` is not assignable to attribute `__qualname__` on type `(() -> None) & <Protocol with members '__qualname__'>`"
+        reveal_type(c.__qualname__)  # revealed: object
+
+        # TODO: should be `property`
+        reveal_type(type(c).__qualname__)  # revealed: @Todo(Intersection meta-type)
+        # TODO: we should emit an error here (`hasattr` only guarantees that an attribute is readable.)
         c.__qualname__ = "my_callable"
 
         result = getattr_static(c, "__qualname__")
