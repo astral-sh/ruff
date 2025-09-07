@@ -1470,7 +1470,7 @@ fn redirect_prefix() {
 
 #[test]
 fn deprecated_direct() {
-    // A deprecated rule selected by exact code should be included
+    // Selection of a deprecated rule without preview enabled should still work
     // but a warning should be displayed
     let mut cmd = RuffCheck::default().args(["--select", "RUF920"]).build();
     assert_cmd_snapshot!(cmd, @r"
@@ -1489,8 +1489,6 @@ fn deprecated_direct() {
 
 #[test]
 fn deprecated_multiple_direct() {
-    // Multiple deprecated rules selected by exact code should be included
-    // but a warning should be displayed
     let mut cmd = RuffCheck::default()
         .args(["--select", "RUF920", "--select", "RUF921"])
         .build();
@@ -1514,13 +1512,20 @@ fn deprecated_multiple_direct() {
 
 #[test]
 fn deprecated_indirect() {
-    // A deprecated rule selected by prefix should not be included
+    // `RUF92` includes deprecated rules but should not warn
+    // since it is not a "direct" selection
     let mut cmd = RuffCheck::default().args(["--select", "RUF92"]).build();
     assert_cmd_snapshot!(cmd, @r"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
-    All checks passed!
+    RUF920 Hey this is a deprecated test rule.
+    --> -:1:1
+
+    RUF921 Hey this is another deprecated test rule.
+    --> -:1:1
+
+    Found 2 errors.
 
     ----- stderr -----
     ");
@@ -1528,8 +1533,7 @@ fn deprecated_indirect() {
 
 #[test]
 fn deprecated_direct_preview_enabled() {
-    // A deprecated rule selected by exact code should be included in preview
-    // but a warning should be displayed
+    // Direct selection of a deprecated rule in preview should fail
     let mut cmd = RuffCheck::default()
         .args(["--select", "RUF920", "--preview"])
         .build();
@@ -1546,7 +1550,7 @@ fn deprecated_direct_preview_enabled() {
 
 #[test]
 fn deprecated_indirect_preview_enabled() {
-    // A deprecated rule selected by prefix should not be included in preview
+    // `RUF920` is deprecated and should be off by default in preview.
     let mut cmd = RuffCheck::default()
         .args(["--select", "RUF92", "--preview"])
         .build();
@@ -1562,8 +1566,8 @@ fn deprecated_indirect_preview_enabled() {
 
 #[test]
 fn deprecated_multiple_direct_preview_enabled() {
-    // Multiple deprecated rules selected by exact code should be included in preview
-    // but a warning should be displayed
+    // Direct selection of the deprecated rules in preview should fail with
+    // a message listing all of the rule codes
     let mut cmd = RuffCheck::default()
         .args(["--select", "RUF920", "--select", "RUF921", "--preview"])
         .build();
