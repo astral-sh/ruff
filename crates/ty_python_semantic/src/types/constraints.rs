@@ -1306,6 +1306,12 @@ impl<'db> Constraint<'db> {
     /// Panics if `ty` is not fully static.
     fn not_comparable(db: &'db dyn Db, ty: Type<'db>) -> Satisfiable<Constraint<'db>> {
         debug_assert_eq!(ty, ty.top_materialization(db));
+
+        // Every type is comparable to Never and to object.
+        if ty.is_never() || ty.is_object(db) {
+            return Satisfiable::Never;
+        }
+
         Satisfiable::Constrained(Constraint::NotComparable(NotComparableConstraint { ty }))
     }
 }
