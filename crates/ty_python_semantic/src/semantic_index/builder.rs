@@ -79,6 +79,8 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     source_type: PySourceType,
     module: &'ast ParsedModuleRef,
     scope_stack: Vec<ScopeInfo>,
+    /// A map of the enclosing scope and lazy snapshot keys, used to optimize snapshot updates.
+    lazy_snapshot_keys: FxHashMap<FileScopeId, Vec<EnclosingSnapshotKey>>,
     /// The assignments we're currently visiting, with
     /// the most recent visit at the end of the Vec
     current_assignments: Vec<CurrentAssignment<'ast, 'db>>,
@@ -151,6 +153,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             generator_functions: FxHashSet::default(),
 
             enclosing_snapshots: FxHashMap::default(),
+            lazy_snapshot_keys: FxHashMap::default(),
 
             python_version: Program::get(db).python_version(db),
             source_text: OnceCell::new(),
@@ -397,6 +400,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     enclosing_place.into(),
                 );
                 self.enclosing_snapshots.insert(key, lazy_snapshot);
+                self.lazy_snapshot_keys
+                    .entry(enclosing_scope_id)
+                    .or_default()
+                    .push(key);
             }
         }
     }
@@ -433,37 +440,44 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         if !symbol.is_reassigned() {
             return;
         }
-        for (key, snapshot_id) in &self.enclosing_snapshots {
-            if let Some(enclosing_symbol) = key.enclosing_place.as_symbol() {
-                let name = self.place_tables[key.enclosing_scope]
-                    .symbol(enclosing_symbol)
-                    .name();
-                let is_reassignment_of_snapshotted_symbol = || {
-                    for (ancestor, _) in
-                        VisibleAncestorsIter::new(&self.scopes, key.enclosing_scope)
-                    {
-                        if ancestor == current_scope {
-                            return true;
-                        }
-                        let ancestor_table = &self.place_tables[ancestor];
-                        // If there is a symbol binding in an ancestor scope,
-                        // then a reassignment in the current scope is not relevant to the snapshot.
-                        if ancestor_table
-                            .symbol_id(name)
-                            .is_some_and(|id| ancestor_table.symbol(id).is_bound())
+        for (descendant, _) in self
+            .scopes
+            .iter_enumerated()
+            .skip_while(|(id, _)| *id != current_scope)
+        {
+            let Some(keys) = self.lazy_snapshot_keys.get(&descendant) else {
+                continue;
+            };
+            for key in keys {
+                if let Some(enclosing_symbol) = key.enclosing_place.as_symbol() {
+                    let name = self.place_tables[key.enclosing_scope]
+                        .symbol(enclosing_symbol)
+                        .name();
+                    let is_reassignment_of_snapshotted_symbol = || {
+                        for (ancestor, _) in
+                            VisibleAncestorsIter::new(&self.scopes, key.enclosing_scope)
                         {
-                            return false;
+                            if ancestor == current_scope {
+                                return true;
+                            }
+                            let ancestor_table = &self.place_tables[ancestor];
+                            // If there is a symbol binding in an ancestor scope,
+                            // then a reassignment in the current scope is not relevant to the snapshot.
+                            if ancestor_table
+                                .symbol_id(name)
+                                .is_some_and(|id| ancestor_table.symbol(id).is_bound())
+                            {
+                                return false;
+                            }
                         }
-                    }
-                    false
-                };
+                        false
+                    };
 
-                if key.nested_laziness.is_lazy()
-                    && symbol.name() == name
-                    && is_reassignment_of_snapshotted_symbol()
-                {
-                    self.use_def_maps[key.enclosing_scope]
-                        .update_enclosing_snapshot(*snapshot_id, enclosing_symbol);
+                    if symbol.name() == name && is_reassignment_of_snapshotted_symbol() {
+                        let snapshot_id = self.enclosing_snapshots[key];
+                        self.use_def_maps[key.enclosing_scope]
+                            .update_enclosing_snapshot(snapshot_id, enclosing_symbol);
+                    }
                 }
             }
         }
