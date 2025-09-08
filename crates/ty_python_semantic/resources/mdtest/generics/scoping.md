@@ -168,8 +168,6 @@ class C[T]:
 
 c: C[int] = C()
 
-# TODO:
-# error: [invalid-argument-type] "Argument to bound method `m` is incorrect: Expected `Self@m`, found `C[Unknown]`"
 reveal_type(c.m(1, "string"))  # revealed: Literal["string"]
 ```
 
