@@ -14,20 +14,34 @@
 //! This module provides the machinery for representing the "under what constraints" part of that
 //! question.
 //!
-//! An individual constraint restricts the specialization of a single typevar to be within a
-//! particular lower and upper bound: the typevar can only specialize to a type that is a supertype
-//! of the lower bound, and a subtype of the upper bound. (Note that lower and upper bounds are
-//! fully static; we take the bottom and top materializations of the bounds to remove any gradual
-//! forms if needed.) Either bound can be "closed" (where the bound is a valid specialization), or
-//! "open" (where it is not).
+//! An individual constraint restricts the specialization of a single typevar. You can then build
+//! up more complex constraint sets using union, intersection, and negation operations. We use a
+//! disjunctive normal form (DNF) representation, just like we do for types: a [constraint
+//! set][ConstraintSet] is the union of zero or more [clauses][ConstraintClause], each of which is
+//! the intersection of zero or more [individual constraints][ConstrainedTypeVar]. Note that the
+//! constraint set that contains no clauses is never satisfiable (`⋃ {} = 0`); and the constraint
+//! set that contains a single clause, where that clause contains no constraints, is always
+//! satisfiable (`⋃ {⋂ {}} = 1`).
 //!
-//! You can then build up more complex constraint sets using union, intersection, and negation
-//! operations. We use a disjunctive normal form (DNF) representation, just like we do for types: a
-//! [constraint set][ConstraintSet] is the union of zero or more [clauses][ConstraintClause], each
-//! of which is the intersection of zero or more [individual constraints][ConstrainedTypeVar]. Note
-//! that the constraint set that contains no clauses is never satisfiable (`⋃ {} = 0`); and the
-//! constraint set that contains a single clause, where that clause contains no constraints,
-//! is always satisfiable (`⋃ {⋂ {}} = 1`).
+//! There are three possible individual constraints:
+//!
+//! - A _range_ constraint requires the typevar to be within a particular lower and upper bound:
+//!   the typevar can only specialize to a type that is a supertype of the lower bound, and a
+//!   subtype of the upper bound.
+//!
+//! - A _not-equivalent_ constraint requires the typevar to specialize to anything _other_ than a
+//!   particular type (the "hole").
+//!
+//! - An _incomparable_ constraint requires the typevar to specialize to any type that is neither a
+//!   subtype nor a supertype of a particular type (the "pivot").
+//!
+//! Not-equivalent and incomparable constraints are usually not constructed directly; instead, they
+//! typically arise when building up complex combinations of range constraints.
+//!
+//! Note that all of the types that a constraint compares against — the bounds of a range
+//! constraint, the hole of not-equivalent constraint, and the pivot of an incomparable constraint
+//! — must be fully static. We take the bottom and top materializations of the types to remove any
+//! gradual forms if needed.
 //!
 //! NOTE: This module is currently in a transitional state: we've added a [`Constraints`] trait,
 //! and updated all of our type property implementations to work on any impl of that trait. We have
@@ -48,29 +62,32 @@
 //! def _[U: (int, str)](u: U) -> None: ...
 //! ```
 //!
-//! The typevar `T` has an upper bound of `B`, which would translate into the constraint
-//! `Never ≤ T ≤ B`. (Every type is a supertype of `Never`, so having `Never` as a closed lower
-//! bound means that there is effectively no lower bound. Similarly, a closed upper bound of
-//! `object` means that there is effectively no upper bound.) The `T ≤ B` part expresses that the
-//! type can specialize to any type that is a subtype of B. The bound is "closed", which means that
-//! this includes `B` itself.
+//! The typevar `T` has an upper bound of `B`, which would translate into the constraint `Never ≤ T
+//! ≤ B`. (Every type is a supertype of `Never`, so having `Never` as a lower bound means that
+//! there is effectively no lower bound. Similarly, an upper bound of `object` means that there is
+//! effectively no upper bound.) The `T ≤ B` part expresses that the type can specialize to any
+//! type that is a subtype of B.
 //!
 //! The typevar `U` is constrained to be either `int` or `str`, which would translate into the
-//! constraint `(int ≤ T ≤ int) ∪ (str ≤ T ≤ str)`. When the lower and upper bounds are the same
-//! (and both closed), the constraint says that the typevar must specialize to that _exact_ type,
-//! not to a subtype or supertype of it.
+//! constraint `(int ≤ T ≤ int) ∪ (str ≤ T ≤ str)`. When the lower and upper bounds are the same,
+//! the constraint says that the typevar must specialize to that _exact_ type, not to a subtype or
+//! supertype of it.
 //!
 //! Python does not give us an easy way to construct this, but we can also consider a typevar that
 //! can specialize to any type that `T` _cannot_ specialize to — that is, the negation of `T`'s
 //! constraint. Another way to write `Never ≤ V ≤ B` is `Never ≤ V ∩ V ≤ B`; if we negate that, we
-//! get `¬(Never ≤ V) ∪ ¬(V ≤ B)`, or `V < Never ∪ B < V`. Note that the bounds in this constraint
-//! are now open! `B < V` indicates that `V` can specialize to any type that is a supertype of `B`
-//! — but not to `B` itself. (For instance, it _can_ specialize to `A`.) `V < Never` is also open,
-//! and says that `V` can specialize to any type that is a subtype of `Never`, but not to `Never`
-//! itself. There aren't any types that satisfy that constraint (the type would have to somehow
-//! contain a negative number of values). You can think of a constraint that cannot be satisfied as
-//! an empty set (of types), which means we can simplify it out of the union. That gives us a final
-//! constraint of `B < V` for the negation of `T`'s constraint.
+//! get `¬(Never ≤ V) ∪ ¬(V ≤ B)`, or `(V ≤ Never ∩ V ≠ Never) ∪ (B ≤ V ∩ V ≠ B)`.
+//!
+//! The first constraint in the union indicates that `V` can specialize to any type that is a
+//! subtype of `Never`, but not to `Never` itself.
+//!
+//! The second constraint in the union indicates that `V` can specialize to any type that is a
+//! supertype of `B` — but not to `B` itself. (For instance, it _can_ specialize to `A`.)
+//!
+//! There aren't any types that satisfy the first constraint in the union (the type would have to
+//! somehow contain a negative number of values). You can think of a constraint that cannot be
+//! satisfied as an empty set (of types), which means we can simplify it out of the union. That
+//! gives us a final constraint of `B ≤ V ∩ V ≠ B` for the negation of `T`'s constraint.
 
 use std::fmt::Display;
 
