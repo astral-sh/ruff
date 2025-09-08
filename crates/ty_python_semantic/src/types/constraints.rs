@@ -80,6 +80,10 @@ use smallvec::{SmallVec, smallvec};
 use crate::Db;
 use crate::types::{BoundTypeVarInstance, IntersectionType, Type, UnionType};
 
+fn not_comparable<'db>(db: &'db dyn Db, left: Type<'db>, right: Type<'db>) -> bool {
+    !left.is_subtype_of(db, right) && !right.is_subtype_of(db, left)
+}
+
 /// Encodes the constraints under which a type property (e.g. assignability) holds.
 pub(crate) trait Constraints<'db>: Clone + Sized {
     /// Returns a constraint set that never holds
@@ -1226,6 +1230,45 @@ impl<'db> NewConstraint<'db> {
         }
     }
 
+    fn union(
+        &self,
+        db: &'db dyn Db,
+        other: &NewConstraint<'db>,
+    ) -> Simplifiable<NewConstraint<'db>> {
+        match (self, other) {
+            (NewConstraint::Range(left), NewConstraint::Range(right)) => {
+                left.union_range(db, right)
+            }
+
+            (NewConstraint::Range(range), NewConstraint::NotEquivalent(not_equivalent))
+            | (NewConstraint::NotEquivalent(not_equivalent), NewConstraint::Range(range)) => {
+                range.union_not_equivalent(db, not_equivalent)
+            }
+
+            (NewConstraint::Range(range), NewConstraint::NotComparable(not_comparable))
+            | (NewConstraint::NotComparable(not_comparable), NewConstraint::Range(range)) => {
+                range.union_not_comparable(db, not_comparable)
+            }
+
+            (NewConstraint::NotEquivalent(left), NewConstraint::NotEquivalent(right)) => {
+                left.union_not_equivalent(db, right)
+            }
+
+            (
+                NewConstraint::NotEquivalent(not_equivalent),
+                NewConstraint::NotComparable(not_comparable),
+            )
+            | (
+                NewConstraint::NotComparable(not_comparable),
+                NewConstraint::NotEquivalent(not_equivalent),
+            ) => not_equivalent.union_not_comparable(db, not_comparable),
+
+            (NewConstraint::NotComparable(left), NewConstraint::NotComparable(right)) => {
+                left.union_not_comparable(db, right)
+            }
+        }
+    }
+
     fn negate_into(
         &self,
         db: &'db dyn Db,
@@ -1358,6 +1401,60 @@ impl<'db> RangeConstraint<'db> {
         )
     }
 
+    fn union_range(
+        &self,
+        db: &'db dyn Db,
+        other: &RangeConstraint<'db>,
+    ) -> Simplifiable<NewConstraint<'db>> {
+        // When one of the bounds is entirely contained within the other, the union simplifies to
+        // the larger bounds.
+        if self.lower.is_subtype_of(db, other.lower) && other.upper.is_subtype_of(db, self.upper) {
+            return Simplifiable::Simplified(NewConstraint::Range(self.clone()));
+        }
+        if other.lower.is_subtype_of(db, self.lower) && self.upper.is_subtype_of(db, other.upper) {
+            return Simplifiable::Simplified(NewConstraint::Range(other.clone()));
+        }
+
+        // Otherwise the result cannot be simplified.
+        Simplifiable::NotSimplified(
+            NewConstraint::Range(self.clone()),
+            NewConstraint::Range(other.clone()),
+        )
+    }
+
+    fn union_not_equivalent(
+        &self,
+        db: &'db dyn Db,
+        other: &NotEquivalentConstraint<'db>,
+    ) -> Simplifiable<NewConstraint<'db>> {
+        // When the range constraint contains the "hole" from the non-equivalent constraint, then
+        // the range constraint fills in the hole, and the result is always satisfiable.
+        if self.lower.is_subtype_of(db, other.ty) && other.ty.is_subtype_of(db, self.upper) {
+            return Simplifiable::AlwaysSatisfiable;
+        }
+
+        // Otherwise the range constraint is subsumed by the non-equivalent constraint.
+        Simplifiable::Simplified(NewConstraint::NotEquivalent(other.clone()))
+    }
+
+    fn union_not_comparable(
+        &self,
+        db: &'db dyn Db,
+        other: &NotComparableConstraint<'db>,
+    ) -> Simplifiable<NewConstraint<'db>> {
+        // When the "pivot" of the incomparable constraint is not comparable with either bound of
+        // the range constraint, the incomparable constraint subsumes the range constraint.
+        if not_comparable(db, self.lower, other.ty) && not_comparable(db, self.upper, other.ty) {
+            return Simplifiable::Simplified(NewConstraint::NotComparable(other.clone()));
+        }
+
+        // Otherwise the result cannot be simplified.
+        Simplifiable::NotSimplified(
+            NewConstraint::Range(self.clone()),
+            NewConstraint::NotComparable(other.clone()),
+        )
+    }
+
     fn negate_into(
         &self,
         db: &'db dyn Db,
@@ -1471,6 +1568,34 @@ impl<'db> NotEquivalentConstraint<'db> {
         )
     }
 
+    fn union_not_equivalent(
+        &self,
+        db: &'db dyn Db,
+        other: &NotEquivalentConstraint<'db>,
+    ) -> Simplifiable<NewConstraint<'db>> {
+        if self.ty.is_equivalent_to(db, other.ty) {
+            return Simplifiable::Simplified(NewConstraint::NotEquivalent(self.clone()));
+        }
+        Simplifiable::AlwaysSatisfiable
+    }
+
+    fn union_not_comparable(
+        &self,
+        db: &'db dyn Db,
+        other: &NotComparableConstraint<'db>,
+    ) -> Simplifiable<NewConstraint<'db>> {
+        // When the "hole" of the non-equivalent constraint and the "pivot" of the incomparable
+        // constraint are not comparable, then the hole is covered by the incomparable constraint,
+        // and the union is therefore always satisfied.
+        if not_comparable(db, self.ty, other.ty) {
+            return Simplifiable::AlwaysSatisfiable;
+        }
+
+        // Otherwise, the hole and pivot are comparable, and the non-equivalent constraint subsumes
+        // the incomparable constraint.
+        Simplifiable::Simplified(NewConstraint::NotEquivalent(self.clone()))
+    }
+
     fn negate_into(
         &self,
         db: &'db dyn Db,
@@ -1526,6 +1651,20 @@ impl<'db> NotComparableConstraint<'db> {
     }
 
     fn intersect_not_comparable(
+        &self,
+        db: &'db dyn Db,
+        other: &NotComparableConstraint<'db>,
+    ) -> Simplifiable<NewConstraint<'db>> {
+        if self.ty.is_equivalent_to(db, other.ty) {
+            return Simplifiable::Simplified(NewConstraint::NotComparable(other.clone()));
+        }
+        Simplifiable::NotSimplified(
+            NewConstraint::NotComparable(self.clone()),
+            NewConstraint::NotComparable(other.clone()),
+        )
+    }
+
+    fn union_not_comparable(
         &self,
         db: &'db dyn Db,
         other: &NotComparableConstraint<'db>,
