@@ -349,8 +349,7 @@ reveal_type(divergent((1,)))  # revealed: None | Divergent
 def call_divergent(x: int):
     return (divergent((1, 2, 3)), x)
 
-# TODO: it would be better to reveal `tuple[Divergent | None, int]`
-reveal_type(call_divergent(1))  # revealed: Divergent
+reveal_type(call_divergent(1))  # revealed: tuple[None | Divergent, int]
 
 def tuple_obj(cond: bool):
     if cond:

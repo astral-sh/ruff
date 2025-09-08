@@ -127,10 +127,10 @@ use crate::types::typed_dict::{
 };
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    CallDunderError, CallableType, ClassLiteral, ClassType, DataclassParams, DynamicType,
-    IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, LintDiagnosticGuard,
-    MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm,
-    Parameters, SpecialFormType, SubclassOfType, Truthiness, Type, TypeAliasType,
+    CallDunderError, CallableType, ClassLiteral, ClassType, DataclassParams, DivergentType,
+    DynamicType, IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType,
+    LintDiagnosticGuard, MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, Parameter,
+    ParameterForm, Parameters, SpecialFormType, SubclassOfType, Truthiness, Type, TypeAliasType,
     TypeAndQualifiers, TypeIsType, TypeQualifiers, TypeVarBoundOrConstraintsEvaluation,
     TypeVarDefaultEvaluation, TypeVarInstance, TypeVarKind, UnionBuilder, UnionType, binding_type,
     todo_type,
@@ -475,6 +475,8 @@ pub(crate) struct ScopeInference<'db> {
 
     /// The extra data that is only present for few inference regions.
     extra: Option<Box<ScopeInferenceExtra>>,
+
+    scope: ScopeId<'db>,
 }
 
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::Update, Default)]
@@ -495,14 +497,13 @@ struct ScopeInferenceExtra {
 
 impl<'db> ScopeInference<'db> {
     fn cycle_fallback(scope: ScopeId<'db>) -> Self {
-        let _ = scope;
-
         Self {
             extra: Some(Box::new(ScopeInferenceExtra {
                 cycle_fallback: true,
                 ..ScopeInferenceExtra::default()
             })),
             expressions: FxHashMap::default(),
+            scope,
         }
     }
 
@@ -510,19 +511,24 @@ impl<'db> ScopeInference<'db> {
         self.extra.as_deref().map(|extra| &extra.diagnostics)
     }
 
-    pub(crate) fn expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Type<'db> {
-        self.try_expression_type(expression)
+    pub(crate) fn expression_type(
+        &self,
+        db: &'db dyn Db,
+        expression: impl Into<ExpressionNodeKey>,
+    ) -> Type<'db> {
+        self.try_expression_type(db, expression)
             .unwrap_or_else(Type::unknown)
     }
 
     pub(crate) fn try_expression_type(
         &self,
+        db: &'db dyn Db,
         expression: impl Into<ExpressionNodeKey>,
     ) -> Option<Type<'db>> {
         self.expressions
             .get(&expression.into())
             .copied()
-            .or_else(|| self.fallback_type())
+            .or_else(|| self.fallback_type(db))
     }
 
     fn is_cycle_callback(&self) -> bool {
@@ -531,9 +537,12 @@ impl<'db> ScopeInference<'db> {
             .is_some_and(|extra| extra.cycle_fallback)
     }
 
-    fn fallback_type(&self) -> Option<Type<'db>> {
+    fn fallback_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         self.is_cycle_callback()
-            .then_some(Type::Dynamic(DynamicType::Divergent))
+            .then_some(Type::Dynamic(DynamicType::Divergent(DivergentType {
+                file: self.scope.file(db),
+                file_scope: self.scope.file_scope_id(db),
+            })))
     }
 
     /// Returns the inferred return type of this function body (union of all possible return types),
@@ -541,26 +550,18 @@ impl<'db> ScopeInference<'db> {
     /// In the case of methods, the return type of the superclass method is further unioned.
     /// If there is no superclass method and this method is not `final`, it will be unioned with `Unknown`.
     pub(crate) fn infer_return_type(&self, db: &'db dyn Db, callee_ty: Type<'db>) -> Type<'db> {
-        let scope = match callee_ty {
-            Type::FunctionLiteral(function) => {
-                function.literal(db).last_definition(db).body_scope(db)
-            }
-            Type::BoundMethod(method) => method
-                .function(db)
-                .literal(db)
-                .last_definition(db)
-                .body_scope(db),
-            _ => return Type::none(db),
-        };
         // TODO: coroutine function type inference
         // TODO: generator function type inference
-        if scope.is_coroutine_function(db) || scope.is_generator_function(db) {
+        if self.scope.is_coroutine_function(db) || self.scope.is_generator_function(db) {
             return Type::unknown();
         }
 
         let mut union = UnionBuilder::new(db);
-        let div = Type::Dynamic(DynamicType::Divergent);
-        if let Some(fallback_type) = self.fallback_type() {
+        let div = Type::Dynamic(DynamicType::Divergent(DivergentType {
+            file: self.scope.file(db),
+            file_scope: self.scope.file_scope_id(db),
+        }));
+        if let Some(fallback_type) = self.fallback_type(db) {
             union = union.add(fallback_type);
         }
         // Here, we use the dynamic type `Divergent` to detect divergent type inference and ensure that we obtain finite results.
@@ -582,10 +583,10 @@ impl<'db> ScopeInference<'db> {
         let mut union_add = |ty: Type<'db>| {
             if ty == div {
                 // `Divergent` appearing in a union does not mean true divergence, so it can be removed.
-            } else if ty.has_divergent_type(db) {
+            } else if ty.has_divergent_type(db, div) {
                 if let Type::Union(union_ty) = ty {
                     let union_ty = union_ty.filter(db, |ty| **ty != div);
-                    if union_ty.has_divergent_type(db) {
+                    if union_ty.has_divergent_type(db, div) {
                         union = std::mem::replace(&mut union, UnionBuilder::new(db)).add(div);
                     } else {
                         union = std::mem::replace(&mut union, UnionBuilder::new(db)).add(union_ty);
@@ -609,11 +610,11 @@ impl<'db> ScopeInference<'db> {
         };
         for returnee in &extra.returnees {
             let ty = returnee.map_or(Type::none(db), |expression| {
-                self.expression_type(expression)
+                self.expression_type(db, expression)
             });
             union_add(ty);
         }
-        let use_def = use_def_map(db, scope);
+        let use_def = use_def_map(db, self.scope);
         if use_def.can_implicitly_return_none(db) {
             union_add(Type::none(db));
         }
@@ -1176,7 +1177,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             InferenceRegion::Scope(scope) if scope == expr_scope => {
                 self.expression_type(expression)
             }
-            _ => infer_scope_types(self.db(), expr_scope).expression_type(expression),
+            _ => infer_scope_types(self.db(), expr_scope).expression_type(self.db(), expression),
         }
     }
 
@@ -7688,8 +7689,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Non-todo Anys take precedence over Todos (as if we fix this `Todo` in the future,
             // the result would then become Any or Unknown, respectively).
-            (div @ Type::Dynamic(DynamicType::Divergent), _, _)
-            | (_, div @ Type::Dynamic(DynamicType::Divergent), _) => Some(div),
+            (div @ Type::Dynamic(DynamicType::Divergent(_)), _, _)
+            | (_, div @ Type::Dynamic(DynamicType::Divergent(_)), _) => Some(div),
             (any @ Type::Dynamic(DynamicType::Any), _, _)
             | (_, any @ Type::Dynamic(DynamicType::Any), _) => Some(any),
 
@@ -8626,7 +8627,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             ).expect("infer_binary_type_comparison should never return None for `CmpOp::Eq`");
 
                                 match eq_result {
-                                    todo @ Type::Dynamic(DynamicType::Todo(_) | DynamicType::Divergent) => return Ok(todo),
+                                    todo @ Type::Dynamic(DynamicType::Todo(_) | DynamicType::Divergent(_)) => return Ok(todo),
                                     // It's okay to ignore errors here because Python doesn't call `__bool__`
                                     // for different union variants. Instead, this is just for us to
                                     // evaluate a possibly truthy value to `false` or `true`.
@@ -8654,7 +8655,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         );
 
                             Ok(match eq_result {
-                                todo @ Type::Dynamic(DynamicType::Todo(_) | DynamicType::Divergent) => todo,
+                                todo @ Type::Dynamic(DynamicType::Todo(_) | DynamicType::Divergent(_)) => todo,
                                 // It's okay to ignore errors here because Python doesn't call `__bool__`
                                 // for `is` and `is not` comparisons. This is an implementation detail
                                 // for how we determine the truthiness of a type.
@@ -9663,7 +9664,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         expressions.shrink_to_fit();
 
-        ScopeInference { expressions, extra }
+        ScopeInference {
+            expressions,
+            extra,
+            scope,
+        }
     }
 }
 

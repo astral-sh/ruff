@@ -54,7 +54,7 @@ impl<'db> ClassBase<'db> {
                 | DynamicType::TodoTypeAlias
                 | DynamicType::TodoUnpack,
             ) => "@Todo",
-            ClassBase::Dynamic(DynamicType::Divergent) => "Divergent",
+            ClassBase::Dynamic(DynamicType::Divergent(_)) => "Divergent",
             ClassBase::Protocol => "Protocol",
             ClassBase::Generic => "Generic",
             ClassBase::TypedDict => "TypedDict",

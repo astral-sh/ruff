@@ -642,12 +642,13 @@ impl<'db> ProtocolInstanceType<'db> {
     pub(super) fn has_divergent_type_impl(
         self,
         db: &'db dyn Db,
+        div: Type<'db>,
         visitor: &HasDivergentTypeVisitor<'db>,
     ) -> bool {
         self.inner
             .interface(db)
             .members(db)
-            .any(|member| member.ty().has_divergent_type_impl(db, visitor))
+            .any(|member| member.ty().has_divergent_type_impl(db, div, visitor))
     }
 }
 

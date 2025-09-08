@@ -877,14 +877,15 @@ impl<'db> Specialization<'db> {
     pub(crate) fn has_divergent_type_impl(
         self,
         db: &'db dyn Db,
+        div: Type<'db>,
         visitor: &HasDivergentTypeVisitor<'db>,
     ) -> bool {
         self.types(db)
             .iter()
-            .any(|ty| ty.has_divergent_type_impl(db, visitor))
+            .any(|ty| ty.has_divergent_type_impl(db, div, visitor))
             || self
                 .tuple_inner(db)
-                .is_some_and(|tuple| tuple.has_divergent_type_impl(db, visitor))
+                .is_some_and(|tuple| tuple.has_divergent_type_impl(db, div, visitor))
     }
 }
 

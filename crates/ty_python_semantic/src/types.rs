@@ -34,7 +34,7 @@ use crate::place::{Boundness, Place, PlaceAndQualifiers, imported_symbol};
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::place::ScopedPlaceId;
 use crate::semantic_index::scope::ScopeId;
-use crate::semantic_index::{imported_modules, place_table, semantic_index};
+use crate::semantic_index::{FileScopeId, imported_modules, place_table, semantic_index};
 use crate::suppression::check_suppressions;
 use crate::types::call::{Binding, Bindings, CallArguments, CallableBinding};
 pub(crate) use crate::types::class_base::ClassBase;
@@ -114,8 +114,16 @@ fn return_type_cycle_recover<'db>(
     salsa::CycleRecoveryAction::Iterate
 }
 
-fn return_type_cycle_initial<'db>(_db: &'db dyn Db, _self: BoundMethodType<'db>) -> Type<'db> {
-    Type::Dynamic(DynamicType::Divergent)
+fn return_type_cycle_initial<'db>(db: &'db dyn Db, method: BoundMethodType<'db>) -> Type<'db> {
+    Type::Dynamic(DynamicType::Divergent(DivergentType {
+        file: method.function(db).file(db),
+        file_scope: method
+            .function(db)
+            .literal(db)
+            .last_definition(db)
+            .body_scope(db)
+            .file_scope_id(db),
+    }))
 }
 
 pub fn check_types(db: &dyn Db, file: File) -> Vec<Diagnostic> {
@@ -186,7 +194,7 @@ fn definition_expression_type<'db>(
         }
     } else {
         // expression is in a type-params sub-scope
-        infer_scope_types(db, scope).expression_type(expression)
+        infer_scope_types(db, scope).expression_type(db, expression)
     }
 }
 
@@ -556,13 +564,14 @@ impl<'db> PropertyInstanceType<'db> {
     fn has_divergent_type_impl(
         self,
         db: &'db dyn Db,
+        div: Type<'db>,
         visitor: &HasDivergentTypeVisitor<'db>,
     ) -> bool {
         self.setter(db)
-            .is_some_and(|setter| setter.has_divergent_type_impl(db, visitor))
+            .is_some_and(|setter| setter.has_divergent_type_impl(db, div, visitor))
             || self
                 .getter(db)
-                .is_some_and(|getter| getter.has_divergent_type_impl(db, visitor))
+                .is_some_and(|getter| getter.has_divergent_type_impl(db, div, visitor))
     }
 }
 
@@ -1917,8 +1926,8 @@ impl<'db> Type<'db> {
         match (self, other) {
             // The `Divergent` type is a special type that is not equivalent to other kinds of dynamic types,
             // which prevents `Divergent` from being eliminated during union reduction.
-            (Type::Dynamic(_), Type::Dynamic(DynamicType::Divergent))
-            | (Type::Dynamic(DynamicType::Divergent), Type::Dynamic(_)) => C::unsatisfiable(db),
+            (Type::Dynamic(_), Type::Dynamic(DynamicType::Divergent(_)))
+            | (Type::Dynamic(DynamicType::Divergent(_)), Type::Dynamic(_)) => C::unsatisfiable(db),
             (Type::Dynamic(_), Type::Dynamic(_)) => C::always_satisfiable(db),
 
             (Type::SubclassOf(first), Type::SubclassOf(second)) => {
@@ -6576,51 +6585,54 @@ impl<'db> Type<'db> {
         }
     }
 
-    pub(super) fn has_divergent_type(self, db: &'db dyn Db) -> bool {
+    pub(super) fn has_divergent_type(self, db: &'db dyn Db, div: Type<'db>) -> bool {
         let visitor = HasDivergentTypeVisitor::new(false);
-        self.has_divergent_type_impl(db, &visitor)
+        self.has_divergent_type_impl(db, div, &visitor)
     }
 
     fn has_divergent_type_impl(
         self,
         db: &'db dyn Db,
+        div: Type<'db>,
         visitor: &HasDivergentTypeVisitor<'db>,
     ) -> bool {
         match self {
-            Type::Dynamic(DynamicType::Divergent) => true,
+            Type::Dynamic(DynamicType::Divergent(_)) => self == div,
             Type::Union(union) => {
-                visitor.visit(self, || union.has_divergent_type_impl(db, visitor))
+                visitor.visit(self, || union.has_divergent_type_impl(db, div, visitor))
             }
-            Type::Intersection(intersection) => {
-                visitor.visit(self, || intersection.has_divergent_type_impl(db, visitor))
-            }
+            Type::Intersection(intersection) => visitor.visit(self, || {
+                intersection.has_divergent_type_impl(db, div, visitor)
+            }),
             Type::GenericAlias(alias) => visitor.visit(self, || {
                 alias
                     .specialization(db)
-                    .has_divergent_type_impl(db, visitor)
+                    .has_divergent_type_impl(db, div, visitor)
             }),
             Type::NominalInstance(instance) => visitor.visit(self, || {
-                instance.class(db).has_divergent_type_impl(db, visitor)
+                instance.class(db).has_divergent_type_impl(db, div, visitor)
             }),
             Type::Callable(callable) => {
-                visitor.visit(self, || callable.has_divergent_type_impl(db, visitor))
+                visitor.visit(self, || callable.has_divergent_type_impl(db, div, visitor))
             }
             Type::ProtocolInstance(protocol) => {
-                visitor.visit(self, || protocol.has_divergent_type_impl(db, visitor))
+                visitor.visit(self, || protocol.has_divergent_type_impl(db, div, visitor))
             }
             Type::PropertyInstance(property) => {
-                visitor.visit(self, || property.has_divergent_type_impl(db, visitor))
+                visitor.visit(self, || property.has_divergent_type_impl(db, div, visitor))
             }
             Type::TypeIs(type_is) => visitor.visit(self, || {
-                type_is.return_type(db).has_divergent_type_impl(db, visitor)
+                type_is
+                    .return_type(db)
+                    .has_divergent_type_impl(db, div, visitor)
             }),
-            Type::SubclassOf(subclass_of) => {
-                visitor.visit(self, || subclass_of.has_divergent_type_impl(db, visitor))
-            }
+            Type::SubclassOf(subclass_of) => visitor.visit(self, || {
+                subclass_of.has_divergent_type_impl(db, div, visitor)
+            }),
             Type::TypedDict(typed_dict) => visitor.visit(self, || {
                 typed_dict
                     .defining_class()
-                    .has_divergent_type_impl(db, visitor)
+                    .has_divergent_type_impl(db, div, visitor)
             }),
             Type::Never
             | Type::AlwaysTruthy
@@ -7012,6 +7024,19 @@ impl<'db> KnownInstanceType<'db> {
     }
 }
 
+/// A type that is determined to be divergent during type inference for a recursive function.
+/// This type must never be eliminated by dynamic type reduction
+/// (e.g. `Divergent` is assignable to `@Todo`, but `@Todo | Divergent` must not be reducted to `@Todo`).
+/// Otherwise, type inference cannot converge properly.
+/// For detailed properties of this type, see the unit test at the end of the file.
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
+pub struct DivergentType {
+    /// The source file where this divergence was detected.
+    file: File,
+    /// The file scope where this divergence was detected.
+    file_scope: FileScopeId,
+}
+
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
 pub enum DynamicType {
     /// An explicitly annotated `typing.Any`
@@ -7037,15 +7062,12 @@ pub enum DynamicType {
     /// A special Todo-variant for `Unpack[Ts]`, so that we can treat it specially in `Generic[Unpack[Ts]]`
     TodoUnpack,
     /// A type that is determined to be divergent during type inference for a recursive function.
-    /// This type must never be eliminated by reduction
-    /// (e.g. `Divergent` is assignable to `@Todo`, but `@Todo | Divergent` must not be reducted to `@Todo`).
-    /// Otherwise, type inference cannot converge properly.
-    Divergent,
+    Divergent(DivergentType),
 }
 
 impl DynamicType {
     fn normalized(self) -> Self {
-        if matches!(self, Self::Divergent) {
+        if matches!(self, Self::Divergent(_)) {
             self
         } else {
             Self::Any
@@ -7082,7 +7104,7 @@ impl std::fmt::Display for DynamicType {
                     f.write_str("@Todo")
                 }
             }
-            DynamicType::Divergent => f.write_str("Divergent"),
+            DynamicType::Divergent(_) => f.write_str("Divergent"),
         }
     }
 }
@@ -9254,9 +9276,11 @@ impl<'db> CallableType<'db> {
     fn has_divergent_type_impl(
         self,
         db: &'db dyn Db,
+        div: Type<'db>,
         visitor: &HasDivergentTypeVisitor<'db>,
     ) -> bool {
-        self.signatures(db).has_divergent_type_impl(db, visitor)
+        self.signatures(db)
+            .has_divergent_type_impl(db, div, visitor)
     }
 }
 
@@ -9933,11 +9957,12 @@ impl<'db> UnionType<'db> {
     fn has_divergent_type_impl(
         self,
         db: &'db dyn Db,
+        div: Type<'db>,
         visitor: &HasDivergentTypeVisitor<'db>,
     ) -> bool {
         self.elements(db)
             .iter()
-            .any(|ty| ty.has_divergent_type_impl(db, visitor))
+            .any(|ty| ty.has_divergent_type_impl(db, div, visitor))
     }
 }
 
@@ -10158,15 +10183,16 @@ impl<'db> IntersectionType<'db> {
     fn has_divergent_type_impl(
         self,
         db: &'db dyn Db,
+        div: Type<'db>,
         visitor: &HasDivergentTypeVisitor<'db>,
     ) -> bool {
         self.positive(db)
             .iter()
-            .any(|ty| ty.has_divergent_type_impl(db, visitor))
+            .any(|ty| ty.has_divergent_type_impl(db, div, visitor))
             || self
                 .negative(db)
                 .iter()
-                .any(|ty| ty.has_divergent_type_impl(db, visitor))
+                .any(|ty| ty.has_divergent_type_impl(db, div, visitor))
     }
 }
 
@@ -10799,9 +10825,13 @@ pub(crate) mod tests {
 
     #[test]
     fn divergent_type() {
-        let db = setup_db();
+        let mut db = setup_db();
 
-        let div = Type::Dynamic(DynamicType::Divergent);
+        db.write_dedented("src/foo.py", "").unwrap();
+        let file = system_path_to_file(&db, "src/foo.py").unwrap();
+        let file_scope = FileScopeId::global();
+
+        let div = Type::Dynamic(DynamicType::Divergent(DivergentType { file, file_scope }));
 
         // The `Divergent` type must not be eliminated in union with other dynamic types,
         // as this would prevent detection of divergent type inference using `Divergent`.

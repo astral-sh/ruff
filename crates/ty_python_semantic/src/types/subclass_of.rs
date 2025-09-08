@@ -205,12 +205,13 @@ impl<'db> SubclassOfType<'db> {
     pub(super) fn has_divergent_type_impl(
         self,
         db: &'db dyn Db,
+        div: Type<'db>,
         visitor: &HasDivergentTypeVisitor<'db>,
     ) -> bool {
         match self.subclass_of {
-            SubclassOfInner::Dynamic(DynamicType::Divergent) => true,
+            SubclassOfInner::Dynamic(d @ DynamicType::Divergent(_)) => Type::Dynamic(d) == div,
             SubclassOfInner::Dynamic(_) => false,
-            SubclassOfInner::Class(class) => class.has_divergent_type_impl(db, visitor),
+            SubclassOfInner::Class(class) => class.has_divergent_type_impl(db, div, visitor),
         }
     }
 }

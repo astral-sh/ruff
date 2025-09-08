@@ -289,11 +289,12 @@ impl<'db> TupleType<'db> {
     pub(super) fn has_divergent_type_impl(
         self,
         db: &'db dyn Db,
+        div: Type<'db>,
         visitor: &HasDivergentTypeVisitor<'db>,
     ) -> bool {
         self.tuple(db)
             .all_elements()
-            .any(|ty| ty.has_divergent_type_impl(db, visitor))
+            .any(|ty| ty.has_divergent_type_impl(db, div, visitor))
     }
 }
 

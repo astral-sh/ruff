@@ -1229,13 +1229,14 @@ impl<'db> ClassType<'db> {
     pub(super) fn has_divergent_type_impl(
         self,
         db: &'db dyn Db,
+        div: Type<'db>,
         visitor: &HasDivergentTypeVisitor<'db>,
     ) -> bool {
         match self {
             ClassType::NonGeneric(_) => false,
             ClassType::Generic(generic) => generic
                 .specialization(db)
-                .has_divergent_type_impl(db, visitor),
+                .has_divergent_type_impl(db, div, visitor),
         }
     }
 

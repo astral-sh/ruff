@@ -78,10 +78,10 @@ use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::any_over_type;
 use crate::types::{
     BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, ClassType,
-    DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
-    IsEquivalentVisitor, KnownClass, NormalizedVisitor, SpecialFormType, Truthiness, Type,
-    TypeMapping, TypeRelation, UnionBuilder, all_members, infer_scope_types, walk_generic_context,
-    walk_type_mapping,
+    DeprecatedInstance, DivergentType, DynamicType, FindLegacyTypeVarsVisitor,
+    HasRelationToVisitor, IsEquivalentVisitor, KnownClass, NormalizedVisitor, SpecialFormType,
+    Truthiness, Type, TypeMapping, TypeRelation, UnionBuilder, all_members, infer_scope_types,
+    walk_generic_context, walk_type_mapping,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -94,8 +94,15 @@ fn return_type_cycle_recover<'db>(
     salsa::CycleRecoveryAction::Iterate
 }
 
-fn return_type_cycle_initial<'db>(_db: &'db dyn Db, _self: FunctionType<'db>) -> Type<'db> {
-    Type::Dynamic(DynamicType::Divergent)
+fn return_type_cycle_initial<'db>(db: &'db dyn Db, function: FunctionType<'db>) -> Type<'db> {
+    Type::Dynamic(DynamicType::Divergent(DivergentType {
+        file: function.file(db),
+        file_scope: function
+            .literal(db)
+            .last_definition(db)
+            .body_scope(db)
+            .file_scope_id(db),
+    }))
 }
 
 /// A collection of useful spans for annotating functions.

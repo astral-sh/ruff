@@ -239,11 +239,12 @@ impl<'db> CallableSignature<'db> {
     pub(super) fn has_divergent_type_impl(
         &self,
         db: &'db dyn Db,
+        div: Type<'db>,
         visitor: &HasDivergentTypeVisitor<'db>,
     ) -> bool {
         self.overloads
             .iter()
-            .any(|signature| signature.has_divergent_type_impl(db, visitor))
+            .any(|signature| signature.has_divergent_type_impl(db, div, visitor))
     }
 }
 
@@ -1031,11 +1032,12 @@ impl<'db> Signature<'db> {
     fn has_divergent_type_impl(
         &self,
         db: &'db dyn Db,
+        div: Type<'db>,
         visitor: &HasDivergentTypeVisitor<'db>,
     ) -> bool {
         self.return_ty
-            .is_some_and(|return_ty| return_ty.has_divergent_type_impl(db, visitor))
-            || self.parameters.has_divergent_type_impl(db, visitor)
+            .is_some_and(|return_ty| return_ty.has_divergent_type_impl(db, div, visitor))
+            || self.parameters.has_divergent_type_impl(db, div, visitor)
     }
 }
 
@@ -1344,12 +1346,13 @@ impl<'db> Parameters<'db> {
     fn has_divergent_type_impl(
         &self,
         db: &'db dyn Db,
+        div: Type<'db>,
         visitor: &HasDivergentTypeVisitor<'db>,
     ) -> bool {
         self.iter().any(|parameter| {
             parameter
                 .annotated_type()
-                .is_some_and(|ty| ty.has_divergent_type_impl(db, visitor))
+                .is_some_and(|ty| ty.has_divergent_type_impl(db, div, visitor))
         })
     }
 }
