@@ -484,21 +484,19 @@ impl<'db> UseDefMap<'db> {
         snapshot_id: ScopedEnclosingSnapshotId,
         nested_laziness: ScopeLaziness,
     ) -> EnclosingSnapshotResult<'_, 'db> {
+        let boundness_analysis = if nested_laziness.is_eager() {
+            BoundnessAnalysis::BasedOnUnboundVisibility
+        } else {
+            // TODO: We haven't implemented proper boundness analysis for nonlocal symbols, so we assume the boundness is bound for now.
+            BoundnessAnalysis::AssumeBound
+        };
         match self.enclosing_snapshots.get(snapshot_id) {
             Some(EnclosingSnapshot::Constraint(constraint)) => {
                 EnclosingSnapshotResult::FoundConstraint(*constraint)
             }
-            Some(EnclosingSnapshot::Bindings(bindings)) => {
-                let boundness_analysis = if nested_laziness.is_eager() {
-                    BoundnessAnalysis::BasedOnUnboundVisibility
-                } else {
-                    // TODO: We haven't implemented proper boundness analysis for nonlocal symbols, so we assume the boundness is bound for now.
-                    BoundnessAnalysis::AssumeBound
-                };
-                EnclosingSnapshotResult::FoundBindings(
-                    self.bindings_iterator(bindings, boundness_analysis),
-                )
-            }
+            Some(EnclosingSnapshot::Bindings(bindings)) => EnclosingSnapshotResult::FoundBindings(
+                self.bindings_iterator(bindings, boundness_analysis),
+            ),
             None => EnclosingSnapshotResult::NotFound,
         }
     }
@@ -667,6 +665,8 @@ pub(crate) struct EnclosingSnapshotKey {
 }
 
 /// A snapshot of enclosing scope place states that can be used to resolve a reference in a nested scope.
+/// If the nested scope is eager, the snapshot is simply recorded and used as is.
+/// If it is lazy, every time a symbol is reassigned, the snapshot is updated to take into account its new binding.
 type EnclosingSnapshots = IndexVec<ScopedEnclosingSnapshotId, EnclosingSnapshot>;
 
 #[derive(Debug)]
@@ -1212,9 +1212,9 @@ impl<'db> UseDefMapBuilder<'db> {
     ) {
         match self.enclosing_snapshots.get_mut(snapshot_id) {
             Some(EnclosingSnapshot::Bindings(bindings)) => {
-                let symbol_state = &self.symbol_states[enclosing_symbol];
+                let new_symbol_state = &self.symbol_states[enclosing_symbol];
                 bindings.merge(
-                    symbol_state.bindings().clone(),
+                    new_symbol_state.bindings().clone(),
                     &mut self.narrowing_constraints,
                     &mut self.reachability_constraints,
                 );
