@@ -3409,6 +3409,23 @@ impl<'db> Type<'db> {
 
             Type::ModuleLiteral(module) => module.static_member(db, name_str),
 
+            // If a protocol does not include a member and the policy disables falling back to
+            // `object`, we return `Place::Unbound` here. This short-circuits attribute lookup
+            // before we find the "fallback to attribute access on `object`" logic later on
+            // (otherwise we would infer that all synthesized protocols have `__getattribute__`
+            // methods, and therefore that all synthesized protocols have all possible attributes.)
+            //
+            // Note that we could do this for *all* protocols, but it's only *necessary* for synthesized
+            // ones, and the standard logic is *probably* more performant for class-based protocols?
+            Type::ProtocolInstance(ProtocolInstanceType {
+                inner: Protocol::Synthesized(protocol),
+                ..
+            }) if policy.mro_no_object_fallback()
+                && !protocol.interface().includes_member(db, name_str) =>
+            {
+                Place::Unbound.into()
+            }
+
             _ if policy.no_instance_fallback() => self.invoke_descriptor_protocol(
                 db,
                 name_str,
