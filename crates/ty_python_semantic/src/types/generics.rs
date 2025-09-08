@@ -134,6 +134,18 @@ impl<'db> GenericContext<'db> {
         Self::new(db, type_params.into_iter().collect::<FxOrderSet<_>>())
     }
 
+    /// Merge this generic context with another, returning a new generic context that
+    /// contains type variables from both contexts.
+    pub(crate) fn merge(self, db: &'db dyn Db, other: Self) -> Self {
+        Self::from_typevar_instances(
+            db,
+            self.variables(db)
+                .iter()
+                .chain(other.variables(db).iter())
+                .copied(),
+        )
+    }
+
     fn variable_from_type_param(
         db: &'db dyn Db,
         index: &'db SemanticIndex<'db>,
