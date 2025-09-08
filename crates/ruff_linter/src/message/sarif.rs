@@ -276,15 +276,60 @@ impl<'a> SarifResult<'a> {
         let start_location = message.expect_ruff_start_location();
         let end_location = message.expect_ruff_end_location();
         let path = normalize_path(&*message.expect_ruff_filename());
+        let uri = url::Url::from_file_path(&path)
+            .map_err(|()| anyhow::anyhow!("Failed to convert path to URL: {}", path.display()))?
+            .to_string();
+        let fixes = message
+            .fix()
+            .map(|fix| {
+                let fix_description = message
+                    .first_help_text()
+                    .map(std::string::ToString::to_string);
+
+                let replacements: Vec<SarifReplacement> = fix
+                    .edits()
+                    .iter()
+                    .map(|edit| SarifReplacement {
+                        deleted_region: SarifRegion {
+                            start_line: start_location.line,
+                            start_column: start_location.column,
+                            end_line: end_location.line,
+                            end_column: end_location.column,
+                        },
+                        inserted_content: InsertedContent {
+                            inserted_content: edit.content().unwrap_or("").to_string(),
+                        },
+                    })
+                    .collect();
+
+                let mut artifact_changes = Vec::new();
+                if !replacements.is_empty() {
+                    artifact_changes.push(SarifArtifactChange {
+                        uri: SarifArtifactLocation { uri: uri.clone() },
+                        replacements,
+                    });
+                }
+
+                SarifFix {
+                    description: RuleDescription {
+                        text: fix_description,
+                    },
+                    artifact_changes,
+                }
+            })
+            .into_iter()
+            .collect();
+
         Ok(Self {
             code: RuleCode::from(message),
             level: "error".to_string(),
             message: message.body().to_string(),
-            uri: path.display().to_string(),
+            uri,
             start_line: start_location.line,
             start_column: start_location.column,
             end_line: end_location.line,
             end_column: end_location.column,
+            fixes,
         })
     }
 }
@@ -320,36 +365,6 @@ impl Serialize for SarifResult<'_> {
         value.serialize(serializer)
     }
 }
-
-// impl Serialize for SarifFix {
-//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-//     where
-//         S: Serializer,
-//     {
-//         json!({
-//             "description": self.description.as_ref().map(|d| { "text": d }),
-//             "artifactChanges": self.artifact_changes.iter().map(|change| {
-//                 json!({
-//                     "artifactLocation": { "uri": change.uri },
-//                     "replacements": change.replacements.iter().map(|r| {
-//                         json!({
-//                             "deletedRegion": {
-//                                 "startLine": r.deleted_region.start_line,
-//                                 "startColumn": r.deleted_region.start_column,
-//                                 "endLine": r.deleted_region.end_line,
-//                                 "endColumn": r.deleted_region.end_column,
-//                             },
-//                             "insertedContent": r.inserted_content.as_ref().map(|c| {
-//                                 json!({ "text": c })
-//                             }),
-//                         })
-//                     }).collect::<Vec<_>>()
-//                 })
-//             }).collect::<Vec<_>>(),
-//         })
-//         .serialize(serializer)
-//     }
-// }
 
 #[cfg(test)]
 mod tests {
