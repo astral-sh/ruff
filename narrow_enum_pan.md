@@ -1,5 +1,9 @@
 # Target
 finish the todos in crates/ty_python_semantic/resources/mdtest/narrow/conditionals/in.md
+related files:
+* crates/ty_python_semantic/src/types/narrow.rs
+* crates/ty_python_semantic/src/types.rs
+
 * ## enums
 * ## Union with enum and `int`
 

@@ -640,6 +640,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     if !element.is_single_valued(self.db)
                         && !element.is_literal_string()
                         && !element.is_bool(self.db)
+                        && !element.is_simple_enum(self.db)
                     {
                         builder = builder.add(*element);
                     }
@@ -675,6 +676,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     if element.is_single_valued(self.db)
                         || element.is_literal_string()
                         || element.is_bool(self.db)
+                        || element.is_simple_enum(self.db)
                     {
                         single_builder = single_builder.add(*element);
                     } else {

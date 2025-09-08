@@ -740,6 +740,43 @@ impl<'db> Type<'db> {
             .is_some_and(|instance| instance.class(db).is_known(db, KnownClass::Bool))
     }
 
+    /// Return true if this is an enum literal or enum class instance that doesn't override __eq__ or __ne__
+    fn is_simple_enum(&self, db: &'db dyn Db) -> bool {
+        let is_enum = match self {
+            Type::EnumLiteral(_) => true,
+            Type::NominalInstance(instance) => {
+                crate::types::enums::enum_metadata(db, instance.class(db).class_literal(db).0)
+                    .is_some()
+            }
+            _ => false,
+        };
+
+        if is_enum {
+            let check_dunder = |dunder_name, allowed_return_value| {
+                // Note that we do explicitly exclude dunder methods on `object`, `int` and `str` here.
+                // The reason for this is that we know that these dunder methods behave in a predictable way.
+                // Only custom dunder methods need to be examined here, as they might break single-valuedness
+                // by always returning `False`, for example.
+                let call_result = self.try_call_dunder_with_policy(
+                    db,
+                    dunder_name,
+                    &mut CallArguments::positional([Type::unknown()]),
+                    MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
+                        | MemberLookupPolicy::MRO_NO_INT_OR_STR_LOOKUP,
+                );
+                let call_result = call_result.as_ref();
+                call_result.is_ok_and(|bindings| {
+                    bindings.return_type(db) == Type::BooleanLiteral(allowed_return_value)
+                }) || call_result
+                    .is_err_and(|err| matches!(err, CallDunderError::MethodNotAvailable))
+            };
+
+            check_dunder("__eq__", true) && check_dunder("__ne__", false)
+        } else {
+            false
+        }
+    }
+
     pub(crate) fn is_notimplemented(&self, db: &'db dyn Db) -> bool {
         self.into_nominal_instance().is_some_and(|instance| {
             instance
@@ -967,22 +1004,28 @@ impl<'db> Type<'db> {
 
     pub(crate) fn is_union_of_single_valued(&self, db: &'db dyn Db) -> bool {
         self.into_union().is_some_and(|union| {
-            union
-                .elements(db)
-                .iter()
-                .all(|ty| ty.is_single_valued(db) || ty.is_bool(db) || ty.is_literal_string())
+            union.elements(db).iter().all(|ty| {
+                ty.is_single_valued(db)
+                    || ty.is_bool(db)
+                    || ty.is_literal_string()
+                    || ty.is_simple_enum(db)
+            })
         }) || self.is_bool(db)
             || self.is_literal_string()
+            || self.is_simple_enum(db)
     }
 
     pub(crate) fn is_union_with_single_valued(&self, db: &'db dyn Db) -> bool {
         self.into_union().is_some_and(|union| {
-            union
-                .elements(db)
-                .iter()
-                .any(|ty| ty.is_single_valued(db) || ty.is_bool(db) || ty.is_literal_string())
+            union.elements(db).iter().any(|ty| {
+                ty.is_single_valued(db)
+                    || ty.is_bool(db)
+                    || ty.is_literal_string()
+                    || ty.is_simple_enum(db)
+            })
         }) || self.is_bool(db)
             || self.is_literal_string()
+            || self.is_simple_enum(db)
     }
 
     pub(crate) fn into_string_literal(self) -> Option<StringLiteralType<'db>> {
