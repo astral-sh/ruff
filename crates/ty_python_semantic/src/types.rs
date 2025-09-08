@@ -9414,8 +9414,18 @@ impl<'db> PEP695TypeAliasType<'db> {
         let module = parsed_module(db, scope.file(db)).load(db);
         let type_alias_stmt_node = scope.node(db).expect_type_alias();
         let definition = self.definition(db);
-        definition_expression_type(db, definition, &type_alias_stmt_node.node(&module).value)
-            .apply_optional_specialization(db, self.specialization(db))
+        let value_type =
+            definition_expression_type(db, definition, &type_alias_stmt_node.node(&module).value);
+
+        if let Some(generic_context) = self.generic_context(db) {
+            let specialization = self
+                .specialization(db)
+                .unwrap_or_else(|| generic_context.default_specialization(db, None));
+
+            value_type.apply_specialization(db, specialization)
+        } else {
+            value_type
+        }
     }
 
     pub(crate) fn apply_specialization(

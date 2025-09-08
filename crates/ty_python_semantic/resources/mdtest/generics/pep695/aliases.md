@@ -56,7 +56,7 @@ from typing import Literal
 
 type C[T] = T
 
-def reveal(a: C[int], b: C[Literal[5]]):
+def _(a: C[int], b: C[Literal[5]]):
     reveal_type(a)  # revealed: int
     reveal_type(b)  # revealed: Literal[5]
 ```
@@ -77,7 +77,7 @@ type B = ...
 reveal_type(B[int])  # revealed: Unknown
 
 # error: [non-subscriptable] "Cannot subscript non-generic type alias"
-def x(b: B[int]): ...
+def _(b: B[int]): ...
 ```
 
 If the type variable has an upper bound, the specialized type must satisfy that bound:
@@ -136,7 +136,26 @@ reveal_type(WithDefault[str, str])  # revealed: WithDefault[str, str]
 reveal_type(WithDefault[str])  # revealed: WithDefault[str, int]
 ```
 
+If the type alias is not specialized explicitly, it is implicitly specialized to `Unknown`:
+
+```py
+type G[T] = list[T]
+
+def _(g: G):
+    reveal_type(g)  # revealed: list[Unknown]
+```
+
+Unless a type default was provided:
+
+```py
+type G[T = int] = list[T]
+
+def _(g: G):
+    reveal_type(g)  # revealed: list[int]
+```
+
 ## Aliases are not callable
+
 
 ```py
 type A = int
@@ -156,6 +175,6 @@ Make sure we handle cycles correctly when computing the truthiness of a generic 
 ```py
 type X[T: X] = T
 
-def check(x: X):
+def _(x: X):
     assert x
 ```
