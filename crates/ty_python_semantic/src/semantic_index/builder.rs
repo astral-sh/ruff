@@ -438,11 +438,29 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 let name = self.place_tables[key.enclosing_scope]
                     .symbol(enclosing_symbol)
                     .name();
+                let is_reassignment_of_snapshotted_symbol = || {
+                    for (ancestor, _) in
+                        VisibleAncestorsIter::new(&self.scopes, key.enclosing_scope)
+                    {
+                        if ancestor == current_scope {
+                            return true;
+                        }
+                        let ancestor_table = &self.place_tables[ancestor];
+                        // If there is a symbol binding in an ancestor scope,
+                        // then a reassignment in the current scope is not relevant to the snapshot.
+                        if ancestor_table
+                            .symbol_id(name)
+                            .is_some_and(|id| ancestor_table.symbol(id).is_bound())
+                        {
+                            return false;
+                        }
+                    }
+                    false
+                };
+
                 if key.nested_laziness.is_lazy()
                     && symbol.name() == name
-                    && (key.enclosing_scope == current_scope
-                        || VisibleAncestorsIter::new(&self.scopes, key.enclosing_scope)
-                            .any(|(ancestor, _)| ancestor == current_scope))
+                    && is_reassignment_of_snapshotted_symbol()
                 {
                     self.use_def_maps[key.enclosing_scope]
                         .update_enclosing_snapshot(*snapshot_id, enclosing_symbol);

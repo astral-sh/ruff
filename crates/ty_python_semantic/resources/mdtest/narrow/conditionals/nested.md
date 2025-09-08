@@ -249,6 +249,13 @@ def f(x: str | None):
     x = None
 
 def f(x: str | None):
+    def _(x: str | None):
+        if x is not None:
+            def closure():
+                reveal_type(x)  # revealed: str
+    x = None
+
+def f(x: str | None):
     class C:
         def _():
             if x is not None:
