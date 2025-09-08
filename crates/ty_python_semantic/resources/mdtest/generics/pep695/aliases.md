@@ -40,13 +40,6 @@ You cannot use the same typevar more than once.
 type RepeatedTypevar[T, T] = ...
 ```
 
-You can only use typevars (TODO: or param specs or typevar tuples) in the alias's generic context.
-
-```py
-# TODO: error
-type GenericOfType[int] = ...
-```
-
 ## Specializing type aliases explicitly
 
 The type parameter can be specified explicitly:
