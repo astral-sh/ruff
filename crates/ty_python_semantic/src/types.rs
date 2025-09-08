@@ -746,24 +746,6 @@ impl<'db> Type<'db> {
         })
     }
 
-    /// Return true if this is an enum literal or enum class instance that doesn't override __eq__ or __ne__
-    fn is_simple_enum(&self, db: &'db dyn Db) -> bool {
-        let is_enum = match self {
-            Type::EnumLiteral(_) => true,
-            Type::NominalInstance(instance) => {
-                crate::types::enums::enum_metadata(db, instance.class(db).class_literal(db).0)
-                    .is_some()
-            }
-            _ => false,
-        };
-
-        if is_enum {
-            !self.overrides_equality(db)
-        } else {
-            false
-        }
-    }
-
     /// Return true if this type overrides __eq__ or __ne__ methods
     fn overrides_equality(&self, db: &'db dyn Db) -> bool {
         let check_dunder = |dunder_name, allowed_return_value| {
