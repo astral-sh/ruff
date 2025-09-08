@@ -450,6 +450,14 @@ impl<'db> ConstraintClause<'db> {
         self.constraints.is_empty()
     }
 
+    fn is_satisfiable(&self) -> Satisfiable<()> {
+        if self.is_always() {
+            Satisfiable::Always
+        } else {
+            Satisfiable::Constrained(())
+        }
+    }
+
     /// Updates this clause to be the intersection of itself and an atomic constraint. Returns a
     /// flag indicating whether the updated clause is never, always, or sometimes satisfied.
     fn intersect_constraint(
@@ -491,12 +499,7 @@ impl<'db> ConstraintClause<'db> {
                     // the result, and also need to copy over any later constraints that we hadn't
                     // processed yet.
                     self.constraints.extend(existing_constraints);
-                    if self.is_always() {
-                        // If there are no further constraints in the clause, the clause is now always
-                        // satisfied.
-                        return Satisfiable::Always;
-                    }
-                    return Satisfiable::Constrained(());
+                    return self.is_satisfiable();
                 }
 
                 Simplifiable::NotSimplified(existing, c) => {
@@ -520,13 +523,7 @@ impl<'db> ConstraintClause<'db> {
         // because we couldn't simplify it with anything, or because we did without it canceling
         // out).
         self.constraints.push(constraint);
-        if self.is_always() {
-            // If there are no further constraints in the clause, the clause is now always
-            // satisfied.
-            Satisfiable::Always
-        } else {
-            Satisfiable::Constrained(())
-        }
+        self.is_satisfiable()
     }
 
     /// Returns the intersection of this clause with another.
