@@ -17,9 +17,9 @@ use ruff_text_size::TextRange;
 /// ## Why is this bad?
 /// Airflow 3.0 removed various deprecated functions, members, and other
 /// values. Some have more modern replacements. Others are considered too niche
-/// and not worth to be maintained in Airflow.
+/// and not worth continued maintenance in Airflow.
 /// Even though these symbols still work fine on Airflow 3.0, they are expected to be removed in a future version.
-/// The user is suggested to replace the original usage with the new ones.
+/// Where available, users should replace the removed functionality with the new alternatives.
 ///
 /// ## Example
 /// ```python
