@@ -640,7 +640,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     if !element.is_single_valued(self.db)
                         && !element.is_literal_string()
                         && !element.is_bool(self.db)
-                        && !(element.is_enum(self.db) && !element.overrides_equality(self.db))
+                        && (!element.is_enum(self.db) || element.overrides_equality(self.db))
                     {
                         builder = builder.add(*element);
                     }
