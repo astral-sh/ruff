@@ -26,7 +26,6 @@ use crate::semantic_index::scope::{
     NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopeKind, ScopeLaziness,
 };
 use crate::semantic_index::symbol::ScopedSymbolId;
-pub(crate) use crate::semantic_index::use_def::{BoundnessAnalysis, ConsideredDefinitions};
 use crate::semantic_index::use_def::{EnclosingSnapshotKey, ScopedEnclosingSnapshotId, UseDefMap};
 use crate::semantic_model::HasTrackedScope;
 

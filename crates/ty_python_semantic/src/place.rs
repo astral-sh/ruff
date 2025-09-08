@@ -6,8 +6,7 @@ use crate::semantic_index::definition::{Definition, DefinitionState};
 use crate::semantic_index::place::{PlaceExprRef, ScopedPlaceId};
 use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{
-    BindingWithConstraints, BindingWithConstraintsIterator, BoundnessAnalysis,
-    ConsideredDefinitions, DeclarationsIterator, place_table,
+    BindingWithConstraints, BindingWithConstraintsIterator, DeclarationsIterator, place_table,
 };
 use crate::semantic_index::{DeclarationWithConstraint, global_scope, use_def_map};
 use crate::types::{
@@ -1509,6 +1508,48 @@ impl RequiresExplicitReExport {
     const fn is_yes(self) -> bool {
         matches!(self, RequiresExplicitReExport::Yes)
     }
+}
+
+/// Specifies which definitions should be considered when looking up a place.
+///
+/// In the example below, the `EndOfScope` variant would consider the `x = 2` and `x = 3` definitions,
+/// while the `AllReachable` variant would also consider the `x = 1` definition.
+/// ```py
+/// def _():
+///     x = 1
+///
+///     x = 2
+///
+///     if flag():
+///         x = 3
+/// ```
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
+pub(crate) enum ConsideredDefinitions {
+    /// Consider only the definitions that are "live" at the end of the scope, i.e. those
+    /// that have not been shadowed or deleted.
+    EndOfScope,
+    /// Consider all definitions that are reachable from the start of the scope.
+    AllReachable,
+}
+
+/// Specifies how the boundness of a place should be determined.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
+pub(crate) enum BoundnessAnalysis {
+    /// The place is always considered bound.
+    AssumeBound,
+    /// The boundness of the place is determined based on the visibility of the implicit
+    /// `unbound` binding. In the example below, when analyzing the visibility of the
+    /// `x = <unbound>` binding from the position of the end of the scope, it would be
+    /// `Truthiness::Ambiguous`, because it could either be visible or not, depending on the
+    /// `flag()` return value. This would result in a `Boundness::PossiblyUnbound` for `x`.
+    ///
+    /// ```py
+    /// x = <unbound>
+    ///
+    /// if flag():
+    ///     x = 1
+    /// ```
+    BasedOnUnboundVisibility,
 }
 
 /// Computes a possibly-widened type `Unknown | T_inferred` from the inferred type `T_inferred`

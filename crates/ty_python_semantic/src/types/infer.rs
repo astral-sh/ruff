@@ -69,10 +69,10 @@ use crate::module_resolver::{
 };
 use crate::node_key::NodeKey;
 use crate::place::{
-    Boundness, LookupError, Place, PlaceAndQualifiers, builtins_module_scope, builtins_symbol,
-    explicit_global_symbol, global_symbol, module_type_implicit_global_declaration,
-    module_type_implicit_global_symbol, place, place_from_bindings, place_from_declarations,
-    typing_extensions_symbol,
+    Boundness, ConsideredDefinitions, LookupError, Place, PlaceAndQualifiers,
+    builtins_module_scope, builtins_symbol, explicit_global_symbol, global_symbol,
+    module_type_implicit_global_declaration, module_type_implicit_global_symbol, place,
+    place_from_bindings, place_from_declarations, typing_extensions_symbol,
 };
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::{HasScopedUseId, ScopedUseId};
@@ -89,8 +89,7 @@ use crate::semantic_index::scope::{
 };
 use crate::semantic_index::symbol::ScopedSymbolId;
 use crate::semantic_index::{
-    ApplicableConstraints, ConsideredDefinitions, EnclosingSnapshotResult, SemanticIndex,
-    place_table, semantic_index,
+    ApplicableConstraints, EnclosingSnapshotResult, SemanticIndex, place_table, semantic_index,
 };
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::class::{CodeGeneratorKind, FieldKind, MetaclassErrorKind, MethodDecorator};

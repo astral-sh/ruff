@@ -244,6 +244,7 @@ use ruff_index::{IndexVec, newtype_index};
 use rustc_hash::FxHashMap;
 
 use crate::node_key::NodeKey;
+use crate::place::BoundnessAnalysis;
 use crate::semantic_index::ast_ids::ScopedUseId;
 use crate::semantic_index::definition::{Definition, DefinitionState};
 use crate::semantic_index::member::ScopedMemberId;
@@ -268,48 +269,6 @@ use crate::semantic_index::{EnclosingSnapshotResult, SemanticIndex};
 use crate::types::{IntersectionBuilder, Truthiness, Type, infer_narrowing_constraint};
 
 mod place_state;
-
-/// Specifies how the boundness of a place should be determined.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub(crate) enum BoundnessAnalysis {
-    /// The place is always considered bound.
-    AssumeBound,
-    /// The boundness of the place is determined based on the visibility of the implicit
-    /// `unbound` binding. In the example below, when analyzing the visibility of the
-    /// `x = <unbound>` binding from the position of the end of the scope, it would be
-    /// `Truthiness::Ambiguous`, because it could either be visible or not, depending on the
-    /// `flag()` return value. This would result in a `Boundness::PossiblyUnbound` for `x`.
-    ///
-    /// ```py
-    /// x = <unbound>
-    ///
-    /// if flag():
-    ///     x = 1
-    /// ```
-    BasedOnUnboundVisibility,
-}
-
-/// Specifies which definitions should be considered when looking up a place.
-///
-/// In the example below, the `EndOfScope` variant would consider the `x = 2` and `x = 3` definitions,
-/// while the `AllReachable` variant would also consider the `x = 1` definition.
-/// ```py
-/// def _():
-///     x = 1
-///
-///     x = 2
-///
-///     if flag():
-///         x = 3
-/// ```
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
-pub(crate) enum ConsideredDefinitions {
-    /// Consider only the definitions that are "live" at the end of the scope, i.e. those
-    /// that have not been shadowed or deleted.
-    EndOfScope,
-    /// Consider all definitions that are reachable from the start of the scope.
-    AllReachable,
-}
 
 /// Applicable definitions and constraints for every use of a name.
 #[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]

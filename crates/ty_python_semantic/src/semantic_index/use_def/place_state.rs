@@ -206,7 +206,7 @@ impl EnclosingSnapshot {
 /// Live bindings for a single place at some point in control flow. Each live binding comes
 /// with a set of narrowing constraints and a reachability constraint.
 #[derive(Clone, Debug, Default, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
-pub(crate) struct Bindings {
+pub(super) struct Bindings {
     /// The narrowing constraint applicable to the "unbound" binding, if we need access to it even
     /// when it's not visible. This happens in class scopes, where local name bindings are not visible
     /// to nested scopes, but we still need to know what narrowing constraints were applied to the
