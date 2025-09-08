@@ -1192,7 +1192,7 @@ impl<'db> Constraint<'db> {
     ///
     /// Panics if `ty` is not fully static.
     fn not_equivalent(db: &'db dyn Db, ty: Type<'db>) -> Satisfiable<Constraint<'db>> {
-        debug_assert_eq!(ty, ty.bottom_materialization(db));
+        debug_assert_eq!(ty, ty.top_materialization(db));
         Satisfiable::Constrained(Constraint::NotEquivalent(NotEquivalentConstraint { ty }))
     }
 }
@@ -1305,7 +1305,7 @@ impl<'db> Constraint<'db> {
     ///
     /// Panics if `ty` is not fully static.
     fn not_comparable(db: &'db dyn Db, ty: Type<'db>) -> Satisfiable<Constraint<'db>> {
-        debug_assert_eq!(ty, ty.bottom_materialization(db));
+        debug_assert_eq!(ty, ty.top_materialization(db));
         Satisfiable::Constrained(Constraint::NotComparable(NotComparableConstraint { ty }))
     }
 }
