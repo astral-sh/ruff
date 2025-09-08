@@ -24,7 +24,7 @@
 //! You can then build up more complex constraint sets using union, intersection, and negation
 //! operations. We use a disjunctive normal form (DNF) representation, just like we do for types: a
 //! [constraint set][ConstraintSet] is the union of zero or more [clauses][ConstraintClause], each
-//! of which is the intersection of zero or more [individual constraints][AtomicConstraint]. Note
+//! of which is the intersection of zero or more [individual constraints][ConstrainedTypeVar]. Note
 //! that the constraint set that contains no clauses is never satisfiable (`⋃ {} = 0`); and the
 //! constraint set that contains a single clause, where that clause contains no constraints,
 //! is always satisfiable (`⋃ {⋂ {}} = 1`).
@@ -214,7 +214,7 @@ where
 ///
 /// We use a DNF representation, so a set contains a list of zero or more
 /// [clauses][ConstraintClause], each of which is an intersection of zero or more
-/// [constraints][AtomicConstraint].
+/// [constraints][ConstrainedTypeVar].
 ///
 /// This is called a "set of constraint sets", and denoted _𝒮_, in [[POPL2015][]].
 ///
@@ -251,7 +251,7 @@ impl<'db> ConstraintSet<'db> {
     fn union_constraint(
         &mut self,
         db: &'db dyn Db,
-        constraint: Satisfiable<AtomicConstraint<'db>>,
+        constraint: Satisfiable<ConstrainedTypeVar<'db>>,
     ) {
         self.union_clause(
             db,
@@ -409,16 +409,11 @@ impl<'db> Constraints<'db> for ConstraintSet<'db> {
 ///
 /// This is called a "constraint set", and denoted _C_, in [[POPL2015][]].
 ///
-/// ### Invariants
-///
-/// - No two constraints in the clause will constrain the same typevar.
-/// - The constraints are sorted by typevar.
-///
 /// [POPL2015]: https://doi.org/10.1145/2676726.2676991
 #[derive(Clone, Debug)]
 pub(crate) struct ConstraintClause<'db> {
     // NOTE: We use 1 here because most clauses only mention a single typevar.
-    constraints: SmallVec<[AtomicConstraint<'db>; 1]>,
+    constraints: SmallVec<[ConstrainedTypeVar<'db>; 1]>,
 }
 
 impl<'db> ConstraintClause<'db> {
@@ -430,7 +425,7 @@ impl<'db> ConstraintClause<'db> {
     }
 
     /// Returns a clause containing a single constraint.
-    fn singleton(constraint: AtomicConstraint<'db>) -> Self {
+    fn singleton(constraint: ConstrainedTypeVar<'db>) -> Self {
         Self {
             constraints: smallvec![constraint],
         }
@@ -439,13 +434,11 @@ impl<'db> ConstraintClause<'db> {
     /// Returns a clause that is the intersection of an iterator of constraints.
     fn from_constraints(
         db: &'db dyn Db,
-        constraints: impl IntoIterator<Item = AtomicConstraint<'db>>,
+        constraints: impl IntoIterator<Item = Satisfiable<ConstrainedTypeVar<'db>>>,
     ) -> Satisfiable<Self> {
         let mut result = Self::always();
         for constraint in constraints {
-            if result.intersect_constraint(db, Satisfiable::Constrained(&constraint))
-                == Satisfiable::Never
-            {
+            if result.intersect_constraint(db, constraint) == Satisfiable::Never {
                 return Satisfiable::Never;
             }
         }
@@ -465,9 +458,9 @@ impl<'db> ConstraintClause<'db> {
     fn intersect_constraint(
         &mut self,
         db: &'db dyn Db,
-        constraint: Satisfiable<&AtomicConstraint<'db>>,
+        constraint: Satisfiable<ConstrainedTypeVar<'db>>,
     ) -> Satisfiable<()> {
-        let constraint = match constraint {
+        let mut constraint = match constraint {
             // If the new constraint cannot be satisfied, that causes this whole clause to be
             // unsatisfiable too.
             Satisfiable::Never => return Satisfiable::Never,
@@ -479,47 +472,64 @@ impl<'db> ConstraintClause<'db> {
             Satisfiable::Constrained(constraint) => constraint,
         };
 
-        // If the clause does not already contain a constraint for this typevar, we just insert the
-        // new constraint into the clause and return.
-        let index = match (self.constraints)
-            .binary_search_by_key(&constraint.typevar, |existing| existing.typevar)
-        {
-            Ok(index) => index,
-            Err(index) => {
-                self.constraints.insert(index, constraint.clone());
-                return Satisfiable::Constrained(());
-            }
-        };
+        // Naively, we would just append the new constraint to the clauses's list of constraints.
+        // But that doesn't ensure that the constraints are simplified with respect to each other.
+        // So instead, we iterate through the list of existing constraints, and try to simplify the
+        // new constraint against each one in turn. (We can assume that the existing constraints
+        // are already simplified with respect to each other, since we can assume that the
+        // invariant holds upon entry to this method.)
+        let mut existing_constraints = std::mem::take(&mut self.constraints).into_iter();
+        for existing in existing_constraints.by_ref() {
+            // Try to simplify the new constraint against an existing constraint.
+            match existing.intersect(db, &constraint) {
+                Simplifiable::NeverSatisfiable => {
+                    // If two constraints cancel out to 0, that makes the entire clause 0, and all
+                    // existing constraints are simplified away.
+                    return Satisfiable::Never;
+                }
 
-        // If the clause already contains a constraint for this typevar, we need to intersect the
-        // existing and new constraints, and simplify the clause accordingly.
-        match self.constraints[index].intersect(db, constraint) {
-            // ... ∩ 0 ∩ ... == 0
-            // If the intersected constraint cannot be satisfied, that causes this whole clause to
-            // be unsatisfiable too.
-            Satisfiable::Never => Satisfiable::Never,
+                Simplifiable::AlwaysSatisfiable => {
+                    // If two constraints cancel out to 1, that does NOT cause the entire clause to
+                    // become 1. We need to keep whatever constraints have already been added to
+                    // the result, and also need to copy over any later constraints that we hadn't
+                    // processed yet.
+                    self.constraints.extend(existing_constraints);
+                    if self.is_always() {
+                        // If there are no further constraints in the clause, the clause is now always
+                        // satisfied.
+                        return Satisfiable::Always;
+                    } else {
+                        return Satisfiable::Constrained(());
+                    }
+                }
 
-            // ... ∩ 1 ∩ ... == ...
-            // If the intersected result is always satisfied, then the constraint no longer
-            // contributes anything to the clause, and can be removed.
-            Satisfiable::Always => {
-                self.constraints.remove(index);
-                if self.is_always() {
-                    // If there are no further constraints in the clause, the clause is now always
-                    // satisfied.
-                    Satisfiable::Always
-                } else {
-                    Satisfiable::Constrained(())
+                Simplifiable::NotSimplified(existing, c) => {
+                    // We couldn't simplify the new constraint relative to this existing
+                    // constraint, so add the existing constraint to the result. Continue trying to
+                    // simplify the new constraint against the later existing constraints.
+                    self.constraints.push(existing);
+                    constraint = c;
+                }
+
+                Simplifiable::Simplified(c) => {
+                    // We were able to simplify the new constraint relative to this existing
+                    // constraint. Don't add it to the result yet; instead, try to simplify the
+                    // result further against later existing constraints.
+                    constraint = c;
                 }
             }
+        }
 
-            // ... ∩ X ∩ ... == ... ∩ X ∩ ...
-            // If the intersection is a single constraint, we can reuse the existing constraint's
-            // place in the clause's constraint list.
-            Satisfiable::Constrained(constraint) => {
-                self.constraints[index] = constraint;
-                Satisfiable::Constrained(())
-            }
+        // If we fall through then we need to add the new constraint to the constraint list (either
+        // because we couldn't simplify it with anything, or because we did without it canceling
+        // out).
+        self.constraints.push(constraint);
+        if self.is_always() {
+            // If there are no further constraints in the clause, the clause is now always
+            // satisfied.
+            Satisfiable::Always
+        } else {
+            Satisfiable::Constrained(())
         }
     }
 
@@ -528,7 +538,7 @@ impl<'db> ConstraintClause<'db> {
         // Add each `other` constraint in turn. Short-circuit if the result ever becomes 0.
         let mut result = self.clone();
         for constraint in &other.constraints {
-            match result.intersect_constraint(db, Satisfiable::Constrained(constraint)) {
+            match result.intersect_constraint(db, Satisfiable::Constrained(constraint.clone())) {
                 Satisfiable::Never => return Satisfiable::Never,
                 Satisfiable::Always | Satisfiable::Constrained(()) => {}
             }
@@ -748,7 +758,7 @@ impl<'db> ConstraintClause<'db> {
     fn negate(&self, db: &'db dyn Db) -> ConstraintSet<'db> {
         let mut result = ConstraintSet::never();
         for constraint in &self.constraints {
-            result.union_set(db, constraint.negate(db));
+            constraint.negate_into(db, &mut result);
         }
         result
     }
@@ -1160,11 +1170,6 @@ pub(crate) struct ConstrainedTypeVar<'db> {
 }
 
 impl<'db> ConstrainedTypeVar<'db> {
-    /// Adds the negation of this atomic constraint to a constraint set.
-    fn negate_into(&self, db: &'db dyn Db, set: &mut ConstraintSet<'db>) {
-        self.constraint.negate_into(db, self.typevar, set);
-    }
-
     /// Returns the intersection of this atomic constraint and another.
     ///
     /// Panics if the two constraints have different typevars.
@@ -1173,6 +1178,35 @@ impl<'db> ConstrainedTypeVar<'db> {
         self.constraint
             .intersect(db, &other.constraint)
             .map(|constraint| constraint.constrain(self.typevar))
+    }
+
+    /// Returns the union of this atomic constraint and another.
+    ///
+    /// Panics if the two constraints have different typevars.
+    fn union(&self, db: &'db dyn Db, other: &Self) -> Simplifiable<Self> {
+        debug_assert_eq!(self.typevar, other.typevar);
+        self.constraint
+            .union(db, &other.constraint)
+            .map(|constraint| constraint.constrain(self.typevar))
+    }
+
+    /// Adds the negation of this atomic constraint to a constraint set.
+    fn negate_into(&self, db: &'db dyn Db, set: &mut ConstraintSet<'db>) {
+        self.constraint.negate_into(db, self.typevar, set);
+    }
+
+    /// Returns whether `self` has tighter bounds than `other` — that is, if the intersection of
+    /// `self` and `other` is `self`.
+    fn subsumes(&self, db: &'db dyn Db, other: &Self) -> bool {
+        debug_assert_eq!(self.typevar, other.typevar);
+        match self.intersect(db, other) {
+            Simplifiable::Simplified(intersection) => intersection == *self,
+            _ => false,
+        }
+    }
+
+    fn display(&self, db: &'db dyn Db) -> impl Display {
+        self.constraint.display(db, self.typevar.display(db))
     }
 }
 
