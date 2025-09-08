@@ -253,10 +253,7 @@ impl<'db> ConstraintSet<'db> {
         db: &'db dyn Db,
         constraint: Satisfiable<ConstrainedTypeVar<'db>>,
     ) {
-        self.union_clause(
-            db,
-            constraint.map(|constraint| ConstraintClause::singleton(constraint)),
-        );
+        self.union_clause(db, constraint.map(ConstraintClause::singleton));
     }
 
     /// Updates this set to be the union of itself and a clause. To maintain the invariants of this
@@ -498,9 +495,8 @@ impl<'db> ConstraintClause<'db> {
                         // If there are no further constraints in the clause, the clause is now always
                         // satisfied.
                         return Satisfiable::Always;
-                    } else {
-                        return Satisfiable::Constrained(());
                     }
+                    return Satisfiable::Constrained(());
                 }
 
                 Simplifiable::NotSimplified(existing, c) => {
@@ -991,11 +987,15 @@ pub(crate) struct RangeConstraint<'db> {
     upper: Type<'db>,
 }
 
-impl<'db> RangeConstraint<'db> {
+impl<'db> NewConstraint<'db> {
     /// Returns a new range constraint.
     ///
     /// Panics if `lower` and `upper` are not both fully static.
-    fn new(db: &'db dyn Db, lower: Type<'db>, upper: Type<'db>) -> Satisfiable<NewConstraint<'db>> {
+    fn range(
+        db: &'db dyn Db,
+        lower: Type<'db>,
+        upper: Type<'db>,
+    ) -> Satisfiable<NewConstraint<'db>> {
         debug_assert_eq!(lower, lower.bottom_materialization(db));
         debug_assert_eq!(upper, upper.top_materialization(db));
 
@@ -1013,14 +1013,16 @@ impl<'db> RangeConstraint<'db> {
 
         Satisfiable::Constrained(NewConstraint::Range(RangeConstraint { lower, upper }))
     }
+}
 
+impl<'db> RangeConstraint<'db> {
     fn intersect_range(
         &self,
         db: &'db dyn Db,
         other: &RangeConstraint<'db>,
     ) -> Simplifiable<NewConstraint<'db>> {
         // (s₁ ≤ α ≤ t₁) ∧ (s₂ ≤ α ≤ t₂) = (s₁ ∪ s₂) ≤ α (t₁ ∩ t₂)
-        Simplifiable::from_one(RangeConstraint::new(
+        Simplifiable::from_one(NewConstraint::range(
             db,
             UnionType::from_elements(db, [self.lower, other.lower]),
             IntersectionType::from_elements(db, [self.upper, other.upper]),
@@ -1125,14 +1127,14 @@ impl<'db> RangeConstraint<'db> {
             ConstraintClause::from_constraints(
                 db,
                 [
-                    RangeConstraint::new(db, Type::Never, self.lower).constrain(typevar),
-                    NotEquivalentConstraint::new(db, self.lower).constrain(typevar),
+                    NewConstraint::range(db, Type::Never, self.lower).constrain(typevar),
+                    NewConstraint::not_equivalent(db, self.lower).constrain(typevar),
                 ],
             ),
         );
         set.union_constraint(
             db,
-            NotComparableConstraint::new(db, self.lower).constrain(typevar),
+            NewConstraint::not_comparable(db, self.lower).constrain(typevar),
         );
 
         // Upper bound:
@@ -1142,14 +1144,14 @@ impl<'db> RangeConstraint<'db> {
             ConstraintClause::from_constraints(
                 db,
                 [
-                    RangeConstraint::new(db, self.upper, Type::object(db)).constrain(typevar),
-                    NotEquivalentConstraint::new(db, self.upper).constrain(typevar),
+                    NewConstraint::range(db, self.upper, Type::object(db)).constrain(typevar),
+                    NewConstraint::not_equivalent(db, self.upper).constrain(typevar),
                 ],
             ),
         );
         set.union_constraint(
             db,
-            NotComparableConstraint::new(db, self.upper).constrain(typevar),
+            NewConstraint::not_comparable(db, self.upper).constrain(typevar),
         );
     }
 
@@ -1187,15 +1189,17 @@ pub(crate) struct NotEquivalentConstraint<'db> {
     ty: Type<'db>,
 }
 
-impl<'db> NotEquivalentConstraint<'db> {
+impl<'db> NewConstraint<'db> {
     /// Returns a new not-equivalent constraint.
     ///
     /// Panics if `ty` is not fully static.
-    fn new(db: &'db dyn Db, ty: Type<'db>) -> Satisfiable<NewConstraint<'db>> {
+    fn not_equivalent(db: &'db dyn Db, ty: Type<'db>) -> Satisfiable<NewConstraint<'db>> {
         debug_assert_eq!(ty, ty.bottom_materialization(db));
         Satisfiable::Constrained(NewConstraint::NotEquivalent(NotEquivalentConstraint { ty }))
     }
+}
 
+impl<'db> NotEquivalentConstraint<'db> {
     fn intersect_not_equivalent(
         &self,
         db: &'db dyn Db,
@@ -1263,7 +1267,7 @@ impl<'db> NotEquivalentConstraint<'db> {
         // ¬(α ≠ t) = (t ≤ α ≤ t)
         set.union_constraint(
             db,
-            RangeConstraint::new(db, self.ty, self.ty).constrain(typevar),
+            NewConstraint::range(db, self.ty, self.ty).constrain(typevar),
         );
     }
 
@@ -1298,15 +1302,17 @@ pub(crate) struct NotComparableConstraint<'db> {
     ty: Type<'db>,
 }
 
-impl<'db> NotComparableConstraint<'db> {
+impl<'db> NewConstraint<'db> {
     /// Returns a new not-comparable constraint.
     ///
     /// Panics if `ty` is not fully static.
-    fn new(db: &'db dyn Db, ty: Type<'db>) -> Satisfiable<NewConstraint<'db>> {
+    fn not_comparable(db: &'db dyn Db, ty: Type<'db>) -> Satisfiable<NewConstraint<'db>> {
         debug_assert_eq!(ty, ty.bottom_materialization(db));
         Satisfiable::Constrained(NewConstraint::NotComparable(NotComparableConstraint { ty }))
     }
+}
 
+impl<'db> NotComparableConstraint<'db> {
     fn intersect_not_comparable(
         &self,
         db: &'db dyn Db,
@@ -1345,11 +1351,11 @@ impl<'db> NotComparableConstraint<'db> {
         // ¬(α ≁ t) = (t ≤ α) ∨ (α ≤ t)
         set.union_constraint(
             db,
-            RangeConstraint::new(db, Type::Never, self.ty).constrain(typevar),
+            NewConstraint::range(db, Type::Never, self.ty).constrain(typevar),
         );
         set.union_constraint(
             db,
-            RangeConstraint::new(db, self.ty, Type::object(db)).constrain(typevar),
+            NewConstraint::range(db, self.ty, Type::object(db)).constrain(typevar),
         );
     }
 
