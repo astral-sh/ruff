@@ -3420,7 +3420,7 @@ impl<'db> Type<'db> {
             Type::ProtocolInstance(ProtocolInstanceType {
                 inner: Protocol::Synthesized(protocol),
                 ..
-            }) if policy.contains(MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK)
+            }) if policy.mro_no_object_fallback()
                 && !protocol.interface().includes_member(db, name_str) =>
             {
                 Place::Unbound.into()
