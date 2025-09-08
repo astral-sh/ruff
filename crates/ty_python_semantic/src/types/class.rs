@@ -3,20 +3,16 @@ use std::sync::{LazyLock, Mutex};
 use super::TypeVarVariance;
 use super::{
     BoundTypeVarInstance, IntersectionBuilder, MemberLookupPolicy, Mro, MroError, MroIterator,
-    SpecialFormType, SubclassOfType, Truthiness, Type, TypeQualifiers,
-    class_base::ClassBase,
-    function::{FunctionDecorators, FunctionType},
-    infer_expression_type, infer_unpack_types,
+    SpecialFormType, SubclassOfType, Truthiness, Type, TypeQualifiers, class_base::ClassBase,
+    function::FunctionType, infer_expression_type, infer_unpack_types,
 };
 use crate::FxOrderMap;
 use crate::module_resolver::KnownModule;
 use crate::semantic_index::definition::{Definition, DefinitionState};
-use crate::semantic_index::place::ScopedPlaceId;
 use crate::semantic_index::scope::NodeWithScopeKind;
 use crate::semantic_index::symbol::Symbol;
 use crate::semantic_index::{
-    BindingWithConstraints, DeclarationWithConstraint, SemanticIndex, attribute_declarations,
-    attribute_scopes,
+    DeclarationWithConstraint, SemanticIndex, attribute_declarations, attribute_scopes,
 };
 use crate::types::constraints::{ConstraintSet, Constraints, IteratorConstraintsExtension};
 use crate::types::context::InferContext;
@@ -285,19 +281,6 @@ impl<'db> GenericAlias<'db> {
         )
     }
 
-    pub(super) fn materialize(
-        self,
-        db: &'db dyn Db,
-        materialization_kind: MaterializationKind,
-    ) -> Self {
-        Self::new(
-            db,
-            self.origin(db),
-            self.specialization(db)
-                .materialize(db, materialization_kind),
-        )
-    }
-
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         self.origin(db).definition(db)
     }
@@ -420,17 +403,6 @@ impl<'db> ClassType<'db> {
         match self {
             Self::NonGeneric(_) => self,
             Self::Generic(generic) => Self::Generic(generic.normalized_impl(db, visitor)),
-        }
-    }
-
-    pub(super) fn materialize(
-        self,
-        db: &'db dyn Db,
-        materialization_kind: MaterializationKind,
-    ) -> Self {
-        match self {
-            Self::NonGeneric(_) => self,
-            Self::Generic(generic) => Self::Generic(generic.materialize(db, materialization_kind)),
         }
     }
 
@@ -784,7 +756,17 @@ impl<'db> ClassType<'db> {
         let fallback_member_lookup = || {
             class_literal
                 .own_class_member(db, inherited_generic_context, specialization, name)
-                .map_type(|ty| ty.apply_optional_specialization(db, specialization))
+                .map_type(|ty| {
+                    let ty = ty.apply_optional_specialization(db, specialization);
+                    match specialization.map(|spec| spec.materialization_kind(db)) {
+                        Some(Some(materialization_kind)) => ty.materialize(
+                            db,
+                            materialization_kind,
+                            &ApplyTypeMappingVisitor::default(),
+                        ),
+                        _ => ty,
+                    }
+                })
         };
 
         let synthesize_simple_tuple_method = |return_type| {
@@ -1283,11 +1265,8 @@ pub(super) enum MethodDecorator {
 }
 
 impl MethodDecorator {
-    fn try_from_fn_type(db: &dyn Db, fn_type: FunctionType) -> Result<Self, ()> {
-        match (
-            fn_type.is_classmethod(db),
-            fn_type.has_known_decorator(db, FunctionDecorators::STATICMETHOD),
-        ) {
+    pub(crate) fn try_from_fn_type(db: &dyn Db, fn_type: FunctionType) -> Result<Self, ()> {
+        match (fn_type.is_classmethod(db), fn_type.is_staticmethod(db)) {
             (true, true) => Err(()), // A method can't be static and class method at the same time.
             (true, false) => Ok(Self::ClassMethod),
             (false, true) => Ok(Self::StaticMethod),
@@ -1317,6 +1296,8 @@ pub(crate) enum FieldKind<'db> {
     TypedDict {
         /// Whether this field is required
         is_required: bool,
+        /// Whether this field is marked read-only
+        is_read_only: bool,
     },
 }
 
@@ -1327,6 +1308,9 @@ pub(crate) struct Field<'db> {
     pub(crate) declared_ty: Type<'db>,
     /// Kind-specific metadata for this field
     pub(crate) kind: FieldKind<'db>,
+    /// The original declaration of this field, if there is exactly one.
+    /// This field is used for backreferences in diagnostics.
+    pub(crate) single_declaration: Option<Definition<'db>>,
 }
 
 impl Field<'_> {
@@ -1338,7 +1322,14 @@ impl Field<'_> {
             FieldKind::Dataclass {
                 init, default_ty, ..
             } => default_ty.is_none() && *init,
-            FieldKind::TypedDict { is_required } => *is_required,
+            FieldKind::TypedDict { is_required, .. } => *is_required,
+        }
+    }
+
+    pub(crate) const fn is_read_only(&self) -> bool {
+        match &self.kind {
+            FieldKind::TypedDict { is_read_only, .. } => *is_read_only,
+            _ => false,
         }
     }
 }
@@ -1439,7 +1430,7 @@ impl<'db> ClassLiteral<'db> {
         let scope = self.body_scope(db);
         let file = scope.file(db);
         let parsed = parsed_module(db, file).load(db);
-        let class_def_node = scope.node(db).expect_class(&parsed);
+        let class_def_node = scope.node(db).expect_class().node(&parsed);
         class_def_node.type_params.as_ref().map(|type_params| {
             let index = semantic_index(db, scope.file(db));
             let definition = index.expect_single_definition(class_def_node);
@@ -1481,14 +1472,13 @@ impl<'db> ClassLiteral<'db> {
     /// query depends on the AST of another file (bad!).
     fn node<'ast>(self, db: &'db dyn Db, module: &'ast ParsedModuleRef) -> &'ast ast::StmtClassDef {
         let scope = self.body_scope(db);
-        scope.node(db).expect_class(module)
+        scope.node(db).expect_class().node(module)
     }
 
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         let body_scope = self.body_scope(db);
-        let module = parsed_module(db, body_scope.file(db)).load(db);
         let index = semantic_index(db, body_scope.file(db));
-        index.expect_single_definition(body_scope.node(db).expect_class(&module))
+        index.expect_single_definition(body_scope.node(db).expect_class())
     }
 
     pub(crate) fn apply_specialization(
@@ -1513,6 +1503,18 @@ impl<'db> ClassLiteral<'db> {
         self.apply_specialization(db, |generic_context| {
             specialization
                 .unwrap_or_else(|| generic_context.default_specialization(db, self.known(db)))
+        })
+    }
+
+    pub(crate) fn top_materialization(self, db: &'db dyn Db) -> ClassType<'db> {
+        self.apply_specialization(db, |generic_context| {
+            generic_context
+                .default_specialization(db, self.known(db))
+                .materialize_impl(
+                    db,
+                    MaterializationKind::Top,
+                    &ApplyTypeMappingVisitor::default(),
+                )
         })
     }
 
@@ -2307,11 +2309,46 @@ impl<'db> ClassLiteral<'db> {
                 }
                 None
             }
+            (CodeGeneratorKind::DataclassLike, "__slots__") => {
+                has_dataclass_param(DataclassParams::SLOTS).then(|| {
+                    let fields = self.fields(db, specialization, field_policy);
+                    let slots = fields.keys().map(|name| Type::string_literal(db, name));
+                    Type::heterogeneous_tuple(db, slots)
+                })
+            }
             (CodeGeneratorKind::TypedDict, "__setitem__") => {
                 let fields = self.fields(db, specialization, field_policy);
 
-                // Add (key type, value type) overloads for all TypedDict items ("fields"):
-                let overloads = fields.iter().map(|(name, field)| {
+                // Add (key type, value type) overloads for all TypedDict items ("fields") that are not read-only:
+
+                let mut writeable_fields = fields
+                    .iter()
+                    .filter(|(_, field)| !field.is_read_only())
+                    .peekable();
+
+                if writeable_fields.peek().is_none() {
+                    // If there are no writeable fields, synthesize a `__setitem__` that takes
+                    // a `key` of type `Never` to signal that no keys are accepted. This leads
+                    // to slightly more user-friendly error messages compared to returning an
+                    // empty overload set.
+                    return Some(Type::Callable(CallableType::new(
+                        db,
+                        CallableSignature::single(Signature::new(
+                            Parameters::new([
+                                Parameter::positional_only(Some(Name::new_static("self")))
+                                    .with_annotated_type(instance_ty),
+                                Parameter::positional_only(Some(Name::new_static("key")))
+                                    .with_annotated_type(Type::Never),
+                                Parameter::positional_only(Some(Name::new_static("value")))
+                                    .with_annotated_type(Type::any()),
+                            ]),
+                            Some(Type::none(db)),
+                        )),
+                        true,
+                    )));
+                }
+
+                let overloads = writeable_fields.map(|(name, field)| {
                     let key_type = Type::StringLiteral(StringLiteralType::new(db, name.as_str()));
 
                     Signature::new(
@@ -2663,7 +2700,9 @@ impl<'db> ClassLiteral<'db> {
 
             let symbol = table.symbol(symbol_id);
 
-            let attr = place_from_declarations(db, declarations).ignore_conflicting_declarations();
+            let result = place_from_declarations(db, declarations.clone());
+            let single_declaration = result.single_declaration;
+            let attr = result.ignore_conflicting_declarations();
             if attr.is_class_var() {
                 continue;
             }
@@ -2714,13 +2753,18 @@ impl<'db> ClassLiteral<'db> {
                                 .expect("TypedDictParams should be available for CodeGeneratorKind::TypedDict")
                                 .contains(TypedDictParams::TOTAL)
                         };
-                        FieldKind::TypedDict { is_required }
+
+                        FieldKind::TypedDict {
+                            is_required,
+                            is_read_only: attr.is_read_only(),
+                        }
                     }
                 };
 
                 let mut field = Field {
                     declared_ty: attr_ty.apply_optional_specialization(db, specialization),
                     kind,
+                    single_declaration,
                 };
 
                 // Check if this is a KW_ONLY sentinel and mark subsequent fields as keyword-only
@@ -2859,8 +2903,8 @@ impl<'db> ClassLiteral<'db> {
         let class_table = place_table(db, class_body_scope);
 
         let is_valid_scope = |method_scope: ScopeId<'db>| {
-            if let Some(method_def) = method_scope.node(db).as_function(&module) {
-                let method_name = method_def.name.as_str();
+            if let Some(method_def) = method_scope.node(db).as_function() {
+                let method_name = method_def.node(&module).name.as_str();
                 if let Place::Type(Type::FunctionLiteral(method_type), _) =
                     class_symbol(db, class_body_scope, method_name).place
                 {
@@ -2935,20 +2979,22 @@ impl<'db> ClassLiteral<'db> {
             }
 
             // The attribute assignment inherits the reachability of the method which contains it
-            let is_method_reachable =
-                if let Some(method_def) = method_scope.node(db).as_function(&module) {
-                    let method = index.expect_single_definition(method_def);
-                    let method_place = class_table.symbol_id(&method_def.name).unwrap();
-                    class_map
-                        .all_reachable_symbol_bindings(method_place)
-                        .find_map(|bind| {
-                            (bind.binding.is_defined_and(|def| def == method))
-                                .then(|| class_map.binding_reachability(db, &bind))
-                        })
-                        .unwrap_or(Truthiness::AlwaysFalse)
-                } else {
-                    Truthiness::AlwaysFalse
-                };
+            let is_method_reachable = if let Some(method_def) = method_scope.node(db).as_function()
+            {
+                let method = index.expect_single_definition(method_def);
+                let method_place = class_table
+                    .symbol_id(&method_def.node(&module).name)
+                    .unwrap();
+                class_map
+                    .all_reachable_symbol_bindings(method_place)
+                    .find_map(|bind| {
+                        (bind.binding.is_defined_and(|def| def == method))
+                            .then(|| class_map.binding_reachability(db, &bind))
+                    })
+                    .unwrap_or(Truthiness::AlwaysFalse)
+            } else {
+                Truthiness::AlwaysFalse
+            };
             if is_method_reachable.is_always_false() {
                 continue;
             }
@@ -3312,7 +3358,7 @@ impl<'db> ClassLiteral<'db> {
     pub(super) fn header_range(self, db: &'db dyn Db) -> TextRange {
         let class_scope = self.body_scope(db);
         let module = parsed_module(db, class_scope.file(db)).load(db);
-        let class_node = class_scope.node(db).expect_class(&module);
+        let class_node = class_scope.node(db).expect_class().node(&module);
         let class_name = &class_node.name;
         TextRange::new(
             class_name.start(),
@@ -3322,54 +3368,6 @@ impl<'db> ClassLiteral<'db> {
                 .map(Ranged::end)
                 .unwrap_or_else(|| class_name.end()),
         )
-    }
-
-    pub(super) fn declarations_of_name(
-        self,
-        db: &'db dyn Db,
-        name: &str,
-        index: &'db SemanticIndex<'db>,
-    ) -> Option<impl Iterator<Item = DeclarationWithConstraint<'db>>> {
-        let class_body_scope = self.body_scope(db).file_scope_id(db);
-        let symbol_id = index.place_table(class_body_scope).symbol_id(name)?;
-        let use_def = index.use_def_map(class_body_scope);
-        Some(use_def.end_of_scope_declarations(ScopedPlaceId::Symbol(symbol_id)))
-    }
-
-    pub(super) fn first_declaration_of_name(
-        self,
-        db: &'db dyn Db,
-        name: &str,
-        index: &'db SemanticIndex<'db>,
-    ) -> Option<DeclarationWithConstraint<'db>> {
-        self.declarations_of_name(db, name, index)
-            .into_iter()
-            .flatten()
-            .next()
-    }
-
-    pub(super) fn bindings_of_name(
-        self,
-        db: &'db dyn Db,
-        name: &str,
-        index: &'db SemanticIndex<'db>,
-    ) -> Option<impl Iterator<Item = BindingWithConstraints<'db, 'db>>> {
-        let class_body_scope = self.body_scope(db).file_scope_id(db);
-        let symbol_id = index.place_table(class_body_scope).symbol_id(name)?;
-        let use_def = index.use_def_map(class_body_scope);
-        Some(use_def.end_of_scope_bindings(ScopedPlaceId::Symbol(symbol_id)))
-    }
-
-    pub(super) fn first_binding_of_name(
-        self,
-        db: &'db dyn Db,
-        name: &str,
-        index: &'db SemanticIndex<'db>,
-    ) -> Option<BindingWithConstraints<'db, 'db>> {
-        self.bindings_of_name(db, name, index)
-            .into_iter()
-            .flatten()
-            .next()
     }
 }
 
@@ -4821,8 +4819,7 @@ impl KnownClass {
                 //   2. The first parameter of the current function (typically `self` or `cls`)
                 match overload.parameter_types() {
                     [] => {
-                        let Some(enclosing_class) =
-                            nearest_enclosing_class(db, index, scope, module)
+                        let Some(enclosing_class) = nearest_enclosing_class(db, index, scope)
                         else {
                             BoundSuperError::UnavailableImplicitArguments
                                 .report_diagnostic(context, call_expression.into());

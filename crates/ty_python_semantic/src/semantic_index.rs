@@ -159,7 +159,6 @@ pub(crate) fn attribute_scopes<'db, 's>(
     class_body_scope: ScopeId<'db>,
 ) -> impl Iterator<Item = FileScopeId> + use<'s, 'db> {
     let file = class_body_scope.file(db);
-    let module = parsed_module(db, file).load(db);
     let index = semantic_index(db, file);
     let class_scope_id = class_body_scope.file_scope_id(db);
 
@@ -175,7 +174,7 @@ pub(crate) fn attribute_scopes<'db, 's>(
                 (child_scope_id, scope)
             };
 
-        function_scope.node().as_function(&module)?;
+        function_scope.node().as_function()?;
         Some(function_scope_id)
     })
 }
@@ -330,6 +329,39 @@ impl<'db> SemanticIndex<'db> {
     #[track_caller]
     pub(crate) fn parent_scope(&self, scope_id: FileScopeId) -> Option<&Scope> {
         Some(&self.scopes[self.parent_scope_id(scope_id)?])
+    }
+
+    /// Return the [`Definition`] of the class enclosing this method, given the
+    /// method's body scope, or `None` if it is not a method.
+    pub(crate) fn class_definition_of_method(
+        &self,
+        function_body_scope: FileScopeId,
+    ) -> Option<Definition<'db>> {
+        let current_scope = self.scope(function_body_scope);
+        if current_scope.kind() != ScopeKind::Function {
+            return None;
+        }
+        let parent_scope_id = current_scope.parent()?;
+        let parent_scope = self.scope(parent_scope_id);
+
+        let class_scope = match parent_scope.kind() {
+            ScopeKind::Class => parent_scope,
+            ScopeKind::TypeParams => {
+                let class_scope_id = parent_scope.parent()?;
+                let potentially_class_scope = self.scope(class_scope_id);
+
+                match potentially_class_scope.kind() {
+                    ScopeKind::Class => potentially_class_scope,
+                    _ => return None,
+                }
+            }
+            _ => return None,
+        };
+
+        class_scope
+            .node()
+            .as_class()
+            .map(|node_ref| self.expect_single_definition(node_ref))
     }
 
     fn is_scope_reachable(&self, db: &'db dyn Db, scope_id: FileScopeId) -> bool {

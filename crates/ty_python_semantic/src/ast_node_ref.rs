@@ -49,6 +49,12 @@ pub struct AstNodeRef<T> {
     _node: PhantomData<T>,
 }
 
+impl<T> AstNodeRef<T> {
+    pub(crate) fn index(&self) -> NodeIndex {
+        self.index
+    }
+}
+
 impl<T> AstNodeRef<T>
 where
     T: HasNodeIndex + Ranged + PartialEq + Debug,

@@ -93,7 +93,7 @@ use crate::semantic_index::{
     use_def_map,
 };
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
-use crate::types::class::{CodeGeneratorKind, FieldKind, MetaclassErrorKind};
+use crate::types::class::{CodeGeneratorKind, FieldKind, MetaclassErrorKind, MethodDecorator};
 use crate::types::diagnostic::{
     self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS,
     CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, DUPLICATE_KW_ONLY, INCONSISTENT_MRO,
@@ -126,6 +126,7 @@ use crate::types::typed_dict::{
     validate_typed_dict_key_assignment,
 };
 use crate::types::unpacker::{UnpackResult, Unpacker};
+use crate::types::visitor::any_over_type;
 use crate::types::{
     CallDunderError, CallableType, ClassLiteral, ClassType, DataclassParams, DivergentType,
     DynamicType, IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType,
@@ -422,12 +423,11 @@ pub(crate) fn nearest_enclosing_class<'db>(
     db: &'db dyn Db,
     semantic: &SemanticIndex<'db>,
     scope: ScopeId,
-    parsed: &ParsedModuleRef,
 ) -> Option<ClassLiteral<'db>> {
     semantic
         .ancestor_scopes(scope.file_scope_id(db))
         .find_map(|(_, ancestor_scope)| {
-            let class = ancestor_scope.node().as_class(parsed)?;
+            let class = ancestor_scope.node().as_class()?;
             let definition = semantic.expect_single_definition(class);
             infer_definition_types(db, definition)
                 .declaration_type(definition)
@@ -1302,14 +1302,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             default_ty: Some(_)
                         }
                     ) {
-                        field_with_default_encountered = Some(field_name);
+                        field_with_default_encountered =
+                            Some((field_name, field.single_declaration));
                     } else if let Some(field_with_default) = field_with_default_encountered.as_ref()
                     {
                         report_namedtuple_field_without_default_after_field_with_default(
                             &self.context,
                             class,
-                            self.index,
-                            &field_name,
+                            &(field_name, field.single_declaration),
                             field_with_default,
                         );
                     }
@@ -2526,32 +2526,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// is a class scope OR the immediate parent scope is an annotation scope
     /// and the grandparent scope is a class scope. This means it has different
     /// behaviour to the [`nearest_enclosing_class`] function.
-    fn class_context_of_current_method(&self) -> Option<ClassLiteral<'db>> {
+    fn class_context_of_current_method(&self) -> Option<ClassType<'db>> {
         let current_scope_id = self.scope().file_scope_id(self.db());
-        let current_scope = self.index.scope(current_scope_id);
-        if current_scope.kind() != ScopeKind::Function {
-            return None;
-        }
-        let parent_scope_id = current_scope.parent()?;
-        let parent_scope = self.index.scope(parent_scope_id);
-
-        let class_scope = match parent_scope.kind() {
-            ScopeKind::Class => parent_scope,
-            ScopeKind::TypeParams => {
-                let class_scope_id = parent_scope.parent()?;
-                let potentially_class_scope = self.index.scope(class_scope_id);
-
-                match potentially_class_scope.kind() {
-                    ScopeKind::Class => potentially_class_scope,
-                    _ => return None,
-                }
-            }
-            _ => return None,
-        };
-
-        let class_stmt = class_scope.node().as_class(self.module())?;
-        let class_definition = self.index.expect_single_definition(class_stmt);
-        binding_type(self.db(), class_definition).into_class_literal()
+        let class_definition = self.index.class_definition_of_method(current_scope_id)?;
+        binding_type(self.db(), class_definition).to_class_type(self.db())
     }
 
     /// If the current scope is a (non-lambda) function, return that function's AST node.
@@ -2563,7 +2541,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if !current_scope.kind().is_non_lambda_function() {
             return None;
         }
-        current_scope.node().as_function(self.module())
+        current_scope
+            .node()
+            .as_function()
+            .map(|node_ref| node_ref.node(self.module()))
     }
 
     fn function_decorator_types<'a>(
@@ -7294,26 +7275,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let first_parameter_name = first_parameter.name();
 
-        let function_decorators = FunctionDecorators::from_decorator_types(
-            self.db(),
-            self.function_decorator_types(current_function),
-        );
+        let function_definition = self.index.expect_single_definition(current_function);
+        let Type::FunctionLiteral(function_type) = binding_type(self.db(), function_definition)
+        else {
+            return;
+        };
 
-        let attribute_exists = if function_decorators.contains(FunctionDecorators::CLASSMETHOD) {
-            if function_decorators.contains(FunctionDecorators::STATICMETHOD) {
-                return;
-            }
-            !Type::instance(self.db(), class.default_specialization(self.db()))
+        let attribute_exists = match MethodDecorator::try_from_fn_type(self.db(), function_type) {
+            Ok(MethodDecorator::ClassMethod) => !Type::instance(self.db(), class)
                 .class_member(self.db(), id.clone())
                 .place
-                .is_unbound()
-        } else if !function_decorators.contains(FunctionDecorators::STATICMETHOD) {
-            !Type::instance(self.db(), class.default_specialization(self.db()))
+                .is_unbound(),
+            Ok(MethodDecorator::None) => !Type::instance(self.db(), class)
                 .member(self.db(), id)
                 .place
-                .is_unbound()
-        } else {
-            false
+                .is_unbound(),
+            Ok(MethodDecorator::StaticMethod) | Err(()) => false,
         };
 
         if attribute_exists {
@@ -9394,26 +9371,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let typevars: Result<FxOrderSet<_>, GenericContextError> = typevars
             .iter()
-            .map(|typevar| match typevar {
-                Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => bind_typevar(
-                    self.db(),
-                    self.module(),
-                    self.index,
-                    self.scope().file_scope_id(self.db()),
-                    self.typevar_binding_context,
-                    *typevar,
-                )
-                .ok_or(GenericContextError::InvalidArgument),
-                Type::Dynamic(DynamicType::TodoUnpack) => Err(GenericContextError::NotYetSupported),
-                Type::NominalInstance(nominal)
-                    if matches!(
+            .map(|typevar| {
+                if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = typevar {
+                    bind_typevar(
+                        self.db(),
+                        self.module(),
+                        self.index,
+                        self.scope().file_scope_id(self.db()),
+                        self.typevar_binding_context,
+                        *typevar,
+                    )
+                    .ok_or(GenericContextError::InvalidArgument)
+                } else if any_over_type(self.db(), *typevar, &|ty| match ty {
+                    Type::Dynamic(DynamicType::TodoUnpack) => true,
+                    Type::NominalInstance(nominal) => matches!(
                         nominal.class(self.db()).known(self.db()),
                         Some(KnownClass::TypeVarTuple | KnownClass::ParamSpec)
-                    ) =>
-                {
+                    ),
+                    _ => false,
+                }) {
                     Err(GenericContextError::NotYetSupported)
-                }
-                _ => {
+                } else {
                     if let Some(builder) =
                         self.context.report_lint(&INVALID_ARGUMENT_TYPE, value_node)
                     {
@@ -11399,18 +11377,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     // `Callable[]`.
                     return None;
                 }
-                match self.infer_name_load(name) {
-                    Type::Dynamic(DynamicType::TodoPEP695ParamSpec) => {
-                        return Some(Parameters::todo());
-                    }
-                    Type::NominalInstance(nominal)
-                        if nominal
-                            .class(self.db())
-                            .is_known(self.db(), KnownClass::ParamSpec) =>
-                    {
-                        return Some(Parameters::todo());
-                    }
-                    _ => {}
+                if any_over_type(self.db(), self.infer_name_load(name), &|ty| match ty {
+                    Type::Dynamic(DynamicType::TodoPEP695ParamSpec) => true,
+                    Type::NominalInstance(nominal) => nominal
+                        .class(self.db())
+                        .is_known(self.db(), KnownClass::ParamSpec),
+                    _ => false,
+                }) {
+                    return Some(Parameters::todo());
                 }
             }
             _ => {}

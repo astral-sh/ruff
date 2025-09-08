@@ -12,7 +12,7 @@
 
 use std::{collections::HashMap, slice::Iter};
 
-use itertools::EitherOrBoth;
+use itertools::{EitherOrBoth, Itertools};
 use smallvec::{SmallVec, smallvec_inline};
 
 use super::{DynamicType, Type, TypeVarVariance, definition_expression_type};
@@ -57,18 +57,6 @@ impl<'db> CallableSignature<'db> {
 
     pub(crate) fn iter(&self) -> std::slice::Iter<'_, Signature<'db>> {
         self.overloads.iter()
-    }
-
-    pub(super) fn materialize(
-        &self,
-        db: &'db dyn Db,
-        materialization_kind: MaterializationKind,
-    ) -> Self {
-        Self::from_overloads(
-            self.overloads
-                .iter()
-                .map(|signature| signature.materialize(db, materialization_kind)),
-        )
     }
 
     pub(crate) fn normalized_impl(
@@ -376,9 +364,14 @@ impl<'db> Signature<'db> {
         definition: Definition<'db>,
         function_node: &ast::StmtFunctionDef,
         is_generator: bool,
+        has_implicitly_positional_first_parameter: bool,
     ) -> Self {
-        let parameters =
-            Parameters::from_parameters(db, definition, function_node.parameters.as_ref());
+        let parameters = Parameters::from_parameters(
+            db,
+            definition,
+            function_node.parameters.as_ref(),
+            has_implicitly_positional_first_parameter,
+        );
         let return_ty = function_node.returns.as_ref().map(|returns| {
             let plain_return_ty = definition_expression_type(db, definition, returns.as_ref())
                 .apply_type_mapping(
@@ -426,21 +419,6 @@ impl<'db> Signature<'db> {
         self
     }
 
-    fn materialize(&self, db: &'db dyn Db, materialization_kind: MaterializationKind) -> Self {
-        Self {
-            generic_context: self.generic_context,
-            inherited_generic_context: self.inherited_generic_context,
-            definition: self.definition,
-            // Parameters are at contravariant position, so the variance is flipped.
-            parameters: self.parameters.materialize(db, materialization_kind.flip()),
-            return_ty: Some(
-                self.return_ty
-                    .unwrap_or(Type::unknown())
-                    .materialize(db, materialization_kind),
-            ),
-        }
-    }
-
     pub(crate) fn normalized_impl(
         &self,
         db: &'db dyn Db,
@@ -481,13 +459,19 @@ impl<'db> Signature<'db> {
         type_mapping: &TypeMapping<'a, 'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
+        let flipped_mapping = match type_mapping {
+            TypeMapping::Materialize(materialization_kind) => {
+                &TypeMapping::Materialize(materialization_kind.flip())
+            }
+            _ => type_mapping,
+        };
         Self {
             generic_context: self.generic_context,
             inherited_generic_context: self.inherited_generic_context,
             definition: self.definition,
             parameters: self
                 .parameters
-                .apply_type_mapping_impl(db, type_mapping, visitor),
+                .apply_type_mapping_impl(db, flipped_mapping, visitor),
             return_ty: self
                 .return_ty
                 .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, visitor)),
@@ -1111,17 +1095,6 @@ impl<'db> Parameters<'db> {
         }
     }
 
-    fn materialize(&self, db: &'db dyn Db, materialization_kind: MaterializationKind) -> Self {
-        if self.is_gradual {
-            Parameters::object(db)
-        } else {
-            Parameters::new(
-                self.iter()
-                    .map(|parameter| parameter.materialize(db, materialization_kind)),
-            )
-        }
-    }
-
     pub(crate) fn as_slice(&self) -> &[Parameter<'db>] {
         self.value.as_slice()
     }
@@ -1194,6 +1167,7 @@ impl<'db> Parameters<'db> {
         db: &'db dyn Db,
         definition: Definition<'db>,
         parameters: &ast::Parameters,
+        has_implicitly_positional_first_parameter: bool,
     ) -> Self {
         let ast::Parameters {
             posonlyargs,
@@ -1204,23 +1178,46 @@ impl<'db> Parameters<'db> {
             range: _,
             node_index: _,
         } = parameters;
+
         let default_type = |param: &ast::ParameterWithDefault| {
             param
                 .default()
                 .map(|default| definition_expression_type(db, definition, default))
         };
-        let positional_only = posonlyargs.iter().map(|arg| {
+
+        let pos_only_param = |param: &ast::ParameterWithDefault| {
             Parameter::from_node_and_kind(
                 db,
                 definition,
-                &arg.parameter,
+                &param.parameter,
                 ParameterKind::PositionalOnly {
-                    name: Some(arg.parameter.name.id.clone()),
-                    default_type: default_type(arg),
+                    name: Some(param.parameter.name.id.clone()),
+                    default_type: default_type(param),
                 },
             )
-        });
-        let positional_or_keyword = args.iter().map(|arg| {
+        };
+
+        let mut positional_only: Vec<Parameter> = posonlyargs.iter().map(pos_only_param).collect();
+
+        let mut pos_or_keyword_iter = args.iter();
+
+        // If there are no PEP-570 positional-only parameters, check for the legacy PEP-484 convention
+        // for denoting positional-only parameters (parameters that start with `__` and do not end with `__`)
+        if positional_only.is_empty() {
+            let pos_or_keyword_iter = pos_or_keyword_iter.by_ref();
+
+            if has_implicitly_positional_first_parameter {
+                positional_only.extend(pos_or_keyword_iter.next().map(pos_only_param));
+            }
+
+            positional_only.extend(
+                pos_or_keyword_iter
+                    .peeking_take_while(|param| param.uses_pep_484_positional_only_convention())
+                    .map(pos_only_param),
+            );
+        }
+
+        let positional_or_keyword = pos_or_keyword_iter.map(|arg| {
             Parameter::from_node_and_kind(
                 db,
                 definition,
@@ -1231,6 +1228,7 @@ impl<'db> Parameters<'db> {
                 },
             )
         });
+
         let variadic = vararg.as_ref().map(|arg| {
             Parameter::from_node_and_kind(
                 db,
@@ -1241,6 +1239,7 @@ impl<'db> Parameters<'db> {
                 },
             )
         });
+
         let keyword_only = kwonlyargs.iter().map(|arg| {
             Parameter::from_node_and_kind(
                 db,
@@ -1252,6 +1251,7 @@ impl<'db> Parameters<'db> {
                 },
             )
         });
+
         let keywords = kwarg.as_ref().map(|arg| {
             Parameter::from_node_and_kind(
                 db,
@@ -1262,8 +1262,10 @@ impl<'db> Parameters<'db> {
                 },
             )
         });
+
         Self::new(
             positional_only
+                .into_iter()
                 .chain(positional_or_keyword)
                 .chain(variadic)
                 .chain(keyword_only)
@@ -1277,13 +1279,27 @@ impl<'db> Parameters<'db> {
         type_mapping: &TypeMapping<'a, 'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
-        Self {
-            value: self
-                .value
-                .iter()
-                .map(|param| param.apply_type_mapping_impl(db, type_mapping, visitor))
-                .collect(),
-            is_gradual: self.is_gradual,
+        match type_mapping {
+            // Note that we've already flipped the materialization in Signature.apply_type_mapping_impl(),
+            // so the "top" materialization here is the bottom materialization of the whole Signature.
+            // It might make sense to flip the materialization here instead.
+            TypeMapping::Materialize(MaterializationKind::Top) if self.is_gradual => {
+                Parameters::object(db)
+            }
+            // TODO: This is wrong, the empty Parameters is not a subtype of all materializations.
+            // The bottom materialization is not currently representable and implementing it
+            // properly requires extending the Parameters struct.
+            TypeMapping::Materialize(MaterializationKind::Bottom) if self.is_gradual => {
+                Parameters::empty()
+            }
+            _ => Self {
+                value: self
+                    .value
+                    .iter()
+                    .map(|param| param.apply_type_mapping_impl(db, type_mapping, visitor))
+                    .collect(),
+                is_gradual: self.is_gradual,
+            },
         }
     }
 
@@ -1459,18 +1475,6 @@ impl<'db> Parameter<'db> {
     pub(crate) fn type_form(mut self) -> Self {
         self.form = ParameterForm::Type;
         self
-    }
-
-    fn materialize(&self, db: &'db dyn Db, materialization_kind: MaterializationKind) -> Self {
-        Self {
-            annotated_type: Some(
-                self.annotated_type
-                    .unwrap_or(Type::unknown())
-                    .materialize(db, materialization_kind),
-            ),
-            kind: self.kind.clone(),
-            form: self.form,
-        }
     }
 
     fn apply_type_mapping_impl<'a>(
