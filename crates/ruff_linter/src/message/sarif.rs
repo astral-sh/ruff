@@ -276,9 +276,7 @@ impl<'a> SarifResult<'a> {
         let start_location = message.expect_ruff_start_location();
         let end_location = message.expect_ruff_end_location();
         let path = normalize_path(&*message.expect_ruff_filename());
-        let uri = url::Url::from_file_path(&path)
-            .map_err(|()| anyhow::anyhow!("Failed to convert path to URL: {}", path.display()))?
-            .to_string();
+        let uri = format!("file://{}", path.display());
         let fixes = message
             .fix()
             .map(|fix| {
