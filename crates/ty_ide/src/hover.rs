@@ -1589,7 +1589,6 @@ def ab(a: int, *, c: int):
             "#,
         );
 
-        // TODO: This should render T@Alias once we create GenericContexts for type alias scopes.
         assert_snapshot!(test.hover(), @r"
         T@Alias
         ---------------------------------------------
