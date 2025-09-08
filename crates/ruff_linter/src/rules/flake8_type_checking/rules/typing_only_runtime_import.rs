@@ -38,6 +38,13 @@ use crate::{Fix, FixAvailability, Violation};
 /// [`lint.flake8-type-checking.runtime-evaluated-decorators`] settings to mark them
 /// as such.
 ///
+/// If [`lint.future-annotations`] is set to `true`, `from __future__ import
+/// annotations` will be added if doing so would enable an import to be
+/// moved into an `if TYPE_CHECKING:` block. This takes precedence over the
+/// [`lint.flake8-type-checking.quote-annotations`] setting described above if
+/// both settings are enabled.
+///
+///
 /// ## Example
 /// ```python
 /// from __future__ import annotations
@@ -62,14 +69,6 @@ use crate::{Fix, FixAvailability, Violation};
 /// def func(sized: local_module.Container) -> int:
 ///     return len(sized)
 /// ```
-///
-///
-/// ## Preview
-/// If [`lint.future-annotations`] is set to `true`, `from __future__ import
-/// annotations` will be added if doing so would enable an import to be moved into an `if
-/// TYPE_CHECKING:` block. This takes precedence over the
-/// [`lint.flake8-type-checking.quote-annotations`] setting described above if both settings are
-/// enabled.
 ///
 /// ## Options
 /// - `lint.flake8-type-checking.quote-annotations`
@@ -122,6 +121,12 @@ impl Violation for TypingOnlyFirstPartyImport {
 /// [`lint.flake8-type-checking.runtime-evaluated-decorators`] settings to mark them
 /// as such.
 ///
+/// If [`lint.future-annotations`] is set to `true`, `from __future__ import
+/// annotations` will be added if doing so would enable an import to be
+/// moved into an `if TYPE_CHECKING:` block. This takes precedence over the
+/// [`lint.flake8-type-checking.quote-annotations`] setting described above if
+/// both settings are enabled.
+///
 /// ## Example
 /// ```python
 /// from __future__ import annotations
@@ -146,13 +151,6 @@ impl Violation for TypingOnlyFirstPartyImport {
 /// def func(df: pd.DataFrame) -> int:
 ///     return len(df)
 /// ```
-///
-/// ## Preview
-/// If [`lint.future-annotations`] is set to `true`, `from __future__ import
-/// annotations` will be added if doing so would enable an import to be moved into an `if
-/// TYPE_CHECKING:` block. This takes precedence over the
-/// [`lint.flake8-type-checking.quote-annotations`] setting described above if both settings are
-/// enabled.
 ///
 /// ## Options
 /// - `lint.flake8-type-checking.quote-annotations`
@@ -205,6 +203,12 @@ impl Violation for TypingOnlyThirdPartyImport {
 /// [`lint.flake8-type-checking.runtime-evaluated-decorators`] settings to mark them
 /// as such.
 ///
+/// If [`lint.future-annotations`] is set to `true`, `from __future__ import
+/// annotations` will be added if doing so would enable an import to be
+/// moved into an `if TYPE_CHECKING:` block. This takes precedence over the
+/// [`lint.flake8-type-checking.quote-annotations`] setting described above if
+/// both settings are enabled.
+///
 /// ## Example
 /// ```python
 /// from __future__ import annotations
@@ -229,15 +233,6 @@ impl Violation for TypingOnlyThirdPartyImport {
 /// def func(path: Path) -> str:
 ///     return str(path)
 /// ```
-///
-/// ## Preview
-///
-/// When [preview](https://docs.astral.sh/ruff/preview/) is enabled, if
-/// [`lint.future-annotations`] is set to `true`, `from __future__ import
-/// annotations` will be added if doing so would enable an import to be moved into an `if
-/// TYPE_CHECKING:` block. This takes precedence over the
-/// [`lint.flake8-type-checking.quote-annotations`] setting described above if both settings are
-/// enabled.
 ///
 /// ## Options
 /// - `lint.flake8-type-checking.quote-annotations`
@@ -287,7 +282,7 @@ pub(crate) fn typing_only_runtime_import(
 
         // If we can't add a `__future__` import and in un-strict mode, don't flag typing-only
         // imports that are implicitly loaded by way of a valid runtime import.
-        if !checker.settings().future_annotations()
+        if !checker.settings().future_annotations
             && !checker.settings().flake8_type_checking.strict
             && runtime_imports
                 .iter()
