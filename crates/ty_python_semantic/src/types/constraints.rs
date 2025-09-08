@@ -1048,9 +1048,13 @@ impl<'db> RangeConstraint<'db> {
 
     fn intersect_not_comparable(
         &self,
-        _db: &'db dyn Db,
+        db: &'db dyn Db,
         other: &NotComparableConstraint<'db>,
     ) -> Simplifiable<Constraint<'db>> {
+        if self.lower.is_equivalent_to(db, other.ty) || self.upper.is_equivalent_to(db, other.ty) {
+            return Simplifiable::NeverSatisfiable;
+        }
+
         // A range constraint and a not-comparable constraint cannot be simplified.
         Simplifiable::NotSimplified(
             Constraint::Range(self.clone()),
