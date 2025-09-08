@@ -22,6 +22,33 @@ exit_code: 1
     {
       "results": [
         {
+          "fixes": [
+            {
+              "artifactChanges": [
+                {
+                  "artifactLocation": {
+                    "uri": "[TMP]/input.py"
+                  },
+                  "replacements": [
+                    {
+                      "deletedRegion": {
+                        "endColumn": 10,
+                        "endLine": 1,
+                        "startColumn": 8,
+                        "startLine": 1
+                      },
+                      "insertedContent": {
+                        "text": ""
+                      }
+                    }
+                  ]
+                }
+              ],
+              "description": {
+                "text": "Remove unused import: `os`"
+              }
+            }
+          ],
           "level": "error",
           "locations": [
             {
