@@ -6896,7 +6896,7 @@ impl<'db> KnownInstanceType<'db> {
                         f.write_str("typing.Generic")?;
                         generic_context.display(self.db).fmt(f)
                     }
-                    KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(alias)) => {
+                    KnownInstanceType::TypeAliasType(alias) => {
                         if let Some(specialization) = alias.specialization(self.db) {
                             f.write_str(alias.name(self.db))?;
                             specialization
@@ -6906,7 +6906,6 @@ impl<'db> KnownInstanceType<'db> {
                             f.write_str("typing.TypeAliasType")
                         }
                     }
-                    KnownInstanceType::TypeAliasType(_) => f.write_str("typing.TypeAliasType"),
                     // This is a legacy `TypeVar` _outside_ of any generic class or function, so we render
                     // it as an instance of `typing.TypeVar`. Inside of a generic class or function, we'll
                     // have a `Type::TypeVar(_)`, which is rendered as the typevar's name.
@@ -9602,6 +9601,34 @@ impl<'db> TypeAliasType<'db> {
         match self {
             TypeAliasType::PEP695(type_alias) => Some(type_alias),
             TypeAliasType::ManualPEP695(_) => None,
+        }
+    }
+
+    pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
+        // TODO: Add support for generic non-PEP695 type aliases.
+        match self {
+            TypeAliasType::PEP695(type_alias) => type_alias.generic_context(db),
+            TypeAliasType::ManualPEP695(_) => None,
+        }
+    }
+
+    pub(crate) fn specialization(self, db: &'db dyn Db) -> Option<Specialization<'db>> {
+        match self {
+            TypeAliasType::PEP695(type_alias) => type_alias.specialization(db),
+            TypeAliasType::ManualPEP695(_) => None,
+        }
+    }
+
+    pub(crate) fn apply_specialization(
+        self,
+        db: &'db dyn Db,
+        f: impl FnOnce(GenericContext<'db>) -> Specialization<'db>,
+    ) -> Self {
+        match self {
+            TypeAliasType::PEP695(type_alias) => {
+                TypeAliasType::PEP695(type_alias.apply_specialization(db, f))
+            }
+            TypeAliasType::ManualPEP695(_) => self,
         }
     }
 }

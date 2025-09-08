@@ -8819,11 +8819,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if let Type::SpecialForm(SpecialFormType::Tuple) = value_ty {
             return tuple_generic_alias(self.db(), self.infer_tuple_type_expression(slice));
         }
-        // TODO: Add support for non-PEP695 generic type aliases.
-        if let Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(
-            type_alias,
-        ))) = value_ty
-        {
+        if let Type::KnownInstance(KnownInstanceType::TypeAliasType(type_alias)) = value_ty {
             if let Some(generic_context) = type_alias.generic_context(self.db()) {
                 return self.infer_explicit_type_alias_specialization(
                     subscript,
@@ -8865,7 +8861,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &mut self,
         subscript: &ast::ExprSubscript,
         value_ty: Type<'db>,
-        generic_type_alias: PEP695TypeAliasType<'db>,
+        generic_type_alias: TypeAliasType<'db>,
         generic_context: GenericContext<'db>,
     ) -> Type<'db> {
         let db = self.db();
@@ -8874,9 +8870,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 generic_context.specialize_partial(db, types.iter().copied())
             });
 
-            Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(
-                type_alias,
-            )))
+            Type::KnownInstance(KnownInstanceType::TypeAliasType(type_alias))
         };
 
         self.infer_explicit_callable_specialization(
@@ -10607,7 +10601,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     self.infer_type_expression(&subscript.slice);
                     todo_type!("TypeVar annotations")
                 }
-                KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(type_alias)) => {
+                KnownInstanceType::TypeAliasType(type_alias @ TypeAliasType::PEP695(_)) => {
                     match type_alias.generic_context(self.db()) {
                         Some(generic_context) => {
                             let specialized_type_alias = self

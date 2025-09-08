@@ -156,7 +156,6 @@ def _(g: G):
 
 ## Aliases are not callable
 
-
 ```py
 type A = int
 type B[T] = T
