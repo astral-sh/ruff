@@ -1375,7 +1375,6 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // used to collect all the overloaded definitions of a function. This needs to be
                 // done on the `Identifier` node as opposed to `ExprName` because that's what the
                 // AST uses.
-                self.mark_symbol_used(symbol);
                 let use_id = self.current_ast_ids().record_use(name);
                 self.current_use_def_map_mut().record_use(
                     symbol.into(),
@@ -1384,6 +1383,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 );
 
                 self.add_definition(symbol.into(), function_def);
+                self.mark_symbol_used(symbol);
             }
             ast::Stmt::ClassDef(class) => {
                 for decorator in &class.decorator_list {
