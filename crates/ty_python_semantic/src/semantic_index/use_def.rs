@@ -243,10 +243,6 @@
 use ruff_index::{IndexVec, newtype_index};
 use rustc_hash::FxHashMap;
 
-use self::place_state::{
-    Bindings, Declarations, EnclosingSnapshot, LiveBindingsIterator, LiveDeclaration,
-    LiveDeclarationsIterator, PlaceState, ScopedDefinitionId,
-};
 use crate::node_key::NodeKey;
 use crate::place::BoundnessAnalysis;
 use crate::semantic_index::ast_ids::ScopedUseId;
@@ -254,6 +250,7 @@ use crate::semantic_index::definition::{Definition, DefinitionState};
 use crate::semantic_index::member::ScopedMemberId;
 use crate::semantic_index::narrowing_constraints::{
     ConstraintKey, NarrowingConstraints, NarrowingConstraintsBuilder, NarrowingConstraintsIterator,
+    ScopedNarrowingConstraint,
 };
 use crate::semantic_index::place::{PlaceExprRef, ScopedPlaceId};
 use crate::semantic_index::predicate::{
@@ -264,7 +261,10 @@ use crate::semantic_index::reachability_constraints::{
 };
 use crate::semantic_index::scope::{FileScopeId, ScopeKind, ScopeLaziness};
 use crate::semantic_index::symbol::ScopedSymbolId;
-use crate::semantic_index::use_def::place_state::PreviousDefinitions;
+use crate::semantic_index::use_def::place_state::{
+    Bindings, Declarations, EnclosingSnapshot, LiveBindingsIterator, LiveDeclaration,
+    LiveDeclarationsIterator, PlaceState, PreviousDefinitions, ScopedDefinitionId,
+};
 use crate::semantic_index::{EnclosingSnapshotResult, SemanticIndex};
 use crate::types::{IntersectionBuilder, Truthiness, Type, infer_narrowing_constraint};
 
@@ -640,8 +640,8 @@ impl<'db> UseDefMap<'db> {
     }
 }
 
-/// Uniquely identifies a snapshot of an enclosing scope place state that can be used to resolve a reference in a
-/// nested scope.
+/// Uniquely identifies a snapshot of an enclosing scope place state that can be used to resolve a
+/// reference in a nested scope.
 ///
 /// An eager scope has its entire body executed immediately at the location where it is defined.
 /// For any free references in the nested scope, we use the bindings that are visible at the point
@@ -660,16 +660,14 @@ pub(crate) struct EnclosingSnapshotKey {
     pub(crate) enclosing_place: ScopedPlaceId,
     /// The nested scope containing the reference
     pub(crate) nested_scope: FileScopeId,
-    /// Laziness of the nested scope
+    /// Laziness of the nested scope (technically redundant, but convenient to have here)
     pub(crate) nested_laziness: ScopeLaziness,
 }
 
-/// A snapshot of enclosing scope place states that can be used to resolve a reference in a nested scope.
-/// Normally, if the current scope is lazily evaluated,
-/// we do not snapshot the place states from the enclosing scope,
-/// and infer the type of the place from its reachable definitions
-/// (and any narrowing constraints introduced in the enclosing scope do not apply to the current scope).
-/// The exception is if the symbol has never been reassigned, in which case it is snapshotted.
+/// Snapshots of enclosing scope place states for resolving a reference in a nested scope.
+/// If the nested scope is eager, the snapshot is simply recorded and used as is.
+/// If it is lazy, every time the outer symbol is reassigned, the snapshot is updated to add the
+/// new binding.
 type EnclosingSnapshots = IndexVec<ScopedEnclosingSnapshotId, EnclosingSnapshot>;
 
 #[derive(Debug)]
@@ -1185,7 +1183,7 @@ impl<'db> UseDefMapBuilder<'db> {
         self.node_reachability.insert(node_key, self.reachability);
     }
 
-    pub(super) fn snapshot_outer_state(
+    pub(super) fn snapshot_enclosing_state(
         &mut self,
         enclosing_place: ScopedPlaceId,
         scope: ScopeKind,
@@ -1205,6 +1203,27 @@ impl<'db> UseDefMapBuilder<'db> {
         } else {
             self.enclosing_snapshots
                 .push(EnclosingSnapshot::Bindings(bindings.clone()))
+        }
+    }
+
+    pub(super) fn update_enclosing_snapshot(
+        &mut self,
+        snapshot_id: ScopedEnclosingSnapshotId,
+        enclosing_symbol: ScopedSymbolId,
+    ) {
+        match self.enclosing_snapshots.get_mut(snapshot_id) {
+            Some(EnclosingSnapshot::Bindings(bindings)) => {
+                let new_symbol_state = &self.symbol_states[enclosing_symbol];
+                bindings.merge(
+                    new_symbol_state.bindings().clone(),
+                    &mut self.narrowing_constraints,
+                    &mut self.reachability_constraints,
+                );
+            }
+            Some(EnclosingSnapshot::Constraint(constraint)) => {
+                *constraint = ScopedNarrowingConstraint::empty();
+            }
+            None => {}
         }
     }
 
