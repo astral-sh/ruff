@@ -740,6 +740,12 @@ impl<'db> Type<'db> {
             .is_some_and(|instance| instance.class(db).is_known(db, KnownClass::Bool))
     }
 
+    fn is_enum(&self, db: &'db dyn Db) -> bool {
+        self.into_nominal_instance().is_some_and(|instance| {
+            crate::types::enums::enum_metadata(db, instance.class(db).class_literal(db).0).is_some()
+        })
+    }
+
     /// Return true if this is an enum literal or enum class instance that doesn't override __eq__ or __ne__
     fn is_simple_enum(&self, db: &'db dyn Db) -> bool {
         let is_enum = match self {
@@ -1012,11 +1018,11 @@ impl<'db> Type<'db> {
                 ty.is_single_valued(db)
                     || ty.is_bool(db)
                     || ty.is_literal_string()
-                    || ty.is_simple_enum(db)
+                    || (ty.is_enum(db) && !ty.overrides_equality(db))
             })
         }) || self.is_bool(db)
             || self.is_literal_string()
-            || self.is_simple_enum(db)
+            || (self.is_enum(db) && !self.overrides_equality(db))
     }
 
     pub(crate) fn is_union_with_single_valued(&self, db: &'db dyn Db) -> bool {
@@ -1025,11 +1031,11 @@ impl<'db> Type<'db> {
                 ty.is_single_valued(db)
                     || ty.is_bool(db)
                     || ty.is_literal_string()
-                    || ty.is_simple_enum(db)
+                    || (ty.is_enum(db) && !ty.overrides_equality(db))
             })
         }) || self.is_bool(db)
             || self.is_literal_string()
-            || self.is_simple_enum(db)
+            || (self.is_enum(db) && !self.overrides_equality(db))
     }
 
     pub(crate) fn into_string_literal(self) -> Option<StringLiteralType<'db>> {
