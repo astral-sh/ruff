@@ -13,7 +13,7 @@ expression: value
               "artifactChanges": [
                 {
                   "artifactLocation": {
-                    "uri": "file:///Users/nik/projects/ruff/crates/ruff_linter/fib.py"
+                    "uri": "[URI]"
                   },
                   "replacements": [
                     {
@@ -62,7 +62,7 @@ expression: value
               "artifactChanges": [
                 {
                   "artifactLocation": {
-                    "uri": "file:///Users/nik/projects/ruff/crates/ruff_linter/fib.py"
+                    "uri": "[URI]"
                   },
                   "replacements": [
                     {

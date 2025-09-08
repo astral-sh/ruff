@@ -384,6 +384,7 @@ mod tests {
         insta::assert_json_snapshot!(value, {
             ".runs[0].tool.driver.version" => "[VERSION]",
             ".runs[0].results[].locations[].physicalLocation.artifactLocation.uri" => "[URI]",
+            ".runs[0].results[].fixes[].artifactChanges[].artifactLocation.uri" => "[URI]",
         });
     }
 }
