@@ -82,7 +82,7 @@ pub(crate) fn invalid_noqa_code(
 
 fn code_is_valid(code: &Code, external: &[String]) -> bool {
     let code_str = code.as_str();
-    Rule::from_code(get_redirect_target(code.as_str()).unwrap_or(code.as_str())).is_ok()
+    Rule::from_code(get_redirect_target(code_str).unwrap_or(code_str)).is_ok()
         || external.iter().any(|ext| code_str.starts_with(ext))
 }
 
