@@ -105,7 +105,7 @@ fn group_diagnostics_by_filename(
             .or_insert_with(Vec::new)
             .push(MessageWithLocation {
                 message: diagnostic,
-                start_location: diagnostic.expect_ruff_start_location(),
+                start_location: diagnostic.ruff_start_location().unwrap_or_default(),
             });
     }
     grouped_messages
