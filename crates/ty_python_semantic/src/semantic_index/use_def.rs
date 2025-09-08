@@ -640,8 +640,8 @@ impl<'db> UseDefMap<'db> {
     }
 }
 
-/// Uniquely identifies a snapshot of an enclosing scope place state that can be used to resolve a reference in a
-/// nested scope.
+/// Uniquely identifies a snapshot of an enclosing scope place state that can be used to resolve a
+/// reference in a nested scope.
 ///
 /// An eager scope has its entire body executed immediately at the location where it is defined.
 /// For any free references in the nested scope, we use the bindings that are visible at the point
@@ -660,13 +660,14 @@ pub(crate) struct EnclosingSnapshotKey {
     pub(crate) enclosing_place: ScopedPlaceId,
     /// The nested scope containing the reference
     pub(crate) nested_scope: FileScopeId,
-    /// Laziness of the nested scope
+    /// Laziness of the nested scope (technically redundant, but convenient to have here)
     pub(crate) nested_laziness: ScopeLaziness,
 }
 
-/// A snapshot of enclosing scope place states that can be used to resolve a reference in a nested scope.
+/// Snapshots of enclosing scope place states for resolving a reference in a nested scope.
 /// If the nested scope is eager, the snapshot is simply recorded and used as is.
-/// If it is lazy, every time a symbol is reassigned, the snapshot is updated to take into account its new binding.
+/// If it is lazy, every time the outer symbol is reassigned, the snapshot is updated to add the
+/// new binding.
 type EnclosingSnapshots = IndexVec<ScopedEnclosingSnapshotId, EnclosingSnapshot>;
 
 #[derive(Debug)]

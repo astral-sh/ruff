@@ -115,6 +115,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     ///
     /// [generator functions]: https://docs.python.org/3/glossary.html#term-generator
     generator_functions: FxHashSet<FileScopeId>,
+    /// Snapshots of enclosing-scope place states visible from nested scopes.
     enclosing_snapshots: FxHashMap<EnclosingSnapshotKey, ScopedEnclosingSnapshotId>,
     /// Errors collected by the `semantic_checker`.
     semantic_syntax_errors: RefCell<Vec<SemanticSyntaxError>>,
@@ -430,6 +431,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let current_scope = self.current_scope();
         let current_place_table = &self.place_tables[current_scope];
         let symbol = current_place_table.symbol(symbol);
+        // Optimization: if this is the first binding of the symbol we've seen, there can't be any
+        // lazy snapshots of it to update.
         if !symbol.is_reassigned() {
             return;
         }
