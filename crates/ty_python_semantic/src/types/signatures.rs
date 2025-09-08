@@ -20,13 +20,16 @@ use super::{
     semantic_index,
 };
 use crate::semantic_index::definition::{Definition, DefinitionKind};
+use crate::semantic_index::scope::ScopeId;
 use crate::types::constraints::{ConstraintSet, Constraints, IteratorConstraintsExtension};
 use crate::types::function::FunctionType;
-use crate::types::generics::{GenericContext, walk_generic_context};
+use crate::types::generics::{GenericContext, bind_typevar, walk_generic_context};
+use crate::types::infer::nearest_enclosing_class;
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, FindLegacyTypeVarsVisitor,
     HasRelationToVisitor, IsEquivalentVisitor, KnownClass, MaterializationKind, NormalizedVisitor,
-    SpecialFormType, TypeMapping, TypeRelation, VarianceInferable, todo_type,
+    TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind,
+    VarianceInferable, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_db::parsed::parsed_module;
@@ -1227,6 +1230,42 @@ impl<'db> Parameters<'db> {
         let is_classmethod = method_type.is_some_and(|f| f.is_classmethod(db));
         let is_staticmethod = method_type.is_some_and(|f| f.is_staticmethod(db));
 
+        // TODO: remove duplication with Type::in_type_expression
+        let get_self_type = |scope_id: ScopeId, typevar_binding_context| {
+            {
+                let module = parsed_module(db, scope_id.file(db)).load(db);
+                let index = semantic_index(db, scope_id.file(db));
+                let class = nearest_enclosing_class(db, index, scope_id).unwrap();
+                let instance = Type::ClassLiteral(class)
+                    .to_instance(db)
+                    .expect("nearest_enclosing_class must return type that can be instantiated");
+                let class_definition = class.definition(db);
+                let typevar = TypeVarInstance::new(
+                    db,
+                    ast::name::Name::new_static("Self"),
+                    Some(class_definition),
+                    Some(TypeVarBoundOrConstraints::UpperBound(instance).into()),
+                    // According to the [spec], we can consider `Self`
+                    // equivalent to an invariant type variable
+                    // [spec]: https://typing.python.org/en/latest/spec/generics.html#self
+                    Some(TypeVarVariance::Invariant),
+                    None,
+                    TypeVarKind::TypingSelf,
+                );
+                Type::TypeVar(
+                    bind_typevar(
+                        db,
+                        &module,
+                        index,
+                        scope_id.file_scope_id(db),
+                        typevar_binding_context,
+                        typevar,
+                    )
+                    .unwrap(),
+                )
+            }
+        };
+
         let positional_or_keyword = pos_or_keyword_iter.map(|arg| {
             if is_method
                 && !is_staticmethod
@@ -1234,11 +1273,12 @@ impl<'db> Parameters<'db> {
                 && arg.parameter.annotation().is_none()
                 && parameters.index(arg.name().id()) == Some(0)
             {
-                let implicit_annotation = Type::SpecialForm(SpecialFormType::TypingSelf)
-                    .in_type_expression(db, definition.scope(db), Some(definition))
-                    .ok();
+                let scope_id = definition.scope(db);
+                let typevar_binding_context = Some(definition);
+                let implicit_annotation = get_self_type(scope_id, typevar_binding_context);
+
                 Parameter {
-                    annotated_type: implicit_annotation,
+                    annotated_type: Some(implicit_annotation),
                     synthetic_annotation: true,
                     kind: ParameterKind::PositionalOrKeyword {
                         name: arg.parameter.name.id.clone(),

@@ -431,6 +431,7 @@ def _(flag: bool):
     reveal_type(C7.union_of_class_data_descriptor_and_attribute)  # revealed: Literal["data", 2]
 
     C7.union_of_metaclass_attributes = 2 if flag else 1
+    # error: [invalid-assignment] "Invalid assignment to data descriptor attribute `union_of_metaclass_data_descriptor_and_attribute` on type `<class 'C7'>` with custom `__set__` method"
     C7.union_of_metaclass_data_descriptor_and_attribute = 2 if flag else 100
     C7.union_of_class_attributes = 2 if flag else 1
     C7.union_of_class_data_descriptor_and_attribute = 2 if flag else DataDescriptor()

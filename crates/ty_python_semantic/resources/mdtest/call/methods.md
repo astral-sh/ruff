@@ -69,7 +69,9 @@ reveal_type(bound_method(1))  # revealed: str
 When we call the function object itself, we need to pass the `instance` explicitly:
 
 ```py
-C.f(1)  # error: [missing-argument]
+# error: [invalid-argument-type] "Argument to function `f` is incorrect: Argument type `Literal[1]` does not satisfy upper bound of type variable `Self`"
+# error: [missing-argument] "No argument provided for required parameter `x` of function `f`"
+C.f(1)
 
 reveal_type(C.f(C(), 1))  # revealed: str
 ```

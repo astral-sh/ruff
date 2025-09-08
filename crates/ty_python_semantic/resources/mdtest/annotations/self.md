@@ -79,8 +79,7 @@ class A:
     def static(x): ...
 
 a = A()
-# TODO: Should reveal Self@implicit_self. Requires implicit self in method body(https://github.com/astral-sh/ruff/pull/18473)
-reveal_type(a.implicit_self())  # revealed: Unknown
+reveal_type(a.implicit_self())  # revealed: A
 reveal_type(a.implicit_self)  # revealed: bound method A.implicit_self() -> A
 ```
 
@@ -130,8 +129,7 @@ class G(Generic[T]):
 
 g = G[int]()
 
-# TODO: Should reveal Self@id Requires implicit self in method body(https://github.com/astral-sh/ruff/pull/18473)
-reveal_type(G[int].id(g))  # revealed: Unknown
+reveal_type(G[int].id(g))  # revealed: G[int]
 ```
 
 Free functions and nested functions do not use implicit `Self`:

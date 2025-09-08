@@ -254,8 +254,7 @@ async def long_running_task():
 
 async def main():
     async with asyncio.TaskGroup() as tg:
-        # TODO: should be `TaskGroup`
-        reveal_type(tg)  # revealed: Unknown
+        reveal_type(tg)  # revealed: TaskGroup
 
         tg.create_task(long_running_task())
 ```
