@@ -34,7 +34,7 @@ use crate::place::{Boundness, Place, PlaceAndQualifiers, imported_symbol};
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::place::ScopedPlaceId;
 use crate::semantic_index::scope::ScopeId;
-use crate::semantic_index::{FileScopeId, imported_modules, place_table, semantic_index};
+use crate::semantic_index::{imported_modules, place_table, semantic_index};
 use crate::suppression::check_suppressions;
 use crate::types::call::{Binding, Bindings, CallArguments, CallableBinding};
 pub(crate) use crate::types::class_base::ClassBase;
@@ -116,13 +116,11 @@ fn return_type_cycle_recover<'db>(
 
 fn return_type_cycle_initial<'db>(db: &'db dyn Db, method: BoundMethodType<'db>) -> Type<'db> {
     Type::Dynamic(DynamicType::Divergent(DivergentType {
-        file: method.function(db).file(db),
-        file_scope: method
+        scope: method
             .function(db)
             .literal(db)
             .last_definition(db)
-            .body_scope(db)
-            .file_scope_id(db),
+            .body_scope(db),
     }))
 }
 
@@ -194,7 +192,7 @@ fn definition_expression_type<'db>(
         }
     } else {
         // expression is in a type-params sub-scope
-        infer_scope_types(db, scope).expression_type(db, expression)
+        infer_scope_types(db, scope).expression_type(expression)
     }
 }
 
@@ -633,7 +631,7 @@ impl From<DataclassTransformerParams> for DataclassParams {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub enum Type<'db> {
     /// The dynamic type: a statically unknown set of values
-    Dynamic(DynamicType),
+    Dynamic(DynamicType<'db>),
     /// The empty set of values
     Never,
     /// A specific function object
@@ -881,14 +879,14 @@ impl<'db> Type<'db> {
         }
     }
 
-    pub(crate) const fn into_dynamic(self) -> Option<DynamicType> {
+    pub(crate) const fn into_dynamic(self) -> Option<DynamicType<'db>> {
         match self {
             Type::Dynamic(dynamic_type) => Some(dynamic_type),
             _ => None,
         }
     }
 
-    pub(crate) const fn expect_dynamic(self) -> DynamicType {
+    pub(crate) const fn expect_dynamic(self) -> DynamicType<'db> {
         self.into_dynamic()
             .expect("Expected a Type::Dynamic variant")
     }
@@ -7029,16 +7027,14 @@ impl<'db> KnownInstanceType<'db> {
 /// (e.g. `Divergent` is assignable to `@Todo`, but `@Todo | Divergent` must not be reducted to `@Todo`).
 /// Otherwise, type inference cannot converge properly.
 /// For detailed properties of this type, see the unit test at the end of the file.
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
-pub struct DivergentType {
-    /// The source file where this divergence was detected.
-    file: File,
-    /// The file scope where this divergence was detected.
-    file_scope: FileScopeId,
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+pub struct DivergentType<'db> {
+    /// The scope where this divergence was detected.
+    scope: ScopeId<'db>,
 }
 
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
-pub enum DynamicType {
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+pub enum DynamicType<'db> {
     /// An explicitly annotated `typing.Any`
     Any,
     /// An unannotated value, or a dynamic type resulting from an error
@@ -7062,10 +7058,10 @@ pub enum DynamicType {
     /// A special Todo-variant for `Unpack[Ts]`, so that we can treat it specially in `Generic[Unpack[Ts]]`
     TodoUnpack,
     /// A type that is determined to be divergent during type inference for a recursive function.
-    Divergent(DivergentType),
+    Divergent(DivergentType<'db>),
 }
 
-impl DynamicType {
+impl DynamicType<'_> {
     fn normalized(self) -> Self {
         if matches!(self, Self::Divergent(_)) {
             self
@@ -7075,7 +7071,7 @@ impl DynamicType {
     }
 }
 
-impl std::fmt::Display for DynamicType {
+impl std::fmt::Display for DynamicType<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             DynamicType::Any => f.write_str("Any"),
@@ -10322,7 +10318,7 @@ impl BoundSuperError<'_> {
 
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, get_size2::GetSize)]
 pub enum SuperOwnerKind<'db> {
-    Dynamic(DynamicType),
+    Dynamic(DynamicType<'db>),
     Class(ClassType<'db>),
     Instance(NominalInstanceType<'db>),
 }
@@ -10688,6 +10684,7 @@ pub(crate) mod tests {
     use super::*;
     use crate::db::tests::{TestDbBuilder, setup_db};
     use crate::place::{global_symbol, typing_extensions_symbol, typing_symbol};
+    use crate::semantic_index::FileScopeId;
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
     use ruff_db::system::DbWithWritableSystem as _;
@@ -10840,9 +10837,10 @@ pub(crate) mod tests {
 
         db.write_dedented("src/foo.py", "").unwrap();
         let file = system_path_to_file(&db, "src/foo.py").unwrap();
-        let file_scope = FileScopeId::global();
+        let file_scope_id = FileScopeId::global();
+        let scope = file_scope_id.to_scope_id(&db, file);
 
-        let div = Type::Dynamic(DynamicType::Divergent(DivergentType { file, file_scope }));
+        let div = Type::Dynamic(DynamicType::Divergent(DivergentType { scope }));
 
         // The `Divergent` type must not be eliminated in union with other dynamic types,
         // as this would prevent detection of divergent type inference using `Divergent`.

@@ -96,12 +96,7 @@ fn return_type_cycle_recover<'db>(
 
 fn return_type_cycle_initial<'db>(db: &'db dyn Db, function: FunctionType<'db>) -> Type<'db> {
     Type::Dynamic(DynamicType::Divergent(DivergentType {
-        file: function.file(db),
-        file_scope: function
-            .literal(db)
-            .last_definition(db)
-            .body_scope(db)
-            .file_scope_id(db),
+        scope: function.literal(db).last_definition(db).body_scope(db),
     }))
 }
 

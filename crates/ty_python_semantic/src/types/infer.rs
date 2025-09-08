@@ -511,24 +511,19 @@ impl<'db> ScopeInference<'db> {
         self.extra.as_deref().map(|extra| &extra.diagnostics)
     }
 
-    pub(crate) fn expression_type(
-        &self,
-        db: &'db dyn Db,
-        expression: impl Into<ExpressionNodeKey>,
-    ) -> Type<'db> {
-        self.try_expression_type(db, expression)
+    pub(crate) fn expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Type<'db> {
+        self.try_expression_type(expression)
             .unwrap_or_else(Type::unknown)
     }
 
     pub(crate) fn try_expression_type(
         &self,
-        db: &'db dyn Db,
         expression: impl Into<ExpressionNodeKey>,
     ) -> Option<Type<'db>> {
         self.expressions
             .get(&expression.into())
             .copied()
-            .or_else(|| self.fallback_type(db))
+            .or_else(|| self.fallback_type())
     }
 
     fn is_cycle_callback(&self) -> bool {
@@ -537,11 +532,10 @@ impl<'db> ScopeInference<'db> {
             .is_some_and(|extra| extra.cycle_fallback)
     }
 
-    fn fallback_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+    fn fallback_type(&self) -> Option<Type<'db>> {
         self.is_cycle_callback()
             .then_some(Type::Dynamic(DynamicType::Divergent(DivergentType {
-                file: self.scope.file(db),
-                file_scope: self.scope.file_scope_id(db),
+                scope: self.scope,
             })))
     }
 
@@ -557,11 +551,8 @@ impl<'db> ScopeInference<'db> {
         }
 
         let mut union = UnionBuilder::new(db);
-        let div = Type::Dynamic(DynamicType::Divergent(DivergentType {
-            file: self.scope.file(db),
-            file_scope: self.scope.file_scope_id(db),
-        }));
-        if let Some(fallback_type) = self.fallback_type(db) {
+        let div = Type::Dynamic(DynamicType::Divergent(DivergentType { scope: self.scope }));
+        if let Some(fallback_type) = self.fallback_type() {
             union = union.add(fallback_type);
         }
         // Here, we use the dynamic type `Divergent` to detect divergent type inference and ensure that we obtain finite results.
@@ -610,7 +601,7 @@ impl<'db> ScopeInference<'db> {
         };
         for returnee in &extra.returnees {
             let ty = returnee.map_or(Type::none(db), |expression| {
-                self.expression_type(db, expression)
+                self.expression_type(expression)
             });
             union_add(ty);
         }
@@ -1177,7 +1168,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             InferenceRegion::Scope(scope) if scope == expr_scope => {
                 self.expression_type(expression)
             }
-            _ => infer_scope_types(self.db(), expr_scope).expression_type(self.db(), expression),
+            _ => infer_scope_types(self.db(), expr_scope).expression_type(expression),
         }
     }
 
