@@ -99,16 +99,16 @@ use crate::types::diagnostic::{
     INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE,
     INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_KEY, INVALID_NAMED_TUPLE,
     INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL,
-    INVALID_TYPE_VARIABLE_CONSTRAINTS, IncompatibleBases, POSSIBLY_UNBOUND_IMPLICIT_CALL,
-    POSSIBLY_UNBOUND_IMPORT, TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE,
-    UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR,
-    report_bad_dunder_set_call, report_cannot_pop_required_field_on_typed_dict,
-    report_implicit_return_type, report_instance_layout_conflict,
-    report_invalid_argument_number_to_special_form, report_invalid_arguments_to_annotated,
-    report_invalid_arguments_to_callable, report_invalid_assignment,
-    report_invalid_attribute_assignment, report_invalid_generator_function_return_type,
-    report_invalid_key_on_typed_dict, report_invalid_return_type,
-    report_namedtuple_field_without_default_after_field_with_default,
+    INVALID_TYPE_VARIABLE_CONSTRAINTS, IncompatibleBases, NON_SUBSCRIPTABLE,
+    POSSIBLY_UNBOUND_IMPLICIT_CALL, POSSIBLY_UNBOUND_IMPORT, TypeCheckDiagnostics,
+    UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT,
+    UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, report_bad_dunder_set_call,
+    report_cannot_pop_required_field_on_typed_dict, report_implicit_return_type,
+    report_instance_layout_conflict, report_invalid_argument_number_to_special_form,
+    report_invalid_arguments_to_annotated, report_invalid_arguments_to_callable,
+    report_invalid_assignment, report_invalid_attribute_assignment,
+    report_invalid_generator_function_return_type, report_invalid_key_on_typed_dict,
+    report_invalid_return_type, report_namedtuple_field_without_default_after_field_with_default,
     report_possibly_unbound_attribute,
 };
 use crate::types::enums::is_enum_class;
@@ -3212,6 +3212,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.db(),
                 &type_alias.name.as_name_expr().unwrap().id,
                 rhs_scope,
+                None,
             )),
         ));
 
@@ -8818,6 +8819,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if let Type::SpecialForm(SpecialFormType::Tuple) = value_ty {
             return tuple_generic_alias(self.db(), self.infer_tuple_type_expression(slice));
         }
+        if let Type::KnownInstance(KnownInstanceType::TypeAliasType(type_alias)) = value_ty {
+            if let Some(generic_context) = type_alias.generic_context(self.db()) {
+                return self.infer_explicit_type_alias_specialization(
+                    subscript,
+                    value_ty,
+                    type_alias,
+                    generic_context,
+                );
+            }
+        }
 
         let slice_ty = self.infer_expression(slice);
         let result_ty = self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *ctx);
@@ -8830,6 +8841,52 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         value_ty: Type<'db>,
         generic_class: ClassLiteral<'db>,
         generic_context: GenericContext<'db>,
+    ) -> Type<'db> {
+        let db = self.db();
+        let specialize = |types: &[Option<Type<'db>>]| {
+            Type::from(generic_class.apply_specialization(db, |_| {
+                generic_context.specialize_partial(db, types.iter().copied())
+            }))
+        };
+
+        self.infer_explicit_callable_specialization(
+            subscript,
+            value_ty,
+            generic_context,
+            specialize,
+        )
+    }
+
+    fn infer_explicit_type_alias_specialization(
+        &mut self,
+        subscript: &ast::ExprSubscript,
+        value_ty: Type<'db>,
+        generic_type_alias: TypeAliasType<'db>,
+        generic_context: GenericContext<'db>,
+    ) -> Type<'db> {
+        let db = self.db();
+        let specialize = |types: &[Option<Type<'db>>]| {
+            let type_alias = generic_type_alias.apply_specialization(db, |_| {
+                generic_context.specialize_partial(db, types.iter().copied())
+            });
+
+            Type::KnownInstance(KnownInstanceType::TypeAliasType(type_alias))
+        };
+
+        self.infer_explicit_callable_specialization(
+            subscript,
+            value_ty,
+            generic_context,
+            specialize,
+        )
+    }
+
+    fn infer_explicit_callable_specialization(
+        &mut self,
+        subscript: &ast::ExprSubscript,
+        value_ty: Type<'db>,
+        generic_context: GenericContext<'db>,
+        specialize: impl FnOnce(&[Option<Type<'db>>]) -> Type<'db>,
     ) -> Type<'db> {
         let slice_node = subscript.slice.as_ref();
         let call_argument_types = match slice_node {
@@ -8864,10 +8921,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .matching_overloads()
             .next()
             .expect("valid bindings should have matching overload");
-        Type::from(generic_class.apply_specialization(self.db(), |_| {
-            generic_context
-                .specialize_partial(self.db(), overload.parameter_types().iter().copied())
-        }))
+
+        specialize(overload.parameter_types())
     }
 
     fn infer_subscript_expression_types(
@@ -9044,6 +9099,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Some(todo_type!("doubly-specialized typing.Protocol"))
             }
 
+            (
+                Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(alias))),
+                _,
+            ) if alias.generic_context(db).is_none() => {
+                if let Some(builder) = self.context.report_lint(&NON_SUBSCRIPTABLE, subscript) {
+                    builder
+                        .into_diagnostic(format_args!("Cannot subscript non-generic type alias"));
+                }
+
+                Some(Type::unknown())
+            }
+
             (Type::SpecialForm(SpecialFormType::Generic), typevars) => Some(
                 self.legacy_generic_class_context(value_node, typevars, LegacyGenericBase::Generic)
                     .map(|context| {
@@ -9066,7 +9133,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             (Type::KnownInstance(known_instance), _)
-                if known_instance.class().is_special_form() =>
+                if known_instance.class(db).is_special_form() =>
             {
                 Some(todo_type!("Inference of subscript on special form"))
             }
@@ -10534,9 +10601,43 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     self.infer_type_expression(&subscript.slice);
                     todo_type!("TypeVar annotations")
                 }
-                KnownInstanceType::TypeAliasType(_) => {
-                    self.infer_type_expression(&subscript.slice);
-                    todo_type!("Generic PEP-695 type alias")
+                KnownInstanceType::TypeAliasType(type_alias @ TypeAliasType::PEP695(_)) => {
+                    match type_alias.generic_context(self.db()) {
+                        Some(generic_context) => {
+                            let specialized_type_alias = self
+                                .infer_explicit_type_alias_specialization(
+                                    subscript,
+                                    value_ty,
+                                    type_alias,
+                                    generic_context,
+                                );
+
+                            specialized_type_alias
+                                .in_type_expression(
+                                    self.db(),
+                                    self.scope(),
+                                    self.typevar_binding_context,
+                                )
+                                .unwrap_or(Type::unknown())
+                        }
+                        None => {
+                            self.infer_type_expression(slice);
+
+                            if let Some(builder) =
+                                self.context.report_lint(&NON_SUBSCRIPTABLE, subscript)
+                            {
+                                builder.into_diagnostic(format_args!(
+                                    "Cannot subscript non-generic type alias"
+                                ));
+                            }
+
+                            Type::unknown()
+                        }
+                    }
+                }
+                KnownInstanceType::TypeAliasType(TypeAliasType::ManualPEP695(_)) => {
+                    self.infer_type_expression(slice);
+                    todo_type!("Generic manual PEP-695 type alias")
                 }
             },
             Type::Dynamic(DynamicType::Todo(_)) => {
@@ -10552,6 +10653,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             class,
                             generic_context,
                         );
+
                         specialized_class
                             .in_type_expression(
                                 self.db(),
