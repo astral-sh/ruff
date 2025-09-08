@@ -388,19 +388,11 @@ class C[T]:
 
     def __init__[S](self, x: T, y: S) -> None: ...
 
-# TODO: there should be no error https://github.com/astral-sh/ty/issues/1131
-# error: [invalid-argument-type] "Argument to bound method `__init__` is incorrect: Expected `Self@__init__`, found `C[int]`"
-reveal_type(C(1, 1))  # revealed: C[Unknown]
-# TODO: there should be no error https://github.com/astral-sh/ty/issues/1131
-# error: [invalid-argument-type]
-reveal_type(C(1, "string"))  # revealed: C[Unknown]
-# TODO: there should be no error https://github.com/astral-sh/ty/issues/1131
-# error: [invalid-argument-type]
-reveal_type(C(1, True))  # revealed: C[Unknown]
+reveal_type(C(1, 1))  # revealed: C[int]
+reveal_type(C(1, "string"))  # revealed: C[int]
+reveal_type(C(1, True))  # revealed: C[int]
 
-# TODO: there should be no error https://github.com/astral-sh/ty/issues/1131
-# The correct error should be [invalid-assignment] "Object of type `C[str]` is not assignable to `C[int]`"
-# error: [invalid-argument-type]
+# error: [invalid-assignment] "Object of type `C[str]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five", 1)
 ```
 
@@ -513,18 +505,16 @@ class C[T]:
 
 reveal_type(generic_context(C))  # revealed: tuple[T@C]
 reveal_type(generic_context(C.method))  # revealed: tuple[Self@method]
-reveal_type(generic_context(C.generic_method))  # revealed: tuple[U@generic_method]
+reveal_type(generic_context(C.generic_method))  # revealed: tuple[Self@generic_method, U@generic_method]
 reveal_type(generic_context(C[int]))  # revealed: None
 reveal_type(generic_context(C[int].method))  # revealed: tuple[Self@method]
-reveal_type(generic_context(C[int].generic_method))  # revealed: tuple[U@generic_method]
+reveal_type(generic_context(C[int].generic_method))  # revealed: tuple[Self@generic_method, U@generic_method]
 
 c: C[int] = C[int]()
-# TODO: there should be no error https://github.com/astral-sh/ty/issues/1131
-# error: [invalid-argument-type]
 reveal_type(c.generic_method(1, "string"))  # revealed: Literal["string"]
 reveal_type(generic_context(c))  # revealed: None
 reveal_type(generic_context(c.method))  # revealed: tuple[Self@method]
-reveal_type(generic_context(c.generic_method))  # revealed: tuple[U@generic_method]
+reveal_type(generic_context(c.generic_method))  # revealed: tuple[Self@generic_method, U@generic_method]
 ```
 
 ## Specializations propagate

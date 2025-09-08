@@ -29,7 +29,6 @@ use crate::types::{
     SpecialFormType, TypeMapping, TypeRelation, VarianceInferable, todo_type,
 };
 use crate::{Db, FxOrderSet};
-use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{self as ast, name::Name};
 
 fn infer_method_type<'db>(
@@ -40,17 +39,13 @@ fn infer_method_type<'db>(
     let file = class_scope_id.file(db);
     let index = semantic_index(db, file);
 
-    let method_scope = index.scope(scope_id.file_scope_id(db));
-    let method = method_scope.node().as_function()?;
-    let parent_scope_id = method_scope.parent()?;
-    let parent_scope = index.scope(parent_scope_id);
-    parent_scope.node().as_class()?;
     let DefinitionKind::Function(func_def) = definition.kind(db) else {
         return None;
     };
     let class_scope = index.scope(class_scope_id.file_scope_id(db));
     class_scope.node().as_class()?;
 
+    let module = parsed_module(db, file).load(db);
     let method_definition = index.expect_single_definition(func_def.node(&module));
     let func_type = infer_definition_types(db, method_definition)
         .declaration_type(method_definition)
