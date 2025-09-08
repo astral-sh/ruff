@@ -6936,12 +6936,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             ));
                         }
                         EnclosingSnapshotResult::FoundBindings(bindings) => {
-                            if place_expr.is_symbol()
-                                && !enclosing_scope_id.is_function_like(db)
-                                && !is_immediately_enclosing_scope
-                            {
-                                continue;
-                            }
                             let place = place_from_bindings(db, bindings).map_type(|ty| {
                                 self.narrow_place_with_applicable_constraints(
                                     place_expr,
