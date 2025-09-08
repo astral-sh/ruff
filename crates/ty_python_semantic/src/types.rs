@@ -7520,7 +7520,7 @@ impl<'db> TypeVarInstance<'db> {
         ))
     }
 
-    #[salsa::tracked]
+    #[salsa::tracked(cycle_fn=lazy_bound_cycle_recover, cycle_initial=lazy_bound_cycle_initial)]
     fn lazy_bound(self, db: &'db dyn Db) -> Option<TypeVarBoundOrConstraints<'db>> {
         let definition = self.definition(db)?;
         let module = parsed_module(db, definition.file(db)).load(db);
@@ -7550,6 +7550,23 @@ impl<'db> TypeVarInstance<'db> {
             typevar_node.default.as_ref()?,
         ))
     }
+}
+
+#[allow(clippy::ref_option)]
+fn lazy_bound_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &Option<TypeVarBoundOrConstraints<'db>>,
+    _count: u32,
+    _self: TypeVarInstance<'db>,
+) -> salsa::CycleRecoveryAction<Option<TypeVarBoundOrConstraints<'db>>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn lazy_bound_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _self: TypeVarInstance<'db>,
+) -> Option<TypeVarBoundOrConstraints<'db>> {
+    None
 }
 
 /// Where a type variable is bound and usable.
