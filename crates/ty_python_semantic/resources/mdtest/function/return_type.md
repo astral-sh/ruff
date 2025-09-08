@@ -268,6 +268,8 @@ def f():
     return 1
 
 reveal_type(f())  # revealed: Literal[1]
+# The inferred return type is not exposed in the signature.
+reveal_type(f)  # revealed: def f() -> Unknown
 
 def g(cond: bool):
     if cond:
