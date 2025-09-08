@@ -407,12 +407,25 @@ impl<'db> Signature<'db> {
         let legacy_generic_context =
             GenericContext::from_function_params(db, definition, &parameters, return_ty);
 
-        if generic_context.is_some() && legacy_generic_context.is_some() {
-            // TODO: Raise a diagnostic!
-        }
+        let full_generic_context = match (legacy_generic_context, generic_context) {
+            (Some(legacy_ctx), Some(ctx)) => {
+                if legacy_ctx
+                    .variables(db)
+                    .iter()
+                    .exactly_one()
+                    .is_ok_and(|bound_typevar| bound_typevar.typevar(db).is_self(db))
+                {
+                    Some(legacy_ctx.merge(db, ctx))
+                } else {
+                    // TODO: Raise a diagnostic — mixing PEP 695 and legacy typevars is not allowed
+                    Some(ctx)
+                }
+            }
+            (left, right) => left.or(right),
+        };
 
         Self {
-            generic_context: generic_context.or(legacy_generic_context),
+            generic_context: full_generic_context,
             inherited_generic_context,
             definition: Some(definition),
             parameters,
