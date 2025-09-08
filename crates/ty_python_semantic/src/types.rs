@@ -5591,12 +5591,6 @@ impl<'db> Type<'db> {
             }),
 
             Type::KnownInstance(known_instance) => match known_instance {
-                KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(alias))
-                    if alias.is_specialized(db) =>
-                {
-                    // Note that the RHS of a type alias statement is required to be in type-form.
-                    Ok(alias.value_type(db))
-                }
                 KnownInstanceType::TypeAliasType(alias) => Ok(Type::TypeAlias(*alias)),
                 KnownInstanceType::TypeVar(typevar) => {
                     let module = parsed_module(db, scope_id.file(db)).load(db);
