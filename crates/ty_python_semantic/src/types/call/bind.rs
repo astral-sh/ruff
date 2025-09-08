@@ -1546,6 +1546,10 @@ impl<'db> CallableBinding<'db> {
             }
         }
 
+        if top_materialized_argument_types.is_empty() {
+            return;
+        }
+
         let top_materialized_argument_type =
             Type::heterogeneous_tuple(db, top_materialized_argument_types);
 
