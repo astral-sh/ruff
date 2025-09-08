@@ -395,8 +395,12 @@ def f_okay(c: Callable[[], None]):
         reveal_type(c.__qualname__)  # revealed: object
 
         # TODO: should be `property`
+        # (or complain that we don't know that `type(c)` has the attribute at all!)
         reveal_type(type(c).__qualname__)  # revealed: @Todo(Intersection meta-type)
-        # TODO: we should emit an error here (`hasattr` only guarantees that an attribute is readable.)
+
+        # `hasattr` only guarantees that an attribute is readable.
+        #
+        # error: [invalid-assignment] "Object of type `Literal["my_callable"]` is not assignable to attribute `__qualname__` on type `(() -> None) & <Protocol with members '__qualname__'>`"
         c.__qualname__ = "my_callable"
 
         result = getattr_static(c, "__qualname__")
