@@ -813,20 +813,20 @@ pub(crate) struct ConstrainedTypeVar<'db> {
 
 impl<'db> ConstrainedTypeVar<'db> {
     /// Returns the intersection of this atomic constraint and another.
-    ///
-    /// Panics if the two constraints have different typevars.
     fn intersect(&self, db: &'db dyn Db, other: &Self) -> Simplifiable<Self> {
-        debug_assert_eq!(self.typevar, other.typevar);
+        if self.typevar != other.typevar {
+            return Simplifiable::NotSimplified(self.clone(), other.clone());
+        }
         self.constraint
             .intersect(db, &other.constraint)
             .map(|constraint| constraint.constrain(self.typevar))
     }
 
     /// Returns the union of this atomic constraint and another.
-    ///
-    /// Panics if the two constraints have different typevars.
     fn union(&self, db: &'db dyn Db, other: &Self) -> Simplifiable<Self> {
-        debug_assert_eq!(self.typevar, other.typevar);
+        if self.typevar != other.typevar {
+            return Simplifiable::NotSimplified(self.clone(), other.clone());
+        }
         self.constraint
             .union(db, &other.constraint)
             .map(|constraint| constraint.constrain(self.typevar))
