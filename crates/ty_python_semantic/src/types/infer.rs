@@ -614,18 +614,7 @@ impl<'db> ScopeInference<'db> {
             // If any method in a base class does not have an annotated return type, `base_return_type` will include `Unknown`.
             // On the other hand, if the return types of all methods in the base classes are annotated, there is no need to include `Unknown`.
             if !method_ty.is_final(db) {
-                let (signature, return_ty) = method_ty
-                    .base_signature_and_return_type(db)
-                    .unwrap_or((Signature::unknown(), Type::unknown()));
-                if let Some(generic_context) = signature.generic_context.as_ref() {
-                    // If the return type of the base method contains a type variable, replace it with `Unknown` to avoid dangling type variables.
-                    union_add(
-                        return_ty
-                            .apply_specialization(db, generic_context.unknown_specialization(db)),
-                    );
-                } else {
-                    union_add(return_ty);
-                }
+                union_add(method_ty.base_return_type(db).unwrap_or(Type::unknown()));
             }
         }
 
