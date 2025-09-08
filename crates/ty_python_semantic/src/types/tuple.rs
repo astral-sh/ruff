@@ -27,8 +27,8 @@ use crate::types::class::{ClassType, KnownClass};
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
-    IsDisjointVisitor, IsEquivalentVisitor, NormalizedVisitor, Type, TypeMapping, TypeRelation,
-    UnionBuilder, UnionType,
+    IsDisjointVisitor, IsEquivalentVisitor, NormalizedVisitor, PremisesVisitor, Type, TypeMapping,
+    TypeRelation, UnionBuilder, UnionType,
 };
 use crate::util::subscript::{Nth, OutOfBoundsError, PyIndex, PySlice, StepSizeZeroError};
 use crate::{Db, FxOrderSet, Program};
@@ -253,6 +253,14 @@ impl<'db> TupleType<'db> {
             .find_legacy_typevars_impl(db, binding_context, typevars, visitor);
     }
 
+    pub(crate) fn premises_impl<C: Constraints<'db>>(
+        self,
+        db: &'db dyn Db,
+        visitor: &PremisesVisitor<'db, C>,
+    ) -> C {
+        self.tuple(db).premises_impl(db, visitor)
+    }
+
     pub(crate) fn has_relation_to_impl(
         self,
         db: &'db dyn Db,
@@ -409,6 +417,14 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         for ty in &self.0 {
             ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
         }
+    }
+
+    fn premises_impl<C: Constraints<'db>>(
+        &self,
+        db: &'db dyn Db,
+        visitor: &PremisesVisitor<'db, C>,
+    ) -> C {
+        (self.0.iter()).when_all(db, |ty| ty.premises_impl(db, visitor))
     }
 
     fn has_relation_to_impl(
@@ -732,6 +748,15 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         for ty in &self.suffix {
             ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
         }
+    }
+
+    fn premises_impl<C: Constraints<'db>>(
+        &self,
+        db: &'db dyn Db,
+        visitor: &PremisesVisitor<'db, C>,
+    ) -> C {
+        self.all_elements()
+            .when_all(db, |ty| ty.premises_impl(db, visitor))
     }
 
     fn has_relation_to_impl(
@@ -1073,6 +1098,17 @@ impl<'db> Tuple<Type<'db>> {
             Tuple::Variable(tuple) => {
                 tuple.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
             }
+        }
+    }
+
+    fn premises_impl<C: Constraints<'db>>(
+        &self,
+        db: &'db dyn Db,
+        visitor: &PremisesVisitor<'db, C>,
+    ) -> C {
+        match self {
+            Tuple::Fixed(tuple) => tuple.premises_impl(db, visitor),
+            Tuple::Variable(tuple) => tuple.premises_impl(db, visitor),
         }
     }
 

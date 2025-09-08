@@ -275,6 +275,12 @@ impl<'db> ConstraintSet<'db> {
         result
     }
 
+    fn equivalent_to(self, db: &'db dyn Db, other: Self) -> Self {
+        self.clone()
+            .and(db, || other.clone())
+            .or(db, || self.negate(db).and(db, || other.negate(db)))
+    }
+
     /// Returns the intersection of this constraint set and another. The other constraint set is
     /// provided as a thunk, to implement short-circuiting: the thunk is not forced if the
     /// constraint set is already saturated.
@@ -1030,8 +1036,18 @@ impl<'db> Constraint<'db> {
     ///
     /// Panics if `lower` and `upper` are not both fully static.
     fn range(db: &'db dyn Db, lower: Type<'db>, upper: Type<'db>) -> Satisfiable<Constraint<'db>> {
-        debug_assert_eq!(lower, lower.bottom_materialization(db));
-        debug_assert_eq!(upper, upper.top_materialization(db));
+        debug_assert_eq!(
+            lower,
+            lower.bottom_materialization(db),
+            "{} is not fully static",
+            lower.display(db)
+        );
+        debug_assert_eq!(
+            upper,
+            upper.top_materialization(db),
+            "{} is not fully static",
+            upper.display(db)
+        );
 
         // If `lower ≰ upper`, then the constraint cannot be satisfied, since there is no type that
         // is both greater than `lower`, and less than `upper`.

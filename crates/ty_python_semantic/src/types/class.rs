@@ -28,9 +28,10 @@ use crate::types::{
     ApplyTypeMappingVisitor, Binding, BoundSuperError, BoundSuperType, CallableType,
     DataclassParams, DeprecatedInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
     IsEquivalentVisitor, KnownInstanceType, ManualPEP695TypeAliasType, MaterializationKind,
-    NormalizedVisitor, PropertyInstanceType, StringLiteralType, TypeAliasType, TypeContext,
-    TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind,
-    TypedDictParams, UnionBuilder, VarianceInferable, declaration_type, infer_definition_types,
+    NormalizedVisitor, PremisesVisitor, PropertyInstanceType, StringLiteralType, TypeAliasType,
+    TypeContext, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance,
+    TypeVarKind, TypedDictParams, UnionBuilder, VarianceInferable, declaration_type,
+    infer_definition_types,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet, Program,
@@ -297,6 +298,14 @@ impl<'db> GenericAlias<'db> {
             .find_legacy_typevars_impl(db, binding_context, typevars, visitor);
     }
 
+    pub(super) fn premises_impl<C: Constraints<'db>>(
+        self,
+        db: &'db dyn Db,
+        visitor: &PremisesVisitor<'db, C>,
+    ) -> C {
+        self.specialization(db).premises_impl(db, visitor)
+    }
+
     pub(super) fn is_typed_dict(self, db: &'db dyn Db) -> bool {
         self.origin(db).is_typed_dict(db)
     }
@@ -488,6 +497,17 @@ impl<'db> ClassType<'db> {
             Self::Generic(generic) => {
                 generic.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
             }
+        }
+    }
+
+    pub(crate) fn premises_impl<C: Constraints<'db>>(
+        self,
+        db: &'db dyn Db,
+        visitor: &PremisesVisitor<'db, C>,
+    ) -> C {
+        match self {
+            Self::NonGeneric(_) => C::always_satisfiable(db),
+            Self::Generic(generic) => generic.premises_impl(db, visitor),
         }
     }
 

@@ -13,8 +13,8 @@ use crate::types::protocol_class::walk_protocol_interface;
 use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
     ApplyTypeMappingVisitor, ClassBase, ClassLiteral, FindLegacyTypeVarsVisitor,
-    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, NormalizedVisitor, TypeMapping,
-    TypeRelation, VarianceInferable,
+    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, NormalizedVisitor,
+    PremisesVisitor, TypeMapping, TypeRelation, VarianceInferable,
 };
 use crate::{Db, FxOrderSet};
 
@@ -465,6 +465,18 @@ impl<'db> NominalInstanceType<'db> {
             NominalInstanceInner::Object => {}
         }
     }
+
+    pub(crate) fn premises_impl<C: Constraints<'db>>(
+        self,
+        db: &'db dyn Db,
+        visitor: &PremisesVisitor<'db, C>,
+    ) -> C {
+        match self.0 {
+            NominalInstanceInner::ExactTuple(tuple) => tuple.premises_impl(db, visitor),
+            NominalInstanceInner::NonTuple(class) => class.premises_impl(db, visitor),
+            NominalInstanceInner::Object => C::always_satisfiable(db),
+        }
+    }
 }
 
 impl<'db> From<NominalInstanceType<'db>> for Type<'db> {
@@ -708,6 +720,17 @@ impl<'db> ProtocolInstanceType<'db> {
         }
     }
 
+    pub(crate) fn premises_impl<C: Constraints<'db>>(
+        self,
+        db: &'db dyn Db,
+        visitor: &PremisesVisitor<'db, C>,
+    ) -> C {
+        match self.inner {
+            Protocol::FromClass(class) => class.premises_impl(db, visitor),
+            Protocol::Synthesized(synthesized) => synthesized.premises_impl(db, visitor),
+        }
+    }
+
     pub(super) fn interface(self, db: &'db dyn Db) -> ProtocolInterface<'db> {
         self.inner.interface(db)
     }
@@ -755,10 +778,11 @@ impl<'db> VarianceInferable<'db> for Protocol<'db> {
 
 mod synthesized_protocol {
     use crate::semantic_index::definition::Definition;
+    use crate::types::constraints::Constraints;
     use crate::types::protocol_class::ProtocolInterface;
     use crate::types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, FindLegacyTypeVarsVisitor,
-        NormalizedVisitor, TypeMapping, TypeVarVariance, VarianceInferable,
+        NormalizedVisitor, PremisesVisitor, TypeMapping, TypeVarVariance, VarianceInferable,
     };
     use crate::{Db, FxOrderSet};
 
@@ -803,6 +827,14 @@ mod synthesized_protocol {
         ) {
             self.0
                 .find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+        }
+
+        pub(super) fn premises_impl<C: Constraints<'db>>(
+            self,
+            db: &'db dyn Db,
+            visitor: &PremisesVisitor<'db, C>,
+        ) -> C {
+            self.0.premises_impl(db, visitor)
         }
 
         pub(in crate::types) fn interface(self) -> ProtocolInterface<'db> {

@@ -79,9 +79,9 @@ use crate::types::visitor::any_over_type;
 use crate::types::{
     BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, ClassType,
     DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
-    IsEquivalentVisitor, KnownClass, KnownInstanceType, NormalizedVisitor, SpecialFormType,
-    TrackedConstraintSet, Truthiness, Type, TypeMapping, TypeRelation, UnionBuilder, all_members,
-    binding_type, walk_type_mapping,
+    IsEquivalentVisitor, KnownClass, KnownInstanceType, NormalizedVisitor, PremisesVisitor,
+    SpecialFormType, TrackedConstraintSet, Truthiness, Type, TypeMapping, TypeRelation,
+    UnionBuilder, all_members, binding_type, walk_type_mapping,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -955,6 +955,14 @@ impl<'db> FunctionType<'db> {
             TypeRelation::Subtyping => ConstraintSet::from(self.is_subtype_of(db, other)),
             TypeRelation::Assignability => ConstraintSet::from(self.is_assignable_to(db, other)),
         }
+    }
+
+    pub(crate) fn premises_impl<C: Constraints<'db>>(
+        self,
+        db: &'db dyn Db,
+        visitor: &PremisesVisitor<'db, C>,
+    ) -> C {
+        self.signature(db).premises_impl(db, visitor)
     }
 
     pub(crate) fn is_subtype_of(self, db: &'db dyn Db, other: Self) -> bool {

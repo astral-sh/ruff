@@ -222,6 +222,10 @@ pub(crate) struct TryBool;
 pub(crate) type NormalizedVisitor<'db> = TypeTransformer<'db, Normalized>;
 pub(crate) struct Normalized;
 
+/// A [`PairVisitor`] that is used in `premises` methods.
+pub(crate) type PremisesVisitor<'db, C> = CycleDetector<Premises, Type<'db>, C>;
+pub(crate) struct Premises;
+
 /// How a generic type has been specialized.
 ///
 /// This matters only if there is at least one invariant type parameter.
@@ -587,6 +591,19 @@ impl<'db> PropertyInstanceType<'db> {
         };
 
         getter_equivalence.and(db, setter_equivalence)
+    }
+
+    fn premises_impl<C: Constraints<'db>>(
+        self,
+        db: &'db dyn Db,
+        visitor: &PremisesVisitor<'db, C>,
+    ) -> C {
+        self.getter(db)
+            .when_some_and(db, |ty| ty.premises_impl(db, visitor))
+            .and(db, || {
+                self.setter(db)
+                    .when_some_and(db, |ty| ty.premises_impl(db, visitor))
+            })
     }
 }
 
@@ -1406,7 +1423,11 @@ impl<'db> Type<'db> {
     }
 
     fn when_subtype_of(self, db: &'db dyn Db, target: Type<'db>) -> ConstraintSet<'db> {
-        self.has_relation_to(db, target, TypeRelation::Subtyping)
+        let premises = self.premises(db).and(db, || target.premises(db));
+        premises.equivalent_to(
+            db,
+            self.has_relation_to(db, target, TypeRelation::Subtyping),
+        )
     }
 
     /// Return true if this type is [assignable to] type `target`.
@@ -1417,7 +1438,11 @@ impl<'db> Type<'db> {
     }
 
     fn when_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> ConstraintSet<'db> {
-        self.has_relation_to(db, target, TypeRelation::Assignability)
+        let premises = self.premises(db).and(db, || target.premises(db));
+        premises.equivalent_to(
+            db,
+            self.has_relation_to(db, target, TypeRelation::Assignability),
+        )
     }
 
     fn has_relation_to(
@@ -1882,6 +1907,93 @@ impl<'db> Type<'db> {
             // Other than the special cases enumerated above, `Instance` types and typevars are
             // never subtypes of any other variants
             (Type::NominalInstance(_), _) => ConstraintSet::from(false),
+        }
+    }
+
+    fn premises<C: Constraints<'db>>(self, db: &'db dyn Db) -> C {
+        self.premises_impl(db, &PremisesVisitor::new(C::always_satisfiable(db)))
+    }
+
+    fn premises_impl<C: Constraints<'db>>(
+        self,
+        db: &'db dyn Db,
+        visitor: &PremisesVisitor<'db, C>,
+    ) -> C {
+        match self {
+            Type::TypeVar(bound_typevar) | Type::NonInferableTypeVar(bound_typevar) => {
+                bound_typevar.premises(db)
+            }
+
+            Type::FunctionLiteral(function) => function.premises_impl(db, visitor),
+
+            Type::BoundMethod(method) => method
+                .function(db)
+                .premises_impl(db, visitor)
+                .and(db, || method.self_instance(db).premises_impl(db, visitor)),
+
+            Type::NominalInstance(instance) => instance.premises_impl(db, visitor),
+            Type::ProtocolInstance(instance) => instance.premises_impl(db, visitor),
+
+            Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(function)) => {
+                function.premises_impl(db, visitor)
+            }
+
+            Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(function)) => {
+                function.premises_impl(db, visitor)
+            }
+
+            Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderGet(property)) => {
+                property.premises_impl(db, visitor)
+            }
+
+            Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderSet(property)) => {
+                property.premises_impl(db, visitor)
+            }
+
+            Type::Callable(callable) => callable.premises_impl(db, visitor),
+
+            Type::GenericAlias(generic) => generic.premises_impl(db, visitor),
+
+            Type::SubclassOf(subclass_of) => subclass_of.premises_impl(db, visitor),
+
+            Type::PropertyInstance(property) => property.premises_impl(db, visitor),
+
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .when_all(db, |element| element.premises_impl(db, visitor)),
+            Type::Intersection(intersection) => intersection
+                .positive(db)
+                .iter()
+                .chain(intersection.negative(db))
+                .when_all(db, |ty| ty.premises_impl(db, visitor)),
+
+            Type::TypeIs(type_is) => type_is.return_type(db).premises_impl(db, visitor),
+
+            Type::TypeAlias(alias) => {
+                visitor.visit(self, || alias.value_type(db).premises_impl(db, visitor))
+            }
+
+            Type::Dynamic(_)
+            | Type::ModuleLiteral(_)
+            | Type::IntLiteral(_)
+            | Type::BooleanLiteral(_)
+            | Type::LiteralString
+            | Type::StringLiteral(_)
+            | Type::BytesLiteral(_)
+            | Type::EnumLiteral(_)
+            | Type::Never
+            | Type::AlwaysTruthy
+            | Type::AlwaysFalsy
+            | Type::WrapperDescriptor(_)
+            | Type::KnownBoundMethod(KnownBoundMethodType::StrStartswith(_))
+            | Type::DataclassDecorator(_)
+            | Type::DataclassTransformer(_)
+            | Type::ClassLiteral(_)
+            | Type::BoundSuper(_)
+            | Type::SpecialForm(_)
+            | Type::KnownInstance(_)
+            | Type::TypedDict(_) => C::always_satisfiable(db),
         }
     }
 
@@ -7692,6 +7804,21 @@ impl<'db> BoundTypeVarInstance<'db> {
     pub(crate) fn variance(self, db: &'db dyn Db) -> TypeVarVariance {
         self.variance_with_polarity(db, TypeVarVariance::Covariant)
     }
+
+    /// Returns the constraints that will be satisfied by any valid specialization of this typevar.
+    pub(crate) fn premises<C: Constraints<'db>>(self, db: &'db dyn Db) -> C {
+        match self.typevar(db).bound_or_constraints(db) {
+            None => C::always_satisfiable(db),
+            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                C::constrain_typevar(db, self, Type::Never, bound)
+            }
+            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                constraints.elements(db).iter().when_any(db, |constraint| {
+                    C::constrain_typevar(db, self, *constraint, *constraint)
+                })
+            }
+        }
+    }
 }
 
 fn walk_bound_type_var_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -9126,6 +9253,14 @@ impl<'db> CallableType<'db> {
     ) {
         self.signatures(db)
             .find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+    }
+
+    fn premises_impl<C: Constraints<'db>>(
+        self,
+        db: &'db dyn Db,
+        visitor: &PremisesVisitor<'db, C>,
+    ) -> C {
+        self.signatures(db).premises_impl(db, visitor)
     }
 
     /// Check whether this callable type has the given relation to another callable type.

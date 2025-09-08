@@ -19,8 +19,8 @@ use crate::{
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral,
         FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, KnownFunction,
-        NormalizedVisitor, PropertyInstanceType, Signature, Type, TypeMapping, TypeQualifiers,
-        TypeRelation, VarianceInferable,
+        NormalizedVisitor, PremisesVisitor, PropertyInstanceType, Signature, Type, TypeMapping,
+        TypeQualifiers, TypeRelation, VarianceInferable,
         constraints::{ConstraintSet, IteratorConstraintsExtension},
         signatures::{Parameter, Parameters},
     },
@@ -294,6 +294,16 @@ impl<'db> ProtocolInterface<'db> {
         }
     }
 
+    pub(crate) fn premises_impl<C: Constraints<'db>>(
+        self,
+        db: &'db dyn Db,
+        visitor: &PremisesVisitor<'db, C>,
+    ) -> C {
+        self.inner(db)
+            .values()
+            .when_all(db, |data| data.premises_impl(db, visitor))
+    }
+
     pub(super) fn display(self, db: &'db dyn Db) -> impl std::fmt::Display {
         struct ProtocolInterfaceDisplay<'db> {
             db: &'db dyn Db,
@@ -368,6 +378,14 @@ impl<'db> ProtocolMemberData<'db> {
     ) {
         self.kind
             .find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+    }
+
+    fn premises_impl<C: Constraints<'db>>(
+        &self,
+        db: &'db dyn Db,
+        visitor: &PremisesVisitor<'db, C>,
+    ) -> C {
+        self.kind.premises_impl(db, visitor)
     }
 
     fn display(&self, db: &'db dyn Db) -> impl std::fmt::Display {
@@ -471,6 +489,18 @@ impl<'db> ProtocolMemberKind<'db> {
             ProtocolMemberKind::Other(ty) => {
                 ty.find_legacy_typevars(db, binding_context, typevars);
             }
+        }
+    }
+
+    fn premises_impl<C: Constraints<'db>>(
+        &self,
+        db: &'db dyn Db,
+        visitor: &PremisesVisitor<'db, C>,
+    ) -> C {
+        match self {
+            ProtocolMemberKind::Method(callable) => callable.premises_impl(db, visitor),
+            ProtocolMemberKind::Property(property) => property.premises_impl(db, visitor),
+            ProtocolMemberKind::Other(ty) => ty.premises_impl(db, visitor),
         }
     }
 }

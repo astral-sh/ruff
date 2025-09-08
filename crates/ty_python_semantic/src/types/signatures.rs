@@ -22,7 +22,7 @@ use crate::types::generics::{GenericContext, walk_generic_context};
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, FindLegacyTypeVarsVisitor,
     HasRelationToVisitor, IsEquivalentVisitor, KnownClass, MaterializationKind, NormalizedVisitor,
-    TypeMapping, TypeRelation, VarianceInferable, todo_type,
+    PremisesVisitor, TypeMapping, TypeRelation, VarianceInferable, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -93,6 +93,16 @@ impl<'db> CallableSignature<'db> {
         for signature in &self.overloads {
             signature.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
         }
+    }
+
+    pub(crate) fn premises_impl<C: Constraints<'db>>(
+        &self,
+        db: &'db dyn Db,
+        visitor: &PremisesVisitor<'db, C>,
+    ) -> C {
+        self.overloads
+            .iter()
+            .when_all(db, |signature| signature.premises_impl(db, visitor))
     }
 
     /// Binds the first (presumably `self`) parameter of this signature. If a `self_type` is
@@ -496,6 +506,32 @@ impl<'db> Signature<'db> {
         if let Some(ty) = self.return_ty {
             ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
         }
+    }
+
+    fn premises_impl<C: Constraints<'db>>(
+        &self,
+        db: &'db dyn Db,
+        visitor: &PremisesVisitor<'db, C>,
+    ) -> C {
+        let mut result = C::always_satisfiable(db);
+        for param in &self.parameters {
+            if let Some(ty) = param.annotated_type() {
+                if (result.intersect(db, ty.premises_impl(db, visitor))).is_never_satisfied(db) {
+                    return result;
+                }
+            }
+            if let Some(ty) = param.default_type() {
+                if (result.intersect(db, ty.premises_impl(db, visitor))).is_never_satisfied(db) {
+                    return result;
+                }
+            }
+        }
+        if let Some(ty) = self.return_ty {
+            if (result.intersect(db, ty.premises_impl(db, visitor))).is_never_satisfied(db) {
+                return result;
+            }
+        }
+        result
     }
 
     /// Return the parameters in this signature.

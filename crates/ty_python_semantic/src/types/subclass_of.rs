@@ -5,8 +5,8 @@ use crate::types::variance::VarianceInferable;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, DynamicType,
     FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, KnownClass,
-    MaterializationKind, MemberLookupPolicy, NormalizedVisitor, SpecialFormType, Type, TypeMapping,
-    TypeRelation,
+    MaterializationKind, MemberLookupPolicy, NormalizedVisitor, PremisesVisitor, SpecialFormType,
+    Type, TypeMapping, TypeRelation,
 };
 use crate::{Db, FxOrderSet};
 
@@ -116,6 +116,17 @@ impl<'db> SubclassOfType<'db> {
                 class.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
             }
             SubclassOfInner::Dynamic(_) => {}
+        }
+    }
+
+    pub(crate) fn premises_impl<C: Constraints<'db>>(
+        self,
+        db: &'db dyn Db,
+        visitor: &PremisesVisitor<'db, C>,
+    ) -> C {
+        match self.subclass_of {
+            SubclassOfInner::Class(class) => class.premises_impl(db, visitor),
+            SubclassOfInner::Dynamic(_) => C::always_satisfiable(db),
         }
     }
 
