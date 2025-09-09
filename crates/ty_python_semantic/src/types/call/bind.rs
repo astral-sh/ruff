@@ -723,8 +723,8 @@ impl<'db> Bindings<'db> {
                                             Type::heterogeneous_tuple(
                                                 db,
                                                 metadata
-                                                    .members
-                                                    .iter()
+                                                    .members(db)
+                                                    .keys()
                                                     .map(|member| Type::string_literal(db, member)),
                                             )
                                         } else {

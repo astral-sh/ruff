@@ -1,8 +1,10 @@
+use std::collections::BTreeMap;
+
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashMap;
 
 use crate::{
-    Db, FxOrderSet,
+    Db, FxOrderMap,
     place::{Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations},
     semantic_index::{place_table, use_def_map},
     types::{
@@ -11,44 +13,52 @@ use crate::{
     },
 };
 
-#[derive(Debug, PartialEq, Eq)]
-pub(crate) struct EnumMetadata {
-    pub(crate) members: FxOrderSet<Name>,
-    pub(crate) aliases: FxHashMap<Name, Name>,
+#[salsa::interned(debug, heap_size=EnumMetadata::heap_size)]
+pub(crate) struct EnumMetadata<'db> {
+    #[returns(ref)]
+    pub(crate) members: FxOrderMap<Name, Type<'db>>,
+    #[returns(ref)]
+    pub(crate) aliases: BTreeMap<Name, Name>,
 }
 
-impl get_size2::GetSize for EnumMetadata {}
+impl get_size2::GetSize for EnumMetadata<'_> {}
 
-impl EnumMetadata {
-    fn empty() -> Self {
-        EnumMetadata {
-            members: FxOrderSet::default(),
-            aliases: FxHashMap::default(),
-        }
+impl<'db> EnumMetadata<'db> {
+    fn empty(db: &'db dyn Db) -> Self {
+        EnumMetadata::new(db, FxOrderMap::default(), BTreeMap::default())
     }
 
-    pub(crate) fn resolve_member<'a>(&'a self, name: &'a Name) -> Option<&'a Name> {
-        if self.members.contains(name) {
+    pub(crate) fn resolve_member<'a>(&'a self, db: &'a dyn Db, name: &'a Name) -> Option<&'a Name> {
+        if self.members(db).contains_key(name) {
             Some(name)
         } else {
-            self.aliases.get(name)
+            self.aliases(db).get(name)
         }
+    }
+
+    fn heap_size(
+        (members, aliases): &(FxOrderMap<Name, Type<'db>>, BTreeMap<Name, Name>),
+    ) -> usize {
+        ruff_memory_usage::order_map_heap_size(members) + ruff_memory_usage::heap_size(aliases)
     }
 }
 
-#[allow(clippy::ref_option)]
-fn enum_metadata_cycle_recover(
-    _db: &dyn Db,
-    _value: &Option<EnumMetadata>,
+#[allow(clippy::ref_option, clippy::trivially_copy_pass_by_ref)]
+fn enum_metadata_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &Option<EnumMetadata<'db>>,
     _count: u32,
-    _class: ClassLiteral<'_>,
-) -> salsa::CycleRecoveryAction<Option<EnumMetadata>> {
+    _class: ClassLiteral<'db>,
+) -> salsa::CycleRecoveryAction<Option<EnumMetadata<'db>>> {
     salsa::CycleRecoveryAction::Iterate
 }
 
 #[allow(clippy::unnecessary_wraps)]
-fn enum_metadata_cycle_initial(_db: &dyn Db, _class: ClassLiteral<'_>) -> Option<EnumMetadata> {
-    Some(EnumMetadata::empty())
+fn enum_metadata_cycle_initial<'db>(
+    db: &'db dyn Db,
+    _class: ClassLiteral<'db>,
+) -> Option<EnumMetadata<'db>> {
+    Some(EnumMetadata::empty(db))
 }
 
 /// List all members of an enum.
@@ -57,7 +67,7 @@ fn enum_metadata_cycle_initial(_db: &dyn Db, _class: ClassLiteral<'_>) -> Option
 pub(crate) fn enum_metadata<'db>(
     db: &'db dyn Db,
     class: ClassLiteral<'db>,
-) -> Option<EnumMetadata> {
+) -> Option<EnumMetadata<'db>> {
     // This is a fast path to avoid traversing the MRO of known classes
     if class
         .known(db)
@@ -97,7 +107,7 @@ pub(crate) fn enum_metadata<'db>(
         None
     };
 
-    let mut aliases = FxHashMap::default();
+    let mut aliases = BTreeMap::default();
 
     let members = use_def_map
         .all_end_of_scope_symbol_bindings()
@@ -217,16 +227,16 @@ pub(crate) fn enum_metadata<'db>(
                 }
             }
 
-            Some(name.clone())
+            Some((name.clone(), value_ty))
         })
-        .collect::<FxOrderSet<_>>();
+        .collect::<FxOrderMap<_, _>>();
 
     if members.is_empty() {
         // Enum subclasses without members are not considered enums.
         return None;
     }
 
-    Some(EnumMetadata { members, aliases })
+    Some(EnumMetadata::new(db, members, aliases))
 }
 
 pub(crate) fn enum_member_literals<'a, 'db: 'a>(
@@ -236,15 +246,15 @@ pub(crate) fn enum_member_literals<'a, 'db: 'a>(
 ) -> Option<impl Iterator<Item = Type<'a>> + 'a> {
     enum_metadata(db, class).map(|metadata| {
         metadata
-            .members
-            .iter()
+            .members(db)
+            .keys()
             .filter(move |name| Some(*name) != exclude_member)
             .map(move |name| Type::EnumLiteral(EnumLiteralType::new(db, class, name.clone())))
     })
 }
 
 pub(crate) fn is_single_member_enum<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> bool {
-    enum_metadata(db, class).is_some_and(|metadata| metadata.members.len() == 1)
+    enum_metadata(db, class).is_some_and(|metadata| metadata.members(db).len() == 1)
 }
 
 pub(crate) fn is_enum_class<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
