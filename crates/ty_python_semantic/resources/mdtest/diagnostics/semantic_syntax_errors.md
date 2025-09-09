@@ -15,10 +15,7 @@ python-version = "3.10"
 ```
 
 ```py
-from ty_extensions import Unknown
-
-# TODO: async generator type inference support
-async def elements(n) -> Unknown:
+async def elements(n):
     yield n
 
 async def f():
@@ -57,10 +54,7 @@ python-version = "3.11"
 ```
 
 ```py
-from ty_extensions import Unknown
-
-# TODO: async generator type inference support
-async def elements(n) -> Unknown:
+async def elements(n):
     yield n
 
 async def f():
@@ -335,10 +329,7 @@ def _():
 This error includes `await`, `async for`, `async with`, and `async` comprehensions.
 
 ```py
-from ty_extensions import Unknown
-
-# TODO: async generator type inference support
-async def elements(n) -> Unknown:
+async def elements(n):
     yield n
 
 def _():
