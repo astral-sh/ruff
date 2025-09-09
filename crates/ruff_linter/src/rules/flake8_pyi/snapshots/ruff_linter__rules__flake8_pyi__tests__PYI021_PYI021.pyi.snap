@@ -90,16 +90,15 @@ PYI021 [*] Docstrings should not be included in stubs
 20 |       def __init__(self) -> None: ...
    |
 help: Remove docstring
-
-ℹ Unsafe fix
-12 12 |     def __init__(self) -> None: ...
-13 13 | 
-14 14 | class Baz:
-15    |-    """Multiline docstring
-16    |-
-17    |-    Lorem ipsum dolor sit amet
-18    |-    """
-   15 |+    
-19 16 | 
-20 17 |     def __init__(self) -> None: ...
-21 18 |
+12 |     def __init__(self) -> None: ...
+13 | 
+14 | class Baz:
+   -     """Multiline docstring
+   - 
+   -     Lorem ipsum dolor sit amet
+   -     """
+15 +     
+16 | 
+17 |     def __init__(self) -> None: ...
+18 | 
+note: This is an unsafe fix and may change runtime behavior

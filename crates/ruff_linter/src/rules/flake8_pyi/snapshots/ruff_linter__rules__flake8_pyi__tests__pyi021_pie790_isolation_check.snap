@@ -10,12 +10,11 @@ PYI021 [*] Docstrings should not be included in stubs
 3 |     ...  # ERROR PIE790
   |
 help: Remove docstring
-
-ℹ Unsafe fix
-1 1 | def check_isolation_level(mode: int) -> None:
-2   |-    """Shouldn't try to fix either."""  # ERROR PYI021
-  2 |+      # ERROR PYI021
-3 3 |     ...  # ERROR PIE790
+1 | def check_isolation_level(mode: int) -> None:
+  -     """Shouldn't try to fix either."""  # ERROR PYI021
+2 +       # ERROR PYI021
+3 |     ...  # ERROR PIE790
+note: This is an unsafe fix and may change runtime behavior
 
 PIE790 [*] Unnecessary `...` literal
  --> PYI021_1.pyi:3:5
@@ -26,9 +25,7 @@ PIE790 [*] Unnecessary `...` literal
   |     ^^^
   |
 help: Remove unnecessary `...`
-
-ℹ Safe fix
-1 1 | def check_isolation_level(mode: int) -> None:
-2 2 |     """Shouldn't try to fix either."""  # ERROR PYI021
-3   |-    ...  # ERROR PIE790
-  3 |+    # ERROR PIE790
+1 | def check_isolation_level(mode: int) -> None:
+2 |     """Shouldn't try to fix either."""  # ERROR PYI021
+  -     ...  # ERROR PIE790
+3 +     # ERROR PIE790
