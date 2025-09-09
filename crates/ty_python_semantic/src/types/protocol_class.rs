@@ -556,31 +556,19 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
 
                 let proto_member_as_bound_method = method.bind_self(db);
 
-                if proto_member_as_bound_method
-                    .signatures(db)
-                    .iter()
-                    .flat_map(|sig| {
-                        sig.parameters()
-                            .iter()
-                            .filter_map(Parameter::annotated_type)
-                            .chain(sig.return_ty)
-                    })
-                    .any(|ty| any_over_type(db, ty, &|t| matches!(t, Type::TypeVar(_))))
-                {
+                if any_over_type(db, proto_member_as_bound_method, &|t| {
+                    matches!(t, Type::TypeVar(_))
+                }) {
                     // TODO: proper validation for generic methods on protocols
                     return ConstraintSet::from(false);
                 }
 
                 visitor.visit(
-                    (
-                        attribute_type,
-                        Type::Callable(proto_member_as_bound_method),
-                        relation,
-                    ),
+                    (attribute_type, proto_member_as_bound_method, relation),
                     || {
                         attribute_type.has_relation_to_impl(
                             db,
-                            Type::Callable(proto_member_as_bound_method),
+                            proto_member_as_bound_method,
                             relation,
                             visitor,
                         )

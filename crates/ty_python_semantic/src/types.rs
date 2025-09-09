@@ -3090,7 +3090,7 @@ impl<'db> Type<'db> {
                     Some((self, AttributeKind::NormalOrNonDataDescriptor))
                 } else {
                     Some((
-                        Type::Callable(callable.bind_self(db)),
+                        callable.bind_self(db),
                         AttributeKind::NormalOrNonDataDescriptor,
                     ))
                 };
@@ -9076,8 +9076,12 @@ impl<'db> CallableType<'db> {
         Self::single(db, Signature::unknown())
     }
 
-    pub(crate) fn bind_self(self, db: &'db dyn Db) -> CallableType<'db> {
-        CallableType::new(db, self.signatures(db).bind_self(db, None), false)
+    pub(crate) fn bind_self(self, db: &'db dyn Db) -> Type<'db> {
+        Type::Callable(CallableType::new(
+            db,
+            self.signatures(db).bind_self(db, None),
+            false,
+        ))
     }
 
     /// Create a callable type which represents a fully-static "bottom" callable.
