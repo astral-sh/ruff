@@ -20,8 +20,8 @@ An individual constraint restricts the specialization of a single typevar. You c
 more complex constraint sets using union, intersection, and negation operations. We use a
 disjunctive normal form (DNF) representation, just like we do for types: a _constraint set_ is the
 union of zero or more _clauses_, each of which is the intersection of zero or more _individual
-constraints_. Note that the constraint set that contains no clauses is never satisfiable (`⋃ {} =
-0`); and the constraint set that contains a single clause, where that clause contains no
+constraints_. Note that the constraint set that contains no clauses is never satisfiable
+(`⋃ {} = 0`); and the constraint set that contains a single clause, where that clause contains no
 constraints, is always satisfiable (`⋃ {⋂ {}} = 1`).
 
 ## Kinds of constraints
