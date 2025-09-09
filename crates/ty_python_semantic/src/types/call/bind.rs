@@ -654,6 +654,18 @@ impl<'db> Bindings<'db> {
                             }
                         }
 
+                        Some(KnownFunction::IncomparableConstraint) => {
+                            if let [Some(Type::NonInferableTypeVar(typevar)), Some(pivot)] =
+                                overload.parameter_types()
+                            {
+                                let constraints = ConstraintSet::incomparable(db, *typevar, *pivot);
+                                let tracked = TrackedConstraintSet::new(db, constraints);
+                                overload.set_return_type(Type::KnownInstance(
+                                    KnownInstanceType::ConstraintSet(tracked),
+                                ));
+                            }
+                        }
+
                         Some(KnownFunction::IsSingleton) => {
                             if let [Some(ty)] = overload.parameter_types() {
                                 overload.set_return_type(Type::BooleanLiteral(ty.is_singleton(db)));

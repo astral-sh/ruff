@@ -33,7 +33,7 @@ typevar can only specialize to a type that is a supertype of the lower bound, an
 upper bound.
 
 ```py
-from typing import Any, Never
+from typing import Any, Never, Sequence
 from ty_extensions import range_constraint
 
 class Super: ...
@@ -88,9 +88,13 @@ their bottom and top materializations, respectively.
 def _[T]():
     # revealed: ty_extensions.ConstraintSet[(Base ≤ T@_)]
     reveal_type(range_constraint(Base, T, Any))
+    # revealed: ty_extensions.ConstraintSet[(Sequence[Base] ≤ T@_ ≤ Sequence[object])]
+    reveal_type(range_constraint(Sequence[Base], T, Sequence[Any]))
 
     # revealed: ty_extensions.ConstraintSet[(T@_ ≤ Base)]
     reveal_type(range_constraint(Any, T, Base))
+    # revealed: ty_extensions.ConstraintSet[(Sequence[Never] ≤ T@_ ≤ Sequence[Base])]
+    reveal_type(range_constraint(Sequence[Any], T, Sequence[Base]))
 ```
 
 ### Not equivalent
@@ -99,7 +103,7 @@ A _not-equivalent_ constraint requires the typevar to specialize to anything _ot
 particular type (the "hole").
 
 ```py
-from typing import Any, Never
+from typing import Any, Never, Sequence
 from ty_extensions import not_equivalent_constraint
 
 class Base: ...
@@ -128,9 +132,45 @@ materialization.
 def _[T]():
     # revealed: ty_extensions.ConstraintSet[(T@_ ≠ object)]
     reveal_type(not_equivalent_constraint(T, Any))
+    # revealed: ty_extensions.ConstraintSet[(T@_ ≠ Sequence[object])]
+    reveal_type(not_equivalent_constraint(T, Sequence[Any]))
 ```
 
 ### Incomparable
 
 An _incomparable_ constraint requires the typevar to specialize to any type that is neither a
 subtype nor a supertype of a particular type (the "pivot").
+
+```py
+from typing import Any, Never, Sequence
+from ty_extensions import incomparable_constraint
+
+class Base: ...
+
+def _[T]():
+    # revealed: ty_extensions.ConstraintSet[(T@_ ≁ Base)]
+    reveal_type(incomparable_constraint(T, Base))
+```
+
+Every type is comparable with `Never` and with `object`, so an incomparable constraint with either
+as a pivot cannot ever be satisfied.
+
+```py
+def _[T]():
+    # revealed: ty_extensions.ConstraintSet[never]
+    reveal_type(incomparable_constraint(T, Never))
+
+    # revealed: ty_extensions.ConstraintSet[never]
+    reveal_type(incomparable_constraint(T, object))
+```
+
+Constraints can only refer to fully static types, so the pivot is transformed into its top
+materialization.
+
+```py
+def _[T]():
+    # revealed: ty_extensions.ConstraintSet[never]
+    reveal_type(incomparable_constraint(T, Any))
+    # revealed: ty_extensions.ConstraintSet[(T@_ ≁ Sequence[object])]
+    reveal_type(incomparable_constraint(T, Sequence[Any]))
+```

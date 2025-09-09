@@ -295,6 +295,18 @@ impl<'db> ConstraintSet<'db> {
         result
     }
 
+    pub(crate) fn incomparable(
+        db: &'db dyn Db,
+        typevar: BoundTypeVarInstance<'db>,
+        pivot: Type<'db>,
+    ) -> Self {
+        let pivot = pivot.top_materialization(db);
+        let constraint = Constraint::incomparable(db, pivot).constrain(typevar);
+        let mut result = Self::never();
+        result.union_constraint(db, constraint);
+        result
+    }
+
     /// Updates this set to be the union of itself and a constraint.
     fn union_constraint(
         &mut self,
