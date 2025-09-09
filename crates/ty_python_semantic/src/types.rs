@@ -3782,6 +3782,11 @@ impl<'db> Type<'db> {
                 Truthiness::Ambiguous
             }
 
+            Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked_set)) => {
+                let constraints = tracked_set.constraints(db);
+                Truthiness::from(constraints.is_always_satisfied(db))
+            }
+
             Type::FunctionLiteral(_)
             | Type::BoundMethod(_)
             | Type::WrapperDescriptor(_)
@@ -4128,28 +4133,25 @@ impl<'db> Type<'db> {
             .into(),
 
             Type::FunctionLiteral(function_type) => match function_type.known(db) {
-                Some(
-                    KnownFunction::IsEquivalentTo
-                    | KnownFunction::IsSubtypeOf
-                    | KnownFunction::IsAssignableTo
-                    | KnownFunction::IsDisjointFrom,
-                ) => Binding::single(
-                    self,
-                    Signature::new(
-                        Parameters::new([
-                            Parameter::positional_only(Some(Name::new_static("a")))
-                                .type_form()
-                                .with_annotated_type(Type::any()),
-                            Parameter::positional_only(Some(Name::new_static("b")))
-                                .type_form()
-                                .with_annotated_type(Type::any()),
-                        ]),
-                        Some(KnownClass::Bool.to_instance(db)),
-                    ),
-                )
-                .into(),
+                Some(KnownFunction::IsEquivalentTo | KnownFunction::IsDisjointFrom) => {
+                    Binding::single(
+                        self,
+                        Signature::new(
+                            Parameters::new([
+                                Parameter::positional_only(Some(Name::new_static("a")))
+                                    .type_form()
+                                    .with_annotated_type(Type::any()),
+                                Parameter::positional_only(Some(Name::new_static("b")))
+                                    .type_form()
+                                    .with_annotated_type(Type::any()),
+                            ]),
+                            Some(KnownClass::Bool.to_instance(db)),
+                        ),
+                    )
+                    .into()
+                }
 
-                Some(KnownFunction::WhenAssignableTo | KnownFunction::WhenSubtypeOf) => {
+                Some(KnownFunction::IsAssignableTo | KnownFunction::IsSubtypeOf) => {
                     Binding::single(
                         self,
                         Signature::new(

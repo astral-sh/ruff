@@ -65,7 +65,7 @@ use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{FileScopeId, SemanticIndex, semantic_index};
 use crate::types::call::{Binding, CallArguments};
-use crate::types::constraints::{ConstraintSet, Constraints};
+use crate::types::constraints::Constraints;
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{
     INVALID_ARGUMENT_TYPE, REDUNDANT_CAST, STATIC_ASSERT_ERROR, TYPE_ASSERTION_FAILURE,
@@ -79,9 +79,8 @@ use crate::types::visitor::any_over_type;
 use crate::types::{
     BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, ClassType,
     DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
-    IsEquivalentVisitor, KnownClass, KnownInstanceType, NormalizedVisitor, SpecialFormType,
-    TrackedConstraintSet, Truthiness, Type, TypeMapping, TypeRelation, UnionBuilder, all_members,
-    binding_type, walk_type_mapping,
+    IsEquivalentVisitor, KnownClass, NormalizedVisitor, SpecialFormType, Truthiness, Type,
+    TypeMapping, TypeRelation, UnionBuilder, all_members, binding_type, walk_type_mapping,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -1256,10 +1255,6 @@ pub enum KnownFunction {
     HasMember,
     /// `ty_extensions.reveal_protocol_interface`
     RevealProtocolInterface,
-    /// `ty_extensions.when_assignable_to`
-    WhenAssignableTo,
-    /// `ty_extensions.reveal_when_subtype_of`
-    WhenSubtypeOf,
 }
 
 impl KnownFunction {
@@ -1325,8 +1320,6 @@ impl KnownFunction {
             | Self::StaticAssert
             | Self::HasMember
             | Self::RevealProtocolInterface
-            | Self::WhenAssignableTo
-            | Self::WhenSubtypeOf
             | Self::AllMembers => module.is_ty_extensions(),
             Self::ImportModule => module.is_importlib(),
         }
@@ -1622,28 +1615,6 @@ impl KnownFunction {
                 overload.set_return_type(Type::module_literal(db, file, module));
             }
 
-            KnownFunction::WhenAssignableTo => {
-                let [Some(ty_a), Some(ty_b)] = overload.parameter_types() else {
-                    return;
-                };
-                let constraints = ty_a.when_assignable_to::<ConstraintSet>(db, *ty_b);
-                let tracked = TrackedConstraintSet::new(db, constraints);
-                overload.set_return_type(Type::KnownInstance(KnownInstanceType::ConstraintSet(
-                    tracked,
-                )));
-            }
-
-            KnownFunction::WhenSubtypeOf => {
-                let [Some(ty_a), Some(ty_b)] = overload.parameter_types() else {
-                    return;
-                };
-                let constraints = ty_a.when_subtype_of::<ConstraintSet>(db, *ty_b);
-                let tracked = TrackedConstraintSet::new(db, constraints);
-                overload.set_return_type(Type::KnownInstance(KnownInstanceType::ConstraintSet(
-                    tracked,
-                )));
-            }
-
             _ => {}
         }
     }
@@ -1704,8 +1675,6 @@ pub(crate) mod tests {
                 | KnownFunction::IsEquivalentTo
                 | KnownFunction::HasMember
                 | KnownFunction::RevealProtocolInterface
-                | KnownFunction::WhenAssignableTo
-                | KnownFunction::WhenSubtypeOf
                 | KnownFunction::AllMembers => KnownModule::TyExtensions,
 
                 KnownFunction::ImportModule => KnownModule::ImportLib,

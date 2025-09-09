@@ -32,8 +32,8 @@ use crate::types::signatures::{Parameter, ParameterForm, Parameters};
 use crate::types::tuple::{Tuple, TupleLength, TupleType};
 use crate::types::{
     BoundMethodType, ClassLiteral, DataclassParams, FieldInstance, KnownClass, KnownInstanceType,
-    MethodWrapperKind, PropertyInstanceType, SpecialFormType, TypeAliasType, TypeMapping,
-    UnionType, WrapperDescriptorKind, enums, ide_support, todo_type,
+    MethodWrapperKind, PropertyInstanceType, SpecialFormType, TrackedConstraintSet, TypeAliasType,
+    TypeMapping, UnionType, WrapperDescriptorKind, enums, ide_support, todo_type,
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, PythonVersion};
@@ -592,16 +592,21 @@ impl<'db> Bindings<'db> {
 
                         Some(KnownFunction::IsSubtypeOf) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
-                                overload.set_return_type(Type::BooleanLiteral(
-                                    ty_a.is_subtype_of(db, *ty_b),
+                                let constraints = ty_a.when_subtype_of::<ConstraintSet>(db, *ty_b);
+                                let tracked = TrackedConstraintSet::new(db, constraints);
+                                overload.set_return_type(Type::KnownInstance(
+                                    KnownInstanceType::ConstraintSet(tracked),
                                 ));
                             }
                         }
 
                         Some(KnownFunction::IsAssignableTo) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
-                                overload.set_return_type(Type::BooleanLiteral(
-                                    ty_a.is_assignable_to(db, *ty_b),
+                                let constraints =
+                                    ty_a.when_assignable_to::<ConstraintSet>(db, *ty_b);
+                                let tracked = TrackedConstraintSet::new(db, constraints);
+                                overload.set_return_type(Type::KnownInstance(
+                                    KnownInstanceType::ConstraintSet(tracked),
                                 ));
                             }
                         }

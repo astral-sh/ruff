@@ -1708,7 +1708,7 @@ static_assert(is_subtype_of(TypeOf[B], Callable[[], B]))
 class C: ...
 
 # TODO: This assertion should be true once we understand `Self`
-# error: [static-assert-error] "Static assertion error: argument evaluates to `False`"
+# error: [static-assert-error] "Static assertion error: argument of type `never` is statically known to be falsy"
 static_assert(is_subtype_of(TypeOf[C], Callable[[], C]))
 
 class D[T]:
@@ -1865,7 +1865,7 @@ static_assert(not is_subtype_of(TypeOf[a.f], Callable[[float], int]))
 static_assert(not is_subtype_of(TypeOf[A.g], Callable[[], int]))
 
 # TODO: This assertion should be true
-# error: [static-assert-error] "Static assertion error: argument evaluates to `False`"
+# error: [static-assert-error] "Static assertion error: argument of type `never` is statically known to be falsy"
 static_assert(is_subtype_of(TypeOf[A.f], Callable[[A, int], int]))
 ```
 
