@@ -246,8 +246,8 @@ where
 ///   be simplified into a single clause.
 ///
 /// [POPL2015]: https://doi.org/10.1145/2676726.2676991
-#[derive(Clone, Debug)]
-pub(crate) struct ConstraintSet<'db> {
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
+pub struct ConstraintSet<'db> {
     // NOTE: We use 2 here because there are a couple of places where we create unions of 2 clauses
     // as temporary values — in particular when negating a constraint — and this lets us avoid
     // spilling the temporary value to the heap.
@@ -429,7 +429,7 @@ impl<'db> Constraints<'db> for ConstraintSet<'db> {
 /// This is called a "constraint set", and denoted _C_, in [[POPL2015][]].
 ///
 /// [POPL2015]: https://doi.org/10.1145/2676726.2676991
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
 pub(crate) struct ConstraintClause<'db> {
     // NOTE: We use 1 here because most clauses only mention a single typevar.
     constraints: SmallVec<[ConstrainedTypeVar<'db>; 1]>,
@@ -810,7 +810,7 @@ impl<'db> ConstraintClause<'db> {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
 pub(crate) struct ConstrainedTypeVar<'db> {
     typevar: BoundTypeVarInstance<'db>,
     constraint: Constraint<'db>,
@@ -857,7 +857,7 @@ impl<'db> ConstrainedTypeVar<'db> {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
 pub(crate) enum Constraint<'db> {
     Range(RangeConstraint<'db>),
     NotEquivalent(NotEquivalentConstraint<'db>),
@@ -980,7 +980,7 @@ impl<'db> Satisfiable<Constraint<'db>> {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
 pub(crate) struct RangeConstraint<'db> {
     lower: Type<'db>,
     upper: Type<'db>,
@@ -1189,7 +1189,7 @@ impl<'db> RangeConstraint<'db> {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
 pub(crate) struct NotEquivalentConstraint<'db> {
     ty: Type<'db>,
 }
@@ -1302,7 +1302,7 @@ impl<'db> NotEquivalentConstraint<'db> {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
 pub(crate) struct IncomparableConstraint<'db> {
     ty: Type<'db>,
 }

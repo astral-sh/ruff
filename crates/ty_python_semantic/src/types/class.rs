@@ -3651,6 +3651,8 @@ pub enum KnownClass {
     TypedDictFallback,
     // string.templatelib
     Template,
+    // ty_extensions
+    ConstraintSet,
 }
 
 impl KnownClass {
@@ -3749,6 +3751,7 @@ impl KnownClass {
             | Self::InitVar
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
+            | Self::ConstraintSet
             | Self::TypedDictFallback => Some(Truthiness::Ambiguous),
 
             Self::Tuple => None,
@@ -3828,6 +3831,7 @@ impl KnownClass {
             | KnownClass::InitVar
             | KnownClass::NamedTupleFallback
             | KnownClass::NamedTupleLike
+            | KnownClass::ConstraintSet
             | KnownClass::TypedDictFallback
             | KnownClass::Template => false,
         }
@@ -3905,6 +3909,7 @@ impl KnownClass {
             | KnownClass::InitVar
             | KnownClass::NamedTupleFallback
             | KnownClass::NamedTupleLike
+            | KnownClass::ConstraintSet
             | KnownClass::TypedDictFallback
             | KnownClass::Template => false,
         }
@@ -3982,6 +3987,7 @@ impl KnownClass {
             | KnownClass::TypedDictFallback
             | KnownClass::NamedTupleLike
             | KnownClass::NamedTupleFallback
+            | KnownClass::ConstraintSet
             | KnownClass::Template => false,
         }
     }
@@ -4070,6 +4076,7 @@ impl KnownClass {
             | Self::KwOnly
             | Self::InitVar
             | Self::NamedTupleFallback
+            | Self::ConstraintSet
             | Self::TypedDictFallback
             | Self::Template => false,
         }
@@ -4166,6 +4173,7 @@ impl KnownClass {
             Self::InitVar => "InitVar",
             Self::NamedTupleFallback => "NamedTupleFallback",
             Self::NamedTupleLike => "NamedTupleLike",
+            Self::ConstraintSet => "ConstraintSet",
             Self::TypedDictFallback => "TypedDictFallback",
             Self::Template => "Template",
         }
@@ -4431,7 +4439,7 @@ impl KnownClass {
             | Self::OrderedDict => KnownModule::Collections,
             Self::Field | Self::KwOnly | Self::InitVar => KnownModule::Dataclasses,
             Self::NamedTupleFallback | Self::TypedDictFallback => KnownModule::TypeCheckerInternals,
-            Self::NamedTupleLike => KnownModule::TyExtensions,
+            Self::NamedTupleLike | Self::ConstraintSet => KnownModule::TyExtensions,
             Self::Template => KnownModule::Templatelib,
         }
     }
@@ -4510,6 +4518,7 @@ impl KnownClass {
             | Self::Iterator
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
+            | Self::ConstraintSet
             | Self::TypedDictFallback
             | Self::Template => Some(false),
 
@@ -4592,6 +4601,7 @@ impl KnownClass {
             | Self::Iterator
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
+            | Self::ConstraintSet
             | Self::TypedDictFallback
             | Self::Template => false,
         }
@@ -4682,6 +4692,7 @@ impl KnownClass {
             "InitVar" => Self::InitVar,
             "NamedTupleFallback" => Self::NamedTupleFallback,
             "NamedTupleLike" => Self::NamedTupleLike,
+            "ConstraintSet" => Self::ConstraintSet,
             "TypedDictFallback" => Self::TypedDictFallback,
             "Template" => Self::Template,
             _ => return None,
@@ -4749,6 +4760,7 @@ impl KnownClass {
             | Self::NamedTupleFallback
             | Self::TypedDictFallback
             | Self::NamedTupleLike
+            | Self::ConstraintSet
             | Self::Awaitable
             | Self::Generator
             | Self::Template => module == self.canonical_module(db),

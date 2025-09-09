@@ -5646,6 +5646,10 @@ impl<'db> Type<'db> {
                     invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Field],
                     fallback_type: Type::unknown(),
                 }),
+                KnownInstanceType::ConstraintSet(__call__) => Err(InvalidTypeExpressionError {
+                    invalid_expressions: smallvec::smallvec![InvalidTypeExpression::ConstraintSet],
+                    fallback_type: Type::unknown(),
+                }),
                 KnownInstanceType::SubscriptedProtocol(_) => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec::smallvec_inline![
                         InvalidTypeExpression::Protocol
@@ -6789,6 +6793,20 @@ impl<'db> TypeMapping<'_, 'db> {
     }
 }
 
+/// A Salsa-tracked constraint set. This is only needed to have something appropriately small to
+/// put in an [`KnownInstance::ConstraintSet`]. We don't actually manipulate these as part of using
+/// constraint sets to check things like assignability; they're only used as a debugging aid in
+/// mdtests. That means there's no need for this to be interned; being tracked is sufficient.
+#[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
+#[derive(PartialOrd, Ord)]
+pub struct TrackedConstraintSet<'db> {
+    #[returns(ref)]
+    set: ConstraintSet<'db>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for TrackedConstraintSet<'_> {}
+
 /// Singleton types that are heavily special-cased by ty. Despite its name,
 /// quite a different type to [`NominalInstanceType`].
 ///
@@ -6831,6 +6849,10 @@ pub enum KnownInstanceType<'db> {
 
     /// A single instance of `dataclasses.Field`
     Field(FieldInstance<'db>),
+
+    /// A constraint set, which is exposed in mdtests as an instance of
+    /// `ty_extensions.ConstraintSet`.
+    ConstraintSet(TrackedConstraintSet<'db>),
 }
 
 fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -6849,7 +6871,7 @@ fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
         KnownInstanceType::TypeAliasType(type_alias) => {
             visitor.visit_type_alias_type(db, type_alias);
         }
-        KnownInstanceType::Deprecated(_) => {
+        KnownInstanceType::Deprecated(_) | KnownInstanceType::ConstraintSet(_) => {
             // Nothing to visit
         }
         KnownInstanceType::Field(field) => {
@@ -6876,6 +6898,10 @@ impl<'db> KnownInstanceType<'db> {
                 Self::Deprecated(deprecated)
             }
             Self::Field(field) => Self::Field(field.normalized_impl(db, visitor)),
+            Self::ConstraintSet(set) => {
+                // Nothing to normalize
+                Self::ConstraintSet(set)
+            }
         }
     }
 
@@ -6889,6 +6915,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::TypeAliasType(_) => KnownClass::TypeAliasType,
             Self::Deprecated(_) => KnownClass::Deprecated,
             Self::Field(_) => KnownClass::Field,
+            Self::ConstraintSet(_) => KnownClass::ConstraintSet,
         }
     }
 
@@ -6947,6 +6974,9 @@ impl<'db> KnownInstanceType<'db> {
                         f.write_str("dataclasses.Field[")?;
                         field.default_type(self.db).display(self.db).fmt(f)?;
                         f.write_str("]")
+                    }
+                    KnownInstanceType::ConstraintSet(tracked_set) => {
+                        tracked_set.set(self.db).display(self.db).fmt(f)
                     }
                 }
             }
@@ -7170,6 +7200,8 @@ enum InvalidTypeExpression<'db> {
     Deprecated,
     /// Same for `dataclasses.Field`
     Field,
+    /// Same for `ty_extensions.ConstraintSet`
+    ConstraintSet,
     /// Same for `typing.TypedDict`
     TypedDict,
     /// Type qualifiers are always invalid in *type expressions*,
@@ -7218,6 +7250,9 @@ impl<'db> InvalidTypeExpression<'db> {
                     }
                     InvalidTypeExpression::Field => {
                         f.write_str("`dataclasses.Field` is not allowed in type expressions")
+                    }
+                    InvalidTypeExpression::ConstraintSet => {
+                        f.write_str("`ty_extensions.ConstraintSet` is not allowed in type expressions")
                     }
                     InvalidTypeExpression::TypedDict => {
                         f.write_str(
