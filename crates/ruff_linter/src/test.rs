@@ -383,17 +383,20 @@ Either ensure you always emit a fix or change `Violation::FIX_AVAILABILITY` to e
 
             // Not strictly necessary but adds some coverage for this code path by overriding the
             // noqa offset and the source file
-            let range = diagnostic.expect_range();
-            diagnostic.set_noqa_offset(directives.noqa_line_for.resolve(range.start()));
+            if let Some(range) = diagnostic.range() {
+                diagnostic.set_noqa_offset(directives.noqa_line_for.resolve(range.start()));
+            }
             // This part actually is necessary to avoid long relative paths in snapshots.
             for annotation in diagnostic.annotations_mut() {
-                let range = annotation.get_span().range().unwrap();
-                annotation.set_span(Span::from(source_code.clone()).with_range(range));
+                if let Some(range) = annotation.get_span().range() {
+                    annotation.set_span(Span::from(source_code.clone()).with_range(range));
+                }
             }
             for sub in diagnostic.sub_diagnostics_mut() {
                 for annotation in sub.annotations_mut() {
-                    let range = annotation.get_span().range().unwrap();
-                    annotation.set_span(Span::from(source_code.clone()).with_range(range));
+                    if let Some(range) = annotation.get_span().range() {
+                        annotation.set_span(Span::from(source_code.clone()).with_range(range));
+                    }
                 }
             }
 
