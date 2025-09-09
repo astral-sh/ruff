@@ -48,6 +48,13 @@ fn enclosing_generic_contexts<'db>(
                     .last_definition_signature(db)
                     .generic_context
             }
+            NodeWithScopeKind::TypeAlias(type_alias) => {
+                let definition = index.expect_single_definition(type_alias.node(module));
+                binding_type(db, definition)
+                    .into_type_alias()?
+                    .into_pep_695_type_alias()?
+                    .generic_context(db)
+            }
             _ => None,
         })
 }
@@ -132,6 +139,18 @@ impl<'db> GenericContext<'db> {
         type_params: impl IntoIterator<Item = BoundTypeVarInstance<'db>>,
     ) -> Self {
         Self::new(db, type_params.into_iter().collect::<FxOrderSet<_>>())
+    }
+
+    /// Merge this generic context with another, returning a new generic context that
+    /// contains type variables from both contexts.
+    pub(crate) fn merge(self, db: &'db dyn Db, other: Self) -> Self {
+        Self::from_typevar_instances(
+            db,
+            self.variables(db)
+                .iter()
+                .chain(other.variables(db).iter())
+                .copied(),
+        )
     }
 
     fn variable_from_type_param(
