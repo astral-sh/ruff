@@ -3610,6 +3610,11 @@ pub enum KnownClass {
     GeneratorType,
     AsyncGeneratorType,
     CoroutineType,
+    NotImplementedType,
+    BuiltinFunctionType,
+    // Exposed as `types.EllipsisType` on Python >=3.10;
+    // backported as `builtins.ellipsis` by typeshed on Python <=3.9
+    EllipsisType,
     // Typeshed
     NoneType, // Part of `types` for Python >= 3.10
     // Typing
@@ -3637,10 +3642,6 @@ pub enum KnownClass {
     OrderedDict,
     // sys
     VersionInfo,
-    // Exposed as `types.EllipsisType` on Python >=3.10;
-    // backported as `builtins.ellipsis` by typeshed on Python <=3.9
-    EllipsisType,
-    NotImplementedType,
     // dataclasses
     Field,
     KwOnly,
@@ -3694,6 +3695,7 @@ impl KnownClass {
             | Self::AsyncGeneratorType
             | Self::MethodWrapperType
             | Self::CoroutineType
+            | Self::BuiltinFunctionType
             | Self::Template => Some(Truthiness::AlwaysTrue),
 
             Self::NoneType => Some(Truthiness::AlwaysFalse),
@@ -3829,6 +3831,7 @@ impl KnownClass {
             | KnownClass::NamedTupleFallback
             | KnownClass::NamedTupleLike
             | KnownClass::TypedDictFallback
+            | KnownClass::BuiltinFunctionType
             | KnownClass::Template => false,
         }
     }
@@ -3906,6 +3909,7 @@ impl KnownClass {
             | KnownClass::NamedTupleFallback
             | KnownClass::NamedTupleLike
             | KnownClass::TypedDictFallback
+            | KnownClass::BuiltinFunctionType
             | KnownClass::Template => false,
         }
     }
@@ -3982,6 +3986,7 @@ impl KnownClass {
             | KnownClass::TypedDictFallback
             | KnownClass::NamedTupleLike
             | KnownClass::NamedTupleFallback
+            | KnownClass::BuiltinFunctionType
             | KnownClass::Template => false,
         }
     }
@@ -4071,6 +4076,7 @@ impl KnownClass {
             | Self::InitVar
             | Self::NamedTupleFallback
             | Self::TypedDictFallback
+            | Self::BuiltinFunctionType
             | Self::Template => false,
         }
     }
@@ -4109,6 +4115,7 @@ impl KnownClass {
             Self::UnionType => "UnionType",
             Self::MethodWrapperType => "MethodWrapperType",
             Self::WrapperDescriptorType => "WrapperDescriptorType",
+            Self::BuiltinFunctionType => "BuiltinFunctionType",
             Self::GeneratorType => "GeneratorType",
             Self::AsyncGeneratorType => "AsyncGeneratorType",
             Self::CoroutineType => "CoroutineType",
@@ -4385,6 +4392,7 @@ impl KnownClass {
             | Self::CoroutineType
             | Self::MethodWrapperType
             | Self::UnionType
+            | Self::BuiltinFunctionType
             | Self::WrapperDescriptorType => KnownModule::Types,
             Self::NoneType => KnownModule::Typeshed,
             Self::Awaitable
@@ -4511,6 +4519,7 @@ impl KnownClass {
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
             | Self::TypedDictFallback
+            | Self::BuiltinFunctionType
             | Self::Template => Some(false),
 
             Self::Tuple => None,
@@ -4593,6 +4602,7 @@ impl KnownClass {
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
             | Self::TypedDictFallback
+            | Self::BuiltinFunctionType
             | Self::Template => false,
         }
     }
@@ -4641,6 +4651,7 @@ impl KnownClass {
             "UnionType" => Self::UnionType,
             "MethodWrapperType" => Self::MethodWrapperType,
             "WrapperDescriptorType" => Self::WrapperDescriptorType,
+            "BuiltinFunctionType" => Self::BuiltinFunctionType,
             "NewType" => Self::NewType,
             "TypeAliasType" => Self::TypeAliasType,
             "TypeVar" => Self::TypeVar,
@@ -4743,6 +4754,7 @@ impl KnownClass {
             | Self::AsyncGeneratorType
             | Self::CoroutineType
             | Self::WrapperDescriptorType
+            | Self::BuiltinFunctionType
             | Self::Field
             | Self::KwOnly
             | Self::InitVar

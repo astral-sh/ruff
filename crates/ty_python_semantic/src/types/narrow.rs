@@ -240,7 +240,7 @@ impl ClassInfoConstraintFunction {
             | Type::Callable(_)
             | Type::DataclassDecorator(_)
             | Type::Never
-            | Type::MethodWrapper(_)
+            | Type::KnownBoundMethod(_)
             | Type::ModuleLiteral(_)
             | Type::FunctionLiteral(_)
             | Type::ProtocolInstance(_)

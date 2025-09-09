@@ -140,7 +140,7 @@ impl<'db> ClassBase<'db> {
             | Type::FunctionLiteral(_)
             | Type::Callable(..)
             | Type::BoundMethod(_)
-            | Type::MethodWrapper(_)
+            | Type::KnownBoundMethod(_)
             | Type::WrapperDescriptor(_)
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)

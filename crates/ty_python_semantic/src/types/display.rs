@@ -16,8 +16,8 @@ use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::tuple::TupleSpec;
 use crate::types::{
-    BoundTypeVarInstance, CallableType, IntersectionType, KnownClass, MaterializationKind,
-    MethodWrapperKind, Protocol, ProtocolInstanceType, StringLiteralType, SubclassOfInner, Type,
+    BoundTypeVarInstance, CallableType, IntersectionType, KnownBoundMethodType, KnownClass,
+    MaterializationKind, Protocol, ProtocolInstanceType, StringLiteralType, SubclassOfInner, Type,
     UnionType, WrapperDescriptorKind,
 };
 use ruff_db::parsed::parsed_module;
@@ -368,27 +368,27 @@ impl Display for DisplayRepresentation<'_> {
                     }
                 }
             }
-            Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(function)) => {
+            Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(function)) => {
                 write!(
                     f,
                     "<method-wrapper `__get__` of `{function}`>",
                     function = function.name(self.db),
                 )
             }
-            Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderCall(function)) => {
+            Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(function)) => {
                 write!(
                     f,
                     "<method-wrapper `__call__` of `{function}`>",
                     function = function.name(self.db),
                 )
             }
-            Type::MethodWrapper(MethodWrapperKind::PropertyDunderGet(_)) => {
+            Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderGet(_)) => {
                 f.write_str("<method-wrapper `__get__` of `property` object>")
             }
-            Type::MethodWrapper(MethodWrapperKind::PropertyDunderSet(_)) => {
+            Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderSet(_)) => {
                 f.write_str("<method-wrapper `__set__` of `property` object>")
             }
-            Type::MethodWrapper(MethodWrapperKind::StrStartswith(_)) => {
+            Type::KnownBoundMethod(KnownBoundMethodType::StrStartswith(_)) => {
                 f.write_str("<method-wrapper `startswith` of `str` object>")
             }
             Type::WrapperDescriptor(kind) => {
@@ -1353,7 +1353,7 @@ impl Display for DisplayMaybeParenthesizedType<'_> {
             |f: &mut Formatter<'_>| write!(f, "({})", self.ty.display_with(self.db, self.settings));
         match self.ty {
             Type::Callable(_)
-            | Type::MethodWrapper(_)
+            | Type::KnownBoundMethod(_)
             | Type::FunctionLiteral(_)
             | Type::BoundMethod(_)
             | Type::Union(_) => write_parentheses(f),

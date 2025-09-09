@@ -31,9 +31,9 @@ use crate::types::generics::{Specialization, SpecializationBuilder, Specializati
 use crate::types::signatures::{Parameter, ParameterForm, Parameters};
 use crate::types::tuple::{Tuple, TupleLength, TupleType};
 use crate::types::{
-    BoundMethodType, ClassLiteral, DataclassParams, FieldInstance, KnownClass, KnownInstanceType,
-    MethodWrapperKind, PropertyInstanceType, SpecialFormType, TypeAliasType, TypeMapping,
-    UnionType, WrapperDescriptorKind, enums, ide_support, todo_type,
+    BoundMethodType, ClassLiteral, DataclassParams, FieldInstance, KnownBoundMethodType,
+    KnownClass, KnownInstanceType, PropertyInstanceType, SpecialFormType, TypeAliasType,
+    TypeMapping, UnionType, WrapperDescriptorKind, enums, ide_support, todo_type,
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, PythonVersion};
@@ -271,7 +271,9 @@ impl<'db> Bindings<'db> {
             let binding_type = binding.callable_type;
             for (overload_index, overload) in binding.matching_overloads_mut() {
                 match binding_type {
-                    Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(function)) => {
+                    Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(
+                        function,
+                    )) => {
                         if function.is_classmethod(db) {
                             match overload.parameter_types() {
                                 [_, Some(owner)] => {
@@ -435,7 +437,7 @@ impl<'db> Bindings<'db> {
                         }
                     }
 
-                    Type::MethodWrapper(MethodWrapperKind::PropertyDunderGet(property)) => {
+                    Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderGet(property)) => {
                         match overload.parameter_types() {
                             [Some(instance), ..] if instance.is_none(db) => {
                                 overload.set_return_type(Type::PropertyInstance(property));
@@ -488,7 +490,7 @@ impl<'db> Bindings<'db> {
                         }
                     }
 
-                    Type::MethodWrapper(MethodWrapperKind::PropertyDunderSet(property)) => {
+                    Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderSet(property)) => {
                         if let [Some(instance), Some(value), ..] = overload.parameter_types() {
                             if let Some(setter) = property.setter(db) {
                                 if let Err(_call_error) = setter
@@ -506,7 +508,7 @@ impl<'db> Bindings<'db> {
                         }
                     }
 
-                    Type::MethodWrapper(MethodWrapperKind::StrStartswith(literal)) => {
+                    Type::KnownBoundMethod(KnownBoundMethodType::StrStartswith(literal)) => {
                         if let [Some(Type::StringLiteral(prefix)), None, None] =
                             overload.parameter_types()
                         {
@@ -1766,9 +1768,9 @@ impl<'db> CallableBinding<'db> {
                         FunctionKind::BoundMethod,
                         bound_method.function(context.db()),
                     )),
-                    Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(function)) => {
-                        Some((FunctionKind::MethodWrapper, function))
-                    }
+                    Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(
+                        function,
+                    )) => Some((FunctionKind::MethodWrapper, function)),
                     _ => None,
                 };
 
@@ -2730,13 +2732,13 @@ impl<'db> CallableDescription<'db> {
                 kind: "bound method",
                 name: bound_method.function(db).name(db),
             }),
-            Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(function)) => {
+            Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(function)) => {
                 Some(CallableDescription {
                     kind: "method wrapper `__get__` of function",
                     name: function.name(db),
                 })
             }
-            Type::MethodWrapper(MethodWrapperKind::PropertyDunderGet(_)) => {
+            Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderGet(_)) => {
                 Some(CallableDescription {
                     kind: "method wrapper",
                     name: "`__get__` of property",

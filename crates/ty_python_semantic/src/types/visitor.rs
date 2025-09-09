@@ -2,7 +2,7 @@ use crate::{
     Db, FxIndexSet,
     types::{
         BoundMethodType, BoundSuperType, BoundTypeVarInstance, CallableType, GenericAlias,
-        IntersectionType, KnownInstanceType, MethodWrapperKind, NominalInstanceType,
+        IntersectionType, KnownBoundMethodType, KnownInstanceType, NominalInstanceType,
         PropertyInstanceType, ProtocolInstanceType, SubclassOfType, Type, TypeAliasType,
         TypeIsType, TypeVarInstance, TypedDictType, UnionType,
         class::walk_generic_alias,
@@ -81,7 +81,11 @@ pub(crate) trait TypeVisitor<'db> {
         walk_protocol_instance_type(db, protocol, self);
     }
 
-    fn visit_method_wrapper_type(&self, db: &'db dyn Db, method_wrapper: MethodWrapperKind<'db>) {
+    fn visit_method_wrapper_type(
+        &self,
+        db: &'db dyn Db,
+        method_wrapper: KnownBoundMethodType<'db>,
+    ) {
         walk_method_wrapper_type(db, method_wrapper, self);
     }
 
@@ -106,7 +110,7 @@ enum NonAtomicType<'db> {
     FunctionLiteral(FunctionType<'db>),
     BoundMethod(BoundMethodType<'db>),
     BoundSuper(BoundSuperType<'db>),
-    MethodWrapper(MethodWrapperKind<'db>),
+    MethodWrapper(KnownBoundMethodType<'db>),
     Callable(CallableType<'db>),
     GenericAlias(GenericAlias<'db>),
     KnownInstance(KnownInstanceType<'db>),
@@ -158,7 +162,7 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
             Type::BoundSuper(bound_super) => {
                 TypeKind::NonAtomic(NonAtomicType::BoundSuper(bound_super))
             }
-            Type::MethodWrapper(method_wrapper) => {
+            Type::KnownBoundMethod(method_wrapper) => {
                 TypeKind::NonAtomic(NonAtomicType::MethodWrapper(method_wrapper))
             }
             Type::Callable(callable) => TypeKind::NonAtomic(NonAtomicType::Callable(callable)),
