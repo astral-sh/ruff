@@ -86,6 +86,15 @@ def _[T]() -> None:
     reveal_type(range_constraint(Base, T, Unrelated))
 ```
 
+The lower and upper bound can be the same type, in which case the typevar can only be specialized to
+that specific type.
+
+```py
+def _[T]() -> None:
+    # revealed: ty_extensions.ConstraintSet[(Base ≤ T@_ ≤ Base)]
+    reveal_type(range_constraint(Base, T, Base))
+```
+
 Constraints can only refer to fully static types, so the lower and upper bounds are transformed into
 their bottom and top materializations, respectively.
 
@@ -178,4 +187,243 @@ def _[T]() -> None:
     reveal_type(incomparable_constraint(T, Any))
     # revealed: ty_extensions.ConstraintSet[(T@_ ≁ Sequence[object])]
     reveal_type(incomparable_constraint(T, Sequence[Any]))
+```
+
+## Intersection
+
+The intersection of two constraint sets requires that the constraints in both sets hold. In many
+cases, we can simplify the result of an intersection.
+
+### Different typevars
+
+```py
+from ty_extensions import incomparable_constraint, not_equivalent_constraint, range_constraint
+
+class Super: ...
+class Base(Super): ...
+class Sub(Base): ...
+```
+
+We cannot simplify the intersection of constraints that refer to different typevars.
+
+```py
+def _[T, U]() -> None:
+    # revealed: ty_extensions.ConstraintSet[((T@_ ≁ Base) ∧ (U@_ ≁ Base))]
+    reveal_type(incomparable_constraint(T, Base) & incomparable_constraint(U, Base))
+    # revealed: ty_extensions.ConstraintSet[((T@_ ≠ Base) ∧ (U@_ ≠ Base))]
+    reveal_type(not_equivalent_constraint(T, Base) & not_equivalent_constraint(U, Base))
+    # revealed: ty_extensions.ConstraintSet[((Sub ≤ T@_ ≤ Base) ∧ (Sub ≤ U@_ ≤ Base))]
+    reveal_type(range_constraint(Sub, T, Base) & range_constraint(Sub, U, Base))
+```
+
+Intersection is reflexive.
+
+```py
+def _[T]() -> None:
+    # revealed: ty_extensions.ConstraintSet[(T@_ ≁ Base)]
+    reveal_type(incomparable_constraint(T, Base) & incomparable_constraint(T, Base))
+```
+
+### Intersection of two ranges
+
+The intersection of two ranges is where the ranges "overlap".
+
+```py
+from typing import final
+from ty_extensions import range_constraint
+
+class Super: ...
+class Base(Super): ...
+class Sub(Base): ...
+class SubSub(Sub): ...
+
+@final
+class Unrelated: ...
+
+def _[T]() -> None:
+    # revealed: ty_extensions.ConstraintSet[(Sub ≤ T@_ ≤ Base)]
+    reveal_type(range_constraint(SubSub, T, Base) & range_constraint(Sub, T, Super))
+    # revealed: ty_extensions.ConstraintSet[(Sub ≤ T@_ ≤ Base)]
+    reveal_type(range_constraint(SubSub, T, Super) & range_constraint(Sub, T, Base))
+    # revealed: ty_extensions.ConstraintSet[(Base ≤ T@_ ≤ Base)]
+    reveal_type(range_constraint(Sub, T, Base) & range_constraint(Base, T, Super))
+    # revealed: ty_extensions.ConstraintSet[(Sub ≤ T@_ ≤ Super)]
+    reveal_type(range_constraint(Sub, T, Super) & range_constraint(Sub, T, Super))
+```
+
+If they don't overlap, the intersection is empty.
+
+```py
+def _[T]() -> None:
+    # revealed: ty_extensions.ConstraintSet[never]
+    reveal_type(range_constraint(SubSub, T, Sub) & range_constraint(Base, T, Super))
+    # revealed: ty_extensions.ConstraintSet[never]
+    reveal_type(range_constraint(SubSub, T, Sub) & range_constraint(Unrelated, T, object))
+```
+
+### Intersection of range and not-equivalent
+
+If the hole of a not-equivalent constraint is within the lower and upper bounds of a range
+constraint, the intersection "removes" the hole from the range. The intersection cannot be
+simplified.
+
+```py
+from typing import final
+from ty_extensions import not_equivalent_constraint, range_constraint
+
+class Super: ...
+class Base(Super): ...
+class Sub(Base): ...
+
+@final
+class Unrelated: ...
+
+def _[T]() -> None:
+    # revealed: ty_extensions.ConstraintSet[((Sub ≤ T@_ ≤ Super) ∧ (T@_ ≠ Base))]
+    reveal_type(range_constraint(Sub, T, Super) & not_equivalent_constraint(T, Base))
+```
+
+If the hole is not within the lower and upper bounds (because it's a subtype of the lower bound, a
+supertype of the upper bound, or not comparable with either), then removing the hole doesn't do
+anything.
+
+```py
+def _[T]() -> None:
+    # revealed: ty_extensions.ConstraintSet[(Base ≤ T@_ ≤ Super)]
+    reveal_type(range_constraint(Base, T, Super) & not_equivalent_constraint(T, Sub))
+    # revealed: ty_extensions.ConstraintSet[(Base ≤ T@_ ≤ Super)]
+    reveal_type(range_constraint(Base, T, Super) & not_equivalent_constraint(T, Unrelated))
+    # revealed: ty_extensions.ConstraintSet[(Sub ≤ T@_ ≤ Base)]
+    reveal_type(range_constraint(Sub, T, Base) & not_equivalent_constraint(T, Super))
+    # revealed: ty_extensions.ConstraintSet[(Sub ≤ T@_ ≤ Base)]
+    reveal_type(range_constraint(Sub, T, Base) & not_equivalent_constraint(T, Unrelated))
+```
+
+If the lower and upper bounds are the same, it's actually an "equivalent" constraint. If the hole is
+also that same type, then the intersection is empty — the not-equivalent constraint removes the only
+type that satisfies the range constraint.
+
+```py
+def _[T]() -> None:
+    # revealed: ty_extensions.ConstraintSet[never]
+    reveal_type(range_constraint(Base, T, Base) & not_equivalent_constraint(T, Base))
+```
+
+### Intersection of range and incomparable
+
+The intersection of a range constraint and an incomparable constraint cannot be satisfied if the
+pivot is a subtype of the lower bound, or a supertype of the upper bound. (If the pivot is a subtype
+of the lower bound, then by transitivity, the pivot is also a subtype of everything in the range.)
+
+```py
+from typing import final
+from ty_extensions import incomparable_constraint, range_constraint
+
+class Super: ...
+class Base(Super): ...
+class Sub(Base): ...
+
+@final
+class Unrelated: ...
+
+def _[T]() -> None:
+    # revealed: ty_extensions.ConstraintSet[never]
+    reveal_type(range_constraint(Base, T, Super) & incomparable_constraint(T, Sub))
+    # revealed: ty_extensions.ConstraintSet[never]
+    reveal_type(range_constraint(Base, T, Super) & incomparable_constraint(T, Base))
+
+    # revealed: ty_extensions.ConstraintSet[never]
+    reveal_type(range_constraint(Sub, T, Base) & incomparable_constraint(T, Super))
+    # revealed: ty_extensions.ConstraintSet[never]
+    reveal_type(range_constraint(Sub, T, Base) & incomparable_constraint(T, Base))
+```
+
+Otherwise, the intersection cannot be simplified.
+
+```py
+from ty_extensions import is_subtype_of
+
+def _[T]() -> None:
+    # revealed: ty_extensions.ConstraintSet[((Base ≤ T@_ ≤ Super) ∧ (T@_ ≁ Unrelated))]
+    reveal_type(range_constraint(Base, T, Super) & incomparable_constraint(T, Unrelated))
+```
+
+### Intersection of two not-equivalents
+
+We can only simplify the intersection of two not-equivalent constraints if they have the same hole.
+
+```py
+from typing import final
+from ty_extensions import not_equivalent_constraint
+
+class Super: ...
+class Base(Super): ...
+class Sub(Base): ...
+
+@final
+class Unrelated: ...
+
+def _[T]() -> None:
+    # revealed: ty_extensions.ConstraintSet[(T@_ ≠ Base)]
+    reveal_type(not_equivalent_constraint(T, Base) & not_equivalent_constraint(T, Base))
+    # revealed: ty_extensions.ConstraintSet[((T@_ ≠ Base) ∧ (T@_ ≠ Super))]
+    reveal_type(not_equivalent_constraint(T, Base) & not_equivalent_constraint(T, Super))
+    # revealed: ty_extensions.ConstraintSet[((T@_ ≠ Base) ∧ (T@_ ≠ Sub))]
+    reveal_type(not_equivalent_constraint(T, Base) & not_equivalent_constraint(T, Sub))
+    # revealed: ty_extensions.ConstraintSet[((T@_ ≠ Base) ∧ (T@_ ≠ Unrelated))]
+    reveal_type(not_equivalent_constraint(T, Base) & not_equivalent_constraint(T, Unrelated))
+```
+
+### Intersection of not-equivalent and incomparable
+
+When intersecting a not-equivalent constraint and an incomparable constraint, if the hole and pivot
+are comparable, then the incomparable constraint already excludes the hole, so removing the hole
+doesn't do anything.
+
+```py
+from typing import final
+from ty_extensions import incomparable_constraint, not_equivalent_constraint
+
+class Super: ...
+class Base(Super): ...
+class Sub(Base): ...
+
+@final
+class Unrelated: ...
+
+def _[T]() -> None:
+    # revealed: ty_extensions.ConstraintSet[(T@_ ≁ Base)]
+    reveal_type(not_equivalent_constraint(T, Super) & incomparable_constraint(T, Base))
+    # revealed: ty_extensions.ConstraintSet[(T@_ ≁ Base)]
+    reveal_type(not_equivalent_constraint(T, Base) & incomparable_constraint(T, Base))
+    # revealed: ty_extensions.ConstraintSet[(T@_ ≁ Base)]
+    reveal_type(not_equivalent_constraint(T, Sub) & incomparable_constraint(T, Base))
+    # revealed: ty_extensions.ConstraintSet[((T@_ ≠ Unrelated) ∧ (T@_ ≁ Base))]
+    reveal_type(not_equivalent_constraint(T, Unrelated) & incomparable_constraint(T, Base))
+```
+
+### Intersection of two incomparables
+
+We can only simplify the intersection of two incomparable constraints if they have the same pivot.
+
+```py
+from typing import final
+from ty_extensions import incomparable_constraint
+
+class Super: ...
+class Base(Super): ...
+class Sub(Base): ...
+
+@final
+class Unrelated: ...
+
+def _[T]() -> None:
+    # revealed: ty_extensions.ConstraintSet[(T@_ ≁ Base)]
+    reveal_type(incomparable_constraint(T, Base) & incomparable_constraint(T, Base))
+    # revealed: ty_extensions.ConstraintSet[((T@_ ≁ Base) ∧ (T@_ ≁ Super))]
+    reveal_type(incomparable_constraint(T, Base) & incomparable_constraint(T, Super))
+    # revealed: ty_extensions.ConstraintSet[((T@_ ≁ Base) ∧ (T@_ ≁ Sub))]
+    reveal_type(incomparable_constraint(T, Base) & incomparable_constraint(T, Sub))
+    # revealed: ty_extensions.ConstraintSet[((T@_ ≁ Base) ∧ (T@_ ≁ Unrelated))]
+    reveal_type(incomparable_constraint(T, Base) & incomparable_constraint(T, Unrelated))
 ```

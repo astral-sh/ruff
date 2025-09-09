@@ -102,8 +102,12 @@ use smallvec::{SmallVec, smallvec};
 use crate::Db;
 use crate::types::{BoundTypeVarInstance, IntersectionType, Type, UnionType};
 
+fn comparable<'db>(db: &'db dyn Db, left: Type<'db>, right: Type<'db>) -> bool {
+    left.is_subtype_of(db, right) || right.is_subtype_of(db, left)
+}
+
 fn incomparable<'db>(db: &'db dyn Db, left: Type<'db>, right: Type<'db>) -> bool {
-    !left.is_subtype_of(db, right) && !right.is_subtype_of(db, left)
+    !comparable(db, left, right)
 }
 
 /// Encodes the constraints under which a type property (e.g. assignability) holds.
@@ -1092,7 +1096,7 @@ impl<'db> RangeConstraint<'db> {
         db: &'db dyn Db,
         other: &IncomparableConstraint<'db>,
     ) -> Simplifiable<Constraint<'db>> {
-        if other.ty.is_subtype_of(db, other.ty) || self.upper.is_subtype_of(db, other.ty) {
+        if other.ty.is_subtype_of(db, self.lower) || self.upper.is_subtype_of(db, other.ty) {
             return Simplifiable::NeverSatisfiable;
         }
 
@@ -1262,8 +1266,9 @@ impl<'db> NotEquivalentConstraint<'db> {
         db: &'db dyn Db,
         other: &IncomparableConstraint<'db>,
     ) -> Simplifiable<Constraint<'db>> {
-        // (α ≠ t) ∧ (a ≁ t) = a ≁ t
-        if self.ty.is_equivalent_to(db, other.ty) {
+        // If the hole and pivot are comparable, then removing the hole from the incomparable
+        // constraint doesn't do anything.
+        if comparable(db, self.ty, other.ty) {
             return Simplifiable::Simplified(Constraint::Incomparable(other.clone()));
         }
         Simplifiable::NotSimplified(

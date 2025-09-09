@@ -43,6 +43,7 @@ type JustComplex = TypeOf[1.0j]
 # Constraints
 class ConstraintSet:
     def __bool__(self) -> bool: ...
+    def __and__(self, other: ConstraintSet) -> ConstraintSet: ...
 
 def range_constraint(
     lower_bound: Any, typevar: Any, upper_bound: Any
