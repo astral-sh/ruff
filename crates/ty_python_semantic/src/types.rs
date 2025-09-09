@@ -4149,9 +4149,7 @@ impl<'db> Type<'db> {
                 )
                 .into(),
 
-                Some(
-                    KnownFunction::RevealWhenAssignableTo | KnownFunction::RevealWhenSubtypeOf,
-                ) => Binding::single(
+                Some(KnownFunction::RevealWhenSubtypeOf) => Binding::single(
                     self,
                     Signature::new(
                         Parameters::new([
@@ -4163,6 +4161,22 @@ impl<'db> Type<'db> {
                                 .with_annotated_type(Type::any()),
                         ]),
                         Some(KnownClass::NoneType.to_instance(db)),
+                    ),
+                )
+                .into(),
+
+                Some(KnownFunction::WhenAssignableTo) => Binding::single(
+                    self,
+                    Signature::new(
+                        Parameters::new([
+                            Parameter::positional_only(Some(Name::new_static("a")))
+                                .type_form()
+                                .with_annotated_type(Type::any()),
+                            Parameter::positional_only(Some(Name::new_static("b")))
+                                .type_form()
+                                .with_annotated_type(Type::any()),
+                        ]),
+                        Some(KnownClass::ConstraintSet.to_instance(db)),
                     ),
                 )
                 .into(),
@@ -6801,7 +6815,7 @@ impl<'db> TypeMapping<'_, 'db> {
 #[derive(PartialOrd, Ord)]
 pub struct TrackedConstraintSet<'db> {
     #[returns(ref)]
-    set: ConstraintSet<'db>,
+    constraints: ConstraintSet<'db>,
 }
 
 // The Salsa heap is tracked separately.
@@ -6976,7 +6990,14 @@ impl<'db> KnownInstanceType<'db> {
                         f.write_str("]")
                     }
                     KnownInstanceType::ConstraintSet(tracked_set) => {
-                        tracked_set.set(self.db).display(self.db).fmt(f)
+                        let constraints = tracked_set.constraints(self.db);
+                        if constraints.is_always_satisfied(self.db) {
+                            f.write_str("always")
+                        } else if constraints.is_never_satisfied(self.db) {
+                            f.write_str("never")
+                        } else {
+                            write!(f, "when {}", constraints.display(self.db))
+                        }
                     }
                 }
             }
