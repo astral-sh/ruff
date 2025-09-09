@@ -76,18 +76,23 @@
 //! Python does not give us an easy way to construct this, but we can also consider a typevar that
 //! can specialize to any type that `T` _cannot_ specialize to — that is, the negation of `T`'s
 //! constraint. Another way to write `Never ≤ V ≤ B` is `Never ≤ V ∩ V ≤ B`; if we negate that, we
-//! get `¬(Never ≤ V) ∪ ¬(V ≤ B)`, or `(V ≤ Never ∩ V ≠ Never) ∪ (B ≤ V ∩ V ≠ B)`.
+//! get `¬(Never ≤ V) ∪ ¬(V ≤ B)`, or
+//!
+//! ```text
+//! ((V ≤ Never ∩ V ≠ Never) ∪ V ≁ Never) ∪ ((B ≤ V ∩ V ≠ B) ∪ V ≁ B)
+//! ```
 //!
 //! The first constraint in the union indicates that `V` can specialize to any type that is a
-//! subtype of `Never`, but not to `Never` itself.
+//! subtype of `Never` or incomparable with `Never`, but not to `Never` itself.
 //!
 //! The second constraint in the union indicates that `V` can specialize to any type that is a
-//! supertype of `B` — but not to `B` itself. (For instance, it _can_ specialize to `A`.)
+//! supertype of `B` or incomparable with `B`, but not to `B` itself. (For instance, it _can_
+//! specialize to `A`.)
 //!
 //! There aren't any types that satisfy the first constraint in the union (the type would have to
 //! somehow contain a negative number of values). You can think of a constraint that cannot be
 //! satisfied as an empty set (of types), which means we can simplify it out of the union. That
-//! gives us a final constraint of `B ≤ V ∩ V ≠ B` for the negation of `T`'s constraint.
+//! gives us a final constraint of `(B ≤ V ∩ V ≠ B) ∪ V ≁ B` for the negation of `T`'s constraint.
 
 use std::fmt::Display;
 
