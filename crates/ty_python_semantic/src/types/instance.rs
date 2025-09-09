@@ -482,6 +482,37 @@ impl<'db> ProtocolInstanceType<'db> {
         }
     }
 
+    pub(super) fn is_equivalent_to_object(self, db: &'db dyn Db) -> bool {
+        #[salsa::tracked(cycle_fn=recover, cycle_initial=initial, heap_size=ruff_memory_usage::heap_size)]
+        fn inner<'db>(db: &'db dyn Db, protocol: ProtocolInstanceType<'db>, _: ()) -> bool {
+            Type::object(db)
+                .satisfies_protocol(
+                    db,
+                    protocol,
+                    TypeRelation::Subtyping,
+                    &HasRelationToVisitor::new(ConstraintSet::always_satisfiable(db)),
+                )
+                .is_always_satisfied(db)
+        }
+
+        #[expect(clippy::trivially_copy_pass_by_ref)]
+        fn recover<'db>(
+            _db: &'db dyn Db,
+            _result: &bool,
+            _count: u32,
+            _value: ProtocolInstanceType<'db>,
+            _: (),
+        ) -> salsa::CycleRecoveryAction<bool> {
+            salsa::CycleRecoveryAction::Iterate
+        }
+
+        fn initial<'db>(_db: &'db dyn Db, _value: ProtocolInstanceType<'db>, _: ()) -> bool {
+            false
+        }
+
+        inner(db, self, ())
+    }
+
     /// Return a "normalized" version of this `Protocol` type.
     ///
     /// See [`Type::normalized`] for more details.
@@ -497,17 +528,8 @@ impl<'db> ProtocolInstanceType<'db> {
         db: &'db dyn Db,
         visitor: &NormalizedVisitor<'db>,
     ) -> Type<'db> {
-        let object = Type::object(db);
-        if object
-            .satisfies_protocol(
-                db,
-                self,
-                TypeRelation::Subtyping,
-                &HasRelationToVisitor::new(ConstraintSet::always_satisfiable(db)),
-            )
-            .is_always_satisfied(db)
-        {
-            return object;
+        if self.is_equivalent_to_object(db) {
+            return Type::object(db);
         }
         match self.inner {
             Protocol::FromClass(_) => Type::ProtocolInstance(Self::synthesized(
