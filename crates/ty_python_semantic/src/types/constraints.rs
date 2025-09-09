@@ -102,7 +102,7 @@ use smallvec::{SmallVec, smallvec};
 use crate::Db;
 use crate::types::{BoundTypeVarInstance, IntersectionType, Type, UnionType};
 
-fn not_comparable<'db>(db: &'db dyn Db, left: Type<'db>, right: Type<'db>) -> bool {
+fn incomparable<'db>(db: &'db dyn Db, left: Type<'db>, right: Type<'db>) -> bool {
     !left.is_subtype_of(db, right) && !right.is_subtype_of(db, left)
 }
 
@@ -861,7 +861,7 @@ impl<'db> ConstrainedTypeVar<'db> {
 pub(crate) enum Constraint<'db> {
     Range(RangeConstraint<'db>),
     NotEquivalent(NotEquivalentConstraint<'db>),
-    NotComparable(NotComparableConstraint<'db>),
+    Incomparable(IncomparableConstraint<'db>),
 }
 
 impl<'db> Constraint<'db> {
@@ -881,26 +881,22 @@ impl<'db> Constraint<'db> {
                 range.intersect_not_equivalent(db, not_equivalent)
             }
 
-            (Constraint::Range(range), Constraint::NotComparable(not_comparable))
-            | (Constraint::NotComparable(not_comparable), Constraint::Range(range)) => {
-                range.intersect_not_comparable(db, not_comparable)
+            (Constraint::Range(range), Constraint::Incomparable(incomparable))
+            | (Constraint::Incomparable(incomparable), Constraint::Range(range)) => {
+                range.intersect_incomparable(db, incomparable)
             }
 
             (Constraint::NotEquivalent(left), Constraint::NotEquivalent(right)) => {
                 left.intersect_not_equivalent(db, right)
             }
 
-            (
-                Constraint::NotEquivalent(not_equivalent),
-                Constraint::NotComparable(not_comparable),
-            )
-            | (
-                Constraint::NotComparable(not_comparable),
-                Constraint::NotEquivalent(not_equivalent),
-            ) => not_equivalent.intersect_not_comparable(db, not_comparable),
+            (Constraint::NotEquivalent(not_equivalent), Constraint::Incomparable(incomparable))
+            | (Constraint::Incomparable(incomparable), Constraint::NotEquivalent(not_equivalent)) => {
+                not_equivalent.intersect_incomparable(db, incomparable)
+            }
 
-            (Constraint::NotComparable(left), Constraint::NotComparable(right)) => {
-                left.intersect_not_comparable(db, right)
+            (Constraint::Incomparable(left), Constraint::Incomparable(right)) => {
+                left.intersect_incomparable(db, right)
             }
         }
     }
@@ -914,26 +910,22 @@ impl<'db> Constraint<'db> {
                 range.union_not_equivalent(db, not_equivalent)
             }
 
-            (Constraint::Range(range), Constraint::NotComparable(not_comparable))
-            | (Constraint::NotComparable(not_comparable), Constraint::Range(range)) => {
-                range.union_not_comparable(db, not_comparable)
+            (Constraint::Range(range), Constraint::Incomparable(incomparable))
+            | (Constraint::Incomparable(incomparable), Constraint::Range(range)) => {
+                range.union_incomparable(db, incomparable)
             }
 
             (Constraint::NotEquivalent(left), Constraint::NotEquivalent(right)) => {
                 left.union_not_equivalent(db, right)
             }
 
-            (
-                Constraint::NotEquivalent(not_equivalent),
-                Constraint::NotComparable(not_comparable),
-            )
-            | (
-                Constraint::NotComparable(not_comparable),
-                Constraint::NotEquivalent(not_equivalent),
-            ) => not_equivalent.union_not_comparable(db, not_comparable),
+            (Constraint::NotEquivalent(not_equivalent), Constraint::Incomparable(incomparable))
+            | (Constraint::Incomparable(incomparable), Constraint::NotEquivalent(not_equivalent)) => {
+                not_equivalent.union_incomparable(db, incomparable)
+            }
 
-            (Constraint::NotComparable(left), Constraint::NotComparable(right)) => {
-                left.union_not_comparable(db, right)
+            (Constraint::Incomparable(left), Constraint::Incomparable(right)) => {
+                left.union_incomparable(db, right)
             }
         }
     }
@@ -947,7 +939,7 @@ impl<'db> Constraint<'db> {
         match self {
             Constraint::Range(constraint) => constraint.negate_into(db, typevar, set),
             Constraint::NotEquivalent(constraint) => constraint.negate_into(db, typevar, set),
-            Constraint::NotComparable(constraint) => constraint.negate_into(db, typevar, set),
+            Constraint::Incomparable(constraint) => constraint.negate_into(db, typevar, set),
         }
     }
 
@@ -967,7 +959,7 @@ impl<'db> Constraint<'db> {
                     Constraint::NotEquivalent(constraint) => {
                         constraint.display(self.db, &self.typevar).fmt(f)
                     }
-                    Constraint::NotComparable(constraint) => {
+                    Constraint::Incomparable(constraint) => {
                         constraint.display(self.db, &self.typevar).fmt(f)
                     }
                 }
@@ -1057,19 +1049,19 @@ impl<'db> RangeConstraint<'db> {
         )
     }
 
-    fn intersect_not_comparable(
+    fn intersect_incomparable(
         &self,
         db: &'db dyn Db,
-        other: &NotComparableConstraint<'db>,
+        other: &IncomparableConstraint<'db>,
     ) -> Simplifiable<Constraint<'db>> {
         if other.ty.is_subtype_of(db, other.ty) || self.upper.is_subtype_of(db, other.ty) {
             return Simplifiable::NeverSatisfiable;
         }
 
-        // A range constraint and a not-comparable constraint cannot be simplified.
+        // A range constraint and an incomparable constraint cannot be simplified.
         Simplifiable::NotSimplified(
             Constraint::Range(self.clone()),
-            Constraint::NotComparable(other.clone()),
+            Constraint::Incomparable(other.clone()),
         )
     }
 
@@ -1109,21 +1101,21 @@ impl<'db> RangeConstraint<'db> {
         Simplifiable::Simplified(Constraint::NotEquivalent(other.clone()))
     }
 
-    fn union_not_comparable(
+    fn union_incomparable(
         &self,
         db: &'db dyn Db,
-        other: &NotComparableConstraint<'db>,
+        other: &IncomparableConstraint<'db>,
     ) -> Simplifiable<Constraint<'db>> {
         // When the "pivot" of the incomparable constraint is not comparable with either bound of
         // the range constraint, the incomparable constraint subsumes the range constraint.
-        if not_comparable(db, self.lower, other.ty) && not_comparable(db, self.upper, other.ty) {
-            return Simplifiable::Simplified(Constraint::NotComparable(other.clone()));
+        if incomparable(db, self.lower, other.ty) && incomparable(db, self.upper, other.ty) {
+            return Simplifiable::Simplified(Constraint::Incomparable(other.clone()));
         }
 
         // Otherwise the result cannot be simplified.
         Simplifiable::NotSimplified(
             Constraint::Range(self.clone()),
-            Constraint::NotComparable(other.clone()),
+            Constraint::Incomparable(other.clone()),
         )
     }
 
@@ -1147,7 +1139,7 @@ impl<'db> RangeConstraint<'db> {
         );
         set.union_constraint(
             db,
-            Constraint::not_comparable(db, self.lower).constrain(typevar),
+            Constraint::incomparable(db, self.lower).constrain(typevar),
         );
 
         // Upper bound:
@@ -1164,7 +1156,7 @@ impl<'db> RangeConstraint<'db> {
         );
         set.union_constraint(
             db,
-            Constraint::not_comparable(db, self.upper).constrain(typevar),
+            Constraint::incomparable(db, self.upper).constrain(typevar),
         );
     }
 
@@ -1227,18 +1219,18 @@ impl<'db> NotEquivalentConstraint<'db> {
         )
     }
 
-    fn intersect_not_comparable(
+    fn intersect_incomparable(
         &self,
         db: &'db dyn Db,
-        other: &NotComparableConstraint<'db>,
+        other: &IncomparableConstraint<'db>,
     ) -> Simplifiable<Constraint<'db>> {
         // (α ≠ t) ∧ (a ≁ t) = a ≁ t
         if self.ty.is_equivalent_to(db, other.ty) {
-            return Simplifiable::Simplified(Constraint::NotComparable(other.clone()));
+            return Simplifiable::Simplified(Constraint::Incomparable(other.clone()));
         }
         Simplifiable::NotSimplified(
             Constraint::NotEquivalent(self.clone()),
-            Constraint::NotComparable(other.clone()),
+            Constraint::Incomparable(other.clone()),
         )
     }
 
@@ -1253,15 +1245,15 @@ impl<'db> NotEquivalentConstraint<'db> {
         Simplifiable::AlwaysSatisfiable
     }
 
-    fn union_not_comparable(
+    fn union_incomparable(
         &self,
         db: &'db dyn Db,
-        other: &NotComparableConstraint<'db>,
+        other: &IncomparableConstraint<'db>,
     ) -> Simplifiable<Constraint<'db>> {
         // When the "hole" of the non-equivalent constraint and the "pivot" of the incomparable
         // constraint are not comparable, then the hole is covered by the incomparable constraint,
         // and the union is therefore always satisfied.
-        if not_comparable(db, self.ty, other.ty) {
+        if incomparable(db, self.ty, other.ty) {
             return Simplifiable::AlwaysSatisfiable;
         }
 
@@ -1311,15 +1303,15 @@ impl<'db> NotEquivalentConstraint<'db> {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct NotComparableConstraint<'db> {
+pub(crate) struct IncomparableConstraint<'db> {
     ty: Type<'db>,
 }
 
 impl<'db> Constraint<'db> {
-    /// Returns a new not-comparable constraint.
+    /// Returns a new incomparable constraint.
     ///
     /// Panics if `ty` is not fully static.
-    fn not_comparable(db: &'db dyn Db, ty: Type<'db>) -> Satisfiable<Constraint<'db>> {
+    fn incomparable(db: &'db dyn Db, ty: Type<'db>) -> Satisfiable<Constraint<'db>> {
         debug_assert_eq!(ty, ty.top_materialization(db));
 
         // Every type is comparable to Never and to object.
@@ -1327,36 +1319,36 @@ impl<'db> Constraint<'db> {
             return Satisfiable::Never;
         }
 
-        Satisfiable::Constrained(Constraint::NotComparable(NotComparableConstraint { ty }))
+        Satisfiable::Constrained(Constraint::Incomparable(IncomparableConstraint { ty }))
     }
 }
 
-impl<'db> NotComparableConstraint<'db> {
-    fn intersect_not_comparable(
+impl<'db> IncomparableConstraint<'db> {
+    fn intersect_incomparable(
         &self,
         db: &'db dyn Db,
-        other: &NotComparableConstraint<'db>,
+        other: &IncomparableConstraint<'db>,
     ) -> Simplifiable<Constraint<'db>> {
         if self.ty.is_equivalent_to(db, other.ty) {
-            return Simplifiable::Simplified(Constraint::NotComparable(other.clone()));
+            return Simplifiable::Simplified(Constraint::Incomparable(other.clone()));
         }
         Simplifiable::NotSimplified(
-            Constraint::NotComparable(self.clone()),
-            Constraint::NotComparable(other.clone()),
+            Constraint::Incomparable(self.clone()),
+            Constraint::Incomparable(other.clone()),
         )
     }
 
-    fn union_not_comparable(
+    fn union_incomparable(
         &self,
         db: &'db dyn Db,
-        other: &NotComparableConstraint<'db>,
+        other: &IncomparableConstraint<'db>,
     ) -> Simplifiable<Constraint<'db>> {
         if self.ty.is_equivalent_to(db, other.ty) {
-            return Simplifiable::Simplified(Constraint::NotComparable(other.clone()));
+            return Simplifiable::Simplified(Constraint::Incomparable(other.clone()));
         }
         Simplifiable::NotSimplified(
-            Constraint::NotComparable(self.clone()),
-            Constraint::NotComparable(other.clone()),
+            Constraint::Incomparable(self.clone()),
+            Constraint::Incomparable(other.clone()),
         )
     }
 
@@ -1379,13 +1371,13 @@ impl<'db> NotComparableConstraint<'db> {
     }
 
     fn display(&self, db: &'db dyn Db, typevar: impl Display) -> impl Display {
-        struct DisplayNotComparableConstraint<'a, 'db, D> {
-            constraint: &'a NotComparableConstraint<'db>,
+        struct DisplayIncomparableConstraint<'a, 'db, D> {
+            constraint: &'a IncomparableConstraint<'db>,
             typevar: D,
             db: &'db dyn Db,
         }
 
-        impl<D: Display> Display for DisplayNotComparableConstraint<'_, '_, D> {
+        impl<D: Display> Display for DisplayIncomparableConstraint<'_, '_, D> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 write!(
                     f,
@@ -1396,7 +1388,7 @@ impl<'db> NotComparableConstraint<'db> {
             }
         }
 
-        DisplayNotComparableConstraint {
+        DisplayIncomparableConstraint {
             constraint: self,
             typevar,
             db,
