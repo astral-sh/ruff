@@ -625,6 +625,22 @@ impl<'db> Bindings<'db> {
                             }
                         }
 
+                        Some(KnownFunction::RangeConstraint) => {
+                            if let [
+                                Some(lower),
+                                Some(Type::NonInferableTypeVar(typevar)),
+                                Some(upper),
+                            ] = overload.parameter_types()
+                            {
+                                let constraints =
+                                    ConstraintSet::range(db, *lower, *typevar, *upper);
+                                let tracked = TrackedConstraintSet::new(db, constraints);
+                                overload.set_return_type(Type::KnownInstance(
+                                    KnownInstanceType::ConstraintSet(tracked),
+                                ));
+                            }
+                        }
+
                         Some(KnownFunction::IsSingleton) => {
                             if let [Some(ty)] = overload.parameter_types() {
                                 overload.set_return_type(Type::BooleanLiteral(ty.is_singleton(db)));

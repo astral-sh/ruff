@@ -269,6 +269,20 @@ impl<'db> ConstraintSet<'db> {
         }
     }
 
+    pub(crate) fn range(
+        db: &'db dyn Db,
+        lower: Type<'db>,
+        typevar: BoundTypeVarInstance<'db>,
+        upper: Type<'db>,
+    ) -> Self {
+        let lower = lower.bottom_materialization(db);
+        let upper = upper.top_materialization(db);
+        let constraint = Constraint::range(db, lower, upper).constrain(typevar);
+        let mut result = Self::never();
+        result.union_constraint(db, constraint);
+        result
+    }
+
     /// Updates this set to be the union of itself and a constraint.
     fn union_constraint(
         &mut self,

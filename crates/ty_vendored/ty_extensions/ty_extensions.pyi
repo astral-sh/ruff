@@ -44,6 +44,8 @@ type JustComplex = TypeOf[1.0j]
 class ConstraintSet:
     def __bool__(self) -> bool: ...
 
+def range_constraint(lower_bound: Any, typevar: Any, upper_bound: Any) -> ConstraintSet: ...
+
 # Predicates on types
 #
 # Ideally, these would be annotated using `TypeForm`, but that has not been
