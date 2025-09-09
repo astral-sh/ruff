@@ -1256,10 +1256,10 @@ pub enum KnownFunction {
     HasMember,
     /// `ty_extensions.reveal_protocol_interface`
     RevealProtocolInterface,
-    /// `ty_extensions.reveal_when_subtype_of`
-    RevealWhenSubtypeOf,
     /// `ty_extensions.when_assignable_to`
     WhenAssignableTo,
+    /// `ty_extensions.reveal_when_subtype_of`
+    WhenSubtypeOf,
 }
 
 impl KnownFunction {
@@ -1325,8 +1325,8 @@ impl KnownFunction {
             | Self::StaticAssert
             | Self::HasMember
             | Self::RevealProtocolInterface
-            | Self::RevealWhenSubtypeOf
             | Self::WhenAssignableTo
+            | Self::WhenSubtypeOf
             | Self::AllMembers => module.is_ty_extensions(),
             Self::ImportModule => module.is_importlib(),
         }
@@ -1622,35 +1622,22 @@ impl KnownFunction {
                 overload.set_return_type(Type::module_literal(db, file, module));
             }
 
-            KnownFunction::RevealWhenSubtypeOf => {
-                let [Some(ty_a), Some(ty_b)] = overload.parameter_types() else {
-                    return;
-                };
-                let constraints = ty_a.when_subtype_of::<ConstraintSet>(db, *ty_b);
-                let Some(builder) =
-                    context.report_diagnostic(DiagnosticId::RevealedType, Severity::Info)
-                else {
-                    return;
-                };
-                let mut diag = builder.into_diagnostic("Subtyping holds");
-                let span = context.span(call_expression);
-                if constraints.is_always_satisfied(db) {
-                    diag.annotate(Annotation::primary(span).message("always"));
-                } else if constraints.is_never_satisfied(db) {
-                    diag.annotate(Annotation::primary(span).message("never"));
-                } else {
-                    diag.annotate(
-                        Annotation::primary(span)
-                            .message(format_args!("when {}", constraints.display(db))),
-                    );
-                }
-            }
-
             KnownFunction::WhenAssignableTo => {
                 let [Some(ty_a), Some(ty_b)] = overload.parameter_types() else {
                     return;
                 };
                 let constraints = ty_a.when_assignable_to::<ConstraintSet>(db, *ty_b);
+                let tracked = TrackedConstraintSet::new(db, constraints);
+                overload.set_return_type(Type::KnownInstance(KnownInstanceType::ConstraintSet(
+                    tracked,
+                )));
+            }
+
+            KnownFunction::WhenSubtypeOf => {
+                let [Some(ty_a), Some(ty_b)] = overload.parameter_types() else {
+                    return;
+                };
+                let constraints = ty_a.when_subtype_of::<ConstraintSet>(db, *ty_b);
                 let tracked = TrackedConstraintSet::new(db, constraints);
                 overload.set_return_type(Type::KnownInstance(KnownInstanceType::ConstraintSet(
                     tracked,
@@ -1717,8 +1704,8 @@ pub(crate) mod tests {
                 | KnownFunction::IsEquivalentTo
                 | KnownFunction::HasMember
                 | KnownFunction::RevealProtocolInterface
-                | KnownFunction::RevealWhenSubtypeOf
                 | KnownFunction::WhenAssignableTo
+                | KnownFunction::WhenSubtypeOf
                 | KnownFunction::AllMembers => KnownModule::TyExtensions,
 
                 KnownFunction::ImportModule => KnownModule::ImportLib,

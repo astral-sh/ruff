@@ -129,7 +129,7 @@ specialization. Thus, the typevar is a subtype of itself and of `object`, but no
 (including other typevars).
 
 ```py
-from ty_extensions import reveal_when_subtype_of, when_assignable_to
+from ty_extensions import when_assignable_to, when_subtype_of
 
 class Super: ...
 class Base(Super): ...
@@ -146,14 +146,14 @@ def unbounded_unconstrained[T, U](t: T, u: U) -> None:
     reveal_type(when_assignable_to(T, U))  # revealed: never
     reveal_type(when_assignable_to(U, T))  # revealed: never
 
-    reveal_when_subtype_of(T, T)  # revealed: always
-    reveal_when_subtype_of(T, object)  # revealed: always
-    reveal_when_subtype_of(T, Super)  # revealed: never
-    reveal_when_subtype_of(U, U)  # revealed: always
-    reveal_when_subtype_of(U, object)  # revealed: always
-    reveal_when_subtype_of(U, Super)  # revealed: never
-    reveal_when_subtype_of(T, U)  # revealed: never
-    reveal_when_subtype_of(U, T)  # revealed: never
+    reveal_type(when_subtype_of(T, T))  # revealed: always
+    reveal_type(when_subtype_of(T, object))  # revealed: always
+    reveal_type(when_subtype_of(T, Super))  # revealed: never
+    reveal_type(when_subtype_of(U, U))  # revealed: always
+    reveal_type(when_subtype_of(U, object))  # revealed: always
+    reveal_type(when_subtype_of(U, Super))  # revealed: never
+    reveal_type(when_subtype_of(T, U))  # revealed: never
+    reveal_type(when_subtype_of(U, T))  # revealed: never
 ```
 
 A bounded typevar is assignable to its bound, and a bounded, fully static typevar is a subtype of
@@ -172,10 +172,10 @@ def bounded[T: Super](t: T) -> None:
     reveal_type(when_assignable_to(Super, T))  # revealed: never
     reveal_type(when_assignable_to(Sub, T))  # revealed: never
 
-    reveal_when_subtype_of(T, Super)  # revealed: always
-    reveal_when_subtype_of(T, Sub)  # revealed: never
-    reveal_when_subtype_of(Super, T)  # revealed: never
-    reveal_when_subtype_of(Sub, T)  # revealed: never
+    reveal_type(when_subtype_of(T, Super))  # revealed: always
+    reveal_type(when_subtype_of(T, Sub))  # revealed: never
+    reveal_type(when_subtype_of(Super, T))  # revealed: never
+    reveal_type(when_subtype_of(Sub, T))  # revealed: never
 
 def bounded_by_gradual[T: Any](t: T) -> None:
     reveal_type(when_assignable_to(T, Any))  # revealed: always
@@ -185,12 +185,12 @@ def bounded_by_gradual[T: Any](t: T) -> None:
     reveal_type(when_assignable_to(T, Sub))  # revealed: always
     reveal_type(when_assignable_to(Sub, T))  # revealed: never
 
-    reveal_when_subtype_of(T, Any)  # revealed: never
-    reveal_when_subtype_of(Any, T)  # revealed: never
-    reveal_when_subtype_of(T, Super)  # revealed: never
-    reveal_when_subtype_of(Super, T)  # revealed: never
-    reveal_when_subtype_of(T, Sub)  # revealed: never
-    reveal_when_subtype_of(Sub, T)  # revealed: never
+    reveal_type(when_subtype_of(T, Any))  # revealed: never
+    reveal_type(when_subtype_of(Any, T))  # revealed: never
+    reveal_type(when_subtype_of(T, Super))  # revealed: never
+    reveal_type(when_subtype_of(Super, T))  # revealed: never
+    reveal_type(when_subtype_of(T, Sub))  # revealed: never
+    reveal_type(when_subtype_of(Sub, T))  # revealed: never
 
 @final
 class FinalClass: ...
@@ -199,8 +199,8 @@ def bounded_final[T: FinalClass](t: T) -> None:
     reveal_type(when_assignable_to(T, FinalClass))  # revealed: always
     reveal_type(when_assignable_to(FinalClass, T))  # revealed: never
 
-    reveal_when_subtype_of(T, FinalClass)  # revealed: always
-    reveal_when_subtype_of(FinalClass, T)  # revealed: never
+    reveal_type(when_subtype_of(T, FinalClass))  # revealed: always
+    reveal_type(when_subtype_of(FinalClass, T))  # revealed: never
 ```
 
 Two distinct fully static typevars are not subtypes of each other, even if they have the same
@@ -213,15 +213,15 @@ def two_bounded[T: Super, U: Super](t: T, u: U) -> None:
     reveal_type(when_assignable_to(T, U))  # revealed: never
     reveal_type(when_assignable_to(U, T))  # revealed: never
 
-    reveal_when_subtype_of(T, U)  # revealed: never
-    reveal_when_subtype_of(U, T)  # revealed: never
+    reveal_type(when_subtype_of(T, U))  # revealed: never
+    reveal_type(when_subtype_of(U, T))  # revealed: never
 
 def two_final_bounded[T: FinalClass, U: FinalClass](t: T, u: U) -> None:
     reveal_type(when_assignable_to(T, U))  # revealed: never
     reveal_type(when_assignable_to(U, T))  # revealed: never
 
-    reveal_when_subtype_of(T, U)  # revealed: never
-    reveal_when_subtype_of(U, T)  # revealed: never
+    reveal_type(when_subtype_of(T, U))  # revealed: never
+    reveal_type(when_subtype_of(U, T))  # revealed: never
 ```
 
 A constrained fully static typevar is assignable to the union of its constraints, but not to any of
@@ -244,17 +244,17 @@ def constrained[T: (Base, Unrelated)](t: T) -> None:
     reveal_type(when_assignable_to(Super | Unrelated, T))  # revealed: never
     reveal_type(when_assignable_to(Intersection[Base, Unrelated], T))  # revealed: always
 
-    reveal_when_subtype_of(T, Super)  # revealed: never
-    reveal_when_subtype_of(T, Base)  # revealed: never
-    reveal_when_subtype_of(T, Sub)  # revealed: never
-    reveal_when_subtype_of(T, Unrelated)  # revealed: never
-    reveal_when_subtype_of(T, Super | Unrelated)  # revealed: always
-    reveal_when_subtype_of(T, Base | Unrelated)  # revealed: always
-    reveal_when_subtype_of(T, Sub | Unrelated)  # revealed: never
-    reveal_when_subtype_of(Super, T)  # revealed: never
-    reveal_when_subtype_of(Unrelated, T)  # revealed: never
-    reveal_when_subtype_of(Super | Unrelated, T)  # revealed: never
-    reveal_when_subtype_of(Intersection[Base, Unrelated], T)  # revealed: always
+    reveal_type(when_subtype_of(T, Super))  # revealed: never
+    reveal_type(when_subtype_of(T, Base))  # revealed: never
+    reveal_type(when_subtype_of(T, Sub))  # revealed: never
+    reveal_type(when_subtype_of(T, Unrelated))  # revealed: never
+    reveal_type(when_subtype_of(T, Super | Unrelated))  # revealed: always
+    reveal_type(when_subtype_of(T, Base | Unrelated))  # revealed: always
+    reveal_type(when_subtype_of(T, Sub | Unrelated))  # revealed: never
+    reveal_type(when_subtype_of(Super, T))  # revealed: never
+    reveal_type(when_subtype_of(Unrelated, T))  # revealed: never
+    reveal_type(when_subtype_of(Super | Unrelated, T))  # revealed: never
+    reveal_type(when_subtype_of(Intersection[Base, Unrelated], T))  # revealed: always
 
 def constrained_by_gradual[T: (Base, Any)](t: T) -> None:
     reveal_type(when_assignable_to(T, Super))  # revealed: always
@@ -274,22 +274,22 @@ def constrained_by_gradual[T: (Base, Any)](t: T) -> None:
     reveal_type(when_assignable_to(Intersection[Base, Unrelated], T))  # revealed: always
     reveal_type(when_assignable_to(Intersection[Base, Any], T))  # revealed: always
 
-    reveal_when_subtype_of(T, Super)  # revealed: never
-    reveal_when_subtype_of(T, Base)  # revealed: never
-    reveal_when_subtype_of(T, Sub)  # revealed: never
-    reveal_when_subtype_of(T, Unrelated)  # revealed: never
-    reveal_when_subtype_of(T, Any)  # revealed: never
-    reveal_when_subtype_of(T, Super | Any)  # revealed: never
-    reveal_when_subtype_of(T, Super | Unrelated)  # revealed: never
-    reveal_when_subtype_of(Super, T)  # revealed: never
-    reveal_when_subtype_of(Base, T)  # revealed: never
-    reveal_when_subtype_of(Unrelated, T)  # revealed: never
-    reveal_when_subtype_of(Any, T)  # revealed: never
-    reveal_when_subtype_of(Super | Any, T)  # revealed: never
-    reveal_when_subtype_of(Base | Any, T)  # revealed: never
-    reveal_when_subtype_of(Super | Unrelated, T)  # revealed: never
-    reveal_when_subtype_of(Intersection[Base, Unrelated], T)  # revealed: never
-    reveal_when_subtype_of(Intersection[Base, Any], T)  # revealed: never
+    reveal_type(when_subtype_of(T, Super))  # revealed: never
+    reveal_type(when_subtype_of(T, Base))  # revealed: never
+    reveal_type(when_subtype_of(T, Sub))  # revealed: never
+    reveal_type(when_subtype_of(T, Unrelated))  # revealed: never
+    reveal_type(when_subtype_of(T, Any))  # revealed: never
+    reveal_type(when_subtype_of(T, Super | Any))  # revealed: never
+    reveal_type(when_subtype_of(T, Super | Unrelated))  # revealed: never
+    reveal_type(when_subtype_of(Super, T))  # revealed: never
+    reveal_type(when_subtype_of(Base, T))  # revealed: never
+    reveal_type(when_subtype_of(Unrelated, T))  # revealed: never
+    reveal_type(when_subtype_of(Any, T))  # revealed: never
+    reveal_type(when_subtype_of(Super | Any, T))  # revealed: never
+    reveal_type(when_subtype_of(Base | Any, T))  # revealed: never
+    reveal_type(when_subtype_of(Super | Unrelated, T))  # revealed: never
+    reveal_type(when_subtype_of(Intersection[Base, Unrelated], T))  # revealed: never
+    reveal_type(when_subtype_of(Intersection[Base, Any], T))  # revealed: never
 ```
 
 Two distinct fully static typevars are not subtypes of each other, even if they have the same
@@ -302,8 +302,8 @@ def two_constrained[T: (int, str), U: (int, str)](t: T, u: U) -> None:
     reveal_type(when_assignable_to(T, U))  # revealed: never
     reveal_type(when_assignable_to(U, T))  # revealed: never
 
-    reveal_when_subtype_of(T, U)  # revealed: never
-    reveal_when_subtype_of(U, T)  # revealed: never
+    reveal_type(when_subtype_of(T, U))  # revealed: never
+    reveal_type(when_subtype_of(U, T))  # revealed: never
 
 @final
 class AnotherFinalClass: ...
@@ -312,8 +312,8 @@ def two_final_constrained[T: (FinalClass, AnotherFinalClass), U: (FinalClass, An
     reveal_type(when_assignable_to(T, U))  # revealed: never
     reveal_type(when_assignable_to(U, T))  # revealed: never
 
-    reveal_when_subtype_of(T, U)  # revealed: never
-    reveal_when_subtype_of(U, T)  # revealed: never
+    reveal_type(when_subtype_of(T, U))  # revealed: never
+    reveal_type(when_subtype_of(U, T))  # revealed: never
 ```
 
 A bound or constrained typevar is a subtype of itself in a union:
@@ -323,8 +323,8 @@ def union[T: Base, U: (Base, Unrelated)](t: T, u: U) -> None:
     reveal_type(when_assignable_to(T, T | None))  # revealed: always
     reveal_type(when_assignable_to(U, U | None))  # revealed: always
 
-    reveal_when_subtype_of(T, T | None)  # revealed: always
-    reveal_when_subtype_of(U, U | None)  # revealed: always
+    reveal_type(when_subtype_of(T, T | None))  # revealed: always
+    reveal_type(when_subtype_of(U, U | None))  # revealed: always
 ```
 
 A bound or constrained typevar in a union with a dynamic type is assignable to the typevar:
@@ -334,8 +334,8 @@ def union_with_dynamic[T: Base, U: (Base, Unrelated)](t: T, u: U) -> None:
     reveal_type(when_assignable_to(T | Any, T))  # revealed: always
     reveal_type(when_assignable_to(U | Any, U))  # revealed: always
 
-    reveal_when_subtype_of(T | Any, T)  # revealed: never
-    reveal_when_subtype_of(U | Any, U)  # revealed: never
+    reveal_type(when_subtype_of(T | Any, T))  # revealed: never
+    reveal_type(when_subtype_of(U | Any, U))  # revealed: never
 ```
 
 And an intersection of a typevar with another type is always a subtype of the TypeVar:
@@ -347,10 +347,10 @@ class A: ...
 
 def inter[T: Base, U: (Base, Unrelated)](t: T, u: U) -> None:
     reveal_type(when_assignable_to(Intersection[T, Unrelated], T))  # revealed: always
-    reveal_when_subtype_of(Intersection[T, Unrelated], T)  # revealed: always
+    reveal_type(when_subtype_of(Intersection[T, Unrelated], T))  # revealed: always
 
     reveal_type(when_assignable_to(Intersection[U, A], U))  # revealed: always
-    reveal_when_subtype_of(Intersection[U, A], U)  # revealed: always
+    reveal_type(when_subtype_of(Intersection[U, A], U))  # revealed: always
 
     static_assert(is_disjoint_from(Not[T], T))
     static_assert(is_disjoint_from(T, Not[T]))
@@ -647,14 +647,14 @@ The intersection of a typevar with any other type is assignable to (and if fully
 of) itself.
 
 ```py
-from ty_extensions import reveal_when_subtype_of, when_assignable_to, Not
+from ty_extensions import when_assignable_to, when_subtype_of, Not
 
 def intersection_is_assignable[T](t: T) -> None:
     reveal_type(when_assignable_to(Intersection[T, None], T))  # revealed: always
     reveal_type(when_assignable_to(Intersection[T, Not[None]], T))  # revealed: always
 
-    reveal_when_subtype_of(Intersection[T, None], T)  # revealed: always
-    reveal_when_subtype_of(Intersection[T, Not[None]], T)  # revealed: always
+    reveal_type(when_subtype_of(Intersection[T, None], T))  # revealed: always
+    reveal_type(when_subtype_of(Intersection[T, Not[None]], T))  # revealed: always
 ```
 
 ## Narrowing
