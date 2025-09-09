@@ -478,7 +478,6 @@ class D(C):
     def f(self):
         return 2
     # TODO: This should be an invalid-override error.
-    # If the override is invalid, the type of the method should be that of the base class method.
     def g(self, x: int):
         return 2
     # A strict application of the Liskov Substitution Principle would consider
