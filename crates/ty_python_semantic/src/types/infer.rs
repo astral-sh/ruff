@@ -8579,7 +8579,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             ).expect("infer_binary_type_comparison should never return None for `CmpOp::Eq`");
 
                                 match eq_result {
-                                    todo @ Type::Dynamic(DynamicType::Todo(_) | DynamicType::Divergent(_)) => return Ok(todo),
+                                    todo @ Type::Dynamic(DynamicType::Todo(_)) => return Ok(todo),
                                     // It's okay to ignore errors here because Python doesn't call `__bool__`
                                     // for different union variants. Instead, this is just for us to
                                     // evaluate a possibly truthy value to `false` or `true`.
@@ -8607,7 +8607,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         );
 
                             Ok(match eq_result {
-                                todo @ Type::Dynamic(DynamicType::Todo(_) | DynamicType::Divergent(_)) => todo,
+                                todo @ Type::Dynamic(DynamicType::Todo(_)) => todo,
                                 // It's okay to ignore errors here because Python doesn't call `__bool__`
                                 // for `is` and `is not` comparisons. This is an implementation detail
                                 // for how we determine the truthiness of a type.
