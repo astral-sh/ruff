@@ -31,6 +31,7 @@ The variable struct.error is an exception raised on errors.
 from _typeshed import ReadableBuffer, WriteableBuffer
 from collections.abc import Iterator
 from typing import Any
+from typing_extensions import disjoint_base
 
 def pack(fmt: str | bytes, /, *v: Any) -> bytes:
     """pack(format, v1, v2, ...) -> bytes
@@ -76,6 +77,7 @@ def iter_unpack(format: str | bytes, buffer: ReadableBuffer, /) -> Iterator[tupl
 def calcsize(format: str | bytes, /) -> int:
     """Return size in bytes of the struct described by the format string."""
 
+@disjoint_base
 class Struct:
     """Struct(fmt) --> compiled struct object"""
 

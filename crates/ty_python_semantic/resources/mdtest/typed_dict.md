@@ -21,12 +21,10 @@ inferred based on the `TypedDict` definition:
 ```py
 alice: Person = {"name": "Alice", "age": 30}
 
-# TODO: this should be `str`
-reveal_type(alice["name"])  # revealed: Unknown
-# TODO: this should be `int | None`
-reveal_type(alice["age"])  # revealed: Unknown
+reveal_type(alice["name"])  # revealed: str
+reveal_type(alice["age"])  # revealed: int | None
 
-# TODO: this should reveal `Unknown`, and it should emit an error
+# error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "non_existing""
 reveal_type(alice["non_existing"])  # revealed: Unknown
 ```
 
@@ -51,23 +49,26 @@ bob.update(age=26)
 The construction of a `TypedDict` is checked for type correctness:
 
 ```py
-# TODO: these should be errors (invalid argument type)
+# error: [invalid-argument-type] "Invalid argument to key "name" with declared type `str` on TypedDict `Person`"
 eve1a: Person = {"name": b"Eve", "age": None}
+# error: [invalid-argument-type] "Invalid argument to key "name" with declared type `str` on TypedDict `Person`"
 eve1b = Person(name=b"Eve", age=None)
 
-# TODO: these should be errors (missing required key)
+# error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
 eve2a: Person = {"age": 22}
+# error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
 eve2b = Person(age=22)
 
-# TODO: these should be errors (additional key)
+# error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "extra""
 eve3a: Person = {"name": "Eve", "age": 25, "extra": True}
+# error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "extra""
 eve3b = Person(name="Eve", age=25, extra=True)
 ```
 
 Assignments to keys are also validated:
 
 ```py
-# TODO: this should be an error
+# error: [invalid-assignment] "Invalid assignment to key "name" with declared type `str` on TypedDict `Person`: value of type `None`"
 alice["name"] = None
 
 # error: [invalid-assignment] "Invalid assignment to key "name" with declared type `str` on TypedDict `Person`: value of type `None`"
@@ -77,11 +78,229 @@ bob["name"] = None
 Assignments to non-existing keys are disallowed:
 
 ```py
-# TODO: this should be an error
+# error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "extra""
 alice["extra"] = True
 
 # error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "extra""
 bob["extra"] = True
+```
+
+## Validation of `TypedDict` construction
+
+```py
+from typing import TypedDict
+
+class Person(TypedDict):
+    name: str
+    age: int | None
+
+class House:
+    owner: Person
+
+house = House()
+
+def accepts_person(p: Person) -> None:
+    pass
+```
+
+The following constructions of `Person` are all valid:
+
+```py
+alice1: Person = {"name": "Alice", "age": 30}
+Person(name="Alice", age=30)
+Person({"name": "Alice", "age": 30})
+
+accepts_person({"name": "Alice", "age": 30})
+house.owner = {"name": "Alice", "age": 30}
+```
+
+All of these are missing the required `age` field:
+
+```py
+# error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `Person` constructor"
+alice2: Person = {"name": "Alice"}
+# error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `Person` constructor"
+Person(name="Alice")
+# error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `Person` constructor"
+Person({"name": "Alice"})
+
+# TODO: this should be an error, similar to the above
+accepts_person({"name": "Alice"})
+# TODO: this should be an error, similar to the above
+house.owner = {"name": "Alice"}
+a_person: Person
+# TODO: this should be an error, similar to the above
+a_person = {"name": "Alice"}
+```
+
+All of these have an invalid type for the `name` field:
+
+```py
+# error: [invalid-argument-type] "Invalid argument to key "name" with declared type `str` on TypedDict `Person`: value of type `None`"
+alice3: Person = {"name": None, "age": 30}
+# error: [invalid-argument-type] "Invalid argument to key "name" with declared type `str` on TypedDict `Person`: value of type `None`"
+Person(name=None, age=30)
+# error: [invalid-argument-type] "Invalid argument to key "name" with declared type `str` on TypedDict `Person`: value of type `None`"
+Person({"name": None, "age": 30})
+
+# TODO: this should be an error, similar to the above
+accepts_person({"name": None, "age": 30})
+# TODO: this should be an error, similar to the above
+house.owner = {"name": None, "age": 30}
+a_person: Person
+# TODO: this should be an error, similar to the above
+a_person = {"name": None, "age": 30}
+```
+
+All of these have an extra field that is not defined in the `TypedDict`:
+
+```py
+# error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "extra""
+alice4: Person = {"name": "Alice", "age": 30, "extra": True}
+# error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "extra""
+Person(name="Alice", age=30, extra=True)
+# error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "extra""
+Person({"name": "Alice", "age": 30, "extra": True})
+
+# TODO: this should be an error
+accepts_person({"name": "Alice", "age": 30, "extra": True})
+# TODO: this should be an error
+house.owner = {"name": "Alice", "age": 30, "extra": True}
+# TODO: this should be an error
+a_person: Person
+a_person = {"name": "Alice", "age": 30, "extra": True}
+```
+
+## Type ignore compatibility issues
+
+Users should be able to ignore TypedDict validation errors with `# type: ignore`
+
+```py
+from typing import TypedDict
+
+class Person(TypedDict):
+    name: str
+    age: int
+
+alice_bad: Person = {"name": None}  # type: ignore
+Person(name=None, age=30)  # type: ignore
+Person(name="Alice", age=30, extra=True)  # type: ignore
+```
+
+## Positional dictionary constructor pattern
+
+The positional dictionary constructor pattern (used by libraries like strawberry) should work
+correctly:
+
+```py
+from typing import TypedDict
+
+class User(TypedDict):
+    name: str
+    age: int
+
+# Valid usage - all required fields provided
+user1 = User({"name": "Alice", "age": 30})
+
+# error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `User` constructor"
+user2 = User({"name": "Bob"})
+
+# error: [invalid-argument-type] "Invalid argument to key "name" with declared type `str` on TypedDict `User`: value of type `None`"
+user3 = User({"name": None, "age": 25})
+
+# error: [invalid-key] "Invalid key access on TypedDict `User`: Unknown key "extra""
+user4 = User({"name": "Charlie", "age": 30, "extra": True})
+```
+
+## Optional fields with `total=False`
+
+By default, all fields in a `TypedDict` are required (`total=True`). You can make all fields
+optional by setting `total=False`:
+
+```py
+from typing import TypedDict
+
+class OptionalPerson(TypedDict, total=False):
+    name: str
+    age: int | None
+
+# All fields are optional with total=False
+charlie = OptionalPerson()
+david = OptionalPerson(name="David")
+emily = OptionalPerson(age=30)
+frank = OptionalPerson(name="Frank", age=25)
+
+# TODO: we could emit an error here, because these fields are not guaranteed to exist
+reveal_type(charlie["name"])  # revealed: str
+reveal_type(david["age"])  # revealed: int | None
+```
+
+Type validation still applies to provided fields:
+
+```py
+# error: [invalid-argument-type] "Invalid argument to key "name" with declared type `str` on TypedDict `OptionalPerson`"
+invalid = OptionalPerson(name=123)
+```
+
+Extra fields are still not allowed, even with `total=False`:
+
+```py
+# error: [invalid-key] "Invalid key access on TypedDict `OptionalPerson`: Unknown key "extra""
+invalid_extra = OptionalPerson(name="George", extra=True)
+```
+
+## `Required` and `NotRequired`
+
+You can have fine-grained control over keys using `Required` and `NotRequired` qualifiers. These
+qualifiers override the class-level `total` setting, which sets the default (`total=True` means that
+all keys are required by default, `total=False` means that all keys are non-required by default):
+
+```py
+from typing_extensions import TypedDict, Required, NotRequired
+
+# total=False by default, but id is explicitly Required
+class Message(TypedDict, total=False):
+    id: Required[int]  # Always required, even though total=False
+    content: str  # Optional due to total=False
+    timestamp: NotRequired[str]  # Explicitly optional (redundant here)
+
+# total=True by default, but content is explicitly NotRequired
+class User(TypedDict):
+    name: str  # Required due to total=True (default)
+    email: Required[str]  # Explicitly required (redundant here)
+    bio: NotRequired[str]  # Optional despite total=True
+
+# Valid Message constructions
+msg1 = Message(id=1)  # id required, content optional
+msg2 = Message(id=2, content="Hello")  # both provided
+msg3 = Message(id=3, timestamp="2024-01-01")  # id required, timestamp optional
+
+# Valid User constructions
+user1 = User(name="Alice", email="alice@example.com")  # required fields
+user2 = User(name="Bob", email="bob@example.com", bio="Developer")  # with optional bio
+
+reveal_type(msg1["id"])  # revealed: int
+reveal_type(msg1["content"])  # revealed: str
+reveal_type(user1["name"])  # revealed: str
+reveal_type(user1["bio"])  # revealed: str
+```
+
+Constructor validation respects `Required`/`NotRequired` overrides:
+
+```py
+# error: [missing-typed-dict-key] "Missing required key 'id' in TypedDict `Message` constructor"
+invalid_msg = Message(content="Hello")  # Missing required id
+
+# error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `User` constructor"
+# error: [missing-typed-dict-key] "Missing required key 'email' in TypedDict `User` constructor"
+invalid_user = User(bio="No name provided")  # Missing required name and email
+```
+
+Type validation still applies to all fields when provided:
+
+```py
+# error: [invalid-argument-type] "Invalid argument to key "id" with declared type `int` on TypedDict `Message`"
+invalid_type = Message(id="not-an-int", content="Hello")
 ```
 
 ## Structural assignability
@@ -134,8 +353,7 @@ alice: Person = {"name": "Alice"}
 # TODO: this should be an invalid-assignment error
 dangerous(alice)
 
-# TODO: this should be `str`
-reveal_type(alice["name"])  # revealed: Unknown
+reveal_type(alice["name"])  # revealed: str
 ```
 
 ## Key-based access
@@ -224,23 +442,90 @@ def _(person: Person, unknown_key: Any):
     person[unknown_key] = "Eve"
 ```
 
+## `ReadOnly`
+
+Assignments to keys that are marked `ReadOnly` will produce an error:
+
+```py
+from typing_extensions import TypedDict, ReadOnly, Required
+
+class Person(TypedDict, total=False):
+    id: ReadOnly[Required[int]]
+    name: str
+    age: int | None
+
+alice: Person = {"id": 1, "name": "Alice", "age": 30}
+alice["age"] = 31  # okay
+
+# error: [invalid-assignment] "Cannot assign to key "id" on TypedDict `Person`: key is marked read-only"
+alice["id"] = 2
+```
+
+This also works if all fields on a `TypedDict` are `ReadOnly`, in which case we synthesize a
+`__setitem__` method with a `key` type of `Never`:
+
+```py
+class Config(TypedDict):
+    host: ReadOnly[str]
+    port: ReadOnly[int]
+
+config: Config = {"host": "localhost", "port": 8080}
+
+# error: [invalid-assignment] "Cannot assign to key "host" on TypedDict `Config`: key is marked read-only"
+config["host"] = "127.0.0.1"
+# error: [invalid-assignment] "Cannot assign to key "port" on TypedDict `Config`: key is marked read-only"
+config["port"] = 80
+```
+
 ## Methods on `TypedDict`
 
 ```py
 from typing import TypedDict
+from typing_extensions import NotRequired
 
 class Person(TypedDict):
     name: str
     age: int | None
+    extra: NotRequired[str]
 
 def _(p: Person) -> None:
     reveal_type(p.keys())  # revealed: dict_keys[str, object]
     reveal_type(p.values())  # revealed: dict_values[str, object]
 
-    reveal_type(p.setdefault("name", "Alice"))  # revealed: @Todo(Support for `TypedDict`)
+    # `get()` returns the field type for required keys (no None union)
+    reveal_type(p.get("name"))  # revealed: str
+    reveal_type(p.get("age"))  # revealed: int | None
 
-    reveal_type(p.get("name"))  # revealed: @Todo(Support for `TypedDict`)
-    reveal_type(p.get("name", "Unknown"))  # revealed: @Todo(Support for `TypedDict`)
+    # It doesn't matter if a default is specified:
+    reveal_type(p.get("name", "default"))  # revealed: str
+    reveal_type(p.get("age", 999))  # revealed: int | None
+
+    # `get()` can return `None` for non-required keys
+    reveal_type(p.get("extra"))  # revealed: str | None
+    reveal_type(p.get("extra", "default"))  # revealed: str
+
+    # The type of the default parameter can be anything:
+    reveal_type(p.get("extra", 0))  # revealed: str | Literal[0]
+
+    # We allow access to unknown keys (they could be set for a subtype of Person)
+    reveal_type(p.get("unknown"))  # revealed: Unknown | None
+    reveal_type(p.get("unknown", "default"))  # revealed: Unknown | Literal["default"]
+
+    # `pop()` only works on non-required fields
+    reveal_type(p.pop("extra"))  # revealed: str
+    reveal_type(p.pop("extra", "fallback"))  # revealed: str
+    # error: [invalid-argument-type] "Cannot pop required field 'name' from TypedDict `Person`"
+    reveal_type(p.pop("name"))  # revealed: Unknown
+
+    # Similar to above, the default parameter can be of any type:
+    reveal_type(p.pop("extra", 0))  # revealed: str | Literal[0]
+
+    # `setdefault()` always returns the field type
+    reveal_type(p.setdefault("name", "Alice"))  # revealed: str
+    reveal_type(p.setdefault("extra", "default"))  # revealed: str
+
+    # error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "extraz" - did you mean "extra"?"
+    reveal_type(p.setdefault("extraz", "value"))  # revealed: Unknown
 ```
 
 ## Unlike normal classes
@@ -340,8 +625,77 @@ class Employee(Person):
 
 alice: Employee = {"name": "Alice", "employee_id": 1}
 
-# TODO: this should be an error (missing required key)
+# error: [missing-typed-dict-key] "Missing required key 'employee_id' in TypedDict `Employee` constructor"
 eve: Employee = {"name": "Eve"}
+```
+
+When inheriting from a `TypedDict` with a different `total` setting, inherited fields maintain their
+original requirement status, while new fields follow the child class's `total` setting:
+
+```py
+from typing import TypedDict
+
+# Case 1: total=True parent, total=False child
+class PersonBase(TypedDict):
+    id: int  # required (from total=True)
+    name: str  # required (from total=True)
+
+class PersonOptional(PersonBase, total=False):
+    age: int  # optional (from total=False)
+    email: str  # optional (from total=False)
+
+# Inherited fields keep their original requirement status
+person1 = PersonOptional(id=1, name="Alice")  # Valid - id/name still required
+person2 = PersonOptional(id=1, name="Alice", age=25)  # Valid - age optional
+person3 = PersonOptional(id=1, name="Alice", email="alice@test.com")  # Valid
+
+# These should be errors - missing required inherited fields
+# error: [missing-typed-dict-key] "Missing required key 'id' in TypedDict `PersonOptional` constructor"
+person_invalid1 = PersonOptional(name="Bob")
+
+# error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `PersonOptional` constructor"
+person_invalid2 = PersonOptional(id=2)
+
+# Case 2: total=False parent, total=True child
+class PersonBaseOptional(TypedDict, total=False):
+    id: int  # optional (from total=False)
+    name: str  # optional (from total=False)
+
+class PersonRequired(PersonBaseOptional):  # total=True by default
+    age: int  # required (from total=True)
+
+# New fields in child are required, inherited fields stay optional
+person4 = PersonRequired(age=30)  # Valid - only age required, id/name optional
+person5 = PersonRequired(id=1, name="Charlie", age=35)  # Valid - all provided
+
+# This should be an error - missing required new field
+# error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `PersonRequired` constructor"
+person_invalid3 = PersonRequired(id=3, name="David")
+```
+
+This also works with `Required` and `NotRequired`:
+
+```py
+from typing_extensions import TypedDict, Required, NotRequired
+
+# Case 3: Mixed inheritance with Required/NotRequired
+class PersonMixed(TypedDict, total=False):
+    id: Required[int]  # required despite total=False
+    name: str  # optional due to total=False
+
+class Employee(PersonMixed):  # total=True by default
+    department: str  # required due to total=True
+
+# id stays required (Required override), name stays optional, department is required
+emp1 = Employee(id=1, department="Engineering")  # Valid
+emp2 = Employee(id=2, name="Eve", department="Sales")  # Valid
+
+# Errors for missing required keys
+# error: [missing-typed-dict-key] "Missing required key 'id' in TypedDict `Employee` constructor"
+emp_invalid1 = Employee(department="HR")
+
+# error: [missing-typed-dict-key] "Missing required key 'department' in TypedDict `Employee` constructor"
+emp_invalid2 = Employee(id=3)
 ```
 
 ## Generic `TypedDict`
@@ -362,7 +716,7 @@ class TaggedData(TypedDict, Generic[T]):
 p1: TaggedData[int] = {"data": 42, "tag": "number"}
 p2: TaggedData[str] = {"data": "Hello", "tag": "text"}
 
-# TODO: this should be an error (type mismatch)
+# error: [invalid-argument-type] "Invalid argument to key "data" with declared type `int` on TypedDict `TaggedData`: value of type `Literal["not a number"]`"
 p3: TaggedData[int] = {"data": "not a number", "tag": "number"}
 ```
 
@@ -383,7 +737,7 @@ class TaggedData[T](TypedDict):
 p1: TaggedData[int] = {"data": 42, "tag": "number"}
 p2: TaggedData[str] = {"data": "Hello", "tag": "text"}
 
-# TODO: this should be an error (type mismatch)
+# error: [invalid-argument-type] "Invalid argument to key "data" with declared type `int` on TypedDict `TaggedData`: value of type `Literal["not a number"]`"
 p3: TaggedData[int] = {"data": "not a number", "tag": "number"}
 ```
 
@@ -441,6 +795,38 @@ from typing import TypedDict
 x: TypedDict = {"name": "Alice"}
 ```
 
+### `dict`-subclass inhabitants
+
+Values that inhabit a `TypedDict` type must be instances of `dict` itself, not a subclass:
+
+```py
+from typing import TypedDict
+
+class MyDict(dict):
+    pass
+
+class Person(TypedDict):
+    name: str
+    age: int | None
+
+# TODO: this should be an error
+x: Person = MyDict({"name": "Alice", "age": 30})
+```
+
+### Cannot be used in `isinstance` tests
+
+```py
+from typing import TypedDict
+
+class Person(TypedDict):
+    name: str
+    age: int | None
+
+def _(obj: object) -> bool:
+    # TODO: this should be an error
+    return isinstance(obj, Person)
+```
+
 ## Diagnostics
 
 <!-- snapshot-diagnostics -->
@@ -473,6 +859,69 @@ def write_to_non_existing_key(person: Person):
 
 def write_to_non_literal_string_key(person: Person, str_key: str):
     person[str_key] = "Alice"  # error: [invalid-key]
+```
+
+Assignment to `ReadOnly` keys:
+
+```py
+from typing_extensions import ReadOnly
+
+class Employee(TypedDict):
+    id: ReadOnly[int]
+    name: str
+
+def write_to_readonly_key(employee: Employee):
+    employee["id"] = 42  # error: [invalid-assignment]
+```
+
+## Import aliases
+
+`TypedDict` can be imported with aliases and should work correctly:
+
+```py
+from typing import TypedDict as TD
+from typing_extensions import Required
+
+class UserWithAlias(TD, total=False):
+    name: Required[str]
+    age: int
+
+user_empty = UserWithAlias(name="Alice")  # name is required
+user_partial = UserWithAlias(name="Alice", age=30)
+
+# error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `UserWithAlias` constructor"
+user_invalid = UserWithAlias(age=30)
+
+reveal_type(user_empty["name"])  # revealed: str
+reveal_type(user_partial["age"])  # revealed: int
+```
+
+## Shadowing behavior
+
+When a local class shadows the `TypedDict` import, only the actual `TypedDict` import should be
+treated as a `TypedDict`:
+
+```py
+from typing import TypedDict as TD
+
+class TypedDict:
+    def __init__(self):
+        pass
+
+class NotActualTypedDict(TypedDict, total=True):
+    name: str
+
+class ActualTypedDict(TD, total=True):
+    name: str
+
+not_td = NotActualTypedDict()
+reveal_type(not_td)  # revealed: NotActualTypedDict
+
+# error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `ActualTypedDict` constructor"
+actual_td = ActualTypedDict()
+actual_td = ActualTypedDict(name="Alice")
+reveal_type(actual_td)  # revealed: ActualTypedDict
+reveal_type(actual_td["name"])  # revealed: str
 ```
 
 [`typeddict`]: https://typing.python.org/en/latest/spec/typeddict.html

@@ -71,7 +71,9 @@ use crate::registry::Rule;
 use crate::rules::pyflakes::rules::{
     LateFutureImport, ReturnOutsideFunction, YieldOutsideFunction,
 };
-use crate::rules::pylint::rules::{AwaitOutsideAsync, LoadBeforeGlobalDeclaration};
+use crate::rules::pylint::rules::{
+    AwaitOutsideAsync, LoadBeforeGlobalDeclaration, YieldFromInAsyncFunction,
+};
 use crate::rules::{flake8_pyi, flake8_type_checking, pyflakes, pyupgrade};
 use crate::settings::rule_table::RuleTable;
 use crate::settings::{LinterSettings, TargetVersion, flags};
@@ -668,6 +670,12 @@ impl SemanticSyntaxContext for Checker<'_> {
                     self.report_diagnostic(AwaitOutsideAsync, error.range);
                 }
             }
+            SemanticSyntaxErrorKind::YieldFromInAsyncFunction => {
+                // PLE1700
+                if self.is_rule_enabled(Rule::YieldFromInAsyncFunction) {
+                    self.report_diagnostic(YieldFromInAsyncFunction, error.range);
+                }
+            }
             SemanticSyntaxErrorKind::ReboundComprehensionVariable
             | SemanticSyntaxErrorKind::DuplicateTypeParameter
             | SemanticSyntaxErrorKind::MultipleCaseAssignment(_)
@@ -703,7 +711,10 @@ impl SemanticSyntaxContext for Checker<'_> {
             match scope.kind {
                 ScopeKind::Class(_) | ScopeKind::Lambda(_) => return false,
                 ScopeKind::Function(ast::StmtFunctionDef { is_async, .. }) => return *is_async,
-                ScopeKind::Generator { .. } | ScopeKind::Module | ScopeKind::Type => {}
+                ScopeKind::Generator { .. }
+                | ScopeKind::Module
+                | ScopeKind::Type
+                | ScopeKind::DunderClassCell => {}
             }
         }
         false
@@ -714,7 +725,10 @@ impl SemanticSyntaxContext for Checker<'_> {
             match scope.kind {
                 ScopeKind::Class(_) => return false,
                 ScopeKind::Function(_) | ScopeKind::Lambda(_) => return true,
-                ScopeKind::Generator { .. } | ScopeKind::Module | ScopeKind::Type => {}
+                ScopeKind::Generator { .. }
+                | ScopeKind::Module
+                | ScopeKind::Type
+                | ScopeKind::DunderClassCell => {}
             }
         }
         false
@@ -725,7 +739,7 @@ impl SemanticSyntaxContext for Checker<'_> {
             match scope.kind {
                 ScopeKind::Class(_) | ScopeKind::Generator { .. } => return false,
                 ScopeKind::Function(_) | ScopeKind::Lambda(_) => return true,
-                ScopeKind::Module | ScopeKind::Type => {}
+                ScopeKind::Module | ScopeKind::Type | ScopeKind::DunderClassCell => {}
             }
         }
         false
@@ -1092,6 +1106,24 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     }
                 }
 
+                // Here we add the implicit scope surrounding a method which allows code in the
+                // method to access `__class__` at runtime. See the `ScopeKind::DunderClassCell`
+                // docs for more information.
+                let added_dunder_class_scope = if self.semantic.current_scope().kind.is_class() {
+                    self.semantic.push_scope(ScopeKind::DunderClassCell);
+                    let binding_id = self.semantic.push_binding(
+                        TextRange::default(),
+                        BindingKind::DunderClassCell,
+                        BindingFlags::empty(),
+                    );
+                    self.semantic
+                        .current_scope_mut()
+                        .add("__class__", binding_id);
+                    true
+                } else {
+                    false
+                };
+
                 self.semantic.push_scope(ScopeKind::Type);
 
                 if let Some(type_params) = type_params {
@@ -1155,6 +1187,9 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 self.semantic.pop_scope(); // Function scope
                 self.semantic.pop_definition();
                 self.semantic.pop_scope(); // Type parameter scope
+                if added_dunder_class_scope {
+                    self.semantic.pop_scope(); // `__class__` cell closure scope
+                }
                 self.add_binding(
                     name,
                     stmt.identifier(),

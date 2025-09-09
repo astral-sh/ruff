@@ -7,13 +7,14 @@ Written by Marc-Andre Lemburg (mal@lemburg.com).
 
 """
 
+import sys
 import types
 from _codecs import *
 from _typeshed import ReadableBuffer
 from abc import abstractmethod
 from collections.abc import Callable, Generator, Iterable
 from typing import Any, BinaryIO, ClassVar, Final, Literal, Protocol, TextIO, overload, type_check_only
-from typing_extensions import Self, TypeAlias
+from typing_extensions import Self, TypeAlias, disjoint_base
 
 __all__ = [
     "register",
@@ -131,35 +132,68 @@ class _IncrementalDecoder(Protocol):
 class _BufferedIncrementalDecoder(Protocol):
     def __call__(self, errors: str = ...) -> BufferedIncrementalDecoder: ...
 
-class CodecInfo(tuple[_Encoder, _Decoder, _StreamReader, _StreamWriter]):
-    """Codec details when looking up the codec registry"""
+if sys.version_info >= (3, 12):
+    class CodecInfo(tuple[_Encoder, _Decoder, _StreamReader, _StreamWriter]):
+        """Codec details when looking up the codec registry"""
 
-    _is_text_encoding: bool
-    @property
-    def encode(self) -> _Encoder: ...
-    @property
-    def decode(self) -> _Decoder: ...
-    @property
-    def streamreader(self) -> _StreamReader: ...
-    @property
-    def streamwriter(self) -> _StreamWriter: ...
-    @property
-    def incrementalencoder(self) -> _IncrementalEncoder: ...
-    @property
-    def incrementaldecoder(self) -> _IncrementalDecoder: ...
-    name: str
-    def __new__(
-        cls,
-        encode: _Encoder,
-        decode: _Decoder,
-        streamreader: _StreamReader | None = None,
-        streamwriter: _StreamWriter | None = None,
-        incrementalencoder: _IncrementalEncoder | None = None,
-        incrementaldecoder: _IncrementalDecoder | None = None,
-        name: str | None = None,
-        *,
-        _is_text_encoding: bool | None = None,
-    ) -> Self: ...
+        _is_text_encoding: bool
+        @property
+        def encode(self) -> _Encoder: ...
+        @property
+        def decode(self) -> _Decoder: ...
+        @property
+        def streamreader(self) -> _StreamReader: ...
+        @property
+        def streamwriter(self) -> _StreamWriter: ...
+        @property
+        def incrementalencoder(self) -> _IncrementalEncoder: ...
+        @property
+        def incrementaldecoder(self) -> _IncrementalDecoder: ...
+        name: str
+        def __new__(
+            cls,
+            encode: _Encoder,
+            decode: _Decoder,
+            streamreader: _StreamReader | None = None,
+            streamwriter: _StreamWriter | None = None,
+            incrementalencoder: _IncrementalEncoder | None = None,
+            incrementaldecoder: _IncrementalDecoder | None = None,
+            name: str | None = None,
+            *,
+            _is_text_encoding: bool | None = None,
+        ) -> Self: ...
+
+else:
+    @disjoint_base
+    class CodecInfo(tuple[_Encoder, _Decoder, _StreamReader, _StreamWriter]):
+        """Codec details when looking up the codec registry"""
+
+        _is_text_encoding: bool
+        @property
+        def encode(self) -> _Encoder: ...
+        @property
+        def decode(self) -> _Decoder: ...
+        @property
+        def streamreader(self) -> _StreamReader: ...
+        @property
+        def streamwriter(self) -> _StreamWriter: ...
+        @property
+        def incrementalencoder(self) -> _IncrementalEncoder: ...
+        @property
+        def incrementaldecoder(self) -> _IncrementalDecoder: ...
+        name: str
+        def __new__(
+            cls,
+            encode: _Encoder,
+            decode: _Decoder,
+            streamreader: _StreamReader | None = None,
+            streamwriter: _StreamWriter | None = None,
+            incrementalencoder: _IncrementalEncoder | None = None,
+            incrementaldecoder: _IncrementalDecoder | None = None,
+            name: str | None = None,
+            *,
+            _is_text_encoding: bool | None = None,
+        ) -> Self: ...
 
 def getencoder(encoding: str) -> _Encoder:
     """Lookup up the codec for the given encoding and return

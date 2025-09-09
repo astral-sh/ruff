@@ -83,6 +83,7 @@ def ip_interface(
 class _IPAddressBase:
     """The mother class."""
 
+    __slots__ = ()
     @property
     def compressed(self) -> str:
         """Return the shorthand version of the IP address as a string."""
@@ -111,6 +112,7 @@ class _BaseAddress(_IPAddressBase):
     used by single IP addresses.
     """
 
+    __slots__ = ()
     def __add__(self, other: int) -> Self: ...
     def __hash__(self) -> int: ...
     def __int__(self) -> int: ...
@@ -255,7 +257,7 @@ class _BaseNetwork(_IPAddressBase, Generic[_A]):
 
         """
 
-    def hosts(self) -> Iterator[_A]:
+    def hosts(self) -> Iterator[_A] | list[_A]:
         """Generate Iterator over usable hosts in a network.
 
         This is like __iter__ except it doesn't return the network
@@ -413,6 +415,7 @@ class _BaseV4:
 
     """
 
+    __slots__ = ()
     if sys.version_info >= (3, 14):
         version: Final = 4
         max_prefixlen: Final = 32
@@ -425,6 +428,7 @@ class _BaseV4:
 class IPv4Address(_BaseV4, _BaseAddress):
     """Represent and manipulate single IPv4 Addresses."""
 
+    __slots__ = ("_ip", "__weakref__")
     def __init__(self, address: object) -> None:
         """
         Args:
@@ -607,6 +611,7 @@ class _BaseV6:
 
     """
 
+    __slots__ = ()
     if sys.version_info >= (3, 14):
         version: Final = 6
         max_prefixlen: Final = 128
@@ -619,6 +624,7 @@ class _BaseV6:
 class IPv6Address(_BaseV6, _BaseAddress):
     """Represent and manipulate single IPv6 Addresses."""
 
+    __slots__ = ("_ip", "_scope_id", "__weakref__")
     def __init__(self, address: object) -> None:
         """Instantiate a new IPv6 address object.
 

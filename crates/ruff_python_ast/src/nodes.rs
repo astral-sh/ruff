@@ -515,7 +515,7 @@ impl FStringValue {
 
     /// Returns `true` if the node represents an empty f-string literal.
     ///
-    /// Noteh that a [`FStringValue`] node will always have >= 1 [`FStringPart`]s inside it.
+    /// Note that a [`FStringValue`] node will always have >= 1 [`FStringPart`]s inside it.
     /// This method checks whether the value of the concatenated parts is equal to the empty
     /// f-string, not whether the f-string has 0 parts inside it.
     pub fn is_empty_literal(&self) -> bool {
@@ -680,6 +680,22 @@ impl TStringValue {
     /// interpolation (`x`) and string literal (`"qux"`).
     pub fn elements(&self) -> impl Iterator<Item = &InterpolatedStringElement> {
         self.iter().flat_map(|tstring| tstring.elements.iter())
+    }
+
+    /// Returns `true` if the node represents an empty t-string in the
+    /// sense that `__iter__` returns an empty iterable.
+    ///
+    /// Beware that empty t-strings are still truthy, i.e. `bool(t"") == True`.
+    ///
+    /// Note that a [`TStringValue`] node will always contain at least one
+    /// [`TString`] node. This method checks whether each of the constituent
+    /// t-strings (in an implicitly concatenated t-string) are empty
+    /// in the above sense.
+    pub fn is_empty_iterable(&self) -> bool {
+        match &self.inner {
+            TStringValueInner::Single(tstring) => tstring.is_empty(),
+            TStringValueInner::Concatenated(tstrings) => tstrings.iter().all(TString::is_empty),
+        }
     }
 }
 
@@ -1182,6 +1198,10 @@ impl TString {
     pub fn quote_style(&self) -> Quote {
         self.flags.quote_style()
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.elements.is_empty()
+    }
 }
 
 impl From<TString> for Expr {
@@ -1582,7 +1602,7 @@ impl StringLiteral {
         Self {
             range,
             value: "".into(),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
             flags: StringLiteralFlags::empty().with_invalid(),
         }
     }
@@ -1602,7 +1622,7 @@ impl From<StringLiteral> for Expr {
     fn from(payload: StringLiteral) -> Self {
         ExprStringLiteral {
             range: payload.range,
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
             value: StringLiteralValue::single(payload),
         }
         .into()
@@ -1981,7 +2001,7 @@ impl BytesLiteral {
         Self {
             range,
             value: Box::new([]),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
             flags: BytesLiteralFlags::empty().with_invalid(),
         }
     }
@@ -1991,7 +2011,7 @@ impl From<BytesLiteral> for Expr {
     fn from(payload: BytesLiteral) -> Self {
         ExprBytesLiteral {
             range: payload.range,
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
             value: BytesLiteralValue::single(payload),
         }
         .into()
@@ -3199,7 +3219,6 @@ impl<'a> IntoIterator for &'a Box<Parameters> {
 /// Used by `Arguments` original type.
 ///
 /// NOTE: This type is different from original Python AST.
-
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ParameterWithDefault {
@@ -3220,6 +3239,14 @@ impl ParameterWithDefault {
 
     pub fn annotation(&self) -> Option<&Expr> {
         self.parameter.annotation()
+    }
+
+    /// Return `true` if the parameter name uses the pre-PEP-570 convention
+    /// (specified in PEP 484) to indicate to a type checker that it should be treated
+    /// as positional-only.
+    pub fn uses_pep_484_positional_only_convention(&self) -> bool {
+        let name = self.name();
+        name.starts_with("__") && !name.ends_with("__")
     }
 }
 
@@ -3525,7 +3552,7 @@ impl Identifier {
     pub fn new(id: impl Into<Name>, range: TextRange) -> Self {
         Self {
             id: id.into(),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
             range,
         }
     }

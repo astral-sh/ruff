@@ -1,3 +1,8 @@
+#![warn(
+    clippy::disallowed_methods,
+    reason = "Prefer System trait methods over std methods in ty crates"
+)]
+mod all_symbols;
 mod completion;
 mod doc_highlights;
 mod docstring;
@@ -20,13 +25,14 @@ mod stub_mapping;
 mod symbols;
 mod workspace_symbols;
 
-pub use completion::completion;
+pub use all_symbols::{AllSymbolInfo, all_symbols};
+pub use completion::{CompletionSettings, completion};
 pub use doc_highlights::document_highlights;
-pub use document_symbols::{document_symbols, document_symbols_with_options};
+pub use document_symbols::document_symbols;
 pub use goto::{goto_declaration, goto_definition, goto_type_definition};
 pub use goto_references::goto_references;
 pub use hover::hover;
-pub use inlay_hints::{InlayHintSettings, inlay_hints};
+pub use inlay_hints::{InlayHintKind, InlayHintLabel, InlayHintSettings, inlay_hints};
 pub use markup::MarkupKind;
 pub use references::ReferencesMode;
 pub use rename::{can_rename, rename};
@@ -35,7 +41,7 @@ pub use semantic_tokens::{
     SemanticToken, SemanticTokenModifier, SemanticTokenType, SemanticTokens, semantic_tokens,
 };
 pub use signature_help::{ParameterDetails, SignatureDetails, SignatureHelpInfo, signature_help};
-pub use symbols::{SymbolInfo, SymbolKind, SymbolsOptions};
+pub use symbols::{FlatSymbols, HierarchicalSymbols, SymbolId, SymbolInfo, SymbolKind};
 pub use workspace_symbols::{WorkspaceSymbolInfo, workspace_symbols};
 
 use ruff_db::files::{File, FileRange};
@@ -235,7 +241,8 @@ impl HasNavigationTargets for Type<'_> {
     fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
         match self {
             Type::Union(union) => union
-                .iter(db)
+                .elements(db)
+                .iter()
                 .flat_map(|target| target.navigation_targets(db))
                 .collect(),
 
@@ -281,11 +288,14 @@ impl HasNavigationTargets for TypeDefinition<'_> {
 
 #[cfg(test)]
 mod tests {
+    use camino::Utf8Component;
     use insta::internals::SettingsBindDropGuard;
+
     use ruff_db::Db;
     use ruff_db::diagnostic::{Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig};
-    use ruff_db::files::{File, system_path_to_file};
+    use ruff_db::files::{File, FileRootKind, system_path_to_file};
     use ruff_db::system::{DbWithWritableSystem, SystemPath, SystemPathBuf};
+    use ruff_python_trivia::textwrap::dedent;
     use ruff_text_size::TextSize;
     use ty_project::ProjectMetadata;
     use ty_python_semantic::{
@@ -372,6 +382,19 @@ mod tests {
                 db.write_file(path, contents)
                     .expect("write to memory file system to be successful");
 
+                // Add a root for the top-most component.
+                let top = path.components().find_map(|c| match c {
+                    Utf8Component::Normal(c) => Some(c),
+                    _ => None,
+                });
+                if let Some(top) = top {
+                    let top = SystemPath::new(top);
+                    if db.system().is_directory(top) {
+                        db.files()
+                            .try_add_root(&db, top, FileRootKind::LibrarySearchPath);
+                    }
+                }
+
                 let file = system_path_to_file(&db, path).expect("newly written file to existing");
 
                 if let Some(offset) = cursor_offset {
@@ -416,12 +439,12 @@ mod tests {
         pub(super) fn source(
             &mut self,
             path: impl Into<SystemPathBuf>,
-            contents: impl Into<String>,
+            contents: impl AsRef<str>,
         ) -> &mut CursorTestBuilder {
             const MARKER: &str = "<CURSOR>";
 
             let path = path.into();
-            let contents = contents.into();
+            let contents = dedent(contents.as_ref()).into_owned();
             let Some(cursor_offset) = contents.find(MARKER) else {
                 self.sources.push(Source {
                     path,

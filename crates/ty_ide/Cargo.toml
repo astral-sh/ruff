@@ -13,6 +13,8 @@ license = { workspace = true }
 [dependencies]
 bitflags = { workspace = true }
 ruff_db = { workspace = true }
+ruff_index = { workspace = true }
+ruff_memory_usage = { workspace = true }
 ruff_python_ast = { workspace = true }
 ruff_python_parser = { workspace = true }
 ruff_python_trivia = { workspace = true }
@@ -21,14 +23,17 @@ ruff_text_size = { workspace = true }
 ty_python_semantic = { workspace = true }
 ty_project = { workspace = true, features = ["testing"] }
 
+get-size2 = { workspace = true }
 itertools = { workspace = true }
+rayon = { workspace = true }
 regex = { workspace = true }
 rustc-hash = { workspace = true }
+salsa = { workspace = true, features = ["compact_str"] }
 smallvec = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
-
+camino = { workspace = true }
 insta = { workspace = true, features = ["filters"] }
 
 [lints]

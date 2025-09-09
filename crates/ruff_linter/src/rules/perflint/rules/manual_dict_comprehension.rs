@@ -354,21 +354,37 @@ fn convert_to_dict_comprehension(
         "for"
     };
     // Handles the case where `key` has a trailing comma, e.g, `dict[x,] = y`
-    let key_range = if let Expr::Tuple(ast::ExprTuple { elts, .. }) = key {
-        let [expr] = elts.as_slice() else {
+    let key_str = if let Expr::Tuple(ast::ExprTuple {
+        elts,
+        parenthesized,
+        ..
+    }) = key
+    {
+        if elts.len() != 1 {
             return None;
-        };
-        expr.range()
+        }
+        if *parenthesized {
+            locator.slice(key).to_string()
+        } else {
+            format!("({})", locator.slice(key))
+        }
     } else {
-        key.range()
+        locator.slice(key).to_string()
     };
-    let elt_str = format!(
-        "{}: {}",
-        locator.slice(key_range),
-        locator.slice(value.range())
-    );
 
-    let comprehension_str = format!("{{{elt_str} {for_type} {target_str} in {iter_str}{if_str}}}");
+    // If the value is a tuple without parentheses, add them
+    let value_str = if let Expr::Tuple(ast::ExprTuple {
+        parenthesized: false,
+        ..
+    }) = value
+    {
+        format!("({})", locator.slice(value))
+    } else {
+        locator.slice(value).to_string()
+    };
+
+    let comprehension_str =
+        format!("{{{key_str}: {value_str} {for_type} {target_str} in {iter_str}{if_str}}}");
 
     let for_loop_inline_comments = comment_strings_in_range(
         checker,

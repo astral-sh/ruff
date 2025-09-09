@@ -30,9 +30,10 @@ bitflags::bitflags! {
         const HIERARCHICAL_DOCUMENT_SYMBOL_SUPPORT = 1 << 10;
         const WORK_DONE_PROGRESS = 1 << 11;
         const FILE_WATCHER_SUPPORT = 1 << 12;
-        const DIAGNOSTIC_DYNAMIC_REGISTRATION = 1 << 13;
-        const WORKSPACE_CONFIGURATION = 1 << 14;
-        const RENAME_DYNAMIC_REGISTRATION = 1 << 15;
+        const RELATIVE_FILE_WATCHER_SUPPORT = 1 << 13;
+        const DIAGNOSTIC_DYNAMIC_REGISTRATION = 1 << 14;
+        const WORKSPACE_CONFIGURATION = 1 << 15;
+        const RENAME_DYNAMIC_REGISTRATION = 1 << 16;
     }
 }
 
@@ -107,6 +108,14 @@ impl ResolvedClientCapabilities {
         self.contains(Self::FILE_WATCHER_SUPPORT)
     }
 
+    /// Returns `true` if the client supports relative file watcher capabilities.
+    ///
+    /// This permits specifying a "base uri" that a glob is interpreted
+    /// relative to.
+    pub(crate) const fn supports_relative_file_watcher(self) -> bool {
+        self.contains(Self::RELATIVE_FILE_WATCHER_SUPPORT)
+    }
+
     /// Returns `true` if the client supports dynamic registration for diagnostic capabilities.
     pub(crate) const fn supports_diagnostic_dynamic_registration(self) -> bool {
         self.contains(Self::DIAGNOSTIC_DYNAMIC_REGISTRATION)
@@ -144,11 +153,15 @@ impl ResolvedClientCapabilities {
             flags |= Self::INLAY_HINT_REFRESH;
         }
 
-        if workspace
-            .and_then(|workspace| workspace.did_change_watched_files?.dynamic_registration)
-            .unwrap_or_default()
+        if let Some(capabilities) =
+            workspace.and_then(|workspace| workspace.did_change_watched_files.as_ref())
         {
-            flags |= Self::FILE_WATCHER_SUPPORT;
+            if capabilities.dynamic_registration == Some(true) {
+                flags |= Self::FILE_WATCHER_SUPPORT;
+            }
+            if capabilities.relative_pattern_support == Some(true) {
+                flags |= Self::RELATIVE_FILE_WATCHER_SUPPORT;
+            }
         }
 
         if text_document.is_some_and(|text_document| text_document.diagnostic.is_some()) {

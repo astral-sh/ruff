@@ -7,16 +7,16 @@ input_file: crates/ruff_python_parser/resources/inline/err/aug_assign_stmt_inval
 ```
 Module(
     ModModule {
-        node_index: AtomicNodeIndex(..),
+        node_index: NodeIndex(None),
         range: 0..59,
         body: [
             AugAssign(
                 StmtAugAssign {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 0..6,
                     target: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 0..1,
                             value: Int(
                                 1,
@@ -26,7 +26,7 @@ Module(
                     op: Add,
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 5..6,
                             value: Int(
                                 1,
@@ -37,17 +37,17 @@ Module(
             ),
             AugAssign(
                 StmtAugAssign {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 7..17,
                     target: StringLiteral(
                         ExprStringLiteral {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 7..10,
                             value: StringLiteralValue {
                                 inner: Single(
                                     StringLiteral {
                                         range: 7..10,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         value: "a",
                                         flags: StringLiteralFlags {
                                             quote_style: Double,
@@ -62,13 +62,13 @@ Module(
                     op: Add,
                     value: StringLiteral(
                         ExprStringLiteral {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 14..17,
                             value: StringLiteralValue {
                                 inner: Single(
                                     StringLiteral {
                                         range: 14..17,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         value: "b",
                                         flags: StringLiteralFlags {
                                             quote_style: Double,
@@ -84,15 +84,15 @@ Module(
             ),
             AugAssign(
                 StmtAugAssign {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 18..25,
                     target: Starred(
                         ExprStarred {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 18..20,
                             value: Name(
                                 ExprName {
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     range: 19..20,
                                     id: Name("x"),
                                     ctx: Store,
@@ -104,7 +104,7 @@ Module(
                     op: Add,
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 24..25,
                             value: Int(
                                 1,
@@ -115,17 +115,17 @@ Module(
             ),
             Pass(
                 StmtPass {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 26..30,
                 },
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 34..35,
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 34..35,
                             value: Int(
                                 1,
@@ -136,11 +136,11 @@ Module(
             ),
             AugAssign(
                 StmtAugAssign {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 36..45,
                     target: Name(
                         ExprName {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 36..37,
                             id: Name("x"),
                             ctx: Store,
@@ -149,7 +149,7 @@ Module(
                     op: Add,
                     value: Name(
                         ExprName {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 41..45,
                             id: Name("pass"),
                             ctx: Load,
@@ -159,15 +159,15 @@ Module(
             ),
             AugAssign(
                 StmtAugAssign {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 46..58,
                     target: BinOp(
                         ExprBinOp {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 47..52,
                             left: Name(
                                 ExprName {
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     range: 47..48,
                                     id: Name("x"),
                                     ctx: Load,
@@ -176,7 +176,7 @@ Module(
                             op: Add,
                             right: Name(
                                 ExprName {
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     range: 51..52,
                                     id: Name("y"),
                                     ctx: Load,
@@ -187,7 +187,7 @@ Module(
                     op: Add,
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 57..58,
                             value: Int(
                                 1,

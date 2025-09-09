@@ -38,6 +38,7 @@
 //! unnecessary `is_subtype_of` checks.
 
 use crate::types::enums::{enum_member_literals, enum_metadata};
+use crate::types::type_ordering::union_or_intersection_elements_ordering;
 use crate::types::{
     BytesLiteralType, IntersectionType, KnownClass, StringLiteralType, Type,
     TypeVarBoundOrConstraints, UnionType,
@@ -202,11 +203,16 @@ enum ReduceResult<'db> {
 
 // TODO increase this once we extend `UnionElement` throughout all union/intersection
 // representations, so that we can make large unions of literals fast in all operations.
-const MAX_UNION_LITERALS: usize = 200;
+//
+// For now (until we solve https://github.com/astral-sh/ty/issues/957), keep this number
+// below 200, which is the salsa fixpoint iteration limit.
+const MAX_UNION_LITERALS: usize = 199;
 
 pub(crate) struct UnionBuilder<'db> {
     elements: Vec<UnionElement<'db>>,
     db: &'db dyn Db,
+    unpack_aliases: bool,
+    order_elements: bool,
 }
 
 impl<'db> UnionBuilder<'db> {
@@ -214,7 +220,19 @@ impl<'db> UnionBuilder<'db> {
         Self {
             db,
             elements: vec![],
+            unpack_aliases: true,
+            order_elements: false,
         }
+    }
+
+    pub(crate) fn unpack_aliases(mut self, val: bool) -> Self {
+        self.unpack_aliases = val;
+        self
+    }
+
+    pub(crate) fn order_elements(mut self, val: bool) -> Self {
+        self.order_elements = val;
+        self
     }
 
     pub(crate) fn is_empty(&self) -> bool {
@@ -236,17 +254,29 @@ impl<'db> UnionBuilder<'db> {
 
     /// Adds a type to this union.
     pub(crate) fn add_in_place(&mut self, ty: Type<'db>) {
+        self.add_in_place_impl(ty, &mut vec![]);
+    }
+
+    pub(crate) fn add_in_place_impl(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
         match ty {
             Type::Union(union) => {
                 let new_elements = union.elements(self.db);
                 self.elements.reserve(new_elements.len());
                 for element in new_elements {
-                    self.add_in_place(*element);
+                    self.add_in_place_impl(*element, seen_aliases);
                 }
             }
             // Adding `Never` to a union is a no-op.
             Type::Never => {}
-            Type::TypeAlias(alias) => self.add_in_place(alias.value_type(self.db)),
+            Type::TypeAlias(alias) if self.unpack_aliases => {
+                if seen_aliases.contains(&ty) {
+                    // Union contains itself recursively via a type alias. This is an error, just
+                    // leave out the recursive alias. TODO surface this error.
+                } else {
+                    seen_aliases.push(ty);
+                    self.add_in_place_impl(alias.value_type(self.db), seen_aliases);
+                }
+            }
             // If adding a string literal, look for an existing `UnionElement::StringLiterals` to
             // add it to, or an existing element that is a super-type of string literals, which
             // means we shouldn't add it. Otherwise, add a new `UnionElement::StringLiterals`
@@ -260,7 +290,7 @@ impl<'db> UnionBuilder<'db> {
                         UnionElement::StringLiterals(literals) => {
                             if literals.len() >= MAX_UNION_LITERALS {
                                 let replace_with = KnownClass::Str.to_instance(self.db);
-                                self.add_in_place(replace_with);
+                                self.add_in_place_impl(replace_with, seen_aliases);
                                 return;
                             }
                             found = Some(literals);
@@ -305,7 +335,7 @@ impl<'db> UnionBuilder<'db> {
                         UnionElement::BytesLiterals(literals) => {
                             if literals.len() >= MAX_UNION_LITERALS {
                                 let replace_with = KnownClass::Bytes.to_instance(self.db);
-                                self.add_in_place(replace_with);
+                                self.add_in_place_impl(replace_with, seen_aliases);
                                 return;
                             }
                             found = Some(literals);
@@ -350,7 +380,7 @@ impl<'db> UnionBuilder<'db> {
                         UnionElement::IntLiterals(literals) => {
                             if literals.len() >= MAX_UNION_LITERALS {
                                 let replace_with = KnownClass::Int.to_instance(self.db);
-                                self.add_in_place(replace_with);
+                                self.add_in_place_impl(replace_with, seen_aliases);
                                 return;
                             }
                             found = Some(literals);
@@ -404,7 +434,10 @@ impl<'db> UnionBuilder<'db> {
                     .is_none();
 
                 if all_members_are_in_union {
-                    self.add_in_place(enum_member_to_add.enum_class_instance(self.db));
+                    self.add_in_place_impl(
+                        enum_member_to_add.enum_class_instance(self.db),
+                        seen_aliases,
+                    );
                 } else if !self
                     .elements
                     .iter()
@@ -426,8 +459,17 @@ impl<'db> UnionBuilder<'db> {
                     None
                 };
 
+                // If an alias gets here, it means we aren't unpacking aliases, and we also
+                // shouldn't try to simplify aliases out of the union, because that will require
+                // unpacking them.
+                let should_simplify_full = !matches!(ty, Type::TypeAlias(_));
+
                 let mut to_remove = SmallVec::<[usize; 2]>::new();
-                let ty_negated = ty.negate(self.db);
+                let ty_negated = if should_simplify_full {
+                    ty.negate(self.db)
+                } else {
+                    Type::Never // won't be used
+                };
 
                 for (index, element) in self.elements.iter_mut().enumerate() {
                     let element_type = match element.try_reduce(self.db, ty) {
@@ -446,29 +488,36 @@ impl<'db> UnionBuilder<'db> {
                             return;
                         }
                     };
-                    if Some(element_type) == bool_pair {
-                        self.add_in_place(KnownClass::Bool.to_instance(self.db));
+
+                    if ty == element_type {
                         return;
                     }
 
-                    if ty.is_equivalent_to(self.db, element_type)
-                        || ty.is_subtype_of(self.db, element_type)
-                    {
+                    if Some(element_type) == bool_pair {
+                        self.add_in_place_impl(KnownClass::Bool.to_instance(self.db), seen_aliases);
                         return;
-                    } else if element_type.is_subtype_of(self.db, ty) {
-                        to_remove.push(index);
-                    } else if ty_negated.is_subtype_of(self.db, element_type) {
-                        // We add `ty` to the union. We just checked that `~ty` is a subtype of an
-                        // existing `element`. This also means that `~ty | ty` is a subtype of
-                        // `element | ty`, because both elements in the first union are subtypes of
-                        // the corresponding elements in the second union. But `~ty | ty` is just
-                        // `object`. Since `object` is a subtype of `element | ty`, we can only
-                        // conclude that `element | ty` must be `object` (object has no other
-                        // supertypes). This means we can simplify the whole union to just
-                        // `object`, since all other potential elements would also be subtypes of
-                        // `object`.
-                        self.collapse_to_object();
-                        return;
+                    }
+
+                    if should_simplify_full && !matches!(element_type, Type::TypeAlias(_)) {
+                        if ty.is_equivalent_to(self.db, element_type)
+                            || ty.is_subtype_of(self.db, element_type)
+                        {
+                            return;
+                        } else if element_type.is_subtype_of(self.db, ty) {
+                            to_remove.push(index);
+                        } else if ty_negated.is_subtype_of(self.db, element_type) {
+                            // We add `ty` to the union. We just checked that `~ty` is a subtype of an
+                            // existing `element`. This also means that `~ty | ty` is a subtype of
+                            // `element | ty`, because both elements in the first union are subtypes of
+                            // the corresponding elements in the second union. But `~ty | ty` is just
+                            // `object`. Since `object` is a subtype of `element | ty`, we can only
+                            // conclude that `element | ty` must be `object` (object has no other
+                            // supertypes). This means we can simplify the whole union to just
+                            // `object`, since all other potential elements would also be subtypes of
+                            // `object`.
+                            self.collapse_to_object();
+                            return;
+                        }
                     }
                 }
                 if let Some((&first, rest)) = to_remove.split_first() {
@@ -503,6 +552,9 @@ impl<'db> UnionBuilder<'db> {
                 }
                 UnionElement::Type(ty) => types.push(ty),
             }
+        }
+        if self.order_elements {
+            types.sort_unstable_by(|l, r| union_or_intersection_elements_ordering(self.db, l, r));
         }
         match types.len() {
             0 => None,
@@ -541,11 +593,27 @@ impl<'db> IntersectionBuilder<'db> {
         }
     }
 
-    pub(crate) fn add_positive(mut self, ty: Type<'db>) -> Self {
+    pub(crate) fn add_positive(self, ty: Type<'db>) -> Self {
+        self.add_positive_impl(ty, &mut vec![])
+    }
+
+    pub(crate) fn add_positive_impl(
+        mut self,
+        ty: Type<'db>,
+        seen_aliases: &mut Vec<Type<'db>>,
+    ) -> Self {
         match ty {
             Type::TypeAlias(alias) => {
+                if seen_aliases.contains(&ty) {
+                    // Recursive alias, add it without expanding to avoid infinite recursion.
+                    for inner in &mut self.intersections {
+                        inner.positive.insert(ty);
+                    }
+                    return self;
+                }
+                seen_aliases.push(ty);
                 let value_type = alias.value_type(self.db);
-                self.add_positive(value_type)
+                self.add_positive_impl(value_type, seen_aliases)
             }
             Type::Union(union) => {
                 // Distribute ourself over this union: for each union element, clone ourself and
@@ -559,7 +627,7 @@ impl<'db> IntersectionBuilder<'db> {
                 union
                     .elements(self.db)
                     .iter()
-                    .map(|elem| self.clone().add_positive(*elem))
+                    .map(|elem| self.clone().add_positive_impl(*elem, seen_aliases))
                     .fold(IntersectionBuilder::empty(self.db), |mut builder, sub| {
                         builder.intersections.extend(sub.intersections);
                         builder
@@ -569,10 +637,10 @@ impl<'db> IntersectionBuilder<'db> {
             Type::Intersection(other) => {
                 let db = self.db;
                 for pos in other.positive(db) {
-                    self = self.add_positive(*pos);
+                    self = self.add_positive_impl(*pos, seen_aliases);
                 }
                 for neg in other.negative(db) {
-                    self = self.add_negative(*neg);
+                    self = self.add_negative_impl(*neg, seen_aliases);
                 }
                 self
             }
@@ -600,12 +668,15 @@ impl<'db> IntersectionBuilder<'db> {
                     // `UnionBuilder` because we would simplify the union to just the enum instance
                     // and end up in this branch again.
                     let db = self.db;
-                    self.add_positive(Type::Union(UnionType::new(
-                        db,
-                        enum_member_literals(db, instance.class(db).class_literal(db).0, None)
-                            .expect("Calling `enum_member_literals` on an enum class")
-                            .collect::<Box<[_]>>(),
-                    )))
+                    self.add_positive_impl(
+                        Type::Union(UnionType::new(
+                            db,
+                            enum_member_literals(db, instance.class(db).class_literal(db).0, None)
+                                .expect("Calling `enum_member_literals` on an enum class")
+                                .collect::<Box<[_]>>(),
+                        )),
+                        seen_aliases,
+                    )
                 } else {
                     for inner in &mut self.intersections {
                         inner.add_positive(self.db, ty);
@@ -624,7 +695,15 @@ impl<'db> IntersectionBuilder<'db> {
         }
     }
 
-    pub(crate) fn add_negative(mut self, ty: Type<'db>) -> Self {
+    pub(crate) fn add_negative(self, ty: Type<'db>) -> Self {
+        self.add_negative_impl(ty, &mut vec![])
+    }
+
+    pub(crate) fn add_negative_impl(
+        mut self,
+        ty: Type<'db>,
+        seen_aliases: &mut Vec<Type<'db>>,
+    ) -> Self {
         let contains_enum = |enum_instance| {
             self.intersections
                 .iter()
@@ -635,12 +714,20 @@ impl<'db> IntersectionBuilder<'db> {
         // See comments above in `add_positive`; this is just the negated version.
         match ty {
             Type::TypeAlias(alias) => {
+                if seen_aliases.contains(&ty) {
+                    // Recursive alias, add it without expanding to avoid infinite recursion.
+                    for inner in &mut self.intersections {
+                        inner.negative.insert(ty);
+                    }
+                    return self;
+                }
+                seen_aliases.push(ty);
                 let value_type = alias.value_type(self.db);
-                self.add_negative(value_type)
+                self.add_negative_impl(value_type, seen_aliases)
             }
             Type::Union(union) => {
                 for elem in union.elements(self.db) {
-                    self = self.add_negative(*elem);
+                    self = self.add_negative_impl(*elem, seen_aliases);
                 }
                 self
             }
@@ -656,13 +743,19 @@ impl<'db> IntersectionBuilder<'db> {
                     .positive(self.db)
                     .iter()
                     // we negate all the positive constraints while distributing
-                    .map(|elem| self.clone().add_negative(*elem));
+                    .map(|elem| {
+                        self.clone()
+                            .add_negative_impl(*elem, &mut seen_aliases.clone())
+                    });
 
                 let negative_side = intersection
                     .negative(self.db)
                     .iter()
                     // all negative constraints end up becoming positive constraints
-                    .map(|elem| self.clone().add_positive(*elem));
+                    .map(|elem| {
+                        self.clone()
+                            .add_positive_impl(*elem, &mut seen_aliases.clone())
+                    });
 
                 positive_side.chain(negative_side).fold(
                     IntersectionBuilder::empty(self.db),
@@ -676,15 +769,18 @@ impl<'db> IntersectionBuilder<'db> {
                 if contains_enum(enum_literal.enum_class_instance(self.db)) =>
             {
                 let db = self.db;
-                self.add_positive(UnionType::from_elements(
-                    db,
-                    enum_member_literals(
+                self.add_positive_impl(
+                    UnionType::from_elements(
                         db,
-                        enum_literal.enum_class(db),
-                        Some(enum_literal.name(db)),
-                    )
-                    .expect("Calling `enum_member_literals` on an enum class"),
-                ))
+                        enum_member_literals(
+                            db,
+                            enum_literal.enum_class(db),
+                            Some(enum_literal.name(db)),
+                        )
+                        .expect("Calling `enum_member_literals` on an enum class"),
+                    ),
+                    seen_aliases,
+                )
             }
             _ => {
                 for inner in &mut self.intersections {
@@ -702,17 +798,6 @@ impl<'db> IntersectionBuilder<'db> {
     {
         for element in elements {
             self = self.add_positive(element.into());
-        }
-        self
-    }
-
-    pub(crate) fn negative_elements<I, T>(mut self, elements: I) -> Self
-    where
-        I: IntoIterator<Item = T>,
-        T: Into<Type<'db>>,
-    {
-        for element in elements {
-            self = self.add_negative(element.into());
         }
         self
     }
@@ -983,7 +1068,8 @@ impl<'db> InnerIntersectionBuilder<'db> {
         let mut positive_to_remove = SmallVec::<[usize; 1]>::new();
 
         for (typevar_index, ty) in self.positive.iter().enumerate() {
-            let Type::TypeVar(bound_typevar) = ty else {
+            let (Type::NonInferableTypeVar(bound_typevar) | Type::TypeVar(bound_typevar)) = ty
+            else {
                 continue;
             };
             let Some(TypeVarBoundOrConstraints::Constraints(constraints)) =

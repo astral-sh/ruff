@@ -30,7 +30,7 @@ error[invalid-argument-type]: Argument to bound method `__call__` is incorrect
 6 | c("wrong")  # error: [invalid-argument-type]
   |   ^^^^^^^ Expected `int`, found `Literal["wrong"]`
   |
-info: Function defined here
+info: Method defined here
  --> src/mdtest_snippet.py:2:9
   |
 1 | class C:

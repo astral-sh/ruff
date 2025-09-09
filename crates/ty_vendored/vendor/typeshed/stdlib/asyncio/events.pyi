@@ -13,7 +13,7 @@ from abc import ABCMeta, abstractmethod
 from collections.abc import Callable, Sequence
 from concurrent.futures import Executor
 from contextvars import Context
-from socket import AddressFamily, SocketKind, _Address, _RetAddress, socket
+from socket import AddressFamily, AddressInfo, SocketKind, _Address, _RetAddress, socket
 from typing import IO, Any, Literal, Protocol, TypeVar, overload, type_check_only
 from typing_extensions import Self, TypeAlias, TypeVarTuple, Unpack, deprecated
 
@@ -77,6 +77,7 @@ class _TaskFactory(Protocol):
 class Handle:
     """Object returned by callback registration methods."""
 
+    __slots__ = ("_callback", "_args", "_cancelled", "_loop", "_source_traceback", "_repr", "__weakref__", "_context")
     _cancelled: bool
     _args: Sequence[Any]
     def __init__(
@@ -91,6 +92,7 @@ class Handle:
 class TimerHandle(Handle):
     """Object returned by timed callback registration methods."""
 
+    __slots__ = ["_scheduled", "_when"]
     def __init__(
         self,
         when: float,
@@ -350,8 +352,8 @@ class AbstractEventLoop:
             host: str | Sequence[str] | None = None,
             port: int = ...,
             *,
-            family: int = ...,
-            flags: int = ...,
+            family: int = AddressFamily.AF_UNSPEC,
+            flags: int = AddressInfo.AI_PASSIVE,
             sock: None = None,
             backlog: int = 100,
             ssl: _SSLContext = None,
@@ -422,8 +424,8 @@ class AbstractEventLoop:
             host: None = None,
             port: None = None,
             *,
-            family: int = ...,
-            flags: int = ...,
+            family: int = AddressFamily.AF_UNSPEC,
+            flags: int = AddressInfo.AI_PASSIVE,
             sock: socket = ...,
             backlog: int = 100,
             ssl: _SSLContext = None,
@@ -443,8 +445,8 @@ class AbstractEventLoop:
             host: str | Sequence[str] | None = None,
             port: int = ...,
             *,
-            family: int = ...,
-            flags: int = ...,
+            family: int = AddressFamily.AF_UNSPEC,
+            flags: int = AddressInfo.AI_PASSIVE,
             sock: None = None,
             backlog: int = 100,
             ssl: _SSLContext = None,
@@ -511,8 +513,8 @@ class AbstractEventLoop:
             host: None = None,
             port: None = None,
             *,
-            family: int = ...,
-            flags: int = ...,
+            family: int = AddressFamily.AF_UNSPEC,
+            flags: int = AddressInfo.AI_PASSIVE,
             sock: socket = ...,
             backlog: int = 100,
             ssl: _SSLContext = None,
@@ -531,8 +533,8 @@ class AbstractEventLoop:
             host: str | Sequence[str] | None = None,
             port: int = ...,
             *,
-            family: int = ...,
-            flags: int = ...,
+            family: int = AddressFamily.AF_UNSPEC,
+            flags: int = AddressInfo.AI_PASSIVE,
             sock: None = None,
             backlog: int = 100,
             ssl: _SSLContext = None,
@@ -594,8 +596,8 @@ class AbstractEventLoop:
             host: None = None,
             port: None = None,
             *,
-            family: int = ...,
-            flags: int = ...,
+            family: int = AddressFamily.AF_UNSPEC,
+            flags: int = AddressInfo.AI_PASSIVE,
             sock: socket = ...,
             backlog: int = 100,
             ssl: _SSLContext = None,
@@ -870,7 +872,7 @@ class AbstractEventLoop:
         bufsize: Literal[0] = 0,
         encoding: None = None,
         errors: None = None,
-        text: Literal[False] | None = ...,
+        text: Literal[False] | None = None,
         **kwargs: Any,
     ) -> tuple[SubprocessTransport, _ProtocolT]: ...
     @abstractmethod
@@ -968,10 +970,10 @@ class _AbstractEventLoopPolicy:
     if sys.version_info < (3, 14):
         if sys.version_info >= (3, 12):
             @abstractmethod
-            @deprecated("Deprecated as of Python 3.12; will be removed in Python 3.14")
+            @deprecated("Deprecated since Python 3.12; removed in Python 3.14.")
             def get_child_watcher(self) -> AbstractChildWatcher: ...
             @abstractmethod
-            @deprecated("Deprecated as of Python 3.12; will be removed in Python 3.14")
+            @deprecated("Deprecated since Python 3.12; removed in Python 3.14.")
             def set_child_watcher(self, watcher: AbstractChildWatcher) -> None: ...
         else:
             @abstractmethod
@@ -1052,9 +1054,9 @@ if sys.version_info >= (3, 14):
         If policy is None, the default policy is restored.
         """
 
-    @deprecated("Deprecated as of Python 3.14; will be removed in Python 3.16")
+    @deprecated("Deprecated since Python 3.14; will be removed in Python 3.16.")
     def get_event_loop_policy() -> _AbstractEventLoopPolicy: ...
-    @deprecated("Deprecated as of Python 3.14; will be removed in Python 3.16")
+    @deprecated("Deprecated since Python 3.14; will be removed in Python 3.16.")
     def set_event_loop_policy(policy: _AbstractEventLoopPolicy | None) -> None: ...
 
 else:
@@ -1075,11 +1077,11 @@ def new_event_loop() -> AbstractEventLoop:
 
 if sys.version_info < (3, 14):
     if sys.version_info >= (3, 12):
-        @deprecated("Deprecated as of Python 3.12; will be removed in Python 3.14")
+        @deprecated("Deprecated since Python 3.12; removed in Python 3.14.")
         def get_child_watcher() -> AbstractChildWatcher:
             """Equivalent to calling get_event_loop_policy().get_child_watcher()."""
 
-        @deprecated("Deprecated as of Python 3.12; will be removed in Python 3.14")
+        @deprecated("Deprecated since Python 3.12; removed in Python 3.14.")
         def set_child_watcher(watcher: AbstractChildWatcher) -> None:
             """Equivalent to calling
             get_event_loop_policy().set_child_watcher(watcher).

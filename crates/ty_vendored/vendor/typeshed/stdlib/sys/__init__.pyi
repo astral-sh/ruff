@@ -552,7 +552,7 @@ def call_tracing(func: Callable[..., _T], args: Any, /) -> _T:
     """
 
 if sys.version_info >= (3, 13):
-    @deprecated("Deprecated in Python 3.13; use _clear_internal_caches() instead.")
+    @deprecated("Deprecated since Python 3.13. Use `_clear_internal_caches()` instead.")
     def _clear_type_cache() -> None:
         """Clear the internal type lookup cache."""
 

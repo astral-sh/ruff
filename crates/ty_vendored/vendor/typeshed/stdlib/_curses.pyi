@@ -1,7 +1,7 @@
 import sys
 from _typeshed import ReadOnlyBuffer, SupportsRead, SupportsWrite
 from curses import _ncurses_version
-from typing import Any, final, overload
+from typing import Any, Final, final, overload
 from typing_extensions import TypeAlias
 
 # NOTE: This module is ordinarily only available on Unix, but the windows-curses
@@ -11,270 +11,270 @@ from typing_extensions import TypeAlias
 _ChType: TypeAlias = str | bytes | int
 
 # ACS codes are only initialized after initscr is called
-ACS_BBSS: int
-ACS_BLOCK: int
-ACS_BOARD: int
-ACS_BSBS: int
-ACS_BSSB: int
-ACS_BSSS: int
-ACS_BTEE: int
-ACS_BULLET: int
-ACS_CKBOARD: int
-ACS_DARROW: int
-ACS_DEGREE: int
-ACS_DIAMOND: int
-ACS_GEQUAL: int
-ACS_HLINE: int
-ACS_LANTERN: int
-ACS_LARROW: int
-ACS_LEQUAL: int
-ACS_LLCORNER: int
-ACS_LRCORNER: int
-ACS_LTEE: int
-ACS_NEQUAL: int
-ACS_PI: int
-ACS_PLMINUS: int
-ACS_PLUS: int
-ACS_RARROW: int
-ACS_RTEE: int
-ACS_S1: int
-ACS_S3: int
-ACS_S7: int
-ACS_S9: int
-ACS_SBBS: int
-ACS_SBSB: int
-ACS_SBSS: int
-ACS_SSBB: int
-ACS_SSBS: int
-ACS_SSSB: int
-ACS_SSSS: int
-ACS_STERLING: int
-ACS_TTEE: int
-ACS_UARROW: int
-ACS_ULCORNER: int
-ACS_URCORNER: int
-ACS_VLINE: int
-ALL_MOUSE_EVENTS: int
-A_ALTCHARSET: int
-A_ATTRIBUTES: int
-A_BLINK: int
-A_BOLD: int
-A_CHARTEXT: int
-A_COLOR: int
-A_DIM: int
-A_HORIZONTAL: int
-A_INVIS: int
-A_ITALIC: int
-A_LEFT: int
-A_LOW: int
-A_NORMAL: int
-A_PROTECT: int
-A_REVERSE: int
-A_RIGHT: int
-A_STANDOUT: int
-A_TOP: int
-A_UNDERLINE: int
-A_VERTICAL: int
-BUTTON1_CLICKED: int
-BUTTON1_DOUBLE_CLICKED: int
-BUTTON1_PRESSED: int
-BUTTON1_RELEASED: int
-BUTTON1_TRIPLE_CLICKED: int
-BUTTON2_CLICKED: int
-BUTTON2_DOUBLE_CLICKED: int
-BUTTON2_PRESSED: int
-BUTTON2_RELEASED: int
-BUTTON2_TRIPLE_CLICKED: int
-BUTTON3_CLICKED: int
-BUTTON3_DOUBLE_CLICKED: int
-BUTTON3_PRESSED: int
-BUTTON3_RELEASED: int
-BUTTON3_TRIPLE_CLICKED: int
-BUTTON4_CLICKED: int
-BUTTON4_DOUBLE_CLICKED: int
-BUTTON4_PRESSED: int
-BUTTON4_RELEASED: int
-BUTTON4_TRIPLE_CLICKED: int
+ACS_BBSS: Final[int]
+ACS_BLOCK: Final[int]
+ACS_BOARD: Final[int]
+ACS_BSBS: Final[int]
+ACS_BSSB: Final[int]
+ACS_BSSS: Final[int]
+ACS_BTEE: Final[int]
+ACS_BULLET: Final[int]
+ACS_CKBOARD: Final[int]
+ACS_DARROW: Final[int]
+ACS_DEGREE: Final[int]
+ACS_DIAMOND: Final[int]
+ACS_GEQUAL: Final[int]
+ACS_HLINE: Final[int]
+ACS_LANTERN: Final[int]
+ACS_LARROW: Final[int]
+ACS_LEQUAL: Final[int]
+ACS_LLCORNER: Final[int]
+ACS_LRCORNER: Final[int]
+ACS_LTEE: Final[int]
+ACS_NEQUAL: Final[int]
+ACS_PI: Final[int]
+ACS_PLMINUS: Final[int]
+ACS_PLUS: Final[int]
+ACS_RARROW: Final[int]
+ACS_RTEE: Final[int]
+ACS_S1: Final[int]
+ACS_S3: Final[int]
+ACS_S7: Final[int]
+ACS_S9: Final[int]
+ACS_SBBS: Final[int]
+ACS_SBSB: Final[int]
+ACS_SBSS: Final[int]
+ACS_SSBB: Final[int]
+ACS_SSBS: Final[int]
+ACS_SSSB: Final[int]
+ACS_SSSS: Final[int]
+ACS_STERLING: Final[int]
+ACS_TTEE: Final[int]
+ACS_UARROW: Final[int]
+ACS_ULCORNER: Final[int]
+ACS_URCORNER: Final[int]
+ACS_VLINE: Final[int]
+ALL_MOUSE_EVENTS: Final[int]
+A_ALTCHARSET: Final[int]
+A_ATTRIBUTES: Final[int]
+A_BLINK: Final[int]
+A_BOLD: Final[int]
+A_CHARTEXT: Final[int]
+A_COLOR: Final[int]
+A_DIM: Final[int]
+A_HORIZONTAL: Final[int]
+A_INVIS: Final[int]
+A_ITALIC: Final[int]
+A_LEFT: Final[int]
+A_LOW: Final[int]
+A_NORMAL: Final[int]
+A_PROTECT: Final[int]
+A_REVERSE: Final[int]
+A_RIGHT: Final[int]
+A_STANDOUT: Final[int]
+A_TOP: Final[int]
+A_UNDERLINE: Final[int]
+A_VERTICAL: Final[int]
+BUTTON1_CLICKED: Final[int]
+BUTTON1_DOUBLE_CLICKED: Final[int]
+BUTTON1_PRESSED: Final[int]
+BUTTON1_RELEASED: Final[int]
+BUTTON1_TRIPLE_CLICKED: Final[int]
+BUTTON2_CLICKED: Final[int]
+BUTTON2_DOUBLE_CLICKED: Final[int]
+BUTTON2_PRESSED: Final[int]
+BUTTON2_RELEASED: Final[int]
+BUTTON2_TRIPLE_CLICKED: Final[int]
+BUTTON3_CLICKED: Final[int]
+BUTTON3_DOUBLE_CLICKED: Final[int]
+BUTTON3_PRESSED: Final[int]
+BUTTON3_RELEASED: Final[int]
+BUTTON3_TRIPLE_CLICKED: Final[int]
+BUTTON4_CLICKED: Final[int]
+BUTTON4_DOUBLE_CLICKED: Final[int]
+BUTTON4_PRESSED: Final[int]
+BUTTON4_RELEASED: Final[int]
+BUTTON4_TRIPLE_CLICKED: Final[int]
 # Darwin ncurses doesn't provide BUTTON5_* constants prior to 3.12.10 and 3.13.3
 if sys.version_info >= (3, 10):
     if sys.version_info >= (3, 12) or sys.platform != "darwin":
-        BUTTON5_PRESSED: int
-        BUTTON5_RELEASED: int
-        BUTTON5_CLICKED: int
-        BUTTON5_DOUBLE_CLICKED: int
-        BUTTON5_TRIPLE_CLICKED: int
-BUTTON_ALT: int
-BUTTON_CTRL: int
-BUTTON_SHIFT: int
-COLOR_BLACK: int
-COLOR_BLUE: int
-COLOR_CYAN: int
-COLOR_GREEN: int
-COLOR_MAGENTA: int
-COLOR_RED: int
-COLOR_WHITE: int
-COLOR_YELLOW: int
-ERR: int
-KEY_A1: int
-KEY_A3: int
-KEY_B2: int
-KEY_BACKSPACE: int
-KEY_BEG: int
-KEY_BREAK: int
-KEY_BTAB: int
-KEY_C1: int
-KEY_C3: int
-KEY_CANCEL: int
-KEY_CATAB: int
-KEY_CLEAR: int
-KEY_CLOSE: int
-KEY_COMMAND: int
-KEY_COPY: int
-KEY_CREATE: int
-KEY_CTAB: int
-KEY_DC: int
-KEY_DL: int
-KEY_DOWN: int
-KEY_EIC: int
-KEY_END: int
-KEY_ENTER: int
-KEY_EOL: int
-KEY_EOS: int
-KEY_EXIT: int
-KEY_F0: int
-KEY_F1: int
-KEY_F10: int
-KEY_F11: int
-KEY_F12: int
-KEY_F13: int
-KEY_F14: int
-KEY_F15: int
-KEY_F16: int
-KEY_F17: int
-KEY_F18: int
-KEY_F19: int
-KEY_F2: int
-KEY_F20: int
-KEY_F21: int
-KEY_F22: int
-KEY_F23: int
-KEY_F24: int
-KEY_F25: int
-KEY_F26: int
-KEY_F27: int
-KEY_F28: int
-KEY_F29: int
-KEY_F3: int
-KEY_F30: int
-KEY_F31: int
-KEY_F32: int
-KEY_F33: int
-KEY_F34: int
-KEY_F35: int
-KEY_F36: int
-KEY_F37: int
-KEY_F38: int
-KEY_F39: int
-KEY_F4: int
-KEY_F40: int
-KEY_F41: int
-KEY_F42: int
-KEY_F43: int
-KEY_F44: int
-KEY_F45: int
-KEY_F46: int
-KEY_F47: int
-KEY_F48: int
-KEY_F49: int
-KEY_F5: int
-KEY_F50: int
-KEY_F51: int
-KEY_F52: int
-KEY_F53: int
-KEY_F54: int
-KEY_F55: int
-KEY_F56: int
-KEY_F57: int
-KEY_F58: int
-KEY_F59: int
-KEY_F6: int
-KEY_F60: int
-KEY_F61: int
-KEY_F62: int
-KEY_F63: int
-KEY_F7: int
-KEY_F8: int
-KEY_F9: int
-KEY_FIND: int
-KEY_HELP: int
-KEY_HOME: int
-KEY_IC: int
-KEY_IL: int
-KEY_LEFT: int
-KEY_LL: int
-KEY_MARK: int
-KEY_MAX: int
-KEY_MESSAGE: int
-KEY_MIN: int
-KEY_MOUSE: int
-KEY_MOVE: int
-KEY_NEXT: int
-KEY_NPAGE: int
-KEY_OPEN: int
-KEY_OPTIONS: int
-KEY_PPAGE: int
-KEY_PREVIOUS: int
-KEY_PRINT: int
-KEY_REDO: int
-KEY_REFERENCE: int
-KEY_REFRESH: int
-KEY_REPLACE: int
-KEY_RESET: int
-KEY_RESIZE: int
-KEY_RESTART: int
-KEY_RESUME: int
-KEY_RIGHT: int
-KEY_SAVE: int
-KEY_SBEG: int
-KEY_SCANCEL: int
-KEY_SCOMMAND: int
-KEY_SCOPY: int
-KEY_SCREATE: int
-KEY_SDC: int
-KEY_SDL: int
-KEY_SELECT: int
-KEY_SEND: int
-KEY_SEOL: int
-KEY_SEXIT: int
-KEY_SF: int
-KEY_SFIND: int
-KEY_SHELP: int
-KEY_SHOME: int
-KEY_SIC: int
-KEY_SLEFT: int
-KEY_SMESSAGE: int
-KEY_SMOVE: int
-KEY_SNEXT: int
-KEY_SOPTIONS: int
-KEY_SPREVIOUS: int
-KEY_SPRINT: int
-KEY_SR: int
-KEY_SREDO: int
-KEY_SREPLACE: int
-KEY_SRESET: int
-KEY_SRIGHT: int
-KEY_SRSUME: int
-KEY_SSAVE: int
-KEY_SSUSPEND: int
-KEY_STAB: int
-KEY_SUNDO: int
-KEY_SUSPEND: int
-KEY_UNDO: int
-KEY_UP: int
-OK: int
-REPORT_MOUSE_POSITION: int
+        BUTTON5_PRESSED: Final[int]
+        BUTTON5_RELEASED: Final[int]
+        BUTTON5_CLICKED: Final[int]
+        BUTTON5_DOUBLE_CLICKED: Final[int]
+        BUTTON5_TRIPLE_CLICKED: Final[int]
+BUTTON_ALT: Final[int]
+BUTTON_CTRL: Final[int]
+BUTTON_SHIFT: Final[int]
+COLOR_BLACK: Final[int]
+COLOR_BLUE: Final[int]
+COLOR_CYAN: Final[int]
+COLOR_GREEN: Final[int]
+COLOR_MAGENTA: Final[int]
+COLOR_RED: Final[int]
+COLOR_WHITE: Final[int]
+COLOR_YELLOW: Final[int]
+ERR: Final[int]
+KEY_A1: Final[int]
+KEY_A3: Final[int]
+KEY_B2: Final[int]
+KEY_BACKSPACE: Final[int]
+KEY_BEG: Final[int]
+KEY_BREAK: Final[int]
+KEY_BTAB: Final[int]
+KEY_C1: Final[int]
+KEY_C3: Final[int]
+KEY_CANCEL: Final[int]
+KEY_CATAB: Final[int]
+KEY_CLEAR: Final[int]
+KEY_CLOSE: Final[int]
+KEY_COMMAND: Final[int]
+KEY_COPY: Final[int]
+KEY_CREATE: Final[int]
+KEY_CTAB: Final[int]
+KEY_DC: Final[int]
+KEY_DL: Final[int]
+KEY_DOWN: Final[int]
+KEY_EIC: Final[int]
+KEY_END: Final[int]
+KEY_ENTER: Final[int]
+KEY_EOL: Final[int]
+KEY_EOS: Final[int]
+KEY_EXIT: Final[int]
+KEY_F0: Final[int]
+KEY_F1: Final[int]
+KEY_F10: Final[int]
+KEY_F11: Final[int]
+KEY_F12: Final[int]
+KEY_F13: Final[int]
+KEY_F14: Final[int]
+KEY_F15: Final[int]
+KEY_F16: Final[int]
+KEY_F17: Final[int]
+KEY_F18: Final[int]
+KEY_F19: Final[int]
+KEY_F2: Final[int]
+KEY_F20: Final[int]
+KEY_F21: Final[int]
+KEY_F22: Final[int]
+KEY_F23: Final[int]
+KEY_F24: Final[int]
+KEY_F25: Final[int]
+KEY_F26: Final[int]
+KEY_F27: Final[int]
+KEY_F28: Final[int]
+KEY_F29: Final[int]
+KEY_F3: Final[int]
+KEY_F30: Final[int]
+KEY_F31: Final[int]
+KEY_F32: Final[int]
+KEY_F33: Final[int]
+KEY_F34: Final[int]
+KEY_F35: Final[int]
+KEY_F36: Final[int]
+KEY_F37: Final[int]
+KEY_F38: Final[int]
+KEY_F39: Final[int]
+KEY_F4: Final[int]
+KEY_F40: Final[int]
+KEY_F41: Final[int]
+KEY_F42: Final[int]
+KEY_F43: Final[int]
+KEY_F44: Final[int]
+KEY_F45: Final[int]
+KEY_F46: Final[int]
+KEY_F47: Final[int]
+KEY_F48: Final[int]
+KEY_F49: Final[int]
+KEY_F5: Final[int]
+KEY_F50: Final[int]
+KEY_F51: Final[int]
+KEY_F52: Final[int]
+KEY_F53: Final[int]
+KEY_F54: Final[int]
+KEY_F55: Final[int]
+KEY_F56: Final[int]
+KEY_F57: Final[int]
+KEY_F58: Final[int]
+KEY_F59: Final[int]
+KEY_F6: Final[int]
+KEY_F60: Final[int]
+KEY_F61: Final[int]
+KEY_F62: Final[int]
+KEY_F63: Final[int]
+KEY_F7: Final[int]
+KEY_F8: Final[int]
+KEY_F9: Final[int]
+KEY_FIND: Final[int]
+KEY_HELP: Final[int]
+KEY_HOME: Final[int]
+KEY_IC: Final[int]
+KEY_IL: Final[int]
+KEY_LEFT: Final[int]
+KEY_LL: Final[int]
+KEY_MARK: Final[int]
+KEY_MAX: Final[int]
+KEY_MESSAGE: Final[int]
+KEY_MIN: Final[int]
+KEY_MOUSE: Final[int]
+KEY_MOVE: Final[int]
+KEY_NEXT: Final[int]
+KEY_NPAGE: Final[int]
+KEY_OPEN: Final[int]
+KEY_OPTIONS: Final[int]
+KEY_PPAGE: Final[int]
+KEY_PREVIOUS: Final[int]
+KEY_PRINT: Final[int]
+KEY_REDO: Final[int]
+KEY_REFERENCE: Final[int]
+KEY_REFRESH: Final[int]
+KEY_REPLACE: Final[int]
+KEY_RESET: Final[int]
+KEY_RESIZE: Final[int]
+KEY_RESTART: Final[int]
+KEY_RESUME: Final[int]
+KEY_RIGHT: Final[int]
+KEY_SAVE: Final[int]
+KEY_SBEG: Final[int]
+KEY_SCANCEL: Final[int]
+KEY_SCOMMAND: Final[int]
+KEY_SCOPY: Final[int]
+KEY_SCREATE: Final[int]
+KEY_SDC: Final[int]
+KEY_SDL: Final[int]
+KEY_SELECT: Final[int]
+KEY_SEND: Final[int]
+KEY_SEOL: Final[int]
+KEY_SEXIT: Final[int]
+KEY_SF: Final[int]
+KEY_SFIND: Final[int]
+KEY_SHELP: Final[int]
+KEY_SHOME: Final[int]
+KEY_SIC: Final[int]
+KEY_SLEFT: Final[int]
+KEY_SMESSAGE: Final[int]
+KEY_SMOVE: Final[int]
+KEY_SNEXT: Final[int]
+KEY_SOPTIONS: Final[int]
+KEY_SPREVIOUS: Final[int]
+KEY_SPRINT: Final[int]
+KEY_SR: Final[int]
+KEY_SREDO: Final[int]
+KEY_SREPLACE: Final[int]
+KEY_SRESET: Final[int]
+KEY_SRIGHT: Final[int]
+KEY_SRSUME: Final[int]
+KEY_SSAVE: Final[int]
+KEY_SSUSPEND: Final[int]
+KEY_STAB: Final[int]
+KEY_SUNDO: Final[int]
+KEY_SUSPEND: Final[int]
+KEY_UNDO: Final[int]
+KEY_UP: Final[int]
+OK: Final[int]
+REPORT_MOUSE_POSITION: Final[int]
 _C_API: Any
-version: bytes
+version: Final[bytes]
 
 def baudrate() -> int:
     """Return the output speed of the terminal in bits per second."""
@@ -573,7 +573,7 @@ def newpad(nlines: int, ncols: int, /) -> window:
       Width.
     """
 
-def newwin(nlines: int, ncols: int, begin_y: int = ..., begin_x: int = ..., /) -> window:
+def newwin(nlines: int, ncols: int, begin_y: int = 0, begin_x: int = 0, /) -> window:
     """newwin(nlines, ncols, [begin_y=0, begin_x=0])
     Return a new window.
 
@@ -947,7 +947,7 @@ class window:  # undocumented
     def attrset(self, attr: int, /) -> None:
         """Set the "background" set of attributes."""
 
-    def bkgd(self, ch: _ChType, attr: int = ..., /) -> None:
+    def bkgd(self, ch: _ChType, attr: int = 0, /) -> None:
         """Set the background property of the window.
 
         ch
@@ -956,7 +956,7 @@ class window:  # undocumented
           Background attributes.
         """
 
-    def bkgdset(self, ch: _ChType, attr: int = ..., /) -> None:
+    def bkgdset(self, ch: _ChType, attr: int = 0, /) -> None:
         """Set the window's background.
 
         ch
@@ -1016,7 +1016,7 @@ class window:  # undocumented
         """
 
     @overload
-    def box(self, vertch: _ChType = ..., horch: _ChType = ...) -> None: ...
+    def box(self, vertch: _ChType = 0, horch: _ChType = 0) -> None: ...
     @overload
     def chgat(self, attr: int) -> None:
         """chgat([y, x,] [n=-1,] attr)
@@ -1085,7 +1085,7 @@ class window:  # undocumented
 
     @overload
     def derwin(self, nlines: int, ncols: int, begin_y: int, begin_x: int) -> window: ...
-    def echochar(self, ch: _ChType, attr: int = ..., /) -> None:
+    def echochar(self, ch: _ChType, attr: int = 0, /) -> None:
         """Add character ch with attribute attr, and refresh.
 
         ch
@@ -1289,7 +1289,7 @@ class window:  # undocumented
     @overload
     def insstr(self, y: int, x: int, str: str, attr: int = ...) -> None: ...
     @overload
-    def instr(self, n: int = ...) -> bytes:
+    def instr(self, n: int = 2047) -> bytes:
         """instr([y, x,] n=2047)
         Return a string of characters, extracted from the window.
 
@@ -1307,7 +1307,7 @@ class window:  # undocumented
         """
 
     @overload
-    def instr(self, y: int, x: int, n: int = ...) -> bytes: ...
+    def instr(self, y: int, x: int, n: int = 2047) -> bytes: ...
     def is_linetouched(self, line: int, /) -> bool:
         """Return True if the specified line was modified, otherwise return False.
 
@@ -1415,7 +1415,7 @@ class window:  # undocumented
     @overload
     def refresh(self, pminrow: int, pmincol: int, sminrow: int, smincol: int, smaxrow: int, smaxcol: int) -> None: ...
     def resize(self, nlines: int, ncols: int) -> None: ...
-    def scroll(self, lines: int = ...) -> None:
+    def scroll(self, lines: int = 1) -> None:
         """scroll([lines=1])
         Scroll the screen or scrolling region.
 
@@ -1483,7 +1483,7 @@ class window:  # undocumented
     def syncok(self, flag: bool) -> None: ...
     def syncup(self) -> None: ...
     def timeout(self, delay: int) -> None: ...
-    def touchline(self, start: int, count: int, changed: bool = ...) -> None:
+    def touchline(self, start: int, count: int, changed: bool = True) -> None:
         """touchline(start, count, [changed=True])
         Pretend count lines have been changed, starting with line start.
 

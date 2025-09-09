@@ -12,16 +12,14 @@ B014 [*] Exception handler with duplicate exception: `OSError`
 19 |     pass
    |
 help: De-duplicate exceptions
-
-ℹ Safe fix
-14 14 | 
-15 15 | try:
-16 16 |     pass
-17    |-except (OSError, OSError) as err:
-   17 |+except OSError as err:
-18 18 |     # Duplicate exception types are useless
-19 19 |     pass
-20 20 | 
+14 | 
+15 | try:
+16 |     pass
+   - except (OSError, OSError) as err:
+17 + except OSError as err:
+18 |     # Duplicate exception types are useless
+19 |     pass
+20 | 
 
 B014 [*] Exception handler with duplicate exception: `MyError`
   --> B014.py:28:8
@@ -34,16 +32,14 @@ B014 [*] Exception handler with duplicate exception: `MyError`
 30 |     pass
    |
 help: De-duplicate exceptions
-
-ℹ Safe fix
-25 25 | 
-26 26 | try:
-27 27 |     pass
-28    |-except (MyError, MyError):
-   28 |+except MyError:
-29 29 |     # Detect duplicate non-builtin errors
-30 30 |     pass
-31 31 | 
+25 | 
+26 | try:
+27 |     pass
+   - except (MyError, MyError):
+28 + except MyError:
+29 |     # Detect duplicate non-builtin errors
+30 |     pass
+31 | 
 
 B014 [*] Exception handler with duplicate exception: `re.error`
   --> B014.py:49:8
@@ -56,16 +52,14 @@ B014 [*] Exception handler with duplicate exception: `re.error`
 51 |     pass
    |
 help: De-duplicate exceptions
-
-ℹ Safe fix
-46 46 | 
-47 47 | try:
-48 48 |     pass
-49    |-except (re.error, re.error):
-   49 |+except re.error:
-50 50 |     # Duplicate exception types as attributes
-51 51 |     pass
-52 52 | 
+46 | 
+47 | try:
+48 |     pass
+   - except (re.error, re.error):
+49 + except re.error:
+50 |     # Duplicate exception types as attributes
+51 |     pass
+52 | 
 
 B014 [*] Exception handler with duplicate exception: `ValueError`
   --> B014.py:82:8
@@ -77,16 +71,14 @@ B014 [*] Exception handler with duplicate exception: `ValueError`
 83 |     pass
    |
 help: De-duplicate exceptions
-
-ℹ Safe fix
-79 79 | # Regression test for: https://github.com/astral-sh/ruff/issues/6412
-80 80 | try:
-81 81 |     pass
-82    |-except (ValueError, ValueError, TypeError):
-   82 |+except (ValueError, TypeError):
-83 83 |     pass
-84 84 | 
-85 85 | 
+79 | # Regression test for: https://github.com/astral-sh/ruff/issues/6412
+80 | try:
+81 |     pass
+   - except (ValueError, ValueError, TypeError):
+82 + except (ValueError, TypeError):
+83 |     pass
+84 | 
+85 | 
 
 B014 [*] Exception handler with duplicate exception: `re.error`
   --> B014.py:89:7
@@ -98,11 +90,9 @@ B014 [*] Exception handler with duplicate exception: `re.error`
 90 |     p
    |
 help: De-duplicate exceptions
-
-ℹ Safe fix
-86 86 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1739801758
-87 87 | try:
-88 88 |     pas
-89    |-except(re.error, re.error):
-   89 |+except re.error:
-90 90 |     p
+86 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1739801758
+87 | try:
+88 |     pas
+   - except(re.error, re.error):
+89 + except re.error:
+90 |     p

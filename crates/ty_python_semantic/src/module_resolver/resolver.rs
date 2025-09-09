@@ -433,13 +433,16 @@ pub(crate) fn dynamic_resolution_paths<'db>(
         let site_packages_dir = site_packages_search_path
             .as_system_path()
             .expect("Expected site package path to be a system path");
+        let site_packages_dir = system
+            .canonicalize_path(site_packages_dir)
+            .unwrap_or_else(|_| site_packages_dir.to_path_buf());
 
-        if !existing_paths.insert(Cow::Borrowed(site_packages_dir)) {
+        if !existing_paths.insert(Cow::Owned(site_packages_dir.clone())) {
             continue;
         }
 
         let site_packages_root = files
-            .root(db, site_packages_dir)
+            .root(db, &site_packages_dir)
             .expect("Site-package root to have been created");
 
         // This query needs to be re-executed each time a `.pth` file
@@ -457,7 +460,7 @@ pub(crate) fn dynamic_resolution_paths<'db>(
         // containing a (relative or absolute) path.
         // Each of these paths may point to an editable install of a package,
         // so should be considered an additional search path.
-        let pth_file_iterator = match PthFileIterator::new(db, site_packages_dir) {
+        let pth_file_iterator = match PthFileIterator::new(db, &site_packages_dir) {
             Ok(iterator) => iterator,
             Err(error) => {
                 tracing::warn!(
@@ -656,7 +659,7 @@ struct ModuleNameIngredient<'db> {
 /// This includes "builtin" modules, which can never be shadowed at runtime either, as well as the
 /// `types` module, which tends to be imported early in Python startup, so can't be consistently
 /// shadowed, and is important to type checking.
-fn is_non_shadowable(minor_version: u8, module_name: &str) -> bool {
+pub(super) fn is_non_shadowable(minor_version: u8, module_name: &str) -> bool {
     module_name == "types" || ruff_python_stdlib::sys::is_builtin_module(minor_version, module_name)
 }
 
@@ -684,7 +687,7 @@ fn resolve_name(db: &dyn Db, name: &ModuleName, mode: ModuleResolveMode) -> Opti
 
         if !search_path.is_standard_library() && resolver_state.mode.stubs_allowed() {
             match resolve_name_in_search_path(&resolver_state, &stub_name, search_path) {
-                Ok((package_kind, ResolvedName::FileModule(module))) => {
+                Ok((package_kind, _, ResolvedName::FileModule(module))) => {
                     if package_kind.is_root() && module.kind.is_module() {
                         tracing::trace!(
                             "Search path `{search_path}` contains a module \
@@ -694,54 +697,66 @@ fn resolve_name(db: &dyn Db, name: &ModuleName, mode: ModuleResolveMode) -> Opti
                         return Some(ResolvedName::FileModule(module));
                     }
                 }
-                Ok((_, ResolvedName::NamespacePackage)) => {
+                Ok((_, _, ResolvedName::NamespacePackage)) => {
                     is_namespace_package = true;
                 }
-                Err(PackageKind::Root) => {
+                Err((PackageKind::Root, _)) => {
                     tracing::trace!(
                         "Search path `{search_path}` contains no stub package named `{stub_name}`."
                     );
                 }
-                Err(PackageKind::Regular) => {
+                Err((PackageKind::Regular, PyTyped::Partial)) => {
+                    tracing::trace!(
+                        "Stub-package in `{search_path}` doesn't contain module: \
+                         `{name}` but it is a partial package, keep going."
+                    );
+                    // stub exists, but the module doesn't. But this is a partial package,
+                    // fall through to looking for a non-stub package
+                }
+                Err((PackageKind::Regular, _)) => {
                     tracing::trace!(
                         "Stub-package in `{search_path}` doesn't contain module: `{name}`"
                     );
                     // stub exists, but the module doesn't.
-                    // TODO: Support partial packages.
                     return None;
                 }
-                Err(PackageKind::Namespace) => {
+                Err((PackageKind::Namespace, _)) => {
                     tracing::trace!(
                         "Stub-package in `{search_path}` doesn't contain module: \
                          `{name}` but it is a namespace package, keep going."
                     );
                     // stub exists, but the module doesn't. But this is a namespace package,
-                    // keep searching the next search path for a stub package with the same name.
-                    continue;
+                    // fall through to looking for a non-stub package
                 }
             }
         }
 
         match resolve_name_in_search_path(&resolver_state, &name, search_path) {
-            Ok((_, ResolvedName::FileModule(module))) => {
+            Ok((_, _, ResolvedName::FileModule(module))) => {
                 return Some(ResolvedName::FileModule(module));
             }
-            Ok((_, ResolvedName::NamespacePackage)) => {
+            Ok((_, _, ResolvedName::NamespacePackage)) => {
                 is_namespace_package = true;
             }
             Err(kind) => match kind {
-                PackageKind::Root => {
+                (PackageKind::Root, _) => {
                     tracing::trace!(
                         "Search path `{search_path}` contains no package named `{name}`."
                     );
                 }
-                PackageKind::Regular => {
+                (PackageKind::Regular, PyTyped::Partial) => {
+                    tracing::trace!(
+                        "Package in `{search_path}` doesn't contain module: \
+                         `{name}` but it is a partial package, keep going."
+                    );
+                }
+                (PackageKind::Regular, _) => {
                     // For regular packages, don't search the next search path. All files of that
                     // package must be in the same location
                     tracing::trace!("Package in `{search_path}` doesn't contain module: `{name}`");
                     return None;
                 }
-                PackageKind::Namespace => {
+                (PackageKind::Namespace, _) => {
                     tracing::trace!(
                         "Package in `{search_path}` doesn't contain module: \
                          `{name}` but it is a namespace package, keep going."
@@ -796,7 +811,7 @@ fn resolve_name_in_search_path(
     context: &ResolverContext,
     name: &RelaxedModuleName,
     search_path: &SearchPath,
-) -> Result<(PackageKind, ResolvedName), PackageKind> {
+) -> Result<(PackageKind, PyTyped, ResolvedName), (PackageKind, PyTyped)> {
     let mut components = name.components();
     let module_name = components.next_back().unwrap();
 
@@ -811,6 +826,7 @@ fn resolve_name_in_search_path(
     if let Some(regular_package) = resolve_file_module(&package_path, context) {
         return Ok((
             resolved_package.kind,
+            resolved_package.typed,
             ResolvedName::FileModule(ResolvedFileModule {
                 search_path: search_path.clone(),
                 kind: ModuleKind::Package,
@@ -825,6 +841,7 @@ fn resolve_name_in_search_path(
     if let Some(file_module) = resolve_file_module(&package_path, context) {
         return Ok((
             resolved_package.kind,
+            resolved_package.typed,
             ResolvedName::FileModule(ResolvedFileModule {
                 file: file_module,
                 kind: ModuleKind::Module,
@@ -859,12 +876,16 @@ fn resolve_name_in_search_path(
                     package_path.search_path().as_system_path().unwrap(),
                 )
             {
-                return Ok((resolved_package.kind, ResolvedName::NamespacePackage));
+                return Ok((
+                    resolved_package.kind,
+                    resolved_package.typed,
+                    ResolvedName::NamespacePackage,
+                ));
             }
         }
     }
 
-    Err(resolved_package.kind)
+    Err((resolved_package.kind, resolved_package.typed))
 }
 
 /// If `module` exists on disk with either a `.pyi` or `.py` extension,
@@ -872,7 +893,10 @@ fn resolve_name_in_search_path(
 ///
 /// `.pyi` files take priority, as they always have priority when
 /// resolving modules.
-fn resolve_file_module(module: &ModulePath, resolver_state: &ResolverContext) -> Option<File> {
+pub(super) fn resolve_file_module(
+    module: &ModulePath,
+    resolver_state: &ResolverContext,
+) -> Option<File> {
     // Stubs have precedence over source files
     let stub_file = if resolver_state.mode.stubs_allowed() {
         module.with_pyi_extension().to_file(resolver_state)
@@ -919,7 +943,7 @@ fn resolve_package<'a, 'db, I>(
     module_search_path: &SearchPath,
     components: I,
     resolver_state: &ResolverContext<'db>,
-) -> Result<ResolvedPackage, PackageKind>
+) -> Result<ResolvedPackage, (PackageKind, PyTyped)>
 where
     I: Iterator<Item = &'a str>,
 {
@@ -933,9 +957,12 @@ where
     // `true` if resolving a sub-package. For example, `true` when resolving `bar` of `foo.bar`.
     let mut in_sub_package = false;
 
+    let mut typed = package_path.py_typed(resolver_state);
+
     // For `foo.bar.baz`, test that `foo` and `bar` both contain a `__init__.py`.
     for folder in components {
         package_path.push(folder);
+        typed = package_path.py_typed(resolver_state).inherit_parent(typed);
 
         let is_regular_package = package_path.is_regular_package(resolver_state);
 
@@ -950,13 +977,13 @@ where
             in_namespace_package = true;
         } else if in_namespace_package {
             // Package not found but it is part of a namespace package.
-            return Err(PackageKind::Namespace);
+            return Err((PackageKind::Namespace, typed));
         } else if in_sub_package {
             // A regular sub package wasn't found.
-            return Err(PackageKind::Regular);
+            return Err((PackageKind::Regular, typed));
         } else {
             // We couldn't find `foo` for `foo.bar.baz`, search the next search path.
-            return Err(PackageKind::Root);
+            return Err((PackageKind::Root, typed));
         }
 
         in_sub_package = true;
@@ -973,6 +1000,7 @@ where
     Ok(ResolvedPackage {
         kind,
         path: package_path,
+        typed,
     })
 }
 
@@ -980,6 +1008,7 @@ where
 struct ResolvedPackage {
     path: ModulePath,
     kind: PackageKind,
+    typed: PyTyped,
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
@@ -1003,6 +1032,32 @@ enum PackageKind {
 impl PackageKind {
     pub(crate) const fn is_root(self) -> bool {
         matches!(self, PackageKind::Root)
+    }
+}
+
+/// Info about the `py.typed` file for this package
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub(crate) enum PyTyped {
+    /// No `py.typed` was found
+    Untyped,
+    /// A `py.typed` was found containing "partial"
+    Partial,
+    /// A `py.typed` was found (not partial)
+    Full,
+}
+
+impl PyTyped {
+    /// Inherit py.typed info from the parent package
+    ///
+    /// > This marker applies recursively: if a top-level package includes it,
+    /// > all its sub-packages MUST support type checking as well.
+    ///
+    /// This implementation implies that once a `py.typed` is specified
+    /// all child packages inherit it, so they can never become Untyped.
+    /// However they can override whether that's Full or Partial by
+    /// redeclaring a `py.typed` file of their own.
+    fn inherit_parent(self, parent: Self) -> Self {
+        if self == Self::Untyped { parent } else { self }
     }
 }
 
@@ -1060,6 +1115,10 @@ impl fmt::Display for RelaxedModuleName {
 
 #[cfg(test)]
 mod tests {
+    #![expect(
+        clippy::disallowed_methods,
+        reason = "These are tests, so it's fine to do I/O by-passing System."
+    )]
     use ruff_db::Db;
     use ruff_db::files::{File, FilePath, system_path_to_file};
     use ruff_db::system::{DbWithTestSystem as _, DbWithWritableSystem as _};
@@ -1093,6 +1152,64 @@ mod tests {
         assert_eq!(ModuleKind::Module, foo_module.kind(&db));
 
         let expected_foo_path = src.join("foo.py");
+        assert_eq!(&expected_foo_path, foo_module.file(&db).unwrap().path(&db));
+        assert_eq!(
+            Some(foo_module),
+            path_to_module(&db, &FilePath::System(expected_foo_path))
+        );
+    }
+
+    #[test]
+    fn stubs_over_module_source() {
+        let TestCase { db, src, .. } = TestCaseBuilder::new()
+            .with_src_files(&[("foo.py", ""), ("foo.pyi", "")])
+            .build();
+
+        let foo_module_name = ModuleName::new_static("foo").unwrap();
+        let foo_module = resolve_module(&db, &foo_module_name).unwrap();
+
+        assert_eq!(
+            Some(&foo_module),
+            resolve_module(&db, &foo_module_name).as_ref()
+        );
+
+        assert_eq!("foo", foo_module.name(&db));
+        assert_eq!(&src, foo_module.search_path(&db).unwrap());
+        assert_eq!(ModuleKind::Module, foo_module.kind(&db));
+
+        let expected_foo_path = src.join("foo.pyi");
+        assert_eq!(&expected_foo_path, foo_module.file(&db).unwrap().path(&db));
+        assert_eq!(
+            Some(foo_module),
+            path_to_module(&db, &FilePath::System(expected_foo_path))
+        );
+    }
+
+    /// Tests precedence when there is a package and a sibling stub file.
+    ///
+    /// NOTE: I am unsure if this is correct. I wrote this test to match
+    /// behavior while implementing "list modules." Notably, in this case, the
+    /// regular source file gets priority. But in `stubs_over_module_source`
+    /// above, the stub file gets priority.
+    #[test]
+    fn stubs_over_package_source() {
+        let TestCase { db, src, .. } = TestCaseBuilder::new()
+            .with_src_files(&[("foo/__init__.py", ""), ("foo.pyi", "")])
+            .build();
+
+        let foo_module_name = ModuleName::new_static("foo").unwrap();
+        let foo_module = resolve_module(&db, &foo_module_name).unwrap();
+
+        assert_eq!(
+            Some(&foo_module),
+            resolve_module(&db, &foo_module_name).as_ref()
+        );
+
+        assert_eq!("foo", foo_module.name(&db));
+        assert_eq!(&src, foo_module.search_path(&db).unwrap());
+        assert_eq!(ModuleKind::Package, foo_module.kind(&db));
+
+        let expected_foo_path = src.join("foo/__init__.py");
         assert_eq!(&expected_foo_path, foo_module.file(&db).unwrap().path(&db));
         assert_eq!(
             Some(foo_module),

@@ -560,7 +560,7 @@ The PEP 257 convention includes all `D` errors apart from:
 [`D409`](rules/mismatched-section-underline-length.md),
 [`D410`](rules/no-blank-line-after-section.md),
 [`D411`](rules/no-blank-line-before-section.md),
-[`D413`](rules/no-blank-line-after-section.md),
+[`D413`](rules/missing-blank-line-after-last-section.md),
 [`D415`](rules/missing-terminal-punctuation.md),
 [`D416`](rules/missing-section-name-colon.md), and
 [`D417`](rules/undocumented-param.md).
@@ -571,7 +571,7 @@ The NumPy convention includes all `D` errors apart from:
 [`D212`](rules/multi-line-summary-first-line.md),
 [`D213`](rules/multi-line-summary-second-line.md),
 [`D402`](rules/signature-in-docstring.md),
-[`D413`](rules/no-blank-line-after-section.md),
+[`D413`](rules/missing-blank-line-after-last-section.md),
 [`D415`](rules/missing-terminal-punctuation.md),
 [`D416`](rules/missing-section-name-colon.md), and
 [`D417`](rules/undocumented-param.md).
@@ -588,7 +588,7 @@ The Google convention includes all `D` errors apart from:
 [`D407`](rules/missing-dashed-underline-after-section.md),
 [`D408`](rules/missing-section-underline-after-name.md),
 [`D409`](rules/mismatched-section-underline-length.md), and
-[`D413`](rules/no-blank-line-after-section.md).
+[`D413`](rules/missing-blank-line-after-last-section.md).
 
 By default, no [`convention`](settings.md#lint_pydocstyle_convention) is set, and so the enabled rules
 are determined by the [`select`](settings.md#lint_select) setting alone.

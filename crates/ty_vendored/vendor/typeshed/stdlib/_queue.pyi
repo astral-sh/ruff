@@ -4,12 +4,14 @@ This module is an implementation detail, please do not use it directly.
 
 from types import GenericAlias
 from typing import Any, Generic, TypeVar
+from typing_extensions import disjoint_base
 
 _T = TypeVar("_T")
 
 class Empty(Exception):
     """Exception raised by Queue.get(block=0)/get_nowait()."""
 
+@disjoint_base
 class SimpleQueue(Generic[_T]):
     """Simple, unbounded, reentrant FIFO queue."""
 

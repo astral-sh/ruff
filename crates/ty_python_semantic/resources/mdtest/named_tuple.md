@@ -78,10 +78,7 @@ reveal_type(Person.id)  # revealed: property
 reveal_type(Person.name)  # revealed: property
 reveal_type(Person.age)  # revealed: property
 
-# TODO... the error is correct, but this is not the friendliest error message
-# for assigning to a read-only property :-)
-#
-# error: [invalid-assignment] "Invalid assignment to data descriptor attribute `id` on type `Person` with custom `__set__` method"
+# error: [invalid-assignment] "Cannot assign to read-only property `id` on object of type `Person`"
 alice.id = 42
 # error: [invalid-assignment]
 bob.age = None
@@ -102,28 +99,59 @@ reveal_type(alice2.name)  # revealed: @Todo(functional `NamedTuple` syntax)
 
 ### Definition
 
-TODO: Fields without default values should come before fields with.
+<!-- snapshot-diagnostics -->
+
+Fields without default values must come before fields with.
 
 ```py
 from typing import NamedTuple
 
 class Location(NamedTuple):
     altitude: float = 0.0
-    latitude: float  # this should be an error
+    # error: [invalid-named-tuple] "NamedTuple field without default value cannot follow field(s) with default value(s): Field `latitude` defined here without a default value"
+    latitude: float
+    # error: [invalid-named-tuple] "NamedTuple field without default value cannot follow field(s) with default value(s): Field `longitude` defined here without a default value"
     longitude: float
+
+class StrangeLocation(NamedTuple):
+    altitude: float
+    altitude: float = 0.0
+    altitude: float
+    altitude: float = 0.0
+    latitude: float  # error: [invalid-named-tuple]
+    longitude: float  # error: [invalid-named-tuple]
+
+class VeryStrangeLocation(NamedTuple):
+    altitude: float = 0.0
+    latitude: float  # error: [invalid-named-tuple]
+    longitude: float  # error: [invalid-named-tuple]
+    altitude: float = 0.0
 ```
 
 ### Multiple Inheritance
 
-Multiple inheritance is not supported for `NamedTuple` classes:
+<!-- snapshot-diagnostics -->
+
+Multiple inheritance is not supported for `NamedTuple` classes except with `Generic`:
 
 ```py
-from typing import NamedTuple
+from typing import NamedTuple, Protocol
 
-# This should ideally emit a diagnostic
+# error: [invalid-named-tuple] "NamedTuple class `C` cannot use multiple inheritance except with `Generic[]`"
 class C(NamedTuple, object):
     id: int
-    name: str
+
+# fmt: off
+
+class D(
+    int,  # error: [invalid-named-tuple]
+    NamedTuple
+): ...
+
+# fmt: on
+
+# error: [invalid-named-tuple]
+class E(NamedTuple, Protocol): ...
 ```
 
 ### Inheriting from a `NamedTuple`
@@ -190,10 +218,7 @@ james = SuperUser(0, "James", 42, "Jimmy")
 # on the subclass
 james.name = "Robert"
 
-# TODO: the error is correct (can't assign to the read-only property inherited from the superclass)
-# but the error message could be friendlier :-)
-#
-# error: [invalid-assignment] "Invalid assignment to data descriptor attribute `nickname` on type `SuperUser` with custom `__set__` method"
+# error: [invalid-assignment] "Cannot assign to read-only property `nickname` on object of type `SuperUser`"
 james.nickname = "Bob"
 ```
 
@@ -243,7 +268,7 @@ class Person(NamedTuple):
 
 reveal_type(Person._field_defaults)  # revealed: dict[str, Any]
 reveal_type(Person._fields)  # revealed: tuple[str, ...]
-reveal_type(Person._make)  # revealed: bound method <class 'Person'>._make(iterable: Iterable[Any]) -> Self@_make
+reveal_type(Person._make)  # revealed: bound method <class 'Person'>._make(iterable: Iterable[Any]) -> Person
 reveal_type(Person._asdict)  # revealed: def _asdict(self) -> dict[str, Any]
 reveal_type(Person._replace)  # revealed: def _replace(self, **kwargs: Any) -> Self@_replace
 
@@ -304,14 +329,17 @@ satisfy:
 ```py
 def expects_named_tuple(x: typing.NamedTuple):
     reveal_type(x)  # revealed: tuple[object, ...] & NamedTupleLike
-    reveal_type(x._make)  # revealed: bound method type[NamedTupleLike]._make(iterable: Iterable[Any]) -> Self@_make
-    reveal_type(x._replace)  # revealed: bound method NamedTupleLike._replace(**kwargs) -> Self@_replace
+    reveal_type(x._make)  # revealed: bound method type[NamedTupleLike]._make(iterable: Iterable[Any]) -> NamedTupleLike
+    reveal_type(x._replace)  # revealed: bound method NamedTupleLike._replace(**kwargs) -> NamedTupleLike
     # revealed: Overload[(value: tuple[object, ...], /) -> tuple[object, ...], (value: tuple[_T@__add__, ...], /) -> tuple[object, ...]]
     reveal_type(x.__add__)
     reveal_type(x.__iter__)  # revealed: bound method tuple[object, ...].__iter__() -> Iterator[object]
 
 def _(y: type[typing.NamedTuple]):
     reveal_type(y)  # revealed: @Todo(unsupported type[X] special form)
+
+# error: [invalid-type-form] "Special form `typing.NamedTuple` expected no type parameter"
+def _(z: typing.NamedTuple[int]): ...
 ```
 
 Any instance of a `NamedTuple` class can therefore be passed for a function parameter that is
@@ -325,7 +353,7 @@ class Point(NamedTuple):
     x: int
     y: int
 
-reveal_type(Point._make)  # revealed: bound method <class 'Point'>._make(iterable: Iterable[Any]) -> Self@_make
+reveal_type(Point._make)  # revealed: bound method <class 'Point'>._make(iterable: Iterable[Any]) -> Point
 reveal_type(Point._asdict)  # revealed: def _asdict(self) -> dict[str, Any]
 reveal_type(Point._replace)  # revealed: def _replace(self, **kwargs: Any) -> Self@_replace
 

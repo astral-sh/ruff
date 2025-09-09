@@ -123,6 +123,12 @@ impl ClientOptions {
     }
 
     #[must_use]
+    pub fn with_experimental_auto_import(mut self, enabled: bool) -> Self {
+        self.global.experimental.get_or_insert_default().auto_import = Some(enabled);
+        self
+    }
+
+    #[must_use]
     pub fn with_unknown(mut self, unknown: HashMap<String, Value>) -> Self {
         self.unknown = unknown;
         self
@@ -148,7 +154,8 @@ impl GlobalOptions {
         let experimental = self
             .experimental
             .map(|experimental| ExperimentalSettings {
-                rename: experimental.rename.unwrap_or(true),
+                rename: experimental.rename.unwrap_or(false),
+                auto_import: experimental.auto_import.unwrap_or(false),
             })
             .unwrap_or_default();
 
@@ -293,6 +300,12 @@ impl Combine for DiagnosticMode {
 pub(crate) struct Experimental {
     /// Whether to enable the experimental symbol rename feature.
     pub(crate) rename: Option<bool>,
+    /// Whether to enable the experimental "auto-import" feature.
+    ///
+    /// At time of writing (2025-08-29), this feature is still
+    /// under active development. It may not work right or may be
+    /// incomplete.
+    pub(crate) auto_import: Option<bool>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]

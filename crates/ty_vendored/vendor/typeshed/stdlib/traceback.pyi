@@ -333,7 +333,7 @@ class TracebackException:
         @property
         def exc_type_str(self) -> str: ...
         @property
-        @deprecated("Deprecated in 3.13. Use exc_type_str instead.")
+        @deprecated("Deprecated since Python 3.13. Use `exc_type_str` instead.")
         def exc_type(self) -> type[BaseException] | None: ...
     else:
         exc_type: type[BaseException]
@@ -505,6 +505,23 @@ class FrameSummary:
       mapping the name to the repr() of the variable.
     """
 
+    if sys.version_info >= (3, 13):
+        __slots__ = (
+            "filename",
+            "lineno",
+            "end_lineno",
+            "colno",
+            "end_colno",
+            "name",
+            "_lines",
+            "_lines_dedented",
+            "locals",
+            "_code",
+        )
+    elif sys.version_info >= (3, 11):
+        __slots__ = ("filename", "lineno", "end_lineno", "colno", "end_colno", "name", "_line", "locals")
+    else:
+        __slots__ = ("filename", "lineno", "name", "_line", "locals")
     if sys.version_info >= (3, 11):
         def __init__(
             self,

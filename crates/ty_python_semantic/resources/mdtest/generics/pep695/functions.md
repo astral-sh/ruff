@@ -454,3 +454,65 @@ def overloaded_outer[T](t: T | None = None) -> None:
     if t is not None:
         inner(t)
 ```
+
+## Unpacking a TypeVar
+
+We can infer precise heterogeneous types from the result of an unpacking operation applied to a
+TypeVar if the TypeVar's upper bound is a type with a precise tuple spec:
+
+```py
+from dataclasses import dataclass
+from typing import NamedTuple, Final
+
+def f[T: tuple[int, str]](x: T) -> T:
+    a, b = x
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: str
+    return x
+
+@dataclass
+class Team[T: tuple[int, str]]:
+    employees: list[T]
+
+def x[T: tuple[int, str]](team: Team[T]) -> Team[T]:
+    age, name = team.employees[0]
+    reveal_type(age)  # revealed: int
+    reveal_type(name)  # revealed: str
+    return team
+
+class Age(int): ...
+class Name(str): ...
+
+class Employee(NamedTuple):
+    age: Age
+    name: Name
+
+EMPLOYEES: Final = (Employee(name=Name("alice"), age=Age(42)),)
+team = Team(employees=list(EMPLOYEES))
+reveal_type(team.employees)  # revealed: list[Employee]
+age, name = team.employees[0]
+reveal_type(age)  # revealed: Age
+reveal_type(name)  # revealed: Name
+```
+
+## `self` in PEP 695 generic methods
+
+When a generic method uses a PEP 695 generic context, an implict or explicit annotation of
+`self: Self` is still part of the full generic context:
+
+```py
+from typing import Self
+
+class C:
+    def explicit_self[T](self: Self, x: T) -> tuple[Self, T]:
+        return self, x
+
+    def implicit_self[T](self, x: T) -> tuple[Self, T]:
+        return self, x
+
+def _(x: int):
+    reveal_type(C().explicit_self(x))  # revealed: tuple[C, int]
+
+    # TODO: this should be `tuple[C, int]` as well, once we support implicit `self`
+    reveal_type(C().implicit_self(x))  # revealed: tuple[Unknown, int]
+```

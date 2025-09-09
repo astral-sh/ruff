@@ -12,16 +12,14 @@ D405 [*] Section name should be properly capitalized ("returns")
 21 |     A value of some sort.
    |
 help: Capitalize "returns"
-
-ℹ Safe fix
-16 16 | def not_capitalized():  # noqa: D416
-17 17 |     """Toggle the gizmo.
-18 18 | 
-19    |-    returns
-   19 |+    Returns
-20 20 |     -------
-21 21 |     A value of some sort.
-22 22 | 
+16 | def not_capitalized():  # noqa: D416
+17 |     """Toggle the gizmo.
+18 | 
+   -     returns
+19 +     Returns
+20 |     -------
+21 |     A value of some sort.
+22 | 
 
 D405 [*] Section name should be properly capitalized ("Short summary")
    --> sections.py:218:5
@@ -33,16 +31,14 @@ D405 [*] Section name should be properly capitalized ("Short summary")
 219 |     -------------
     |
 help: Capitalize "Short summary"
-
-ℹ Safe fix
-215 215 | def multiple_sections():  # noqa: D416
-216 216 |     """Toggle the gizmo.
-217 217 | 
-218     |-    Short summary
-    218 |+    Short Summary
-219 219 |     -------------
-220 220 | 
-221 221 |     This is the function's description, which will also specify what it
+215 | def multiple_sections():  # noqa: D416
+216 |     """Toggle the gizmo.
+217 | 
+    -     Short summary
+218 +     Short Summary
+219 |     -------------
+220 | 
+221 |     This is the function's description, which will also specify what it
 
 D405 [*] Section name should be properly capitalized ("returns")
    --> sections.py:573:5
@@ -55,13 +51,11 @@ D405 [*] Section name should be properly capitalized ("returns")
 575 |     """
     |
 help: Capitalize "returns"
-
-ℹ Safe fix
-570 570 |     Args:
-571 571 |         arg: Here's a note.
-572 572 | 
-573     |-    returns:
-    573 |+    Returns:
-574 574 |         Here's another note.
-575 575 |     """
-576 576 |
+570 |     Args:
+571 |         arg: Here's a note.
+572 | 
+    -     returns:
+573 +     Returns:
+574 |         Here's another note.
+575 |     """
+576 |

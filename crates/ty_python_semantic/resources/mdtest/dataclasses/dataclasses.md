@@ -546,7 +546,29 @@ class A:
 
 ### `slots`
 
-To do
+If a dataclass is defined with `slots=True`, the `__slots__` attribute is generated as a tuple. It
+is not present otherwise.
+
+```py
+from dataclasses import dataclass
+from typing import Tuple
+
+@dataclass
+class A:
+    x: int
+    y: int
+
+# revealed: Unknown
+# error: [unresolved-attribute]
+reveal_type(A.__slots__)
+
+@dataclass(slots=True)
+class B:
+    x: int
+    y: int
+
+reveal_type(B.__slots__)  # revealed: tuple[Literal["x"], Literal["y"]]
+```
 
 ### `weakref_slot`
 
@@ -986,6 +1008,28 @@ class D:  # error: [duplicate-kw-only]
         y: str
         _2: KW_ONLY
         z: float
+```
+
+`KW_ONLY` should only affect fields declared after it within the same class, not fields in
+subclasses:
+
+```py
+from dataclasses import dataclass, KW_ONLY
+
+@dataclass
+class D:
+    x: int
+    _: KW_ONLY
+    y: str
+
+@dataclass
+class E(D):
+    z: bytes
+
+# This should work: x=1 (positional), z=b"foo" (positional), y="foo" (keyword-only)
+E(1, b"foo", y="foo")
+
+reveal_type(E.__init__)  # revealed: (self: E, x: int, z: bytes, *, y: str) -> None
 ```
 
 ## Other special cases

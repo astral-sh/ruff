@@ -10,16 +10,12 @@ I001 [*] Import block is un-sorted or un-formatted
   | |___________^
   |
 help: Organize imports
-
-ℹ Safe fix
-  1 |+import math
-  2 |+import random
-1 3 | from pathlib import Path
-2   |-import random
-3   |-import math
-4 4 | from typing import Any
-5 5 | import collections
-6 6 | # Newline should be added here
+ ::: cell 1
+1 + import math
+2 + import random
+3 | from pathlib import Path
+  - import random
+  - import math
 
 I001 [*] Import block is un-sorted or un-formatted
  --> isort.ipynb:cell 2:1:1
@@ -31,19 +27,15 @@ I001 [*] Import block is un-sorted or un-formatted
 4 |   def foo():
   |
 help: Organize imports
-
-ℹ Safe fix
-1 1 | from pathlib import Path
-2 2 | import random
-3 3 | import math
-  4 |+import collections
-4 5 | from typing import Any
-5   |-import collections
-  6 |+
-  7 |+
-6 8 | # Newline should be added here
-7 9 | def foo():
-8 10 |     pass
+ ::: cell 2
+1 + import collections
+2 | from typing import Any
+  - import collections
+3 + 
+4 + 
+5 | # Newline should be added here
+6 | def foo():
+7 |     pass
 
 I001 [*] Import block is un-sorted or un-formatted
  --> isort.ipynb:cell 3:1:1
@@ -55,17 +47,13 @@ I001 [*] Import block is un-sorted or un-formatted
 4 |   %matplotlib \
   |
 help: Organize imports
-
-ℹ Safe fix
-6  6  | # Newline should be added here
-7  7  | def foo():
-8  8  |     pass
-   9  |+import sys
-9  10 | from pathlib import Path
-10    |-import sys
-11 11 | 
-12 12 | %matplotlib \
-13 13 |     --inline
+ ::: cell 3
+1 + import sys
+2 | from pathlib import Path
+  - import sys
+3 | 
+4 | %matplotlib \
+5 |     --inline
 
 I001 [*] Import block is un-sorted or un-formatted
  --> isort.ipynb:cell 3:7:1
@@ -77,11 +65,10 @@ I001 [*] Import block is un-sorted or un-formatted
   | |__________^
   |
 help: Organize imports
-
-ℹ Safe fix
-12 12 | %matplotlib \
-13 13 |     --inline
-14 14 | 
-   15 |+import abc
-15 16 | import math
-16    |-import abc
+ ::: cell 3
+4 | %matplotlib \
+5 |     --inline
+6 | 
+7 + import abc
+8 | import math
+  - import abc

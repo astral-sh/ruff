@@ -53,19 +53,19 @@ mod tests {
 
         assert_snapshot!(test.goto_declaration(), @r"
         info[goto-declaration]: Declaration
-         --> main.py:2:17
+         --> main.py:2:5
           |
-        2 |             def my_function(x, y):
-          |                 ^^^^^^^^^^^
-        3 |                 return x + y
+        2 | def my_function(x, y):
+          |     ^^^^^^^^^^^
+        3 |     return x + y
           |
         info: Source
-         --> main.py:5:22
+         --> main.py:5:10
           |
-        3 |                 return x + y
+        3 |     return x + y
         4 |
-        5 |             result = my_function(1, 2)
-          |                      ^^^^^^^^^^^
+        5 | result = my_function(1, 2)
+          |          ^^^^^^^^^^^
           |
         ");
     }
@@ -81,18 +81,18 @@ mod tests {
 
         assert_snapshot!(test.goto_declaration(), @r"
         info[goto-declaration]: Declaration
-         --> main.py:2:13
+         --> main.py:2:1
           |
-        2 |             x = 42
-          |             ^
-        3 |             y = x
+        2 | x = 42
+          | ^
+        3 | y = x
           |
         info: Source
-         --> main.py:3:17
+         --> main.py:3:5
           |
-        2 |             x = 42
-        3 |             y = x
-          |                 ^
+        2 | x = 42
+        3 | y = x
+          |     ^
           |
         ");
     }
@@ -111,20 +111,37 @@ mod tests {
 
         assert_snapshot!(test.goto_declaration(), @r"
         info[goto-declaration]: Declaration
-         --> main.py:2:19
+         --> main.py:2:7
           |
-        2 |             class MyClass:
-          |                   ^^^^^^^
-        3 |                 def __init__(self):
-        4 |                     pass
+        2 | class MyClass:
+          |       ^^^^^^^
+        3 |     def __init__(self):
+        4 |         pass
           |
         info: Source
-         --> main.py:6:24
+         --> main.py:6:12
           |
-        4 |                     pass
+        4 |         pass
         5 |
-        6 |             instance = MyClass()
-          |                        ^^^^^^^
+        6 | instance = MyClass()
+          |            ^^^^^^^
+          |
+
+        info[goto-declaration]: Declaration
+         --> main.py:3:9
+          |
+        2 | class MyClass:
+        3 |     def __init__(self):
+          |         ^^^^^^^^
+        4 |         pass
+          |
+        info: Source
+         --> main.py:6:12
+          |
+        4 |         pass
+        5 |
+        6 | instance = MyClass()
+          |            ^^^^^^^
           |
         ");
     }
@@ -140,18 +157,18 @@ mod tests {
 
         assert_snapshot!(test.goto_declaration(), @r"
         info[goto-declaration]: Declaration
-         --> main.py:2:21
+         --> main.py:2:9
           |
-        2 |             def foo(param):
-          |                     ^^^^^
-        3 |                 return param * 2
+        2 | def foo(param):
+          |         ^^^^^
+        3 |     return param * 2
           |
         info: Source
-         --> main.py:3:24
+         --> main.py:3:12
           |
-        2 |             def foo(param):
-        3 |                 return param * 2
-          |                        ^^^^^
+        2 | def foo(param):
+        3 |     return param * 2
+          |            ^^^^^
           |
         ");
     }
@@ -168,20 +185,20 @@ mod tests {
 
         assert_snapshot!(test.goto_declaration(), @r"
         info[goto-declaration]: Declaration
-         --> main.py:2:30
+         --> main.py:2:18
           |
-        2 |             def generic_func[T](value: T) -> T:
-          |                              ^
-        3 |                 v: T = value
-        4 |                 return v
+        2 | def generic_func[T](value: T) -> T:
+          |                  ^
+        3 |     v: T = value
+        4 |     return v
           |
         info: Source
-         --> main.py:3:20
+         --> main.py:3:8
           |
-        2 |             def generic_func[T](value: T) -> T:
-        3 |                 v: T = value
-          |                    ^
-        4 |                 return v
+        2 | def generic_func[T](value: T) -> T:
+        3 |     v: T = value
+          |        ^
+        4 |     return v
           |
         ");
     }
@@ -198,20 +215,20 @@ mod tests {
 
         assert_snapshot!(test.goto_declaration(), @r"
         info[goto-declaration]: Declaration
-         --> main.py:2:32
+         --> main.py:2:20
           |
-        2 |             class GenericClass[T]:
-          |                                ^
-        3 |                 def __init__(self, value: T):
-        4 |                     self.value = value
+        2 | class GenericClass[T]:
+          |                    ^
+        3 |     def __init__(self, value: T):
+        4 |         self.value = value
           |
         info: Source
-         --> main.py:3:43
+         --> main.py:3:31
           |
-        2 |             class GenericClass[T]:
-        3 |                 def __init__(self, value: T):
-          |                                           ^
-        4 |                     self.value = value
+        2 | class GenericClass[T]:
+        3 |     def __init__(self, value: T):
+          |                               ^
+        4 |         self.value = value
           |
         ");
     }
@@ -230,21 +247,21 @@ mod tests {
 
         assert_snapshot!(test.goto_declaration(), @r#"
         info[goto-declaration]: Declaration
-         --> main.py:2:13
+         --> main.py:2:1
           |
-        2 |             x = "outer"
-          |             ^
-        3 |             def outer_func():
-        4 |                 def inner_func():
+        2 | x = "outer"
+          | ^
+        3 | def outer_func():
+        4 |     def inner_func():
           |
         info: Source
-         --> main.py:5:28
+         --> main.py:5:16
           |
-        3 |             def outer_func():
-        4 |                 def inner_func():
-        5 |                     return x  # Should find outer x
-          |                            ^
-        6 |                 return inner_func
+        3 | def outer_func():
+        4 |     def inner_func():
+        5 |         return x  # Should find outer x
+          |                ^
+        6 |     return inner_func
           |
         "#);
     }
@@ -852,21 +869,21 @@ def another_helper(path):
 
         assert_snapshot!(test.goto_declaration(), @r"
         info[goto-declaration]: Declaration
-         --> main.py:4:21
+         --> main.py:4:9
           |
-        2 |             class C:
-        3 |                 def __init__(self):
-        4 |                     self.x: int = 1
-          |                     ^^^^^^
+        2 | class C:
+        3 |     def __init__(self):
+        4 |         self.x: int = 1
+          |         ^^^^^^
         5 |
-        6 |             c = C()
+        6 | c = C()
           |
         info: Source
-         --> main.py:7:19
+         --> main.py:7:7
           |
-        6 |             c = C()
-        7 |             y = c.x
-          |                   ^
+        6 | c = C()
+        7 | y = c.x
+          |       ^
           |
         ");
     }
@@ -890,21 +907,21 @@ def another_helper(path):
 
         assert_snapshot!(test.goto_declaration(), @r"
         info[goto-declaration]: Declaration
-         --> main.py:4:21
+         --> main.py:4:9
           |
-        2 |             class C:
-        3 |                 def __init__(self):
-        4 |                     self.x: int = 1
-          |                     ^^^^^^
+        2 | class C:
+        3 |     def __init__(self):
+        4 |         self.x: int = 1
+          |         ^^^^^^
         5 |
-        6 |             class D:
+        6 | class D:
           |
         info: Source
-          --> main.py:11:21
+          --> main.py:11:9
            |
-        10 |             d = D()
-        11 |             y = d.y.x
-           |                     ^
+        10 | d = D()
+        11 | y = d.y.x
+           |         ^
            |
         ");
     }
@@ -924,21 +941,21 @@ def another_helper(path):
 
         assert_snapshot!(test.goto_declaration(), @r"
         info[goto-declaration]: Declaration
-         --> main.py:4:21
+         --> main.py:4:9
           |
-        2 |             class C:
-        3 |                 def __init__(self):
-        4 |                     self.x = 1
-          |                     ^^^^^^
+        2 | class C:
+        3 |     def __init__(self):
+        4 |         self.x = 1
+          |         ^^^^^^
         5 |
-        6 |             c = C()
+        6 | c = C()
           |
         info: Source
-         --> main.py:7:19
+         --> main.py:7:7
           |
-        6 |             c = C()
-        7 |             y = c.x
-          |                   ^
+        6 | c = C()
+        7 | y = c.x
+          |       ^
           |
         ");
     }
@@ -958,19 +975,19 @@ def another_helper(path):
 
         assert_snapshot!(test.goto_declaration(), @r"
         info[goto-declaration]: Declaration
-         --> main.py:3:21
+         --> main.py:3:9
           |
-        2 |             class C:
-        3 |                 def foo(self):
-          |                     ^^^
-        4 |                     return 42
+        2 | class C:
+        3 |     def foo(self):
+          |         ^^^
+        4 |         return 42
           |
         info: Source
-         --> main.py:7:21
+         --> main.py:7:9
           |
-        6 |             c = C()
-        7 |             res = c.foo()
-          |                     ^^^
+        6 | c = C()
+        7 | res = c.foo()
+          |         ^^^
           |
         ");
     }
@@ -1036,7 +1053,7 @@ def outer():
         2 | def outer():
         3 |     x = "outer_value"
           |     ^
-        4 |     
+        4 |
         5 |     def inner():
           |
         info: Source
@@ -1046,7 +1063,7 @@ def outer():
          7 |         x = "modified"
          8 |         return x  # Should find the nonlocal x declaration in outer scope
            |                ^
-         9 |     
+         9 |
         10 |     return inner
            |
         "#);
@@ -1103,20 +1120,20 @@ def function():
 
         assert_snapshot!(test.goto_declaration(), @r"
         info[goto-declaration]: Declaration
-         --> main.py:3:17
+         --> main.py:3:5
           |
-        2 |             class A:
-        3 |                 x = 10
-          |                 ^
+        2 | class A:
+        3 |     x = 10
+          |     ^
         4 |
-        5 |             class B(A):
+        5 | class B(A):
           |
         info: Source
-         --> main.py:9:19
+         --> main.py:9:7
           |
-        8 |             b = B()
-        9 |             y = b.x
-          |                   ^
+        8 | b = B()
+        9 | y = b.x
+          |       ^
           |
         ");
     }
@@ -1140,19 +1157,19 @@ def function():
 
         assert_snapshot!(test.goto_declaration(), @r"
         info[goto-declaration]: Declaration
-         --> main.py:7:21
+         --> main.py:7:9
           |
-        6 |                 @property
-        7 |                 def value(self):
-          |                     ^^^^^
-        8 |                     return self._value
+        6 |     @property
+        7 |     def value(self):
+          |         ^^^^^
+        8 |         return self._value
           |
         info: Source
-          --> main.py:11:15
+          --> main.py:11:3
            |
-        10 |             c = C()
-        11 |             c.value = 42
-           |               ^^^^^
+        10 | c = C()
+        11 | c.value = 42
+           |   ^^^^^
            |
         ");
     }
@@ -1213,21 +1230,21 @@ def function():
 
         assert_snapshot!(test.goto_declaration(), @r"
         info[goto-declaration]: Declaration
-         --> main.py:6:17
+         --> main.py:6:5
           |
-        4 |             class Drawable(Protocol):
-        5 |                 def draw(self) -> None: ...
-        6 |                 name: str
-          |                 ^^^^
+        4 | class Drawable(Protocol):
+        5 |     def draw(self) -> None: ...
+        6 |     name: str
+          |     ^^^^
         7 |
-        8 |             def use_drawable(obj: Drawable):
+        8 | def use_drawable(obj: Drawable):
           |
         info: Source
-         --> main.py:9:21
+         --> main.py:9:9
           |
-        8 |             def use_drawable(obj: Drawable):
-        9 |                 obj.name
-          |                     ^^^^
+        8 | def use_drawable(obj: Drawable):
+        9 |     obj.name
+          |         ^^^^
           |
         ");
     }
@@ -1252,14 +1269,14 @@ class MyClass:
         2 | class MyClass:
         3 |     ClassType = int
           |     ^^^^^^^^^
-        4 |     
+        4 |
         5 |     def generic_method[T](self, value: ClassType) -> T:
           |
         info: Source
          --> main.py:5:40
           |
         3 |     ClassType = int
-        4 |     
+        4 |
         5 |     def generic_method[T](self, value: ClassType) -> T:
           |                                        ^^^^^^^^^
         6 |         return value
@@ -1280,19 +1297,19 @@ class MyClass:
 
         assert_snapshot!(test.goto_declaration(), @r"
         info[goto-declaration]: Declaration
-         --> main.py:2:32
+         --> main.py:2:20
           |
-        2 |             def my_function(x, y, z=10):
-          |                                ^
-        3 |                 return x + y + z
+        2 | def my_function(x, y, z=10):
+          |                    ^
+        3 |     return x + y + z
           |
         info: Source
-         --> main.py:5:37
+         --> main.py:5:25
           |
-        3 |                 return x + y + z
+        3 |     return x + y + z
         4 |
-        5 |             result = my_function(1, y=2, z=3)
-          |                                     ^
+        5 | result = my_function(1, y=2, z=3)
+          |                         ^
           |
         ");
     }
@@ -1320,39 +1337,495 @@ class MyClass:
         // Should navigate to the parameter in both matching overloads
         assert_snapshot!(test.goto_declaration(), @r#"
         info[goto-declaration]: Declaration
-         --> main.py:5:36
+         --> main.py:5:24
           |
-        4 |             @overload
-        5 |             def process(data: str, format: str) -> str: ...
-          |                                    ^^^^^^
+        4 | @overload
+        5 | def process(data: str, format: str) -> str: ...
+          |                        ^^^^^^
         6 |
-        7 |             @overload
+        7 | @overload
           |
         info: Source
-          --> main.py:14:39
+          --> main.py:14:27
            |
-        13 |             # Call the overloaded function
-        14 |             result = process("hello", format="json")
-           |                                       ^^^^^^
+        13 | # Call the overloaded function
+        14 | result = process("hello", format="json")
+           |                           ^^^^^^
            |
 
         info[goto-declaration]: Declaration
-          --> main.py:8:36
+          --> main.py:8:24
            |
-         7 |             @overload
-         8 |             def process(data: int, format: int) -> int: ...
-           |                                    ^^^^^^
+         7 | @overload
+         8 | def process(data: int, format: int) -> int: ...
+           |                        ^^^^^^
          9 |
-        10 |             def process(data, format):
+        10 | def process(data, format):
            |
         info: Source
-          --> main.py:14:39
+          --> main.py:14:27
            |
-        13 |             # Call the overloaded function
-        14 |             result = process("hello", format="json")
-           |                                       ^^^^^^
+        13 | # Call the overloaded function
+        14 | result = process("hello", format="json")
+           |                           ^^^^^^
            |
         "#);
+    }
+
+    #[test]
+    fn goto_declaration_overload_type_disambiguated1() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from mymodule import ab
+
+a<CURSOR>b(1)
+",
+            )
+            .source(
+                "mymodule.py",
+                r#"
+def ab(a):
+    """the real implementation!"""
+"#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+from typing import overload
+
+@overload
+def ab(a: int): ...
+
+@overload
+def ab(a: str): ...
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_declaration(), @r"
+        info[goto-declaration]: Declaration
+         --> mymodule.pyi:5:5
+          |
+        4 | @overload
+        5 | def ab(a: int): ...
+          |     ^^
+        6 |
+        7 | @overload
+          |
+        info: Source
+         --> main.py:4:1
+          |
+        2 | from mymodule import ab
+        3 |
+        4 | ab(1)
+          | ^^
+          |
+
+        info[goto-declaration]: Declaration
+         --> mymodule.pyi:8:5
+          |
+        7 | @overload
+        8 | def ab(a: str): ...
+          |     ^^
+          |
+        info: Source
+         --> main.py:4:1
+          |
+        2 | from mymodule import ab
+        3 |
+        4 | ab(1)
+          | ^^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_overload_type_disambiguated2() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+from mymodule import ab
+
+a<CURSOR>b("hello")
+"#,
+            )
+            .source(
+                "mymodule.py",
+                r#"
+def ab(a):
+    """the real implementation!"""
+"#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+from typing import overload
+
+@overload
+def ab(a: int): ...
+
+@overload
+def ab(a: str): ...
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_declaration(), @r#"
+        info[goto-declaration]: Declaration
+         --> mymodule.pyi:5:5
+          |
+        4 | @overload
+        5 | def ab(a: int): ...
+          |     ^^
+        6 |
+        7 | @overload
+          |
+        info: Source
+         --> main.py:4:1
+          |
+        2 | from mymodule import ab
+        3 |
+        4 | ab("hello")
+          | ^^
+          |
+
+        info[goto-declaration]: Declaration
+         --> mymodule.pyi:8:5
+          |
+        7 | @overload
+        8 | def ab(a: str): ...
+          |     ^^
+          |
+        info: Source
+         --> main.py:4:1
+          |
+        2 | from mymodule import ab
+        3 |
+        4 | ab("hello")
+          | ^^
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_declaration_overload_arity_disambiguated1() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from mymodule import ab
+
+a<CURSOR>b(1, 2)
+",
+            )
+            .source(
+                "mymodule.py",
+                r#"
+def ab(a, b = None):
+    """the real implementation!"""
+"#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+from typing import overload
+
+@overload
+def ab(a: int, b: int): ...
+
+@overload
+def ab(a: int): ...
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_declaration(), @r"
+        info[goto-declaration]: Declaration
+         --> mymodule.pyi:5:5
+          |
+        4 | @overload
+        5 | def ab(a: int, b: int): ...
+          |     ^^
+        6 |
+        7 | @overload
+          |
+        info: Source
+         --> main.py:4:1
+          |
+        2 | from mymodule import ab
+        3 |
+        4 | ab(1, 2)
+          | ^^
+          |
+
+        info[goto-declaration]: Declaration
+         --> mymodule.pyi:8:5
+          |
+        7 | @overload
+        8 | def ab(a: int): ...
+          |     ^^
+          |
+        info: Source
+         --> main.py:4:1
+          |
+        2 | from mymodule import ab
+        3 |
+        4 | ab(1, 2)
+          | ^^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_overload_arity_disambiguated2() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from mymodule import ab
+
+a<CURSOR>b(1)
+",
+            )
+            .source(
+                "mymodule.py",
+                r#"
+def ab(a, b = None):
+    """the real implementation!"""
+"#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+from typing import overload
+
+@overload
+def ab(a: int, b: int): ...
+
+@overload
+def ab(a: int): ...
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_declaration(), @r"
+        info[goto-declaration]: Declaration
+         --> mymodule.pyi:5:5
+          |
+        4 | @overload
+        5 | def ab(a: int, b: int): ...
+          |     ^^
+        6 |
+        7 | @overload
+          |
+        info: Source
+         --> main.py:4:1
+          |
+        2 | from mymodule import ab
+        3 |
+        4 | ab(1)
+          | ^^
+          |
+
+        info[goto-declaration]: Declaration
+         --> mymodule.pyi:8:5
+          |
+        7 | @overload
+        8 | def ab(a: int): ...
+          |     ^^
+          |
+        info: Source
+         --> main.py:4:1
+          |
+        2 | from mymodule import ab
+        3 |
+        4 | ab(1)
+          | ^^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_overload_keyword_disambiguated1() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from mymodule import ab
+
+a<CURSOR>b(1, b=2)
+",
+            )
+            .source(
+                "mymodule.py",
+                r#"
+def ab(a, *, b = None, c = None):
+    """the real implementation!"""
+"#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+from typing import overload
+
+@overload
+def ab(a: int): ...
+
+@overload
+def ab(a: int, *, b: int): ...
+
+@overload
+def ab(a: int, *, c: int): ...
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_declaration(), @r"
+        info[goto-declaration]: Declaration
+         --> mymodule.pyi:5:5
+          |
+        4 | @overload
+        5 | def ab(a: int): ...
+          |     ^^
+        6 |
+        7 | @overload
+          |
+        info: Source
+         --> main.py:4:1
+          |
+        2 | from mymodule import ab
+        3 |
+        4 | ab(1, b=2)
+          | ^^
+          |
+
+        info[goto-declaration]: Declaration
+          --> mymodule.pyi:8:5
+           |
+         7 | @overload
+         8 | def ab(a: int, *, b: int): ...
+           |     ^^
+         9 |
+        10 | @overload
+           |
+        info: Source
+         --> main.py:4:1
+          |
+        2 | from mymodule import ab
+        3 |
+        4 | ab(1, b=2)
+          | ^^
+          |
+
+        info[goto-declaration]: Declaration
+          --> mymodule.pyi:11:5
+           |
+        10 | @overload
+        11 | def ab(a: int, *, c: int): ...
+           |     ^^
+           |
+        info: Source
+         --> main.py:4:1
+          |
+        2 | from mymodule import ab
+        3 |
+        4 | ab(1, b=2)
+          | ^^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_overload_keyword_disambiguated2() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from mymodule import ab
+
+a<CURSOR>b(1, c=2)
+",
+            )
+            .source(
+                "mymodule.py",
+                r#"
+def ab(a, *, b = None, c = None):
+    """the real implementation!"""
+"#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+from typing import overload
+
+@overload
+def ab(a: int): ...
+
+@overload
+def ab(a: int, *, b: int): ...
+
+@overload
+def ab(a: int, *, c: int): ...
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_declaration(), @r"
+        info[goto-declaration]: Declaration
+         --> mymodule.pyi:5:5
+          |
+        4 | @overload
+        5 | def ab(a: int): ...
+          |     ^^
+        6 |
+        7 | @overload
+          |
+        info: Source
+         --> main.py:4:1
+          |
+        2 | from mymodule import ab
+        3 |
+        4 | ab(1, c=2)
+          | ^^
+          |
+
+        info[goto-declaration]: Declaration
+          --> mymodule.pyi:8:5
+           |
+         7 | @overload
+         8 | def ab(a: int, *, b: int): ...
+           |     ^^
+         9 |
+        10 | @overload
+           |
+        info: Source
+         --> main.py:4:1
+          |
+        2 | from mymodule import ab
+        3 |
+        4 | ab(1, c=2)
+          | ^^
+          |
+
+        info[goto-declaration]: Declaration
+          --> mymodule.pyi:11:5
+           |
+        10 | @overload
+        11 | def ab(a: int, *, c: int): ...
+           |     ^^
+           |
+        info: Source
+         --> main.py:4:1
+          |
+        2 | from mymodule import ab
+        3 |
+        4 | ab(1, c=2)
+          | ^^
+          |
+        ");
     }
 
     impl CursorTest {

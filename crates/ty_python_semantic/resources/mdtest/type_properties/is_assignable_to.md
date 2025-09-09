@@ -221,11 +221,11 @@ static_assert(is_assignable_to(type[Unknown], Meta))
 static_assert(is_assignable_to(Meta, type[Any]))
 static_assert(is_assignable_to(Meta, type[Unknown]))
 
-class AnyMeta(metaclass=Any): ...
-
-static_assert(is_assignable_to(type[AnyMeta], type))
-static_assert(is_assignable_to(type[AnyMeta], type[object]))
-static_assert(is_assignable_to(type[AnyMeta], type[Any]))
+def _(x: Any):
+    class AnyMeta(metaclass=x): ...
+    static_assert(is_assignable_to(type[AnyMeta], type))
+    static_assert(is_assignable_to(type[AnyMeta], type[object]))
+    static_assert(is_assignable_to(type[AnyMeta], type[Any]))
 
 from typing import TypeVar, Generic, Any
 

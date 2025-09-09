@@ -5801,3 +5801,62 @@ fn future_annotations_preview_warning() {
     ",
     );
 }
+
+#[test]
+fn up045_nested_optional_flatten_all() {
+    let contents = "\
+from typing import Optional
+nested_optional: Optional[Optional[Optional[str]]] = None
+";
+
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .args(["--select", "UP045", "--diff", "--target-version", "py312"])
+            .arg("-")
+            .pass_stdin(contents),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    @@ -1,2 +1,2 @@
+     from typing import Optional
+    -nested_optional: Optional[Optional[Optional[str]]] = None
+    +nested_optional: str | None = None
+
+
+    ----- stderr -----
+    Would fix 1 error.
+    ",
+    );
+}
+
+#[test]
+fn show_fixes_in_full_output_with_preview_enabled() {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args(["check", "--no-cache", "--output-format", "full"])
+            .args(["--select", "F401"])
+            .arg("--preview")
+            .arg("-")
+            .pass_stdin("import math"),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    F401 [*] `math` imported but unused
+     --> -:1:8
+      |
+    1 | import math
+      |        ^^^^
+      |
+    help: Remove unused import: `math`
+      - import math
+
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    ",
+    );
+}

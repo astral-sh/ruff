@@ -325,6 +325,11 @@ impl Diagnostic {
         self.inner.fix.as_ref()
     }
 
+    #[cfg(test)]
+    pub(crate) fn fix_mut(&mut self) -> Option<&mut Fix> {
+        Arc::make_mut(&mut self.inner).fix.as_mut()
+    }
+
     /// Set the fix for this diagnostic.
     pub fn set_fix(&mut self, fix: Fix) {
         debug_assert!(
@@ -342,6 +347,13 @@ impl Diagnostic {
     /// Returns `true` if the diagnostic contains a [`Fix`].
     pub fn fixable(&self) -> bool {
         self.fix().is_some()
+    }
+
+    /// Returns `true` if the diagnostic is [`fixable`](Diagnostic::fixable) and applies at the
+    /// configured applicability level.
+    pub fn has_applicable_fix(&self, config: &DisplayDiagnosticConfig) -> bool {
+        self.fix()
+            .is_some_and(|fix| fix.applies(config.fix_applicability))
     }
 
     /// Returns the offset of the parent statement for this diagnostic if it exists.
@@ -489,13 +501,18 @@ impl Diagnostic {
 
     /// Returns the ordering of diagnostics based on the start of their ranges, if they have any.
     ///
-    /// Panics if either diagnostic has no primary span, if the span has no range, or if its file is
-    /// not a `SourceFile`.
+    /// Panics if either diagnostic has no primary span, or if its file is not a `SourceFile`.
     pub fn ruff_start_ordering(&self, other: &Self) -> std::cmp::Ordering {
-        (self.expect_ruff_source_file(), self.expect_range().start()).cmp(&(
+        let a = (
+            self.expect_ruff_source_file(),
+            self.range().map(|r| r.start()),
+        );
+        let b = (
             other.expect_ruff_source_file(),
-            other.expect_range().start(),
-        ))
+            other.range().map(|r| r.start()),
+        );
+
+        a.cmp(&b)
     }
 }
 
@@ -1294,6 +1311,10 @@ pub struct DisplayDiagnosticConfig {
     hide_severity: bool,
     /// Whether to show the availability of a fix in a diagnostic.
     show_fix_status: bool,
+    /// Whether to show the diff for an available fix after the main diagnostic.
+    ///
+    /// This currently only applies to `DiagnosticFormat::Full`.
+    show_fix_diff: bool,
     /// The lowest applicability that should be shown when reporting diagnostics.
     fix_applicability: Applicability,
 }
@@ -1341,6 +1362,14 @@ impl DisplayDiagnosticConfig {
         }
     }
 
+    /// Whether to show a diff for an available fix after the main diagnostic.
+    pub fn show_fix_diff(self, yes: bool) -> DisplayDiagnosticConfig {
+        DisplayDiagnosticConfig {
+            show_fix_diff: yes,
+            ..self
+        }
+    }
+
     /// Set the lowest fix applicability that should be shown.
     ///
     /// In other words, an applicability of `Safe` (the default) would suppress showing fixes or fix
@@ -1364,6 +1393,7 @@ impl Default for DisplayDiagnosticConfig {
             preview: false,
             hide_severity: false,
             show_fix_status: false,
+            show_fix_diff: false,
             fix_applicability: Applicability::Safe,
         }
     }
@@ -1417,6 +1447,11 @@ pub enum DiagnosticFormat {
     /// Print diagnostics in the format expected by JUnit.
     #[cfg(feature = "junit")]
     Junit,
+    /// Print diagnostics in the JSON format used by GitLab [Code Quality] reports.
+    ///
+    /// [Code Quality]: https://docs.gitlab.com/ci/testing/code_quality/#code-quality-report-format
+    #[cfg(feature = "serde")]
+    Gitlab,
 }
 
 /// A representation of the kinds of messages inside a diagnostic.

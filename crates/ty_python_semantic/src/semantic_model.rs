@@ -6,7 +6,8 @@ use ruff_source_file::LineIndex;
 
 use crate::Db;
 use crate::module_name::ModuleName;
-use crate::module_resolver::{KnownModule, Module, resolve_module};
+use crate::module_resolver::{KnownModule, Module, list_modules, resolve_module};
+use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::FileScopeId;
 use crate::semantic_index::semantic_index;
 use crate::types::ide_support::all_declarations_and_bindings;
@@ -40,8 +41,25 @@ impl<'db> SemanticModel<'db> {
         resolve_module(self.db, module_name)
     }
 
+    /// Returns completions for symbols available in a `import <CURSOR>` context.
+    pub fn import_completions(&self) -> Vec<Completion<'db>> {
+        list_modules(self.db)
+            .into_iter()
+            .map(|module| {
+                let builtin = module.is_known(self.db, KnownModule::Builtins);
+                let ty = Type::module_literal(self.db, self.file, module);
+                Completion {
+                    name: Name::new(module.name(self.db).as_str()),
+                    ty: Some(ty),
+                    kind: None,
+                    builtin,
+                }
+            })
+            .collect()
+    }
+
     /// Returns completions for symbols available in a `from module import <CURSOR>` context.
-    pub fn import_completions(
+    pub fn from_import_completions(
         &self,
         import: &ast::StmtImportFrom,
         _name: Option<usize>,
@@ -60,6 +78,79 @@ impl<'db> SemanticModel<'db> {
         self.module_completions(&module_name)
     }
 
+    /// Returns completions only for submodules for the module
+    /// identified by `name` in `import`.
+    ///
+    /// For example, `import re, os.<CURSOR>, zlib`.
+    pub fn import_submodule_completions(
+        &self,
+        import: &ast::StmtImport,
+        name: usize,
+    ) -> Vec<Completion<'db>> {
+        let module_ident = &import.names[name].name;
+        let Some((parent_ident, _)) = module_ident.rsplit_once('.') else {
+            return vec![];
+        };
+        let module_name =
+            match ModuleName::from_identifier_parts(self.db, self.file, Some(parent_ident), 0) {
+                Ok(module_name) => module_name,
+                Err(err) => {
+                    tracing::debug!(
+                        "Could not extract module name from `{module:?}`: {err:?}",
+                        module = module_ident,
+                    );
+                    return vec![];
+                }
+            };
+        self.import_submodule_completions_for_name(&module_name)
+    }
+
+    /// Returns completions only for submodules for the module
+    /// used in a `from module import attribute` statement.
+    ///
+    /// For example, `from os.<CURSOR>`.
+    pub fn from_import_submodule_completions(
+        &self,
+        import: &ast::StmtImportFrom,
+    ) -> Vec<Completion<'db>> {
+        let level = import.level;
+        let Some(module_ident) = import.module.as_deref() else {
+            return vec![];
+        };
+        let Some((parent_ident, _)) = module_ident.rsplit_once('.') else {
+            return vec![];
+        };
+        let module_name = match ModuleName::from_identifier_parts(
+            self.db,
+            self.file,
+            Some(parent_ident),
+            level,
+        ) {
+            Ok(module_name) => module_name,
+            Err(err) => {
+                tracing::debug!(
+                    "Could not extract module name from `{module:?}` with level {level}: {err:?}",
+                    module = import.module,
+                    level = import.level,
+                );
+                return vec![];
+            }
+        };
+        self.import_submodule_completions_for_name(&module_name)
+    }
+
+    /// Returns submodule-only completions for the given module.
+    fn import_submodule_completions_for_name(
+        &self,
+        module_name: &ModuleName,
+    ) -> Vec<Completion<'db>> {
+        let Some(module) = resolve_module(self.db, module_name) else {
+            tracing::debug!("Could not resolve module from `{module_name:?}`");
+            return vec![];
+        };
+        self.submodule_completions(&module)
+    }
+
     /// Returns completions for symbols available in the given module as if
     /// it were imported by this model's `File`.
     fn module_completions(&self, module_name: &ModuleName) -> Vec<Completion<'db>> {
@@ -72,22 +163,28 @@ impl<'db> SemanticModel<'db> {
 
         let mut completions = vec![];
         for crate::types::Member { name, ty } in crate::types::all_members(self.db, ty) {
-            completions.push(Completion { name, ty, builtin });
-        }
-        for submodule_basename in module.all_submodules(self.db) {
-            let Some(basename) = ModuleName::new(submodule_basename.as_str()) else {
-                continue;
-            };
-            let mut submodule_name = module_name.clone();
-            submodule_name.extend(&basename);
-
-            let Some(submodule) = resolve_module(self.db, &submodule_name) else {
-                continue;
-            };
-            let ty = Type::module_literal(self.db, self.file, submodule);
             completions.push(Completion {
-                name: submodule_basename.clone(),
-                ty,
+                name,
+                ty: Some(ty),
+                kind: None,
+                builtin,
+            });
+        }
+        completions.extend(self.submodule_completions(&module));
+        completions
+    }
+
+    /// Returns completions for submodules of the given module.
+    fn submodule_completions(&self, module: &Module<'db>) -> Vec<Completion<'db>> {
+        let builtin = module.is_known(self.db, KnownModule::Builtins);
+
+        let mut completions = vec![];
+        for submodule in module.all_submodules(self.db) {
+            let ty = Type::module_literal(self.db, self.file, *submodule);
+            completions.push(Completion {
+                name: Name::new(submodule.name(self.db).as_str()),
+                ty: Some(ty),
+                kind: None,
                 builtin,
             });
         }
@@ -101,7 +198,8 @@ impl<'db> SemanticModel<'db> {
             .into_iter()
             .map(|member| Completion {
                 name: member.name,
-                ty: member.ty,
+                ty: Some(member.ty),
+                kind: None,
                 builtin: false,
             })
             .collect()
@@ -137,7 +235,8 @@ impl<'db> SemanticModel<'db> {
                 all_declarations_and_bindings(self.db, file_scope.to_scope_id(self.db, self.file))
                     .map(|member| Completion {
                         name: member.name,
-                        ty: member.ty,
+                        ty: Some(member.ty),
+                        kind: None,
                         builtin: false,
                     }),
             );
@@ -187,8 +286,22 @@ impl NameKind {
 pub struct Completion<'db> {
     /// The label shown to the user for this suggestion.
     pub name: Name,
-    /// The type of this completion.
-    pub ty: Type<'db>,
+    /// The type of this completion, if available.
+    ///
+    /// Generally speaking, this is always available
+    /// *unless* this was a completion corresponding to
+    /// an unimported symbol. In that case, computing the
+    /// type of all such symbols could be quite expensive.
+    pub ty: Option<Type<'db>>,
+    /// The "kind" of this completion.
+    ///
+    /// When this is set, it takes priority over any kind
+    /// inferred from `ty`.
+    ///
+    /// Usually this is set when `ty` is `None`, since it
+    /// may be cheaper to compute at scale. (e.g., For
+    /// unimported symbol completions.)
+    pub kind: Option<CompletionKind>,
     /// Whether this suggestion came from builtins or not.
     ///
     /// At time of writing (2025-06-26), this information
@@ -232,7 +345,7 @@ impl<'db> Completion<'db> {
                 | Type::BytesLiteral(_) => CompletionKind::Value,
                 Type::EnumLiteral(_) => CompletionKind::Enum,
                 Type::ProtocolInstance(_) => CompletionKind::Interface,
-                Type::TypeVar(_) => CompletionKind::TypeParameter,
+                Type::NonInferableTypeVar(_) | Type::TypeVar(_) => CompletionKind::TypeParameter,
                 Type::Union(union) => union.elements(db).iter().find_map(|&ty| imp(db, ty))?,
                 Type::Intersection(intersection) => {
                     intersection.iter_positive(db).find_map(|ty| imp(db, ty))?
@@ -246,7 +359,7 @@ impl<'db> Completion<'db> {
                 Type::TypeAlias(alias) => imp(db, alias.value_type(db))?,
             })
         }
-        imp(db, self.ty)
+        self.kind.or_else(|| self.ty.and_then(|ty| imp(db, ty)))
     }
 }
 
@@ -294,6 +407,14 @@ pub trait HasType {
     /// ## Panics
     /// May panic if `self` is from another file than `model`.
     fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Type<'db>;
+}
+
+pub trait HasDefinition {
+    /// Returns the inferred type of `self`.
+    ///
+    /// ## Panics
+    /// May panic if `self` is from another file than `model`.
+    fn definition<'db>(&self, model: &SemanticModel<'db>) -> Definition<'db>;
 }
 
 impl HasType for ast::ExprRef<'_> {
@@ -392,24 +513,31 @@ impl HasType for ast::Expr {
     }
 }
 
-macro_rules! impl_binding_has_ty {
+macro_rules! impl_binding_has_ty_def {
     ($ty: ty) => {
+        impl HasDefinition for $ty {
+            #[inline]
+            fn definition<'db>(&self, model: &SemanticModel<'db>) -> Definition<'db> {
+                let index = semantic_index(model.db, model.file);
+                index.expect_single_definition(self)
+            }
+        }
+
         impl HasType for $ty {
             #[inline]
             fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
-                let index = semantic_index(model.db, model.file);
-                let binding = index.expect_single_definition(self);
+                let binding = HasDefinition::definition(self, model);
                 binding_type(model.db, binding)
             }
         }
     };
 }
 
-impl_binding_has_ty!(ast::StmtFunctionDef);
-impl_binding_has_ty!(ast::StmtClassDef);
-impl_binding_has_ty!(ast::Parameter);
-impl_binding_has_ty!(ast::ParameterWithDefault);
-impl_binding_has_ty!(ast::ExceptHandlerExceptHandler);
+impl_binding_has_ty_def!(ast::StmtFunctionDef);
+impl_binding_has_ty_def!(ast::StmtClassDef);
+impl_binding_has_ty_def!(ast::Parameter);
+impl_binding_has_ty_def!(ast::ParameterWithDefault);
+impl_binding_has_ty_def!(ast::ExceptHandlerExceptHandler);
 
 impl HasType for ast::Alias {
     fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {

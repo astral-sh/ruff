@@ -9,6 +9,7 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 use crate::preview::{
     is_assert_raises_exception_call_enabled, is_optional_as_none_in_union_enabled,
+    is_unnecessary_default_type_args_stubs_enabled,
 };
 use crate::registry::Rule;
 use crate::rules::{
@@ -142,7 +143,10 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             }
 
             if checker.is_rule_enabled(Rule::UnnecessaryDefaultTypeArgs) {
-                if checker.target_version() >= PythonVersion::PY313 {
+                if checker.target_version() >= PythonVersion::PY313
+                    || is_unnecessary_default_type_args_stubs_enabled(checker.settings())
+                        && checker.semantic().in_stub_file()
+                {
                     pyupgrade::rules::unnecessary_default_type_args(checker, expr);
                 }
             }
@@ -660,6 +664,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::BlockingHttpCallInAsyncFunction) {
                 flake8_async::rules::blocking_http_call(checker, call);
             }
+            if checker.is_rule_enabled(Rule::BlockingHttpCallHttpxInAsyncFunction) {
+                flake8_async::rules::blocking_http_call_httpx(checker, call);
+            }
             if checker.is_rule_enabled(Rule::BlockingOpenCallInAsyncFunction) {
                 flake8_async::rules::blocking_open_call(checker, call);
             }
@@ -669,6 +676,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 Rule::WaitForProcessInAsyncFunction,
             ]) {
                 flake8_async::rules::blocking_process_invocation(checker, call);
+            }
+            if checker.is_rule_enabled(Rule::BlockingInputInAsyncFunction) {
+                flake8_async::rules::blocking_input(checker, call);
             }
             if checker.is_rule_enabled(Rule::BlockingSleepInAsyncFunction) {
                 flake8_async::rules::blocking_sleep(checker, call);
@@ -1039,8 +1049,6 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 flake8_simplify::rules::zip_dict_keys_and_values(checker, call);
             }
             if checker.any_rule_enabled(&[
-                Rule::OsMkdir,
-                Rule::OsMakedirs,
                 Rule::OsStat,
                 Rule::OsPathJoin,
                 Rule::OsPathSplitext,
@@ -1048,7 +1056,6 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 Rule::PyPath,
                 Rule::Glob,
                 Rule::OsListdir,
-                Rule::OsSymlink,
             ]) {
                 flake8_use_pathlib::rules::replaceable_by_pathlib(checker, call);
             }
@@ -1119,6 +1126,15 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 }
                 if checker.is_rule_enabled(Rule::OsPathSamefile) {
                     flake8_use_pathlib::rules::os_path_samefile(checker, call, segments);
+                }
+                if checker.is_rule_enabled(Rule::OsMkdir) {
+                    flake8_use_pathlib::rules::os_mkdir(checker, call, segments);
+                }
+                if checker.is_rule_enabled(Rule::OsMakedirs) {
+                    flake8_use_pathlib::rules::os_makedirs(checker, call, segments);
+                }
+                if checker.is_rule_enabled(Rule::OsSymlink) {
+                    flake8_use_pathlib::rules::os_symlink(checker, call, segments);
                 }
                 if checker.is_rule_enabled(Rule::PathConstructorCurrentDirectory) {
                     flake8_use_pathlib::rules::path_constructor_current_directory(
@@ -1307,12 +1323,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 pylint::rules::yield_in_init(checker, expr);
             }
         }
-        Expr::YieldFrom(yield_from) => {
+        Expr::YieldFrom(_) => {
             if checker.is_rule_enabled(Rule::YieldInInit) {
                 pylint::rules::yield_in_init(checker, expr);
-            }
-            if checker.is_rule_enabled(Rule::YieldFromInAsyncFunction) {
-                pylint::rules::yield_from_in_async_function(checker, yield_from);
             }
         }
         Expr::FString(f_string_expr @ ast::ExprFString { value, .. }) => {

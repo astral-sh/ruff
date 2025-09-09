@@ -1,10 +1,11 @@
 use crate::Db;
+use crate::types::class::CodeGeneratorKind;
 use crate::types::generics::Specialization;
 use crate::types::tuple::TupleType;
 use crate::types::{
     ApplyTypeMappingVisitor, ClassLiteral, ClassType, DynamicType, KnownClass, KnownInstanceType,
-    MroError, MroIterator, NormalizedVisitor, SpecialFormType, Type, TypeMapping, TypeTransformer,
-    todo_type,
+    MaterializationKind, MroError, MroIterator, NormalizedVisitor, SpecialFormType, Type,
+    TypeMapping, todo_type,
 };
 
 /// Enumeration of the possible kinds of types we allow in class bases.
@@ -77,13 +78,7 @@ impl<'db> ClassBase<'db> {
     ) -> Option<Self> {
         match ty {
             Type::Dynamic(dynamic) => Some(Self::Dynamic(dynamic)),
-            Type::ClassLiteral(literal) => {
-                if literal.is_known(db, KnownClass::Any) {
-                    Some(Self::Dynamic(DynamicType::Any))
-                } else {
-                    Some(Self::Class(literal.default_specialization(db)))
-                }
-            }
+            Type::ClassLiteral(literal) => Some(Self::Class(literal.default_specialization(db))),
             Type::GenericAlias(generic) => Some(Self::Class(ClassType::Generic(generic))),
             Type::NominalInstance(instance)
                 if instance.class(db).is_known(db, KnownClass::GenericAlias) =>
@@ -155,6 +150,7 @@ impl<'db> ClassBase<'db> {
             | Type::StringLiteral(_)
             | Type::LiteralString
             | Type::ModuleLiteral(_)
+            | Type::NonInferableTypeVar(_)
             | Type::TypeVar(_)
             | Type::BoundSuper(_)
             | Type::ProtocolInstance(_)
@@ -192,19 +188,22 @@ impl<'db> ClassBase<'db> {
                 | SpecialFormType::ReadOnly
                 | SpecialFormType::Optional
                 | SpecialFormType::Not
+                | SpecialFormType::Top
+                | SpecialFormType::Bottom
                 | SpecialFormType::Intersection
                 | SpecialFormType::TypeOf
                 | SpecialFormType::CallableTypeOf
                 | SpecialFormType::AlwaysTruthy
                 | SpecialFormType::AlwaysFalsy => None,
 
+                SpecialFormType::Any => Some(Self::Dynamic(DynamicType::Any)),
                 SpecialFormType::Unknown => Some(Self::unknown()),
 
                 SpecialFormType::Protocol => Some(Self::Protocol),
                 SpecialFormType::Generic => Some(Self::Generic),
 
                 SpecialFormType::NamedTuple => {
-                    let fields = subclass.own_fields(db, None);
+                    let fields = subclass.own_fields(db, None, CodeGeneratorKind::NamedTuple);
                     Self::try_from_type(
                         db,
                         TupleType::heterogeneous(
@@ -288,14 +287,26 @@ impl<'db> ClassBase<'db> {
         specialization: Option<Specialization<'db>>,
     ) -> Self {
         if let Some(specialization) = specialization {
-            self.apply_type_mapping_impl(
+            let new_self = self.apply_type_mapping_impl(
                 db,
                 &TypeMapping::Specialization(specialization),
-                &TypeTransformer::default(),
-            )
+                &ApplyTypeMappingVisitor::default(),
+            );
+            match specialization.materialization_kind(db) {
+                None => new_self,
+                Some(materialization_kind) => new_self.materialize(db, materialization_kind),
+            }
         } else {
             self
         }
+    }
+
+    fn materialize(self, db: &'db dyn Db, kind: MaterializationKind) -> Self {
+        self.apply_type_mapping_impl(
+            db,
+            &TypeMapping::Materialize(kind),
+            &ApplyTypeMappingVisitor::default(),
+        )
     }
 
     pub(super) fn has_cyclic_mro(self, db: &'db dyn Db) -> bool {

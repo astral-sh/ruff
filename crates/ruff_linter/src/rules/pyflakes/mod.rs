@@ -376,6 +376,22 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::UnusedImport, Path::new("F401_35.py"))]
+    fn f401_allowed_unused_imports_top_level_module(rule_code: Rule, path: &Path) -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pyflakes").join(path).as_path(),
+            &LinterSettings {
+                pyflakes: pyflakes::settings::Settings {
+                    allowed_unused_imports: vec!["hvplot".to_string()],
+                    ..pyflakes::settings::Settings::default()
+                },
+                ..LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
     #[test]
     fn f841_dummy_variable_rgx() -> Result<()> {
         let diagnostics = test_path(
@@ -737,6 +753,7 @@ mod tests {
 
     /// A re-implementation of the Pyflakes test runner.
     /// Note that all tests marked with `#[ignore]` should be considered TODOs.
+    #[track_caller]
     fn flakes(contents: &str, expected: &[Rule]) {
         let contents = dedent(contents);
         let source_type = PySourceType::default();
