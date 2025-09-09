@@ -1033,6 +1033,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "040") => (RuleGroup::Stable, rules::ruff::rules::InvalidAssertMessageLiteralArgument),
         (Ruff, "041") => (RuleGroup::Stable, rules::ruff::rules::UnnecessaryNestedLiteral),
         (Ruff, "043") => (RuleGroup::Preview, rules::ruff::rules::PytestRaisesAmbiguousPattern),
+        (Ruff, "044") => (RuleGroup::Preview, rules::ruff::rules::AbstractMethodInNormalClass),
         (Ruff, "045") => (RuleGroup::Preview, rules::ruff::rules::ImplicitClassVarInDataclass),
         (Ruff, "046") => (RuleGroup::Stable, rules::ruff::rules::UnnecessaryCastToInt),
         (Ruff, "047") => (RuleGroup::Preview, rules::ruff::rules::NeedlessElse),
