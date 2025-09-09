@@ -1051,7 +1051,7 @@ impl<'db> RangeConstraint<'db> {
         db: &'db dyn Db,
         other: &NotComparableConstraint<'db>,
     ) -> Simplifiable<Constraint<'db>> {
-        if self.lower.is_equivalent_to(db, other.ty) || self.upper.is_equivalent_to(db, other.ty) {
+        if other.ty.is_subtype_of(db, other.ty) || self.upper.is_subtype_of(db, other.ty) {
             return Simplifiable::NeverSatisfiable;
         }
 
