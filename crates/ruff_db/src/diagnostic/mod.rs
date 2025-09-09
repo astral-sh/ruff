@@ -454,24 +454,26 @@ impl Diagnostic {
 
     /// Computes the start source location for the message.
     ///
-    /// Panics if the diagnostic has no primary span, if its file is not a `SourceFile`, or if the
-    /// span has no range.
-    pub fn expect_ruff_start_location(&self) -> LineColumn {
-        self.expect_primary_span()
-            .expect_ruff_file()
-            .to_source_code()
-            .line_column(self.expect_range().start())
+    /// Returns None if the diagnostic has no primary span, if its file is not a `SourceFile`,
+    /// or if the span has no range.
+    pub fn ruff_start_location(&self) -> Option<LineColumn> {
+        Some(
+            self.ruff_source_file()?
+                .to_source_code()
+                .line_column(self.range()?.start()),
+        )
     }
 
     /// Computes the end source location for the message.
     ///
-    /// Panics if the diagnostic has no primary span, if its file is not a `SourceFile`, or if the
-    /// span has no range.
-    pub fn expect_ruff_end_location(&self) -> LineColumn {
-        self.expect_primary_span()
-            .expect_ruff_file()
-            .to_source_code()
-            .line_column(self.expect_range().end())
+    /// Returns None if the diagnostic has no primary span, if its file is not a `SourceFile`,
+    /// or if the span has no range.
+    pub fn ruff_end_location(&self) -> Option<LineColumn> {
+        Some(
+            self.ruff_source_file()?
+                .to_source_code()
+                .line_column(self.range()?.end()),
+        )
     }
 
     /// Returns the [`SourceFile`] which the message belongs to.
@@ -501,13 +503,18 @@ impl Diagnostic {
 
     /// Returns the ordering of diagnostics based on the start of their ranges, if they have any.
     ///
-    /// Panics if either diagnostic has no primary span, if the span has no range, or if its file is
-    /// not a `SourceFile`.
+    /// Panics if either diagnostic has no primary span, or if its file is not a `SourceFile`.
     pub fn ruff_start_ordering(&self, other: &Self) -> std::cmp::Ordering {
-        (self.expect_ruff_source_file(), self.expect_range().start()).cmp(&(
+        let a = (
+            self.expect_ruff_source_file(),
+            self.range().map(|r| r.start()),
+        );
+        let b = (
             other.expect_ruff_source_file(),
-            other.expect_range().start(),
-        ))
+            other.range().map(|r| r.start()),
+        );
+
+        a.cmp(&b)
     }
 }
 
@@ -1444,7 +1451,7 @@ pub enum DiagnosticFormat {
     Junit,
     /// Print diagnostics in the JSON format used by GitLab [Code Quality] reports.
     ///
-    /// [Code Quality]: https://docs.gitlab.com/ee/ci/testing/code_quality.html#implement-a-custom-tool
+    /// [Code Quality]: https://docs.gitlab.com/ci/testing/code_quality/#code-quality-report-format
     #[cfg(feature = "serde")]
     Gitlab,
 }

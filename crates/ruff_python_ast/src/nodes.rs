@@ -3219,7 +3219,6 @@ impl<'a> IntoIterator for &'a Box<Parameters> {
 /// Used by `Arguments` original type.
 ///
 /// NOTE: This type is different from original Python AST.
-
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ParameterWithDefault {
@@ -3240,6 +3239,14 @@ impl ParameterWithDefault {
 
     pub fn annotation(&self) -> Option<&Expr> {
         self.parameter.annotation()
+    }
+
+    /// Return `true` if the parameter name uses the pre-PEP-570 convention
+    /// (specified in PEP 484) to indicate to a type checker that it should be treated
+    /// as positional-only.
+    pub fn uses_pep_484_positional_only_convention(&self) -> bool {
+        let name = self.name();
+        name.starts_with("__") && !name.ends_with("__")
     }
 }
 

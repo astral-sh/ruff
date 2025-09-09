@@ -250,7 +250,7 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install mold"
-        uses: rui314/setup-mold@7344740a9418dcdcb481c7df83d9fbd1d5072d7d # v1
+        uses: rui314/setup-mold@725a8794d15fc7563f59595bd9556495c0564878 # v1
       - name: "Install cargo nextest"
         uses: taiki-e/install-action@6064345e6658255e90e9500fdf9a06ab77e6909c # v2.57.6
         with:
@@ -259,6 +259,10 @@ jobs:
         uses: taiki-e/install-action@6064345e6658255e90e9500fdf9a06ab77e6909c # v2.57.6
         with:
           tool: cargo-insta
+      - name: "Install uv"
+        uses: astral-sh/setup-uv@e92bafb6253dcd438e0484186d7669ea7a8ca1cc # v6.4.3
+        with:
+          enable-cache: "true"
       - name: ty mdtests (GitHub annotations)
         if: ${{ needs.determine_changes.outputs.ty == 'true' }}
         env:
@@ -308,7 +312,7 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install mold"
-        uses: rui314/setup-mold@7344740a9418dcdcb481c7df83d9fbd1d5072d7d # v1
+        uses: rui314/setup-mold@725a8794d15fc7563f59595bd9556495c0564878 # v1
       - name: "Install cargo nextest"
         uses: taiki-e/install-action@6064345e6658255e90e9500fdf9a06ab77e6909c # v2.57.6
         with:
@@ -317,6 +321,10 @@ jobs:
         uses: taiki-e/install-action@6064345e6658255e90e9500fdf9a06ab77e6909c # v2.57.6
         with:
           tool: cargo-insta
+      - name: "Install uv"
+        uses: astral-sh/setup-uv@e92bafb6253dcd438e0484186d7669ea7a8ca1cc # v6.4.3
+        with:
+          enable-cache: "true"
       - name: "Run tests"
         shell: bash
         env:
@@ -340,6 +348,10 @@ jobs:
         uses: taiki-e/install-action@6064345e6658255e90e9500fdf9a06ab77e6909c # v2.57.6
         with:
           tool: cargo-nextest
+      - name: "Install uv"
+        uses: astral-sh/setup-uv@e92bafb6253dcd438e0484186d7669ea7a8ca1cc # v6.4.3
+        with:
+          enable-cache: "true"
       - name: "Run tests"
         shell: bash
         env:
@@ -393,7 +405,7 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install mold"
-        uses: rui314/setup-mold@7344740a9418dcdcb481c7df83d9fbd1d5072d7d # v1
+        uses: rui314/setup-mold@725a8794d15fc7563f59595bd9556495c0564878 # v1
       - name: "Build"
         run: cargo build --release --locked
 
@@ -418,7 +430,7 @@ jobs:
           MSRV: ${{ steps.msrv.outputs.value }}
         run: rustup default "${MSRV}"
       - name: "Install mold"
-        uses: rui314/setup-mold@7344740a9418dcdcb481c7df83d9fbd1d5072d7d # v1
+        uses: rui314/setup-mold@725a8794d15fc7563f59595bd9556495c0564878 # v1
       - name: "Build tests"
         shell: bash
         env:
@@ -441,9 +453,7 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install cargo-binstall"
-        uses: cargo-bins/cargo-binstall@0dca8cf8dfb40cb77a29cece06933ce674674523 # v1.15.1
-        with:
-          tool: cargo-fuzz@0.11.2
+        uses: cargo-bins/cargo-binstall@837578dfb436769f1e6669b2e23ffea9d9d2da8f # v1.15.4
       - name: "Install cargo-fuzz"
         # Download the latest version from quick install and not the github releases because github releases only has MUSL targets.
         run: cargo binstall cargo-fuzz --force  --disable-strategies crate-meta-data --no-confirm
@@ -463,7 +473,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@4959332f0f014c5280e7eac8b70c90cb574c9f9b # v6.6.0
+      - uses: astral-sh/setup-uv@557e51de59eb14aaaba2ed9621916900a91d50c6 # v6.6.1
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         name: Download Ruff binary to test
         id: download-cached-binary
@@ -664,7 +674,7 @@ jobs:
           branch: ${{ github.event.pull_request.base.ref }}
           workflow: "ci.yaml"
           check_artifacts: true
-      - uses: astral-sh/setup-uv@4959332f0f014c5280e7eac8b70c90cb574c9f9b # v6.6.0
+      - uses: astral-sh/setup-uv@557e51de59eb14aaaba2ed9621916900a91d50c6 # v6.6.1
       - name: Fuzz
         env:
           FORCE_COLOR: 1
@@ -694,7 +704,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-      - uses: cargo-bins/cargo-binstall@0dca8cf8dfb40cb77a29cece06933ce674674523 # v1.15.1
+      - uses: cargo-bins/cargo-binstall@837578dfb436769f1e6669b2e23ffea9d9d2da8f # v1.15.4
       - run: cargo binstall --no-confirm cargo-shear
       - run: cargo shear
 
@@ -734,7 +744,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@4959332f0f014c5280e7eac8b70c90cb574c9f9b # v6.6.0
+      - uses: astral-sh/setup-uv@557e51de59eb14aaaba2ed9621916900a91d50c6 # v6.6.1
       - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
@@ -777,7 +787,7 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
       - name: Install uv
-        uses: astral-sh/setup-uv@4959332f0f014c5280e7eac8b70c90cb574c9f9b # v6.6.0
+        uses: astral-sh/setup-uv@557e51de59eb14aaaba2ed9621916900a91d50c6 # v6.6.1
       - name: "Install Insiders dependencies"
         if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS == 'true' }}
         run: uv pip install -r docs/requirements-insiders.txt --system
@@ -909,7 +919,7 @@ jobs:
           persist-credentials: false
 
       - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
-      - uses: astral-sh/setup-uv@4959332f0f014c5280e7eac8b70c90cb574c9f9b # v6.6.0
+      - uses: astral-sh/setup-uv@557e51de59eb14aaaba2ed9621916900a91d50c6 # v6.6.1
 
       - name: "Install Rust toolchain"
         run: rustup show
@@ -923,7 +933,7 @@ jobs:
         run: cargo codspeed build --features "codspeed,instrumented" --no-default-features -p ruff_benchmark
 
       - name: "Run benchmarks"
-        uses: CodSpeedHQ/action@0b6e7a3d96c9d2a6057e7bcea6b45aaf2f7ce60b # v3.8.0
+        uses: CodSpeedHQ/action@76578c2a7ddd928664caa737f0e962e3085d4e7c # v3.8.1
         with:
           run: cargo codspeed run
           token: ${{ secrets.CODSPEED_TOKEN }}
@@ -942,7 +952,7 @@ jobs:
           persist-credentials: false
 
       - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
-      - uses: astral-sh/setup-uv@4959332f0f014c5280e7eac8b70c90cb574c9f9b # v6.6.0
+      - uses: astral-sh/setup-uv@557e51de59eb14aaaba2ed9621916900a91d50c6 # v6.6.1
 
       - name: "Install Rust toolchain"
         run: rustup show
@@ -956,7 +966,7 @@ jobs:
         run: cargo codspeed build --features "codspeed,walltime" --no-default-features -p ruff_benchmark
 
       - name: "Run benchmarks"
-        uses: CodSpeedHQ/action@0b6e7a3d96c9d2a6057e7bcea6b45aaf2f7ce60b # v3.8.0
+        uses: CodSpeedHQ/action@76578c2a7ddd928664caa737f0e962e3085d4e7c # v3.8.1
         with:
           run: cargo codspeed run
           token: ${{ secrets.CODSPEED_TOKEN }}

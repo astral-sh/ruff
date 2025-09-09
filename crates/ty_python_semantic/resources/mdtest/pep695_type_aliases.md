@@ -188,7 +188,7 @@ T = TypeVar("T")
 IntAnd = TypeAliasType("IntAndT", tuple[int, T], type_params=(T,))
 
 def f(x: IntAnd[str]) -> None:
-    reveal_type(x)  # revealed: @Todo(Generic PEP-695 type alias)
+    reveal_type(x)  # revealed: @Todo(Generic manual PEP-695 type alias)
 ```
 
 ### Error cases
@@ -285,6 +285,20 @@ type C = Callable[[], C | None]
 
 def _(x: C):
     reveal_type(x)  # revealed: () -> C | None
+```
+
+### Subtyping of materializations of cyclic aliases
+
+```py
+from ty_extensions import static_assert, is_subtype_of, Bottom, Top
+
+type JsonValue = None | JsonDict
+type JsonDict = dict[str, JsonValue]
+
+static_assert(is_subtype_of(Top[JsonDict], Top[JsonDict]))
+static_assert(is_subtype_of(Top[JsonDict], Bottom[JsonDict]))
+static_assert(is_subtype_of(Bottom[JsonDict], Bottom[JsonDict]))
+static_assert(is_subtype_of(Bottom[JsonDict], Top[JsonDict]))
 ```
 
 ### Union inside generic

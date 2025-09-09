@@ -32,8 +32,8 @@ use crate::types::signatures::{Parameter, ParameterForm, Parameters};
 use crate::types::tuple::{Tuple, TupleLength, TupleType};
 use crate::types::{
     BoundMethodType, ClassLiteral, DataclassParams, FieldInstance, KnownClass, KnownInstanceType,
-    MethodWrapperKind, PropertyInstanceType, SpecialFormType, TypeMapping, UnionType,
-    WrapperDescriptorKind, enums, ide_support, todo_type,
+    MethodWrapperKind, PropertyInstanceType, SpecialFormType, TypeAliasType, TypeMapping,
+    UnionType, WrapperDescriptorKind, enums, ide_support, todo_type,
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, PythonVersion};
@@ -272,7 +272,7 @@ impl<'db> Bindings<'db> {
             for (overload_index, overload) in binding.matching_overloads_mut() {
                 match binding_type {
                     Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(function)) => {
-                        if function.has_known_decorator(db, FunctionDecorators::CLASSMETHOD) {
+                        if function.is_classmethod(db) {
                             match overload.parameter_types() {
                                 [_, Some(owner)] => {
                                     overload.set_return_type(Type::BoundMethod(
@@ -290,8 +290,7 @@ impl<'db> Bindings<'db> {
                                 }
                                 _ => {}
                             }
-                        } else if function.has_known_decorator(db, FunctionDecorators::STATICMETHOD)
-                        {
+                        } else if function.is_staticmethod(db) {
                             overload.set_return_type(Type::FunctionLiteral(function));
                         } else if let [Some(first), _] = overload.parameter_types() {
                             if first.is_none(db) {
@@ -308,7 +307,7 @@ impl<'db> Bindings<'db> {
                         if let [Some(function_ty @ Type::FunctionLiteral(function)), ..] =
                             overload.parameter_types()
                         {
-                            if function.has_known_decorator(db, FunctionDecorators::CLASSMETHOD) {
+                            if function.is_classmethod(db) {
                                 match overload.parameter_types() {
                                     [_, _, Some(owner)] => {
                                         overload.set_return_type(Type::BoundMethod(
@@ -662,6 +661,13 @@ impl<'db> Bindings<'db> {
                                     Type::BoundMethod(bound_method) => {
                                         function_generic_context(bound_method.function(db))
                                     }
+
+                                    Type::KnownInstance(KnownInstanceType::TypeAliasType(
+                                        TypeAliasType::PEP695(alias),
+                                    )) => alias
+                                        .generic_context(db)
+                                        .map(|generic_context| generic_context.as_tuple(db))
+                                        .unwrap_or_else(|| Type::none(db)),
 
                                     _ => Type::none(db),
                                 });

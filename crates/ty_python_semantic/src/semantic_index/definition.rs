@@ -769,13 +769,14 @@ impl DefinitionKind<'_> {
                 target_range.cover(value_range)
             }
             DefinitionKind::AnnotatedAssignment(assign) => {
-                let target_range = assign.target.node(module).range();
+                let mut full_range = assign.target.node(module).range();
+                full_range = full_range.cover(assign.annotation.node(module).range());
+
                 if let Some(ref value) = assign.value {
-                    let value_range = value.node(module).range();
-                    target_range.cover(value_range)
-                } else {
-                    target_range
+                    full_range = full_range.cover(value.node(module).range());
                 }
+
+                full_range
             }
             DefinitionKind::AugmentedAssignment(aug_assign) => aug_assign.node(module).range(),
             DefinitionKind::For(for_stmt) => for_stmt.target.node(module).range(),
@@ -1224,5 +1225,14 @@ impl From<&ast::TypeParamParamSpec> for DefinitionNodeKey {
 impl From<&ast::TypeParamTypeVarTuple> for DefinitionNodeKey {
     fn from(value: &ast::TypeParamTypeVarTuple) -> Self {
         Self(NodeKey::from_node(value))
+    }
+}
+
+impl<T> From<&AstNodeRef<T>> for DefinitionNodeKey
+where
+    for<'a> &'a T: Into<DefinitionNodeKey>,
+{
+    fn from(value: &AstNodeRef<T>) -> Self {
+        Self(NodeKey::from_node_ref(value))
     }
 }

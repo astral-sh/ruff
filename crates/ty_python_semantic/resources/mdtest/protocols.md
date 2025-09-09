@@ -413,13 +413,13 @@ To see the kinds and types of the protocol members, you can use the debugging ai
 from ty_extensions import reveal_protocol_interface
 from typing import SupportsIndex, SupportsAbs, ClassVar, Iterator
 
-# error: [revealed-type] "Revealed protocol interface: `{"method_member": MethodMember(`(self) -> bytes`), "x": AttributeMember(`int`), "y": PropertyMember { getter: `def y(self) -> str` }, "z": PropertyMember { getter: `def z(self) -> int`, setter: `def z(self, z: int) -> None` }}`"
+# revealed: {"method_member": MethodMember(`(self, /) -> bytes`), "x": AttributeMember(`int`), "y": PropertyMember { getter: `def y(self, /) -> str` }, "z": PropertyMember { getter: `def z(self, /) -> int`, setter: `def z(self, /, z: int) -> None` }}
 reveal_protocol_interface(Foo)
-# error: [revealed-type] "Revealed protocol interface: `{"__index__": MethodMember(`(self) -> int`)}`"
+# revealed: {"__index__": MethodMember(`(self, /) -> int`)}
 reveal_protocol_interface(SupportsIndex)
-# error: [revealed-type] "Revealed protocol interface: `{"__abs__": MethodMember(`(self) -> Unknown`)}`"
+# revealed: {"__abs__": MethodMember(`(self, /) -> Unknown`)}
 reveal_protocol_interface(SupportsAbs)
-# error: [revealed-type] "Revealed protocol interface: `{"__iter__": MethodMember(`(self) -> Iterator[Unknown]`), "__next__": MethodMember(`(self) -> Unknown`)}`"
+# revealed: {"__iter__": MethodMember(`(self, /) -> Iterator[Unknown]`), "__next__": MethodMember(`(self, /) -> Unknown`)}
 reveal_protocol_interface(Iterator)
 
 # error: [invalid-argument-type] "Invalid argument to `reveal_protocol_interface`: Only protocol classes can be passed to `reveal_protocol_interface`"
@@ -439,9 +439,9 @@ do not implement any special handling for generic aliases passed to the function
 reveal_type(get_protocol_members(SupportsAbs[int]))  # revealed: frozenset[str]
 reveal_type(get_protocol_members(Iterator[int]))  # revealed: frozenset[str]
 
-# error: [revealed-type] "Revealed protocol interface: `{"__abs__": MethodMember(`(self) -> int`)}`"
+# revealed: {"__abs__": MethodMember(`(self, /) -> int`)}
 reveal_protocol_interface(SupportsAbs[int])
-# error: [revealed-type] "Revealed protocol interface: `{"__iter__": MethodMember(`(self) -> Iterator[int]`), "__next__": MethodMember(`(self) -> int`)}`"
+# revealed: {"__iter__": MethodMember(`(self, /) -> Iterator[int]`), "__next__": MethodMember(`(self, /) -> int`)}
 reveal_protocol_interface(Iterator[int])
 
 class BaseProto(Protocol):
@@ -450,16 +450,16 @@ class BaseProto(Protocol):
 class SubProto(BaseProto, Protocol):
     def member(self) -> bool: ...
 
-# error: [revealed-type] "Revealed protocol interface: `{"member": MethodMember(`(self) -> int`)}`"
+# revealed: {"member": MethodMember(`(self, /) -> int`)}
 reveal_protocol_interface(BaseProto)
 
-# error: [revealed-type] "Revealed protocol interface: `{"member": MethodMember(`(self) -> bool`)}`"
+# revealed: {"member": MethodMember(`(self, /) -> bool`)}
 reveal_protocol_interface(SubProto)
 
 class ProtoWithClassVar(Protocol):
     x: ClassVar[int]
 
-# error: [revealed-type] "Revealed protocol interface: `{"x": AttributeMember(`int`; ClassVar)}`"
+# revealed: {"x": AttributeMember(`int`; ClassVar)}
 reveal_protocol_interface(ProtoWithClassVar)
 
 class ProtocolWithDefault(Protocol):
@@ -468,7 +468,7 @@ class ProtocolWithDefault(Protocol):
 # We used to incorrectly report this as having an `x: Literal[0]` member;
 # declared types should take priority over inferred types for protocol interfaces!
 #
-# error: [revealed-type] "Revealed protocol interface: `{"x": AttributeMember(`int`)}`"
+# revealed: {"x": AttributeMember(`int`)}
 reveal_protocol_interface(ProtocolWithDefault)
 ```
 
@@ -1767,13 +1767,168 @@ class Foo(Protocol):
     def method(self) -> str: ...
 
 def f(x: Foo):
-    reveal_type(type(x).method)  # revealed: def method(self) -> str
+    reveal_type(type(x).method)  # revealed: def method(self, /) -> str
 
 class Bar:
     def __init__(self):
         self.method = lambda: "foo"
 
 f(Bar())  # error: [invalid-argument-type]
+```
+
+Some protocols use the old convention (specified in PEP-484) for denoting positional-only
+parameters. This is supported by ty:
+
+```py
+class HasPosOnlyDunders:
+    def __invert__(self, /) -> "HasPosOnlyDunders":
+        return self
+
+    def __lt__(self, other, /) -> bool:
+        return True
+
+class SupportsLessThan(Protocol):
+    def __lt__(self, __other) -> bool: ...
+
+class Invertable(Protocol):
+    # `self` and `cls` are always implicitly positional-only for methods defined in `Protocol`
+    # classes, even if no parameters in the method use the PEP-484 convention.
+    def __invert__(self) -> object: ...
+
+static_assert(is_assignable_to(HasPosOnlyDunders, SupportsLessThan))
+static_assert(is_assignable_to(HasPosOnlyDunders, Invertable))
+static_assert(is_assignable_to(str, SupportsLessThan))
+static_assert(is_assignable_to(int, Invertable))
+```
+
+## Subtyping of protocols with generic method members
+
+Protocol method members can be generic. They can have generic contexts scoped to the class:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing_extensions import TypeVar, Self, Protocol
+from ty_extensions import is_equivalent_to, static_assert, is_assignable_to, is_subtype_of
+
+class NewStyleClassScoped[T](Protocol):
+    def method(self, input: T) -> None: ...
+
+S = TypeVar("S")
+
+class LegacyClassScoped(Protocol[S]):
+    def method(self, input: S) -> None: ...
+
+static_assert(is_equivalent_to(NewStyleClassScoped, LegacyClassScoped))
+static_assert(is_equivalent_to(NewStyleClassScoped[int], LegacyClassScoped[int]))
+
+class NominalGeneric[T]:
+    def method(self, input: T) -> None: ...
+
+def _[T](x: T) -> T:
+    static_assert(is_equivalent_to(NewStyleClassScoped[T], LegacyClassScoped[T]))
+    static_assert(is_subtype_of(NominalGeneric[T], NewStyleClassScoped[T]))
+    static_assert(is_subtype_of(NominalGeneric[T], LegacyClassScoped[T]))
+    return x
+
+class NominalConcrete:
+    def method(self, input: int) -> None: ...
+
+static_assert(is_assignable_to(NominalConcrete, NewStyleClassScoped))
+static_assert(is_assignable_to(NominalConcrete, LegacyClassScoped))
+static_assert(is_assignable_to(NominalGeneric[int], NewStyleClassScoped))
+static_assert(is_assignable_to(NominalGeneric[int], LegacyClassScoped))
+static_assert(is_assignable_to(NominalGeneric, NewStyleClassScoped[int]))
+static_assert(is_assignable_to(NominalGeneric, LegacyClassScoped[int]))
+
+# `NewStyleClassScoped` is implicitly `NewStyleClassScoped[Unknown]`,
+# and there exist fully static materializations of `NewStyleClassScoped[Unknown]`
+# where `Nominal` would not be a subtype of the given materialization,
+# hence there is no subtyping relation:
+#
+# TODO: these should pass
+static_assert(not is_subtype_of(NominalConcrete, NewStyleClassScoped))  # error: [static-assert-error]
+static_assert(not is_subtype_of(NominalConcrete, LegacyClassScoped))  # error: [static-assert-error]
+
+# Similarly, `NominalGeneric` is implicitly `NominalGeneric[Unknown`]
+#
+# TODO: these should pass
+static_assert(not is_subtype_of(NominalGeneric, NewStyleClassScoped[int]))  # error: [static-assert-error]
+static_assert(not is_subtype_of(NominalGeneric, LegacyClassScoped[int]))  # error: [static-assert-error]
+
+static_assert(is_subtype_of(NominalConcrete, NewStyleClassScoped[int]))
+static_assert(is_subtype_of(NominalConcrete, LegacyClassScoped[int]))
+static_assert(is_subtype_of(NominalGeneric[int], NewStyleClassScoped[int]))
+static_assert(is_subtype_of(NominalGeneric[int], LegacyClassScoped[int]))
+
+# TODO: these should pass
+static_assert(not is_assignable_to(NominalConcrete, NewStyleClassScoped[str]))  # error: [static-assert-error]
+static_assert(not is_assignable_to(NominalConcrete, LegacyClassScoped[str]))  # error: [static-assert-error]
+static_assert(not is_subtype_of(NominalGeneric[int], NewStyleClassScoped[str]))  # error: [static-assert-error]
+static_assert(not is_subtype_of(NominalGeneric[int], LegacyClassScoped[str]))  # error: [static-assert-error]
+```
+
+And they can also have generic contexts scoped to the method:
+
+```py
+class NewStyleFunctionScoped(Protocol):
+    def f[T](self, input: T) -> T: ...
+
+S = TypeVar("S")
+
+class LegacyFunctionScoped(Protocol):
+    def f(self, input: S) -> S: ...
+
+class UsesSelf(Protocol):
+    def g(self: Self) -> Self: ...
+
+class NominalNewStyle:
+    def f[T](self, input: T) -> T:
+        return input
+
+class NominalLegacy:
+    def f(self, input: S) -> S:
+        return input
+
+class NominalWithSelf:
+    def g(self: Self) -> Self:
+        return self
+
+class NominalNotGeneric:
+    def f(self, input: int) -> int:
+        return input
+
+class NominalReturningSelfNotGeneric:
+    def g(self) -> "NominalReturningSelfNotGeneric":
+        return self
+
+# TODO: should pass
+static_assert(is_equivalent_to(LegacyFunctionScoped, NewStyleFunctionScoped))  # error: [static-assert-error]
+
+static_assert(is_subtype_of(NominalNewStyle, NewStyleFunctionScoped))
+static_assert(is_subtype_of(NominalNewStyle, LegacyFunctionScoped))
+static_assert(not is_assignable_to(NominalNewStyle, UsesSelf))
+
+static_assert(is_subtype_of(NominalLegacy, NewStyleFunctionScoped))
+static_assert(is_subtype_of(NominalLegacy, LegacyFunctionScoped))
+static_assert(not is_assignable_to(NominalLegacy, UsesSelf))
+
+static_assert(not is_assignable_to(NominalWithSelf, NewStyleFunctionScoped))
+static_assert(not is_assignable_to(NominalWithSelf, LegacyFunctionScoped))
+static_assert(is_subtype_of(NominalWithSelf, UsesSelf))
+
+# TODO: these should pass
+static_assert(not is_assignable_to(NominalNotGeneric, NewStyleFunctionScoped))  # error: [static-assert-error]
+static_assert(not is_assignable_to(NominalNotGeneric, LegacyFunctionScoped))  # error: [static-assert-error]
+static_assert(not is_assignable_to(NominalNotGeneric, UsesSelf))
+
+static_assert(not is_assignable_to(NominalReturningSelfNotGeneric, NewStyleFunctionScoped))
+static_assert(not is_assignable_to(NominalReturningSelfNotGeneric, LegacyFunctionScoped))
+# TODO: should pass
+static_assert(not is_assignable_to(NominalReturningSelfNotGeneric, UsesSelf))  # error: [static-assert-error]
 ```
 
 ## Equivalence of protocols with method or property members
@@ -1894,7 +2049,7 @@ def f(arg1: type, arg2: type):
         reveal_type(arg2)  # revealed: type & ~type[OnlyMethodMembers]
 ```
 
-## Truthiness of protocol instance
+## Truthiness of protocol instances
 
 An instance of a protocol type generally has ambiguous truthiness:
 
@@ -2474,7 +2629,7 @@ class Foo(Protocol):
 from stub import Foo
 from ty_extensions import reveal_protocol_interface
 
-# error: [revealed-type] "Revealed protocol interface: `{"x": AttributeMember(`int`; ClassVar)}`"
+# revealed: {"x": AttributeMember(`int`; ClassVar)}
 reveal_protocol_interface(Foo)
 ```
 
@@ -2495,7 +2650,6 @@ Add tests for:
 - `super()` on nominal subtypes (explicit and implicit) of protocol classes
 - [Recursive protocols][recursive_protocols_spec]
 - Generic protocols
-- Non-generic protocols with function-scoped generic methods
 - Protocols with instance attributes annotated with `Callable` (can a nominal type with a method
     satisfy that protocol, and if so in what cases?)
 - Protocols decorated with `@final`

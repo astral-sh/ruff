@@ -125,11 +125,11 @@ def _(
     top_meth: Top[TypeOf[A().method]],
     bottom_meth: Bottom[TypeOf[A().method]],
 ):
-    reveal_type(top_func)  # revealed: def function(x: Any) -> None
-    reveal_type(bottom_func)  # revealed: def function(x: Any) -> None
+    reveal_type(top_func)  # revealed: def function(x: Never) -> None
+    reveal_type(bottom_func)  # revealed: def function(x: object) -> None
 
-    reveal_type(top_meth)  # revealed: bound method A.method(x: Any) -> None
-    reveal_type(bottom_meth)  # revealed: bound method A.method(x: Any) -> None
+    reveal_type(top_meth)  # revealed: bound method A.method(x: Never) -> None
+    reveal_type(bottom_meth)  # revealed: bound method A.method(x: object) -> None
 ```
 
 ## Callable
@@ -697,4 +697,36 @@ static_assert(is_equivalent_to(Top[CovariantBase[Any]], CovariantBase[object]))
 static_assert(is_assignable_to(InvariantChild[Any], CovariantBase[A]))
 
 static_assert(not is_assignable_to(Top[InvariantChild[Any]], CovariantBase[A]))
+```
+
+## Attributes
+
+Attributes on top and bottom materializations are specialized on access.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from ty_extensions import Top, Bottom
+from typing import Any
+
+class Invariant[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+    def push(self, obj: T) -> None: ...
+
+    attr: T
+
+def capybara(top: Top[Invariant[Any]], bottom: Bottom[Invariant[Any]]) -> None:
+    reveal_type(top.get)  # revealed: bound method Top[Invariant[Any]].get() -> object
+    reveal_type(top.push)  # revealed: bound method Top[Invariant[Any]].push(obj: Never) -> None
+
+    reveal_type(bottom.get)  # revealed: bound method Bottom[Invariant[Any]].get() -> Never
+    reveal_type(bottom.push)  # revealed: bound method Bottom[Invariant[Any]].push(obj: object) -> None
+
+    reveal_type(top.attr)  # revealed: object
+    reveal_type(bottom.attr)  # revealed: Never
 ```

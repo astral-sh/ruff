@@ -494,3 +494,25 @@ age, name = team.employees[0]
 reveal_type(age)  # revealed: Age
 reveal_type(name)  # revealed: Name
 ```
+
+## `self` in PEP 695 generic methods
+
+When a generic method uses a PEP 695 generic context, an implict or explicit annotation of
+`self: Self` is still part of the full generic context:
+
+```py
+from typing import Self
+
+class C:
+    def explicit_self[T](self: Self, x: T) -> tuple[Self, T]:
+        return self, x
+
+    def implicit_self[T](self, x: T) -> tuple[Self, T]:
+        return self, x
+
+def _(x: int):
+    reveal_type(C().explicit_self(x))  # revealed: tuple[C, int]
+
+    # TODO: this should be `tuple[C, int]` as well, once we support implicit `self`
+    reveal_type(C().implicit_self(x))  # revealed: tuple[Unknown, int]
+```
