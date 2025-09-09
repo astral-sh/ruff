@@ -836,10 +836,10 @@ impl<'a, 'b> BlankLinesChecker<'a, 'b> {
             // Allow groups of one-liners.
             && !(state.follows.is_any_def() && line.last_token != TokenKind::Colon)
             && !state.follows.follows_def_with_dummy_body()
-            // Apply to functions within classes: both immediately within and nested within conditional blocks.
-            // This aligns with pycodestyle's behavior where E301 triggers for functions in classes regardless
-            // of whether they're immediately within the class or nested in control structures.
+            // Only for class scope: we must be inside a class block
             && matches!(state.class_status, Status::Inside(_))
+            // But NOT inside a function body; nested defs inside methods are handled by E306
+            && matches!(state.fn_status, Status::Outside | Status::CommentAfter(_))
             // The class/parent method's docstring can directly precede the def.
             // Allow following a decorator (if there is an error it will be triggered on the first decorator).
             && !matches!(state.follows, Follows::Docstring | Follows::Decorator)
@@ -858,8 +858,7 @@ impl<'a, 'b> BlankLinesChecker<'a, 'b> {
                 )));
             }
         } else if line.preceding_blank_lines == 0
-            // Apply to nested definitions: only within function bodies, not within classes
-            // (E301 handles functions within classes, including those nested in conditional blocks)
+            // Apply to nested definitions: within any function body
             && matches!(state.fn_status, Status::Inside(_))
             && line.kind.is_class_function_or_decorator()
             // Allow following a decorator (if there is an error it will be triggered on the first decorator).
