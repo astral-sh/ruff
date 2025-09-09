@@ -1814,52 +1814,72 @@ python-version = "3.12"
 from typing_extensions import TypeVar, Self, Protocol
 from ty_extensions import is_equivalent_to, static_assert, is_assignable_to, is_subtype_of
 
-class NewStyle[T](Protocol):
+class NewStyleClassScoped[T](Protocol):
     def method(self, input: T) -> None: ...
 
 S = TypeVar("S")
 
-class OldStyle(Protocol[S]):
+class LegacyClassScoped(Protocol[S]):
     def method(self, input: S) -> None: ...
 
-static_assert(is_equivalent_to(NewStyle, OldStyle))
-static_assert(is_equivalent_to(NewStyle[int], OldStyle[int]))
+static_assert(is_equivalent_to(NewStyleClassScoped, LegacyClassScoped))
+static_assert(is_equivalent_to(NewStyleClassScoped[int], LegacyClassScoped[int]))
+
+class NominalGeneric[T]:
+    def method(self, input: T) -> None: ...
 
 def _[T](x: T) -> T:
-    # TODO: should pass
-    static_assert(is_equivalent_to(NewStyle[T], OldStyle[T]))  # error: [static-assert-error]
+    static_assert(is_equivalent_to(NewStyleClassScoped[T], LegacyClassScoped[T]))
+    static_assert(is_subtype_of(NominalGeneric[T], NewStyleClassScoped[T]))
+    static_assert(is_subtype_of(NominalGeneric[T], LegacyClassScoped[T]))
     return x
 
-class Nominal:
+class NominalConcrete:
     def method(self, input: int) -> None: ...
 
-static_assert(is_assignable_to(Nominal, NewStyle))
-static_assert(is_assignable_to(Nominal, OldStyle))
+static_assert(is_assignable_to(NominalConcrete, NewStyleClassScoped))
+static_assert(is_assignable_to(NominalConcrete, LegacyClassScoped))
+static_assert(is_assignable_to(NominalGeneric[int], NewStyleClassScoped))
+static_assert(is_assignable_to(NominalGeneric[int], LegacyClassScoped))
+static_assert(is_assignable_to(NominalGeneric, NewStyleClassScoped[int]))
+static_assert(is_assignable_to(NominalGeneric, LegacyClassScoped[int]))
 
-# `NewStyle` is implicitly `NewStyle[Unknown]`, which is not a fully static type,
+# `NewStyleClassScoped` is implicitly `NewStyleClassScoped[Unknown]`,
+# and there exist fully static materializations of `NewStyleClassScoped[Unknown]`
+# where `Nominal` would not be a subtype of the given materialization,
 # hence there is no subtyping relation:
 #
 # TODO: these should pass
-static_assert(not is_subtype_of(Nominal, NewStyle))  # error: [static-assert-error]
-static_assert(not is_subtype_of(Nominal, OldStyle))  # error: [static-assert-error]
+static_assert(not is_subtype_of(NominalConcrete, NewStyleClassScoped))  # error: [static-assert-error]
+static_assert(not is_subtype_of(NominalConcrete, LegacyClassScoped))  # error: [static-assert-error]
 
-static_assert(is_subtype_of(Nominal, NewStyle[int]))
-static_assert(is_subtype_of(Nominal, OldStyle[int]))
+# Similarly, `NominalGeneric` is implicitly `NominalGeneric[Unknown`]
+#
+# TODO: these should pass
+static_assert(not is_subtype_of(NominalGeneric, NewStyleClassScoped[int]))  # error: [static-assert-error]
+static_assert(not is_subtype_of(NominalGeneric, LegacyClassScoped[int]))  # error: [static-assert-error]
+
+static_assert(is_subtype_of(NominalConcrete, NewStyleClassScoped[int]))
+static_assert(is_subtype_of(NominalConcrete, LegacyClassScoped[int]))
+static_assert(is_subtype_of(NominalGeneric[int], NewStyleClassScoped[int]))
+static_assert(is_subtype_of(NominalGeneric[int], LegacyClassScoped[int]))
 
 # TODO: these should pass
-static_assert(not is_assignable_to(Nominal, NewStyle[str]))  # error: [static-assert-error]
-static_assert(not is_assignable_to(Nominal, OldStyle[str]))  # error: [static-assert-error]
+static_assert(not is_assignable_to(NominalConcrete, NewStyleClassScoped[str]))  # error: [static-assert-error]
+static_assert(not is_assignable_to(NominalConcrete, LegacyClassScoped[str]))  # error: [static-assert-error]
+static_assert(not is_subtype_of(NominalGeneric[int], NewStyleClassScoped[str]))  # error: [static-assert-error]
+static_assert(not is_subtype_of(NominalGeneric[int], LegacyClassScoped[str]))  # error: [static-assert-error]
 ```
 
 And they can also have generic contexts scoped to the method:
 
 ```py
-class NewStyle(Protocol):
+class NewStyleFunctionScoped(Protocol):
     def f[T](self, input: T) -> T: ...
 
 S = TypeVar("S")
 
-class Legacy(Protocol):
+class LegacyFunctionScoped(Protocol):
     def f(self, input: S) -> S: ...
 
 class UsesSelf(Protocol):
@@ -1877,20 +1897,38 @@ class NominalWithSelf:
     def g(self: Self) -> Self:
         return self
 
-# TODO: should pass
-static_assert(is_equivalent_to(Legacy, NewStyle))  # error: [static-assert-error]
+class NominalNotGeneric:
+    def f(self, input: int) -> int:
+        return input
 
-static_assert(is_subtype_of(NominalNewStyle, NewStyle))
-static_assert(is_subtype_of(NominalNewStyle, Legacy))
+class NominalReturningSelfNotGeneric:
+    def g(self) -> "NominalReturningSelfNotGeneric":
+        return self
+
+# TODO: should pass
+static_assert(is_equivalent_to(LegacyFunctionScoped, NewStyleFunctionScoped))  # error: [static-assert-error]
+
+static_assert(is_subtype_of(NominalNewStyle, NewStyleFunctionScoped))
+static_assert(is_subtype_of(NominalNewStyle, LegacyFunctionScoped))
 static_assert(not is_assignable_to(NominalNewStyle, UsesSelf))
 
-static_assert(is_subtype_of(NominalLegacy, NewStyle))
-static_assert(is_subtype_of(NominalLegacy, Legacy))
+static_assert(is_subtype_of(NominalLegacy, NewStyleFunctionScoped))
+static_assert(is_subtype_of(NominalLegacy, LegacyFunctionScoped))
 static_assert(not is_assignable_to(NominalLegacy, UsesSelf))
 
-static_assert(not is_assignable_to(NominalWithSelf, NewStyle))
-static_assert(not is_assignable_to(NominalWithSelf, Legacy))
+static_assert(not is_assignable_to(NominalWithSelf, NewStyleFunctionScoped))
+static_assert(not is_assignable_to(NominalWithSelf, LegacyFunctionScoped))
 static_assert(is_subtype_of(NominalWithSelf, UsesSelf))
+
+# TODO: these should pass
+static_assert(not is_assignable_to(NominalNotGeneric, NewStyleFunctionScoped))  # error: [static-assert-error]
+static_assert(not is_assignable_to(NominalNotGeneric, LegacyFunctionScoped))  # error: [static-assert-error]
+static_assert(not is_assignable_to(NominalNotGeneric, UsesSelf))
+
+static_assert(not is_assignable_to(NominalReturningSelfNotGeneric, NewStyleFunctionScoped))
+static_assert(not is_assignable_to(NominalReturningSelfNotGeneric, LegacyFunctionScoped))
+# TODO: should pass
+static_assert(not is_assignable_to(NominalReturningSelfNotGeneric, UsesSelf))  # error: [static-assert-error]
 ```
 
 ## Equivalence of protocols with method or property members
