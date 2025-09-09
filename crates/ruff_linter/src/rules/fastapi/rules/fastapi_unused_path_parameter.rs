@@ -79,7 +79,6 @@ impl Violation for FastApiUnusedPathParameter {
             function_name,
             is_positional,
         } = self;
-        #[expect(clippy::if_not_else)]
         if !is_positional {
             format!(
                 "Parameter `{arg_name}` appears in route path, but not in `{function_name}` signature"
