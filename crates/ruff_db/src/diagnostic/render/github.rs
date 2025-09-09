@@ -53,17 +53,19 @@ impl<'a> GithubRenderer<'a> {
 
                 write!(
                     f,
-                    "{path}:{row}:{column}:",
+                    "{path}:{row}:{column}: ",
                     path = file.relative_path(self.resolver).display(),
                     row = start_location.line,
                     column = start_location.column,
                 )?;
+            } else {
+                write!(f, "::")?;
             }
 
             if let Some(code) = diagnostic.secondary_code() {
-                write!(f, " {code}")?;
+                write!(f, "{code}")?;
             } else {
-                write!(f, " {id}:", id = diagnostic.id())?;
+                write!(f, "{id}:", id = diagnostic.id())?;
             }
 
             writeln!(f, " {}", diagnostic.body())?;
@@ -77,7 +79,7 @@ impl<'a> GithubRenderer<'a> {
 mod tests {
     use crate::diagnostic::{
         DiagnosticFormat,
-        render::tests::{create_diagnostics, create_syntax_error_diagnostics},
+        render::tests::{TestEnvironment, create_diagnostics, create_syntax_error_diagnostics},
     };
 
     #[test]
@@ -90,5 +92,18 @@ mod tests {
     fn syntax_errors() {
         let (env, diagnostics) = create_syntax_error_diagnostics(DiagnosticFormat::Github);
         insta::assert_snapshot!(env.render_diagnostics(&diagnostics));
+    }
+
+    #[test]
+    fn missing_file() {
+        let mut env = TestEnvironment::new();
+        env.format(DiagnosticFormat::Github);
+
+        let diag = env.err().build();
+
+        insta::assert_snapshot!(
+            env.render(&diag),
+            @"::error title=Ruff (test-diagnostic)::test-diagnostic: main diagnostic message",
+        );
     }
 }
