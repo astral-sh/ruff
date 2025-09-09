@@ -4,8 +4,6 @@
 )]
 use std::hash::BuildHasherDefault;
 
-use rustc_hash::FxHasher;
-
 use crate::lint::{LintRegistry, LintRegistryBuilder};
 use crate::suppression::{INVALID_IGNORE_COMMENT, UNKNOWN_RULE, UNUSED_IGNORE_COMMENT};
 pub use db::Db;
@@ -19,6 +17,7 @@ pub use program::{
     PythonVersionWithSource, SearchPathSettings,
 };
 pub use python_platform::PythonPlatform;
+use rustc_hash::FxHasher;
 pub use semantic_model::{
     Completion, CompletionKind, HasDefinition, HasType, NameKind, SemanticModel,
 };
