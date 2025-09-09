@@ -300,6 +300,18 @@ def generator():
 
 # TODO: Should be `Generator[Literal[1, 2], Any, None]`
 reveal_type(generator())  # revealed: Unknown
+
+async def async_generator():
+    yield
+
+# TODO: Should be `AsyncGenerator[None, Any]`
+reveal_type(async_generator())  # revealed: Unknown
+
+async def coroutine():
+    return
+
+# TODO: Should be `CoroutineType[Any, Any, None]`
+reveal_type(coroutine())  # revealed: Unknown
 ```
 
 The return type of a recursive function is also inferred. When the return type inference would
