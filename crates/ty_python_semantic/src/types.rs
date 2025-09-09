@@ -6965,11 +6965,15 @@ impl<'db> KnownInstanceType<'db> {
                     KnownInstanceType::ConstraintSet(tracked_set) => {
                         let constraints = tracked_set.constraints(self.db);
                         if constraints.is_always_satisfied(self.db) {
-                            f.write_str("always")
+                            f.write_str("ty_extensions.ConstraintSet[always]")
                         } else if constraints.is_never_satisfied(self.db) {
-                            f.write_str("never")
+                            f.write_str("ty_extensions.ConstraintSet[never]")
                         } else {
-                            write!(f, "when {}", constraints.display(self.db))
+                            write!(
+                                f,
+                                "ty_extensions.ConstraintSet[{}]",
+                                constraints.display(self.db)
+                            )
                         }
                     }
                 }
