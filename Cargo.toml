@@ -251,6 +251,14 @@ rest_pat_in_fully_bound_structs = "warn"
 redundant_clone = "warn"
 debug_assert_with_mut_call = "warn"
 unused_peekable = "warn"
+# This lint sometimes flags code whose `if` and `else`
+# bodies could be flipped when a `!` operator is removed.
+# While perhaps sometimes a good idea, it is also often
+# not a good idea due to other factors impacting
+# readability. For example, if flipping the bodies results
+# in the `if` being an order of magnitude bigger than the
+# `else`, then some might consider that harder to read.
+if_not_else = "allow"
 
 # Diagnostics are not actionable: Enable once https://github.com/rust-lang/rust-clippy/issues/13774 is resolved.
 large_stack_arrays = "allow"
