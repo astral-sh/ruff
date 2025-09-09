@@ -16,6 +16,8 @@ reveal_type(__doc__)  # revealed: str | None
 reveal_type(__spec__)  # revealed: ModuleSpec | None
 reveal_type(__path__)  # revealed: MutableSequence[str]
 reveal_type(__builtins__)  # revealed: Any
+# error: [possibly-unresolved-reference] "Name `__warningregistry__` used when possibly not defined"
+reveal_type(__warningregistry__)  # revealed: Any
 
 import sys
 
@@ -75,6 +77,8 @@ reveal_type(module.__file__)  # revealed: Unknown | None
 reveal_type(module.__path__)  # revealed: list[str]
 reveal_type(module.__doc__)  # revealed: Unknown
 reveal_type(module.__spec__)  # revealed: Unknown | ModuleSpec | None
+# error: [unresolved-attribute]
+reveal_type(module.__warningregistry__)  # revealed: Unknown
 
 def nested_scope():
     global __loader__

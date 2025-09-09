@@ -927,10 +927,33 @@ mod tests {
     }
 
     #[test]
-    fn module_annotate_py314_plus() {
-        // __annotate__ is available starting in Python 3.14; ensure no F821 when enabled.
-        // Note: The helper uses default target version from settings; ensure CI targets latest.
-        flakes("__annotate__", &[]);
+    fn module_annotate_py314_available() {
+        // __annotate__ is available starting in Python 3.14.
+        let diagnostics = crate::test::test_snippet(
+            "__annotate__",
+            &crate::settings::LinterSettings {
+                unresolved_target_version: ruff_python_ast::PythonVersion::PY314.into(),
+                ..crate::settings::LinterSettings::for_rules(vec![
+                    crate::codes::Rule::UndefinedName,
+                ])
+            },
+        );
+        assert!(diagnostics.is_empty());
+    }
+
+    #[test]
+    fn module_annotate_pre_py314_undefined() {
+        // __annotate__ is not available before Python 3.14.
+        let diagnostics = crate::test::test_snippet(
+            "__annotate__",
+            &crate::settings::LinterSettings {
+                unresolved_target_version: ruff_python_ast::PythonVersion::PY313.into(),
+                ..crate::settings::LinterSettings::for_rules(vec![
+                    crate::codes::Rule::UndefinedName,
+                ])
+            },
+        );
+        assert_eq!(diagnostics.len(), 1);
     }
 
     #[test]
