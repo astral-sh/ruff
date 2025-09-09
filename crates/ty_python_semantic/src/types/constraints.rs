@@ -1039,6 +1039,12 @@ impl<'db> RangeConstraint<'db> {
             return Simplifiable::NeverSatisfiable;
         }
 
+        // If the "hole" of the not-equivalent type is not contained in the range, the the
+        // intersection simplifies to the range.
+        if !self.lower.is_subtype_of(db, other.ty) || !other.ty.is_subtype_of(db, self.upper) {
+            return Simplifiable::Simplified(Constraint::Range(self.clone()));
+        }
+
         // Otherwise the result cannot be simplified.
         Simplifiable::NotSimplified(
             Constraint::Range(self.clone()),
