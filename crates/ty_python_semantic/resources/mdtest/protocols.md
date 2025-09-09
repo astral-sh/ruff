@@ -985,6 +985,13 @@ from ty_extensions import is_equivalent_to
 static_assert(is_equivalent_to(UniversalSet, object))
 ```
 
+and that therefore `Any` is a subtype of `UniversalSet` (in general, `Any` can _only_ ever be a
+subtype of `object` and types that are equivalent to `object`):
+
+```py
+static_assert(is_subtype_of(Any, UniversalSet))
+```
+
 `object` is a subtype of certain other protocols too. Since all fully static types (whether nominal
 or structural) are subtypes of `object`, these protocols are also subtypes of `object`; and this
 means that these protocols are also equivalent to `UniversalSet` and `object`:
@@ -1049,10 +1056,19 @@ This means that any type considered assignable to `object` (which is all types) 
 to be assignable to `Hashable`. This avoids false positives on code like this:
 
 ```py
+from typing import Sequence
+from ty_extensions import is_disjoint_from
+
 def takes_hashable_or_sequence(x: Hashable | list[Hashable]): ...
 
 takes_hashable_or_sequence(["foo"])  # fine
 takes_hashable_or_sequence(None)  # fine
+
+static_assert(not is_disjoint_from(list[str], Hashable | list[Hashable]))
+static_assert(not is_disjoint_from(list[str], Sequence[Hashable]))
+
+static_assert(is_subtype_of(list[Hashable], Sequence[Hashable]))
+static_assert(is_subtype_of(list[str], Sequence[Hashable]))
 ```
 
 but means that ty currently does not detect errors on code like this, which is flagged by other type
