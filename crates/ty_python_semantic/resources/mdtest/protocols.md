@@ -1801,6 +1801,98 @@ static_assert(is_assignable_to(str, SupportsLessThan))
 static_assert(is_assignable_to(int, Invertable))
 ```
 
+## Subtyping of protocols with generic method members
+
+Protocol method members can be generic. They can have generic contexts scoped to the class:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing_extensions import TypeVar, Self, Protocol
+from ty_extensions import is_equivalent_to, static_assert, is_assignable_to, is_subtype_of
+
+class NewStyle[T](Protocol):
+    def method(self, input: T) -> None: ...
+
+S = TypeVar("S")
+
+class OldStyle(Protocol[S]):
+    def method(self, input: S) -> None: ...
+
+static_assert(is_equivalent_to(NewStyle, OldStyle))
+static_assert(is_equivalent_to(NewStyle[int], OldStyle[int]))
+
+def _[T](x: T) -> T:
+    # TODO: should pass
+    static_assert(is_equivalent_to(NewStyle[T], OldStyle[T]))  # error: [static-assert-error]
+    return x
+
+class Nominal:
+    def method(self, input: int) -> None: ...
+
+static_assert(is_assignable_to(Nominal, NewStyle))
+static_assert(is_assignable_to(Nominal, OldStyle))
+
+# `NewStyle` is implicitly `NewStyle[Unknown]`, which is not a fully static type,
+# hence there is no subtyping relation:
+#
+# TODO: these should pass
+static_assert(not is_subtype_of(Nominal, NewStyle))  # error: [static-assert-error]
+static_assert(not is_subtype_of(Nominal, OldStyle))  # error: [static-assert-error]
+
+static_assert(is_subtype_of(Nominal, NewStyle[int]))
+static_assert(is_subtype_of(Nominal, OldStyle[int]))
+
+# TODO: these should pass
+static_assert(not is_assignable_to(Nominal, NewStyle[str]))  # error: [static-assert-error]
+static_assert(not is_assignable_to(Nominal, OldStyle[str]))  # error: [static-assert-error]
+```
+
+And they can also have generic contexts scoped to the method:
+
+```py
+class NewStyle(Protocol):
+    def f[T](self, input: T) -> T: ...
+
+S = TypeVar("S")
+
+class Legacy(Protocol):
+    def f(self, input: S) -> S: ...
+
+class UsesSelf(Protocol):
+    def g(self: Self) -> Self: ...
+
+class NominalNewStyle:
+    def f[T](self, input: T) -> T:
+        return input
+
+class NominalLegacy:
+    def f(self, input: S) -> S:
+        return input
+
+class NominalWithSelf:
+    def g(self: Self) -> Self:
+        return self
+
+# TODO: should pass
+static_assert(is_equivalent_to(Legacy, NewStyle))  # error: [static-assert-error]
+
+static_assert(is_subtype_of(NominalNewStyle, NewStyle))
+static_assert(is_subtype_of(NominalNewStyle, Legacy))
+static_assert(not is_assignable_to(NominalNewStyle, UsesSelf))
+
+static_assert(is_subtype_of(NominalLegacy, NewStyle))
+static_assert(is_subtype_of(NominalLegacy, Legacy))
+static_assert(not is_assignable_to(NominalLegacy, UsesSelf))
+
+static_assert(not is_assignable_to(NominalWithSelf, NewStyle))
+static_assert(not is_assignable_to(NominalWithSelf, Legacy))
+static_assert(is_subtype_of(NominalWithSelf, UsesSelf))
+```
+
 ## Equivalence of protocols with method or property members
 
 Two protocols `P1` and `P2`, both with a method member `x`, are considered equivalent if the
@@ -1919,7 +2011,7 @@ def f(arg1: type, arg2: type):
         reveal_type(arg2)  # revealed: type & ~type[OnlyMethodMembers]
 ```
 
-## Truthiness of protocol instance
+## Truthiness of protocol instances
 
 An instance of a protocol type generally has ambiguous truthiness:
 
@@ -2520,7 +2612,6 @@ Add tests for:
 - `super()` on nominal subtypes (explicit and implicit) of protocol classes
 - [Recursive protocols][recursive_protocols_spec]
 - Generic protocols
-- Non-generic protocols with function-scoped generic methods
 - Protocols with instance attributes annotated with `Callable` (can a nominal type with a method
     satisfy that protocol, and if so in what cases?)
 - Protocols decorated with `@final`
