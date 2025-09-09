@@ -214,19 +214,10 @@ fn has_local_dunder_class_var_ref(semantic: &SemanticModel, func_stmt: &Stmt) ->
         return false;
     }
 
-    let mut finder = AnyExpressionFinder::new(vec![
-        |expr: &Expr| {
-            expr.as_name_expr()
-                .is_some_and(|name| name.id.as_str() == "super" && name.ctx.is_load())
-        },
-        |expr: &Expr| {
-            expr.as_name_expr()
-                .is_some_and(|name| name.id.as_str() == "__class__" && name.ctx.is_load())
-        },
-    ]);
+    let mut finder = ClassCellReferenceFinder::new();
     finder.visit_stmt(func_stmt);
 
-    finder.has_expression()
+    finder.found()
 }
 
 /// Returns `true` if the call is to the built-in `builtins.super` function.
@@ -236,32 +227,30 @@ fn is_builtins_super(semantic: &SemanticModel, call: &ast::ExprCall) -> bool {
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["builtins", "super"]))
 }
 
-/// A [`Visitor`] that searches for [`Expr`] matching any of the provided conditions
-/// , excluding nested class definitions.
+/// A [`Visitor`] that searches for implicit reference to `__class__` cell,
+/// excluding nested class definitions.
 #[derive(Debug)]
-struct AnyExpressionFinder<'a> {
-    result_expression: Vec<&'a Expr>,
-    conditions: Vec<fn(&Expr) -> bool>,
+struct ClassCellReferenceFinder {
+    has_class_cell: bool,
 }
 
-impl AnyExpressionFinder<'_> {
-    pub(crate) fn new(conditions: Vec<fn(&Expr) -> bool>) -> Self {
-        AnyExpressionFinder {
-            result_expression: Vec::with_capacity(1),
-            conditions,
+impl ClassCellReferenceFinder {
+    pub(crate) fn new() -> Self {
+        ClassCellReferenceFinder {
+            has_class_cell: false,
         }
     }
-    pub(crate) fn has_expression(&self) -> bool {
-        !self.result_expression.is_empty()
+    pub(crate) fn found(&self) -> bool {
+        self.has_class_cell
     }
 }
 
-impl<'a> Visitor<'a> for AnyExpressionFinder<'a> {
+impl<'a> Visitor<'a> for ClassCellReferenceFinder {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
             Stmt::ClassDef(_) => {}
             _ => {
-                if self.result_expression.is_empty() {
+                if !self.has_class_cell {
                     walk_stmt(self, stmt);
                 }
             }
@@ -269,11 +258,11 @@ impl<'a> Visitor<'a> for AnyExpressionFinder<'a> {
     }
 
     fn visit_expr(&mut self, expr: &'a Expr) {
-        for condition in &self.conditions {
-            if condition(expr) {
-                self.result_expression.insert(0, expr);
-                return;
-            }
+        if expr.as_name_expr().is_some_and(|name| {
+            matches!(name.id.as_str(), "super" | "__class__") && name.ctx.is_load()
+        }) {
+            self.has_class_cell = true;
+            return;
         }
         walk_expr(self, expr);
     }
