@@ -7,7 +7,7 @@ use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
 /// ## What it does
 /// Checks for unnecessary default type arguments for `Generator` and
-/// `AsyncGenerator` on Python 3.13+ or stubs.
+/// `AsyncGenerator` on Python 3.13+ or in stubs.
 ///
 /// ## Why is this bad?
 /// Python 3.13 introduced the ability for type parameters to specify default

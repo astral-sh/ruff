@@ -1,27 +1,59 @@
-# https://github.com/python/typeshed/blob/main/stubs/networkx/networkx/algorithms/community/louvain.pyi
-from _typeshed import Incomplete
-from collections.abc import Generator
+from collections.abc import Generator, AsyncGenerator
 
-from networkx.classes.graph import Graph, _Node
-from networkx.utils.backends import _dispatchable
-from numpy.random import RandomState
 
-__all__ = ["louvain_communities", "louvain_partitions"]
+def func() -> Generator[int, None, None]:
+    yield 42
 
-@_dispatchable
-def louvain_communities(
-        G: Graph[_Node],
-        weight: str | None = "weight",
-        resolution: float | None = 1,
-        threshold: float | None = 1e-07,
-        max_level: int | None = None,
-        seed: int | RandomState | None = None,
-) -> list[set[Incomplete]]: ...
-@_dispatchable
-def louvain_partitions(
-        G: Graph[_Node],
-        weight: str | None = "weight",
-        resolution: float | None = 1,
-        threshold: float | None = 1e-07,
-        seed: int | RandomState | None = None,
-) -> Generator[list[set[Incomplete]], None, None]: ...
+
+def func() -> Generator[int, None]:
+    yield 42
+
+
+def func() -> Generator[int]:
+    yield 42
+
+
+def func() -> Generator[int, int, int]:
+    foo = yield 42
+    return foo
+
+
+def func() -> Generator[int, int, None]:
+    _ = yield 42
+    return None
+
+
+def func() -> Generator[int, None, int]:
+    yield 42
+    return 42
+
+
+async def func() -> AsyncGenerator[int, None]:
+    yield 42
+
+
+async def func() -> AsyncGenerator[int]:
+    yield 42
+
+
+async def func() -> AsyncGenerator[int, int]:
+    foo = yield 42
+    return foo
+
+
+from typing import Generator, AsyncGenerator
+
+
+def func() -> Generator[str, None, None]:
+    yield "hello"
+
+
+async def func() -> AsyncGenerator[str, None]:
+    yield "hello"
+
+
+async def func() -> AsyncGenerator[  # type: ignore
+    str,
+    None
+]:
+    yield "hello"
