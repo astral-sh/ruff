@@ -7546,6 +7546,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // the result would then become Any or Unknown, respectively).
             (div @ Type::Dynamic(DynamicType::Divergent(_)), _, _)
             | (_, div @ Type::Dynamic(DynamicType::Divergent(_)), _) => Some(div),
+
             (any @ Type::Dynamic(DynamicType::Any), _, _)
             | (_, any @ Type::Dynamic(DynamicType::Any), _) => Some(any),
 
