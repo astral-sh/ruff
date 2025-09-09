@@ -482,6 +482,12 @@ impl<'db> ProtocolInstanceType<'db> {
         }
     }
 
+    /// Return `true` if this protocol is a supertype of `object`.
+    ///
+    /// This indicates that the protocol represents the same set of possible runtime objects
+    /// as `object` (since `object` is the universal set of *all* possible runtime objects!).
+    /// Such a protocol is therefore an equivalent type to `object`, which would in fact be
+    /// normalised to `object`.
     pub(super) fn is_equivalent_to_object(self, db: &'db dyn Db) -> bool {
         #[salsa::tracked(cycle_fn=recover, cycle_initial=initial, heap_size=ruff_memory_usage::heap_size)]
         fn inner<'db>(db: &'db dyn Db, protocol: ProtocolInstanceType<'db>, _: ()) -> bool {
@@ -537,22 +543,6 @@ impl<'db> ProtocolInstanceType<'db> {
             )),
             Protocol::Synthesized(_) => Type::ProtocolInstance(self),
         }
-    }
-
-    /// Return `true` if this protocol type has the given type relation to the protocol `other`.
-    ///
-    /// TODO: consider the types of the members as well as their existence
-    pub(super) fn has_relation_to_impl<C: Constraints<'db>>(
-        self,
-        db: &'db dyn Db,
-        other: Self,
-        _relation: TypeRelation,
-        visitor: &HasRelationToVisitor<'db, C>,
-    ) -> C {
-        other
-            .inner
-            .interface(db)
-            .is_sub_interface_of(db, self.inner.interface(db), visitor)
     }
 
     /// Return `true` if this protocol type is equivalent to the protocol `other`.

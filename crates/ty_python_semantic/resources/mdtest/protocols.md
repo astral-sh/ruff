@@ -985,7 +985,7 @@ from ty_extensions import is_equivalent_to
 static_assert(is_equivalent_to(UniversalSet, object))
 ```
 
-and that therefore `Any` is a subtype of `UniversalSet` (in general, `Any` can _only_ ever be a
+and that therefore `Any` is a subtype of `UniversalSet` (in general, `Any` can *only* ever be a
 subtype of `object` and types that are equivalent to `object`):
 
 ```py
