@@ -2228,8 +2228,8 @@ to be a subtype of a given protocol, even if the other type violates the Liskov 
 Principle in some way.
 
 ```py
-from typing import Protocol
-from ty_extensions import static_assert, is_subtype_of
+from typing import Protocol, final
+from ty_extensions import static_assert, is_subtype_of, is_disjoint_from
 
 class X(Protocol):
     x: int
@@ -2237,11 +2237,14 @@ class X(Protocol):
 class YProto(X, Protocol):
     x: None = None  # TODO: we should emit an error here due to the Liskov violation
 
+@final
 class YNominal(X):
-    x = None  # TODO: we should emit an error here due to the Liskov violation
+    x: None = None  # TODO: we should emit an error here due to the Liskov violation
 
 static_assert(is_subtype_of(YProto, X))
 static_assert(is_subtype_of(YNominal, X))
+static_assert(not is_disjoint_from(YProto, X))
+static_assert(not is_disjoint_from(YNominal, X))
 ```
 
 A common use case for this behaviour is that a lot of ecosystem code depends on type checkers
@@ -2256,6 +2259,7 @@ we:
 from typing import Container
 
 static_assert(is_subtype_of(str, Container[str]))
+static_assert(not is_disjoint_from(str, Container[str]))
 ```
 
 This behaviour can have some counter-intuitive repercussions. For example, one implication of this
