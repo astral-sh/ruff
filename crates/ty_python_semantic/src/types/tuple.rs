@@ -22,6 +22,7 @@ use std::hash::Hash;
 use itertools::{Either, EitherOrBoth, Itertools};
 
 use crate::semantic_index::definition::Definition;
+use crate::types::Truthiness;
 use crate::types::class::{ClassType, KnownClass};
 use crate::types::constraints::{Constraints, IteratorConstraintsExtension};
 use crate::types::{
@@ -29,7 +30,6 @@ use crate::types::{
     IsDisjointVisitor, IsEquivalentVisitor, NormalizedVisitor, Type, TypeMapping, TypeRelation,
     UnionBuilder, UnionType,
 };
-use crate::types::{HasDivergentTypeVisitor, Truthiness};
 use crate::util::subscript::{Nth, OutOfBoundsError, PyIndex, PySlice, StepSizeZeroError};
 use crate::{Db, FxOrderSet, Program};
 
@@ -276,17 +276,6 @@ impl<'db> TupleType<'db> {
 
     pub(crate) fn is_single_valued(self, db: &'db dyn Db) -> bool {
         self.tuple(db).is_single_valued(db)
-    }
-
-    pub(super) fn has_divergent_type_impl(
-        self,
-        db: &'db dyn Db,
-        div: Type<'db>,
-        visitor: &HasDivergentTypeVisitor<'db>,
-    ) -> bool {
-        self.tuple(db)
-            .all_elements()
-            .any(|ty| ty.has_divergent_type_impl(db, div, visitor))
     }
 }
 
