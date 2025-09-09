@@ -315,7 +315,7 @@ reveal_type(coroutine())  # revealed: Unknown
 ```
 
 The return type of a recursive function is also inferred. When the return type inference would
-diverge, it is truncated and replaced with the type `Unknown`.
+diverge, it is truncated and replaced with the special dynamic type `Divergent`.
 
 ```py
 def fibonacci(n: int):
