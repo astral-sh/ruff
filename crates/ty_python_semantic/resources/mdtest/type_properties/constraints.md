@@ -43,7 +43,7 @@ class Sub(Base): ...
 @final
 class Unrelated: ...
 
-def _[T]():
+def _[T]() -> None:
     # revealed: ty_extensions.ConstraintSet[(Sub ≤ T@_ ≤ Super)]
     reveal_type(range_constraint(Sub, T, Super))
 ```
@@ -52,7 +52,7 @@ Every type is a supertype of `Never`, so a lower bound of `Never` is the same as
 bound.
 
 ```py
-def _[T]():
+def _[T]() -> None:
     # revealed: ty_extensions.ConstraintSet[(T@_ ≤ Base)]
     reveal_type(range_constraint(Never, T, Base))
 ```
@@ -61,7 +61,7 @@ Similarly, every type is a subtype of `object`, so an upper bound of `object` is
 no upper bound.
 
 ```py
-def _[T]():
+def _[T]() -> None:
     # revealed: ty_extensions.ConstraintSet[(Base ≤ T@_)]
     reveal_type(range_constraint(Base, T, object))
 ```
@@ -70,7 +70,7 @@ And a range constraint with _both_ a lower bound of `Never` and an upper bound o
 constrain the typevar at all.
 
 ```py
-def _[T]():
+def _[T]() -> None:
     # revealed: ty_extensions.ConstraintSet[always]
     reveal_type(range_constraint(Never, T, object))
 ```
@@ -79,7 +79,7 @@ If the lower bound and upper bounds are "inverted" (the upper bound is a subtype
 bound) or incomparable, then there is no type that can satisfy the constraint.
 
 ```py
-def _[T]():
+def _[T]() -> None:
     # revealed: ty_extensions.ConstraintSet[never]
     reveal_type(range_constraint(Super, T, Sub))
     # revealed: ty_extensions.ConstraintSet[never]
@@ -90,7 +90,7 @@ Constraints can only refer to fully static types, so the lower and upper bounds 
 their bottom and top materializations, respectively.
 
 ```py
-def _[T]():
+def _[T]() -> None:
     # revealed: ty_extensions.ConstraintSet[(Base ≤ T@_)]
     reveal_type(range_constraint(Base, T, Any))
     # revealed: ty_extensions.ConstraintSet[(Sequence[Base] ≤ T@_ ≤ Sequence[object])]
@@ -113,7 +113,7 @@ from ty_extensions import not_equivalent_constraint
 
 class Base: ...
 
-def _[T]():
+def _[T]() -> None:
     # revealed: ty_extensions.ConstraintSet[(T@_ ≠ Base)]
     reveal_type(not_equivalent_constraint(T, Base))
 ```
@@ -122,7 +122,7 @@ Unlike range constraints, `Never` and `object` are not special when used as the 
 not-equivalent constraint — there are many types that are not equivalent to `Never` or `object`.
 
 ```py
-def _[T]():
+def _[T]() -> None:
     # revealed: ty_extensions.ConstraintSet[(T@_ ≠ Never)]
     reveal_type(not_equivalent_constraint(T, Never))
 
@@ -134,7 +134,7 @@ Constraints can only refer to fully static types, so the hole is transformed int
 materialization.
 
 ```py
-def _[T]():
+def _[T]() -> None:
     # revealed: ty_extensions.ConstraintSet[(T@_ ≠ object)]
     reveal_type(not_equivalent_constraint(T, Any))
     # revealed: ty_extensions.ConstraintSet[(T@_ ≠ Sequence[object])]
@@ -152,7 +152,7 @@ from ty_extensions import incomparable_constraint
 
 class Base: ...
 
-def _[T]():
+def _[T]() -> None:
     # revealed: ty_extensions.ConstraintSet[(T@_ ≁ Base)]
     reveal_type(incomparable_constraint(T, Base))
 ```
@@ -161,7 +161,7 @@ Every type is comparable with `Never` and with `object`, so an incomparable cons
 as a pivot cannot ever be satisfied.
 
 ```py
-def _[T]():
+def _[T]() -> None:
     # revealed: ty_extensions.ConstraintSet[never]
     reveal_type(incomparable_constraint(T, Never))
 
@@ -173,7 +173,7 @@ Constraints can only refer to fully static types, so the pivot is transformed in
 materialization.
 
 ```py
-def _[T]():
+def _[T]() -> None:
     # revealed: ty_extensions.ConstraintSet[never]
     reveal_type(incomparable_constraint(T, Any))
     # revealed: ty_extensions.ConstraintSet[(T@_ ≁ Sequence[object])]
