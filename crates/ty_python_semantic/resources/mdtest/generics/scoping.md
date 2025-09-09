@@ -167,7 +167,6 @@ class C[T]:
         return y
 
 c: C[int] = C()
-
 reveal_type(c.m(1, "string"))  # revealed: Literal["string"]
 ```
 
