@@ -584,8 +584,11 @@ impl<'db> Bindings<'db> {
                     Type::FunctionLiteral(function_type) => match function_type.known(db) {
                         Some(KnownFunction::IsEquivalentTo) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
-                                overload.set_return_type(Type::BooleanLiteral(
-                                    ty_a.is_equivalent_to(db, *ty_b),
+                                let constraints =
+                                    ty_a.when_equivalent_to::<ConstraintSet>(db, *ty_b);
+                                let tracked = TrackedConstraintSet::new(db, constraints);
+                                overload.set_return_type(Type::KnownInstance(
+                                    KnownInstanceType::ConstraintSet(tracked),
                                 ));
                             }
                         }
@@ -613,8 +616,11 @@ impl<'db> Bindings<'db> {
 
                         Some(KnownFunction::IsDisjointFrom) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
-                                overload.set_return_type(Type::BooleanLiteral(
-                                    ty_a.is_disjoint_from(db, *ty_b),
+                                let constraints =
+                                    ty_a.when_disjoint_from::<ConstraintSet>(db, *ty_b);
+                                let tracked = TrackedConstraintSet::new(db, constraints);
+                                overload.set_return_type(Type::KnownInstance(
+                                    KnownInstanceType::ConstraintSet(tracked),
                                 ));
                             }
                         }
