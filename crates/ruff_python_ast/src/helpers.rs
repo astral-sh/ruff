@@ -700,65 +700,6 @@ pub const fn is_mutable_iterable_initializer(expr: &Expr) -> bool {
     )
 }
 
-/// Determine if a mapping expression is definitely empty, definitely non-empty, or unknown.
-///
-/// Returns:
-/// - `Some(true)` if the mapping is definitely empty (e.g., `{}`, `{**{}}`, `dict()`)
-/// - `Some(false)` if the mapping is definitely non-empty (e.g., `{1:2}`, `{**{1:2}}`)
-/// - `None` if unknown at analysis time (e.g., `{**x}`, `dict(x)`, comprehensions)
-fn is_definitely_empty_mapping(expr: &Expr, is_builtin: &dyn Fn(&str) -> bool) -> Option<bool> {
-    match expr {
-        Expr::Dict(d) => {
-            if d.is_empty() {
-                return Some(true);
-            }
-            if d.items
-                .iter()
-                .all(|item| matches!(item, DictItem { key: None, .. }))
-            {
-                let mut any_non_empty = false;
-                let mut all_empty = true;
-                for item in &d.items {
-                    match is_definitely_empty_mapping(&item.value, is_builtin) {
-                        Some(true) => { /* still empty */ }
-                        Some(false) => {
-                            any_non_empty = true;
-                            all_empty = false;
-                            break;
-                        }
-                        None => {
-                            all_empty = false;
-                        }
-                    }
-                }
-                if any_non_empty {
-                    Some(false)
-                } else if all_empty {
-                    Some(true)
-                } else {
-                    None
-                }
-            } else {
-                // Presence of keyed items makes the literal definitely non-empty.
-                Some(false)
-            }
-        }
-        Expr::Call(ast::ExprCall {
-            func, arguments, ..
-        }) => {
-            if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
-                if id.as_str() == "dict" && is_builtin("dict") {
-                    if arguments.is_empty() {
-                        return Some(true);
-                    }
-                }
-            }
-            None
-        }
-        _ => None,
-    }
-}
-
 /// Extract the names of all handled exceptions.
 pub fn extract_handled_exceptions(handlers: &[ExceptHandler]) -> Vec<&Expr> {
     let mut handled_exceptions = Vec::new();
@@ -1354,46 +1295,15 @@ impl Truthiness {
                 }
 
                 // If the dict consists only of double-starred items (e.g., {**x, **y}),
-                // its truthiness depends on the truthiness of the unpacked mappings.
-                // - If any unpacked mapping is definitely truthy, the result is truthy.
-                // - If all unpacked mappings are definitely falsey (e.g., {} or dict()),
-                //   the result is falsey.
-                // - Otherwise, the result is unknown.
+                // consider its truthiness unknown. This matches lists/sets/tuples containing
+                // only starred elements, which are also Unknown.
                 if dict
                     .items
                     .iter()
                     .all(|item| matches!(item, DictItem { key: None, .. }))
                 {
-                    // Evaluate only simple, non-recursive cases to avoid generic recursion.
-                    let mut any_definitely_truthy = false;
-                    let mut all_definitely_falsey = true;
-
-                    for item in &dict.items {
-                        let mapping_expr = &item.value;
-                        let (is_true, is_false, is_unknown) =
-                            match is_definitely_empty_mapping(mapping_expr, &is_builtin) {
-                                Some(true) => (false, true, false),  // empty mapping => falsey
-                                Some(false) => (true, false, false), // non-empty mapping => truthy
-                                None => (false, false, true),        // unknown
-                            };
-
-                        if is_true {
-                            any_definitely_truthy = true;
-                            break;
-                        }
-                        if !is_false {
-                            all_definitely_falsey = false;
-                        }
-                        let _ = is_unknown;
-                    }
-
-                    if any_definitely_truthy {
-                        Self::Truthy
-                    } else if all_definitely_falsey {
-                        Self::Falsey
-                    } else {
-                        Self::Unknown
-                    }
+                    // {**foo} / {**foo, **bar}
+                    Self::Unknown
                 } else {
                     Self::Truthy
                 }
