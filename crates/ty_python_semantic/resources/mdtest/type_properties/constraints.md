@@ -98,6 +98,38 @@ def _[T]():
 A _not-equivalent_ constraint requires the typevar to specialize to anything _other_ than a
 particular type (the "hole").
 
+```py
+from typing import Any, Never
+from ty_extensions import not_equivalent_constraint
+
+class Base: ...
+
+def _[T]():
+    # revealed: ty_extensions.ConstraintSet[(T@_ ≠ Base)]
+    reveal_type(not_equivalent_constraint(T, Base))
+```
+
+Unlike range constraints, `Never` and `object` are not special when used as the hole of a
+not-equivalent constraint — there are many types that are not equivalent to `Never` or `object`.
+
+```py
+def _[T]():
+    # revealed: ty_extensions.ConstraintSet[(T@_ ≠ Never)]
+    reveal_type(not_equivalent_constraint(T, Never))
+
+    # revealed: ty_extensions.ConstraintSet[(T@_ ≠ object)]
+    reveal_type(not_equivalent_constraint(T, object))
+```
+
+Constraints can only refer to fully static types, so the hole is transformed into its top
+materialization.
+
+```py
+def _[T]():
+    # revealed: ty_extensions.ConstraintSet[(T@_ ≠ object)]
+    reveal_type(not_equivalent_constraint(T, Any))
+```
+
 ### Incomparable
 
 An _incomparable_ constraint requires the typevar to specialize to any type that is neither a

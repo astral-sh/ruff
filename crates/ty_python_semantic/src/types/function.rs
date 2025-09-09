@@ -1257,6 +1257,8 @@ pub enum KnownFunction {
     RevealProtocolInterface,
     /// `ty_extensions.range_constraint`
     RangeConstraint,
+    /// `ty_extensions.not_equivalent_constraint`
+    NotEquivalentConstraint,
 }
 
 impl KnownFunction {
@@ -1323,6 +1325,7 @@ impl KnownFunction {
             | Self::HasMember
             | Self::RevealProtocolInterface
             | Self::RangeConstraint
+            | Self::NotEquivalentConstraint
             | Self::AllMembers => module.is_ty_extensions(),
             Self::ImportModule => module.is_importlib(),
         }
@@ -1679,6 +1682,7 @@ pub(crate) mod tests {
                 | KnownFunction::HasMember
                 | KnownFunction::RevealProtocolInterface
                 | KnownFunction::RangeConstraint
+                | KnownFunction::NotEquivalentConstraint
                 | KnownFunction::AllMembers => KnownModule::TyExtensions,
 
                 KnownFunction::ImportModule => KnownModule::ImportLib,

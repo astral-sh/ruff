@@ -283,6 +283,18 @@ impl<'db> ConstraintSet<'db> {
         result
     }
 
+    pub(crate) fn not_equivalent(
+        db: &'db dyn Db,
+        typevar: BoundTypeVarInstance<'db>,
+        hole: Type<'db>,
+    ) -> Self {
+        let hole = hole.top_materialization(db);
+        let constraint = Constraint::not_equivalent(db, hole).constrain(typevar);
+        let mut result = Self::never();
+        result.union_constraint(db, constraint);
+        result
+    }
+
     /// Updates this set to be the union of itself and a constraint.
     fn union_constraint(
         &mut self,
