@@ -424,7 +424,7 @@ impl<'db> Constraints<'db> for ConstraintSet<'db> {
     }
 }
 
-/// The intersection of zero or more atomic constraints.
+/// The intersection of zero or more individual constraints.
 ///
 /// This is called a "constraint set", and denoted _C_, in [[POPL2015][]].
 ///
@@ -480,8 +480,8 @@ impl<'db> ConstraintClause<'db> {
         }
     }
 
-    /// Updates this clause to be the intersection of itself and an atomic constraint. Returns a
-    /// flag indicating whether the updated clause is never, always, or sometimes satisfied.
+    /// Updates this clause to be the intersection of itself and an individual constraint. Returns
+    /// a flag indicating whether the updated clause is never, always, or sometimes satisfied.
     fn intersect_constraint(
         &mut self,
         db: &'db dyn Db,
@@ -817,7 +817,7 @@ pub(crate) struct ConstrainedTypeVar<'db> {
 }
 
 impl<'db> ConstrainedTypeVar<'db> {
-    /// Returns the intersection of this atomic constraint and another.
+    /// Returns the intersection of this individual constraint and another.
     fn intersect(&self, db: &'db dyn Db, other: &Self) -> Simplifiable<Self> {
         if self.typevar != other.typevar {
             return Simplifiable::NotSimplified(self.clone(), other.clone());
@@ -827,7 +827,7 @@ impl<'db> ConstrainedTypeVar<'db> {
             .map(|constraint| constraint.constrain(self.typevar))
     }
 
-    /// Returns the union of this atomic constraint and another.
+    /// Returns the union of this individual constraint and another.
     fn union(&self, db: &'db dyn Db, other: &Self) -> Simplifiable<Self> {
         if self.typevar != other.typevar {
             return Simplifiable::NotSimplified(self.clone(), other.clone());
@@ -837,7 +837,7 @@ impl<'db> ConstrainedTypeVar<'db> {
             .map(|constraint| constraint.constrain(self.typevar))
     }
 
-    /// Adds the negation of this atomic constraint to a constraint set.
+    /// Adds the negation of this individual constraint to a constraint set.
     fn negate_into(&self, db: &'db dyn Db, set: &mut ConstraintSet<'db>) {
         self.constraint.negate_into(db, self.typevar, set);
     }
