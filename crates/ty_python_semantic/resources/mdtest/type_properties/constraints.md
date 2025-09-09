@@ -33,12 +33,15 @@ typevar can only specialize to a type that is a supertype of the lower bound, an
 upper bound.
 
 ```py
-from typing import Any, Never, Sequence
+from typing import Any, final, Never, Sequence
 from ty_extensions import range_constraint
 
 class Super: ...
 class Base(Super): ...
 class Sub(Base): ...
+
+@final
+class Unrelated: ...
 
 def _[T]():
     # revealed: ty_extensions.ConstraintSet[(Sub ≤ T@_ ≤ Super)]
@@ -73,12 +76,14 @@ def _[T]():
 ```
 
 If the lower bound and upper bounds are "inverted" (the upper bound is a subtype of the lower
-bound), then there is no type that can satisfy the constraint.
+bound) or incomparable, then there is no type that can satisfy the constraint.
 
 ```py
 def _[T]():
     # revealed: ty_extensions.ConstraintSet[never]
     reveal_type(range_constraint(Super, T, Sub))
+    # revealed: ty_extensions.ConstraintSet[never]
+    reveal_type(range_constraint(Base, T, Unrelated))
 ```
 
 Constraints can only refer to fully static types, so the lower and upper bounds are transformed into
