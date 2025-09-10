@@ -115,7 +115,7 @@ jiff = { version = "0.2.0" }
 js-sys = { version = "0.3.69" }
 jod-thread = { version = "1.0.0" }
 libc = { version = "0.2.153" }
-libcst = { version = "1.1.0", default-features = false }
+libcst = { version = "1.8.4", default-features = false }
 log = { version = "0.4.17" }
 lsp-server = { version = "0.7.6" }
 lsp-types = { git = "https://github.com/astral-sh/lsp-types.git", rev = "3512a9f", features = [
