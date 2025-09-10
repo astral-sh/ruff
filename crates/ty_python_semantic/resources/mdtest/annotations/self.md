@@ -30,7 +30,9 @@ class Shape:
 
     def nested_func_without_enclosing_binding(self):
         def inner(x: Self):
-            reveal_type(x)  # revealed: Self@nested_func_without_enclosing_binding
+            # TODO: revealed: Self@nested_func_without_enclosing_binding
+            # (The outer method binds an implicit `Self`)
+            reveal_type(x)  # revealed: Self@inner
         inner(self)
 
 reveal_type(Shape().nested_type())  # revealed: list[Shape]

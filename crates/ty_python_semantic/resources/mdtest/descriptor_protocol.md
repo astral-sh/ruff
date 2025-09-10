@@ -431,6 +431,8 @@ def _(flag: bool):
     reveal_type(C7.union_of_class_data_descriptor_and_attribute)  # revealed: Literal["data", 2]
 
     C7.union_of_metaclass_attributes = 2 if flag else 1
+    # TODO: https://github.com/astral-sh/ty/issues/1163
+    # error: [invalid-assignment]
     C7.union_of_metaclass_data_descriptor_and_attribute = 2 if flag else 100
     C7.union_of_class_attributes = 2 if flag else 1
     C7.union_of_class_data_descriptor_and_attribute = 2 if flag else DataDescriptor()
