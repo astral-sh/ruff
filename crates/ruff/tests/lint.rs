@@ -5059,6 +5059,60 @@ fn flake8_import_convention_unused_aliased_import_no_conflict() {
     );
 }
 
+// https://github.com/astral-sh/ruff/issues/19842
+#[test]
+fn pyupgrade_up026_respects_isort_required_import_fix() {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .arg("check")
+            .arg("--no-cache")
+            .arg("--isolated")
+            .arg("--fix")
+            .arg("--config")
+            .arg(r#"lint.isort.required-imports = ["import mock"]"#)
+            .args(["--select", "I002,UP026"])
+            .args(["--stdin-filename", "test.py"])
+            .arg("-")
+            .pass_stdin("import mock\n"),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    import mock
+
+    ----- stderr -----
+    All checks passed!
+    "
+    );
+}
+
+// https://github.com/astral-sh/ruff/issues/19842
+#[test]
+fn pyupgrade_up026_respects_isort_required_import_from_fix() {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .arg("check")
+            .arg("--no-cache")
+            .arg("--isolated")
+            .arg("--fix")
+            .arg("--config")
+            .arg(r#"lint.isort.required-imports = ["from mock import mock"]"#)
+            .args(["--select", "UP026"])
+            .args(["--stdin-filename", "test.py"])
+            .arg("-")
+            .pass_stdin("from mock import mock\n"),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    from mock import mock
+
+    ----- stderr -----
+    All checks passed!
+    "
+    );
+}
+
 // See: https://github.com/astral-sh/ruff/issues/16177
 #[test]
 fn flake8_pyi_redundant_none_literal() {

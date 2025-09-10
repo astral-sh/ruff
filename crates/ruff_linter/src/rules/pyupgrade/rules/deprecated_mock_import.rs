@@ -17,6 +17,7 @@ use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::{match_import, match_import_from, match_statement};
 use crate::fix::codemods::CodegenStylist;
+use crate::rules::pyupgrade::rules::is_import_required_by_isort;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
@@ -299,6 +300,13 @@ pub(crate) fn deprecated_mock_import(checker: &Checker, stmt: &Stmt) {
 
                 // Add a `Diagnostic` for each `mock` import.
                 for name in names {
+                    if is_import_required_by_isort(
+                        &checker.settings().isort.required_imports,
+                        stmt.into(),
+                        name,
+                    ) {
+                        continue;
+                    }
                     if &name.name == "mock" || &name.name == "mock.mock" {
                         let mut diagnostic = checker.report_diagnostic(
                             DeprecatedMockImport {
@@ -319,6 +327,7 @@ pub(crate) fn deprecated_mock_import(checker: &Checker, stmt: &Stmt) {
         Stmt::ImportFrom(ast::StmtImportFrom {
             module: Some(module),
             level,
+            names,
             ..
         }) => {
             if *level > 0 {
@@ -326,6 +335,16 @@ pub(crate) fn deprecated_mock_import(checker: &Checker, stmt: &Stmt) {
             }
 
             if module == "mock" {
+                if names.iter().any(|alias| {
+                    is_import_required_by_isort(
+                        &checker.settings().isort.required_imports,
+                        stmt.into(),
+                        alias,
+                    )
+                }) {
+                    return;
+                }
+
                 let mut diagnostic = checker.report_diagnostic(
                     DeprecatedMockImport {
                         reference_type: MockReference::Import,
