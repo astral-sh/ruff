@@ -195,6 +195,10 @@ impl ScopeLaziness {
     pub(crate) const fn is_eager(self) -> bool {
         matches!(self, ScopeLaziness::Eager)
     }
+
+    pub(crate) const fn is_lazy(self) -> bool {
+        matches!(self, ScopeLaziness::Lazy)
+    }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]

@@ -40,13 +40,6 @@ You cannot use the same typevar more than once.
 class RepeatedTypevar[T, T]: ...
 ```
 
-You can only use typevars (TODO: or param specs or typevar tuples) in the class's generic context.
-
-```py
-# TODO: error
-class GenericOfType[int]: ...
-```
-
 You can also define a generic class by inheriting from some _other_ generic class, and specializing
 it with typevars. With PEP 695 syntax, you must explicitly list all of the typevars that you use in
 your base classes.
