@@ -3265,7 +3265,7 @@ impl<'db> Type<'db> {
         policy: InstanceFallbackShadowsNonDataDescriptor,
         member_policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
-        if name == "__call__" && self.is_callable_type() {
+        if name == "__call__" && matches!(self, Type::Callable(_) | Type::DataclassTransformer(_)) {
             return Place::bound(self).into();
         }
 
@@ -3447,11 +3447,6 @@ impl<'db> Type<'db> {
                         })
                 }
             },
-            Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(function))
-                if name == "__call__" =>
-            {
-                Place::bound(Type::Callable(function.into_callable_type(db))).into()
-            }
             Type::KnownBoundMethod(method) => method
                 .class()
                 .to_instance(db)
