@@ -1327,6 +1327,12 @@ impl<'db> Type<'db> {
                 false,
             ))),
 
+            Type::WrapperDescriptor(wrapper_descriptor) => Some(Type::Callable(CallableType::new(
+                db,
+                CallableSignature::from_overloads(wrapper_descriptor.signatures(db)),
+                false,
+            ))),
+
             Type::Never
             | Type::DataclassTransformer(_)
             | Type::AlwaysTruthy
@@ -1340,8 +1346,7 @@ impl<'db> Type<'db> {
             | Type::TypedDict(_) => None,
 
             // TODO
-            Type::WrapperDescriptor(_)
-            | Type::DataclassDecorator(_)
+            Type::DataclassDecorator(_)
             | Type::ModuleLiteral(_)
             | Type::SpecialForm(_)
             | Type::KnownInstance(_)
@@ -1352,6 +1357,7 @@ impl<'db> Type<'db> {
             | Type::BoundSuper(_) => None,
         }
     }
+
     /// Return true if this type is a [subtype of] type `target`.
     ///
     /// For fully static types, this means that the set of objects represented by `self` is a
@@ -4018,77 +4024,9 @@ impl<'db> Type<'db> {
                 CallableBinding::from_overloads(self, method.signatures(db)).into()
             }
 
-            Type::WrapperDescriptor(
-                kind @ (WrapperDescriptorKind::FunctionTypeDunderGet
-                | WrapperDescriptorKind::PropertyDunderGet),
-            ) => {
-                // Here, we also model `types.FunctionType.__get__` (or builtins.property.__get__),
-                // but now we consider a call to this as a function, i.e. we also expect the `self`
-                // argument to be passed in.
-
-                // TODO: Consider merging this signature with the one in the previous match clause,
-                // since the previous one is just this signature with the `self` parameters
-                // removed.
-                let descriptor = match kind {
-                    WrapperDescriptorKind::FunctionTypeDunderGet => {
-                        KnownClass::FunctionType.to_instance(db)
-                    }
-                    WrapperDescriptorKind::PropertyDunderGet => {
-                        KnownClass::Property.to_instance(db)
-                    }
-                    WrapperDescriptorKind::PropertyDunderSet => {
-                        unreachable!("Not part of outer match pattern")
-                    }
-                };
-                CallableBinding::from_overloads(
-                    self,
-                    [
-                        Signature::new(
-                            Parameters::new([
-                                Parameter::positional_only(Some(Name::new_static("self")))
-                                    .with_annotated_type(descriptor),
-                                Parameter::positional_only(Some(Name::new_static("instance")))
-                                    .with_annotated_type(Type::none(db)),
-                                Parameter::positional_only(Some(Name::new_static("owner")))
-                                    .with_annotated_type(KnownClass::Type.to_instance(db)),
-                            ]),
-                            None,
-                        ),
-                        Signature::new(
-                            Parameters::new([
-                                Parameter::positional_only(Some(Name::new_static("self")))
-                                    .with_annotated_type(descriptor),
-                                Parameter::positional_only(Some(Name::new_static("instance")))
-                                    .with_annotated_type(Type::object(db)),
-                                Parameter::positional_only(Some(Name::new_static("owner")))
-                                    .with_annotated_type(UnionType::from_elements(
-                                        db,
-                                        [KnownClass::Type.to_instance(db), Type::none(db)],
-                                    ))
-                                    .with_default_type(Type::none(db)),
-                            ]),
-                            None,
-                        ),
-                    ],
-                )
-                .into()
+            Type::WrapperDescriptor(wrapper_descriptor) => {
+                CallableBinding::from_overloads(self, wrapper_descriptor.signatures(db)).into()
             }
-
-            Type::WrapperDescriptor(WrapperDescriptorKind::PropertyDunderSet) => Binding::single(
-                self,
-                Signature::new(
-                    Parameters::new([
-                        Parameter::positional_only(Some(Name::new_static("self")))
-                            .with_annotated_type(KnownClass::Property.to_instance(db)),
-                        Parameter::positional_only(Some(Name::new_static("instance")))
-                            .with_annotated_type(Type::object(db)),
-                        Parameter::positional_only(Some(Name::new_static("value")))
-                            .with_annotated_type(Type::object(db)),
-                    ]),
-                    None,
-                ),
-            )
-            .into(),
 
             // TODO: We should probably also check the original return type of the function
             // that was decorated with `@dataclass_transform`, to see if it is consistent with
@@ -9417,6 +9355,10 @@ impl<'db> KnownBoundMethodType<'db> {
             //
             // For `builtins.property.__get__`, we use the same signature. The return types are not
             // specified yet, they will be dynamically added in `Bindings::evaluate_known_cases`.
+            //
+            // TODO: Consider merging these synthesized signatures with the ones in
+            // [`WrapperDescriptorKind::signatures`], since this one is just that signature
+            // with the `self` parameters removed.
             KnownBoundMethodType::FunctionTypeDunderGet(_)
             | KnownBoundMethodType::PropertyDunderGet(_) => Either::Left(Either::Left(
                 [
@@ -9501,6 +9443,75 @@ pub enum WrapperDescriptorKind {
     PropertyDunderGet,
     /// `property.__set__`
     PropertyDunderSet,
+}
+
+impl WrapperDescriptorKind {
+    fn signatures(self, db: &dyn Db) -> impl Iterator<Item = Signature<'_>> {
+        /// Similar to what we do in [`KnownBoundMethod::signatures`],
+        /// here we also model `types.FunctionType.__get__` (or builtins.property.__get__),
+        /// but now we consider a call to this as a function, i.e. we also expect the `self`
+        /// argument to be passed in.
+        ///
+        /// TODO: Consider merging these synthesized signatures with the ones in
+        /// [`KnownBoundMethod::signatures`], since that one is just this signature
+        /// with the `self` parameters removed.
+        fn dunder_get_signatures(db: &dyn Db, class: KnownClass) -> [Signature<'_>; 2] {
+            let type_instance = KnownClass::Type.to_instance(db);
+            let none = Type::none(db);
+            let descriptor = class.to_instance(db);
+            [
+                Signature::new(
+                    Parameters::new([
+                        Parameter::positional_only(Some(Name::new_static("self")))
+                            .with_annotated_type(descriptor),
+                        Parameter::positional_only(Some(Name::new_static("instance")))
+                            .with_annotated_type(none),
+                        Parameter::positional_only(Some(Name::new_static("owner")))
+                            .with_annotated_type(type_instance),
+                    ]),
+                    None,
+                ),
+                Signature::new(
+                    Parameters::new([
+                        Parameter::positional_only(Some(Name::new_static("self")))
+                            .with_annotated_type(descriptor),
+                        Parameter::positional_only(Some(Name::new_static("instance")))
+                            .with_annotated_type(Type::object(db)),
+                        Parameter::positional_only(Some(Name::new_static("owner")))
+                            .with_annotated_type(UnionType::from_elements(
+                                db,
+                                [type_instance, none],
+                            ))
+                            .with_default_type(none),
+                    ]),
+                    None,
+                ),
+            ]
+        }
+
+        match self {
+            WrapperDescriptorKind::FunctionTypeDunderGet => {
+                Either::Left(dunder_get_signatures(db, KnownClass::FunctionType).into_iter())
+            }
+            WrapperDescriptorKind::PropertyDunderGet => {
+                Either::Left(dunder_get_signatures(db, KnownClass::Property).into_iter())
+            }
+            WrapperDescriptorKind::PropertyDunderSet => {
+                let object = Type::object(db);
+                Either::Right(std::iter::once(Signature::new(
+                    Parameters::new([
+                        Parameter::positional_only(Some(Name::new_static("self")))
+                            .with_annotated_type(KnownClass::Property.to_instance(db)),
+                        Parameter::positional_only(Some(Name::new_static("instance")))
+                            .with_annotated_type(object),
+                        Parameter::positional_only(Some(Name::new_static("value")))
+                            .with_annotated_type(object),
+                    ]),
+                    None,
+                )))
+            }
+        }
+    }
 }
 
 /// # Ordering

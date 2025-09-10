@@ -610,9 +610,6 @@ static_assert(is_assignable_to(types.FunctionType, Callable))
 
 # revealed: <wrapper-descriptor `__get__` of `function` objects>
 reveal_type(types.FunctionType.__get__)
-
-# TODO: should pass
-# error: [static-assert-error]
 static_assert(is_assignable_to(TypeOf[types.FunctionType.__get__], Callable))
 
 # revealed: def f(obj: type) -> None
@@ -633,9 +630,6 @@ static_assert(is_assignable_to(TypeOf[f.__call__], Callable))
 
 # revealed: <wrapper-descriptor `__get__` of `property` objects>
 reveal_type(property.__get__)
-
-# TODO: should pass
-# error: [static-assert-error]
 static_assert(is_assignable_to(TypeOf[property.__get__], Callable))
 
 # revealed: property
@@ -649,9 +643,6 @@ static_assert(is_assignable_to(TypeOf[MyClass.my_property.__get__], Callable))
 
 # revealed: <wrapper-descriptor `__set__` of `property` objects>
 reveal_type(property.__set__)
-
-# TODO: should pass
-# error: [static-assert-error]
 static_assert(is_assignable_to(TypeOf[property.__set__], Callable))
 
 # revealed: <method-wrapper `__set__` of `property` object>
