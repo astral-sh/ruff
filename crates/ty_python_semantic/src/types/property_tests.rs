@@ -133,13 +133,13 @@ mod stable {
     // All types should be assignable to `object`
     type_property_test!(
         all_types_assignable_to_object, db,
-        forall types t. t.is_assignable_to(db, Type::object(db))
+        forall types t. t.is_assignable_to(db, Type::object())
     );
 
     // And all types should be subtypes of `object`
     type_property_test!(
         all_types_subtype_of_object, db,
-        forall types t. t.is_subtype_of(db, Type::object(db))
+        forall types t. t.is_subtype_of(db, Type::object())
     );
 
     // Never should be assignable to every type
@@ -182,7 +182,7 @@ mod stable {
     // Only `object` is a supertype of `Any`.
     type_property_test!(
         only_object_is_supertype_of_any, db,
-        forall types t. !t.is_equivalent_to(db, Type::object(db)) => !Type::any().is_subtype_of(db, t)
+        forall types t. !t.is_equivalent_to(db, Type::object()) => !Type::any().is_subtype_of(db, t)
     );
 
     // Equivalence is commutative.
@@ -332,6 +332,6 @@ mod flaky {
     // Currently flaky due to <https://github.com/astral-sh/ty/issues/889>
     type_property_test!(
         all_type_assignable_to_iterable_are_iterable, db,
-        forall types t. t.is_assignable_to(db, KnownClass::Iterable.to_specialized_instance(db, [Type::object(db)])) => t.try_iterate(db).is_ok()
+        forall types t. t.is_assignable_to(db, KnownClass::Iterable.to_specialized_instance(db, [Type::object()])) => t.try_iterate(db).is_ok()
     );
 }

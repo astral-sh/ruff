@@ -1037,8 +1037,10 @@ fn is_instance_truthiness<'db>(
 ) -> Truthiness {
     let is_instance = |ty: &Type<'_>| {
         if let Type::NominalInstance(instance) = ty {
-            if instance
-                .class(db)
+            let Some(nominal_class) = instance.class(db) else {
+                return false;
+            };
+            if nominal_class
                 .iter_mro(db)
                 .filter_map(ClassBase::into_class)
                 .any(|c| match c {

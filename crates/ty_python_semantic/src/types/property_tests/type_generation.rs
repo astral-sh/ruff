@@ -152,9 +152,8 @@ impl Ty {
                 let ty = known_module_symbol(db, KnownModule::Dataclasses, "MISSING")
                     .place
                     .expect_type();
-                debug_assert!(
-                    matches!(ty, Type::NominalInstance(instance) if is_single_member_enum(db, instance.class(db).class_literal(db).0))
-                );
+                debug_assert!(matches!(ty, Type::NominalInstance(instance) if
+                        instance.class_literal(db).is_some_and(|class| is_single_member_enum(db, class))));
                 ty
             }
             Ty::BuiltinInstance(s) => builtins_symbol(db, s)

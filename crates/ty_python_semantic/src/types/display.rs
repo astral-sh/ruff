@@ -90,9 +90,7 @@ impl DisplaySettings {
 fn type_to_class_literal<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<ClassLiteral<'db>> {
     match ty {
         Type::ClassLiteral(class) => Some(class),
-        Type::NominalInstance(instance) => {
-            type_to_class_literal(db, Type::from(instance.class(db)))
-        }
+        Type::NominalInstance(instance) => instance.class_literal(db),
         Type::EnumLiteral(enum_literal) => Some(enum_literal.enum_class(db)),
         Type::GenericAlias(alias) => Some(alias.origin(db)),
         Type::ProtocolInstance(ProtocolInstanceType {
@@ -253,7 +251,9 @@ impl Display for DisplayRepresentation<'_> {
             Type::Dynamic(dynamic) => dynamic.fmt(f),
             Type::Never => f.write_str("Never"),
             Type::NominalInstance(instance) => {
-                let class = instance.class(self.db);
+                let Some(class) = instance.class(self.db) else {
+                    return f.write_str("[missing class]");
+                };
 
                 match (class, class.known(self.db)) {
                     (_, Some(KnownClass::NoneType)) => f.write_str("None"),
@@ -1648,7 +1648,7 @@ mod tests {
                         .with_annotated_type(KnownClass::Int.to_instance(&db))
                         .with_default_type(Type::IntLiteral(4)),
                     Parameter::variadic(Name::new_static("args"))
-                        .with_annotated_type(Type::object(&db)),
+                        .with_annotated_type(Type::object()),
                     Parameter::keyword_only(Name::new_static("g"))
                         .with_default_type(Type::IntLiteral(5)),
                     Parameter::keyword_only(Name::new_static("h"))
@@ -1804,7 +1804,7 @@ mod tests {
                         .with_annotated_type(KnownClass::Int.to_instance(&db))
                         .with_default_type(Type::IntLiteral(4)),
                     Parameter::variadic(Name::new_static("args"))
-                        .with_annotated_type(Type::object(&db)),
+                        .with_annotated_type(Type::object()),
                     Parameter::keyword_only(Name::new_static("g"))
                         .with_default_type(Type::IntLiteral(5)),
                     Parameter::keyword_only(Name::new_static("h"))

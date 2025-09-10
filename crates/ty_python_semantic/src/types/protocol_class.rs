@@ -227,7 +227,7 @@ impl<'db> ProtocolInterface<'db> {
                 place: Place::bound(member.ty()),
                 qualifiers: member.qualifiers(),
             })
-            .unwrap_or_else(|| Type::object(db).member(db, name))
+            .unwrap_or_else(|| Type::object().member(db, name))
     }
 
     /// Return `true` if `self` extends the interface of `other`, i.e.,

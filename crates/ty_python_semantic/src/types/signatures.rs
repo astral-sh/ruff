@@ -704,11 +704,11 @@ impl<'db> Signature<'db> {
             && self
                 .parameters
                 .variadic()
-                .is_some_and(|(_, param)| param.annotated_type().is_some_and(|ty| ty.is_object(db)))
+                .is_some_and(|(_, param)| param.annotated_type().is_some_and(|ty| ty.is_object()))
             && self
                 .parameters
                 .keyword_variadic()
-                .is_some_and(|(_, param)| param.annotated_type().is_some_and(|ty| ty.is_object(db)))
+                .is_some_and(|(_, param)| param.annotated_type().is_some_and(|ty| ty.is_object()))
         {
             return C::always_satisfiable(db);
         }
@@ -1145,9 +1145,9 @@ impl<'db> Parameters<'db> {
     pub(crate) fn object(db: &'db dyn Db) -> Self {
         Self {
             value: vec![
-                Parameter::variadic(Name::new_static("args")).with_annotated_type(Type::object(db)),
+                Parameter::variadic(Name::new_static("args")).with_annotated_type(Type::object()),
                 Parameter::keyword_variadic(Name::new_static("kwargs"))
-                    .with_annotated_type(Type::object(db)),
+                    .with_annotated_type(Type::object()),
             ],
             is_gradual: false,
         }
@@ -1779,8 +1779,7 @@ mod tests {
                 Parameter::positional_or_keyword(Name::new_static("f"))
                     .with_annotated_type(Type::IntLiteral(4))
                     .with_default_type(Type::IntLiteral(4)),
-                Parameter::variadic(Name::new_static("args"))
-                    .with_annotated_type(Type::object(&db)),
+                Parameter::variadic(Name::new_static("args")).with_annotated_type(Type::object()),
                 Parameter::keyword_only(Name::new_static("g"))
                     .with_default_type(Type::IntLiteral(5)),
                 Parameter::keyword_only(Name::new_static("h"))

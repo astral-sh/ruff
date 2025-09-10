@@ -1042,7 +1042,7 @@ impl<'db> Constraint<'db> {
 
         // If the requested constraint is `Never ≤ T ≤ object`, then the typevar can be specialized
         // to _any_ type, and the constraint does nothing.
-        if lower.is_never() && upper.is_object(db) {
+        if lower.is_never() && upper.is_object() {
             return Satisfiable::Always;
         }
 
@@ -1189,7 +1189,7 @@ impl<'db> RangeConstraint<'db> {
             ConstraintClause::from_constraints(
                 db,
                 [
-                    Constraint::range(db, self.upper, Type::object(db)).constrain(typevar),
+                    Constraint::range(db, self.upper, Type::object()).constrain(typevar),
                     Constraint::not_equivalent(db, self.upper).constrain(typevar),
                 ],
             ),
@@ -1214,7 +1214,7 @@ impl<'db> RangeConstraint<'db> {
                     write!(f, "{} ≤ ", self.constraint.lower.display(self.db))?;
                 }
                 self.typevar.fmt(f)?;
-                if !self.constraint.upper.is_object(self.db) {
+                if !self.constraint.upper.is_object() {
                     write!(f, " ≤ {}", self.constraint.upper.display(self.db))?;
                 }
                 f.write_str(")")
@@ -1356,7 +1356,7 @@ impl<'db> Constraint<'db> {
         debug_assert_eq!(ty, ty.top_materialization(db));
 
         // Every type is comparable to Never and to object.
-        if ty.is_never() || ty.is_object(db) {
+        if ty.is_never() || ty.is_object() {
             return Satisfiable::Never;
         }
 
@@ -1407,7 +1407,7 @@ impl<'db> IncomparableConstraint<'db> {
         );
         set.union_constraint(
             db,
-            Constraint::range(db, self.ty, Type::object(db)).constrain(typevar),
+            Constraint::range(db, self.ty, Type::object()).constrain(typevar),
         );
     }
 
