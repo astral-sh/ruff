@@ -19,14 +19,15 @@ use super::{
     DynamicType, Type, TypeVarVariance, definition_expression_type, infer_definition_types,
     semantic_index,
 };
-use crate::semantic_index::definition::{Definition, DefinitionKind};
+use crate::semantic_index::definition::Definition;
 use crate::types::constraints::{ConstraintSet, Constraints, IteratorConstraintsExtension};
 use crate::types::function::FunctionType;
 use crate::types::generics::{GenericContext, walk_generic_context};
 use crate::types::{
-    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, FindLegacyTypeVarsVisitor,
-    HasRelationToVisitor, IsEquivalentVisitor, KnownClass, MaterializationKind, NormalizedVisitor,
-    SpecialFormType, TypeMapping, TypeRelation, VarianceInferable, todo_type,
+    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, ClassType,
+    FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsEquivalentVisitor, KnownClass,
+    MaterializationKind, NormalizedVisitor, SpecialFormType, TypeMapping, TypeRelation,
+    VarianceInferable, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -39,19 +40,27 @@ fn infer_method_type<'db>(
     let file = class_scope_id.file(db);
     let index = semantic_index(db, file);
 
-    let DefinitionKind::Function(func_def) = definition.kind(db) else {
-        return None;
-    };
     let class_scope = index.scope(class_scope_id.file_scope_id(db));
     class_scope.node().as_class()?;
 
-    let module = parsed_module(db, file).load(db);
-    let method_definition = index.expect_single_definition(func_def.node(&module));
-    let func_type = infer_definition_types(db, method_definition)
-        .declaration_type(method_definition)
+    let func_type = infer_definition_types(db, definition)
+        .declaration_type(definition)
         .inner_type()
         .into_function_literal()?;
     Some(func_type)
+}
+
+fn infer_class_type<'db>(db: &'db dyn Db, definition: Definition<'db>) -> Option<ClassType<'db>> {
+    let class_scope_id = definition.scope(db);
+    let index = semantic_index(db, class_scope_id.file(db));
+    let class_scope = index.scope(class_scope_id.file_scope_id(db));
+    let class_def = index.expect_single_definition(class_scope.node().as_class()?);
+    let class_literal = infer_definition_types(db, class_def)
+        .declaration_type(class_def)
+        .inner_type();
+    let t = class_literal.to_class_type(db);
+    debug_assert!(t.is_some());
+    t
 }
 
 /// The signature of a single callable. If the callable is overloaded, there is a separate
@@ -1245,6 +1254,7 @@ impl<'db> Parameters<'db> {
             );
         }
         let method_type = infer_method_type(db, definition);
+        let class_type = infer_class_type(db, definition);
         let is_method = method_type.is_some();
         let is_classmethod = method_type.is_some_and(|f| f.is_classmethod(db));
         let is_staticmethod = method_type.is_some_and(|f| f.is_staticmethod(db));
@@ -1255,10 +1265,22 @@ impl<'db> Parameters<'db> {
                 && !is_classmethod
                 && arg.parameter.annotation().is_none()
                 && parameters.index(arg.name().id()) == Some(0)
+                && let Some(class) = class_type
+                && let Some(method) = method_type
             {
-                let implicit_annotation = Type::SpecialForm(SpecialFormType::TypingSelf)
-                    .in_type_expression(db, definition.scope(db), Some(definition))
-                    .ok();
+                let is_method_generic = method
+                    .signature(db)
+                    .overloads
+                    .iter()
+                    .any(|s| s.generic_context.is_some());
+                let is_class_generic = !class.is_not_generic();
+                let implicit_annotation = if !is_method_generic && !is_class_generic {
+                    Some(Type::instance(db, class))
+                } else {
+                    Type::SpecialForm(SpecialFormType::TypingSelf)
+                        .in_type_expression(db, definition.scope(db), Some(definition))
+                        .ok()
+                };
                 Parameter {
                     annotated_type: implicit_annotation,
                     synthetic_annotation: true,
