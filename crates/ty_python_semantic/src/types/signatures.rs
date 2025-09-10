@@ -522,7 +522,7 @@ impl<'db> Signature<'db> {
                 return_ty.map(|ty| ty.apply_type_mapping(db, &TypeMapping::BindSelf(self_type)));
         }
         Self {
-            generic_context: self.generic_context,
+            generic_context: self.generic_context.map(|context| context.bind_self(db)),
             inherited_generic_context: self.inherited_generic_context,
             definition: self.definition,
             parameters,

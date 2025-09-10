@@ -17,8 +17,8 @@ use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
     IsEquivalentVisitor, KnownClass, KnownInstanceType, MaterializationKind, NormalizedVisitor,
-    Type, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarVariance,
-    UnionType, binding_type, declaration_type,
+    Type, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind,
+    TypeVarVariance, UnionType, binding_type, declaration_type,
 };
 use crate::{Db, FxOrderSet};
 
@@ -400,6 +400,17 @@ impl<'db> GenericContext<'db> {
 
     fn heap_size((variables,): &(FxOrderSet<BoundTypeVarInstance<'db>>,)) -> usize {
         ruff_memory_usage::order_set_heap_size(variables)
+    }
+
+    /// Returns a version of this generic context with the `Self` typevar removed.
+    pub(crate) fn bind_self(self, db: &'db dyn Db) -> Self {
+        Self::from_typevar_instances(
+            db,
+            self.variables(db)
+                .iter()
+                .filter(|typevar| typevar.typevar(db).kind(db) != TypeVarKind::TypingSelf)
+                .copied(),
+        )
     }
 }
 
