@@ -762,6 +762,10 @@ impl<'db> Type<'db> {
         Self::Dynamic(DynamicType::Unknown)
     }
 
+    pub(crate) fn divergent(scope: ScopeId<'db>) -> Self {
+        Self::Dynamic(DynamicType::Divergent(DivergentType { scope }))
+    }
+
     pub(crate) fn object(db: &'db dyn Db) -> Self {
         KnownClass::Object.to_instance(db)
     }
@@ -6516,7 +6520,6 @@ impl<'db> Type<'db> {
         }
     }
 
-    #[allow(unused)]
     pub(super) fn has_divergent_type(self, db: &'db dyn Db, div: Type<'db>) -> bool {
         any_over_type(db, self, &|ty| match ty {
             Type::Dynamic(DynamicType::Divergent(_)) => ty == div,

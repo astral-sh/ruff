@@ -2419,6 +2419,16 @@ reveal_type(Answer.NO.value)  # revealed: Any
 reveal_type(Answer.__members__)  # revealed: MappingProxyType[str, Unknown]
 ```
 
+## Divergent inferred implicit instance attribute types
+
+```py
+class C:
+    def f(self, other: "C"):
+        self.x = (other.x,)
+
+reveal_type((C().x,))  # revealed: tuple[Unknown | Divergent]
+```
+
 ## References
 
 Some of the tests in the *Class and instance variables* section draw inspiration from
