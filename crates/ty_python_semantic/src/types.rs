@@ -618,22 +618,21 @@ pub enum Type<'db> {
     /// the `self` parameter, and return a `MethodType & Callable[[int], str]`.
     /// One drawback would be that we could not show the bound instance when that type is displayed.
     BoundMethod(BoundMethodType<'db>),
-    /// Represents a specific instance of `types.MethodWrapperType`.
+    /// Represents a specific instance of a bound method type for a builtin class.
     ///
     /// TODO: consider replacing this with `Callable & types.MethodWrapperType` type?
-    /// Requires `Callable` to be able to represent overloads, e.g. `types.FunctionType.__get__` has
+    /// The `Callable` type would need to be overloaded -- e.g. `types.FunctionType.__get__` has
     /// this behaviour when a method is accessed on a class vs an instance:
     ///
     /// ```txt
     ///  * (None,   type)         ->  Literal[function_on_which_it_was_called]
     ///  * (object, type | None)  ->  BoundMethod[instance, function_on_which_it_was_called]
     /// ```
-    MethodWrapper(MethodWrapperKind<'db>),
+    KnownBoundMethod(KnownBoundMethodType<'db>),
     /// Represents a specific instance of `types.WrapperDescriptorType`.
     ///
     /// TODO: Similar to above, this could eventually be replaced by a generic `Callable`
-    /// type. We currently add this as a separate variant because `FunctionType.__get__`
-    /// is an overloaded method and we do not support `@overload` yet.
+    /// type.
     WrapperDescriptor(WrapperDescriptorKind),
     /// A special callable that is returned by a `dataclass(…)` call. It is usually
     /// used as a decorator. Note that this is only used as a return type for actual
@@ -1121,8 +1120,8 @@ impl<'db> Type<'db> {
             Type::PropertyInstance(property) => visitor.visit(self, || {
                 Type::PropertyInstance(property.normalized_impl(db, visitor))
             }),
-            Type::MethodWrapper(method_kind) => visitor.visit(self, || {
-                Type::MethodWrapper(method_kind.normalized_impl(db, visitor))
+            Type::KnownBoundMethod(method_kind) => visitor.visit(self, || {
+                Type::KnownBoundMethod(method_kind.normalized_impl(db, visitor))
             }),
             Type::BoundMethod(method) => visitor.visit(self, || {
                 Type::BoundMethod(method.normalized_impl(db, visitor))
@@ -1192,7 +1191,7 @@ impl<'db> Type<'db> {
             | Type::FunctionLiteral(..)
             | Type::BoundMethod(_)
             | Type::WrapperDescriptor(_)
-            | Type::MethodWrapper(_)
+            | Type::KnownBoundMethod(_)
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
             | Type::ModuleLiteral(..)
@@ -1291,7 +1290,7 @@ impl<'db> Type<'db> {
             | Type::TypedDict(_) => None,
 
             // TODO
-            Type::MethodWrapper(_)
+            Type::KnownBoundMethod(_)
             | Type::WrapperDescriptor(_)
             | Type::DataclassDecorator(_)
             | Type::ModuleLiteral(_)
@@ -1580,7 +1579,7 @@ impl<'db> Type<'db> {
             (Type::BoundMethod(self_method), Type::BoundMethod(target_method)) => {
                 self_method.has_relation_to_impl(db, target_method, relation, visitor)
             }
-            (Type::MethodWrapper(self_method), Type::MethodWrapper(target_method)) => {
+            (Type::KnownBoundMethod(self_method), Type::KnownBoundMethod(target_method)) => {
                 self_method.has_relation_to_impl(db, target_method, relation, visitor)
             }
 
@@ -1662,7 +1661,8 @@ impl<'db> Type<'db> {
             (Type::BoundMethod(_), _) => KnownClass::MethodType
                 .to_instance(db)
                 .has_relation_to_impl(db, target, relation, visitor),
-            (Type::MethodWrapper(_), _) => KnownClass::WrapperDescriptorType
+            (Type::KnownBoundMethod(method), _) => method
+                .class()
                 .to_instance(db)
                 .has_relation_to_impl(db, target, relation, visitor),
             (Type::WrapperDescriptor(_), _) => KnownClass::WrapperDescriptorType
@@ -1901,7 +1901,7 @@ impl<'db> Type<'db> {
             (Type::BoundMethod(self_method), Type::BoundMethod(target_method)) => {
                 self_method.is_equivalent_to_impl(db, target_method, visitor)
             }
-            (Type::MethodWrapper(self_method), Type::MethodWrapper(target_method)) => {
+            (Type::KnownBoundMethod(self_method), Type::KnownBoundMethod(target_method)) => {
                 self_method.is_equivalent_to_impl(db, target_method, visitor)
             }
             (Type::Callable(first), Type::Callable(second)) => {
@@ -2074,7 +2074,7 @@ impl<'db> Type<'db> {
                 | Type::EnumLiteral(..)
                 | Type::FunctionLiteral(..)
                 | Type::BoundMethod(..)
-                | Type::MethodWrapper(..)
+                | Type::KnownBoundMethod(..)
                 | Type::WrapperDescriptor(..)
                 | Type::ModuleLiteral(..)
                 | Type::ClassLiteral(..)
@@ -2088,7 +2088,7 @@ impl<'db> Type<'db> {
                 | Type::EnumLiteral(..)
                 | Type::FunctionLiteral(..)
                 | Type::BoundMethod(..)
-                | Type::MethodWrapper(..)
+                | Type::KnownBoundMethod(..)
                 | Type::WrapperDescriptor(..)
                 | Type::ModuleLiteral(..)
                 | Type::ClassLiteral(..)
@@ -2107,7 +2107,7 @@ impl<'db> Type<'db> {
                 | Type::EnumLiteral(..)
                 | Type::FunctionLiteral(..)
                 | Type::BoundMethod(..)
-                | Type::MethodWrapper(..)
+                | Type::KnownBoundMethod(..)
                 | Type::WrapperDescriptor(..)
                 | Type::ModuleLiteral(..),
             )
@@ -2120,7 +2120,7 @@ impl<'db> Type<'db> {
                 | Type::EnumLiteral(..)
                 | Type::FunctionLiteral(..)
                 | Type::BoundMethod(..)
-                | Type::MethodWrapper(..)
+                | Type::KnownBoundMethod(..)
                 | Type::WrapperDescriptor(..)
                 | Type::ModuleLiteral(..),
                 Type::SubclassOf(_),
@@ -2374,8 +2374,9 @@ impl<'db> Type<'db> {
                 .to_instance(db)
                 .is_disjoint_from_impl(db, other, visitor),
 
-            (Type::MethodWrapper(_), other) | (other, Type::MethodWrapper(_)) => {
-                KnownClass::MethodWrapperType
+            (Type::KnownBoundMethod(method), other) | (other, Type::KnownBoundMethod(method)) => {
+                method
+                    .class()
                     .to_instance(db)
                     .is_disjoint_from_impl(db, other, visitor)
             }
@@ -2562,7 +2563,7 @@ impl<'db> Type<'db> {
                 // ```
                 false
             }
-            Type::MethodWrapper(_) => {
+            Type::KnownBoundMethod(_) => {
                 // Just a special case of `BoundMethod` really
                 // (this variant represents `f.__get__`, where `f` is any function)
                 false
@@ -2599,7 +2600,7 @@ impl<'db> Type<'db> {
             Type::FunctionLiteral(..)
             | Type::BoundMethod(_)
             | Type::WrapperDescriptor(_)
-            | Type::MethodWrapper(_)
+            | Type::KnownBoundMethod(_)
             | Type::ModuleLiteral(..)
             | Type::ClassLiteral(..)
             | Type::GenericAlias(..)
@@ -2788,7 +2789,7 @@ impl<'db> Type<'db> {
             | Type::Callable(_)
             | Type::BoundMethod(_)
             | Type::WrapperDescriptor(_)
-            | Type::MethodWrapper(_)
+            | Type::KnownBoundMethod(_)
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
             | Type::ModuleLiteral(_)
@@ -2900,9 +2901,9 @@ impl<'db> Type<'db> {
             Type::BoundMethod(_) => KnownClass::MethodType
                 .to_instance(db)
                 .instance_member(db, name),
-            Type::MethodWrapper(_) => KnownClass::MethodWrapperType
-                .to_instance(db)
-                .instance_member(db, name),
+            Type::KnownBoundMethod(method) => {
+                method.class().to_instance(db).instance_member(db, name)
+            }
             Type::WrapperDescriptor(_) => KnownClass::WrapperDescriptorType
                 .to_instance(db)
                 .instance_member(db, name),
@@ -3326,23 +3327,23 @@ impl<'db> Type<'db> {
             Type::Dynamic(..) | Type::Never => Place::bound(self).into(),
 
             Type::FunctionLiteral(function) if name == "__get__" => Place::bound(
-                Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(function)),
+                Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(function)),
             )
             .into(),
             Type::FunctionLiteral(function) if name == "__call__" => Place::bound(
-                Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderCall(function)),
+                Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(function)),
             )
             .into(),
             Type::PropertyInstance(property) if name == "__get__" => Place::bound(
-                Type::MethodWrapper(MethodWrapperKind::PropertyDunderGet(property)),
+                Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderGet(property)),
             )
             .into(),
             Type::PropertyInstance(property) if name == "__set__" => Place::bound(
-                Type::MethodWrapper(MethodWrapperKind::PropertyDunderSet(property)),
+                Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderSet(property)),
             )
             .into(),
             Type::StringLiteral(literal) if name == "startswith" => Place::bound(
-                Type::MethodWrapper(MethodWrapperKind::StrStartswith(literal)),
+                Type::KnownBoundMethod(KnownBoundMethodType::StrStartswith(literal)),
             )
             .into(),
 
@@ -3385,7 +3386,8 @@ impl<'db> Type<'db> {
                         })
                 }
             },
-            Type::MethodWrapper(_) => KnownClass::MethodWrapperType
+            Type::KnownBoundMethod(method) => method
+                .class()
                 .to_instance(db)
                 .member_lookup_with_policy(db, name, policy),
             Type::WrapperDescriptor(_) => KnownClass::WrapperDescriptorType
@@ -3786,7 +3788,7 @@ impl<'db> Type<'db> {
             Type::FunctionLiteral(_)
             | Type::BoundMethod(_)
             | Type::WrapperDescriptor(_)
-            | Type::MethodWrapper(_)
+            | Type::KnownBoundMethod(_)
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
             | Type::ModuleLiteral(_)
@@ -3949,9 +3951,9 @@ impl<'db> Type<'db> {
                     .into()
             }
 
-            Type::MethodWrapper(
-                MethodWrapperKind::FunctionTypeDunderGet(_)
-                | MethodWrapperKind::PropertyDunderGet(_),
+            Type::KnownBoundMethod(
+                KnownBoundMethodType::FunctionTypeDunderGet(_)
+                | KnownBoundMethodType::PropertyDunderGet(_),
             ) => {
                 // Here, we dynamically model the overloaded function signature of `types.FunctionType.__get__`.
                 // This is required because we need to return more precise types than what the signature in
@@ -4055,7 +4057,7 @@ impl<'db> Type<'db> {
                 .into()
             }
 
-            Type::MethodWrapper(MethodWrapperKind::PropertyDunderSet(_)) => Binding::single(
+            Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderSet(_)) => Binding::single(
                 self,
                 Signature::new(
                     Parameters::new([
@@ -4085,7 +4087,7 @@ impl<'db> Type<'db> {
             )
             .into(),
 
-            Type::MethodWrapper(MethodWrapperKind::StrStartswith(_)) => Binding::single(
+            Type::KnownBoundMethod(KnownBoundMethodType::StrStartswith(_)) => Binding::single(
                 self,
                 Signature::new(
                     Parameters::new([
@@ -4814,7 +4816,7 @@ impl<'db> Type<'db> {
             }
 
             // TODO: these are actually callable
-            Type::MethodWrapper(_) | Type::DataclassDecorator(_) => {
+            Type::KnownBoundMethod(_) | Type::DataclassDecorator(_) => {
                 CallableBinding::not_callable(self).into()
             }
 
@@ -5065,7 +5067,7 @@ impl<'db> Type<'db> {
             Type::FunctionLiteral(_)
             | Type::GenericAlias(_)
             | Type::BoundMethod(_)
-            | Type::MethodWrapper(_)
+            | Type::KnownBoundMethod(_)
             | Type::WrapperDescriptor(_)
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
@@ -5527,7 +5529,7 @@ impl<'db> Type<'db> {
             | Type::EnumLiteral(_)
             | Type::FunctionLiteral(_)
             | Type::Callable(..)
-            | Type::MethodWrapper(_)
+            | Type::KnownBoundMethod(_)
             | Type::BoundMethod(_)
             | Type::WrapperDescriptor(_)
             | Type::DataclassDecorator(_)
@@ -5607,7 +5609,7 @@ impl<'db> Type<'db> {
             | Type::Callable(_)
             | Type::BoundMethod(_)
             | Type::WrapperDescriptor(_)
-            | Type::MethodWrapper(_)
+            | Type::KnownBoundMethod(_)
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
             | Type::Never
@@ -5896,7 +5898,7 @@ impl<'db> Type<'db> {
             Type::EnumLiteral(enum_literal) => Type::ClassLiteral(enum_literal.enum_class(db)),
             Type::FunctionLiteral(_) => KnownClass::FunctionType.to_class_literal(db),
             Type::BoundMethod(_) => KnownClass::MethodType.to_class_literal(db),
-            Type::MethodWrapper(_) => KnownClass::MethodWrapperType.to_class_literal(db),
+            Type::KnownBoundMethod(method) => method.class().to_class_literal(db),
             Type::WrapperDescriptor(_) => KnownClass::WrapperDescriptorType.to_class_literal(db),
             Type::DataclassDecorator(_) => KnownClass::FunctionType.to_class_literal(db),
             Type::Callable(callable) if callable.is_function_like(db) => {
@@ -6095,26 +6097,26 @@ impl<'db> Type<'db> {
                 Type::ProtocolInstance(instance.apply_type_mapping_impl(db, type_mapping, visitor))
             }
 
-            Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(function)) => {
-                Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(
+            Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(function)) => {
+                Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(
                     function.with_type_mapping(db, type_mapping),
                 ))
             }
 
-            Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderCall(function)) => {
-                Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderCall(
+            Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(function)) => {
+                Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(
                     function.with_type_mapping(db, type_mapping),
                 ))
             }
 
-            Type::MethodWrapper(MethodWrapperKind::PropertyDunderGet(property)) => {
-                Type::MethodWrapper(MethodWrapperKind::PropertyDunderGet(
+            Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderGet(property)) => {
+                Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderGet(
                     property.apply_type_mapping_impl(db, type_mapping, visitor),
                 ))
             }
 
-            Type::MethodWrapper(MethodWrapperKind::PropertyDunderSet(property)) => {
-                Type::MethodWrapper(MethodWrapperKind::PropertyDunderSet(
+            Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderSet(property)) => {
+                Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderSet(
                     property.apply_type_mapping_impl(db, type_mapping, visitor),
                 ))
             }
@@ -6198,7 +6200,7 @@ impl<'db> Type<'db> {
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy
             | Type::WrapperDescriptor(_)
-            | Type::MethodWrapper(MethodWrapperKind::StrStartswith(_))
+            | Type::KnownBoundMethod(KnownBoundMethodType::StrStartswith(_))
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
             // A non-generic class never needs to be specialized. A generic class is specialized
@@ -6266,16 +6268,16 @@ impl<'db> Type<'db> {
                 );
             }
 
-            Type::MethodWrapper(
-                MethodWrapperKind::FunctionTypeDunderGet(function)
-                | MethodWrapperKind::FunctionTypeDunderCall(function),
+            Type::KnownBoundMethod(
+                KnownBoundMethodType::FunctionTypeDunderGet(function)
+                | KnownBoundMethodType::FunctionTypeDunderCall(function),
             ) => {
                 function.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
             }
 
-            Type::MethodWrapper(
-                MethodWrapperKind::PropertyDunderGet(property)
-                | MethodWrapperKind::PropertyDunderSet(property),
+            Type::KnownBoundMethod(
+                KnownBoundMethodType::PropertyDunderGet(property)
+                | KnownBoundMethodType::PropertyDunderSet(property),
             ) => {
                 property.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
             }
@@ -6343,7 +6345,7 @@ impl<'db> Type<'db> {
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy
             | Type::WrapperDescriptor(_)
-            | Type::MethodWrapper(MethodWrapperKind::StrStartswith(_))
+            | Type::KnownBoundMethod(KnownBoundMethodType::StrStartswith(_))
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
             | Type::ModuleLiteral(_)
@@ -6459,7 +6461,7 @@ impl<'db> Type<'db> {
             | Self::BytesLiteral(_)
             // TODO: For enum literals, it would be even better to jump to the definition of the specific member
             | Self::EnumLiteral(_)
-            | Self::MethodWrapper(_)
+            | Self::KnownBoundMethod(_)
             | Self::WrapperDescriptor(_)
             | Self::DataclassDecorator(_)
             | Self::DataclassTransformer(_)
@@ -6645,7 +6647,7 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             Type::Dynamic(_)
             | Type::Never
             | Type::WrapperDescriptor(_)
-            | Type::MethodWrapper(_)
+            | Type::KnownBoundMethod(_)
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
             | Type::ModuleLiteral(_)
@@ -9153,11 +9155,14 @@ impl<'db> CallableType<'db> {
     }
 }
 
-/// Represents a specific instance of `types.MethodWrapperType`
+/// Represents a specific instance of a bound method type for a builtin class.
+///
+/// Unlike bound methods of user-defined classes, these are not generally instances
+/// of `types.BoundMethodType` at runtime.
 #[derive(
     Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, salsa::Update, get_size2::GetSize,
 )]
-pub enum MethodWrapperKind<'db> {
+pub enum KnownBoundMethodType<'db> {
     /// Method wrapper for `some_function.__get__`
     FunctionTypeDunderGet(FunctionType<'db>),
     /// Method wrapper for `some_function.__call__`
@@ -9176,29 +9181,29 @@ pub enum MethodWrapperKind<'db> {
 
 pub(super) fn walk_method_wrapper_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
-    method_wrapper: MethodWrapperKind<'db>,
+    method_wrapper: KnownBoundMethodType<'db>,
     visitor: &V,
 ) {
     match method_wrapper {
-        MethodWrapperKind::FunctionTypeDunderGet(function) => {
+        KnownBoundMethodType::FunctionTypeDunderGet(function) => {
             visitor.visit_function_type(db, function);
         }
-        MethodWrapperKind::FunctionTypeDunderCall(function) => {
+        KnownBoundMethodType::FunctionTypeDunderCall(function) => {
             visitor.visit_function_type(db, function);
         }
-        MethodWrapperKind::PropertyDunderGet(property) => {
+        KnownBoundMethodType::PropertyDunderGet(property) => {
             visitor.visit_property_instance_type(db, property);
         }
-        MethodWrapperKind::PropertyDunderSet(property) => {
+        KnownBoundMethodType::PropertyDunderSet(property) => {
             visitor.visit_property_instance_type(db, property);
         }
-        MethodWrapperKind::StrStartswith(string_literal) => {
+        KnownBoundMethodType::StrStartswith(string_literal) => {
             visitor.visit_type(db, Type::StringLiteral(string_literal));
         }
     }
 }
 
-impl<'db> MethodWrapperKind<'db> {
+impl<'db> KnownBoundMethodType<'db> {
     fn has_relation_to_impl<C: Constraints<'db>>(
         self,
         db: &'db dyn Db,
@@ -9208,32 +9213,38 @@ impl<'db> MethodWrapperKind<'db> {
     ) -> C {
         match (self, other) {
             (
-                MethodWrapperKind::FunctionTypeDunderGet(self_function),
-                MethodWrapperKind::FunctionTypeDunderGet(other_function),
+                KnownBoundMethodType::FunctionTypeDunderGet(self_function),
+                KnownBoundMethodType::FunctionTypeDunderGet(other_function),
             ) => self_function.has_relation_to_impl(db, other_function, relation, visitor),
 
             (
-                MethodWrapperKind::FunctionTypeDunderCall(self_function),
-                MethodWrapperKind::FunctionTypeDunderCall(other_function),
+                KnownBoundMethodType::FunctionTypeDunderCall(self_function),
+                KnownBoundMethodType::FunctionTypeDunderCall(other_function),
             ) => self_function.has_relation_to_impl(db, other_function, relation, visitor),
 
-            (MethodWrapperKind::PropertyDunderGet(_), MethodWrapperKind::PropertyDunderGet(_))
-            | (MethodWrapperKind::PropertyDunderSet(_), MethodWrapperKind::PropertyDunderSet(_))
-            | (MethodWrapperKind::StrStartswith(_), MethodWrapperKind::StrStartswith(_)) => {
+            (
+                KnownBoundMethodType::PropertyDunderGet(_),
+                KnownBoundMethodType::PropertyDunderGet(_),
+            )
+            | (
+                KnownBoundMethodType::PropertyDunderSet(_),
+                KnownBoundMethodType::PropertyDunderSet(_),
+            )
+            | (KnownBoundMethodType::StrStartswith(_), KnownBoundMethodType::StrStartswith(_)) => {
                 C::from_bool(db, self == other)
             }
 
             (
-                MethodWrapperKind::FunctionTypeDunderGet(_)
-                | MethodWrapperKind::FunctionTypeDunderCall(_)
-                | MethodWrapperKind::PropertyDunderGet(_)
-                | MethodWrapperKind::PropertyDunderSet(_)
-                | MethodWrapperKind::StrStartswith(_),
-                MethodWrapperKind::FunctionTypeDunderGet(_)
-                | MethodWrapperKind::FunctionTypeDunderCall(_)
-                | MethodWrapperKind::PropertyDunderGet(_)
-                | MethodWrapperKind::PropertyDunderSet(_)
-                | MethodWrapperKind::StrStartswith(_),
+                KnownBoundMethodType::FunctionTypeDunderGet(_)
+                | KnownBoundMethodType::FunctionTypeDunderCall(_)
+                | KnownBoundMethodType::PropertyDunderGet(_)
+                | KnownBoundMethodType::PropertyDunderSet(_)
+                | KnownBoundMethodType::StrStartswith(_),
+                KnownBoundMethodType::FunctionTypeDunderGet(_)
+                | KnownBoundMethodType::FunctionTypeDunderCall(_)
+                | KnownBoundMethodType::PropertyDunderGet(_)
+                | KnownBoundMethodType::PropertyDunderSet(_)
+                | KnownBoundMethodType::StrStartswith(_),
             ) => C::unsatisfiable(db),
         }
     }
@@ -9246,51 +9257,68 @@ impl<'db> MethodWrapperKind<'db> {
     ) -> C {
         match (self, other) {
             (
-                MethodWrapperKind::FunctionTypeDunderGet(self_function),
-                MethodWrapperKind::FunctionTypeDunderGet(other_function),
+                KnownBoundMethodType::FunctionTypeDunderGet(self_function),
+                KnownBoundMethodType::FunctionTypeDunderGet(other_function),
             ) => self_function.is_equivalent_to_impl(db, other_function, visitor),
 
             (
-                MethodWrapperKind::FunctionTypeDunderCall(self_function),
-                MethodWrapperKind::FunctionTypeDunderCall(other_function),
+                KnownBoundMethodType::FunctionTypeDunderCall(self_function),
+                KnownBoundMethodType::FunctionTypeDunderCall(other_function),
             ) => self_function.is_equivalent_to_impl(db, other_function, visitor),
 
-            (MethodWrapperKind::PropertyDunderGet(_), MethodWrapperKind::PropertyDunderGet(_))
-            | (MethodWrapperKind::PropertyDunderSet(_), MethodWrapperKind::PropertyDunderSet(_))
-            | (MethodWrapperKind::StrStartswith(_), MethodWrapperKind::StrStartswith(_)) => {
+            (
+                KnownBoundMethodType::PropertyDunderGet(_),
+                KnownBoundMethodType::PropertyDunderGet(_),
+            )
+            | (
+                KnownBoundMethodType::PropertyDunderSet(_),
+                KnownBoundMethodType::PropertyDunderSet(_),
+            )
+            | (KnownBoundMethodType::StrStartswith(_), KnownBoundMethodType::StrStartswith(_)) => {
                 C::from_bool(db, self == other)
             }
 
             (
-                MethodWrapperKind::FunctionTypeDunderGet(_)
-                | MethodWrapperKind::FunctionTypeDunderCall(_)
-                | MethodWrapperKind::PropertyDunderGet(_)
-                | MethodWrapperKind::PropertyDunderSet(_)
-                | MethodWrapperKind::StrStartswith(_),
-                MethodWrapperKind::FunctionTypeDunderGet(_)
-                | MethodWrapperKind::FunctionTypeDunderCall(_)
-                | MethodWrapperKind::PropertyDunderGet(_)
-                | MethodWrapperKind::PropertyDunderSet(_)
-                | MethodWrapperKind::StrStartswith(_),
+                KnownBoundMethodType::FunctionTypeDunderGet(_)
+                | KnownBoundMethodType::FunctionTypeDunderCall(_)
+                | KnownBoundMethodType::PropertyDunderGet(_)
+                | KnownBoundMethodType::PropertyDunderSet(_)
+                | KnownBoundMethodType::StrStartswith(_),
+                KnownBoundMethodType::FunctionTypeDunderGet(_)
+                | KnownBoundMethodType::FunctionTypeDunderCall(_)
+                | KnownBoundMethodType::PropertyDunderGet(_)
+                | KnownBoundMethodType::PropertyDunderSet(_)
+                | KnownBoundMethodType::StrStartswith(_),
             ) => C::unsatisfiable(db),
         }
     }
 
     fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         match self {
-            MethodWrapperKind::FunctionTypeDunderGet(function) => {
-                MethodWrapperKind::FunctionTypeDunderGet(function.normalized_impl(db, visitor))
+            KnownBoundMethodType::FunctionTypeDunderGet(function) => {
+                KnownBoundMethodType::FunctionTypeDunderGet(function.normalized_impl(db, visitor))
             }
-            MethodWrapperKind::FunctionTypeDunderCall(function) => {
-                MethodWrapperKind::FunctionTypeDunderCall(function.normalized_impl(db, visitor))
+            KnownBoundMethodType::FunctionTypeDunderCall(function) => {
+                KnownBoundMethodType::FunctionTypeDunderCall(function.normalized_impl(db, visitor))
             }
-            MethodWrapperKind::PropertyDunderGet(property) => {
-                MethodWrapperKind::PropertyDunderGet(property.normalized_impl(db, visitor))
+            KnownBoundMethodType::PropertyDunderGet(property) => {
+                KnownBoundMethodType::PropertyDunderGet(property.normalized_impl(db, visitor))
             }
-            MethodWrapperKind::PropertyDunderSet(property) => {
-                MethodWrapperKind::PropertyDunderSet(property.normalized_impl(db, visitor))
+            KnownBoundMethodType::PropertyDunderSet(property) => {
+                KnownBoundMethodType::PropertyDunderSet(property.normalized_impl(db, visitor))
             }
-            MethodWrapperKind::StrStartswith(_) => self,
+            KnownBoundMethodType::StrStartswith(_) => self,
+        }
+    }
+
+    /// Return the [`KnownClass`] that inhabitants of this type are instances of at runtime
+    fn class(self) -> KnownClass {
+        match self {
+            KnownBoundMethodType::FunctionTypeDunderGet(_)
+            | KnownBoundMethodType::FunctionTypeDunderCall(_)
+            | KnownBoundMethodType::PropertyDunderGet(_)
+            | KnownBoundMethodType::PropertyDunderSet(_) => KnownClass::MethodWrapperType,
+            KnownBoundMethodType::StrStartswith(_) => KnownClass::BuiltinFunctionType,
         }
     }
 }
