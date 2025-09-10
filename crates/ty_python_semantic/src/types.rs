@@ -6832,7 +6832,7 @@ impl<'db> TypeMapping<'_, 'db> {
 }
 
 /// A Salsa-tracked constraint set. This is only needed to have something appropriately small to
-/// put in an [`KnownInstance::ConstraintSet`]. We don't actually manipulate these as part of using
+/// put in a [`KnownInstance::ConstraintSet`]. We don't actually manipulate these as part of using
 /// constraint sets to check things like assignability; they're only used as a debugging aid in
 /// mdtests. That means there's no need for this to be interned; being tracked is sufficient.
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
