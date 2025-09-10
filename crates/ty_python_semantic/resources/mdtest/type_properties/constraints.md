@@ -350,7 +350,7 @@ def _[T]() -> None:
 
 ### Intersection of two not-equivalents
 
-We can only simplify the intersection of two not-equivalent constraints if they have the same hole.
+Intersection is reflexive, so the intersection of a not-equivalent constraint with itself is itself.
 
 ```py
 from typing import final
@@ -400,6 +400,15 @@ def _[T]() -> None:
     reveal_type(not_equivalent_constraint(T, Sub) & incomparable_constraint(T, Base))
     # revealed: ty_extensions.ConstraintSet[((T@_ ≠ Unrelated) ∧ (T@_ ≁ Base))]
     reveal_type(not_equivalent_constraint(T, Unrelated) & incomparable_constraint(T, Base))
+
+    # revealed: ty_extensions.ConstraintSet[(T@_ ≁ Super)]
+    reveal_type(not_equivalent_constraint(T, Base) & incomparable_constraint(T, Super))
+    # revealed: ty_extensions.ConstraintSet[(T@_ ≁ Base)]
+    reveal_type(not_equivalent_constraint(T, Base) & incomparable_constraint(T, Base))
+    # revealed: ty_extensions.ConstraintSet[(T@_ ≁ Sub)]
+    reveal_type(not_equivalent_constraint(T, Base) & incomparable_constraint(T, Sub))
+    # revealed: ty_extensions.ConstraintSet[((T@_ ≠ Base) ∧ (T@_ ≁ Unrelated))]
+    reveal_type(not_equivalent_constraint(T, Base) & incomparable_constraint(T, Unrelated))
 ```
 
 ### Intersection of two incomparables
@@ -426,4 +435,238 @@ def _[T]() -> None:
     reveal_type(incomparable_constraint(T, Base) & incomparable_constraint(T, Sub))
     # revealed: ty_extensions.ConstraintSet[((T@_ ≁ Base) ∧ (T@_ ≁ Unrelated))]
     reveal_type(incomparable_constraint(T, Base) & incomparable_constraint(T, Unrelated))
+```
+
+## Union
+
+The union of two constraint sets requires that the constraints in either set hold. In many cases, we
+can simplify the result of an union.
+
+### Different typevars
+
+```py
+from ty_extensions import incomparable_constraint, not_equivalent_constraint, range_constraint
+
+class Super: ...
+class Base(Super): ...
+class Sub(Base): ...
+```
+
+We cannot simplify the union of constraints that refer to different typevars.
+
+```py
+def _[T, U]() -> None:
+    # revealed: ty_extensions.ConstraintSet[(T@_ ≁ Base) ∨ (U@_ ≁ Base)]
+    reveal_type(incomparable_constraint(T, Base) | incomparable_constraint(U, Base))
+    # revealed: ty_extensions.ConstraintSet[(T@_ ≠ Base) ∨ (U@_ ≠ Base)]
+    reveal_type(not_equivalent_constraint(T, Base) | not_equivalent_constraint(U, Base))
+    # revealed: ty_extensions.ConstraintSet[(Sub ≤ T@_ ≤ Base) ∨ (Sub ≤ U@_ ≤ Base)]
+    reveal_type(range_constraint(Sub, T, Base) | range_constraint(Sub, U, Base))
+```
+
+Union is reflexive.
+
+```py
+def _[T]() -> None:
+    # revealed: ty_extensions.ConstraintSet[(T@_ ≁ Base)]
+    reveal_type(incomparable_constraint(T, Base) | incomparable_constraint(T, Base))
+```
+
+### Union of two ranges
+
+When one of the bounds is entirely contained within the other, the union simplifies to the larger
+bounds.
+
+```py
+from typing import final
+from ty_extensions import range_constraint
+
+class Super: ...
+class Base(Super): ...
+class Sub(Base): ...
+class SubSub(Sub): ...
+
+@final
+class Unrelated: ...
+
+def _[T]() -> None:
+    # revealed: ty_extensions.ConstraintSet[(SubSub ≤ T@_ ≤ Super)]
+    reveal_type(range_constraint(SubSub, T, Super) | range_constraint(Sub, T, Base))
+    # revealed: ty_extensions.ConstraintSet[(Sub ≤ T@_ ≤ Super)]
+    reveal_type(range_constraint(Sub, T, Super) | range_constraint(Sub, T, Super))
+```
+
+Otherwise, the union cannot be simplified.
+
+```py
+def _[T]() -> None:
+    # revealed: ty_extensions.ConstraintSet[(SubSub ≤ T@_ ≤ Base) ∨ (Sub ≤ T@_ ≤ Super)]
+    reveal_type(range_constraint(SubSub, T, Base) | range_constraint(Sub, T, Super))
+    # revealed: ty_extensions.ConstraintSet[(Sub ≤ T@_ ≤ Base) ∨ (Base ≤ T@_ ≤ Super)]
+    reveal_type(range_constraint(Sub, T, Base) | range_constraint(Base, T, Super))
+    # revealed: ty_extensions.ConstraintSet[(SubSub ≤ T@_ ≤ Sub) ∨ (Base ≤ T@_ ≤ Super)]
+    reveal_type(range_constraint(SubSub, T, Sub) | range_constraint(Base, T, Super))
+    # revealed: ty_extensions.ConstraintSet[(SubSub ≤ T@_ ≤ Sub) ∨ (Unrelated ≤ T@_)]
+    reveal_type(range_constraint(SubSub, T, Sub) | range_constraint(Unrelated, T, object))
+```
+
+### Union of range and not-equivalent
+
+If the hole of a not-equivalent constraint is within the lower and upper bounds of a range
+constraint, the range "fills in" the hole. The resulting union can always be satisfied.
+
+```py
+from typing import final
+from ty_extensions import not_equivalent_constraint, range_constraint
+
+class Super: ...
+class Base(Super): ...
+class Sub(Base): ...
+
+@final
+class Unrelated: ...
+
+def _[T]() -> None:
+    # revealed: ty_extensions.ConstraintSet[always]
+    reveal_type(range_constraint(Sub, T, Super) | not_equivalent_constraint(T, Base))
+```
+
+Otherwise the range constraint is subsumed by the not-equivalent constraint.
+
+```py
+def _[T]() -> None:
+    # revealed: ty_extensions.ConstraintSet[(T@_ ≠ Super)]
+    reveal_type(range_constraint(Sub, T, Base) | not_equivalent_constraint(T, Super))
+```
+
+### Union of range and incomparable
+
+When the "pivot" of the incomparable constraint is not comparable with either bound of the range
+constraint, the incomparable constraint subsumes the range constraint.
+
+```py
+from typing import final
+from ty_extensions import incomparable_constraint, range_constraint
+
+class Super: ...
+class Base(Super): ...
+class Sub(Base): ...
+
+@final
+class Unrelated: ...
+
+def _[T]() -> None:
+    # revealed: ty_extensions.ConstraintSet[(T@_ ≁ Unrelated)]
+    reveal_type(range_constraint(Base, T, Super) | incomparable_constraint(T, Unrelated))
+```
+
+Otherwise, the union cannot be simplified.
+
+```py
+from ty_extensions import is_subtype_of
+
+def _[T]() -> None:
+    # revealed: ty_extensions.ConstraintSet[(Base ≤ T@_ ≤ Super) ∨ (T@_ ≁ Base)]
+    reveal_type(range_constraint(Base, T, Super) | incomparable_constraint(T, Base))
+    # revealed: ty_extensions.ConstraintSet[(Base ≤ T@_ ≤ Super) ∨ (T@_ ≁ Sub)]
+    reveal_type(range_constraint(Base, T, Super) | incomparable_constraint(T, Sub))
+    # revealed: ty_extensions.ConstraintSet[(Base ≤ T@_ ≤ Super) ∨ (T@_ ≁ Super)]
+    reveal_type(range_constraint(Base, T, Super) | incomparable_constraint(T, Super))
+```
+
+### Union of two not-equivalents
+
+Union is reflexive, so the union of a not-equivalent constraint with itself is itself. The union of
+two different not-equivalent constraints is always satisfied.
+
+```py
+from typing import final
+from ty_extensions import not_equivalent_constraint
+
+class Super: ...
+class Base(Super): ...
+class Sub(Base): ...
+
+@final
+class Unrelated: ...
+
+def _[T]() -> None:
+    # revealed: ty_extensions.ConstraintSet[(T@_ ≠ Base)]
+    reveal_type(not_equivalent_constraint(T, Base) | not_equivalent_constraint(T, Base))
+    # revealed: ty_extensions.ConstraintSet[always]
+    reveal_type(not_equivalent_constraint(T, Base) | not_equivalent_constraint(T, Super))
+    # revealed: ty_extensions.ConstraintSet[always]
+    reveal_type(not_equivalent_constraint(T, Base) | not_equivalent_constraint(T, Sub))
+    # revealed: ty_extensions.ConstraintSet[always]
+    reveal_type(not_equivalent_constraint(T, Base) | not_equivalent_constraint(T, Unrelated))
+```
+
+### Union of not-equivalent and incomparable
+
+When the hole of the non-equivalent constraint and the pivot of the incomparable constraint are not
+comparable, then the hole is covered by the incomparable constraint, and the union is therefore
+always satisfied.
+
+```py
+from typing import final
+from ty_extensions import incomparable_constraint, not_equivalent_constraint
+
+class Super: ...
+class Base(Super): ...
+class Sub(Base): ...
+
+@final
+class Unrelated: ...
+
+def _[T]() -> None:
+    # revealed: ty_extensions.ConstraintSet[always]
+    reveal_type(not_equivalent_constraint(T, Unrelated) | incomparable_constraint(T, Base))
+    # revealed: ty_extensions.ConstraintSet[always]
+    reveal_type(not_equivalent_constraint(T, Base) | incomparable_constraint(T, Unrelated))
+```
+
+Otherwise, the hole and pivot are comparable, and the non-equivalent constraint subsumes the
+incomparable constraint.
+
+```py
+def _[T]() -> None:
+    # revealed: ty_extensions.ConstraintSet[(T@_ ≠ Base)]
+    reveal_type(not_equivalent_constraint(T, Base) | incomparable_constraint(T, Super))
+    # revealed: ty_extensions.ConstraintSet[(T@_ ≠ Base)]
+    reveal_type(not_equivalent_constraint(T, Base) | incomparable_constraint(T, Base))
+    # revealed: ty_extensions.ConstraintSet[(T@_ ≠ Base)]
+    reveal_type(not_equivalent_constraint(T, Base) | incomparable_constraint(T, Sub))
+
+    # revealed: ty_extensions.ConstraintSet[(T@_ ≠ Super)]
+    reveal_type(not_equivalent_constraint(T, Super) | incomparable_constraint(T, Base))
+    # revealed: ty_extensions.ConstraintSet[(T@_ ≠ Base)]
+    reveal_type(not_equivalent_constraint(T, Base) | incomparable_constraint(T, Base))
+    # revealed: ty_extensions.ConstraintSet[(T@_ ≠ Sub)]
+    reveal_type(not_equivalent_constraint(T, Sub) | incomparable_constraint(T, Base))
+```
+
+### Union of two incomparables
+
+We can only simplify the union of two incomparable constraints if they have the same pivot.
+
+```py
+from typing import final
+from ty_extensions import incomparable_constraint
+
+class Super: ...
+class Base(Super): ...
+class Sub(Base): ...
+
+@final
+class Unrelated: ...
+
+def _[T]() -> None:
+    # revealed: ty_extensions.ConstraintSet[(T@_ ≁ Base)]
+    reveal_type(incomparable_constraint(T, Base) | incomparable_constraint(T, Base))
+    # revealed: ty_extensions.ConstraintSet[(T@_ ≁ Base) ∨ (T@_ ≁ Super)]
+    reveal_type(incomparable_constraint(T, Base) | incomparable_constraint(T, Super))
+    # revealed: ty_extensions.ConstraintSet[(T@_ ≁ Base) ∨ (T@_ ≁ Sub)]
+    reveal_type(incomparable_constraint(T, Base) | incomparable_constraint(T, Sub))
+    # revealed: ty_extensions.ConstraintSet[(T@_ ≁ Base) ∨ (T@_ ≁ Unrelated)]
+    reveal_type(incomparable_constraint(T, Base) | incomparable_constraint(T, Unrelated))
 ```

@@ -7737,6 +7737,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 )))
             }
 
+            (
+                Type::KnownInstance(KnownInstanceType::ConstraintSet(left)),
+                Type::KnownInstance(KnownInstanceType::ConstraintSet(right)),
+                ast::Operator::BitOr,
+            ) => {
+                let left = left.constraints(self.db()).clone();
+                let right = right.constraints(self.db()).clone();
+                let result = left.or(self.db(), || right);
+                Some(Type::KnownInstance(KnownInstanceType::ConstraintSet(
+                    TrackedConstraintSet::new(self.db(), result),
+                )))
+            }
+
             // We've handled all of the special cases that we support for literals, so we need to
             // fall back on looking for dunder methods on one of the operand types.
             (
