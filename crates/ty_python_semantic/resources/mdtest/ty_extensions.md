@@ -469,6 +469,8 @@ c4: CallableTypeOf[()]
 Using it in annotation to reveal the signature of the callable object:
 
 ```py
+from typing_extensions import Self
+
 class Foo:
     def __init__(self, x: int) -> None:
         pass
@@ -476,12 +478,16 @@ class Foo:
     def __call__(self, x: int) -> str:
         return "foo"
 
+    def returns_self(self, x: int) -> Self:
+        return self
+
 def _(
     c1: CallableTypeOf[f1],
     c2: CallableTypeOf[f2],
     c3: CallableTypeOf[f3],
     c4: CallableTypeOf[Foo],
     c5: CallableTypeOf[Foo(42).__call__],
+    c6: CallableTypeOf[Foo(42).returns_self],
 ) -> None:
     reveal_type(c1)  # revealed: () -> Unknown
     reveal_type(c2)  # revealed: () -> int
@@ -491,4 +497,6 @@ def _(
     reveal_type(c4)  # revealed: (...) -> Foo
 
     reveal_type(c5)  #  revealed: (x: int) -> str
+
+    reveal_type(c6)  # revealed: (x: int) -> Foo
 ```

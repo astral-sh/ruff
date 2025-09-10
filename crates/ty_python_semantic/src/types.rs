@@ -1046,8 +1046,11 @@ impl<'db> Type<'db> {
         matches!(self, Type::FunctionLiteral(..))
     }
 
-    pub(crate) const fn is_bound_method(&self) -> bool {
-        matches!(self, Type::BoundMethod(..))
+    pub(crate) const fn into_bound_method(self) -> Option<BoundMethodType<'db>> {
+        match self {
+            Type::BoundMethod(bound_method) => Some(bound_method),
+            _ => None,
+        }
     }
 
     pub(crate) fn is_union_of_single_valued(&self, db: &'db dyn Db) -> bool {
