@@ -10989,8 +10989,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     .expect("`Bindings` should have at least one `CallableBinding`");
 
                 let mut signature_iter = callable_binding.into_iter().map(|binding| {
-                    if argument_type.is_bound_method() {
-                        binding.signature.bind_self(self.db(), Some(argument_type))
+                    if let Some(bound_method) = argument_type.into_bound_method() {
+                        binding
+                            .signature
+                            .bind_self(self.db(), Some(bound_method.self_instance(db)))
                     } else {
                         binding.signature.clone()
                     }
