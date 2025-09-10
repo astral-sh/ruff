@@ -260,7 +260,7 @@ impl<'db> NominalInstanceType<'db> {
     }
 
     /// Return `true` if this type represents instances of the class `builtins.object`.
-    pub(super) fn is_object(self, db: &'db dyn Db) -> bool {
+    pub(super) fn is_object(self) -> bool {
         match self.0 {
             NominalInstanceInner::ExactTuple(_) | NominalInstanceInner::NonTuple(_) => false,
             NominalInstanceInner::Object => true,

@@ -408,8 +408,8 @@ impl<'db> Signature<'db> {
     }
 
     /// Return the "bottom" signature, subtype of all other fully-static signatures.
-    pub(crate) fn bottom(db: &'db dyn Db) -> Self {
-        Self::new(Parameters::object(db), Some(Type::Never))
+    pub(crate) fn bottom() -> Self {
+        Self::new(Parameters::object(), Some(Type::Never))
     }
 
     pub(crate) fn with_inherited_generic_context(
@@ -1142,7 +1142,7 @@ impl<'db> Parameters<'db> {
     }
 
     /// Return parameters that represents `(*args: object, **kwargs: object)`.
-    pub(crate) fn object(db: &'db dyn Db) -> Self {
+    pub(crate) fn object() -> Self {
         Self {
             value: vec![
                 Parameter::variadic(Name::new_static("args")).with_annotated_type(Type::object()),
@@ -1274,7 +1274,7 @@ impl<'db> Parameters<'db> {
             // so the "top" materialization here is the bottom materialization of the whole Signature.
             // It might make sense to flip the materialization here instead.
             TypeMapping::Materialize(MaterializationKind::Top) if self.is_gradual => {
-                Parameters::object(db)
+                Parameters::object()
             }
             // TODO: This is wrong, the empty Parameters is not a subtype of all materializations.
             // The bottom materialization is not currently representable and implementing it

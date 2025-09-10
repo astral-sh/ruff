@@ -1440,7 +1440,7 @@ impl<'db> Type<'db> {
 
         match (self, target) {
             // Everything is a subtype of `object`.
-            (_, Type::NominalInstance(instance)) if instance.is_object(db) => {
+            (_, Type::NominalInstance(instance)) if instance.is_object() => {
                 C::always_satisfiable(db)
             }
             (_, Type::ProtocolInstance(target)) if target.is_equivalent_to_object(db) => {
@@ -1964,7 +1964,7 @@ impl<'db> Type<'db> {
             }
             (Type::ProtocolInstance(protocol), nominal @ Type::NominalInstance(n))
             | (nominal @ Type::NominalInstance(n), Type::ProtocolInstance(protocol)) => {
-                C::from_bool(db, n.is_object(db) && protocol.normalized(db) == nominal)
+                C::from_bool(db, n.is_object() && protocol.normalized(db) == nominal)
             }
             // An instance of an enum class is equivalent to an enum literal of that class,
             // if that enum has only has one member.
@@ -9091,7 +9091,7 @@ impl<'db> CallableType<'db> {
     /// `(*args: object, **kwargs: object) -> Never`.
     #[cfg(test)]
     pub(crate) fn bottom(db: &'db dyn Db) -> Type<'db> {
-        Self::single(db, Signature::bottom(db))
+        Self::single(db, Signature::bottom())
     }
 
     /// Return a "normalized" version of this `Callable` type.

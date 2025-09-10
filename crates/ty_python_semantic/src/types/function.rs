@@ -1135,10 +1135,10 @@ fn signature_cycle_recover<'db>(
 }
 
 fn signature_cycle_initial<'db>(
-    db: &'db dyn Db,
+    _db: &'db dyn Db,
     _function: FunctionType<'db>,
 ) -> CallableSignature<'db> {
-    CallableSignature::single(Signature::bottom(db))
+    CallableSignature::single(Signature::bottom())
 }
 
 fn last_definition_signature_cycle_recover<'db>(
@@ -1151,10 +1151,10 @@ fn last_definition_signature_cycle_recover<'db>(
 }
 
 fn last_definition_signature_cycle_initial<'db>(
-    db: &'db dyn Db,
+    _db: &'db dyn Db,
     _function: FunctionType<'db>,
 ) -> Signature<'db> {
-    Signature::bottom(db)
+    Signature::bottom()
 }
 
 /// Non-exhaustive enumeration of known functions (e.g. `builtins.reveal_type`, ...) that might
