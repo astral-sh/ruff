@@ -1770,7 +1770,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Note that this method will only return `Some` if the immediate parent scope
     /// is a class scope OR the immediate parent scope is an annotation scope
     /// and the grandparent scope is a class scope. This means it has different
-    /// behaviour to the [`nearest_enclosing_class`] function.
+    /// behaviour to the [`super::nearest_enclosing_class`] function.
     fn class_context_of_current_method(&self) -> Option<ClassType<'db>> {
         let current_scope_id = self.scope().file_scope_id(self.db());
         let class_definition = self.index.class_definition_of_method(current_scope_id)?;
