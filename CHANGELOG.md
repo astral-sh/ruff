@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.13.0
+
+### Breaking changes
+
+- Ruff 0.13 ([#20194](https://github.com/astral-sh/ruff/pull/20194))
+
+### Preview features
+
+- \[`ruff`\] Use helper function for empty f-string detection in `in-empty-collection` (`RUF060`) ([#20249](https://github.com/astral-sh/ruff/pull/20249))
+
+### Bug fixes
+
+- \[`pyupgrade`\] Apply `UP008` only when the `__class__` cell exists ([#19424](https://github.com/astral-sh/ruff/pull/19424))
+
+### Rule changes
+
+- \[`pyupgrade`\] Enable rule triggering for stub files (`UP043`) ([#20027](https://github.com/astral-sh/ruff/pull/20027))
+
+### Server
+
+- Add support for using uv as an alternative formatter backend ([#19665](https://github.com/astral-sh/ruff/pull/19665))
+
+### Documentation
+
+- \[`pep8-naming`\] Fix formatting of `__all__` (`N816`) ([#20301](https://github.com/astral-sh/ruff/pull/20301))
+
+### Other changes
+
+- Allow the `if_not_else` Clippy lint ([#20315](https://github.com/astral-sh/ruff/pull/20315))
+- Bump LibCST to 1.8.4 ([#20321](https://github.com/astral-sh/ruff/pull/20321))
+- [ty] equality narrowing on enums that don't override `__eq__` or `__ne__` ([#20285](https://github.com/astral-sh/ruff/pull/20285))
+
 ## 0.12.12
 
 ### Preview features
