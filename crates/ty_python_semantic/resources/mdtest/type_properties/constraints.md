@@ -75,8 +75,8 @@ def _[T]() -> None:
     reveal_type(range_constraint(Never, T, object))
 ```
 
-If the lower bound and upper bounds are "inverted" (the upper bound is a subtype of the lower
-bound) or incomparable, then there is no type that can satisfy the constraint.
+If the lower bound and upper bounds are "inverted" (the upper bound is a subtype of the lower bound)
+or incomparable, then there is no type that can satisfy the constraint.
 
 ```py
 def _[T]() -> None:
