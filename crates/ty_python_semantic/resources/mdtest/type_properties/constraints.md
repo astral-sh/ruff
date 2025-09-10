@@ -506,14 +506,28 @@ Otherwise, the union cannot be simplified.
 
 ```py
 def _[T]() -> None:
-    # revealed: ty_extensions.ConstraintSet[(SubSub ≤ T@_ ≤ Base) ∨ (Sub ≤ T@_ ≤ Super)]
-    reveal_type(range_constraint(SubSub, T, Base) | range_constraint(Sub, T, Super))
     # revealed: ty_extensions.ConstraintSet[(Sub ≤ T@_ ≤ Base) ∨ (Base ≤ T@_ ≤ Super)]
     reveal_type(range_constraint(Sub, T, Base) | range_constraint(Base, T, Super))
     # revealed: ty_extensions.ConstraintSet[(SubSub ≤ T@_ ≤ Sub) ∨ (Base ≤ T@_ ≤ Super)]
     reveal_type(range_constraint(SubSub, T, Sub) | range_constraint(Base, T, Super))
     # revealed: ty_extensions.ConstraintSet[(SubSub ≤ T@_ ≤ Sub) ∨ (Unrelated ≤ T@_)]
     reveal_type(range_constraint(SubSub, T, Sub) | range_constraint(Unrelated, T, object))
+```
+
+In particular, the following does not simplify, even though it seems like it could simplify to
+`SubSub ≤ T@_ ≤ Super`. The issue is that there are types that are within the bounds of
+`SubSub ≤ T@_ ≤ Super`, but which are not comparable to `Base` or `Sub`, and which therefore should
+not be included in the union. An example would be the type that contains all instances of `Super`,
+`Base`, and `SubSub` (but _not_ including instances of `Sub`). (We don't have a way to spell that
+type at the moment, but it is a valid type.) That type is not in `SubSub ≤ T ≤ Base`, since it
+includes `Super`, which is outside the range. It's also not in `Sub ≤ T ≤ Super`, because it does
+not include `Sub`. That means it should not be in the union. Since that type _is_ in
+`SubSub ≤ T ≤ Super`, it is not correct to simplify the union in this way.
+
+```py
+def _[T]() -> None:
+    # revealed: ty_extensions.ConstraintSet[(SubSub ≤ T@_ ≤ Base) ∨ (Sub ≤ T@_ ≤ Super)]
+    reveal_type(range_constraint(SubSub, T, Base) | range_constraint(Sub, T, Super))
 ```
 
 ### Union of range and not-equivalent
