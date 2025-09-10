@@ -434,7 +434,7 @@ impl<'db> NominalInstanceType<'db> {
     pub(super) fn to_meta_type(self, db: &'db dyn Db) -> Type<'db> {
         self.class(db)
             .map(|class| SubclassOfType::from(db, class))
-            .unwrap_or_else(|| SubclassOfType::subclass_of_unknown())
+            .unwrap_or_else(SubclassOfType::subclass_of_unknown)
     }
 
     pub(super) fn apply_type_mapping_impl<'a>(
