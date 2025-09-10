@@ -1321,6 +1321,12 @@ impl<'db> Type<'db> {
 
             Type::TypeAlias(alias) => alias.value_type(db).into_callable(db),
 
+            Type::KnownBoundMethod(method) => Some(Type::Callable(CallableType::new(
+                db,
+                CallableSignature::from_overloads(method.signatures(db)),
+                false,
+            ))),
+
             Type::Never
             | Type::DataclassTransformer(_)
             | Type::AlwaysTruthy
@@ -1334,8 +1340,7 @@ impl<'db> Type<'db> {
             | Type::TypedDict(_) => None,
 
             // TODO
-            Type::KnownBoundMethod(_)
-            | Type::WrapperDescriptor(_)
+            Type::WrapperDescriptor(_)
             | Type::DataclassDecorator(_)
             | Type::ModuleLiteral(_)
             | Type::SpecialForm(_)
@@ -4004,54 +4009,8 @@ impl<'db> Type<'db> {
                     .into()
             }
 
-            Type::KnownBoundMethod(
-                KnownBoundMethodType::FunctionTypeDunderGet(_)
-                | KnownBoundMethodType::PropertyDunderGet(_),
-            ) => {
-                // Here, we dynamically model the overloaded function signature of `types.FunctionType.__get__`.
-                // This is required because we need to return more precise types than what the signature in
-                // typeshed provides:
-                //
-                // ```py
-                // class FunctionType:
-                //     # ...
-                //     @overload
-                //     def __get__(self, instance: None, owner: type, /) -> FunctionType: ...
-                //     @overload
-                //     def __get__(self, instance: object, owner: type | None = None, /) -> MethodType: ...
-                // ```
-                //
-                // For `builtins.property.__get__`, we use the same signature. The return types are not
-                // specified yet, they will be dynamically added in `Bindings::evaluate_known_cases`.
-
-                CallableBinding::from_overloads(
-                    self,
-                    [
-                        Signature::new(
-                            Parameters::new([
-                                Parameter::positional_only(Some(Name::new_static("instance")))
-                                    .with_annotated_type(Type::none(db)),
-                                Parameter::positional_only(Some(Name::new_static("owner")))
-                                    .with_annotated_type(KnownClass::Type.to_instance(db)),
-                            ]),
-                            None,
-                        ),
-                        Signature::new(
-                            Parameters::new([
-                                Parameter::positional_only(Some(Name::new_static("instance")))
-                                    .with_annotated_type(Type::object(db)),
-                                Parameter::positional_only(Some(Name::new_static("owner")))
-                                    .with_annotated_type(UnionType::from_elements(
-                                        db,
-                                        [KnownClass::Type.to_instance(db), Type::none(db)],
-                                    ))
-                                    .with_default_type(Type::none(db)),
-                            ]),
-                            None,
-                        ),
-                    ],
-                )
-                .into()
+            Type::KnownBoundMethod(method) => {
+                CallableBinding::from_overloads(self, method.signatures(db)).into()
             }
 
             Type::WrapperDescriptor(
@@ -4110,20 +4069,6 @@ impl<'db> Type<'db> {
                 .into()
             }
 
-            Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderSet(_)) => Binding::single(
-                self,
-                Signature::new(
-                    Parameters::new([
-                        Parameter::positional_only(Some(Name::new_static("instance")))
-                            .with_annotated_type(Type::object(db)),
-                        Parameter::positional_only(Some(Name::new_static("value")))
-                            .with_annotated_type(Type::object(db)),
-                    ]),
-                    None,
-                ),
-            )
-            .into(),
-
             Type::WrapperDescriptor(WrapperDescriptorKind::PropertyDunderSet) => Binding::single(
                 self,
                 Signature::new(
@@ -4136,36 +4081,6 @@ impl<'db> Type<'db> {
                             .with_annotated_type(Type::object(db)),
                     ]),
                     None,
-                ),
-            )
-            .into(),
-
-            Type::KnownBoundMethod(KnownBoundMethodType::StrStartswith(_)) => Binding::single(
-                self,
-                Signature::new(
-                    Parameters::new([
-                        Parameter::positional_only(Some(Name::new_static("prefix")))
-                            .with_annotated_type(UnionType::from_elements(
-                                db,
-                                [
-                                    KnownClass::Str.to_instance(db),
-                                    Type::homogeneous_tuple(db, KnownClass::Str.to_instance(db)),
-                                ],
-                            )),
-                        Parameter::positional_only(Some(Name::new_static("start")))
-                            .with_annotated_type(UnionType::from_elements(
-                                db,
-                                [KnownClass::SupportsIndex.to_instance(db), Type::none(db)],
-                            ))
-                            .with_default_type(Type::none(db)),
-                        Parameter::positional_only(Some(Name::new_static("end")))
-                            .with_annotated_type(UnionType::from_elements(
-                                db,
-                                [KnownClass::SupportsIndex.to_instance(db), Type::none(db)],
-                            ))
-                            .with_default_type(Type::none(db)),
-                    ]),
-                    Some(KnownClass::Bool.to_instance(db)),
                 ),
             )
             .into(),
@@ -4868,10 +4783,8 @@ impl<'db> Type<'db> {
                 Binding::single(self, Signature::todo("Type::Intersection.call()")).into()
             }
 
-            // TODO: these are actually callable
-            Type::KnownBoundMethod(_) | Type::DataclassDecorator(_) => {
-                CallableBinding::not_callable(self).into()
-            }
+            // TODO: this is actually callable
+            Type::DataclassDecorator(_) => CallableBinding::not_callable(self).into(),
 
             // TODO: some `SpecialForm`s are callable (e.g. TypedDicts)
             Type::SpecialForm(_) => CallableBinding::not_callable(self).into(),
@@ -9397,6 +9310,98 @@ impl<'db> KnownBoundMethodType<'db> {
             | KnownBoundMethodType::PropertyDunderGet(_)
             | KnownBoundMethodType::PropertyDunderSet(_) => KnownClass::MethodWrapperType,
             KnownBoundMethodType::StrStartswith(_) => KnownClass::BuiltinFunctionType,
+        }
+    }
+
+    /// Return the signatures of this bound method type.
+    ///
+    /// If the bound method type is overloaded, it may have multiple signatures.
+    fn signatures(self, db: &'db dyn Db) -> impl Iterator<Item = Signature<'db>> {
+        match self {
+            // Here, we dynamically model the overloaded function signature of `types.FunctionType.__get__`.
+            // This is required because we need to return more precise types than what the signature in
+            // typeshed provides:
+            //
+            // ```py
+            // class FunctionType:
+            //     # ...
+            //     @overload
+            //     def __get__(self, instance: None, owner: type, /) -> FunctionType: ...
+            //     @overload
+            //     def __get__(self, instance: object, owner: type | None = None, /) -> MethodType: ...
+            // ```
+            //
+            // For `builtins.property.__get__`, we use the same signature. The return types are not
+            // specified yet, they will be dynamically added in `Bindings::evaluate_known_cases`.
+            KnownBoundMethodType::FunctionTypeDunderGet(_)
+            | KnownBoundMethodType::PropertyDunderGet(_) => Either::Left(Either::Left(
+                [
+                    Signature::new(
+                        Parameters::new([
+                            Parameter::positional_only(Some(Name::new_static("instance")))
+                                .with_annotated_type(Type::none(db)),
+                            Parameter::positional_only(Some(Name::new_static("owner")))
+                                .with_annotated_type(KnownClass::Type.to_instance(db)),
+                        ]),
+                        None,
+                    ),
+                    Signature::new(
+                        Parameters::new([
+                            Parameter::positional_only(Some(Name::new_static("instance")))
+                                .with_annotated_type(Type::object(db)),
+                            Parameter::positional_only(Some(Name::new_static("owner")))
+                                .with_annotated_type(UnionType::from_elements(
+                                    db,
+                                    [KnownClass::Type.to_instance(db), Type::none(db)],
+                                ))
+                                .with_default_type(Type::none(db)),
+                        ]),
+                        None,
+                    ),
+                ]
+                .into_iter(),
+            )),
+            KnownBoundMethodType::FunctionTypeDunderCall(function) => Either::Left(Either::Right(
+                function.signature(db).overloads.iter().cloned(),
+            )),
+            KnownBoundMethodType::PropertyDunderSet(_) => {
+                Either::Right(std::iter::once(Signature::new(
+                    Parameters::new([
+                        Parameter::positional_only(Some(Name::new_static("instance")))
+                            .with_annotated_type(Type::object(db)),
+                        Parameter::positional_only(Some(Name::new_static("value")))
+                            .with_annotated_type(Type::object(db)),
+                    ]),
+                    None,
+                )))
+            }
+            KnownBoundMethodType::StrStartswith(_) => {
+                Either::Right(std::iter::once(Signature::new(
+                    Parameters::new([
+                        Parameter::positional_only(Some(Name::new_static("prefix")))
+                            .with_annotated_type(UnionType::from_elements(
+                                db,
+                                [
+                                    KnownClass::Str.to_instance(db),
+                                    Type::homogeneous_tuple(db, KnownClass::Str.to_instance(db)),
+                                ],
+                            )),
+                        Parameter::positional_only(Some(Name::new_static("start")))
+                            .with_annotated_type(UnionType::from_elements(
+                                db,
+                                [KnownClass::SupportsIndex.to_instance(db), Type::none(db)],
+                            ))
+                            .with_default_type(Type::none(db)),
+                        Parameter::positional_only(Some(Name::new_static("end")))
+                            .with_annotated_type(UnionType::from_elements(
+                                db,
+                                [KnownClass::SupportsIndex.to_instance(db), Type::none(db)],
+                            ))
+                            .with_default_type(Type::none(db)),
+                    ]),
+                    Some(KnownClass::Bool.to_instance(db)),
+                )))
+            }
         }
     }
 }

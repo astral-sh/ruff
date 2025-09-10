@@ -621,9 +621,6 @@ static_assert(is_assignable_to(TypeOf[f], Callable))
 
 # revealed: <method-wrapper `__get__` of `f`>
 reveal_type(f.__get__)
-
-# TODO: should pass
-# error: [static-assert-error]
 static_assert(is_assignable_to(TypeOf[f.__get__], Callable))
 
 # revealed: def __call__(self, *args: Any, **kwargs: Any) -> Any
@@ -632,9 +629,6 @@ static_assert(is_assignable_to(TypeOf[types.FunctionType.__call__], Callable))
 
 # revealed: <method-wrapper `__call__` of `f`>
 reveal_type(f.__call__)
-
-# TODO: should pass
-# error: [static-assert-error]
 static_assert(is_assignable_to(TypeOf[f.__call__], Callable))
 
 # revealed: <wrapper-descriptor `__get__` of `property` objects>
@@ -651,9 +645,6 @@ static_assert(not is_assignable_to(TypeOf[MyClass.my_property], Callable))
 
 # revealed: <method-wrapper `__get__` of `property` object>
 reveal_type(MyClass.my_property.__get__)
-
-# TODO: should pass
-# error: [static-assert-error]
 static_assert(is_assignable_to(TypeOf[MyClass.my_property.__get__], Callable))
 
 # revealed: <wrapper-descriptor `__set__` of `property` objects>
@@ -665,9 +656,6 @@ static_assert(is_assignable_to(TypeOf[property.__set__], Callable))
 
 # revealed: <method-wrapper `__set__` of `property` object>
 reveal_type(MyClass.my_property.__set__)
-
-# TODO: should pass
-# error: [static-assert-error]
 static_assert(is_assignable_to(TypeOf[MyClass.my_property.__set__], Callable))
 
 # revealed: def startswith(self, prefix: str | tuple[str, ...], start: SupportsIndex | None = ellipsis, end: SupportsIndex | None = ellipsis, /) -> bool
@@ -676,9 +664,6 @@ static_assert(is_assignable_to(TypeOf[str.startswith], Callable))
 
 # revealed: <method-wrapper `startswith` of `str` object>
 reveal_type("foo".startswith)
-
-# TODO: should pass
-# error: [static-assert-error]
 static_assert(is_assignable_to(TypeOf["foo".startswith], Callable))
 
 def _(
@@ -686,8 +671,7 @@ def _(
     b: CallableTypeOf[f],
     c: CallableTypeOf[f.__get__],
     d: CallableTypeOf[types.FunctionType.__call__],
-    # TODO: false-positive diagnostic
-    e: CallableTypeOf[f.__call__],  # error: [invalid-type-form]
+    e: CallableTypeOf[f.__call__],
     f: CallableTypeOf[property],
     g: CallableTypeOf[property.__get__],
     h: CallableTypeOf[MyClass.my_property.__get__],
@@ -709,8 +693,7 @@ def _(
     # revealed: (self, *args: Any, **kwargs: Any) -> Any
     reveal_type(d)
 
-    # TODO: this should be `(obj: type) -> None`
-    # revealed: Unknown
+    # revealed: (obj: type) -> None
     reveal_type(e)
 
     # revealed: (fget: ((Any, /) -> Any) | None = None, fset: ((Any, Any, /) -> None) | None = None, fdel: ((Any, /) -> Any) | None = None, doc: str | None = None) -> Unknown
