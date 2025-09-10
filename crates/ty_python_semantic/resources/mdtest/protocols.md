@@ -1922,27 +1922,22 @@ static_assert(is_assignable_to(NominalGeneric, LegacyClassScoped[int]))
 # and there exist fully static materializations of `NewStyleClassScoped[Unknown]`
 # where `Nominal` would not be a subtype of the given materialization,
 # hence there is no subtyping relation:
-#
-# TODO: these should pass
-static_assert(not is_subtype_of(NominalConcrete, NewStyleClassScoped))  # error: [static-assert-error]
-static_assert(not is_subtype_of(NominalConcrete, LegacyClassScoped))  # error: [static-assert-error]
+static_assert(not is_subtype_of(NominalConcrete, NewStyleClassScoped))
+static_assert(not is_subtype_of(NominalConcrete, LegacyClassScoped))
 
 # Similarly, `NominalGeneric` is implicitly `NominalGeneric[Unknown`]
-#
-# TODO: these should pass
-static_assert(not is_subtype_of(NominalGeneric, NewStyleClassScoped[int]))  # error: [static-assert-error]
-static_assert(not is_subtype_of(NominalGeneric, LegacyClassScoped[int]))  # error: [static-assert-error]
+static_assert(not is_subtype_of(NominalGeneric, NewStyleClassScoped[int]))
+static_assert(not is_subtype_of(NominalGeneric, LegacyClassScoped[int]))
 
 static_assert(is_subtype_of(NominalConcrete, NewStyleClassScoped[int]))
 static_assert(is_subtype_of(NominalConcrete, LegacyClassScoped[int]))
 static_assert(is_subtype_of(NominalGeneric[int], NewStyleClassScoped[int]))
 static_assert(is_subtype_of(NominalGeneric[int], LegacyClassScoped[int]))
 
-# TODO: these should pass
-static_assert(not is_assignable_to(NominalConcrete, NewStyleClassScoped[str]))  # error: [static-assert-error]
-static_assert(not is_assignable_to(NominalConcrete, LegacyClassScoped[str]))  # error: [static-assert-error]
-static_assert(not is_subtype_of(NominalGeneric[int], NewStyleClassScoped[str]))  # error: [static-assert-error]
-static_assert(not is_subtype_of(NominalGeneric[int], LegacyClassScoped[str]))  # error: [static-assert-error]
+static_assert(not is_assignable_to(NominalConcrete, NewStyleClassScoped[str]))
+static_assert(not is_assignable_to(NominalConcrete, LegacyClassScoped[str]))
+static_assert(not is_subtype_of(NominalGeneric[int], NewStyleClassScoped[str]))
+static_assert(not is_subtype_of(NominalGeneric[int], LegacyClassScoped[str]))
 ```
 
 And they can also have generic contexts scoped to the method:
