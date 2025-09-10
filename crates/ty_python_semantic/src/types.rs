@@ -5711,9 +5711,7 @@ impl<'db> Type<'db> {
                             ],
                         });
                     };
-                    let instance = Type::ClassLiteral(class).to_instance(db).expect(
-                        "nearest_enclosing_class must return type that can be instantiated",
-                    );
+                    let instance = Type::instance(db, class.unknown_specialization(db));
                     let class_definition = class.definition(db);
                     let typevar = TypeVarInstance::new(
                         db,

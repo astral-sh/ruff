@@ -277,8 +277,11 @@ reveal_type(Person._make(("Alice", 42)))  # revealed: Unknown
 
 person = Person("Alice", 42)
 
+# TODO: should not be an error
+# error: [invalid-argument-type]
 reveal_type(person._asdict())  # revealed: dict[str, Any]
-# TODO: should be `Person` once we support `Self`
+# TODO: should be `Person` once we support `Self`, should not be an error
+# error: [invalid-argument-type]
 reveal_type(person._replace(name="Bob"))  # revealed: Unknown
 ```
 

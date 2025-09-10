@@ -3086,14 +3086,20 @@ impl<'db> BindingError<'db> {
                         String::new()
                     }
                 ));
-                diag.set_primary_message(format_args!(
-                    "Argument type `{argument_ty_display}` does not satisfy {} of type variable `{}`",
-                    match error {
-                        SpecializationError::MismatchedBound {..} => "upper bound",
-                        SpecializationError::MismatchedConstraint {..} => "constraints",
-                    },
-                    typevar.name(context.db()),
-                ));
+
+                let typevar_name = typevar.name(context.db());
+                match error {
+                    SpecializationError::MismatchedBound { .. } => {
+                        diag.set_primary_message(format_args!("Argument type `{argument_ty_display}` does not satisfy upper bound of type variable `{typevar_name}` ({})",
+                        typevar.upper_bound(context.db()).expect("type variable should have an upper bound if this error occurs").display(context.db())
+                    ));
+                    }
+                    SpecializationError::MismatchedConstraint { .. } => {
+                        diag.set_primary_message(format_args!("Argument type `{argument_ty_display}` does not satisfy constraints of type variable `{typevar_name}` ({})",
+                        typevar.constraints(context.db()).expect("type variable should have constraints if this error occurs").iter().map(|ty| ty.display(context.db())).join(", ")
+                    ));
+                    }
+                }
 
                 if let Some(typevar_definition) = typevar.definition(context.db()) {
                     let module = parsed_module(context.db(), typevar_definition.file(context.db()))
