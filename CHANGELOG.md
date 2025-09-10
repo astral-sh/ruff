@@ -9,11 +9,11 @@ guide and overview of the changes!
 
 - **Several rules can now add `from __future__ import annotations` automatically**
 
-    `TC001`, `TC002`, `TC003`, `RUF013`, and `UP037` now add `from __future__   import annotations` as part of their fixes when the
-    `lint.future-annotations` setting is enabled. This import allows the rules
-    to move more imports into `TYPE_CHECKING` blocks (`TC001`, `TC002`, and
-    `TC003`), use PEP 604 union syntax on Python versions before 3.10
-    (`RUF013`), and unquote more annotations (`UP037`).
+    `TC001`, `TC002`, `TC003`, `RUF013`, and `UP037` now add `from __future__ import annotations` as part of their fixes when the
+    `lint.future-annotations` setting is enabled. This allows the rules to move
+    more imports into `TYPE_CHECKING` blocks (`TC001`, `TC002`, and `TC003`),
+    use PEP 604 union syntax on Python versions before 3.10 (`RUF013`), and
+    unquote more annotations (`UP037`).
 
 - **Full module paths are now used to verify first-party modules**
 
@@ -80,7 +80,7 @@ The following behaviors have been stabilized:
     only the context manager forms.
 - [`missing-trailing-comma`](https://docs.astral.sh/ruff/rules/missing-trailing-comma) (`COM812`)
     and [`prohibited-trailing-comma`](https://docs.astral.sh/ruff/rules/prohibited-trailing-comma)
-    (`COM819`) now check for trailing commas in [PEP 695] type parameter lists.
+    (`COM819`) now check for trailing commas in PEP 695 type parameter lists.
 - [`raw-string-in-exception`](https://docs.astral.sh/ruff/rules/raw-string-in-exception) (`EM101`)
     now also checks for byte strings in exception messages.
 - [`invalid-mock-access`](https://docs.astral.sh/ruff/rules/invalid-mock-access) (`PGH005`) now
