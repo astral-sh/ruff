@@ -7376,6 +7376,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Type::IntLiteral(!i64::from(bool))
             }
 
+            (
+                ast::UnaryOp::Invert,
+                Type::KnownInstance(KnownInstanceType::ConstraintSet(constraints)),
+            ) => {
+                let constraints = constraints.constraints(self.db()).clone();
+                let result = constraints.negate(self.db());
+                Type::KnownInstance(KnownInstanceType::ConstraintSet(TrackedConstraintSet::new(
+                    self.db(),
+                    result,
+                )))
+            }
+
             (ast::UnaryOp::Not, ty) => ty
                 .try_bool(self.db())
                 .unwrap_or_else(|err| {

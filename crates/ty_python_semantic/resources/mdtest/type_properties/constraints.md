@@ -670,3 +670,80 @@ def _[T]() -> None:
     # revealed: ty_extensions.ConstraintSet[(T@_ ≁ Base) ∨ (T@_ ≁ Unrelated)]
     reveal_type(incomparable_constraint(T, Base) | incomparable_constraint(T, Unrelated))
 ```
+
+## Negation
+
+### Negation of a range constraint
+
+In the negation of a range constraint, the typevar must specialize to a type that is not a subtype
+of the lower bound, or is not a supertype of the upper bound. Subtyping is a partial order, so one
+type is not a subtype of another if it is a _proper_ supertype, or if they are incomparable.
+
+```py
+from typing import Never
+from ty_extensions import range_constraint
+
+class Super: ...
+class Base(Super): ...
+class Sub(Base): ...
+
+def _[T]() -> None:
+    # revealed: ty_extensions.ConstraintSet[((T@_ ≤ Sub) ∧ (T@_ ≠ Sub)) ∨ (T@_ ≁ Sub) ∨ ((Base ≤ T@_) ∧ (T@_ ≠ Base)) ∨ (T@_ ≁ Base)]
+    reveal_type(~range_constraint(Sub, T, Base))
+    # revealed: ty_extensions.ConstraintSet[((Base ≤ T@_) ∧ (T@_ ≠ Base)) ∨ (T@_ ≁ Base)]
+    reveal_type(~range_constraint(Never, T, Base))
+    # revealed: ty_extensions.ConstraintSet[((T@_ ≤ Sub) ∧ (T@_ ≠ Sub)) ∨ (T@_ ≁ Sub)]
+    reveal_type(~range_constraint(Sub, T, object))
+    # revealed: ty_extensions.ConstraintSet[never]
+    reveal_type(~range_constraint(Never, T, object))
+```
+
+### Negation of a not-equivalent constraint
+
+In the negation of a not-equivalent constrant, the typevar must specialize to a type that _is_
+equivalent to the hole. The negation does not include types that are incomparable with the hole —
+those types are not equivalent to the hole, and are therefore in the original not-equivalent
+constraint, not its negation.
+
+```py
+from typing import Never
+from ty_extensions import not_equivalent_constraint
+
+class Super: ...
+class Base(Super): ...
+class Sub(Base): ...
+
+def _[T]() -> None:
+    # revealed: ty_extensions.ConstraintSet[(Base ≤ T@_ ≤ Base)]
+    reveal_type(~not_equivalent_constraint(T, Base))
+    # revealed: ty_extensions.ConstraintSet[(Sub ≤ T@_ ≤ Sub)]
+    reveal_type(~not_equivalent_constraint(T, Sub))
+    # revealed: ty_extensions.ConstraintSet[(T@_ ≤ Never)]
+    reveal_type(~not_equivalent_constraint(T, Never))
+    # revealed: ty_extensions.ConstraintSet[(object ≤ T@_)]
+    reveal_type(~not_equivalent_constraint(T, object))
+```
+
+### Negation of an incomparable constraint
+
+In the negation of an incomparable constraint, the typevar must specialize to a type that _is_
+comparable with (either a subtype _or_ supertype of) the pivot.
+
+```py
+from typing import Never
+from ty_extensions import incomparable_constraint
+
+class Super: ...
+class Base(Super): ...
+class Sub(Base): ...
+
+def _[T]() -> None:
+    # revealed: ty_extensions.ConstraintSet[(T@_ ≤ Base) ∨ (Base ≤ T@_)]
+    reveal_type(~incomparable_constraint(T, Base))
+    # revealed: ty_extensions.ConstraintSet[(T@_ ≤ Sub) ∨ (Sub ≤ T@_)]
+    reveal_type(~incomparable_constraint(T, Sub))
+    # revealed: ty_extensions.ConstraintSet[always]
+    reveal_type(~incomparable_constraint(T, Never))
+    # revealed: ty_extensions.ConstraintSet[always]
+    reveal_type(~incomparable_constraint(T, object))
+```
