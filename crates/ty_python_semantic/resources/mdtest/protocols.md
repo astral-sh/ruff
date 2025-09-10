@@ -985,6 +985,13 @@ from ty_extensions import is_equivalent_to
 static_assert(is_equivalent_to(UniversalSet, object))
 ```
 
+and that therefore `Any` is a subtype of `UniversalSet` (in general, `Any` can *only* ever be a
+subtype of `object` and types that are equivalent to `object`):
+
+```py
+static_assert(is_subtype_of(Any, UniversalSet))
+```
+
 `object` is a subtype of certain other protocols too. Since all fully static types (whether nominal
 or structural) are subtypes of `object`, these protocols are also subtypes of `object`; and this
 means that these protocols are also equivalent to `UniversalSet` and `object`:
@@ -995,6 +1002,10 @@ class SupportsStr(Protocol):
 
 static_assert(is_equivalent_to(SupportsStr, UniversalSet))
 static_assert(is_equivalent_to(SupportsStr, object))
+static_assert(is_subtype_of(SupportsStr, UniversalSet))
+static_assert(is_subtype_of(UniversalSet, SupportsStr))
+static_assert(is_assignable_to(UniversalSet, SupportsStr))
+static_assert(is_assignable_to(SupportsStr, UniversalSet))
 
 class SupportsClass(Protocol):
     @property
@@ -1003,6 +1014,11 @@ class SupportsClass(Protocol):
 static_assert(is_equivalent_to(SupportsClass, UniversalSet))
 static_assert(is_equivalent_to(SupportsClass, SupportsStr))
 static_assert(is_equivalent_to(SupportsClass, object))
+
+static_assert(is_subtype_of(SupportsClass, SupportsStr))
+static_assert(is_subtype_of(SupportsStr, SupportsClass))
+static_assert(is_assignable_to(SupportsStr, SupportsClass))
+static_assert(is_assignable_to(SupportsClass, SupportsStr))
 ```
 
 If a protocol contains members that are not defined on `object`, then that protocol will (like all
@@ -1022,6 +1038,47 @@ or a subtype of:
 ```py
 static_assert(not is_assignable_to(HasX, Foo))
 static_assert(not is_subtype_of(HasX, Foo))
+```
+
+Since `object` defines a `__hash__` method, this means that the standard-library `Hashable` protocol
+is currently understood by ty as being equivalent to `object`, much like `SupportsStr` and
+`UniversalSet` above:
+
+```py
+from typing import Hashable
+
+static_assert(is_equivalent_to(object, Hashable))
+static_assert(is_assignable_to(object, Hashable))
+static_assert(is_subtype_of(object, Hashable))
+```
+
+This means that any type considered assignable to `object` (which is all types) is considered by ty
+to be assignable to `Hashable`. This avoids false positives on code like this:
+
+```py
+from typing import Sequence
+from ty_extensions import is_disjoint_from
+
+def takes_hashable_or_sequence(x: Hashable | list[Hashable]): ...
+
+takes_hashable_or_sequence(["foo"])  # fine
+takes_hashable_or_sequence(None)  # fine
+
+static_assert(not is_disjoint_from(list[str], Hashable | list[Hashable]))
+static_assert(not is_disjoint_from(list[str], Sequence[Hashable]))
+
+static_assert(is_subtype_of(list[Hashable], Sequence[Hashable]))
+static_assert(is_subtype_of(list[str], Sequence[Hashable]))
+```
+
+but means that ty currently does not detect errors on code like this, which is flagged by other type
+checkers:
+
+```py
+def needs_something_hashable(x: Hashable):
+    hash(x)
+
+needs_something_hashable([])
 ```
 
 ## Diagnostics for protocols with invalid attribute members
@@ -2551,6 +2608,48 @@ class D:
 class E[T: B](Protocol): ...
 
 x: E[D]
+```
+
+### Recursive supertypes of `object`
+
+A recursive protocol can be a supertype of `object` (though it is hard to create such a protocol
+without violating the Liskov Substitution Principle, since all protocols are also subtypes of
+`object`):
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert, is_subtype_of, is_equivalent_to, is_disjoint_from
+
+class HasRepr(Protocol):
+    # TODO: we should emit a diagnostic here complaining about a Liskov violation
+    # (it incompatibly overrides `__repr__` from `object`, a supertype of `HasRepr`)
+    def __repr__(self) -> object: ...
+
+class HasReprRecursive(Protocol):
+    # TODO: we should emit a diagnostic here complaining about a Liskov violation
+    # (it incompatibly overrides `__repr__` from `object`, a supertype of `HasReprRecursive`)
+    def __repr__(self) -> "HasReprRecursive": ...
+
+class HasReprRecursiveAndFoo(Protocol):
+    # TODO: we should emit a diagnostic here complaining about a Liskov violation
+    # (it incompatibly overrides `__repr__` from `object`, a supertype of `HasReprRecursiveAndFoo`)
+    def __repr__(self) -> "HasReprRecursiveAndFoo": ...
+    foo: int
+
+static_assert(is_subtype_of(object, HasRepr))
+static_assert(is_subtype_of(HasRepr, object))
+static_assert(is_equivalent_to(object, HasRepr))
+static_assert(not is_disjoint_from(HasRepr, object))
+
+static_assert(is_subtype_of(object, HasReprRecursive))
+static_assert(is_subtype_of(HasReprRecursive, object))
+static_assert(is_equivalent_to(object, HasReprRecursive))
+static_assert(not is_disjoint_from(HasReprRecursive, object))
+
+static_assert(not is_subtype_of(object, HasReprRecursiveAndFoo))
+static_assert(is_subtype_of(HasReprRecursiveAndFoo, object))
+static_assert(not is_equivalent_to(object, HasReprRecursiveAndFoo))
+static_assert(not is_disjoint_from(HasReprRecursiveAndFoo, object))
 ```
 
 ## Meta-protocols

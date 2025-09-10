@@ -1397,6 +1397,9 @@ impl<'db> Type<'db> {
             (_, Type::NominalInstance(instance)) if instance.is_object(db) => {
                 C::always_satisfiable(db)
             }
+            (_, Type::ProtocolInstance(target)) if target.is_equivalent_to_object(db) => {
+                C::always_satisfiable(db)
+            }
 
             // `Never` is the bottom type, the empty set.
             // It is a subtype of all other types.
@@ -1610,9 +1613,10 @@ impl<'db> Type<'db> {
                 callable.has_relation_to_impl(db, target, relation, visitor)
             }),
 
-            (Type::ProtocolInstance(left), Type::ProtocolInstance(right)) => {
-                left.has_relation_to_impl(db, right, relation, visitor)
-            }
+            (Type::ProtocolInstance(left), Type::ProtocolInstance(right)) => left
+                .interface(db)
+                .extends_interface_of(db, right.interface(db), relation, visitor),
+
             // A protocol instance can never be a subtype of a nominal type, with the *sole* exception of `object`.
             (Type::ProtocolInstance(_), _) => C::unsatisfiable(db),
             (_, Type::ProtocolInstance(protocol)) => {
