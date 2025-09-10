@@ -534,6 +534,49 @@ impl<'db> PropertyInstanceType<'db> {
             ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
         }
     }
+
+    fn when_equivalent_to<C: Constraints<'db>>(self, db: &'db dyn Db, other: Self) -> C {
+        self.is_equivalent_to_impl(
+            db,
+            other,
+            &IsEquivalentVisitor::new(C::always_satisfiable(db)),
+        )
+    }
+
+    fn is_equivalent_to_impl<C: Constraints<'db>>(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        visitor: &IsEquivalentVisitor<'db, C>,
+    ) -> C {
+        let getter_equivalence = if let Some(getter) = self.getter(db) {
+            let Some(other_getter) = other.getter(db) else {
+                return C::unsatisfiable(db);
+            };
+            getter.is_equivalent_to_impl(db, other_getter, visitor)
+        } else {
+            if other.getter(db).is_some() {
+                return C::unsatisfiable(db);
+            }
+            C::always_satisfiable(db)
+        };
+
+        let setter_equivalence = || {
+            if let Some(setter) = self.setter(db) {
+                let Some(other_setter) = other.setter(db) else {
+                    return C::unsatisfiable(db);
+                };
+                setter.is_equivalent_to_impl(db, other_setter, visitor)
+            } else {
+                if other.setter(db).is_some() {
+                    return C::unsatisfiable(db);
+                }
+                C::always_satisfiable(db)
+            }
+        };
+
+        getter_equivalence.and(db, setter_equivalence)
+    }
 }
 
 bitflags! {
@@ -1931,6 +1974,11 @@ impl<'db> Type<'db> {
                 let class_literal = instance.class(db).class_literal(db).0;
                 C::from_bool(db, is_single_member_enum(db, class_literal))
             }
+
+            (Type::PropertyInstance(left), Type::PropertyInstance(right)) => {
+                left.is_equivalent_to_impl(db, right, visitor)
+            }
+
             _ => C::unsatisfiable(db),
         }
     }
@@ -9251,14 +9299,15 @@ impl<'db> KnownBoundMethodType<'db> {
             ) => self_function.has_relation_to_impl(db, other_function, relation, visitor),
 
             (
-                KnownBoundMethodType::PropertyDunderGet(_),
-                KnownBoundMethodType::PropertyDunderGet(_),
+                KnownBoundMethodType::PropertyDunderGet(self_property),
+                KnownBoundMethodType::PropertyDunderGet(other_property),
             )
             | (
-                KnownBoundMethodType::PropertyDunderSet(_),
-                KnownBoundMethodType::PropertyDunderSet(_),
-            )
-            | (KnownBoundMethodType::StrStartswith(_), KnownBoundMethodType::StrStartswith(_)) => {
+                KnownBoundMethodType::PropertyDunderSet(self_property),
+                KnownBoundMethodType::PropertyDunderSet(other_property),
+            ) => self_property.when_equivalent_to(db, other_property),
+
+            (KnownBoundMethodType::StrStartswith(_), KnownBoundMethodType::StrStartswith(_)) => {
                 C::from_bool(db, self == other)
             }
 
@@ -9295,14 +9344,15 @@ impl<'db> KnownBoundMethodType<'db> {
             ) => self_function.is_equivalent_to_impl(db, other_function, visitor),
 
             (
-                KnownBoundMethodType::PropertyDunderGet(_),
-                KnownBoundMethodType::PropertyDunderGet(_),
+                KnownBoundMethodType::PropertyDunderGet(self_property),
+                KnownBoundMethodType::PropertyDunderGet(other_property),
             )
             | (
-                KnownBoundMethodType::PropertyDunderSet(_),
-                KnownBoundMethodType::PropertyDunderSet(_),
-            )
-            | (KnownBoundMethodType::StrStartswith(_), KnownBoundMethodType::StrStartswith(_)) => {
+                KnownBoundMethodType::PropertyDunderSet(self_property),
+                KnownBoundMethodType::PropertyDunderSet(other_property),
+            ) => self_property.is_equivalent_to_impl(db, other_property, visitor),
+
+            (KnownBoundMethodType::StrStartswith(_), KnownBoundMethodType::StrStartswith(_)) => {
                 C::from_bool(db, self == other)
             }
 
