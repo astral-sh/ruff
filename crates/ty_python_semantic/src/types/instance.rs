@@ -513,7 +513,7 @@ impl<'db> ProtocolInstanceType<'db> {
         }
 
         fn initial<'db>(_db: &'db dyn Db, _value: ProtocolInstanceType<'db>, _: ()) -> bool {
-            false
+            true
         }
 
         inner(db, self, ())

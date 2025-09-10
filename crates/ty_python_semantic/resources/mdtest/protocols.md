@@ -2610,6 +2610,48 @@ class E[T: B](Protocol): ...
 x: E[D]
 ```
 
+### Recursive supertypes of `object`
+
+A recursive protocol can be a supertype of `object` (though it is hard to create such a protocol
+without violating the Liskov Substitution Principle, since all protocols are also subtypes of
+`object`):
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert, is_subtype_of, is_equivalent_to, is_disjoint_from
+
+class HasRepr(Protocol):
+    # TODO: we should emit a diagnostic here complaining about a Liskov violation
+    # (it incompatibly overrides `__repr__` from `object`, a supertype of `HasRepr`)
+    def __repr__(self) -> object: ...
+
+class HasReprRecursive(Protocol):
+    # TODO: we should emit a diagnostic here complaining about a Liskov violation
+    # (it incompatibly overrides `__repr__` from `object`, a supertype of `HasReprRecursive`)
+    def __repr__(self) -> "HasReprRecursive": ...
+
+class HasReprRecursiveAndFoo(Protocol):
+    # TODO: we should emit a diagnostic here complaining about a Liskov violation
+    # (it incompatibly overrides `__repr__` from `object`, a supertype of `HasReprRecursiveAndFoo`)
+    def __repr__(self) -> "HasReprRecursiveAndFoo": ...
+    foo: int
+
+static_assert(is_subtype_of(object, HasRepr))
+static_assert(is_subtype_of(HasRepr, object))
+static_assert(is_equivalent_to(object, HasRepr))
+static_assert(not is_disjoint_from(HasRepr, object))
+
+static_assert(is_subtype_of(object, HasReprRecursive))
+static_assert(is_subtype_of(HasReprRecursive, object))
+static_assert(is_equivalent_to(object, HasReprRecursive))
+static_assert(not is_disjoint_from(HasReprRecursive, object))
+
+static_assert(not is_subtype_of(object, HasReprRecursiveAndFoo))
+static_assert(is_subtype_of(HasReprRecursiveAndFoo, object))
+static_assert(not is_equivalent_to(object, HasReprRecursiveAndFoo))
+static_assert(not is_disjoint_from(HasReprRecursiveAndFoo, object))
+```
+
 ## Meta-protocols
 
 Where `P` is a protocol type, a class object `N` can be said to inhabit the type `type[P]` if:
