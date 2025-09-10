@@ -28,9 +28,9 @@ use crate::types::{
     ApplyTypeMappingVisitor, Binding, BoundSuperError, BoundSuperType, CallableType,
     DataclassParams, DeprecatedInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
     IsEquivalentVisitor, KnownInstanceType, ManualPEP695TypeAliasType, MaterializationKind,
-    NormalizedVisitor, PropertyInstanceType, StringLiteralType, TypeAliasType, TypeMapping,
-    TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, TypedDictParams,
-    UnionBuilder, VarianceInferable, declaration_type, infer_definition_types,
+    NormalizedVisitor, PropertyInstanceType, StringLiteralType, TypeAliasType, TypeContext,
+    TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind,
+    TypedDictParams, UnionBuilder, VarianceInferable, declaration_type, infer_definition_types,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet, Program,
@@ -2926,7 +2926,11 @@ impl<'db> ClassLiteral<'db> {
                         // `self.SOME_CONSTANT: Final = 1`, infer the type from the value
                         // on the right-hand side.
 
-                        let inferred_ty = infer_expression_type(db, index.expression(value));
+                        let inferred_ty = infer_expression_type(
+                            db,
+                            index.expression(value),
+                            TypeContext::default(),
+                        );
                         return Place::bound(inferred_ty).with_qualifiers(all_qualifiers);
                     }
 
@@ -3014,6 +3018,7 @@ impl<'db> ClassLiteral<'db> {
                                 let inferred_ty = infer_expression_type(
                                     db,
                                     index.expression(assign.value(&module)),
+                                    TypeContext::default(),
                                 );
 
                                 union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
@@ -3041,6 +3046,7 @@ impl<'db> ClassLiteral<'db> {
                                 let iterable_ty = infer_expression_type(
                                     db,
                                     index.expression(for_stmt.iterable(&module)),
+                                    TypeContext::default(),
                                 );
                                 // TODO: Potential diagnostics resulting from the iterable are currently not reported.
                                 let inferred_ty =
@@ -3071,6 +3077,7 @@ impl<'db> ClassLiteral<'db> {
                                 let context_ty = infer_expression_type(
                                     db,
                                     index.expression(with_item.context_expr(&module)),
+                                    TypeContext::default(),
                                 );
                                 let inferred_ty = if with_item.is_async() {
                                     context_ty.aenter(db)
@@ -3104,6 +3111,7 @@ impl<'db> ClassLiteral<'db> {
                                 let iterable_ty = infer_expression_type(
                                     db,
                                     index.expression(comprehension.iterable(&module)),
+                                    TypeContext::default(),
                                 );
                                 // TODO: Potential diagnostics resulting from the iterable are currently not reported.
                                 let inferred_ty =
