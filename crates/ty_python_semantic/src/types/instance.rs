@@ -107,13 +107,36 @@ impl<'db> Type<'db> {
         relation: TypeRelation,
         visitor: &HasRelationToVisitor<'db, C>,
     ) -> C {
-        protocol
-            .inner
-            .interface(db)
-            .members(db)
-            .when_all(db, |member| {
-                member.is_satisfied_by(db, self, relation, visitor)
-            })
+        let structurally_satisfied = if let Type::ProtocolInstance(self_protocol) = self {
+            self_protocol.interface(db).extends_interface_of(
+                db,
+                protocol.interface(db),
+                relation,
+                visitor,
+            )
+        } else {
+            protocol
+                .inner
+                .interface(db)
+                .members(db)
+                .when_all(db, |member| {
+                    member.is_satisfied_by(db, self, relation, visitor)
+                })
+        };
+
+        // Even if `self` does not satisfy the protocol from a structural perspective,
+        // we may still need to consider it as satisfying the protocol if `protocol` is
+        // a class-based protocol and `self` has the protocol class in its MRO.
+        //
+        // This matches the behaviour of other type checkers, and is required for us to
+        // recognise `str` as a subtype of `Container[str]`.
+        structurally_satisfied.or(db, || {
+            if let Protocol::FromClass(class) = protocol.inner {
+                self.has_relation_to_impl(db, Type::non_tuple_instance(class), relation, visitor)
+            } else {
+                C::unsatisfiable(db)
+            }
+        })
     }
 }
 

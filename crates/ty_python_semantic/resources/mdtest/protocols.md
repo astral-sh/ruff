@@ -2220,6 +2220,65 @@ static_assert(is_subtype_of(TypeOf[satisfies_foo], Foo))
 static_assert(is_assignable_to(TypeOf[satisfies_foo], Foo))
 ```
 
+## Nominal subtyping of protocols
+
+Protocols can participate in nominal subtyping as well as structural subtyping. The main use case
+for this is that it allows users an "escape hatch" to force a type checker to consider another type
+to be a subtype of a given protocol, even if the other type violates the Liskov Substitution
+Principle in some way.
+
+```py
+from typing import Protocol, final
+from ty_extensions import static_assert, is_subtype_of, is_disjoint_from
+
+class X(Protocol):
+    x: int
+
+class YProto(X, Protocol):
+    x: None = None  # TODO: we should emit an error here due to the Liskov violation
+
+@final
+class YNominal(X):
+    x: None = None  # TODO: we should emit an error here due to the Liskov violation
+
+static_assert(is_subtype_of(YProto, X))
+static_assert(is_subtype_of(YNominal, X))
+static_assert(not is_disjoint_from(YProto, X))
+static_assert(not is_disjoint_from(YNominal, X))
+```
+
+A common use case for this behaviour is that a lot of ecosystem code depends on type checkers
+considering `str` to be a subtype of `Container[str]`. From a structural-subtyping perspective, this
+is not the case, since `str.__contains__` only accepts `str`, while the `Container` interface
+specifies that a type must have a `__contains__` method which accepts `object` in order for that
+type to be considered a subtype of `Container`. Nonetheless, `str` has `Container[str]` in its MRO,
+and other type checkers therefore consider it to be a subtype of `Container[str]` -- as such, so do
+we:
+
+```py
+from typing import Container
+
+static_assert(is_subtype_of(str, Container[str]))
+static_assert(not is_disjoint_from(str, Container[str]))
+```
+
+This behaviour can have some counter-intuitive repercussions. For example, one implication of this
+is that not all subtype of `Iterable` are necessarily considered iterable by ty if a given subtype
+violates the Liskov principle (this also matches the behaviour of other type checkers):
+
+```py
+from typing import Iterable
+
+class Foo(Iterable[int]):
+    __iter__ = None
+
+static_assert(is_subtype_of(Foo, Iterable[int]))
+
+def _(x: Foo):
+    for item in x:  # error: [not-iterable]
+        pass
+```
+
 ## Protocols are never singleton types, and are never single-valued types
 
 It *might* be possible to have a singleton protocol-instance type...?
