@@ -143,7 +143,7 @@ impl<'db> AllMembers<'db> {
             | Type::PropertyInstance(_)
             | Type::FunctionLiteral(_)
             | Type::BoundMethod(_)
-            | Type::MethodWrapper(_)
+            | Type::KnownBoundMethod(_)
             | Type::WrapperDescriptor(_)
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)

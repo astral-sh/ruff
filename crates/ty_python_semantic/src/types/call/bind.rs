@@ -31,9 +31,9 @@ use crate::types::generics::{Specialization, SpecializationBuilder, Specializati
 use crate::types::signatures::{Parameter, ParameterForm, Parameters};
 use crate::types::tuple::{Tuple, TupleLength, TupleType};
 use crate::types::{
-    BoundMethodType, ClassLiteral, DataclassParams, FieldInstance, KnownClass, KnownInstanceType,
-    MethodWrapperKind, PropertyInstanceType, SpecialFormType, TrackedConstraintSet, TypeAliasType,
-    TypeMapping, UnionType, WrapperDescriptorKind, enums, ide_support, todo_type,
+    BoundMethodType, ClassLiteral, DataclassParams, FieldInstance, KnownBoundMethodType,
+    KnownClass, KnownInstanceType, PropertyInstanceType, SpecialFormType, TrackedConstraintSet,
+    TypeAliasType, TypeMapping, UnionType, WrapperDescriptorKind, enums, ide_support, todo_type,
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, PythonVersion};
@@ -271,7 +271,9 @@ impl<'db> Bindings<'db> {
             let binding_type = binding.callable_type;
             for (overload_index, overload) in binding.matching_overloads_mut() {
                 match binding_type {
-                    Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(function)) => {
+                    Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(
+                        function,
+                    )) => {
                         if function.is_classmethod(db) {
                             match overload.parameter_types() {
                                 [_, Some(owner)] => {
@@ -435,7 +437,7 @@ impl<'db> Bindings<'db> {
                         }
                     }
 
-                    Type::MethodWrapper(MethodWrapperKind::PropertyDunderGet(property)) => {
+                    Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderGet(property)) => {
                         match overload.parameter_types() {
                             [Some(instance), ..] if instance.is_none(db) => {
                                 overload.set_return_type(Type::PropertyInstance(property));
@@ -488,7 +490,7 @@ impl<'db> Bindings<'db> {
                         }
                     }
 
-                    Type::MethodWrapper(MethodWrapperKind::PropertyDunderSet(property)) => {
+                    Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderSet(property)) => {
                         if let [Some(instance), Some(value), ..] = overload.parameter_types() {
                             if let Some(setter) = property.setter(db) {
                                 if let Err(_call_error) = setter
@@ -506,7 +508,7 @@ impl<'db> Bindings<'db> {
                         }
                     }
 
-                    Type::MethodWrapper(MethodWrapperKind::StrStartswith(literal)) => {
+                    Type::KnownBoundMethod(KnownBoundMethodType::StrStartswith(literal)) => {
                         if let [Some(Type::StringLiteral(prefix)), None, None] =
                             overload.parameter_types()
                         {
@@ -1110,17 +1112,15 @@ impl<'db> Bindings<'db> {
                             // `tuple(range(42))` => `tuple[int, ...]`
                             // BUT `tuple((1, 2))` => `tuple[Literal[1], Literal[2]]` rather than `tuple[Literal[1, 2], ...]`
                             if let [Some(argument)] = overload.parameter_types() {
-                                let Ok(tuple_spec) = argument.try_iterate(db) else {
-                                    tracing::debug!(
-                                        "type" = %argument.display(db),
-                                        "try_iterate() should not fail on a type \
-                                            assignable to `Iterable`",
-                                    );
-                                    continue;
-                                };
+                                // We deliberately use `.iterate()` here (falling back to `Unknown` if it isn't iterable)
+                                // rather than `.try_iterate().expect()`. Even though we know at this point that the input
+                                // type is assignable to `Iterable`, that doesn't mean that the input type is *actually*
+                                // iterable (it could be a Liskov-uncompliant subtype of the `Iterable` class that sets
+                                // `__iter__ = None`, for example). That would be badly written Python code, but we still
+                                // need to be able to handle it without crashing.
                                 overload.set_return_type(Type::tuple(TupleType::new(
                                     db,
-                                    tuple_spec.as_ref(),
+                                    &argument.iterate(db),
                                 )));
                             }
                         }
@@ -1820,9 +1820,9 @@ impl<'db> CallableBinding<'db> {
                         FunctionKind::BoundMethod,
                         bound_method.function(context.db()),
                     )),
-                    Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(function)) => {
-                        Some((FunctionKind::MethodWrapper, function))
-                    }
+                    Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(
+                        function,
+                    )) => Some((FunctionKind::MethodWrapper, function)),
                     _ => None,
                 };
 
@@ -2784,13 +2784,13 @@ impl<'db> CallableDescription<'db> {
                 kind: "bound method",
                 name: bound_method.function(db).name(db),
             }),
-            Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(function)) => {
+            Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(function)) => {
                 Some(CallableDescription {
                     kind: "method wrapper `__get__` of function",
                     name: function.name(db),
                 })
             }
-            Type::MethodWrapper(MethodWrapperKind::PropertyDunderGet(_)) => {
+            Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderGet(_)) => {
                 Some(CallableDescription {
                     kind: "method wrapper",
                     name: "`__get__` of property",
@@ -3138,14 +3138,20 @@ impl<'db> BindingError<'db> {
                         String::new()
                     }
                 ));
-                diag.set_primary_message(format_args!(
-                    "Argument type `{argument_ty_display}` does not satisfy {} of type variable `{}`",
-                    match error {
-                        SpecializationError::MismatchedBound {..} => "upper bound",
-                        SpecializationError::MismatchedConstraint {..} => "constraints",
-                    },
-                    typevar.name(context.db()),
-                ));
+
+                let typevar_name = typevar.name(context.db());
+                match error {
+                    SpecializationError::MismatchedBound { .. } => {
+                        diag.set_primary_message(format_args!("Argument type `{argument_ty_display}` does not satisfy upper bound `{}` of type variable `{typevar_name}`",
+                        typevar.upper_bound(context.db()).expect("type variable should have an upper bound if this error occurs").display(context.db())
+                    ));
+                    }
+                    SpecializationError::MismatchedConstraint { .. } => {
+                        diag.set_primary_message(format_args!("Argument type `{argument_ty_display}` does not satisfy constraints ({}) of type variable `{typevar_name}`",
+                        typevar.constraints(context.db()).expect("type variable should have constraints if this error occurs").iter().map(|ty| format!("`{}`", ty.display(context.db()))).join(", ")
+                    ));
+                    }
+                }
 
                 if let Some(typevar_definition) = typevar.definition(context.db()) {
                     let module = parsed_module(context.db(), typevar_definition.file(context.db()))

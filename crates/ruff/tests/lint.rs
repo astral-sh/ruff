@@ -5781,28 +5781,6 @@ match 42:  # invalid-syntax
 }
 
 #[test]
-fn future_annotations_preview_warning() {
-    assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME))
-            .args(STDIN_BASE_OPTIONS)
-            .args(["--config", "lint.future-annotations = true"])
-            .args(["--select", "F"])
-            .arg("--no-preview")
-            .arg("-")
-            .pass_stdin("1"),
-        @r"
-    success: true
-    exit_code: 0
-    ----- stdout -----
-    All checks passed!
-
-    ----- stderr -----
-    warning: The `lint.future-annotations` setting will have no effect because `preview` is disabled
-    ",
-    );
-}
-
-#[test]
 fn up045_nested_optional_flatten_all() {
     let contents = "\
 from typing import Optional

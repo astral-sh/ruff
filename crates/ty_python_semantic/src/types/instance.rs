@@ -107,13 +107,36 @@ impl<'db> Type<'db> {
         relation: TypeRelation,
         visitor: &HasRelationToVisitor<'db, C>,
     ) -> C {
-        protocol
-            .inner
-            .interface(db)
-            .members(db)
-            .when_all(db, |member| {
-                member.is_satisfied_by(db, self, relation, visitor)
-            })
+        let structurally_satisfied = if let Type::ProtocolInstance(self_protocol) = self {
+            self_protocol.interface(db).extends_interface_of(
+                db,
+                protocol.interface(db),
+                relation,
+                visitor,
+            )
+        } else {
+            protocol
+                .inner
+                .interface(db)
+                .members(db)
+                .when_all(db, |member| {
+                    member.is_satisfied_by(db, self, relation, visitor)
+                })
+        };
+
+        // Even if `self` does not satisfy the protocol from a structural perspective,
+        // we may still need to consider it as satisfying the protocol if `protocol` is
+        // a class-based protocol and `self` has the protocol class in its MRO.
+        //
+        // This matches the behaviour of other type checkers, and is required for us to
+        // recognise `str` as a subtype of `Container[str]`.
+        structurally_satisfied.or(db, || {
+            if let Protocol::FromClass(class) = protocol.inner {
+                self.has_relation_to_impl(db, Type::non_tuple_instance(class), relation, visitor)
+            } else {
+                C::unsatisfiable(db)
+            }
+        })
     }
 }
 
@@ -482,6 +505,43 @@ impl<'db> ProtocolInstanceType<'db> {
         }
     }
 
+    /// Return `true` if this protocol is a supertype of `object`.
+    ///
+    /// This indicates that the protocol represents the same set of possible runtime objects
+    /// as `object` (since `object` is the universal set of *all* possible runtime objects!).
+    /// Such a protocol is therefore an equivalent type to `object`, which would in fact be
+    /// normalised to `object`.
+    pub(super) fn is_equivalent_to_object(self, db: &'db dyn Db) -> bool {
+        #[salsa::tracked(cycle_fn=recover, cycle_initial=initial, heap_size=ruff_memory_usage::heap_size)]
+        fn inner<'db>(db: &'db dyn Db, protocol: ProtocolInstanceType<'db>, _: ()) -> bool {
+            Type::object(db)
+                .satisfies_protocol(
+                    db,
+                    protocol,
+                    TypeRelation::Subtyping,
+                    &HasRelationToVisitor::new(ConstraintSet::always_satisfiable(db)),
+                )
+                .is_always_satisfied(db)
+        }
+
+        #[expect(clippy::trivially_copy_pass_by_ref)]
+        fn recover<'db>(
+            _db: &'db dyn Db,
+            _result: &bool,
+            _count: u32,
+            _value: ProtocolInstanceType<'db>,
+            _: (),
+        ) -> salsa::CycleRecoveryAction<bool> {
+            salsa::CycleRecoveryAction::Iterate
+        }
+
+        fn initial<'db>(_db: &'db dyn Db, _value: ProtocolInstanceType<'db>, _: ()) -> bool {
+            true
+        }
+
+        inner(db, self, ())
+    }
+
     /// Return a "normalized" version of this `Protocol` type.
     ///
     /// See [`Type::normalized`] for more details.
@@ -497,17 +557,8 @@ impl<'db> ProtocolInstanceType<'db> {
         db: &'db dyn Db,
         visitor: &NormalizedVisitor<'db>,
     ) -> Type<'db> {
-        let object = Type::object(db);
-        if object
-            .satisfies_protocol(
-                db,
-                self,
-                TypeRelation::Subtyping,
-                &HasRelationToVisitor::new(ConstraintSet::always_satisfiable(db)),
-            )
-            .is_always_satisfied(db)
-        {
-            return object;
+        if self.is_equivalent_to_object(db) {
+            return Type::object(db);
         }
         match self.inner {
             Protocol::FromClass(_) => Type::ProtocolInstance(Self::synthesized(
@@ -515,22 +566,6 @@ impl<'db> ProtocolInstanceType<'db> {
             )),
             Protocol::Synthesized(_) => Type::ProtocolInstance(self),
         }
-    }
-
-    /// Return `true` if this protocol type has the given type relation to the protocol `other`.
-    ///
-    /// TODO: consider the types of the members as well as their existence
-    pub(super) fn has_relation_to_impl<C: Constraints<'db>>(
-        self,
-        db: &'db dyn Db,
-        other: Self,
-        _relation: TypeRelation,
-        visitor: &HasRelationToVisitor<'db, C>,
-    ) -> C {
-        other
-            .inner
-            .interface(db)
-            .is_sub_interface_of(db, self.inner.interface(db), visitor)
     }
 
     /// Return `true` if this protocol type is equivalent to the protocol `other`.
