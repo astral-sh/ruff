@@ -320,6 +320,15 @@ mod flaky {
     // iteration protocol as well as the new-style iteration protocol: not all objects that
     // we consider iterable are assignable to `Iterable[object]`.
     //
+    // Note also that (like other property tests in this module),
+    // this invariant will only hold true for Liskov-compliant types assignable to `Iterable`.
+    // Since protocols can participate in nominal assignability/subtyping as well as
+    // structural assignability/subtyping, it is possible to construct types that a type
+    // checker must consider to be subtypes of `Iterable` even though they are not in fact
+    // iterable (as long as the user `type: ignore`s any type-checker errors stemming from
+    // the Liskov violation). All you need to do is to create a class that subclasses
+    // `Iterable` but assigns `__iter__ = None` in the class body (or similar).
+    //
     // Currently flaky due to <https://github.com/astral-sh/ty/issues/889>
     type_property_test!(
         all_type_assignable_to_iterable_are_iterable, db,

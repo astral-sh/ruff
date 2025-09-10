@@ -1058,6 +1058,12 @@ impl<'db> Bindings<'db> {
                             // `tuple(range(42))` => `tuple[int, ...]`
                             // BUT `tuple((1, 2))` => `tuple[Literal[1], Literal[2]]` rather than `tuple[Literal[1, 2], ...]`
                             if let [Some(argument)] = overload.parameter_types() {
+                                // We deliberately use `.iterate()` here (falling back to `Unknown` if it isn't iterable)
+                                // rather than `.try_iterate().expect()`. Even though we know at this point that the input
+                                // type is assignable to `Iterable`, that doesn't mean that the input type is *actually*
+                                // iterable (it could be a Liskov-uncompliant subtype of the `Iterable` class that sets
+                                // `__iter__ = None`, for example). That would be badly written Python code, but we still
+                                // need to be able to handle it without crashing.
                                 overload.set_return_type(Type::tuple(TupleType::new(
                                     db,
                                     &argument.iterate(db),
