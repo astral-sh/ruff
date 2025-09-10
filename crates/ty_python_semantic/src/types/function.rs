@@ -79,8 +79,9 @@ use crate::types::visitor::any_over_type;
 use crate::types::{
     BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, ClassType,
     DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
-    IsEquivalentVisitor, KnownClass, NormalizedVisitor, SpecialFormType, Truthiness, Type,
-    TypeMapping, TypeRelation, UnionBuilder, all_members, binding_type, walk_type_mapping,
+    IsEquivalentVisitor, KnownClass, KnownInstanceType, NormalizedVisitor, SpecialFormType,
+    TrackedConstraintSet, Truthiness, Type, TypeMapping, TypeRelation, UnionBuilder, all_members,
+    binding_type, walk_type_mapping,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -1255,10 +1256,12 @@ pub enum KnownFunction {
     HasMember,
     /// `ty_extensions.reveal_protocol_interface`
     RevealProtocolInterface,
-    /// `ty_extensions.reveal_when_assignable_to`
-    RevealWhenAssignableTo,
-    /// `ty_extensions.reveal_when_subtype_of`
-    RevealWhenSubtypeOf,
+    /// `ty_extensions.range_constraint`
+    RangeConstraint,
+    /// `ty_extensions.not_equivalent_constraint`
+    NotEquivalentConstraint,
+    /// `ty_extensions.incomparable_constraint`
+    IncomparableConstraint,
 }
 
 impl KnownFunction {
@@ -1324,8 +1327,9 @@ impl KnownFunction {
             | Self::StaticAssert
             | Self::HasMember
             | Self::RevealProtocolInterface
-            | Self::RevealWhenAssignableTo
-            | Self::RevealWhenSubtypeOf
+            | Self::RangeConstraint
+            | Self::NotEquivalentConstraint
+            | Self::IncomparableConstraint
             | Self::AllMembers => module.is_ty_extensions(),
             Self::ImportModule => module.is_importlib(),
         }
@@ -1621,52 +1625,82 @@ impl KnownFunction {
                 overload.set_return_type(Type::module_literal(db, file, module));
             }
 
-            KnownFunction::RevealWhenAssignableTo => {
-                let [Some(ty_a), Some(ty_b)] = overload.parameter_types() else {
-                    return;
-                };
-                let constraints = ty_a.when_assignable_to::<ConstraintSet>(db, *ty_b);
-                let Some(builder) =
-                    context.report_diagnostic(DiagnosticId::RevealedType, Severity::Info)
+            KnownFunction::RangeConstraint => {
+                let [
+                    Some(lower),
+                    Some(Type::NonInferableTypeVar(typevar)),
+                    Some(upper),
+                ] = parameter_types
                 else {
                     return;
                 };
-                let mut diag = builder.into_diagnostic("Assignability holds");
-                let span = context.span(call_expression);
-                if constraints.is_always_satisfied(db) {
-                    diag.annotate(Annotation::primary(span).message("always"));
-                } else if constraints.is_never_satisfied(db) {
-                    diag.annotate(Annotation::primary(span).message("never"));
-                } else {
-                    diag.annotate(
-                        Annotation::primary(span)
-                            .message(format_args!("when {}", constraints.display(db))),
-                    );
-                }
+
+                let constraints = ConstraintSet::range(db, *lower, *typevar, *upper);
+                let tracked = TrackedConstraintSet::new(db, constraints);
+                overload.set_return_type(Type::KnownInstance(KnownInstanceType::ConstraintSet(
+                    tracked,
+                )));
             }
 
-            KnownFunction::RevealWhenSubtypeOf => {
-                let [Some(ty_a), Some(ty_b)] = overload.parameter_types() else {
+            KnownFunction::NotEquivalentConstraint => {
+                let [Some(Type::NonInferableTypeVar(typevar)), Some(hole)] = parameter_types else {
                     return;
                 };
-                let constraints = ty_a.when_subtype_of::<ConstraintSet>(db, *ty_b);
-                let Some(builder) =
-                    context.report_diagnostic(DiagnosticId::RevealedType, Severity::Info)
+
+                if !hole.is_equivalent_to(db, hole.top_materialization(db)) {
+                    if let Some(builder) =
+                        context.report_lint(&INVALID_ARGUMENT_TYPE, call_expression)
+                    {
+                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                            "Not-equivalent constraint must have a fully static type"
+                        ));
+                        diagnostic.annotate(
+                            Annotation::secondary(context.span(&call_expression.arguments.args[1]))
+                                .message(format_args!(
+                                    "Type `{}` is not fully static",
+                                    hole.display(db)
+                                )),
+                        );
+                    }
+                    return;
+                }
+
+                let constraints = ConstraintSet::not_equivalent(db, *typevar, *hole);
+                let tracked = TrackedConstraintSet::new(db, constraints);
+                overload.set_return_type(Type::KnownInstance(KnownInstanceType::ConstraintSet(
+                    tracked,
+                )));
+            }
+
+            KnownFunction::IncomparableConstraint => {
+                let [Some(Type::NonInferableTypeVar(typevar)), Some(pivot)] = parameter_types
                 else {
                     return;
                 };
-                let mut diag = builder.into_diagnostic("Subtyping holds");
-                let span = context.span(call_expression);
-                if constraints.is_always_satisfied(db) {
-                    diag.annotate(Annotation::primary(span).message("always"));
-                } else if constraints.is_never_satisfied(db) {
-                    diag.annotate(Annotation::primary(span).message("never"));
-                } else {
-                    diag.annotate(
-                        Annotation::primary(span)
-                            .message(format_args!("when {}", constraints.display(db))),
-                    );
+
+                if !pivot.is_equivalent_to(db, pivot.top_materialization(db)) {
+                    if let Some(builder) =
+                        context.report_lint(&INVALID_ARGUMENT_TYPE, call_expression)
+                    {
+                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                            "Incomparable constraint must have a fully static type"
+                        ));
+                        diagnostic.annotate(
+                            Annotation::secondary(context.span(&call_expression.arguments.args[1]))
+                                .message(format_args!(
+                                    "Type `{}` is not fully static",
+                                    pivot.display(db)
+                                )),
+                        );
+                    }
+                    return;
                 }
+
+                let constraints = ConstraintSet::incomparable(db, *typevar, *pivot);
+                let tracked = TrackedConstraintSet::new(db, constraints);
+                overload.set_return_type(Type::KnownInstance(KnownInstanceType::ConstraintSet(
+                    tracked,
+                )));
             }
 
             _ => {}
@@ -1729,8 +1763,9 @@ pub(crate) mod tests {
                 | KnownFunction::IsEquivalentTo
                 | KnownFunction::HasMember
                 | KnownFunction::RevealProtocolInterface
-                | KnownFunction::RevealWhenAssignableTo
-                | KnownFunction::RevealWhenSubtypeOf
+                | KnownFunction::RangeConstraint
+                | KnownFunction::NotEquivalentConstraint
+                | KnownFunction::IncomparableConstraint
                 | KnownFunction::AllMembers => KnownModule::TyExtensions,
 
                 KnownFunction::ImportModule => KnownModule::ImportLib,

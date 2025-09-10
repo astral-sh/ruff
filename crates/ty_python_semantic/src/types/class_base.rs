@@ -166,7 +166,8 @@ impl<'db> ClassBase<'db> {
                 KnownInstanceType::TypeAliasType(_)
                 | KnownInstanceType::TypeVar(_)
                 | KnownInstanceType::Deprecated(_)
-                | KnownInstanceType::Field(_) => None,
+                | KnownInstanceType::Field(_)
+                | KnownInstanceType::ConstraintSet(_) => None,
             },
 
             Type::SpecialForm(special_form) => match special_form {

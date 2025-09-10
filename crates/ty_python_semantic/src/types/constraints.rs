@@ -102,8 +102,12 @@ use smallvec::{SmallVec, smallvec};
 use crate::Db;
 use crate::types::{BoundTypeVarInstance, IntersectionType, Type, UnionType};
 
+fn comparable<'db>(db: &'db dyn Db, left: Type<'db>, right: Type<'db>) -> bool {
+    left.is_subtype_of(db, right) || right.is_subtype_of(db, left)
+}
+
 fn incomparable<'db>(db: &'db dyn Db, left: Type<'db>, right: Type<'db>) -> bool {
-    !left.is_subtype_of(db, right) && !right.is_subtype_of(db, left)
+    !comparable(db, left, right)
 }
 
 /// Encodes the constraints under which a type property (e.g. assignability) holds.
@@ -246,8 +250,8 @@ where
 ///   be simplified into a single clause.
 ///
 /// [POPL2015]: https://doi.org/10.1145/2676726.2676991
-#[derive(Clone, Debug)]
-pub(crate) struct ConstraintSet<'db> {
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
+pub struct ConstraintSet<'db> {
     // NOTE: We use 2 here because there are a couple of places where we create unions of 2 clauses
     // as temporary values — in particular when negating a constraint — and this lets us avoid
     // spilling the temporary value to the heap.
@@ -267,6 +271,42 @@ impl<'db> ConstraintSet<'db> {
         Self {
             clauses: smallvec![clause],
         }
+    }
+
+    pub(crate) fn range(
+        db: &'db dyn Db,
+        lower: Type<'db>,
+        typevar: BoundTypeVarInstance<'db>,
+        upper: Type<'db>,
+    ) -> Self {
+        let lower = lower.bottom_materialization(db);
+        let upper = upper.top_materialization(db);
+        let constraint = Constraint::range(db, lower, upper).constrain(typevar);
+        let mut result = Self::never();
+        result.union_constraint(db, constraint);
+        result
+    }
+
+    pub(crate) fn not_equivalent(
+        db: &'db dyn Db,
+        typevar: BoundTypeVarInstance<'db>,
+        hole: Type<'db>,
+    ) -> Self {
+        let constraint = Constraint::not_equivalent(db, hole).constrain(typevar);
+        let mut result = Self::never();
+        result.union_constraint(db, constraint);
+        result
+    }
+
+    pub(crate) fn incomparable(
+        db: &'db dyn Db,
+        typevar: BoundTypeVarInstance<'db>,
+        pivot: Type<'db>,
+    ) -> Self {
+        let constraint = Constraint::incomparable(db, pivot).constrain(typevar);
+        let mut result = Self::never();
+        result.union_constraint(db, constraint);
+        result
     }
 
     /// Updates this set to be the union of itself and a constraint.
@@ -429,7 +469,7 @@ impl<'db> Constraints<'db> for ConstraintSet<'db> {
 /// This is called a "constraint set", and denoted _C_, in [[POPL2015][]].
 ///
 /// [POPL2015]: https://doi.org/10.1145/2676726.2676991
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
 pub(crate) struct ConstraintClause<'db> {
     // NOTE: We use 1 here because most clauses only mention a single typevar.
     constraints: SmallVec<[ConstrainedTypeVar<'db>; 1]>,
@@ -810,7 +850,7 @@ impl<'db> ConstraintClause<'db> {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
 pub(crate) struct ConstrainedTypeVar<'db> {
     typevar: BoundTypeVarInstance<'db>,
     constraint: Constraint<'db>,
@@ -857,7 +897,7 @@ impl<'db> ConstrainedTypeVar<'db> {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
 pub(crate) enum Constraint<'db> {
     Range(RangeConstraint<'db>),
     NotEquivalent(NotEquivalentConstraint<'db>),
@@ -980,7 +1020,7 @@ impl<'db> Satisfiable<Constraint<'db>> {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
 pub(crate) struct RangeConstraint<'db> {
     lower: Type<'db>,
     upper: Type<'db>,
@@ -1054,7 +1094,7 @@ impl<'db> RangeConstraint<'db> {
         db: &'db dyn Db,
         other: &IncomparableConstraint<'db>,
     ) -> Simplifiable<Constraint<'db>> {
-        if other.ty.is_subtype_of(db, other.ty) || self.upper.is_subtype_of(db, other.ty) {
+        if other.ty.is_subtype_of(db, self.lower) || self.upper.is_subtype_of(db, other.ty) {
             return Simplifiable::NeverSatisfiable;
         }
 
@@ -1189,7 +1229,7 @@ impl<'db> RangeConstraint<'db> {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
 pub(crate) struct NotEquivalentConstraint<'db> {
     ty: Type<'db>,
 }
@@ -1224,8 +1264,9 @@ impl<'db> NotEquivalentConstraint<'db> {
         db: &'db dyn Db,
         other: &IncomparableConstraint<'db>,
     ) -> Simplifiable<Constraint<'db>> {
-        // (α ≠ t) ∧ (a ≁ t) = a ≁ t
-        if self.ty.is_equivalent_to(db, other.ty) {
+        // If the hole and pivot are comparable, then removing the hole from the incomparable
+        // constraint doesn't do anything.
+        if comparable(db, self.ty, other.ty) {
             return Simplifiable::Simplified(Constraint::Incomparable(other.clone()));
         }
         Simplifiable::NotSimplified(
@@ -1302,7 +1343,7 @@ impl<'db> NotEquivalentConstraint<'db> {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
 pub(crate) struct IncomparableConstraint<'db> {
     ty: Type<'db>,
 }

@@ -93,6 +93,7 @@ use crate::semantic_index::{
 };
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::class::{CodeGeneratorKind, FieldKind, MetaclassErrorKind, MethodDecorator};
+use crate::types::constraints::Constraints;
 use crate::types::diagnostic::{
     self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS,
     CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, DUPLICATE_KW_ONLY, INCONSISTENT_MRO,
@@ -130,10 +131,10 @@ use crate::types::{
     CallDunderError, CallableType, ClassLiteral, ClassType, DataclassParams, DynamicType,
     IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, LintDiagnosticGuard,
     MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm,
-    Parameters, SpecialFormType, SubclassOfType, Truthiness, Type, TypeAliasType,
-    TypeAndQualifiers, TypeIsType, TypeQualifiers, TypeVarBoundOrConstraintsEvaluation,
-    TypeVarDefaultEvaluation, TypeVarInstance, TypeVarKind, UnionBuilder, UnionType, binding_type,
-    todo_type,
+    Parameters, SpecialFormType, SubclassOfType, TrackedConstraintSet, Truthiness, Type,
+    TypeAliasType, TypeAndQualifiers, TypeIsType, TypeQualifiers,
+    TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation, TypeVarInstance, TypeVarKind,
+    UnionBuilder, UnionType, binding_type, todo_type,
 };
 use crate::unpack::{EvaluationMode, Unpack, UnpackPosition};
 use crate::util::diagnostics::format_enumeration;
@@ -7375,6 +7376,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Type::IntLiteral(!i64::from(bool))
             }
 
+            (
+                ast::UnaryOp::Invert,
+                Type::KnownInstance(KnownInstanceType::ConstraintSet(constraints)),
+            ) => {
+                let constraints = constraints.constraints(self.db()).clone();
+                let result = constraints.negate(self.db());
+                Type::KnownInstance(KnownInstanceType::ConstraintSet(TrackedConstraintSet::new(
+                    self.db(),
+                    result,
+                )))
+            }
+
             (ast::UnaryOp::Not, ty) => ty
                 .try_bool(self.db())
                 .unwrap_or_else(|err| {
@@ -7725,6 +7738,32 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     Type::IntLiteral(i64::from(b2)),
                     op,
                 ),
+
+            (
+                Type::KnownInstance(KnownInstanceType::ConstraintSet(left)),
+                Type::KnownInstance(KnownInstanceType::ConstraintSet(right)),
+                ast::Operator::BitAnd,
+            ) => {
+                let left = left.constraints(self.db()).clone();
+                let right = right.constraints(self.db()).clone();
+                let result = left.and(self.db(), || right);
+                Some(Type::KnownInstance(KnownInstanceType::ConstraintSet(
+                    TrackedConstraintSet::new(self.db(), result),
+                )))
+            }
+
+            (
+                Type::KnownInstance(KnownInstanceType::ConstraintSet(left)),
+                Type::KnownInstance(KnownInstanceType::ConstraintSet(right)),
+                ast::Operator::BitOr,
+            ) => {
+                let left = left.constraints(self.db()).clone();
+                let right = right.constraints(self.db()).clone();
+                let result = left.or(self.db(), || right);
+                Some(Type::KnownInstance(KnownInstanceType::ConstraintSet(
+                    TrackedConstraintSet::new(self.db(), result),
+                )))
+            }
 
             // We've handled all of the special cases that we support for literals, so we need to
             // fall back on looking for dunder methods on one of the operand types.
@@ -10590,6 +10629,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         builder.into_diagnostic(format_args!(
                             "`dataclasses.Field` is not allowed in type expressions",
+                        ));
+                    }
+                    Type::unknown()
+                }
+                KnownInstanceType::ConstraintSet(_) => {
+                    self.infer_type_expression(&subscript.slice);
+                    if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
+                        builder.into_diagnostic(format_args!(
+                            "`ty_extensions.ConstraintSet` is not allowed in type expressions",
                         ));
                     }
                     Type::unknown()
