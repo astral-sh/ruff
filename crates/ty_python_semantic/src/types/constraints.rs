@@ -292,7 +292,6 @@ impl<'db> ConstraintSet<'db> {
         typevar: BoundTypeVarInstance<'db>,
         hole: Type<'db>,
     ) -> Self {
-        let hole = hole.top_materialization(db);
         let constraint = Constraint::not_equivalent(db, hole).constrain(typevar);
         let mut result = Self::never();
         result.union_constraint(db, constraint);
@@ -304,7 +303,6 @@ impl<'db> ConstraintSet<'db> {
         typevar: BoundTypeVarInstance<'db>,
         pivot: Type<'db>,
     ) -> Self {
-        let pivot = pivot.top_materialization(db);
         let constraint = Constraint::incomparable(db, pivot).constrain(typevar);
         let mut result = Self::never();
         result.union_constraint(db, constraint);

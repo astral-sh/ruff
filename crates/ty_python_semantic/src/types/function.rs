@@ -65,7 +65,7 @@ use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{FileScopeId, SemanticIndex, semantic_index};
 use crate::types::call::{Binding, CallArguments};
-use crate::types::constraints::Constraints;
+use crate::types::constraints::{ConstraintSet, Constraints};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{
     INVALID_ARGUMENT_TYPE, REDUNDANT_CAST, STATIC_ASSERT_ERROR, TYPE_ASSERTION_FAILURE,
@@ -79,8 +79,9 @@ use crate::types::visitor::any_over_type;
 use crate::types::{
     BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, ClassType,
     DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
-    IsEquivalentVisitor, KnownClass, NormalizedVisitor, SpecialFormType, Truthiness, Type,
-    TypeMapping, TypeRelation, UnionBuilder, all_members, binding_type, walk_type_mapping,
+    IsEquivalentVisitor, KnownClass, KnownInstanceType, NormalizedVisitor, SpecialFormType,
+    TrackedConstraintSet, Truthiness, Type, TypeMapping, TypeRelation, UnionBuilder, all_members,
+    binding_type, walk_type_mapping,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -1622,6 +1623,84 @@ impl KnownFunction {
                 };
 
                 overload.set_return_type(Type::module_literal(db, file, module));
+            }
+
+            KnownFunction::RangeConstraint => {
+                let [
+                    Some(lower),
+                    Some(Type::NonInferableTypeVar(typevar)),
+                    Some(upper),
+                ] = parameter_types
+                else {
+                    return;
+                };
+
+                let constraints = ConstraintSet::range(db, *lower, *typevar, *upper);
+                let tracked = TrackedConstraintSet::new(db, constraints);
+                overload.set_return_type(Type::KnownInstance(KnownInstanceType::ConstraintSet(
+                    tracked,
+                )));
+            }
+
+            KnownFunction::NotEquivalentConstraint => {
+                let [Some(Type::NonInferableTypeVar(typevar)), Some(hole)] = parameter_types else {
+                    return;
+                };
+
+                if !hole.is_equivalent_to(db, hole.top_materialization(db)) {
+                    if let Some(builder) =
+                        context.report_lint(&INVALID_ARGUMENT_TYPE, call_expression)
+                    {
+                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                            "Not-equivalent constraint must have a fully static type"
+                        ));
+                        diagnostic.annotate(
+                            Annotation::secondary(context.span(&call_expression.arguments.args[1]))
+                                .message(format_args!(
+                                    "Type `{}` is not fully static",
+                                    hole.display(db)
+                                )),
+                        );
+                    }
+                    return;
+                }
+
+                let constraints = ConstraintSet::not_equivalent(db, *typevar, *hole);
+                let tracked = TrackedConstraintSet::new(db, constraints);
+                overload.set_return_type(Type::KnownInstance(KnownInstanceType::ConstraintSet(
+                    tracked,
+                )));
+            }
+
+            KnownFunction::IncomparableConstraint => {
+                let [Some(Type::NonInferableTypeVar(typevar)), Some(pivot)] = parameter_types
+                else {
+                    return;
+                };
+
+                if !pivot.is_equivalent_to(db, pivot.top_materialization(db)) {
+                    if let Some(builder) =
+                        context.report_lint(&INVALID_ARGUMENT_TYPE, call_expression)
+                    {
+                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                            "Incomparable constraint must have a fully static type"
+                        ));
+                        diagnostic.annotate(
+                            Annotation::secondary(context.span(&call_expression.arguments.args[1]))
+                                .message(format_args!(
+                                    "Type `{}` is not fully static",
+                                    pivot.display(db)
+                                )),
+                        );
+                    }
+                    return;
+                }
+
+                let constraints = ConstraintSet::incomparable(db, *typevar, *pivot);
+                let tracked = TrackedConstraintSet::new(db, constraints);
+                overload.set_return_type(Type::KnownInstance(KnownInstanceType::ConstraintSet(
+                    tracked,
+                )));
             }
 
             _ => {}

@@ -139,15 +139,18 @@ def _[T]() -> None:
     reveal_type(not_equivalent_constraint(T, object))
 ```
 
-Constraints can only refer to fully static types, so the hole is transformed into its top
-materialization.
+Constraints can only refer to fully static types. However, not-equivalent constraints are not
+created directly; they are only created when negating a range constraint. Since that range
+constraint will have fully static lower and upper bounds, the not-equivalent constraints that we
+create will already have a fully static hole. Therefore, we raise a diagnostic when calling the
+internal `not_equivalent_constraint` constructor with a non-fully-static type.
 
 ```py
 def _[T]() -> None:
-    # revealed: ty_extensions.ConstraintSet[(T@_ ≠ object)]
-    reveal_type(not_equivalent_constraint(T, Any))
-    # revealed: ty_extensions.ConstraintSet[(T@_ ≠ Sequence[object])]
-    reveal_type(not_equivalent_constraint(T, Sequence[Any]))
+    # error: [invalid-argument-type] "Not-equivalent constraint must have a fully static type"
+    reveal_type(not_equivalent_constraint(T, Any))  # revealed: ConstraintSet
+    # error: [invalid-argument-type] "Not-equivalent constraint must have a fully static type"
+    reveal_type(not_equivalent_constraint(T, Sequence[Any]))  # revealed: ConstraintSet
 ```
 
 ### Incomparable
@@ -178,15 +181,18 @@ def _[T]() -> None:
     reveal_type(incomparable_constraint(T, object))
 ```
 
-Constraints can only refer to fully static types, so the pivot is transformed into its top
-materialization.
+Constraints can only refer to fully static types. However, incomparable constraints are not created
+directly; they are only created when negating a range constraint. Since that range constraint will
+have fully static lower and upper bounds, the incomparable constraints that we create will already
+have a fully static hole. Therefore, we raise a diagnostic when calling the internal
+`incomparable_constraint` constructor with a non-fully-static type.
 
 ```py
 def _[T]() -> None:
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(incomparable_constraint(T, Any))
-    # revealed: ty_extensions.ConstraintSet[(T@_ ≁ Sequence[object])]
-    reveal_type(incomparable_constraint(T, Sequence[Any]))
+    # error: [invalid-argument-type] "Incomparable constraint must have a fully static type"
+    reveal_type(incomparable_constraint(T, Any))  # revealed: ConstraintSet
+    # error: [invalid-argument-type] "Incomparable constraint must have a fully static type"
+    reveal_type(incomparable_constraint(T, Sequence[Any]))  # revealed: ConstraintSet
 ```
 
 ## Intersection

@@ -627,47 +627,6 @@ impl<'db> Bindings<'db> {
                             }
                         }
 
-                        Some(KnownFunction::RangeConstraint) => {
-                            if let [
-                                Some(lower),
-                                Some(Type::NonInferableTypeVar(typevar)),
-                                Some(upper),
-                            ] = overload.parameter_types()
-                            {
-                                let constraints =
-                                    ConstraintSet::range(db, *lower, *typevar, *upper);
-                                let tracked = TrackedConstraintSet::new(db, constraints);
-                                overload.set_return_type(Type::KnownInstance(
-                                    KnownInstanceType::ConstraintSet(tracked),
-                                ));
-                            }
-                        }
-
-                        Some(KnownFunction::NotEquivalentConstraint) => {
-                            if let [Some(Type::NonInferableTypeVar(typevar)), Some(hole)] =
-                                overload.parameter_types()
-                            {
-                                let constraints =
-                                    ConstraintSet::not_equivalent(db, *typevar, *hole);
-                                let tracked = TrackedConstraintSet::new(db, constraints);
-                                overload.set_return_type(Type::KnownInstance(
-                                    KnownInstanceType::ConstraintSet(tracked),
-                                ));
-                            }
-                        }
-
-                        Some(KnownFunction::IncomparableConstraint) => {
-                            if let [Some(Type::NonInferableTypeVar(typevar)), Some(pivot)] =
-                                overload.parameter_types()
-                            {
-                                let constraints = ConstraintSet::incomparable(db, *typevar, *pivot);
-                                let tracked = TrackedConstraintSet::new(db, constraints);
-                                overload.set_return_type(Type::KnownInstance(
-                                    KnownInstanceType::ConstraintSet(tracked),
-                                ));
-                            }
-                        }
-
                         Some(KnownFunction::IsSingleton) => {
                             if let [Some(ty)] = overload.parameter_types() {
                                 overload.set_return_type(Type::BooleanLiteral(ty.is_singleton(db)));
