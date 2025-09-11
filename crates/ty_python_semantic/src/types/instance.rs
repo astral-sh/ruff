@@ -34,29 +34,22 @@ impl<'db> Type<'db> {
 
     pub(crate) fn instance(db: &'db dyn Db, class: ClassType<'db>) -> Self {
         let (class_literal, specialization) = class.class_literal(db);
-
         match class_literal.known(db) {
-            Some(KnownClass::Tuple) => {
-                return Type::tuple(TupleType::new(
-                    db,
-                    specialization
-                        .and_then(|spec| Some(Cow::Borrowed(spec.tuple(db)?)))
-                        .unwrap_or_else(|| Cow::Owned(TupleSpec::homogeneous(Type::unknown())))
-                        .as_ref(),
-                ));
+            Some(KnownClass::Tuple) => Type::tuple(TupleType::new(
+                db,
+                specialization
+                    .and_then(|spec| Some(Cow::Borrowed(spec.tuple(db)?)))
+                    .unwrap_or_else(|| Cow::Owned(TupleSpec::homogeneous(Type::unknown())))
+                    .as_ref(),
+            )),
+            Some(KnownClass::Object) => Type::object(),
+            _ if class_literal.is_protocol(db) => {
+                Self::ProtocolInstance(ProtocolInstanceType::from_class(class))
             }
-            Some(KnownClass::Object) => return Type::object(),
-            _ => {}
-        }
-
-        if class_literal.is_protocol(db) {
-            Self::ProtocolInstance(ProtocolInstanceType::from_class(class))
-        } else if class_literal.is_typed_dict(db) {
-            Type::typed_dict(class)
-        } else {
+            _ if class_literal.is_typed_dict(db) => Type::typed_dict(class),
             // We don't call non_tuple_instance here because we've already checked that the class
             // is not `object`
-            Type::NominalInstance(NominalInstanceType(NominalInstanceInner::NonTuple(class)))
+            _ => Type::NominalInstance(NominalInstanceType(NominalInstanceInner::NonTuple(class))),
         }
     }
 
@@ -267,10 +260,7 @@ impl<'db> NominalInstanceType<'db> {
 
     /// Return `true` if this type represents instances of the class `builtins.object`.
     pub(super) fn is_object(self) -> bool {
-        match self.0 {
-            NominalInstanceInner::ExactTuple(_) | NominalInstanceInner::NonTuple(_) => false,
-            NominalInstanceInner::Object => true,
-        }
+        matches!(self.0, NominalInstanceInner::Object)
     }
 
     /// If this type is an *exact* tuple type (*not* a subclass of `tuple`), returns the
@@ -350,16 +340,15 @@ impl<'db> NominalInstanceType<'db> {
         relation: TypeRelation,
         visitor: &HasRelationToVisitor<'db, C>,
     ) -> C {
-        if let (
-            NominalInstanceInner::ExactTuple(tuple1),
-            NominalInstanceInner::ExactTuple(tuple2),
-        ) = (self.0, other.0)
-        {
-            return tuple1.has_relation_to_impl(db, tuple2, relation, visitor);
+        match (self.0, other.0) {
+            (
+                NominalInstanceInner::ExactTuple(tuple1),
+                NominalInstanceInner::ExactTuple(tuple2),
+            ) => tuple1.has_relation_to_impl(db, tuple2, relation, visitor),
+            _ => self
+                .class(db)
+                .has_relation_to_impl(db, other.class(db), relation, visitor),
         }
-
-        self.class(db)
-            .has_relation_to_impl(db, other.class(db), relation, visitor)
     }
 
     pub(super) fn is_equivalent_to_impl<C: Constraints<'db>>(
@@ -399,9 +388,7 @@ impl<'db> NominalInstanceType<'db> {
         result.or(db, || {
             C::from_bool(
                 db,
-                !self
-                    .class(db)
-                    .could_coexist_in_mro_with(db, other.class(db)),
+                !(self.class(db)).could_coexist_in_mro_with(db, other.class(db)),
             )
         })
     }
