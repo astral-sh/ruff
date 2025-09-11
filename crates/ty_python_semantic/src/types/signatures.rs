@@ -27,40 +27,45 @@ use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, ClassType,
     FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsEquivalentVisitor, KnownClass,
     MaterializationKind, NormalizedVisitor, SpecialFormType, TypeMapping, TypeRelation,
-    VarianceInferable, todo_type,
+    TypeVarKind, VarianceInferable, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
 
-fn infer_method_type<'db>(
+#[derive(Clone, Copy, Debug)]
+struct MethodInformation<'db> {
+    method_type: FunctionType<'db>,
+    class_type: ClassType<'db>,
+}
+
+fn infer_method_information<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
-) -> Option<FunctionType<'db>> {
+) -> Option<MethodInformation<'db>> {
     let class_scope_id = definition.scope(db);
     let file = class_scope_id.file(db);
     let index = semantic_index(db, file);
 
     let class_scope = index.scope(class_scope_id.file_scope_id(db));
-    class_scope.node().as_class()?;
+    let Some(class_node) = class_scope.node().as_class() else {
+        return None;
+    };
 
-    let func_type = infer_definition_types(db, definition)
+    let method_type = infer_definition_types(db, definition)
         .declaration_type(definition)
         .inner_type()
         .into_function_literal()?;
-    Some(func_type)
-}
 
-fn infer_class_type<'db>(db: &'db dyn Db, definition: Definition<'db>) -> Option<ClassType<'db>> {
-    let class_scope_id = definition.scope(db);
-    let index = semantic_index(db, class_scope_id.file(db));
-    let class_scope = index.scope(class_scope_id.file_scope_id(db));
-    let class_def = index.expect_single_definition(class_scope.node().as_class()?);
+    let class_def = index.expect_single_definition(class_node);
     let class_literal = infer_definition_types(db, class_def)
         .declaration_type(class_def)
         .inner_type();
-    let t = class_literal.to_class_type(db);
-    debug_assert!(t.is_some());
-    t
+    let class_type = class_literal.to_class_type(db)?;
+
+    Some(MethodInformation {
+        method_type,
+        class_type,
+    })
 }
 
 /// The signature of a single callable. If the callable is overloaded, there is a separate
@@ -1253,34 +1258,41 @@ impl<'db> Parameters<'db> {
                     .map(pos_only_param),
             );
         }
-        let method_type = infer_method_type(db, definition);
-        let class_type = infer_class_type(db, definition);
-        let is_method = method_type.is_some();
-        let is_classmethod = method_type.is_some_and(|f| f.is_classmethod(db));
-        let is_staticmethod = method_type.is_some_and(|f| f.is_staticmethod(db));
+        let method_info = infer_method_information(db, definition);
+        let is_classmethod = method_info.is_some_and(|f| f.method_type.is_classmethod(db));
+        let is_staticmethod = method_info.is_some_and(|f| f.method_type.is_staticmethod(db));
 
         let positional_or_keyword = pos_or_keyword_iter.map(|arg| {
-            if is_method
+            if let Some(MethodInformation {
+                method_type: method,
+                class_type: class,
+            }) = method_info
                 && !is_staticmethod
                 && !is_classmethod
                 && arg.parameter.annotation().is_none()
                 && parameters.index(arg.name().id()) == Some(0)
-                && let Some(class) = class_type
-                && let Some(method) = method_type
             {
-                let is_method_generic = method
-                    .signature(db)
-                    .overloads
-                    .iter()
-                    .any(|s| s.generic_context.is_some());
-                let is_class_generic = !class.is_not_generic();
-                let implicit_annotation = if !is_method_generic && !is_class_generic {
-                    Some(Type::instance(db, class))
-                } else {
-                    Type::SpecialForm(SpecialFormType::TypingSelf)
-                        .in_type_expression(db, definition.scope(db), Some(definition))
-                        .ok()
-                };
+                let method_has_self_in_generic_context =
+                    method.signature(db).overloads.iter().any(|s| {
+                        if let Some(context) = s.generic_context {
+                            context
+                                .variables(db)
+                                .iter()
+                                .any(|v| v.typevar(db).kind(db) == TypeVarKind::TypingSelf);
+                            true
+                        } else {
+                            false
+                        }
+                    });
+                let implicit_annotation =
+                    if !method_has_self_in_generic_context && class.is_not_generic() {
+                        let c = Some(Type::instance(db, class));
+                        c
+                    } else {
+                        Type::SpecialForm(SpecialFormType::TypingSelf)
+                            .in_type_expression(db, definition.scope(db), Some(definition))
+                            .ok()
+                    };
                 Parameter {
                     annotated_type: implicit_annotation,
                     synthetic_annotation: true,
