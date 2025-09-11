@@ -55,3 +55,8 @@ def foo(some_other):
 def foo():
     dict = {"Tom": 23, "Maria": 23, "Dog": 11}
     age = dict.get("Cat", None)
+
+# https://github.com/astral-sh/ruff/issues/20341
+ages = {"Tom": 23, "Maria": 23, "Dog": 11}
+key_source = {"Thomas": "Tom"}
+age = ages.get(key_source.get("Thomas", "Tom"), None)
