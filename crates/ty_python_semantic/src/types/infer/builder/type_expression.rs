@@ -1166,7 +1166,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     if let Some(bound_method) = argument_type.into_bound_method() {
                         binding
                             .signature
-                            .bind_self(self.db(), Some(bound_method.self_instance(db)))
+                            .bind_self(self.db(), Some(bound_method.typing_self_type(db)))
                     } else {
                         binding.signature.clone()
                     }
