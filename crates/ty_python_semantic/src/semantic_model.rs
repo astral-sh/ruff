@@ -326,7 +326,7 @@ impl<'db> Completion<'db> {
                 | Type::WrapperDescriptor(_)
                 | Type::DataclassTransformer(_)
                 | Type::Callable(_) => CompletionKind::Function,
-                Type::BoundMethod(_) | Type::MethodWrapper(_) => CompletionKind::Method,
+                Type::BoundMethod(_) | Type::KnownBoundMethod(_) => CompletionKind::Method,
                 Type::ModuleLiteral(_) => CompletionKind::Module,
                 Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => {
                     CompletionKind::Class

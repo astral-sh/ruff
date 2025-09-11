@@ -230,19 +230,21 @@ impl<'db> ProtocolInterface<'db> {
             .unwrap_or_else(|| Type::object(db).member(db, name))
     }
 
-    /// Return `true` if if all members on `self` are also members of `other`.
+    /// Return `true` if `self` extends the interface of `other`, i.e.,
+    /// all members on `other` are also members of `self`.
     ///
     /// TODO: this method should consider the types of the members as well as their names.
-    pub(super) fn is_sub_interface_of<C: Constraints<'db>>(
+    pub(super) fn extends_interface_of<C: Constraints<'db>>(
         self,
         db: &'db dyn Db,
         other: Self,
+        _relation: TypeRelation,
         _visitor: &HasRelationToVisitor<'db, C>,
     ) -> C {
         // TODO: This could just return a bool as written, but this form is what will be needed to
         // combine the constraints when we do assignability checks on each member.
-        self.inner(db).keys().when_all(db, |member_name| {
-            C::from_bool(db, other.inner(db).contains_key(member_name))
+        other.inner(db).keys().when_all(db, |member_name| {
+            C::from_bool(db, self.inner(db).contains_key(member_name))
         })
     }
 

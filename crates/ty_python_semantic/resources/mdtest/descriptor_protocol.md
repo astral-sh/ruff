@@ -585,13 +585,16 @@ that method calls work as expected. See [this test suite](./call/methods.md) for
 Here, we only demonstrate how `__get__` works on functions:
 
 ```py
+import types
 from inspect import getattr_static
+from ty_extensions import static_assert, is_subtype_of, TypeOf
 
 def f(x: object) -> str:
     return "a"
 
 reveal_type(f)  # revealed: def f(x: object) -> str
 reveal_type(f.__get__)  # revealed: <method-wrapper `__get__` of `f`>
+static_assert(is_subtype_of(TypeOf[f.__get__], types.MethodWrapperType))
 reveal_type(f.__get__(None, type(f)))  # revealed: def f(x: object) -> str
 reveal_type(f.__get__(None, type(f))(1))  # revealed: str
 
@@ -599,6 +602,7 @@ wrapper_descriptor = getattr_static(f, "__get__")
 
 reveal_type(wrapper_descriptor)  # revealed: <wrapper-descriptor `__get__` of `function` objects>
 reveal_type(wrapper_descriptor(f, None, type(f)))  # revealed: def f(x: object) -> str
+static_assert(is_subtype_of(TypeOf[wrapper_descriptor], types.WrapperDescriptorType))
 
 # Attribute access on the method-wrapper `f.__get__` falls back to `MethodWrapperType`:
 reveal_type(f.__get__.__hash__)  # revealed: bound method MethodWrapperType.__hash__() -> int

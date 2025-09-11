@@ -1294,15 +1294,14 @@ impl Truthiness {
                     return Self::Falsey;
                 }
 
-                if dict.items.iter().all(|item| {
-                    matches!(
-                        item,
-                        DictItem {
-                            key: None,
-                            value: Expr::Name(..)
-                        }
-                    )
-                }) {
+                // If the dict consists only of double-starred items (e.g., {**x, **y}),
+                // consider its truthiness unknown. This matches lists/sets/tuples containing
+                // only starred elements, which are also Unknown.
+                if dict
+                    .items
+                    .iter()
+                    .all(|item| matches!(item, DictItem { key: None, .. }))
+                {
                     // {**foo} / {**foo, **bar}
                     Self::Unknown
                 } else {

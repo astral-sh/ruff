@@ -334,7 +334,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Async, "109") => (RuleGroup::Stable, rules::flake8_async::rules::AsyncFunctionWithTimeout),
         (Flake8Async, "110") => (RuleGroup::Stable, rules::flake8_async::rules::AsyncBusyWait),
         (Flake8Async, "115") => (RuleGroup::Stable, rules::flake8_async::rules::AsyncZeroSleep),
-        (Flake8Async, "116") => (RuleGroup::Preview, rules::flake8_async::rules::LongSleepNotForever),
+        (Flake8Async, "116") => (RuleGroup::Stable, rules::flake8_async::rules::LongSleepNotForever),
         (Flake8Async, "210") => (RuleGroup::Stable, rules::flake8_async::rules::BlockingHttpCallInAsyncFunction),
         (Flake8Async, "212") => (RuleGroup::Preview, rules::flake8_async::rules::BlockingHttpCallHttpxInAsyncFunction),
         (Flake8Async, "220") => (RuleGroup::Stable, rules::flake8_async::rules::CreateSubprocessInAsyncFunction),
@@ -563,7 +563,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pyupgrade, "035") => (RuleGroup::Stable, rules::pyupgrade::rules::DeprecatedImport),
         (Pyupgrade, "036") => (RuleGroup::Stable, rules::pyupgrade::rules::OutdatedVersionBlock),
         (Pyupgrade, "037") => (RuleGroup::Stable, rules::pyupgrade::rules::QuotedAnnotation),
-        (Pyupgrade, "038") => (RuleGroup::Deprecated, rules::pyupgrade::rules::NonPEP604Isinstance),
+        (Pyupgrade, "038") => (RuleGroup::Removed, rules::pyupgrade::rules::NonPEP604Isinstance),
         (Pyupgrade, "039") => (RuleGroup::Stable, rules::pyupgrade::rules::UnnecessaryClassParentheses),
         (Pyupgrade, "040") => (RuleGroup::Stable, rules::pyupgrade::rules::NonPEP695TypeAlias),
         (Pyupgrade, "041") => (RuleGroup::Stable, rules::pyupgrade::rules::TimeoutErrorAlias),
@@ -574,7 +574,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pyupgrade, "046") => (RuleGroup::Stable, rules::pyupgrade::rules::NonPEP695GenericClass),
         (Pyupgrade, "047") => (RuleGroup::Stable, rules::pyupgrade::rules::NonPEP695GenericFunction),
         (Pyupgrade, "049") => (RuleGroup::Stable, rules::pyupgrade::rules::PrivateTypeParameter),
-        (Pyupgrade, "050") => (RuleGroup::Preview, rules::pyupgrade::rules::UselessClassMetaclassType),
+        (Pyupgrade, "050") => (RuleGroup::Stable, rules::pyupgrade::rules::UselessClassMetaclassType),
 
         // pydocstyle
         (Pydocstyle, "100") => (RuleGroup::Stable, rules::pydocstyle::rules::UndocumentedPublicModule),
@@ -773,7 +773,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (PandasVet, "013") => (RuleGroup::Stable, rules::pandas_vet::rules::PandasUseOfDotStack),
         (PandasVet, "015") => (RuleGroup::Stable, rules::pandas_vet::rules::PandasUseOfPdMerge),
         (PandasVet, "101") => (RuleGroup::Stable, rules::pandas_vet::rules::PandasNuniqueConstantSeriesCheck),
-        (PandasVet, "901") => (RuleGroup::Deprecated, rules::pandas_vet::rules::PandasDfVariableName),
+        (PandasVet, "901") => (RuleGroup::Removed, rules::pandas_vet::rules::PandasDfVariableName),
 
         // flake8-errmsg
         (Flake8ErrMsg, "101") => (RuleGroup::Stable, rules::flake8_errmsg::rules::RawStringInException),
@@ -830,8 +830,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Pyi, "056") => (RuleGroup::Stable, rules::flake8_pyi::rules::UnsupportedMethodCallOnAll),
         (Flake8Pyi, "058") => (RuleGroup::Stable, rules::flake8_pyi::rules::GeneratorReturnFromIterMethod),
         (Flake8Pyi, "057") => (RuleGroup::Stable, rules::flake8_pyi::rules::ByteStringUsage),
-        (Flake8Pyi, "059") => (RuleGroup::Preview, rules::flake8_pyi::rules::GenericNotLastBaseClass),
-        (Flake8Pyi, "061") => (RuleGroup::Preview, rules::flake8_pyi::rules::RedundantNoneLiteral),
+        (Flake8Pyi, "059") => (RuleGroup::Stable, rules::flake8_pyi::rules::GenericNotLastBaseClass),
+        (Flake8Pyi, "061") => (RuleGroup::Stable, rules::flake8_pyi::rules::RedundantNoneLiteral),
         (Flake8Pyi, "062") => (RuleGroup::Stable, rules::flake8_pyi::rules::DuplicateLiteralMember),
         (Flake8Pyi, "063") => (RuleGroup::Stable, rules::flake8_pyi::rules::Pep484StylePositionalOnlyParameter),
         (Flake8Pyi, "064") => (RuleGroup::Stable, rules::flake8_pyi::rules::RedundantFinalLiteral),
@@ -956,7 +956,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8UsePathlib, "207") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::Glob),
         (Flake8UsePathlib, "208") => (RuleGroup::Stable, rules::flake8_use_pathlib::violations::OsListdir),
         (Flake8UsePathlib, "210") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::InvalidPathlibWithSuffix),
-        (Flake8UsePathlib, "211") => (RuleGroup::Preview, rules::flake8_use_pathlib::rules::OsSymlink),
+        (Flake8UsePathlib, "211") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::OsSymlink),
 
         // flake8-logging-format
         (Flake8LoggingFormat, "001") => (RuleGroup::Stable, rules::flake8_logging_format::violations::LoggingStringFormat),
@@ -1032,7 +1032,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "039") => (RuleGroup::Preview, rules::ruff::rules::UnrawRePattern),
         (Ruff, "040") => (RuleGroup::Stable, rules::ruff::rules::InvalidAssertMessageLiteralArgument),
         (Ruff, "041") => (RuleGroup::Stable, rules::ruff::rules::UnnecessaryNestedLiteral),
-        (Ruff, "043") => (RuleGroup::Preview, rules::ruff::rules::PytestRaisesAmbiguousPattern),
+        (Ruff, "043") => (RuleGroup::Stable, rules::ruff::rules::PytestRaisesAmbiguousPattern),
         (Ruff, "045") => (RuleGroup::Preview, rules::ruff::rules::ImplicitClassVarInDataclass),
         (Ruff, "046") => (RuleGroup::Stable, rules::ruff::rules::UnnecessaryCastToInt),
         (Ruff, "047") => (RuleGroup::Preview, rules::ruff::rules::NeedlessElse),
@@ -1046,7 +1046,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "056") => (RuleGroup::Preview, rules::ruff::rules::FalsyDictGetFallback),
         (Ruff, "057") => (RuleGroup::Stable, rules::ruff::rules::UnnecessaryRound),
         (Ruff, "058") => (RuleGroup::Stable, rules::ruff::rules::StarmapZip),
-        (Ruff, "059") => (RuleGroup::Preview, rules::ruff::rules::UnusedUnpackedVariable),
+        (Ruff, "059") => (RuleGroup::Stable, rules::ruff::rules::UnusedUnpackedVariable),
         (Ruff, "060") => (RuleGroup::Preview, rules::ruff::rules::InEmptyCollection),
         (Ruff, "061") => (RuleGroup::Preview, rules::ruff::rules::LegacyFormPytestRaises),
         (Ruff, "063") => (RuleGroup::Preview, rules::ruff::rules::AccessAnnotationsFromClassDict),
@@ -1106,11 +1106,11 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
 
         // airflow
         (Airflow, "001") => (RuleGroup::Stable, rules::airflow::rules::AirflowVariableNameTaskIdMismatch),
-        (Airflow, "002") => (RuleGroup::Preview, rules::airflow::rules::AirflowDagNoScheduleArgument),
-        (Airflow, "301") => (RuleGroup::Preview, rules::airflow::rules::Airflow3Removal),
-        (Airflow, "302") => (RuleGroup::Preview, rules::airflow::rules::Airflow3MovedToProvider),
-        (Airflow, "311") => (RuleGroup::Preview, rules::airflow::rules::Airflow3SuggestedUpdate),
-        (Airflow, "312") => (RuleGroup::Preview, rules::airflow::rules::Airflow3SuggestedToMoveToProvider),
+        (Airflow, "002") => (RuleGroup::Stable, rules::airflow::rules::AirflowDagNoScheduleArgument),
+        (Airflow, "301") => (RuleGroup::Stable, rules::airflow::rules::Airflow3Removal),
+        (Airflow, "302") => (RuleGroup::Stable, rules::airflow::rules::Airflow3MovedToProvider),
+        (Airflow, "311") => (RuleGroup::Stable, rules::airflow::rules::Airflow3SuggestedUpdate),
+        (Airflow, "312") => (RuleGroup::Stable, rules::airflow::rules::Airflow3SuggestedToMoveToProvider),
 
         // perflint
         (Perflint, "101") => (RuleGroup::Stable, rules::perflint::rules::UnnecessaryListCast),
@@ -1137,7 +1137,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Refurb, "105") => (RuleGroup::Stable, rules::refurb::rules::PrintEmptyString),
         (Refurb, "110") => (RuleGroup::Preview, rules::refurb::rules::IfExpInsteadOfOrOperator),
         (Refurb, "113") => (RuleGroup::Preview, rules::refurb::rules::RepeatedAppend),
-        (Refurb, "116") => (RuleGroup::Preview, rules::refurb::rules::FStringNumberFormat),
+        (Refurb, "116") => (RuleGroup::Stable, rules::refurb::rules::FStringNumberFormat),
         (Refurb, "118") => (RuleGroup::Preview, rules::refurb::rules::ReimplementedOperator),
         (Refurb, "122") => (RuleGroup::Stable, rules::refurb::rules::ForLoopWrites),
         (Refurb, "129") => (RuleGroup::Stable, rules::refurb::rules::ReadlinesInFor),

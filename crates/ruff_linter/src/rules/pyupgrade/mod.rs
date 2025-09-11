@@ -147,7 +147,6 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pyupgrade").join(path).as_path(),
             &settings::LinterSettings {
-                preview: PreviewMode::Enabled,
                 future_annotations: true,
                 ..settings::LinterSettings::for_rule(rule_code)
             },
@@ -356,5 +355,20 @@ mod tests {
         1 + from collections import Sequence
         2 | from pipes import quote, Template
         ");
+    }
+
+    #[test]
+    fn unnecessary_default_type_args_stubs_py312_preview() -> Result<()> {
+        let snapshot = format!("{}__preview", "UP043.pyi");
+        let diagnostics = test_path(
+            Path::new("pyupgrade/UP043.pyi"),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                unresolved_target_version: PythonVersion::PY312.into(),
+                ..settings::LinterSettings::for_rule(Rule::UnnecessaryDefaultTypeArgs)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
     }
 }

@@ -444,8 +444,7 @@ impl<'db> UnionBuilder<'db> {
                     .filter_map(UnionElement::to_type_element)
                     .any(|ty| Type::EnumLiteral(enum_member_to_add).is_subtype_of(self.db, ty))
                 {
-                    self.elements
-                        .push(UnionElement::Type(Type::EnumLiteral(enum_member_to_add)));
+                    self.push_type(Type::EnumLiteral(enum_member_to_add), seen_aliases);
                 }
             }
             // Adding `object` to a union results in `object`.
@@ -453,83 +452,87 @@ impl<'db> UnionBuilder<'db> {
                 self.collapse_to_object();
             }
             _ => {
-                let bool_pair = if let Type::BooleanLiteral(b) = ty {
-                    Some(Type::BooleanLiteral(!b))
-                } else {
-                    None
-                };
+                self.push_type(ty, seen_aliases);
+            }
+        }
+    }
 
-                // If an alias gets here, it means we aren't unpacking aliases, and we also
-                // shouldn't try to simplify aliases out of the union, because that will require
-                // unpacking them.
-                let should_simplify_full = !matches!(ty, Type::TypeAlias(_));
+    fn push_type(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
+        let bool_pair = if let Type::BooleanLiteral(b) = ty {
+            Some(Type::BooleanLiteral(!b))
+        } else {
+            None
+        };
 
-                let mut to_remove = SmallVec::<[usize; 2]>::new();
-                let ty_negated = if should_simplify_full {
-                    ty.negate(self.db)
-                } else {
-                    Type::Never // won't be used
-                };
+        // If an alias gets here, it means we aren't unpacking aliases, and we also
+        // shouldn't try to simplify aliases out of the union, because that will require
+        // unpacking them.
+        let should_simplify_full = !matches!(ty, Type::TypeAlias(_));
 
-                for (index, element) in self.elements.iter_mut().enumerate() {
-                    let element_type = match element.try_reduce(self.db, ty) {
-                        ReduceResult::KeepIf(keep) => {
-                            if !keep {
-                                to_remove.push(index);
-                            }
-                            continue;
-                        }
-                        ReduceResult::Type(ty) => ty,
-                        ReduceResult::CollapseToObject => {
-                            self.collapse_to_object();
-                            return;
-                        }
-                        ReduceResult::Ignore => {
-                            return;
-                        }
-                    };
+        let mut to_remove = SmallVec::<[usize; 2]>::new();
+        let ty_negated = if should_simplify_full {
+            ty.negate(self.db)
+        } else {
+            Type::Never // won't be used
+        };
 
-                    if ty == element_type {
-                        return;
+        for (index, element) in self.elements.iter_mut().enumerate() {
+            let element_type = match element.try_reduce(self.db, ty) {
+                ReduceResult::KeepIf(keep) => {
+                    if !keep {
+                        to_remove.push(index);
                     }
-
-                    if Some(element_type) == bool_pair {
-                        self.add_in_place_impl(KnownClass::Bool.to_instance(self.db), seen_aliases);
-                        return;
-                    }
-
-                    if should_simplify_full && !matches!(element_type, Type::TypeAlias(_)) {
-                        if ty.is_equivalent_to(self.db, element_type)
-                            || ty.is_subtype_of(self.db, element_type)
-                        {
-                            return;
-                        } else if element_type.is_subtype_of(self.db, ty) {
-                            to_remove.push(index);
-                        } else if ty_negated.is_subtype_of(self.db, element_type) {
-                            // We add `ty` to the union. We just checked that `~ty` is a subtype of an
-                            // existing `element`. This also means that `~ty | ty` is a subtype of
-                            // `element | ty`, because both elements in the first union are subtypes of
-                            // the corresponding elements in the second union. But `~ty | ty` is just
-                            // `object`. Since `object` is a subtype of `element | ty`, we can only
-                            // conclude that `element | ty` must be `object` (object has no other
-                            // supertypes). This means we can simplify the whole union to just
-                            // `object`, since all other potential elements would also be subtypes of
-                            // `object`.
-                            self.collapse_to_object();
-                            return;
-                        }
-                    }
+                    continue;
                 }
-                if let Some((&first, rest)) = to_remove.split_first() {
-                    self.elements[first] = UnionElement::Type(ty);
-                    // We iterate in descending order to keep remaining indices valid after `swap_remove`.
-                    for &index in rest.iter().rev() {
-                        self.elements.swap_remove(index);
-                    }
-                } else {
-                    self.elements.push(UnionElement::Type(ty));
+                ReduceResult::Type(ty) => ty,
+                ReduceResult::CollapseToObject => {
+                    self.collapse_to_object();
+                    return;
+                }
+                ReduceResult::Ignore => {
+                    return;
+                }
+            };
+
+            if ty == element_type {
+                return;
+            }
+
+            if Some(element_type) == bool_pair {
+                self.add_in_place_impl(KnownClass::Bool.to_instance(self.db), seen_aliases);
+                return;
+            }
+
+            if should_simplify_full && !matches!(element_type, Type::TypeAlias(_)) {
+                if ty.is_equivalent_to(self.db, element_type)
+                    || ty.is_subtype_of(self.db, element_type)
+                {
+                    return;
+                } else if element_type.is_subtype_of(self.db, ty) {
+                    to_remove.push(index);
+                } else if ty_negated.is_subtype_of(self.db, element_type) {
+                    // We add `ty` to the union. We just checked that `~ty` is a subtype of an
+                    // existing `element`. This also means that `~ty | ty` is a subtype of
+                    // `element | ty`, because both elements in the first union are subtypes of
+                    // the corresponding elements in the second union. But `~ty | ty` is just
+                    // `object`. Since `object` is a subtype of `element | ty`, we can only
+                    // conclude that `element | ty` must be `object` (object has no other
+                    // supertypes). This means we can simplify the whole union to just
+                    // `object`, since all other potential elements would also be subtypes of
+                    // `object`.
+                    self.collapse_to_object();
+                    return;
                 }
             }
+        }
+        if let Some((&first, rest)) = to_remove.split_first() {
+            self.elements[first] = UnionElement::Type(ty);
+            // We iterate in descending order to keep remaining indices valid after `swap_remove`.
+            for &index in rest.iter().rev() {
+                self.elements.swap_remove(index);
+            }
+        } else {
+            self.elements.push(UnionElement::Type(ty));
         }
     }
 

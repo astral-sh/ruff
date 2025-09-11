@@ -23,7 +23,7 @@ use ruff_text_size::TextRange;
 /// ## Why is this bad?
 /// Airflow 3.0 removed various deprecated functions, members, and other
 /// values. Some have more modern replacements. Others are considered too niche
-/// and not worth to be maintained in Airflow.
+/// and not worth continued maintenance in Airflow.
 ///
 /// ## Example
 /// ```python

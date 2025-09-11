@@ -231,8 +231,12 @@ impl Workspace {
             .map(|msg| ExpandedMessage {
                 code: msg.secondary_code_or_id().to_string(),
                 message: msg.body().to_string(),
-                start_location: source_code.line_column(msg.expect_range().start()).into(),
-                end_location: source_code.line_column(msg.expect_range().end()).into(),
+                start_location: source_code
+                    .line_column(msg.range().unwrap_or_default().start())
+                    .into(),
+                end_location: source_code
+                    .line_column(msg.range().unwrap_or_default().end())
+                    .into(),
                 fix: msg.fix().map(|fix| ExpandedFix {
                     message: msg.first_help_text().map(ToString::to_string),
                     edits: fix

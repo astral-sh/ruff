@@ -89,7 +89,7 @@ error[invalid-argument-type]: Argument to function `f` is incorrect
 11 | reveal_type(f(None))  # revealed: None
 12 | # error: [invalid-argument-type]
 13 | reveal_type(f("string"))  # revealed: Unknown
-   |               ^^^^^^^^ Argument type `Literal["string"]` does not satisfy constraints of type variable `T`
+   |               ^^^^^^^^ Argument type `Literal["string"]` does not satisfy constraints (`int`, `None`) of type variable `T`
    |
 info: Type variable defined here
  --> src/mdtest_snippet.py:4:1

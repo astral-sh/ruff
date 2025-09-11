@@ -11,12 +11,10 @@ use crate::checkers::ast::{Checker, DiagnosticGuard};
 use crate::codes::Rule;
 use crate::fix;
 use crate::importer::ImportedMembers;
-use crate::preview::is_full_path_match_source_strategy_enabled;
 use crate::rules::flake8_type_checking::helpers::{
     TypingReference, filter_contained, quote_annotation,
 };
 use crate::rules::flake8_type_checking::imports::ImportBinding;
-use crate::rules::isort::categorize::MatchSourceStrategy;
 use crate::rules::isort::{ImportSection, ImportType, categorize};
 use crate::{Fix, FixAvailability, Violation};
 
@@ -39,6 +37,13 @@ use crate::{Fix, FixAvailability, Violation};
 /// the [`lint.flake8-type-checking.runtime-evaluated-base-classes`] and
 /// [`lint.flake8-type-checking.runtime-evaluated-decorators`] settings to mark them
 /// as such.
+///
+/// If [`lint.future-annotations`] is set to `true`, `from __future__ import
+/// annotations` will be added if doing so would enable an import to be
+/// moved into an `if TYPE_CHECKING:` block. This takes precedence over the
+/// [`lint.flake8-type-checking.quote-annotations`] setting described above if
+/// both settings are enabled.
+///
 ///
 /// ## Example
 /// ```python
@@ -64,18 +69,6 @@ use crate::{Fix, FixAvailability, Violation};
 /// def func(sized: local_module.Container) -> int:
 ///     return len(sized)
 /// ```
-///
-///
-/// ## Preview
-/// When [preview](https://docs.astral.sh/ruff/preview/) is enabled,
-/// the criterion for determining whether an import is first-party
-/// is stricter, which could affect whether this lint is triggered vs [`TC001`](https://docs.astral.sh/ruff/rules/typing-only-third-party-import/). See [this FAQ section](https://docs.astral.sh/ruff/faq/#how-does-ruff-determine-which-of-my-imports-are-first-party-third-party-etc) for more details.
-///
-/// If [`lint.future-annotations`] is set to `true`, `from __future__ import
-/// annotations` will be added if doing so would enable an import to be moved into an `if
-/// TYPE_CHECKING:` block. This takes precedence over the
-/// [`lint.flake8-type-checking.quote-annotations`] setting described above if both settings are
-/// enabled.
 ///
 /// ## Options
 /// - `lint.flake8-type-checking.quote-annotations`
@@ -128,6 +121,12 @@ impl Violation for TypingOnlyFirstPartyImport {
 /// [`lint.flake8-type-checking.runtime-evaluated-decorators`] settings to mark them
 /// as such.
 ///
+/// If [`lint.future-annotations`] is set to `true`, `from __future__ import
+/// annotations` will be added if doing so would enable an import to be
+/// moved into an `if TYPE_CHECKING:` block. This takes precedence over the
+/// [`lint.flake8-type-checking.quote-annotations`] setting described above if
+/// both settings are enabled.
+///
 /// ## Example
 /// ```python
 /// from __future__ import annotations
@@ -152,17 +151,6 @@ impl Violation for TypingOnlyFirstPartyImport {
 /// def func(df: pd.DataFrame) -> int:
 ///     return len(df)
 /// ```
-///
-/// ## Preview
-/// When [preview](https://docs.astral.sh/ruff/preview/) is enabled,
-/// the criterion for determining whether an import is first-party
-/// is stricter, which could affect whether this lint is triggered vs [`TC001`](https://docs.astral.sh/ruff/rules/typing-only-first-party-import/). See [this FAQ section](https://docs.astral.sh/ruff/faq/#how-does-ruff-determine-which-of-my-imports-are-first-party-third-party-etc) for more details.
-///
-/// If [`lint.future-annotations`] is set to `true`, `from __future__ import
-/// annotations` will be added if doing so would enable an import to be moved into an `if
-/// TYPE_CHECKING:` block. This takes precedence over the
-/// [`lint.flake8-type-checking.quote-annotations`] setting described above if both settings are
-/// enabled.
 ///
 /// ## Options
 /// - `lint.flake8-type-checking.quote-annotations`
@@ -215,6 +203,12 @@ impl Violation for TypingOnlyThirdPartyImport {
 /// [`lint.flake8-type-checking.runtime-evaluated-decorators`] settings to mark them
 /// as such.
 ///
+/// If [`lint.future-annotations`] is set to `true`, `from __future__ import
+/// annotations` will be added if doing so would enable an import to be
+/// moved into an `if TYPE_CHECKING:` block. This takes precedence over the
+/// [`lint.flake8-type-checking.quote-annotations`] setting described above if
+/// both settings are enabled.
+///
 /// ## Example
 /// ```python
 /// from __future__ import annotations
@@ -239,15 +233,6 @@ impl Violation for TypingOnlyThirdPartyImport {
 /// def func(path: Path) -> str:
 ///     return str(path)
 /// ```
-///
-/// ## Preview
-///
-/// When [preview](https://docs.astral.sh/ruff/preview/) is enabled, if
-/// [`lint.future-annotations`] is set to `true`, `from __future__ import
-/// annotations` will be added if doing so would enable an import to be moved into an `if
-/// TYPE_CHECKING:` block. This takes precedence over the
-/// [`lint.flake8-type-checking.quote-annotations`] setting described above if both settings are
-/// enabled.
 ///
 /// ## Options
 /// - `lint.flake8-type-checking.quote-annotations`
@@ -297,7 +282,7 @@ pub(crate) fn typing_only_runtime_import(
 
         // If we can't add a `__future__` import and in un-strict mode, don't flag typing-only
         // imports that are implicitly loaded by way of a valid runtime import.
-        if !checker.settings().future_annotations()
+        if !checker.settings().future_annotations
             && !checker.settings().flake8_type_checking.strict
             && runtime_imports
                 .iter()
@@ -347,13 +332,6 @@ pub(crate) fn typing_only_runtime_import(
         let source_name = import.source_name().join(".");
 
         // Categorize the import, using coarse-grained categorization.
-        let match_source_strategy =
-            if is_full_path_match_source_strategy_enabled(checker.settings()) {
-                MatchSourceStrategy::FullPath
-            } else {
-                MatchSourceStrategy::Root
-            };
-
         let import_type = match categorize(
             &source_name,
             qualified_name.is_unresolved_import(),
@@ -365,7 +343,6 @@ pub(crate) fn typing_only_runtime_import(
             checker.settings().isort.no_sections,
             &checker.settings().isort.section_order,
             &checker.settings().isort.default_section,
-            match_source_strategy,
         ) {
             ImportSection::Known(ImportType::LocalFolder | ImportType::FirstParty) => {
                 ImportType::FirstParty

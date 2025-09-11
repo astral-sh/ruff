@@ -18,7 +18,7 @@ use crate::{
 
 /// A cross-module identifier of a scope that can be used as a salsa query parameter.
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
-#[derive(Ord, PartialOrd)]
+#[derive(PartialOrd, Ord)]
 pub struct ScopeId<'db> {
     pub file: File,
 

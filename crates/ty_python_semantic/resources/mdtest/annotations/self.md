@@ -2,7 +2,7 @@
 
 ```toml
 [environment]
-python-version = "3.11"
+python-version = "3.13"
 ```
 
 `Self` is treated as if it were a `TypeVar` bound to the class it's being used on.
@@ -145,6 +145,23 @@ class Shape:
     def union(self: Self, other: Self | None):
         reveal_type(other)  # revealed: Self@union | None
         return self
+```
+
+## `Self` for classes with a default value for their generic parameter
+
+This is a regression test for <https://github.com/astral-sh/ty/issues/1156>.
+
+```py
+from typing import Self
+
+class Container[T = bytes]:
+    def __init__(self: Self, data: T | None = None) -> None:
+        self.data = data
+
+reveal_type(Container())  # revealed: Container[bytes]
+reveal_type(Container(1))  # revealed: Container[int]
+reveal_type(Container("a"))  # revealed: Container[str]
+reveal_type(Container(b"a"))  # revealed: Container[bytes]
 ```
 
 ## Invalid Usage
