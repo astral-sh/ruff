@@ -260,7 +260,7 @@ class SecondRequiredArgument:
     def __len__(self, v: int) -> Literal[1]:
         return 1
 
-# TODO: Emit a diagnostic
+# this is fine: the call succeeds at runtime since the second argument is optional
 reveal_type(len(SecondOptionalArgument()))  # revealed: Literal[0]
 
 # TODO: Emit a diagnostic

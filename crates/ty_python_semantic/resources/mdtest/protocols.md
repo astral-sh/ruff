@@ -1813,9 +1813,28 @@ class Foo:
 static_assert(not is_assignable_to(Foo, Iterable[Any]))
 ```
 
-Because method members must always be available on the class, it is safe to access a method on
-`type[P]`, where `P` is a protocol class, just like it is generally safe to access a method on
-`type[C]` where `C` is a nominal class:
+Because method members are always looked up on the meta-type of an object when testing assignability
+and subtyping, we understand that `IterableClass` here is a subtype of `Iterable` even though
+`Foo.__iter__` resolves to a type with the wrong signature:
+
+```py
+from typing import Iterator, Iterable
+from ty_extensions import static_assert, is_subtype_of, TypeOf
+
+class Meta(type):
+    def __iter__(self) -> Iterator[int]:
+        yield from range(42)
+
+class IterableClass(metaclass=Meta):
+    def __iter__(self) -> Iterator[str]:
+        yield from "abc"
+
+static_assert(is_subtype_of(TypeOf[IterableClass], Iterable[int]))
+```
+
+Enforcing that members must always be available on the class also means that it is safe to access a
+method on `type[P]`, where `P` is a protocol class, just like it is generally safe to access a
+method on `type[C]` where `C` is a nominal class:
 
 ```py
 from typing import Protocol
