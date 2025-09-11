@@ -43,14 +43,14 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     pub(crate) fn from_arguments(
         db: &'db dyn Db,
         arguments: &'a ast::Arguments,
-        mut infer_argument_type: impl FnMut(&ast::Expr, &ast::Expr) -> Type<'db>,
+        mut infer_argument_type: impl FnMut(Option<&ast::Expr>, &ast::Expr) -> Type<'db>,
     ) -> Self {
         arguments
             .arguments_source_order()
             .map(|arg_or_keyword| match arg_or_keyword {
                 ast::ArgOrKeyword::Arg(arg) => match arg {
                     ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
-                        let ty = infer_argument_type(arg, value);
+                        let ty = infer_argument_type(Some(arg), value);
                         let length = ty
                             .try_iterate(db)
                             .map(|tuple| tuple.len())
@@ -59,11 +59,12 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                     }
                     _ => (Argument::Positional, None),
                 },
-                ast::ArgOrKeyword::Keyword(ast::Keyword { arg, .. }) => {
+                ast::ArgOrKeyword::Keyword(ast::Keyword { arg, value, .. }) => {
                     if let Some(arg) = arg {
                         (Argument::Keyword(&arg.id), None)
                     } else {
-                        (Argument::Keywords, None)
+                        let ty = infer_argument_type(None, value);
+                        (Argument::Keywords, Some(ty))
                     }
                 }
             })
