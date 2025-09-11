@@ -1424,10 +1424,11 @@ impl<'db> Type<'db> {
 
     fn when_subtype_of(self, db: &'db dyn Db, target: Type<'db>) -> ConstraintSet<'db> {
         let premises = self.premises(db).and(db, || target.premises(db));
-        premises.equivalent_to(
-            db,
-            self.has_relation_to(db, target, TypeRelation::Subtyping),
-        )
+        let when = self.has_relation_to(db, target, TypeRelation::Subtyping);
+        if premises.is_always_satisfied(db) {
+            return when;
+        }
+        (premises.clone()).equivalent_to(db, premises.implies(db, || when))
     }
 
     /// Return true if this type is [assignable to] type `target`.
@@ -1439,10 +1440,11 @@ impl<'db> Type<'db> {
 
     fn when_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> ConstraintSet<'db> {
         let premises = self.premises(db).and(db, || target.premises(db));
-        premises.equivalent_to(
-            db,
-            self.has_relation_to(db, target, TypeRelation::Assignability),
-        )
+        let when = self.has_relation_to(db, target, TypeRelation::Assignability);
+        if premises.is_always_satisfied(db) {
+            return when;
+        }
+        (premises.clone()).equivalent_to(db, premises.implies(db, || when))
     }
 
     fn has_relation_to(
