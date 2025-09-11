@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Applicability, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{ArgOrKeyword, ExprCall};
 use ruff_text_size::Ranged;
 
@@ -7,8 +7,8 @@ use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use crate::preview::is_fix_os_chmod_enabled;
 use crate::rules::flake8_use_pathlib::helpers::{
-    has_unknown_keywords_or_starred_expr, is_file_descriptor, is_keyword_only_argument_non_default
-    , is_pathlib_path_call,
+    has_unknown_keywords_or_starred_expr, is_file_descriptor, is_keyword_only_argument_non_default,
+    is_pathlib_path_call,
 };
 use crate::{FixAvailability, Violation};
 
