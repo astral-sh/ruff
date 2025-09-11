@@ -6,7 +6,7 @@ use crate::types::string_annotation::{
     BYTE_STRING_TYPE_ANNOTATION, FSTRING_TYPE_ANNOTATION, parse_string_annotation,
 };
 use crate::types::{
-    KnownClass, SpecialFormType, Type, TypeAndQualifiers, TypeQualifiers, todo_type,
+    KnownClass, SpecialFormType, Type, TypeAndQualifiers, TypeContext, TypeQualifiers, todo_type,
 };
 
 /// Annotation expressions.
@@ -122,7 +122,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             },
 
             ast::Expr::Subscript(subscript @ ast::ExprSubscript { value, slice, .. }) => {
-                let value_ty = self.infer_expression(value);
+                let value_ty = self.infer_expression(value, TypeContext::default());
 
                 let slice = &**slice;
 
@@ -141,7 +141,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                             if let [inner_annotation, metadata @ ..] = &arguments[..] {
                                 for element in metadata {
-                                    self.infer_expression(element);
+                                    self.infer_expression(element, TypeContext::default());
                                 }
 
                                 let inner_annotation_ty =
@@ -151,7 +151,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 inner_annotation_ty
                             } else {
                                 for argument in arguments {
-                                    self.infer_expression(argument);
+                                    self.infer_expression(argument, TypeContext::default());
                                 }
                                 self.store_expression_type(slice, Type::unknown());
                                 TypeAndQualifiers::unknown()

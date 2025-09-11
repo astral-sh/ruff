@@ -9,7 +9,7 @@ use crate::Db;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::scope::ScopeId;
 use crate::types::tuple::{ResizeTupleError, Tuple, TupleLength, TupleSpec, TupleUnpacker};
-use crate::types::{Type, TypeCheckDiagnostics, infer_expression_types};
+use crate::types::{Type, TypeCheckDiagnostics, TypeContext, infer_expression_types};
 use crate::unpack::{UnpackKind, UnpackValue};
 
 use super::context::InferContext;
@@ -48,8 +48,9 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
             "Unpacking target must be a list or tuple expression"
         );
 
-        let value_type = infer_expression_types(self.db(), value.expression())
-            .expression_type(value.expression().node_ref(self.db(), self.module()));
+        let value_type =
+            infer_expression_types(self.db(), value.expression(), TypeContext::default())
+                .expression_type(value.expression().node_ref(self.db(), self.module()));
 
         let value_type = match value.kind() {
             UnpackKind::Assign => {
