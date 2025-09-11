@@ -202,7 +202,7 @@ where
     ) -> ConstraintSet<'db> {
         let mut result = ConstraintSet::always_satisfiable(db);
         for child in self {
-            if result.intersect(db, f(child)).is_never_satisfied(db) {
+            if result.intersect(db, &f(child)).is_never_satisfied(db) {
                 return result;
             }
         }
@@ -262,8 +262,8 @@ impl<'db> ConstraintSet<'db> {
     }
 
     /// Updates this constraint set to hold the intersection of itself and another constraint set.
-    pub(crate) fn intersect(&mut self, db: &'db dyn Db, other: Self) -> &Self {
-        self.intersect_set(db, &other);
+    pub(crate) fn intersect(&mut self, db: &'db dyn Db, other: &Self) -> &Self {
+        self.intersect_set(db, other);
         self
     }
 
@@ -290,7 +290,7 @@ impl<'db> ConstraintSet<'db> {
     /// constraint set is already saturated.
     pub(crate) fn and(mut self, db: &'db dyn Db, other: impl FnOnce() -> Self) -> Self {
         if !self.is_never_satisfied(db) {
-            self.intersect(db, other());
+            self.intersect(db, &other());
         }
         self
     }

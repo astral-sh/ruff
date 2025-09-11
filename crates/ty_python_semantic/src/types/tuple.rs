@@ -439,7 +439,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
                     let element_constraints =
                         self_ty.has_relation_to_impl(db, *other_ty, relation, visitor);
                     if result
-                        .intersect(db, element_constraints)
+                        .intersect(db, &element_constraints)
                         .is_never_satisfied(db)
                     {
                         return result;
@@ -452,7 +452,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
                     let element_constraints =
                         self_ty.has_relation_to_impl(db, *other_ty, relation, visitor);
                     if result
-                        .intersect(db, element_constraints)
+                        .intersect(db, &element_constraints)
                         .is_never_satisfied(db)
                     {
                         return result;
@@ -770,7 +770,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                     let element_constraints =
                         self_ty.has_relation_to_impl(db, other_ty, relation, visitor);
                     if result
-                        .intersect(db, element_constraints)
+                        .intersect(db, &element_constraints)
                         .is_never_satisfied(db)
                     {
                         return result;
@@ -784,7 +784,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                     let element_constraints =
                         self_ty.has_relation_to_impl(db, other_ty, relation, visitor);
                     if result
-                        .intersect(db, element_constraints)
+                        .intersect(db, &element_constraints)
                         .is_never_satisfied(db)
                     {
                         return result;
@@ -829,7 +829,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                         }
                     };
                     if result
-                        .intersect(db, pair_constraints)
+                        .intersect(db, &pair_constraints)
                         .is_never_satisfied(db)
                     {
                         return result;
@@ -858,7 +858,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                         }
                     };
                     if result
-                        .intersect(db, pair_constraints)
+                        .intersect(db, &pair_constraints)
                         .is_never_satisfied(db)
                     {
                         return result;

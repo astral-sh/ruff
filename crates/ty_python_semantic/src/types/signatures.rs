@@ -543,7 +543,10 @@ impl<'db> Signature<'db> {
             let self_type = self_type.unwrap_or(Type::unknown());
             let other_type = other_type.unwrap_or(Type::unknown());
             !result
-                .intersect(db, self_type.is_equivalent_to_impl(db, other_type, visitor))
+                .intersect(
+                    db,
+                    &self_type.is_equivalent_to_impl(db, other_type, visitor),
+                )
                 .is_never_satisfied(db)
         };
 
@@ -688,7 +691,10 @@ impl<'db> Signature<'db> {
             let type1 = type1.unwrap_or(Type::unknown());
             let type2 = type2.unwrap_or(Type::unknown());
             !result
-                .intersect(db, type1.has_relation_to_impl(db, type2, relation, visitor))
+                .intersect(
+                    db,
+                    &type1.has_relation_to_impl(db, type2, relation, visitor),
+                )
                 .is_never_satisfied(db)
         };
 

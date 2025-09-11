@@ -853,7 +853,7 @@ impl<'db> Specialization<'db> {
                 }
                 TypeVarVariance::Bivariant => ConstraintSet::always_satisfiable(db),
             };
-            if result.intersect(db, compatible).is_never_satisfied(db) {
+            if result.intersect(db, &compatible).is_never_satisfied(db) {
                 return result;
             }
         }
@@ -894,7 +894,7 @@ impl<'db> Specialization<'db> {
                 }
                 TypeVarVariance::Bivariant => ConstraintSet::always_satisfiable(db),
             };
-            if result.intersect(db, compatible).is_never_satisfied(db) {
+            if result.intersect(db, &compatible).is_never_satisfied(db) {
                 return result;
             }
         }
@@ -904,7 +904,7 @@ impl<'db> Specialization<'db> {
             (None, None) => {}
             (Some(self_tuple), Some(other_tuple)) => {
                 let compatible = self_tuple.is_equivalent_to_impl(db, other_tuple, visitor);
-                if result.intersect(db, compatible).is_never_satisfied(db) {
+                if result.intersect(db, &compatible).is_never_satisfied(db) {
                     return result;
                 }
             }
