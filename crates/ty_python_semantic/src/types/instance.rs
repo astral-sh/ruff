@@ -121,7 +121,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         protocol: ProtocolInstanceType<'db>,
         relation: TypeRelation,
-        visitor: &HasRelationToVisitor<'db, ConstraintSet<'db>>,
+        visitor: &HasRelationToVisitor<'db>,
     ) -> ConstraintSet<'db> {
         let structurally_satisfied = if let Type::ProtocolInstance(self_protocol) = self {
             self_protocol.interface(db).extends_interface_of(
@@ -341,7 +341,7 @@ impl<'db> NominalInstanceType<'db> {
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
-        visitor: &HasRelationToVisitor<'db, ConstraintSet<'db>>,
+        visitor: &HasRelationToVisitor<'db>,
     ) -> ConstraintSet<'db> {
         match (self.0, other.0) {
             (_, NominalInstanceInner::Object) => ConstraintSet::always_satisfiable(),
@@ -359,7 +359,7 @@ impl<'db> NominalInstanceType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        visitor: &IsEquivalentVisitor<'db, ConstraintSet<'db>>,
+        visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         match (self.0, other.0) {
             (
@@ -380,7 +380,7 @@ impl<'db> NominalInstanceType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        visitor: &IsDisjointVisitor<'db, ConstraintSet<'db>>,
+        visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self.is_object() || other.is_object() {
             return ConstraintSet::unsatisfiable();
@@ -588,7 +588,7 @@ impl<'db> ProtocolInstanceType<'db> {
                     db,
                     protocol,
                     TypeRelation::Subtyping,
-                    &HasRelationToVisitor::new(ConstraintSet::always_satisfiable()),
+                    &HasRelationToVisitor::default(),
                 )
                 .is_always_satisfied()
         }
@@ -644,7 +644,7 @@ impl<'db> ProtocolInstanceType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        _visitor: &IsEquivalentVisitor<'db, ConstraintSet<'db>>,
+        _visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self == other {
             return ConstraintSet::always_satisfiable();
@@ -665,7 +665,7 @@ impl<'db> ProtocolInstanceType<'db> {
         self,
         _db: &'db dyn Db,
         _other: Self,
-        _visitor: &IsDisjointVisitor<'db, ConstraintSet<'db>>,
+        _visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
         ConstraintSet::unsatisfiable()
     }

@@ -239,7 +239,7 @@ impl<'db> ProtocolInterface<'db> {
         db: &'db dyn Db,
         other: Self,
         _relation: TypeRelation,
-        _visitor: &HasRelationToVisitor<'db, ConstraintSet<'db>>,
+        _visitor: &HasRelationToVisitor<'db>,
     ) -> ConstraintSet<'db> {
         // TODO: This could just return a bool as written, but this form is what will be needed to
         // combine the constraints when we do assignability checks on each member.
@@ -518,7 +518,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         &self,
         db: &'db dyn Db,
         other: Type<'db>,
-        visitor: &IsDisjointVisitor<'db, ConstraintSet<'db>>,
+        visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
         match &self.kind {
             // TODO: implement disjointness for property/method members as well as attribute members
@@ -536,7 +536,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         db: &'db dyn Db,
         other: Type<'db>,
         relation: TypeRelation,
-        visitor: &HasRelationToVisitor<'db, ConstraintSet<'db>>,
+        visitor: &HasRelationToVisitor<'db>,
     ) -> ConstraintSet<'db> {
         match &self.kind {
             // TODO: consider the types of the attribute on `other` for method members

@@ -536,7 +536,7 @@ impl<'db> ClassType<'db> {
             db,
             other,
             TypeRelation::Subtyping,
-            &HasRelationToVisitor::new(ConstraintSet::always_satisfiable()),
+            &HasRelationToVisitor::default(),
         )
     }
 
@@ -545,7 +545,7 @@ impl<'db> ClassType<'db> {
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
-        visitor: &HasRelationToVisitor<'db, ConstraintSet<'db>>,
+        visitor: &HasRelationToVisitor<'db>,
     ) -> ConstraintSet<'db> {
         self.iter_mro(db).when_any(db, |base| {
             match base {
@@ -592,7 +592,7 @@ impl<'db> ClassType<'db> {
         self,
         db: &'db dyn Db,
         other: ClassType<'db>,
-        visitor: &IsEquivalentVisitor<'db, ConstraintSet<'db>>,
+        visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self == other {
             return ConstraintSet::always_satisfiable();

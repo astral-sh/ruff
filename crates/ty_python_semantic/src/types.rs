@@ -183,16 +183,31 @@ fn definition_expression_type<'db>(
 pub(crate) type ApplyTypeMappingVisitor<'db> = TypeTransformer<'db, TypeMapping<'db, 'db>>;
 
 /// A [`PairVisitor`] that is used in `has_relation_to` methods.
-pub(crate) type HasRelationToVisitor<'db, C> =
-    CycleDetector<TypeRelation, (Type<'db>, Type<'db>, TypeRelation), C>;
+pub(crate) type HasRelationToVisitor<'db> =
+    CycleDetector<TypeRelation, (Type<'db>, Type<'db>, TypeRelation), ConstraintSet<'db>>;
+impl Default for HasRelationToVisitor<'_> {
+    fn default() -> Self {
+        HasRelationToVisitor::new(ConstraintSet::always_satisfiable())
+    }
+}
 
 /// A [`PairVisitor`] that is used in `is_disjoint_from` methods.
-pub(crate) type IsDisjointVisitor<'db, C> = PairVisitor<'db, IsDisjoint, C>;
+pub(crate) type IsDisjointVisitor<'db> = PairVisitor<'db, IsDisjoint, ConstraintSet<'db>>;
 pub(crate) struct IsDisjoint;
+impl Default for IsDisjointVisitor<'_> {
+    fn default() -> Self {
+        IsDisjointVisitor::new(ConstraintSet::unsatisfiable())
+    }
+}
 
 /// A [`PairVisitor`] that is used in `is_equivalent` methods.
-pub(crate) type IsEquivalentVisitor<'db, C> = PairVisitor<'db, IsEquivalent, C>;
+pub(crate) type IsEquivalentVisitor<'db> = PairVisitor<'db, IsEquivalent, ConstraintSet<'db>>;
 pub(crate) struct IsEquivalent;
+impl Default for IsEquivalentVisitor<'_> {
+    fn default() -> Self {
+        IsEquivalentVisitor::new(ConstraintSet::always_satisfiable())
+    }
+}
 
 /// A [`CycleDetector`] that is used in `find_legacy_typevars` methods.
 pub(crate) type FindLegacyTypeVarsVisitor<'db> = CycleDetector<FindLegacyTypeVars, Type<'db>, ()>;
@@ -536,18 +551,14 @@ impl<'db> PropertyInstanceType<'db> {
     }
 
     fn when_equivalent_to(self, db: &'db dyn Db, other: Self) -> ConstraintSet<'db> {
-        self.is_equivalent_to_impl(
-            db,
-            other,
-            &IsEquivalentVisitor::new(ConstraintSet::always_satisfiable()),
-        )
+        self.is_equivalent_to_impl(db, other, &IsEquivalentVisitor::default())
     }
 
     fn is_equivalent_to_impl(
         self,
         db: &'db dyn Db,
         other: Self,
-        visitor: &IsEquivalentVisitor<'db, ConstraintSet<'db>>,
+        visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         let getter_equivalence = if let Some(getter) = self.getter(db) {
             let Some(other_getter) = other.getter(db) else {
@@ -1415,12 +1426,7 @@ impl<'db> Type<'db> {
         target: Type<'db>,
         relation: TypeRelation,
     ) -> ConstraintSet<'db> {
-        self.has_relation_to_impl(
-            db,
-            target,
-            relation,
-            &HasRelationToVisitor::new(ConstraintSet::always_satisfiable()),
-        )
+        self.has_relation_to_impl(db, target, relation, &HasRelationToVisitor::default())
     }
 
     fn has_relation_to_impl(
@@ -1428,7 +1434,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         target: Type<'db>,
         relation: TypeRelation,
-        visitor: &HasRelationToVisitor<'db, ConstraintSet<'db>>,
+        visitor: &HasRelationToVisitor<'db>,
     ) -> ConstraintSet<'db> {
         // Subtyping implies assignability, so if subtyping is reflexive and the two types are
         // equal, it is both a subtype and assignable. Assignability is always reflexive.
@@ -1888,18 +1894,14 @@ impl<'db> Type<'db> {
     }
 
     fn when_equivalent_to(self, db: &'db dyn Db, other: Type<'db>) -> ConstraintSet<'db> {
-        self.is_equivalent_to_impl(
-            db,
-            other,
-            &IsEquivalentVisitor::new(ConstraintSet::always_satisfiable()),
-        )
+        self.is_equivalent_to_impl(db, other, &IsEquivalentVisitor::default())
     }
 
     pub(crate) fn is_equivalent_to_impl(
         self,
         db: &'db dyn Db,
         other: Type<'db>,
-        visitor: &IsEquivalentVisitor<'db, ConstraintSet<'db>>,
+        visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self == other {
             return ConstraintSet::always_satisfiable();
@@ -1997,24 +1999,20 @@ impl<'db> Type<'db> {
     }
 
     fn when_disjoint_from(self, db: &'db dyn Db, other: Type<'db>) -> ConstraintSet<'db> {
-        self.is_disjoint_from_impl(
-            db,
-            other,
-            &IsDisjointVisitor::new(ConstraintSet::unsatisfiable()),
-        )
+        self.is_disjoint_from_impl(db, other, &IsDisjointVisitor::default())
     }
 
     pub(crate) fn is_disjoint_from_impl(
         self,
         db: &'db dyn Db,
         other: Type<'db>,
-        visitor: &IsDisjointVisitor<'db, ConstraintSet<'db>>,
+        visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
         fn any_protocol_members_absent_or_disjoint<'db>(
             db: &'db dyn Db,
             protocol: ProtocolInstanceType<'db>,
             other: Type<'db>,
-            visitor: &IsDisjointVisitor<'db, ConstraintSet<'db>>,
+            visitor: &IsDisjointVisitor<'db>,
         ) -> ConstraintSet<'db> {
             protocol.interface(db).members(db).when_any(db, |member| {
                 other
@@ -8982,7 +8980,7 @@ impl<'db> BoundMethodType<'db> {
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
-        visitor: &HasRelationToVisitor<'db, ConstraintSet<'db>>,
+        visitor: &HasRelationToVisitor<'db>,
     ) -> ConstraintSet<'db> {
         // A bound method is a typically a subtype of itself. However, we must explicitly verify
         // the subtyping of the underlying function signatures (since they might be specialized
@@ -9004,7 +9002,7 @@ impl<'db> BoundMethodType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        visitor: &IsEquivalentVisitor<'db, ConstraintSet<'db>>,
+        visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         self.function(db)
             .is_equivalent_to_impl(db, other.function(db), visitor)
@@ -9138,7 +9136,7 @@ impl<'db> CallableType<'db> {
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
-        visitor: &HasRelationToVisitor<'db, ConstraintSet<'db>>,
+        visitor: &HasRelationToVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if other.is_function_like(db) && !self.is_function_like(db) {
             return ConstraintSet::unsatisfiable();
@@ -9154,7 +9152,7 @@ impl<'db> CallableType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        visitor: &IsEquivalentVisitor<'db, ConstraintSet<'db>>,
+        visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self == other {
             return ConstraintSet::always_satisfiable();
@@ -9224,7 +9222,7 @@ impl<'db> KnownBoundMethodType<'db> {
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
-        visitor: &HasRelationToVisitor<'db, ConstraintSet<'db>>,
+        visitor: &HasRelationToVisitor<'db>,
     ) -> ConstraintSet<'db> {
         match (self, other) {
             (
@@ -9269,7 +9267,7 @@ impl<'db> KnownBoundMethodType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        visitor: &IsEquivalentVisitor<'db, ConstraintSet<'db>>,
+        visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         match (self, other) {
             (
@@ -10121,7 +10119,7 @@ impl<'db> UnionType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        _visitor: &IsEquivalentVisitor<'db, ConstraintSet<'db>>,
+        _visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self == other {
             return ConstraintSet::always_satisfiable();
@@ -10222,7 +10220,7 @@ impl<'db> IntersectionType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        _visitor: &IsEquivalentVisitor<'db, ConstraintSet<'db>>,
+        _visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self == other {
             return ConstraintSet::always_satisfiable();

@@ -949,7 +949,7 @@ impl<'db> FunctionType<'db> {
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
-        _visitor: &HasRelationToVisitor<'db, ConstraintSet<'db>>,
+        _visitor: &HasRelationToVisitor<'db>,
     ) -> ConstraintSet<'db> {
         match relation {
             TypeRelation::Subtyping => ConstraintSet::from_bool(self.is_subtype_of(db, other)),
@@ -988,7 +988,7 @@ impl<'db> FunctionType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        visitor: &IsEquivalentVisitor<'db, ConstraintSet<'db>>,
+        visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self.normalized(db) == other.normalized(db) {
             return ConstraintSet::always_satisfiable();

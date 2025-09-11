@@ -120,7 +120,7 @@ impl<'db> CallableSignature<'db> {
             db,
             other,
             TypeRelation::Subtyping,
-            &HasRelationToVisitor::new(ConstraintSet::always_satisfiable()),
+            &HasRelationToVisitor::default(),
         )
     }
 
@@ -132,7 +132,7 @@ impl<'db> CallableSignature<'db> {
             db,
             other,
             TypeRelation::Assignability,
-            &HasRelationToVisitor::new(ConstraintSet::always_satisfiable()),
+            &HasRelationToVisitor::default(),
         )
         .is_always_satisfied()
     }
@@ -142,7 +142,7 @@ impl<'db> CallableSignature<'db> {
         db: &'db dyn Db,
         other: &Self,
         relation: TypeRelation,
-        visitor: &HasRelationToVisitor<'db, ConstraintSet<'db>>,
+        visitor: &HasRelationToVisitor<'db>,
     ) -> ConstraintSet<'db> {
         Self::has_relation_to_inner(db, &self.overloads, &other.overloads, relation, visitor)
     }
@@ -154,7 +154,7 @@ impl<'db> CallableSignature<'db> {
         self_signatures: &[Signature<'db>],
         other_signatures: &[Signature<'db>],
         relation: TypeRelation,
-        visitor: &HasRelationToVisitor<'db, ConstraintSet<'db>>,
+        visitor: &HasRelationToVisitor<'db>,
     ) -> ConstraintSet<'db> {
         match (self_signatures, other_signatures) {
             ([self_signature], [other_signature]) => {
@@ -204,7 +204,7 @@ impl<'db> CallableSignature<'db> {
         &self,
         db: &'db dyn Db,
         other: &Self,
-        visitor: &IsEquivalentVisitor<'db, ConstraintSet<'db>>,
+        visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         match (self.overloads.as_slice(), other.overloads.as_slice()) {
             ([self_signature], [other_signature]) => {
@@ -536,7 +536,7 @@ impl<'db> Signature<'db> {
         &self,
         db: &'db dyn Db,
         other: &Signature<'db>,
-        visitor: &IsEquivalentVisitor<'db, ConstraintSet<'db>>,
+        visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         let mut result = ConstraintSet::always_satisfiable();
         let mut check_types = |self_type: Option<Type<'db>>, other_type: Option<Type<'db>>| {
@@ -623,7 +623,7 @@ impl<'db> Signature<'db> {
         db: &'db dyn Db,
         other: &Signature<'db>,
         relation: TypeRelation,
-        visitor: &HasRelationToVisitor<'db, ConstraintSet<'db>>,
+        visitor: &HasRelationToVisitor<'db>,
     ) -> ConstraintSet<'db> {
         /// A helper struct to zip two slices of parameters together that provides control over the
         /// two iterators individually. It also keeps track of the current parameter in each
