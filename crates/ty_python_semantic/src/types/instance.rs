@@ -382,6 +382,9 @@ impl<'db> NominalInstanceType<'db> {
         other: Self,
         visitor: &IsDisjointVisitor<'db, C>,
     ) -> C {
+        if self.is_object() || other.is_object() {
+            return C::unsatisfiable(db);
+        }
         let mut result = C::unsatisfiable(db);
         if let Some(self_spec) = self.tuple_spec(db) {
             if let Some(other_spec) = other.tuple_spec(db) {
