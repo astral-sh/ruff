@@ -647,7 +647,10 @@ impl<'db> IntersectionBuilder<'db> {
                 self
             }
             Type::NominalInstance(instance)
-                if enum_metadata(self.db, instance.class_literal(self.db)).is_some() =>
+                if instance
+                    .known_class(self.db)
+                    .is_none_or(|class| class.is_enum_subclass_with_members())
+                    && enum_metadata(self.db, instance.class_literal(self.db)).is_some() =>
             {
                 let mut contains_enum_literal_as_negative_element = false;
                 for intersection in &self.intersections {
