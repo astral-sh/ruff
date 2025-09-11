@@ -134,7 +134,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
                 );
             }
             if checker.is_rule_enabled(Rule::FunctionCallInDataclassDefaultArgument) {
-                ruff::rules::function_call_in_dataclass_default(checker, class_def);
+                ruff::rules::function_call_in_dataclass_default(checker, class_def, scope_id);
             }
             if checker.is_rule_enabled(Rule::MutableClassDefault) {
                 ruff::rules::mutable_class_default(checker, class_def);
