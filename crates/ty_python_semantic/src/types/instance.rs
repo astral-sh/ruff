@@ -259,7 +259,7 @@ impl<'db> NominalInstanceType<'db> {
     }
 
     /// Return `true` if this type represents instances of the class `builtins.object`.
-    pub(super) fn is_object(self) -> bool {
+    pub(super) const fn is_object(self) -> bool {
         matches!(self.0, NominalInstanceInner::Object)
     }
 
