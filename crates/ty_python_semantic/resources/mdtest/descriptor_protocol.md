@@ -375,7 +375,7 @@ def _(flag: bool):
     # error: [invalid-assignment] "Object of type `None` is not assignable to attribute `meta_data_descriptor1` of type `Literal["value on class"]`"
     C5.meta_data_descriptor1 = None
 
-    # error: [possibly-unbound-attribute]
+    # error: [possibly-undeclared-attribute]
     C5.meta_data_descriptor2 = 1
 ```
 
@@ -401,7 +401,7 @@ def _(flag: bool):
     reveal_type(C6.attribute1)  # revealed: Literal["data"]
     reveal_type(C6.attribute2)  # revealed: Literal["non-data", "value on class"]
     reveal_type(C6.attribute3)  # revealed: Literal["value on metaclass", "value on class"]
-    # error: [possibly-unbound-attribute]
+    # error: [possibly-undeclared-attribute]
     reveal_type(C6.attribute4)  # revealed: Literal["value on class"]
 ```
 
@@ -756,16 +756,16 @@ def _(flag: bool):
             non_data: NonDataDescriptor = NonDataDescriptor()
             data: DataDescriptor = DataDescriptor()
 
-    # error: [possibly-unbound-attribute] "Attribute `non_data` on type `<class 'PossiblyUnbound'>` is possibly unbound"
+    # error: [possibly-undeclared-attribute] "Attribute `non_data` on type `<class 'PossiblyUnbound'>` is possibly undeclared"
     reveal_type(PossiblyUnbound.non_data)  # revealed: int
 
-    # error: [possibly-unbound-attribute] "Attribute `non_data` on type `PossiblyUnbound` is possibly unbound"
+    # error: [possibly-undeclared-attribute] "Attribute `non_data` on type `PossiblyUnbound` is possibly undeclared"
     reveal_type(PossiblyUnbound().non_data)  # revealed: int
 
-    # error: [possibly-unbound-attribute] "Attribute `data` on type `<class 'PossiblyUnbound'>` is possibly unbound"
+    # error: [possibly-undeclared-attribute] "Attribute `data` on type `<class 'PossiblyUnbound'>` is possibly undeclared"
     reveal_type(PossiblyUnbound.data)  # revealed: int
 
-    # error: [possibly-unbound-attribute] "Attribute `data` on type `PossiblyUnbound` is possibly unbound"
+    # error: [possibly-undeclared-attribute] "Attribute `data` on type `PossiblyUnbound` is possibly undeclared"
     reveal_type(PossiblyUnbound().data)  # revealed: int
 ```
 
