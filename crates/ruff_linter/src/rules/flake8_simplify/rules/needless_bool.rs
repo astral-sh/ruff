@@ -1,3 +1,4 @@
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::traversal;
@@ -48,10 +49,15 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// ## Fix safety
 ///
-/// This fix is marked as unsafe because it may change the program’s behavior if the condition does not
-/// return a proper Boolean. While the fix will try to wrap non-boolean values in a call to bool,
-/// custom implementations of comparison functions like `__eq__` can avoid the bool call and still
-/// lead to altered behavior.
+/// This rule provides safe fixes when the replacement expression is guaranteed to evaluate
+/// to a real boolean value – for example, a logical negation (`not`), an identity or
+/// membership comparison (`is`, `is not`, `in`, `not in`), or a call to the builtin
+/// `bool(...)`.
+///
+/// In other cases, the fix is marked as unsafe because it can change runtime behavior. In
+/// particular, equality and inequality comparisons (`==`, `!=`) may be overloaded to return
+/// non-boolean values. When `bool` is shadowed and the expression is not guaranteed to be
+/// boolean, no fix is offered.
 ///
 /// ## References
 /// - [Python documentation: Truth Value Testing](https://docs.python.org/3/library/stdtypes.html#truth-value-testing)
@@ -216,63 +222,184 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
         return;
     }
 
-    // Generate the replacement condition.
-    let condition = if checker
+    // Build replacement condition and decide safety together.
+    let (condition, applicability) = if checker
         .comment_ranges()
         .has_comments(&range, checker.source())
     {
-        None
+        (None, Applicability::Unsafe)
     } else {
-        // If the return values are inverted, wrap the condition in a `not`.
-        if inverted {
-            match if_test {
-                Expr::UnaryOp(ast::ExprUnaryOp {
-                    op: ast::UnaryOp::Not,
-                    operand,
-                    ..
-                }) => Some((**operand).clone()),
+        build_replacement_and_safety(
+            if_test,
+            inverted,
+            checker.semantic().has_builtin_binding("bool"),
+        )
+    };
 
-                Expr::Compare(ast::ExprCompare {
-                    ops,
-                    left,
-                    comparators,
-                    ..
-                }) if matches!(
-                    ops.as_ref(),
-                    [ast::CmpOp::Eq
-                        | ast::CmpOp::NotEq
-                        | ast::CmpOp::In
-                        | ast::CmpOp::NotIn
-                        | ast::CmpOp::Is
-                        | ast::CmpOp::IsNot]
-                ) =>
-                {
-                    let ([op], [right]) = (ops.as_ref(), comparators.as_ref()) else {
-                        unreachable!("Single comparison with multiple comparators");
-                    };
+    // Generate the replacement `return` statement.
+    let replacement = condition.as_ref().map(|expr| {
+        Stmt::Return(ast::StmtReturn {
+            value: Some(Box::new(expr.clone())),
+            range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        })
+    });
 
-                    Some(Expr::Compare(ast::ExprCompare {
-                        ops: Box::new([op.negate()]),
-                        left: left.clone(),
-                        comparators: Box::new([right.clone()]),
-                        range: TextRange::default(),
-                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                    }))
-                }
+    // Generate source code.
+    let replacement = replacement
+        .as_ref()
+        .map(|stmt| checker.generator().stmt(stmt));
+    let condition_code = condition
+        .as_ref()
+        .map(|expr| checker.generator().expr(expr));
 
-                _ => Some(Expr::UnaryOp(ast::ExprUnaryOp {
+    let mut diagnostic = checker.report_diagnostic(
+        NeedlessBool {
+            condition: condition_code.map(SourceCodeSnippet::new),
+            negate: inverted,
+        },
+        range,
+    );
+    if let Some(replacement) = replacement {
+        diagnostic.set_fix(Fix::applicable_edit(
+            Edit::range_replacement(replacement, range),
+            applicability,
+        ));
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Bool {
+    True,
+    False,
+}
+
+/// Build the replacement expression for SIM103 and determine whether applying it is safe.
+///
+/// Safety rules:
+/// - Safe if the replacement is guaranteed boolean:
+///   - a negation (`not <expr>`),
+///   - an identity/membership comparison (`is`, `is not`, `in`, `not in`), or
+///   - a call to the builtin `bool(<expr>)` (only when `bool` is not shadowed).
+/// - Unsafe for equality comparisons (`==`, `!=`), because user types may overload them to return
+///   non-boolean values.
+/// - When `bool` is shadowed and the expression is not guaranteed boolean, no fix is provided.
+fn build_replacement_and_safety(
+    if_test: &Expr,
+    inverted: bool,
+    has_builtin_bool: bool,
+) -> (Option<Expr>, Applicability) {
+    fn is_identity_or_membership_ops(ops: &[ast::CmpOp]) -> bool {
+        ops.iter().all(|op| {
+            matches!(
+                op,
+                ast::CmpOp::In | ast::CmpOp::NotIn | ast::CmpOp::Is | ast::CmpOp::IsNot
+            )
+        })
+    }
+
+    fn is_eq_neq_ops(ops: &[ast::CmpOp]) -> bool {
+        ops.iter()
+            .all(|op| matches!(op, ast::CmpOp::Eq | ast::CmpOp::NotEq))
+    }
+
+    match (inverted, if_test) {
+        // Replacement becomes the operand; safe only if guaranteed-boolean.
+        (
+            true,
+            Expr::UnaryOp(ast::ExprUnaryOp {
+                op: ast::UnaryOp::Not,
+                operand,
+                ..
+            }),
+        ) => match operand.as_ref() {
+            Expr::UnaryOp(ast::ExprUnaryOp {
+                op: ast::UnaryOp::Not,
+                ..
+            }) => (Some((**operand).clone()), Applicability::Safe),
+            Expr::Compare(ast::ExprCompare { ops, .. }) => {
+                let app = if is_identity_or_membership_ops(ops.as_ref()) {
+                    Applicability::Safe
+                } else {
+                    Applicability::Unsafe
+                };
+                (Some((**operand).clone()), app)
+            }
+            _ => (Some((**operand).clone()), Applicability::Unsafe),
+        },
+
+        // Replacement becomes a negated comparison: safe only for identity/membership. For
+        // other comparisons, the replacement will be `not <expr>` which is a bool, except for
+        // `==`/`!=` which can be overloaded to return non-bool.
+        (
+            true,
+            Expr::Compare(ast::ExprCompare {
+                ops,
+                left,
+                comparators,
+                ..
+            }),
+        ) => match ops.as_ref() {
+            [
+                ast::CmpOp::Eq
+                | ast::CmpOp::NotEq
+                | ast::CmpOp::In
+                | ast::CmpOp::NotIn
+                | ast::CmpOp::Is
+                | ast::CmpOp::IsNot,
+            ] => {
+                let ([op], [right]) = (ops.as_ref(), comparators.as_ref()) else {
+                    unreachable!("Single comparison with multiple comparators");
+                };
+                let replacement = Expr::Compare(ast::ExprCompare {
+                    ops: Box::new([op.negate()]),
+                    left: left.clone(),
+                    comparators: Box::new([right.clone()]),
+                    range: TextRange::default(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                });
+                (
+                    Some(replacement),
+                    if is_identity_or_membership_ops(ops.as_ref()) && !is_eq_neq_ops(ops.as_ref()) {
+                        Applicability::Safe
+                    } else {
+                        Applicability::Unsafe
+                    },
+                )
+            }
+            _ => {
+                let replacement = Expr::UnaryOp(ast::ExprUnaryOp {
                     op: ast::UnaryOp::Not,
                     operand: Box::new(if_test.clone()),
                     range: TextRange::default(),
                     node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                })),
+                });
+                (Some(replacement), Applicability::Safe)
             }
-        } else if if_test.is_compare_expr() {
-            // If the condition is a comparison, we can replace it with the condition, since we
-            // know it's a boolean.
-            Some(if_test.clone())
-        } else if checker.semantic().has_builtin_binding("bool") {
-            // Otherwise, we need to wrap the condition in a call to `bool`.
+        },
+
+        // Replacement becomes `not <expr>` which is always a bool.
+        (true, _) => (
+            Some(Expr::UnaryOp(ast::ExprUnaryOp {
+                op: ast::UnaryOp::Not,
+                operand: Box::new(if_test.clone()),
+                range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+            })),
+            Applicability::Safe,
+        ),
+
+        // Non-inverted: direct compare is safe only for identity/membership; otherwise
+        // we rely on wrapping with `bool(...)` if available.
+        (false, Expr::Compare(ast::ExprCompare { ops, .. })) => (
+            Some(if_test.clone()),
+            if is_identity_or_membership_ops(ops.as_ref()) {
+                Applicability::Safe
+            } else {
+                Applicability::Unsafe
+            },
+        ),
+        (false, _) if has_builtin_bool => {
             let func_node = ast::ExprName {
                 id: Name::new_static("bool"),
                 ctx: ExprContext::Load,
@@ -290,48 +417,10 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             };
-            Some(Expr::Call(call_node))
-        } else {
-            None
+            (Some(Expr::Call(call_node)), Applicability::Safe)
         }
-    };
-
-    // Generate the replacement `return` statement.
-    let replacement = condition.as_ref().map(|expr| {
-        Stmt::Return(ast::StmtReturn {
-            value: Some(Box::new(expr.clone())),
-            range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        })
-    });
-
-    // Generate source code.
-    let replacement = replacement
-        .as_ref()
-        .map(|stmt| checker.generator().stmt(stmt));
-    let condition = condition
-        .as_ref()
-        .map(|expr| checker.generator().expr(expr));
-
-    let mut diagnostic = checker.report_diagnostic(
-        NeedlessBool {
-            condition: condition.map(SourceCodeSnippet::new),
-            negate: inverted,
-        },
-        range,
-    );
-    if let Some(replacement) = replacement {
-        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-            replacement,
-            range,
-        )));
+        (false, _) => (None, Applicability::Unsafe),
     }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Bool {
-    True,
-    False,
 }
 
 impl From<bool> for Bool {
