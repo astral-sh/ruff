@@ -792,8 +792,10 @@ class PlaygroundServer
     } as languages.LocationLink;
   }
 
-  private mapNavigationTargets(links: any[]): languages.LocationLink[] {
-    return links.map(this.mapNavigationTarget);
+  private mapNavigationTargets(
+    links: LocationLink[],
+  ): languages.LocationLink[] {
+    return links.map((link) => this.mapNavigationTarget(link));
   }
 
   dispose() {
