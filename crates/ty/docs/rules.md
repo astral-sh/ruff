@@ -1838,7 +1838,7 @@ Use instead:
 a = 20 / 0  # type: ignore
 ```
 
-## `possibly-unbound-attribute`
+## `possibly-undeclared-attribute`
 
 <small>
 Default level: [`warn`](../rules.md#rule-levels "This lint has a default level of 'warn'.") ·
@@ -1848,11 +1848,11 @@ Default level: [`warn`](../rules.md#rule-levels "This lint has a default level o
 
 **What it does**
 
-Checks for possibly unbound attributes.
+Checks for possibly undeclared attributes.
 
 **Why is this bad?**
 
-Attempting to access an unbound attribute will raise an `AttributeError` at runtime.
+Attempting to access an undeclared attribute will raise an `AttributeError` at runtime.
 
 **Examples**
 
@@ -1864,7 +1864,7 @@ class A:
 A.c  # AttributeError: type object 'A' has no attribute 'c'
 ```
 
-## `possibly-unbound-implicit-call`
+## `possibly-undeclared-implicit-call`
 
 <small>
 Default level: [`warn`](../rules.md#rule-levels "This lint has a default level of 'warn'.") ·
@@ -1874,7 +1874,7 @@ Default level: [`warn`](../rules.md#rule-levels "This lint has a default level o
 
 **What it does**
 
-Checks for implicit calls to possibly unbound methods.
+Checks for implicit calls to possibly undeclared methods.
 
 **Why is this bad?**
 

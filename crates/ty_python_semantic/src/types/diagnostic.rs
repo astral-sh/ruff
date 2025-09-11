@@ -38,7 +38,7 @@ use std::fmt::Formatter;
 pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&AMBIGUOUS_PROTOCOL_MEMBER);
     registry.register_lint(&CALL_NON_CALLABLE);
-    registry.register_lint(&POSSIBLY_UNBOUND_IMPLICIT_CALL);
+    registry.register_lint(&POSSIBLY_UNDECLARED_IMPLICIT_CALL);
     registry.register_lint(&CONFLICTING_ARGUMENT_FORMS);
     registry.register_lint(&CONFLICTING_DECLARATIONS);
     registry.register_lint(&CONFLICTING_METACLASS);
@@ -80,7 +80,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&NOT_ITERABLE);
     registry.register_lint(&UNSUPPORTED_BOOL_CONVERSION);
     registry.register_lint(&PARAMETER_ALREADY_ASSIGNED);
-    registry.register_lint(&POSSIBLY_UNBOUND_ATTRIBUTE);
+    registry.register_lint(&POSSIBLY_UNDECLARED_ATTRIBUTE);
     registry.register_lint(&POSSIBLY_UNBOUND_IMPORT);
     registry.register_lint(&POSSIBLY_UNRESOLVED_REFERENCE);
     registry.register_lint(&SUBCLASS_OF_FINAL_CLASS);
@@ -130,12 +130,12 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks for implicit calls to possibly unbound methods.
+    /// Checks for implicit calls to possibly undeclared methods.
     ///
     /// ## Why is this bad?
     /// Expressions such as `x[y]` and `x * y` call methods
     /// under the hood (`__getitem__` and `__mul__` respectively).
-    /// Calling an unbound method will raise an `AttributeError` at runtime.
+    /// Calling an undeclared method will raise an `AttributeError` at runtime.
     ///
     /// ## Examples
     /// ```python
@@ -147,8 +147,8 @@ declare_lint! {
     ///
     /// A()[0]  # TypeError: 'A' object is not subscriptable
     /// ```
-    pub(crate) static POSSIBLY_UNBOUND_IMPLICIT_CALL = {
-        summary: "detects implicit calls to possibly unbound methods",
+    pub(crate) static POSSIBLY_UNDECLARED_IMPLICIT_CALL = {
+        summary: "detects implicit calls to possibly undeclared methods",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Warn,
     }
@@ -1326,10 +1326,10 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks for possibly unbound attributes.
+    /// Checks for possibly undeclared attributes.
     ///
     /// ## Why is this bad?
-    /// Attempting to access an unbound attribute will raise an `AttributeError` at runtime.
+    /// Attempting to access an undeclared attribute will raise an `AttributeError` at runtime.
     ///
     /// ## Examples
     /// ```python
@@ -1339,8 +1339,8 @@ declare_lint! {
     ///
     /// A.c  # AttributeError: type object 'A' has no attribute 'c'
     /// ```
-    pub(crate) static POSSIBLY_UNBOUND_ATTRIBUTE = {
-        summary: "detects references to possibly unbound attributes",
+    pub(crate) static POSSIBLY_UNDECLARED_ATTRIBUTE = {
+        summary: "detects references to possibly undeclared attributes",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Warn,
     }
@@ -2166,17 +2166,17 @@ pub(super) fn report_possibly_unresolved_reference(
     builder.into_diagnostic(format_args!("Name `{id}` used when possibly not defined"));
 }
 
-pub(super) fn report_possibly_unbound_attribute(
+pub(super) fn report_possibly_undeclared_attribute(
     context: &InferContext,
     target: &ast::ExprAttribute,
     attribute: &str,
     object_ty: Type,
 ) {
-    let Some(builder) = context.report_lint(&POSSIBLY_UNBOUND_ATTRIBUTE, target) else {
+    let Some(builder) = context.report_lint(&POSSIBLY_UNDECLARED_ATTRIBUTE, target) else {
         return;
     };
     builder.into_diagnostic(format_args!(
-        "Attribute `{attribute}` on type `{}` is possibly unbound",
+        "Attribute `{attribute}` on type `{}` is possibly undeclared",
         object_ty.display(context.db()),
     ));
 }

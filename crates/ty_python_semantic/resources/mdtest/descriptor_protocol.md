@@ -365,7 +365,7 @@ def _(flag: bool):
         meta_data_descriptor1: Literal["value on class"] = "value on class"
 
     reveal_type(C5.meta_data_descriptor1)  # revealed: Literal["data", "value on class"]
-    # error: [possibly-unbound-attribute]
+    # error: [possibly-undeclared-attribute]
     reveal_type(C5.meta_data_descriptor2)  # revealed: Literal["data"]
 
     # TODO: We currently emit two diagnostics here, corresponding to the two states of `flag`. The diagnostics are not

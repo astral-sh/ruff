@@ -914,7 +914,7 @@ def _(flag: bool):
     reveal_type(C3.attr2)  # revealed: Literal["metaclass value", "class value"]
 ```
 
-If the *metaclass* attribute is only partially defined, we emit a `possibly-unbound-attribute`
+If the *metaclass* attribute is only partially defined, we emit a `possibly-undeclared-attribute`
 diagnostic:
 
 ```py
@@ -924,12 +924,12 @@ def _(flag: bool):
             attr1: str = "metaclass value"
 
     class C4(metaclass=Meta4): ...
-    # error: [possibly-unbound-attribute]
+    # error: [possibly-undeclared-attribute]
     reveal_type(C4.attr1)  # revealed: str
 ```
 
 Finally, if both the metaclass attribute and the class-level attribute are only partially defined,
-we union them and emit a `possibly-unbound-attribute` diagnostic:
+we union them and emit a `possibly-undeclared-attribute` diagnostic:
 
 ```py
 def _(flag1: bool, flag2: bool):
@@ -941,7 +941,7 @@ def _(flag1: bool, flag2: bool):
         if flag2:
             attr1 = "class value"
 
-    # error: [possibly-unbound-attribute]
+    # error: [possibly-undeclared-attribute]
     reveal_type(C5.attr1)  # revealed: Unknown | Literal["metaclass value", "class value"]
 ```
 
@@ -1180,13 +1180,13 @@ def _(flag1: bool, flag2: bool):
 
     C = C1 if flag1 else C2 if flag2 else C3
 
-    # error: [possibly-unbound-attribute] "Attribute `x` on type `<class 'C1'> | <class 'C2'> | <class 'C3'>` is possibly unbound"
+    # error: [possibly-undeclared-attribute] "Attribute `x` on type `<class 'C1'> | <class 'C2'> | <class 'C3'>` is possibly undeclared"
     reveal_type(C.x)  # revealed: Unknown | Literal[1, 3]
 
     # error: [invalid-assignment] "Object of type `Literal[100]` is not assignable to attribute `x` on type `<class 'C1'> | <class 'C2'> | <class 'C3'>`"
     C.x = 100
 
-    # error: [possibly-unbound-attribute] "Attribute `x` on type `C1 | C2 | C3` is possibly unbound"
+    # error: [possibly-undeclared-attribute] "Attribute `x` on type `C1 | C2 | C3` is possibly undeclared"
     reveal_type(C().x)  # revealed: Unknown | Literal[1, 3]
 
     # error: [invalid-assignment] "Object of type `Literal[100]` is not assignable to attribute `x` on type `C1 | C2 | C3`"
@@ -1212,18 +1212,18 @@ def _(flag: bool, flag1: bool, flag2: bool):
 
     C = C1 if flag1 else C2 if flag2 else C3
 
-    # error: [possibly-unbound-attribute] "Attribute `x` on type `<class 'C1'> | <class 'C2'> | <class 'C3'>` is possibly unbound"
+    # error: [possibly-undeclared-attribute] "Attribute `x` on type `<class 'C1'> | <class 'C2'> | <class 'C3'>` is possibly undeclared"
     reveal_type(C.x)  # revealed: Unknown | Literal[1, 2, 3]
 
-    # error: [possibly-unbound-attribute]
+    # error: [possibly-undeclared-attribute]
     C.x = 100
 
-    # Note: we might want to consider ignoring possibly-unbound diagnostics for instance attributes eventually,
+    # Note: we might want to consider ignoring possibly-undeclared diagnostics for instance attributes eventually,
     # see the "Possibly unbound/undeclared instance attribute" section below.
-    # error: [possibly-unbound-attribute] "Attribute `x` on type `C1 | C2 | C3` is possibly unbound"
+    # error: [possibly-undeclared-attribute] "Attribute `x` on type `C1 | C2 | C3` is possibly undeclared"
     reveal_type(C().x)  # revealed: Unknown | Literal[1, 2, 3]
 
-    # error: [possibly-unbound-attribute]
+    # error: [possibly-undeclared-attribute]
     C().x = 100
 ```
 
@@ -1287,16 +1287,16 @@ def _(flag: bool):
         if flag:
             x = 2
 
-    # error: [possibly-unbound-attribute]
+    # error: [possibly-undeclared-attribute]
     reveal_type(Bar.x)  # revealed: Unknown | Literal[2, 1]
 
-    # error: [possibly-unbound-attribute]
+    # error: [possibly-undeclared-attribute]
     Bar.x = 3
 
-    # error: [possibly-unbound-attribute]
+    # error: [possibly-undeclared-attribute]
     reveal_type(Bar().x)  # revealed: Unknown | Literal[2, 1]
 
-    # error: [possibly-unbound-attribute]
+    # error: [possibly-undeclared-attribute]
     Bar().x = 3
 ```
 
@@ -1304,7 +1304,7 @@ def _(flag: bool):
 
 We currently treat implicit instance attributes to be bound, even if they are only conditionally
 defined within a method. If the class-level definition or the whole method is only conditionally
-available, we emit a `possibly-unbound-attribute` diagnostic.
+available, we emit a `possibly-undeclared-attribute` diagnostic.
 
 #### Possibly unbound and undeclared
 
@@ -1484,17 +1484,17 @@ def _(flag: bool):
     class B1: ...
 
     def inner1(a_and_b: Intersection[A1, B1]):
-        # error: [possibly-unbound-attribute]
+        # error: [possibly-undeclared-attribute]
         reveal_type(a_and_b.x)  # revealed: P
 
-        # error: [possibly-unbound-attribute]
+        # error: [possibly-undeclared-attribute]
         a_and_b.x = R()
     # Same for class objects
     def inner1_class(a_and_b: Intersection[type[A1], type[B1]]):
-        # error: [possibly-unbound-attribute]
+        # error: [possibly-undeclared-attribute]
         reveal_type(a_and_b.x)  # revealed: P
 
-        # error: [possibly-unbound-attribute]
+        # error: [possibly-undeclared-attribute]
         a_and_b.x = R()
 
     class A2:
@@ -1509,7 +1509,7 @@ def _(flag: bool):
 
         # TODO: this should not be an error, we need better intersection
         # handling in `validate_attribute_assignment` for this
-        # error: [possibly-unbound-attribute]
+        # error: [possibly-undeclared-attribute]
         a_and_b.x = R()
     # Same for class objects
     def inner2_class(a_and_b: Intersection[type[A2], type[B1]]):
@@ -1524,17 +1524,17 @@ def _(flag: bool):
             x: Q = Q()
 
     def inner3(a_and_b: Intersection[A3, B3]):
-        # error: [possibly-unbound-attribute]
+        # error: [possibly-undeclared-attribute]
         reveal_type(a_and_b.x)  # revealed: P & Q
 
-        # error: [possibly-unbound-attribute]
+        # error: [possibly-undeclared-attribute]
         a_and_b.x = R()
     # Same for class objects
     def inner3_class(a_and_b: Intersection[type[A3], type[B3]]):
-        # error: [possibly-unbound-attribute]
+        # error: [possibly-undeclared-attribute]
         reveal_type(a_and_b.x)  # revealed: P & Q
 
-        # error: [possibly-unbound-attribute]
+        # error: [possibly-undeclared-attribute]
         a_and_b.x = R()
 
     class A4: ...
