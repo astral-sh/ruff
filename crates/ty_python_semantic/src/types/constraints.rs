@@ -43,7 +43,7 @@
 //! — must be fully static. We take the bottom and top materializations of the types to remove any
 //! gradual forms if needed.
 //!
-//! NOTE: This module is currently in a transitional state: added the DNF [`ConstraintSet`]
+//! NOTE: This module is currently in a transitional state. We've added the DNF [`ConstraintSet`]
 //! representation, and updated all of our property checks to build up a constraint set and then
 //! check whether it is ever or always satisfiable, as appropriate. We are not yet inferring
 //! specializations from those constraints.
