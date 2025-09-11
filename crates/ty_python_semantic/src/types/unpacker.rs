@@ -224,7 +224,7 @@ impl<'db> UnpackResult<'db> {
         &self.diagnostics
     }
 
-    pub(crate) fn cycle_fallback(cycle_fallback_type: Type<'db>) -> Self {
+    pub(crate) fn cycle_initial(cycle_fallback_type: Type<'db>) -> Self {
         Self {
             targets: FxHashMap::default(),
             diagnostics: TypeCheckDiagnostics::default(),
