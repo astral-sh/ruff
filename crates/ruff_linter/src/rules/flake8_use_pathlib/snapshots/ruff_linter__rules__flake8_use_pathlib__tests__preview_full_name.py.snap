@@ -652,7 +652,7 @@ help: Replace with `Path.open()`
 46 | open(p, opener=opener)
 47 | open(p, mode='r', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
    - open(p, 'r', - 1, None, None, None, True, None)
-48 + pathlib.Path(p).open('r', -1, None, None, None)
+48 + pathlib.Path(p).open('r', - 1, None, None, None)
 49 | open(p, 'r', - 1, None, None, None, False, opener)
 50 | 
 51 | # Cannot be upgraded `pathlib.Open` does not support fds

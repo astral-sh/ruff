@@ -108,16 +108,15 @@ pub(crate) fn builtin_open(checker: &Checker, call: &ExprCall, segments: &[&str]
         return;
     }
 
-    let range = call.range();
     let mut diagnostic = checker.report_diagnostic(BuiltinOpen, call.func.range());
-
-    let Some(file) = file_arg else {
-        return;
-    };
 
     if !is_fix_builtin_open_enabled(checker.settings()) {
         return;
     }
+
+    let Some(file) = file_arg else {
+        return;
+    };
 
     if has_unknown_keywords_or_starred_expr(
         &call.arguments,
@@ -145,37 +144,25 @@ pub(crate) fn builtin_open(checker: &Checker, call: &ExprCall, segments: &[&str]
         let locator = checker.locator();
         let file_code = locator.slice(file.range());
 
-        let args = |i: usize, arg: ArgOrKeyword| {
-            let clean_expr = |expr: &Expr, s: &str| match expr {
-                Expr::StringLiteral(_) | Expr::TString(_) | Expr::FString(_) => s.to_string(),
-                _ => s.replace(char::is_whitespace, ""),
-            };
-
-            match arg {
-                ArgOrKeyword::Arg(expr) => {
-                    if expr.range() == file.range() {
-                        None
-                    } else if i == 6 || i == 7 {
-                        // skip `closefd` and `opener`
-                        None
-                    } else {
-                        let s = locator.slice(expr.range());
-                        Some(clean_expr(expr, s))
-                    }
+        let args = |i: usize, arg: ArgOrKeyword| match arg {
+            ArgOrKeyword::Arg(expr) => {
+                if expr.range() == file.range() || i == 6 || i == 7 {
+                    None
+                } else {
+                    Some(locator.slice(expr.range()).to_string())
                 }
-                ArgOrKeyword::Keyword(kw) => match kw.arg.as_deref() {
-                    Some(arg)
-                        if matches!(
-                            arg,
-                            "mode" | "buffering" | "encoding" | "errors" | "newline"
-                        ) =>
-                    {
-                        let s = locator.slice(&kw.value);
-                        Some(format!("{arg}={}", clean_expr(&kw.value, s)))
-                    }
-                    _ => None,
-                },
             }
+            ArgOrKeyword::Keyword(kw) => match kw.arg.as_deref() {
+                Some(arg)
+                    if matches!(
+                        arg,
+                        "mode" | "buffering" | "encoding" | "errors" | "newline"
+                    ) =>
+                {
+                    Some(format!("{arg}={}", locator.slice(&kw.value)))
+                }
+                _ => None,
+            },
         };
 
         let open_args = itertools::join(
@@ -191,6 +178,8 @@ pub(crate) fn builtin_open(checker: &Checker, call: &ExprCall, segments: &[&str]
         } else {
             format!("{binding}({file_code}).open({open_args})")
         };
+
+        let range = call.range();
 
         let applicability = if checker.comment_ranges().intersects(range) {
             Applicability::Unsafe
