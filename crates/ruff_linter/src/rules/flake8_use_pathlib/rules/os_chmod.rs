@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Applicability, Edit, Fix};
-use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{ArgOrKeyword, ExprCall};
 use ruff_text_size::Ranged;
 
@@ -7,8 +7,8 @@ use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use crate::preview::is_fix_os_chmod_enabled;
 use crate::rules::flake8_use_pathlib::helpers::{
-    has_unknown_keywords_or_starred_expr, is_file_descriptor, is_keyword_only_argument_non_default,
-    is_optional_bool_literal, is_pathlib_path_call,
+    has_unknown_keywords_or_starred_expr, is_file_descriptor, is_keyword_only_argument_non_default
+    , is_pathlib_path_call,
 };
 use crate::{FixAvailability, Violation};
 
@@ -109,10 +109,6 @@ pub(crate) fn os_chmod(checker: &Checker, call: &ExprCall, segments: &[&str]) {
         return;
     };
 
-    if !is_optional_bool_literal(&call.arguments, "follow_symlinks", 3) {
-        return;
-    }
-
     diagnostic.try_set_fix(|| {
         let (import_edit, binding) = checker.importer().get_or_import_symbol(
             &ImportRequest::import("pathlib", "Path"),
@@ -133,11 +129,9 @@ pub(crate) fn os_chmod(checker: &Checker, call: &ExprCall, segments: &[&str]) {
             }
             ArgOrKeyword::Keyword(kw) => match kw.arg.as_deref() {
                 Some("mode") => Some(format!("mode={}", locator.slice(&kw.value))),
-                Some("follow_symlinks") => match kw.value.as_boolean_literal_expr() {
-                    Some(bl) if !bl.value => Some("follow_symlinks=False".to_string()),
-                    Some(_) => None,
-                    None => Some(format!("follow_symlinks={}", locator.slice(&kw.value))),
-                },
+                Some("follow_symlinks") => {
+                    Some(format!("follow_symlinks={}", locator.slice(&kw.value)))
+                }
                 _ => None,
             },
         };

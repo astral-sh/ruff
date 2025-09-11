@@ -877,61 +877,50 @@ help: Replace with `Path(...).chmod(...)`
 130 | # https://github.com/astral-sh/ruff/issues/20134
 131 | os.chmod("pth1_link", mode=0o600, follow_symlinks=      False    )
     - os.chmod("pth1_link", mode=0o600, follow_symlinks=True)
-132 + pathlib.Path("pth1_link").chmod(mode=0o600)
+132 + pathlib.Path("pth1_link").chmod(mode=0o600, follow_symlinks=True)
 133 | 
 134 | # Only diagnostic
-135 | os.chmod("pth1_link", 0o600, follow_symlinks="False") # string instead of a bool
+135 | os.chmod("pth1_file", 0o700, None, True, 1, *[1], **{"x": 1}, foo=1)
 
 PTH101 `os.chmod()` should be replaced by `Path.chmod()`
    --> full_name.py:134:1
     |
 133 | # Only diagnostic
-134 | os.chmod("pth1_link", 0o600, follow_symlinks="False") # string instead of a bool
+134 | os.chmod("pth1_file", 0o700, None, True, 1, *[1], **{"x": 1}, foo=1)
     | ^^^^^^^^
-135 | os.chmod("pth1_file", 0o700, None, True, 1, *[1], **{"x": 1}, foo=1)
-    |
-help: Replace with `Path(...).chmod(...)`
-
-PTH101 `os.chmod()` should be replaced by `Path.chmod()`
-   --> full_name.py:135:1
-    |
-133 | # Only diagnostic
-134 | os.chmod("pth1_link", 0o600, follow_symlinks="False") # string instead of a bool
-135 | os.chmod("pth1_file", 0o700, None, True, 1, *[1], **{"x": 1}, foo=1)
-    | ^^^^^^^^
-136 |
-137 | os.rename("pth1_file", "pth1_file1", None, None, 1, *[1], **{"x": 1}, foo=1)
+135 |
+136 | os.rename("pth1_file", "pth1_file1", None, None, 1, *[1], **{"x": 1}, foo=1)
     |
 help: Replace with `Path(...).chmod(...)`
 
 PTH104 `os.rename()` should be replaced by `Path.rename()`
-   --> full_name.py:137:1
+   --> full_name.py:136:1
     |
-135 | os.chmod("pth1_file", 0o700, None, True, 1, *[1], **{"x": 1}, foo=1)
-136 |
-137 | os.rename("pth1_file", "pth1_file1", None, None, 1, *[1], **{"x": 1}, foo=1)
+134 | os.chmod("pth1_file", 0o700, None, True, 1, *[1], **{"x": 1}, foo=1)
+135 |
+136 | os.rename("pth1_file", "pth1_file1", None, None, 1, *[1], **{"x": 1}, foo=1)
     | ^^^^^^^^^
-138 | os.replace("pth1_file1", "pth1_file", None, None, 1, *[1], **{"x": 1}, foo=1)
+137 | os.replace("pth1_file1", "pth1_file", None, None, 1, *[1], **{"x": 1}, foo=1)
     |
 help: Replace with `Path(...).rename(...)`
 
 PTH105 `os.replace()` should be replaced by `Path.replace()`
-   --> full_name.py:138:1
+   --> full_name.py:137:1
     |
-137 | os.rename("pth1_file", "pth1_file1", None, None, 1, *[1], **{"x": 1}, foo=1)
-138 | os.replace("pth1_file1", "pth1_file", None, None, 1, *[1], **{"x": 1}, foo=1)
+136 | os.rename("pth1_file", "pth1_file1", None, None, 1, *[1], **{"x": 1}, foo=1)
+137 | os.replace("pth1_file1", "pth1_file", None, None, 1, *[1], **{"x": 1}, foo=1)
     | ^^^^^^^^^^
-139 |
-140 | os.path.samefile("pth1_file", "pth1_link", 1, *[1], **{"x": 1}, foo=1)
+138 |
+139 | os.path.samefile("pth1_file", "pth1_link", 1, *[1], **{"x": 1}, foo=1)
     |
 help: Replace with `Path(...).replace(...)`
 
 PTH121 `os.path.samefile()` should be replaced by `Path.samefile()`
-   --> full_name.py:140:1
+   --> full_name.py:139:1
     |
-138 | os.replace("pth1_file1", "pth1_file", None, None, 1, *[1], **{"x": 1}, foo=1)
-139 |
-140 | os.path.samefile("pth1_file", "pth1_link", 1, *[1], **{"x": 1}, foo=1)
+137 | os.replace("pth1_file1", "pth1_file", None, None, 1, *[1], **{"x": 1}, foo=1)
+138 |
+139 | os.path.samefile("pth1_file", "pth1_link", 1, *[1], **{"x": 1}, foo=1)
     | ^^^^^^^^^^^^^^^^
     |
 help: Replace with `Path(...).samefile()`

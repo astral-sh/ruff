@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Applicability, Edit, Fix};
-use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{ArgOrKeyword, ExprCall};
 use ruff_text_size::Ranged;
 
@@ -7,7 +7,7 @@ use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use crate::preview::is_fix_os_makedirs_enabled;
 use crate::rules::flake8_use_pathlib::helpers::{
-    has_unknown_keywords_or_starred_expr, is_optional_bool_literal, is_pathlib_path_call,
+    has_unknown_keywords_or_starred_expr, is_pathlib_path_call,
 };
 use crate::{FixAvailability, Violation};
 
@@ -95,10 +95,6 @@ pub(crate) fn os_makedirs(checker: &Checker, call: &ExprCall, segments: &[&str])
     // We should not offer autofixes if there are keyword arguments
     // that don't match the original function signature
     if has_unknown_keywords_or_starred_expr(&call.arguments, &["name", "mode", "exist_ok"]) {
-        return;
-    }
-
-    if !is_optional_bool_literal(&call.arguments, "exist_ok", 2) {
         return;
     }
 

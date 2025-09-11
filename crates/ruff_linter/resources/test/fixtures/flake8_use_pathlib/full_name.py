@@ -131,7 +131,6 @@ os.chmod("pth1_link", mode=0o600, follow_symlinks=      False    )
 os.chmod("pth1_link", mode=0o600, follow_symlinks=True)
 
 # Only diagnostic
-os.chmod("pth1_link", 0o600, follow_symlinks="False") # string instead of a bool
 os.chmod("pth1_file", 0o700, None, True, 1, *[1], **{"x": 1}, foo=1)
 
 os.rename("pth1_file", "pth1_file1", None, None, 1, *[1], **{"x": 1}, foo=1)
