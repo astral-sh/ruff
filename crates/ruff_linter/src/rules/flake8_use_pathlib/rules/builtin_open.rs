@@ -114,6 +114,14 @@ pub(crate) fn builtin_open(checker: &Checker, call: &ExprCall, segments: &[&str]
         return;
     }
 
+    if checker
+        .semantic()
+        .current_expression_grandparent()
+        .is_some_and(|expr| matches!(expr, Expr::Call(_) | Expr::Attribute(_)))
+    {
+        return;
+    }
+
     let Some(file) = file_arg else {
         return;
     };
