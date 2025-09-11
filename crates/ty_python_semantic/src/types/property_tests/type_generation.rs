@@ -153,7 +153,7 @@ impl Ty {
                     .place
                     .expect_type();
                 debug_assert!(matches!(ty, Type::NominalInstance(instance) if
-                        instance.class_literal(db).is_some_and(|class| is_single_member_enum(db, class))));
+                            is_single_member_enum(db, instance.class_literal(db))));
                 ty
             }
             Ty::BuiltinInstance(s) => builtins_symbol(db, s)

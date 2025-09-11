@@ -787,8 +787,7 @@ impl<'db> Type<'db> {
 
     fn is_enum(&self, db: &'db dyn Db) -> bool {
         self.into_nominal_instance()
-            .and_then(|instance| instance.class_literal(db))
-            .and_then(|class| crate::types::enums::enum_metadata(db, class))
+            .and_then(|instance| crate::types::enums::enum_metadata(db, instance.class_literal(db)))
             .is_some()
     }
 
@@ -1973,10 +1972,7 @@ impl<'db> Type<'db> {
                 if literal.enum_class_instance(db) != Type::NominalInstance(instance) {
                     return C::unsatisfiable(db);
                 }
-                let Some(class_literal) = instance.class_literal(db) else {
-                    return C::unsatisfiable(db);
-                };
-                C::from_bool(db, is_single_member_enum(db, class_literal))
+                C::from_bool(db, is_single_member_enum(db, instance.class_literal(db)))
             }
 
             (Type::PropertyInstance(left), Type::PropertyInstance(right)) => {
@@ -2281,7 +2277,7 @@ impl<'db> Type<'db> {
             // (<https://github.com/rust-lang/rust/issues/129967>)
             (Type::ProtocolInstance(protocol), nominal @ Type::NominalInstance(n))
             | (nominal @ Type::NominalInstance(n), Type::ProtocolInstance(protocol))
-                if n.class(db).is_some_and(|class| class.is_final(db)) =>
+                if n.class(db).is_final(db) =>
             {
                 visitor.visit((self, other), || {
                     any_protocol_members_absent_or_disjoint(db, protocol, nominal, visitor)
@@ -2338,25 +2334,21 @@ impl<'db> Type<'db> {
 
             (Type::SpecialForm(special_form), Type::NominalInstance(instance))
             | (Type::NominalInstance(instance), Type::SpecialForm(special_form)) => {
-                instance.class(db).when_some_and(db, |class| {
-                    C::from_bool(db, !special_form.is_instance_of(db, class))
-                })
+                C::from_bool(db, !special_form.is_instance_of(db, instance.class(db)))
             }
 
             (Type::KnownInstance(known_instance), Type::NominalInstance(instance))
             | (Type::NominalInstance(instance), Type::KnownInstance(known_instance)) => {
-                instance.class(db).when_some_and(db, |class| {
-                    C::from_bool(db, !known_instance.is_instance_of(db, class))
-                })
+                C::from_bool(db, !known_instance.is_instance_of(db, instance.class(db)))
             }
 
             (Type::BooleanLiteral(..) | Type::TypeIs(_), Type::NominalInstance(instance))
             | (Type::NominalInstance(instance), Type::BooleanLiteral(..) | Type::TypeIs(_)) => {
                 // A `Type::BooleanLiteral()` must be an instance of exactly `bool`
                 // (it cannot be an instance of a `bool` subclass)
-                instance.class(db).when_some_and(db, |class| {
-                    KnownClass::Bool.when_subclass_of::<C>(db, class).negate(db)
-                })
+                KnownClass::Bool
+                    .when_subclass_of::<C>(db, instance.class(db))
+                    .negate(db)
             }
 
             (Type::BooleanLiteral(..) | Type::TypeIs(_), _)
@@ -2366,9 +2358,9 @@ impl<'db> Type<'db> {
             | (Type::NominalInstance(instance), Type::IntLiteral(..)) => {
                 // A `Type::IntLiteral()` must be an instance of exactly `int`
                 // (it cannot be an instance of an `int` subclass)
-                instance.class(db).when_some_and(db, |class| {
-                    KnownClass::Int.when_subclass_of::<C>(db, class).negate(db)
-                })
+                KnownClass::Int
+                    .when_subclass_of::<C>(db, instance.class(db))
+                    .negate(db)
             }
 
             (Type::IntLiteral(..), _) | (_, Type::IntLiteral(..)) => C::always_satisfiable(db),
@@ -2380,9 +2372,9 @@ impl<'db> Type<'db> {
             | (Type::NominalInstance(instance), Type::StringLiteral(..) | Type::LiteralString) => {
                 // A `Type::StringLiteral()` or a `Type::LiteralString` must be an instance of exactly `str`
                 // (it cannot be an instance of a `str` subclass)
-                instance.class(db).when_some_and(db, |class| {
-                    KnownClass::Str.when_subclass_of::<C>(db, class).negate(db)
-                })
+                KnownClass::Str
+                    .when_subclass_of::<C>(db, instance.class(db))
+                    .negate(db)
             }
 
             (Type::LiteralString, Type::LiteralString) => C::unsatisfiable(db),
@@ -2392,11 +2384,9 @@ impl<'db> Type<'db> {
             | (Type::NominalInstance(instance), Type::BytesLiteral(..)) => {
                 // A `Type::BytesLiteral()` must be an instance of exactly `bytes`
                 // (it cannot be an instance of a `bytes` subclass)
-                instance.class(db).when_some_and(db, |class| {
-                    KnownClass::Bytes
-                        .when_subclass_of::<C>(db, class)
-                        .negate(db)
-                })
+                KnownClass::Bytes
+                    .when_subclass_of::<C>(db, instance.class(db))
+                    .negate(db)
             }
 
             (Type::EnumLiteral(enum_literal), instance @ Type::NominalInstance(_))
@@ -2428,11 +2418,9 @@ impl<'db> Type<'db> {
             | (Type::NominalInstance(instance), Type::FunctionLiteral(..)) => {
                 // A `Type::FunctionLiteral()` must be an instance of exactly `types.FunctionType`
                 // (it cannot be an instance of a `types.FunctionType` subclass)
-                instance.class(db).when_some_and(db, |class| {
-                    KnownClass::FunctionType
-                        .when_subclass_of::<C>(db, class)
-                        .negate(db)
-                })
+                KnownClass::FunctionType
+                    .when_subclass_of::<C>(db, instance.class(db))
+                    .negate(db)
             }
 
             (Type::BoundMethod(_), other) | (other, Type::BoundMethod(_)) => KnownClass::MethodType
@@ -2484,7 +2472,7 @@ impl<'db> Type<'db> {
             | (
                 instance @ Type::NominalInstance(nominal),
                 Type::Callable(_) | Type::DataclassDecorator(_) | Type::DataclassTransformer(_),
-            ) if nominal.class(db).is_some_and(|class| class.is_final(db)) => instance
+            ) if nominal.class(db).is_final(db) => instance
                 .member_lookup_with_policy(
                     db,
                     Name::new_static("__call__"),
@@ -2953,10 +2941,7 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(_) | Type::Never => Place::bound(self).into(),
 
-            Type::NominalInstance(instance) => match instance.class(db) {
-                Some(class) => class.instance_member(db, name),
-                None => Place::Unbound.into(),
-            },
+            Type::NominalInstance(instance) => instance.class(db).instance_member(db, name),
 
             Type::ProtocolInstance(protocol) => protocol.instance_member(db, name),
 
@@ -5243,7 +5228,7 @@ impl<'db> Type<'db> {
 
         match self {
             Type::NominalInstance(instance) => {
-                instance.class(db)?.iter_mro(db).find_map(from_class_base)
+                instance.class(db).iter_mro(db).find_map(from_class_base)
             }
             Type::ProtocolInstance(instance) => {
                 if let Protocol::FromClass(class) = instance.inner {
@@ -6380,7 +6365,7 @@ impl<'db> Type<'db> {
             }
             Self::GenericAlias(alias) => Some(TypeDefinition::Class(alias.definition(db))),
             Self::NominalInstance(instance) => {
-                Some(TypeDefinition::Class(instance.class(db)?.definition(db)))
+                Some(TypeDefinition::Class(instance.class(db).definition(db)))
             }
             Self::KnownInstance(instance) => match instance {
                 KnownInstanceType::TypeVar(var) => {
@@ -6504,7 +6489,7 @@ impl<'db> Type<'db> {
         match self {
             Type::GenericAlias(generic) => Some(generic.origin(db)),
             Type::NominalInstance(instance) => {
-                if let Some(ClassType::Generic(generic)) = instance.class(db) {
+                if let ClassType::Generic(generic) = instance.class(db) {
                     Some(generic.origin(db))
                 } else {
                     None
@@ -10497,10 +10482,7 @@ impl<'db> SuperOwnerKind<'db> {
                 Either::Left(ClassBase::Dynamic(dynamic).mro(db, None))
             }
             SuperOwnerKind::Class(class) => Either::Right(class.iter_mro(db)),
-            SuperOwnerKind::Instance(instance) => match instance.class(db) {
-                Some(class) => Either::Right(class.iter_mro(db)),
-                None => Either::Left(ClassBase::Dynamic(DynamicType::Unknown).mro(db, None)),
-            },
+            SuperOwnerKind::Instance(instance) => Either::Right(instance.class(db).iter_mro(db)),
         }
     }
 
@@ -10516,7 +10498,7 @@ impl<'db> SuperOwnerKind<'db> {
         match self {
             SuperOwnerKind::Dynamic(_) => None,
             SuperOwnerKind::Class(class) => Some(class),
-            SuperOwnerKind::Instance(instance) => instance.class(db),
+            SuperOwnerKind::Instance(instance) => Some(instance.class(db)),
         }
     }
 
@@ -10736,10 +10718,7 @@ impl<'db> BoundSuperType<'db> {
                     .expect("Calling `find_name_in_mro` on dynamic type should return `Some`");
             }
             SuperOwnerKind::Class(class) => class,
-            SuperOwnerKind::Instance(instance) => match instance.class(db) {
-                Some(class) => class,
-                None => return Place::Unbound.into(),
-            },
+            SuperOwnerKind::Instance(instance) => instance.class(db),
         };
 
         let (class_literal, _) = class.class_literal(db);

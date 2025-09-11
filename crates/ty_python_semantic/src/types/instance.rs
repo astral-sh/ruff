@@ -181,35 +181,41 @@ pub(super) fn walk_nominal_instance_type<'db, V: super::visitor::TypeVisitor<'db
     nominal: NominalInstanceType<'db>,
     visitor: &V,
 ) {
-    let Some(class) = nominal.class(db) else {
-        return;
-    };
-    visitor.visit_type(db, class.into());
+    visitor.visit_type(db, nominal.class(db).into());
 }
 
 impl<'db> NominalInstanceType<'db> {
-    pub(super) fn class(&self, db: &'db dyn Db) -> Option<ClassType<'db>> {
+    pub(super) fn class(&self, db: &'db dyn Db) -> ClassType<'db> {
         match self.0 {
-            NominalInstanceInner::ExactTuple(tuple) => Some(tuple.to_class_type(db)),
-            NominalInstanceInner::NonTuple(class) => Some(class),
+            NominalInstanceInner::ExactTuple(tuple) => tuple.to_class_type(db),
+            NominalInstanceInner::NonTuple(class) => class,
             NominalInstanceInner::Object => KnownClass::Object
                 .try_to_class_literal(db)
-                .map(|class_literal| class_literal.default_specialization(db)),
+                .expect("Typeshed should always have a `object` class in `builtins.pyi`")
+                .default_specialization(db),
         }
     }
 
-    pub(super) fn class_literal(&self, db: &'db dyn Db) -> Option<ClassLiteral<'db>> {
+    pub(super) fn class_literal(&self, db: &'db dyn Db) -> ClassLiteral<'db> {
         let class = match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => tuple.to_class_type(db),
             NominalInstanceInner::NonTuple(class) => class,
-            NominalInstanceInner::Object => return KnownClass::Object.try_to_class_literal(db),
+            NominalInstanceInner::Object => {
+                return KnownClass::Object
+                    .try_to_class_literal(db)
+                    .expect("Typeshed should always have a `object` class in `builtins.pyi`");
+            }
         };
         let (class_literal, _) = class.class_literal(db);
-        Some(class_literal)
+        class_literal
     }
 
     pub(super) fn known_class(&self, db: &'db dyn Db) -> Option<KnownClass> {
-        self.class(db).and_then(|class| class.known(db))
+        match self.0 {
+            NominalInstanceInner::ExactTuple(_) => Some(KnownClass::Tuple),
+            NominalInstanceInner::NonTuple(class) => class.known(db),
+            NominalInstanceInner::Object => Some(KnownClass::Object),
+        }
     }
 
     pub(super) fn has_known_class(&self, db: &'db dyn Db, known_class: KnownClass) -> bool {
@@ -352,12 +358,8 @@ impl<'db> NominalInstanceType<'db> {
             return tuple1.has_relation_to_impl(db, tuple2, relation, visitor);
         }
 
-        match (self.class(db), other.class(db)) {
-            (Some(self_class), Some(other_class)) => {
-                self_class.has_relation_to_impl(db, other_class, relation, visitor)
-            }
-            _ => C::unsatisfiable(db),
-        }
+        self.class(db)
+            .has_relation_to_impl(db, other.class(db), relation, visitor)
     }
 
     pub(super) fn is_equivalent_to_impl<C: Constraints<'db>>(
@@ -374,10 +376,7 @@ impl<'db> NominalInstanceType<'db> {
             (
                 NominalInstanceInner::Object | NominalInstanceInner::NonTuple(_),
                 NominalInstanceInner::Object | NominalInstanceInner::NonTuple(_),
-            ) => match (self.class(db), other.class(db)) {
-                (Some(class1), Some(class2)) => class1.is_equivalent_to_impl(db, class2, visitor),
-                _ => C::unsatisfiable(db),
-            },
+            ) => (self.class(db)).is_equivalent_to_impl(db, other.class(db), visitor),
             _ => C::unsatisfiable(db),
         }
     }
@@ -397,13 +396,14 @@ impl<'db> NominalInstanceType<'db> {
                 }
             }
         }
-        if let (Some(self_class), Some(other_class)) = (self.class(db), other.class(db)) {
-            result.union(
+        result.or(db, || {
+            C::from_bool(
                 db,
-                C::from_bool(db, !self_class.could_coexist_in_mro_with(db, other_class)),
-            );
-        }
-        result
+                !self
+                    .class(db)
+                    .could_coexist_in_mro_with(db, other.class(db)),
+            )
+        })
     }
 
     pub(super) fn is_singleton(self, db: &'db dyn Db) -> bool {
@@ -434,9 +434,7 @@ impl<'db> NominalInstanceType<'db> {
     }
 
     pub(super) fn to_meta_type(self, db: &'db dyn Db) -> Type<'db> {
-        self.class(db)
-            .map(|class| SubclassOfType::from(db, class))
-            .unwrap_or_else(SubclassOfType::subclass_of_unknown)
+        SubclassOfType::from(db, self.class(db))
     }
 
     pub(super) fn apply_type_mapping_impl<'a>(
@@ -514,9 +512,7 @@ pub(crate) struct SliceLiteral {
 
 impl<'db> VarianceInferable<'db> for NominalInstanceType<'db> {
     fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
-        self.class(db)
-            .map(|class| class.variance_of(db, typevar))
-            .unwrap_or(TypeVarVariance::Bivariant)
+        self.class(db).variance_of(db, typevar)
     }
 }
 

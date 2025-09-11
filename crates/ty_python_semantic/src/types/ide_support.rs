@@ -95,9 +95,7 @@ impl<'db> AllMembers<'db> {
             ),
 
             Type::NominalInstance(instance) => {
-                if let Some(class_literal) = instance.class_literal(db) {
-                    self.extend_with_instance_members(db, ty, class_literal);
-                }
+                self.extend_with_instance_members(db, ty, instance.class_literal(db));
             }
 
             Type::ClassLiteral(class_literal) if class_literal.is_typed_dict(db) => {

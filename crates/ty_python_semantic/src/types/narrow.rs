@@ -565,16 +565,11 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     }
                     // Treat enums as a union of their members.
                     Type::NominalInstance(instance)
-                        if instance
-                            .class_literal(db)
-                            .and_then(|class| enum_metadata(db, class))
-                            .is_some() =>
+                        if enum_metadata(db, instance.class_literal(db)).is_some() =>
                     {
                         UnionType::from_elements(
                             db,
-                            instance
-                                .class_literal(db)
-                                .and_then(|class| enum_member_literals(db, class, None))
+                            enum_member_literals(db, instance.class_literal(db), None)
                                 .expect("Calling `enum_member_literals` on an enum class")
                                 .map(|ty| filter_to_cannot_be_equal(db, ty, rhs_ty)),
                         )
