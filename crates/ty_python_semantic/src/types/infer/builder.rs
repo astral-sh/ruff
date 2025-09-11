@@ -5199,23 +5199,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             parenthesized: _,
         } = tuple;
 
-        let divergent_marker = Type::divergent(self.scope());
-        let mut divergent = None;
-        let mut element_types = Vec::with_capacity(elts.len());
-        for element in elts {
+        let db = self.db();
+        let divergent = Type::divergent(self.scope());
+        let element_types = elts.iter().map(|element| {
             let element_type = self.infer_expression(element);
-            if element_type.has_divergent_type(self.db(), divergent_marker) {
-                divergent = Some(element_type);
-                break;
+            if element_type.has_divergent_type(self.db(), divergent) {
+                divergent
+            } else {
+                element_type
             }
-            element_types.push(element_type);
-        }
+        });
 
-        if let Some(divergent) = divergent {
-            divergent
-        } else {
-            Type::heterogeneous_tuple(self.db(), element_types)
-        }
+        Type::heterogeneous_tuple(db, element_types)
     }
 
     fn infer_list_expression(&mut self, list: &ast::ExprList) -> Type<'db> {

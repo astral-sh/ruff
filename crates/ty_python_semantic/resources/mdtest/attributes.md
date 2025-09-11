@@ -2424,9 +2424,9 @@ reveal_type(Answer.__members__)  # revealed: MappingProxyType[str, Unknown]
 ```py
 class C:
     def f(self, other: "C"):
-        self.x = (other.x,)
+        self.x = (other.x, 1)
 
-reveal_type((C().x,))  # revealed: tuple[Unknown | Divergent]
+reveal_type(C().x)  # revealed: Unknown | tuple[Divergent, Literal[1]]
 ```
 
 ## References
