@@ -412,6 +412,10 @@ mod tests {
             })
         }
 
+        fn with_extra_file(&mut self, file_name: &str, content: &str) {
+            self.db.write_file(file_name, content).unwrap();
+        }
+
         /// Returns the inlay hints for the given test case with custom settings.
         fn inlay_hints_with_settings(&self, settings: &InlayHintSettings) -> String {
             let hints = inlay_hints(&self.db, self.file, self.range, settings);
@@ -1295,64 +1299,34 @@ mod tests {
     }
 
     #[test]
-    fn test_generic_function_calls() {
-        let test = inlay_hint_test(
+    fn test_function_calls_different_file() {
+        let mut test = inlay_hint_test(
             "
-            from typing import TypeVar, Generic
+            from foo import bar
 
-            T = TypeVar('T')
+            bar(1)",
+        );
 
-            def identity(x: T) -> T:
-                return x
-
-            identity(42)
-            identity('hello')",
+        test.with_extra_file(
+            "foo.py",
+            "
+        def bar(x: int | str):
+            pass",
         );
 
         assert_snapshot!(test.inlay_hints(), @r"
-        from typing import TypeVar, Generic
+        from foo import bar
 
-        T[: typing.TypeVar] = TypeVar([name=]'T')
-
-        def identity(x: T) -> T:
-            return x
-
-        identity([x=]42)
-        identity([x=]'hello')
+        bar([x=]1)
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/typing.pyi:278:13
-            |
-        276 |         def __new__(
-        277 |             cls,
-        278 |             name: str,
-            |             ^^^^
-        279 |             *constraints: Any,  # AnnotationForm
-        280 |             bound: Any | None = None,  # AnnotationForm
-            |
-        info: For inlay hint label 'name' at 68..72
-
-        info[inlay-hint-location]: Inlay Hint Target
-         --> main.py:6:14
+         --> foo.py:2:17
           |
-        4 | T = TypeVar('T')
-        5 |
-        6 | def identity(x: T) -> T:
-          |              ^
-        7 |     return x
+        2 |         def bar(x: int | str):
+          |                 ^
+        3 |             pass
           |
-        info: For inlay hint label 'x' at 129..130
-
-        info[inlay-hint-location]: Inlay Hint Target
-         --> main.py:6:14
-          |
-        4 | T = TypeVar('T')
-        5 |
-        6 | def identity(x: T) -> T:
-          |              ^
-        7 |     return x
-          |
-        info: For inlay hint label 'x' at 146..147
+        info: For inlay hint label 'x' at 26..27
         ");
     }
 
