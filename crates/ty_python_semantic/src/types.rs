@@ -1444,6 +1444,8 @@ impl<'db> Type<'db> {
         if premises.is_always_satisfied(db) {
             return when;
         }
+        eprintln!("==> premises {}", premises.display(db));
+        eprintln!(" -> when     {}", when.display(db));
         (premises.clone()).equivalent_to(db, premises.implies(db, || when))
     }
 

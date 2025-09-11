@@ -1036,6 +1036,23 @@ impl<'db> Constraint<'db> {
     ///
     /// Panics if `lower` and `upper` are not both fully static.
     fn range(db: &'db dyn Db, lower: Type<'db>, upper: Type<'db>) -> Satisfiable<Constraint<'db>> {
+        eprintln!(
+            "==> range {}/{} .. {}/{}",
+            lower.display(db),
+            lower.bottom_materialization(db).display(db),
+            upper.display(db),
+            upper.top_materialization(db).display(db),
+        );
+        debug_assert!(
+            !matches!(lower, Type::Dynamic(_)),
+            "{} is not fully static",
+            lower.display(db)
+        );
+        debug_assert!(
+            !matches!(upper, Type::Dynamic(_)),
+            "{} is not fully static",
+            upper.display(db)
+        );
         debug_assert_eq!(
             lower,
             lower.bottom_materialization(db),
@@ -1180,6 +1197,15 @@ impl<'db> RangeConstraint<'db> {
         typevar: BoundTypeVarInstance<'db>,
         set: &mut ConstraintSet<'db>,
     ) {
+        /*
+        eprintln!(
+            "==> ¬({} ≤ {} ≤ {})",
+            self.lower.display(db),
+            typevar.display(db),
+            self.upper.display(db)
+        );
+        */
+
         // Lower bound:
         // ¬(s ≤ α) = ((α ≤ s) ∧ α ≠ s) ∨ (a ≁ s)
         set.union_clause(
@@ -1199,6 +1225,8 @@ impl<'db> RangeConstraint<'db> {
 
         // Upper bound:
         // ¬(α ≤ t) = ((t ≤ α) ∧ α ≠ t) ∨ (a ≁ t)
+        eprintln!("==> what {}", self.upper.display(db));
+        eprintln!("==> what {}", Type::object(db).display(db));
         set.union_clause(
             db,
             ConstraintClause::from_constraints(

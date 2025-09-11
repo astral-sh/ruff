@@ -4362,6 +4362,7 @@ impl KnownClass {
     pub(crate) fn to_class_literal(self, db: &dyn Db) -> Type<'_> {
         self.try_to_class_literal(db)
             .map(Type::ClassLiteral)
+            .inspect(|_| eprintln!("==> a {:?}", self))
             .unwrap_or_else(Type::unknown)
     }
 
