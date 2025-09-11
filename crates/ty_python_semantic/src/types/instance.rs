@@ -203,6 +203,8 @@ impl<'db> NominalInstanceType<'db> {
         class_literal
     }
 
+    /// Returns the [`KnownClass`] that this is a nominal instance of, or `None` if it is not an
+    /// instance of a known class.
     pub(super) fn known_class(&self, db: &'db dyn Db) -> Option<KnownClass> {
         match self.0 {
             NominalInstanceInner::ExactTuple(_) => Some(KnownClass::Tuple),
@@ -211,6 +213,7 @@ impl<'db> NominalInstanceType<'db> {
         }
     }
 
+    /// Returns whether this is a nominal instance of a particular [`KnownClass`].
     pub(super) fn has_known_class(&self, db: &'db dyn Db, known_class: KnownClass) -> bool {
         self.known_class(db) == Some(known_class)
     }
@@ -363,7 +366,9 @@ impl<'db> NominalInstanceType<'db> {
                 NominalInstanceInner::ExactTuple(tuple1),
                 NominalInstanceInner::ExactTuple(tuple2),
             ) => tuple1.is_equivalent_to_impl(db, tuple2, visitor),
-            (NominalInstanceInner::Object, NominalInstanceInner::Object) => C::always_satisfiable(db),
+            (NominalInstanceInner::Object, NominalInstanceInner::Object) => {
+                C::always_satisfiable(db)
+            }
             (NominalInstanceInner::NonTuple(class1), NominalInstanceInner::NonTuple(class2)) => {
                 class1.is_equivalent_to_impl(db, class2, visitor)
             }
