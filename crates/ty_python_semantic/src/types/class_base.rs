@@ -81,7 +81,9 @@ impl<'db> ClassBase<'db> {
             Type::Dynamic(dynamic) => Some(Self::Dynamic(dynamic)),
             Type::ClassLiteral(literal) => Some(Self::Class(literal.default_specialization(db))),
             Type::GenericAlias(generic) => Some(Self::Class(ClassType::Generic(generic))),
-            Type::NominalInstance(instance) if instance.is_known(db, KnownClass::GenericAlias) => {
+            Type::NominalInstance(instance)
+                if instance.has_known_class(db, KnownClass::GenericAlias) =>
+            {
                 Self::try_from_type(db, todo_type!("GenericAlias instance"), subclass)
             }
             Type::SubclassOf(subclass_of) => subclass_of

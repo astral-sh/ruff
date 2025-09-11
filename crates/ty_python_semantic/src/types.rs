@@ -777,12 +777,12 @@ impl<'db> Type<'db> {
 
     fn is_none(&self, db: &'db dyn Db) -> bool {
         self.into_nominal_instance()
-            .is_some_and(|instance| instance.is_known(db, KnownClass::NoneType))
+            .is_some_and(|instance| instance.has_known_class(db, KnownClass::NoneType))
     }
 
     fn is_bool(&self, db: &'db dyn Db) -> bool {
         self.into_nominal_instance()
-            .is_some_and(|instance| instance.is_known(db, KnownClass::Bool))
+            .is_some_and(|instance| instance.has_known_class(db, KnownClass::Bool))
     }
 
     fn is_enum(&self, db: &'db dyn Db) -> bool {
@@ -817,7 +817,7 @@ impl<'db> Type<'db> {
 
     pub(crate) fn is_notimplemented(&self, db: &'db dyn Db) -> bool {
         self.into_nominal_instance()
-            .is_some_and(|instance| instance.is_known(db, KnownClass::NotImplementedType))
+            .is_some_and(|instance| instance.has_known_class(db, KnownClass::NotImplementedType))
     }
 
     pub(crate) const fn is_todo(&self) -> bool {
@@ -2834,7 +2834,7 @@ impl<'db> Type<'db> {
             // i.e. Type::NominalInstance(type). So looking up a name in the MRO of
             // `Type::NominalInstance(type)` is equivalent to looking up the name in the
             // MRO of the class `object`.
-            Type::NominalInstance(instance) if instance.is_known(db, KnownClass::Type) => {
+            Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Type) => {
                 if policy.mro_no_object_fallback() {
                     Some(Place::Unbound.into())
                 } else {
@@ -3477,7 +3477,7 @@ impl<'db> Type<'db> {
 
             Type::NominalInstance(instance)
                 if matches!(name.as_str(), "major" | "minor")
-                    && instance.is_known(db, KnownClass::VersionInfo) =>
+                    && instance.has_known_class(db, KnownClass::VersionInfo) =>
             {
                 let python_version = Program::get(db).python_version(db);
                 let segment = if name == "major" {
@@ -3572,7 +3572,7 @@ impl<'db> Type<'db> {
                     // resolve the attribute.
                     if matches!(
                         self.into_nominal_instance()
-                            .and_then(|instance| instance.known(db)),
+                            .and_then(|instance| instance.known_class(db)),
                         Some(KnownClass::ModuleType | KnownClass::GenericAlias)
                     ) {
                         return Place::Unbound.into();
@@ -3901,7 +3901,7 @@ impl<'db> Type<'db> {
             Type::TypeVar(_) => Truthiness::Ambiguous,
 
             Type::NominalInstance(instance) => instance
-                .known(db)
+                .known_class(db)
                 .and_then(KnownClass::bool)
                 .map(Ok)
                 .unwrap_or_else(try_dunder_bool)?,
@@ -5781,7 +5781,7 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(_) => Ok(*self),
 
-            Type::NominalInstance(instance) => match instance.known(db) {
+            Type::NominalInstance(instance) => match instance.known_class(db) {
                 Some(KnownClass::TypeVar) => Ok(todo_type!(
                     "Support for `typing.TypeVar` instances in type expressions"
                 )),

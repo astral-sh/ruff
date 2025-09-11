@@ -212,7 +212,7 @@ impl<'db> AllMembers<'db> {
                         match ty {
                             Type::NominalInstance(instance)
                                 if matches!(
-                                    instance.known(db),
+                                    instance.known_class(db),
                                     Some(
                                         KnownClass::TypeVar
                                             | KnownClass::TypeVarTuple

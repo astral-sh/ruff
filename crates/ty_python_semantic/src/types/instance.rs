@@ -213,7 +213,7 @@ impl<'db> NominalInstanceType<'db> {
     }
 
     pub(super) fn has_known_class(&self, db: &'db dyn Db, known_class: KnownClass) -> bool {
-        self.known(db) == Some(known_class)
+        self.known_class(db) == Some(known_class)
     }
 
     /// If this is an instance type where the class has a tuple spec, returns the tuple spec.
@@ -307,7 +307,9 @@ impl<'db> NominalInstanceType<'db> {
         let to_u32 = |ty: &Type<'db>| match ty {
             Type::IntLiteral(n) => i32::try_from(*n).map(Some).ok(),
             Type::BooleanLiteral(b) => Some(Some(i32::from(*b))),
-            Type::NominalInstance(instance) if instance.is_known(db, KnownClass::NoneType) => {
+            Type::NominalInstance(instance)
+                if instance.has_known_class(db, KnownClass::NoneType) =>
+            {
                 Some(None)
             }
             _ => None,

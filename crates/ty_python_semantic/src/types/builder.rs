@@ -863,7 +863,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
             _ => {
                 let known_instance = new_positive
                     .into_nominal_instance()
-                    .and_then(|instance| instance.known(db));
+                    .and_then(|instance| instance.known_class(db));
 
                 if known_instance == Some(KnownClass::Object) {
                     // `object & T` -> `T`; it is always redundant to add `object` to an intersection
@@ -883,7 +883,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                             new_positive = Type::BooleanLiteral(false);
                         }
                         Type::NominalInstance(instance)
-                            if instance.is_known(db, KnownClass::Bool) =>
+                            if instance.has_known_class(db, KnownClass::Bool) =>
                         {
                             match new_positive {
                                 // `bool & AlwaysTruthy` -> `Literal[True]`
@@ -977,7 +977,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
             self.positive
                 .iter()
                 .filter_map(|ty| ty.into_nominal_instance())
-                .filter_map(|instance| instance.known(db))
+                .filter_map(|instance| instance.known_class(db))
                 .any(KnownClass::is_bool)
         };
 

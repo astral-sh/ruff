@@ -1236,7 +1236,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Type::BooleanLiteral(_) | Type::IntLiteral(_) => {}
             Type::NominalInstance(instance)
                 if matches!(
-                    instance.class(self.db()).known(self.db()),
+                    instance.known_class(self.db()),
                     Some(KnownClass::Float | KnownClass::Int | KnownClass::Bool)
                 ) => {}
             _ => return false,
@@ -3402,9 +3402,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ),
 
             // Super instances do not allow attribute assignment
-            Type::NominalInstance(instance)
-                if instance.class(db).is_known(db, KnownClass::Super) =>
-            {
+            Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Super) => {
                 if emit_diagnostics {
                     if let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target) {
                         builder.into_diagnostic(format_args!(
@@ -7544,10 +7542,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // We didn't see any positive elements, check if the operation is supported on `object`:
                 match intersection_on {
                     IntersectionOn::Left => {
-                        self.infer_binary_type_comparison(Type::object(self.db()), op, other, range)
+                        self.infer_binary_type_comparison(Type::object(), op, other, range)
                     }
                     IntersectionOn::Right => {
-                        self.infer_binary_type_comparison(other, op, Type::object(self.db()), range)
+                        self.infer_binary_type_comparison(other, op, Type::object(), range)
                     }
                 }
             }
@@ -8718,7 +8716,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 } else if any_over_type(self.db(), *typevar, &|ty| match ty {
                     Type::Dynamic(DynamicType::TodoUnpack) => true,
                     Type::NominalInstance(nominal) => matches!(
-                        nominal.class(self.db()).known(self.db()),
+                        nominal.known_class(self.db()),
                         Some(KnownClass::TypeVarTuple | KnownClass::ParamSpec)
                     ),
                     _ => false,
@@ -8761,9 +8759,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let type_to_slice_argument = |ty: Option<Type<'db>>| match ty {
             Some(ty @ (Type::IntLiteral(_) | Type::BooleanLiteral(_))) => SliceArg::Arg(ty),
             Some(ty @ Type::NominalInstance(instance))
-                if instance
-                    .class(self.db())
-                    .is_known(self.db(), KnownClass::NoneType) =>
+                if instance.has_known_class(self.db(), KnownClass::NoneType) =>
             {
                 SliceArg::Arg(ty)
             }
