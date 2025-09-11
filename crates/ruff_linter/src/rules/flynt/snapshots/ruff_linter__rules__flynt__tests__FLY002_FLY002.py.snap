@@ -126,39 +126,38 @@ help: Replace with `f"{secrets.token_urlsafe()}a{secrets.token_hex()}"`
 note: This is an unsafe fix and may change runtime behavior
 
 FLY002 [*] Consider f-string instead of string join
-  --> FLY002.py:19:8
+  --> FLY002.py:20:8
    |
-17 | nok6 = "a".join(x for x in "feefoofum")  # Not OK (generator)
 18 | nok7 = "a".join([f"foo{8}", "bar"])  # Not OK (contains an f-string)
-19 | nok8 = '\n'.join([r'line1','line2']) # https://github.com/astral-sh/ruff/issues/19887
+19 | # https://github.com/astral-sh/ruff/issues/19887
+20 | nok8 = '\n'.join([r'line1','line2'])
    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-20 |
-21 | # Regression test for: https://github.com/astral-sh/ruff/issues/7197
+21 | nok9 = '\n'.join([r"raw string", '<""">', "<'''>"])  # Not OK (both triple-quote delimiters appear; should bail)
    |
 help: Replace with f-string
-16 | nok5 = "a".join([choice("flarp")])  # Not OK (not a simple call)
 17 | nok6 = "a".join(x for x in "feefoofum")  # Not OK (generator)
 18 | nok7 = "a".join([f"foo{8}", "bar"])  # Not OK (contains an f-string)
-   - nok8 = '\n'.join([r'line1','line2']) # https://github.com/astral-sh/ruff/issues/19887
-19 + nok8 = r'''line1
-20 + line2''' # https://github.com/astral-sh/ruff/issues/19887
-21 | 
-22 | # Regression test for: https://github.com/astral-sh/ruff/issues/7197
-23 | def create_file_public_url(url, filename):
+19 | # https://github.com/astral-sh/ruff/issues/19887
+   - nok8 = '\n'.join([r'line1','line2'])
+20 + nok8 = r'''line1
+21 + line2'''
+22 | nok9 = '\n'.join([r"raw string", '<""">', "<'''>"])  # Not OK (both triple-quote delimiters appear; should bail)
+23 | 
+24 | # Regression test for: https://github.com/astral-sh/ruff/issues/7197
 note: This is an unsafe fix and may change runtime behavior
 
 FLY002 [*] Consider `f"{url}{filename}"` instead of string join
-  --> FLY002.py:23:11
+  --> FLY002.py:25:11
    |
-21 | # Regression test for: https://github.com/astral-sh/ruff/issues/7197
-22 | def create_file_public_url(url, filename):
-23 |     return''.join([url, filename])
+23 | # Regression test for: https://github.com/astral-sh/ruff/issues/7197
+24 | def create_file_public_url(url, filename):
+25 |     return''.join([url, filename])
    |           ^^^^^^^^^^^^^^^^^^^^^^^^
    |
 help: Replace with `f"{url}{filename}"`
-20 | 
-21 | # Regression test for: https://github.com/astral-sh/ruff/issues/7197
-22 | def create_file_public_url(url, filename):
+22 | 
+23 | # Regression test for: https://github.com/astral-sh/ruff/issues/7197
+24 | def create_file_public_url(url, filename):
    -     return''.join([url, filename])
-23 +     return f"{url}{filename}"
+25 +     return f"{url}{filename}"
 note: This is an unsafe fix and may change runtime behavior

@@ -94,18 +94,13 @@ fn build_fstring(joiner: &str, joinees: &[Expr], flags: FStringFlags) -> Option<
         if flags.prefix().is_raw() && (content.contains('\n') || content.contains('\r')) {
             flags = flags.with_triple_quotes(ruff_python_ast::str::TripleQuotes::Yes);
 
-            // Ensure we pick a safe triple-quote delimiter that doesn't occur in the content.
-            let quote = flags.quote_style();
-            match quote {
-                ruff_python_ast::str::Quote::Single => {
-                    if content.contains("'''") {
-                        flags = flags.with_quote_style(ruff_python_ast::str::Quote::Double);
-                    }
-                }
-                ruff_python_ast::str::Quote::Double => {
-                    if content.contains("\"\"\"") {
-                        flags = flags.with_quote_style(ruff_python_ast::str::Quote::Single);
-                    }
+            // Prefer a delimiter that doesn't occur in the content; if both occur, bail.
+            if content.contains(flags.quote_str()) {
+                flags = flags.with_quote_style(flags.quote_style().opposite());
+                if content.contains(flags.quote_str()) {
+                    // Both "'''" and "\"\"\"" are present in content; avoid emitting
+                    // an invalid raw triple-quoted literal (or escaping). Bail on the fix.
+                    return None;
                 }
             }
         }
