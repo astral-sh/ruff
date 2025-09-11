@@ -111,7 +111,7 @@ fn incomparable<'db>(db: &'db dyn Db, left: Type<'db>, right: Type<'db>) -> bool
 }
 
 /// Encodes the constraints under which a type property (e.g. assignability) holds.
-pub(crate) trait Constraints<'db>: Clone + Sized + Debug {
+pub(crate) trait Constraints<'db>: Clone + Sized + std::fmt::Debug {
     /// Returns a constraint set that never holds
     fn unsatisfiable(db: &'db dyn Db) -> Self;
 
