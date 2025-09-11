@@ -387,19 +387,20 @@ impl<'db> InferenceRegion<'db> {
     }
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, get_size2::GetSize)]
-enum CycleRecovery {
+#[derive(Debug, Clone, Copy, Eq, PartialEq, get_size2::GetSize, salsa::Update)]
+enum CycleRecovery<'db> {
     /// An initial-value for fixpoint iteration; all types are `Type::Never`.
     Initial,
     /// A divergence-fallback value for fixpoint iteration; all types are `Divergent`.
-    Divergent,
+    Divergent(ScopeId<'db>),
 }
 
-impl CycleRecovery {
-    fn merge(self, other: Option<CycleRecovery>) -> CycleRecovery {
+impl<'db> CycleRecovery<'db> {
+    fn merge(self, other: Option<CycleRecovery<'db>>) -> Self {
         if let Some(other) = other {
             match (self, other) {
-                (Self::Divergent, _) | (_, Self::Divergent) => Self::Divergent,
+                // It's important here that we keep the scope of `self` if merging two `Divergent`.
+                (Self::Divergent(scope), _) | (_, Self::Divergent(scope)) => Self::Divergent(scope),
                 _ => Self::Initial,
             }
         } else {
@@ -407,10 +408,10 @@ impl CycleRecovery {
         }
     }
 
-    fn fallback_type<'db>(self, scope_fn: impl FnOnce() -> ScopeId<'db>) -> Type<'db> {
+    fn fallback_type(self) -> Type<'db> {
         match self {
             Self::Initial => Type::Never,
-            Self::Divergent => Type::divergent(scope_fn()),
+            Self::Divergent(scope) => Type::divergent(scope),
         }
     }
 }
@@ -428,13 +429,10 @@ pub(crate) struct ScopeInference<'db> {
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::Update, Default)]
 struct ScopeInferenceExtra<'db> {
     /// Is this a cycle-recovery inference result, and if so, what kind?
-    cycle_recovery: Option<CycleRecovery>,
+    cycle_recovery: Option<CycleRecovery<'db>>,
 
     /// The diagnostics for this region.
     diagnostics: TypeCheckDiagnostics,
-
-    /// The scope for which this is an inference result, if we are a divergent cycle recovery.
-    scope: Option<ScopeId<'db>>,
 }
 
 impl<'db> ScopeInference<'db> {
@@ -470,12 +468,9 @@ impl<'db> ScopeInference<'db> {
     }
 
     fn fallback_type(&self) -> Option<Type<'db>> {
-        self.extra.as_ref().and_then(|extra| {
-            extra.cycle_recovery.map(|recovery| {
-                recovery
-                    .fallback_type(|| extra.scope.expect("Divergent inference should have scope"))
-            })
-        })
+        self.extra
+            .as_ref()
+            .and_then(|extra| extra.cycle_recovery.map(CycleRecovery::fallback_type))
     }
 }
 
@@ -509,7 +504,7 @@ pub(crate) struct DefinitionInference<'db> {
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::Update, Default)]
 struct DefinitionInferenceExtra<'db> {
     /// Is this a cycle-recovery inference result, and if so, what kind?
-    cycle_recovery: Option<CycleRecovery>,
+    cycle_recovery: Option<CycleRecovery<'db>>,
 
     /// The definitions that are deferred.
     deferred: Box<[Definition<'db>]>,
@@ -519,9 +514,6 @@ struct DefinitionInferenceExtra<'db> {
 
     /// For function definitions, the undecorated type of the function.
     undecorated_type: Option<Type<'db>>,
-
-    /// The scope this region is part of, if we are a divergent cycle recovery.
-    scope: Option<ScopeId<'db>>,
 }
 
 impl<'db> DefinitionInference<'db> {
@@ -605,12 +597,9 @@ impl<'db> DefinitionInference<'db> {
     }
 
     fn fallback_type(&self) -> Option<Type<'db>> {
-        self.extra.as_ref().and_then(|extra| {
-            extra.cycle_recovery.map(|recovery| {
-                recovery
-                    .fallback_type(|| extra.scope.expect("Divergent inference should have scope"))
-            })
-        })
+        self.extra
+            .as_ref()
+            .and_then(|extra| extra.cycle_recovery.map(CycleRecovery::fallback_type))
     }
 
     pub(crate) fn undecorated_type(&self) -> Option<Type<'db>> {
@@ -643,13 +632,10 @@ struct ExpressionInferenceExtra<'db> {
     diagnostics: TypeCheckDiagnostics,
 
     /// Is this a cycle recovery inference result, and if so, what kind?
-    cycle_recovery: Option<CycleRecovery>,
+    cycle_recovery: Option<CycleRecovery<'db>>,
 
     /// `true` if all places in this expression are definitely bound
     all_definitely_bound: bool,
-
-    /// The scope this region is part of (if we are a Divergent cycle recovery.)
-    scope: Option<ScopeId<'db>>,
 }
 
 impl<'db> ExpressionInference<'db> {
@@ -672,9 +658,8 @@ impl<'db> ExpressionInference<'db> {
         let _ = scope;
         Self {
             extra: Some(Box::new(ExpressionInferenceExtra {
-                cycle_recovery: Some(CycleRecovery::Divergent),
+                cycle_recovery: Some(CycleRecovery::Divergent(scope)),
                 all_definitely_bound: true,
-                scope: Some(scope),
                 ..ExpressionInferenceExtra::default()
             })),
             expressions: FxHashMap::default(),
@@ -700,12 +685,9 @@ impl<'db> ExpressionInference<'db> {
     }
 
     fn fallback_type(&self) -> Option<Type<'db>> {
-        self.extra.as_ref().and_then(|extra| {
-            extra.cycle_recovery.map(|recovery| {
-                recovery
-                    .fallback_type(|| extra.scope.expect("Divergent inference should have scope"))
-            })
-        })
+        self.extra
+            .as_ref()
+            .and_then(|extra| extra.cycle_recovery.map(CycleRecovery::fallback_type))
     }
 
     /// Returns true if all places in this expression are definitely bound.

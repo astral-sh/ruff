@@ -252,7 +252,7 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     undecorated_type: Option<Type<'db>>,
 
     /// Did we merge in a sub-region with a cycle-recovery fallback, and if so, what kind?
-    cycle_recovery: Option<CycleRecovery>,
+    cycle_recovery: Option<CycleRecovery<'db>>,
 
     /// `true` if all places in this expression are definitely bound
     all_definitely_bound: bool,
@@ -293,7 +293,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn extend_cycle_recovery(&mut self, other_recovery: Option<CycleRecovery>) {
+    fn extend_cycle_recovery(&mut self, other_recovery: Option<CycleRecovery<'db>>) {
         match &mut self.cycle_recovery {
             Some(recovery) => *recovery = recovery.merge(other_recovery),
             recovery @ None => *recovery = other_recovery,
@@ -301,8 +301,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn fallback_type(&self) -> Option<Type<'db>> {
-        self.cycle_recovery
-            .map(|recovery| recovery.fallback_type(|| self.scope))
+        self.cycle_recovery.map(CycleRecovery::fallback_type)
     }
 
     fn extend_definition(&mut self, inference: &DefinitionInference<'db>) {
@@ -8866,7 +8865,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     diagnostics,
                     cycle_recovery,
                     all_definitely_bound,
-                    scope: Some(scope),
                 })
             });
 
@@ -8915,7 +8913,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 deferred: deferred.into_boxed_slice(),
                 diagnostics,
                 undecorated_type,
-                scope: Some(scope),
             })
         });
 
@@ -8981,7 +8978,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Box::new(ScopeInferenceExtra {
                 cycle_recovery,
                 diagnostics,
-                scope: Some(scope),
             })
         });
 
