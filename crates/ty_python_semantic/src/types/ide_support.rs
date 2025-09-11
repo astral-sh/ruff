@@ -821,6 +821,7 @@ fn definition_parameter_offsets(
                 .map(|param| (param.name().to_string(), param.name().range()))
                 .collect(),
         ),
+        // Todo: lambda functions
         _ => None,
     }
 }
@@ -920,7 +921,13 @@ pub fn find_active_signature_from_details(
 
 #[derive(Default)]
 pub struct InlayHintFunctionArgumentDetails {
+    /// The file containing the signature derived from the [`ast::ExprCall`].
+    ///
+    /// This is [`None`] if the signature does not have a definition.
+    /// This should only happen if [`definition_parameter_offsets`] is incomplete.
     pub target_signature_file: Option<File>,
+
+    /// The position of the arguments mapped to their name and the range of the argument definition in the signature.
     pub argument_names: HashMap<usize, (String, Option<TextRange>)>,
 }
 

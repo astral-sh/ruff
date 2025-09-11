@@ -433,7 +433,6 @@ mod tests {
                     let label_length = part.text().len();
 
                     if let Some(target) = part.target() {
-                        println!("Target: {:?}", target);
                         let label_range = TextRange::new(
                             TextSize::try_from(end_position).unwrap(),
                             TextSize::try_from(end_position + label_length).unwrap(),
