@@ -9,10 +9,10 @@ use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use super::{
-    DefinitionInference, DefinitionInferenceExtra, ExpressionInference, ExpressionInferenceExtra,
-    InferenceRegion, ScopeInference, ScopeInferenceExtra, infer_deferred_types,
-    infer_definition_types, infer_expression_types, infer_same_file_expression_type,
-    infer_scope_types, infer_unpack_types,
+    CycleRecovery, DefinitionInference, DefinitionInferenceExtra, ExpressionInference,
+    ExpressionInferenceExtra, InferenceRegion, ScopeInference, ScopeInferenceExtra,
+    infer_deferred_types, infer_definition_types, infer_expression_types,
+    infer_same_file_expression_type, infer_scope_types, infer_unpack_types,
 };
 use crate::module_name::{ModuleName, ModuleNameResolutionError};
 use crate::module_resolver::{
@@ -251,10 +251,8 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// For function definitions, the undecorated type of the function.
     undecorated_type: Option<Type<'db>>,
 
-    /// The fallback type for missing expressions/bindings/declarations.
-    ///
-    /// This is used only when constructing a cycle-recovery `TypeInference`.
-    cycle_fallback: bool,
+    /// Did we merge in a sub-region with a cycle-recovery fallback, and if so, what kind?
+    cycle_recovery: Option<CycleRecovery<'db>>,
 
     /// `true` if all places in this expression are definitely bound
     all_definitely_bound: bool,
@@ -290,9 +288,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             typevar_binding_context: None,
             deferred: VecSet::default(),
             undecorated_type: None,
-            cycle_fallback: false,
+            cycle_recovery: None,
             all_definitely_bound: true,
         }
+    }
+
+    fn extend_cycle_recovery(&mut self, other_recovery: Option<CycleRecovery<'db>>) {
+        match &mut self.cycle_recovery {
+            Some(recovery) => *recovery = recovery.merge(other_recovery),
+            recovery @ None => *recovery = other_recovery,
+        }
+    }
+
+    fn fallback_type(&self) -> Option<Type<'db>> {
+        self.cycle_recovery.map(CycleRecovery::fallback_type)
     }
 
     fn extend_definition(&mut self, inference: &DefinitionInference<'db>) {
@@ -307,7 +316,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         if let Some(extra) = &inference.extra {
-            self.cycle_fallback |= extra.cycle_fallback;
+            self.extend_cycle_recovery(extra.cycle_recovery);
             self.context.extend(&extra.diagnostics);
             self.deferred.extend(extra.deferred.iter().copied());
         }
@@ -325,7 +334,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if let Some(extra) = &inference.extra {
             self.context.extend(&extra.diagnostics);
-            self.cycle_fallback |= extra.cycle_fallback;
+            self.extend_cycle_recovery(extra.cycle_recovery);
 
             if !matches!(self.region, InferenceRegion::Scope(..)) {
                 self.bindings.extend(extra.bindings.iter().copied());
@@ -399,7 +408,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.expressions
             .get(&expr.into())
             .copied()
-            .or(self.cycle_fallback.then_some(Type::Never))
+            .or(self.fallback_type())
     }
 
     /// Get the type of an expression from any scope in the same file.
@@ -5189,12 +5198,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             parenthesized: _,
         } = tuple;
 
-        // Collecting all elements is necessary to infer all sub-expressions even if some
-        // element types are `Never` (which leads `from_elements` to return early without
-        // consuming the whole iterator).
-        let element_types: Vec<_> = elts.iter().map(|elt| self.infer_expression(elt)).collect();
+        let db = self.db();
+        let divergent = Type::divergent(self.scope());
+        let element_types = elts.iter().map(|element| {
+            let element_type = self.infer_expression(element);
+            if element_type.has_divergent_type(self.db(), divergent) {
+                divergent
+            } else {
+                element_type
+            }
+        });
 
-        Type::heterogeneous_tuple(self.db(), element_types)
+        Type::heterogeneous_tuple(db, element_types)
     }
 
     fn infer_list_expression(&mut self, list: &ast::ExprList) -> Type<'db> {
@@ -8808,7 +8823,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             bindings,
             declarations,
             deferred,
-            cycle_fallback,
+            cycle_recovery,
             all_definitely_bound,
 
             // Ignored; only relevant to definition regions
@@ -8836,7 +8851,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
 
         let extra =
-            (cycle_fallback || !bindings.is_empty() || !diagnostics.is_empty() || !all_definitely_bound).then(|| {
+            (cycle_recovery.is_some() || !bindings.is_empty() || !diagnostics.is_empty() || !all_definitely_bound).then(|| {
                 if bindings.len() > 20 {
                     tracing::debug!(
                         "Inferred expression region `{:?}` contains {} bindings. Lookups by linear scan might be slow.",
@@ -8848,7 +8863,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Box::new(ExpressionInferenceExtra {
                     bindings: bindings.into_boxed_slice(),
                     diagnostics,
-                    cycle_fallback,
+                    cycle_recovery,
                     all_definitely_bound,
                 })
             });
@@ -8873,7 +8888,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             bindings,
             declarations,
             deferred,
-            cycle_fallback,
+            cycle_recovery,
             undecorated_type,
             all_definitely_bound: _,
             // builder only state
@@ -8889,12 +8904,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let diagnostics = context.finish();
 
         let extra = (!diagnostics.is_empty()
-            || cycle_fallback
+            || cycle_recovery.is_some()
             || undecorated_type.is_some()
             || !deferred.is_empty())
         .then(|| {
             Box::new(DefinitionInferenceExtra {
-                cycle_fallback,
+                cycle_recovery,
                 deferred: deferred.into_boxed_slice(),
                 diagnostics,
                 undecorated_type,
@@ -8936,7 +8951,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             context,
             mut expressions,
             scope,
-            cycle_fallback,
+            cycle_recovery,
 
             // Ignored, because scope types are never extended into other scopes.
             deferred: _,
@@ -8959,9 +8974,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let _ = scope;
         let diagnostics = context.finish();
 
-        let extra = (!diagnostics.is_empty() || cycle_fallback).then(|| {
+        let extra = (!diagnostics.is_empty() || cycle_recovery.is_some()).then(|| {
             Box::new(ScopeInferenceExtra {
-                cycle_fallback,
+                cycle_recovery,
                 diagnostics,
             })
         });
