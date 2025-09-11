@@ -55,4 +55,3 @@ def foo(some_other):
 def foo():
     dict = {"Tom": 23, "Maria": 23, "Dog": 11}
     age = dict.get("Cat", None)
-
