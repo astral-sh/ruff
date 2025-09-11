@@ -89,12 +89,11 @@ pub(crate) fn os_chmod(checker: &Checker, call: &ExprCall, segments: &[&str]) {
     let range = call.range();
     let mut diagnostic = checker.report_diagnostic(OsChmod, call.func.range());
 
-    // Needs a minimum two arguments for fix
-    if call.arguments.len() < 2 {
+    if !is_fix_os_chmod_enabled(checker.settings()) {
         return;
     }
 
-    if !is_fix_os_chmod_enabled(checker.settings()) {
+    if call.arguments.len() < 2 {
         return;
     }
 

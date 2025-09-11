@@ -197,8 +197,6 @@ pub(crate) fn has_unknown_keywords_or_starred_expr(
 }
 
 pub(crate) fn is_optional_bool_literal(args: &Arguments, name: &str, pos: usize) -> bool {
-    match args.find_argument_value(name, pos) {
-        Some(expr) => expr.as_boolean_literal_expr().is_some(),
-        None => true,
-    }
+    args.find_argument_value(name, pos)
+        .is_none_or(Expr::is_boolean_literal_expr)
 }
