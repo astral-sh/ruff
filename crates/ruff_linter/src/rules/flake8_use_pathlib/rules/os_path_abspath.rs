@@ -1,13 +1,11 @@
-use ruff_diagnostics::{Edit, Fix};
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::ExprCall;
-use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::importer::ImportRequest;
 use crate::preview::is_fix_os_path_abspath_enabled;
 use crate::rules::flake8_use_pathlib::helpers::{
-    has_unknown_keywords_or_starred_expr, is_pathlib_path_call,
+    check_os_pathlib_single_arg_calls, has_unknown_keywords_or_starred_expr,
 };
 use crate::{FixAvailability, Violation};
 
@@ -75,43 +73,17 @@ pub(crate) fn os_path_abspath(checker: &Checker, call: &ExprCall, segments: &[&s
         return;
     }
 
-    if call.arguments.len() != 1 {
-        return;
-    }
-
-    let Some(arg) = call.arguments.find_argument_value("path", 0) else {
-        return;
-    };
-
-    let arg_code = checker.locator().slice(arg.range());
-    let range = call.range();
-
-    let mut diagnostic = checker.report_diagnostic(OsPathAbspath, call.func.range());
-
     if has_unknown_keywords_or_starred_expr(&call.arguments, &["path"]) {
         return;
     }
 
-    if !is_fix_os_path_abspath_enabled(checker.settings()) {
-        return;
-    }
-
-    diagnostic.try_set_fix(|| {
-        let (import_edit, binding) = checker.importer().get_or_import_symbol(
-            &ImportRequest::import("pathlib", "Path"),
-            call.start(),
-            checker.semantic(),
-        )?;
-
-        let replacement = if is_pathlib_path_call(checker, arg) {
-            format!("{arg_code}.resolve()")
-        } else {
-            format!("{binding}({arg_code}).resolve()")
-        };
-
-        Ok(Fix::unsafe_edits(
-            Edit::range_replacement(replacement, range),
-            [import_edit],
-        ))
-    });
+    check_os_pathlib_single_arg_calls(
+        checker,
+        call,
+        "resolve()",
+        "path",
+        is_fix_os_path_abspath_enabled(checker.settings()),
+        OsPathAbspath,
+        Some(Applicability::Unsafe),
+    );
 }
