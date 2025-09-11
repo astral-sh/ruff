@@ -522,7 +522,9 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
     ) -> ConstraintSet<'db> {
         match &self.kind {
             // TODO: implement disjointness for property/method members as well as attribute members
-            ProtocolMemberKind::Property(_) | ProtocolMemberKind::Method(_) => ConstraintSet::unsatisfiable(db),
+            ProtocolMemberKind::Property(_) | ProtocolMemberKind::Method(_) => {
+                ConstraintSet::unsatisfiable(db)
+            }
             ProtocolMemberKind::Other(ty) => ty.is_disjoint_from_impl(db, other, visitor),
         }
     }

@@ -585,8 +585,7 @@ impl<'db> Bindings<'db> {
                     Type::FunctionLiteral(function_type) => match function_type.known(db) {
                         Some(KnownFunction::IsEquivalentTo) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
-                                let constraints =
-                                    ty_a.when_equivalent_to(db, *ty_b);
+                                let constraints = ty_a.when_equivalent_to(db, *ty_b);
                                 let tracked = TrackedConstraintSet::new(db, constraints);
                                 overload.set_return_type(Type::KnownInstance(
                                     KnownInstanceType::ConstraintSet(tracked),
@@ -606,8 +605,7 @@ impl<'db> Bindings<'db> {
 
                         Some(KnownFunction::IsAssignableTo) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
-                                let constraints =
-                                    ty_a.when_assignable_to(db, *ty_b);
+                                let constraints = ty_a.when_assignable_to(db, *ty_b);
                                 let tracked = TrackedConstraintSet::new(db, constraints);
                                 overload.set_return_type(Type::KnownInstance(
                                     KnownInstanceType::ConstraintSet(tracked),
@@ -617,8 +615,7 @@ impl<'db> Bindings<'db> {
 
                         Some(KnownFunction::IsDisjointFrom) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
-                                let constraints =
-                                    ty_a.when_disjoint_from(db, *ty_b);
+                                let constraints = ty_a.when_disjoint_from(db, *ty_b);
                                 let tracked = TrackedConstraintSet::new(db, constraints);
                                 overload.set_return_type(Type::KnownInstance(
                                     KnownInstanceType::ConstraintSet(tracked),

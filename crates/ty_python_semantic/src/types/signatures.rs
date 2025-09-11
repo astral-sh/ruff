@@ -112,8 +112,7 @@ impl<'db> CallableSignature<'db> {
     ///
     /// See [`Type::is_subtype_of`] for more details.
     pub(crate) fn is_subtype_of(&self, db: &'db dyn Db, other: &Self) -> bool {
-        self.is_subtype_of_impl(db, other)
-            .is_always_satisfied(db)
+        self.is_subtype_of_impl(db, other).is_always_satisfied(db)
     }
 
     fn is_subtype_of_impl(&self, db: &'db dyn Db, other: &Self) -> ConstraintSet<'db> {

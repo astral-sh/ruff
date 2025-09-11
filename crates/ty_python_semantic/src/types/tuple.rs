@@ -419,11 +419,13 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         visitor: &HasRelationToVisitor<'db, ConstraintSet<'db>>,
     ) -> ConstraintSet<'db> {
         match other {
-            Tuple::Fixed(other) => ConstraintSet::from_bool(db, self.0.len() == other.0.len()).and(db, || {
-                (self.0.iter().zip(&other.0)).when_all(db, |(self_ty, other_ty)| {
-                    self_ty.has_relation_to_impl(db, *other_ty, relation, visitor)
+            Tuple::Fixed(other) => {
+                ConstraintSet::from_bool(db, self.0.len() == other.0.len()).and(db, || {
+                    (self.0.iter().zip(&other.0)).when_all(db, |(self_ty, other_ty)| {
+                        self_ty.has_relation_to_impl(db, *other_ty, relation, visitor)
+                    })
                 })
-            }),
+            }
 
             Tuple::Variable(other) => {
                 // This tuple must have enough elements to match up with the other tuple's prefix
@@ -887,7 +889,9 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                         EitherOrBoth::Both(self_ty, other_ty) => {
                             self_ty.is_equivalent_to_impl(db, other_ty, visitor)
                         }
-                        EitherOrBoth::Left(_) | EitherOrBoth::Right(_) => ConstraintSet::unsatisfiable(db),
+                        EitherOrBoth::Left(_) | EitherOrBoth::Right(_) => {
+                            ConstraintSet::unsatisfiable(db)
+                        }
                     })
             })
             .and(db, || {
@@ -897,7 +901,9 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                         EitherOrBoth::Both(self_ty, other_ty) => {
                             self_ty.is_equivalent_to_impl(db, other_ty, visitor)
                         }
-                        EitherOrBoth::Left(_) | EitherOrBoth::Right(_) => ConstraintSet::unsatisfiable(db),
+                        EitherOrBoth::Left(_) | EitherOrBoth::Right(_) => {
+                            ConstraintSet::unsatisfiable(db)
+                        }
                     })
             })
     }

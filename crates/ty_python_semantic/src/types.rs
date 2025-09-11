@@ -1391,8 +1391,7 @@ impl<'db> Type<'db> {
     /// intersection simplification dependent on the order in which elements are added), so we do
     /// not use this more general definition of subtyping.
     pub(crate) fn is_subtype_of(self, db: &'db dyn Db, target: Type<'db>) -> bool {
-        self.when_subtype_of(db, target)
-            .is_always_satisfied(db)
+        self.when_subtype_of(db, target).is_always_satisfied(db)
     }
 
     fn when_subtype_of(self, db: &'db dyn Db, target: Type<'db>) -> ConstraintSet<'db> {
@@ -1403,8 +1402,7 @@ impl<'db> Type<'db> {
     ///
     /// [assignable to]: https://typing.python.org/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation
     pub(crate) fn is_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
-        self.when_assignable_to(db, target)
-            .is_always_satisfied(db)
+        self.when_assignable_to(db, target).is_always_satisfied(db)
     }
 
     fn when_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> ConstraintSet<'db> {
@@ -1611,8 +1609,12 @@ impl<'db> Type<'db> {
 
             // Note that the definition of `Type::AlwaysFalsy` depends on the return value of `__bool__`.
             // If `__bool__` always returns True or False, it can be treated as a subtype of `AlwaysTruthy` or `AlwaysFalsy`, respectively.
-            (left, Type::AlwaysFalsy) => ConstraintSet::from_bool(db, left.bool(db).is_always_false()),
-            (left, Type::AlwaysTruthy) => ConstraintSet::from_bool(db, left.bool(db).is_always_true()),
+            (left, Type::AlwaysFalsy) => {
+                ConstraintSet::from_bool(db, left.bool(db).is_always_false())
+            }
+            (left, Type::AlwaysTruthy) => {
+                ConstraintSet::from_bool(db, left.bool(db).is_always_true())
+            }
             // Currently, the only supertype of `AlwaysFalsy` and `AlwaysTruthy` is the universal set (object instance).
             (Type::AlwaysFalsy | Type::AlwaysTruthy, _) => {
                 target.when_equivalent_to(db, Type::object())
@@ -1867,7 +1869,9 @@ impl<'db> Type<'db> {
 
             // Other than the special cases enumerated above, `Instance` types and typevars are
             // never subtypes of any other variants
-            (Type::NominalInstance(_) | Type::NonInferableTypeVar(_), _) => ConstraintSet::unsatisfiable(db),
+            (Type::NominalInstance(_) | Type::NonInferableTypeVar(_), _) => {
+                ConstraintSet::unsatisfiable(db)
+            }
         }
     }
 
@@ -1884,8 +1888,7 @@ impl<'db> Type<'db> {
     ///
     /// [equivalent to]: https://typing.python.org/en/latest/spec/glossary.html#term-equivalent
     pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Type<'db>) -> bool {
-        self.when_equivalent_to(db, other)
-            .is_always_satisfied(db)
+        self.when_equivalent_to(db, other).is_always_satisfied(db)
     }
 
     fn when_equivalent_to(self, db: &'db dyn Db, other: Type<'db>) -> ConstraintSet<'db> {
@@ -1910,7 +1913,9 @@ impl<'db> Type<'db> {
             // The `Divergent` type is a special type that is not equivalent to other kinds of dynamic types,
             // which prevents `Divergent` from being eliminated during union reduction.
             (Type::Dynamic(_), Type::Dynamic(DynamicType::Divergent(_)))
-            | (Type::Dynamic(DynamicType::Divergent(_)), Type::Dynamic(_)) => ConstraintSet::unsatisfiable(db),
+            | (Type::Dynamic(DynamicType::Divergent(_)), Type::Dynamic(_)) => {
+                ConstraintSet::unsatisfiable(db)
+            }
             (Type::Dynamic(_), Type::Dynamic(_)) => ConstraintSet::always_satisfiable(db),
 
             (Type::SubclassOf(first), Type::SubclassOf(second)) => {
@@ -1992,12 +1997,15 @@ impl<'db> Type<'db> {
     /// Note: This function aims to have no false positives, but might return
     /// wrong `false` answers in some cases.
     pub(crate) fn is_disjoint_from(self, db: &'db dyn Db, other: Type<'db>) -> bool {
-        self.when_disjoint_from(db, other)
-            .is_always_satisfied(db)
+        self.when_disjoint_from(db, other).is_always_satisfied(db)
     }
 
     fn when_disjoint_from(self, db: &'db dyn Db, other: Type<'db>) -> ConstraintSet<'db> {
-        self.is_disjoint_from_impl(db, other, &IsDisjointVisitor::new(ConstraintSet::unsatisfiable(db)))
+        self.is_disjoint_from_impl(
+            db,
+            other,
+            &IsDisjointVisitor::new(ConstraintSet::unsatisfiable(db)),
+        )
     }
 
     pub(crate) fn is_disjoint_from_impl(
@@ -2356,7 +2364,9 @@ impl<'db> Type<'db> {
             }
 
             (Type::BooleanLiteral(..) | Type::TypeIs(_), _)
-            | (_, Type::BooleanLiteral(..) | Type::TypeIs(_)) => ConstraintSet::always_satisfiable(db),
+            | (_, Type::BooleanLiteral(..) | Type::TypeIs(_)) => {
+                ConstraintSet::always_satisfiable(db)
+            }
 
             (Type::IntLiteral(..), Type::NominalInstance(instance))
             | (Type::NominalInstance(instance), Type::IntLiteral(..)) => {
@@ -2367,7 +2377,9 @@ impl<'db> Type<'db> {
                     .negate(db)
             }
 
-            (Type::IntLiteral(..), _) | (_, Type::IntLiteral(..)) => ConstraintSet::always_satisfiable(db),
+            (Type::IntLiteral(..), _) | (_, Type::IntLiteral(..)) => {
+                ConstraintSet::always_satisfiable(db)
+            }
 
             (Type::StringLiteral(..), Type::LiteralString)
             | (Type::LiteralString, Type::StringLiteral(..)) => ConstraintSet::unsatisfiable(db),
@@ -2382,7 +2394,9 @@ impl<'db> Type<'db> {
             }
 
             (Type::LiteralString, Type::LiteralString) => ConstraintSet::unsatisfiable(db),
-            (Type::LiteralString, _) | (_, Type::LiteralString) => ConstraintSet::always_satisfiable(db),
+            (Type::LiteralString, _) | (_, Type::LiteralString) => {
+                ConstraintSet::always_satisfiable(db)
+            }
 
             (Type::BytesLiteral(..), Type::NominalInstance(instance))
             | (Type::NominalInstance(instance), Type::BytesLiteral(..)) => {
@@ -2400,7 +2414,9 @@ impl<'db> Type<'db> {
                     .when_subtype_of(db, instance)
                     .negate(db)
             }
-            (Type::EnumLiteral(..), _) | (_, Type::EnumLiteral(..)) => ConstraintSet::always_satisfiable(db),
+            (Type::EnumLiteral(..), _) | (_, Type::EnumLiteral(..)) => {
+                ConstraintSet::always_satisfiable(db)
+            }
 
             // A class-literal type `X` is always disjoint from an instance type `Y`,
             // unless the type expressing "all instances of `Z`" is a subtype of of `Y`,
@@ -9148,10 +9164,13 @@ impl<'db> CallableType<'db> {
             return ConstraintSet::always_satisfiable(db);
         }
 
-        ConstraintSet::from_bool(db, self.is_function_like(db) == other.is_function_like(db)).and(db, || {
-            self.signatures(db)
-                .is_equivalent_to_impl(db, other.signatures(db), visitor)
-        })
+        ConstraintSet::from_bool(db, self.is_function_like(db) == other.is_function_like(db)).and(
+            db,
+            || {
+                self.signatures(db)
+                    .is_equivalent_to_impl(db, other.signatures(db), visitor)
+            },
+        )
     }
 }
 

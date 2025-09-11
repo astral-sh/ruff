@@ -953,7 +953,9 @@ impl<'db> FunctionType<'db> {
     ) -> ConstraintSet<'db> {
         match relation {
             TypeRelation::Subtyping => ConstraintSet::from_bool(db, self.is_subtype_of(db, other)),
-            TypeRelation::Assignability => ConstraintSet::from_bool(db, self.is_assignable_to(db, other)),
+            TypeRelation::Assignability => {
+                ConstraintSet::from_bool(db, self.is_assignable_to(db, other))
+            }
         }
     }
 

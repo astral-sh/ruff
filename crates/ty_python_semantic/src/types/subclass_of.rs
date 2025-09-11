@@ -1,6 +1,6 @@
 use crate::place::PlaceAndQualifiers;
-use crate::types::constraints::ConstraintSet;
 use crate::semantic_index::definition::Definition;
+use crate::types::constraints::ConstraintSet;
 use crate::types::variance::VarianceInferable;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, DynamicType,
@@ -141,7 +141,10 @@ impl<'db> SubclassOfType<'db> {
                 ConstraintSet::from_bool(db, relation.is_assignability())
             }
             (SubclassOfInner::Dynamic(_), SubclassOfInner::Class(other_class)) => {
-                ConstraintSet::from_bool(db, other_class.is_object(db) || relation.is_assignability())
+                ConstraintSet::from_bool(
+                    db,
+                    other_class.is_object(db) || relation.is_assignability(),
+                )
             }
             (SubclassOfInner::Class(_), SubclassOfInner::Dynamic(_)) => {
                 ConstraintSet::from_bool(db, relation.is_assignability())
