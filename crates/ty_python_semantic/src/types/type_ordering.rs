@@ -76,9 +76,9 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::BoundMethod(_), _) => Ordering::Less,
         (_, Type::BoundMethod(_)) => Ordering::Greater,
 
-        (Type::MethodWrapper(left), Type::MethodWrapper(right)) => left.cmp(right),
-        (Type::MethodWrapper(_), _) => Ordering::Less,
-        (_, Type::MethodWrapper(_)) => Ordering::Greater,
+        (Type::KnownBoundMethod(left), Type::KnownBoundMethod(right)) => left.cmp(right),
+        (Type::KnownBoundMethod(_), _) => Ordering::Less,
+        (_, Type::KnownBoundMethod(_)) => Ordering::Greater,
 
         (Type::WrapperDescriptor(left), Type::WrapperDescriptor(right)) => left.cmp(right),
         (Type::WrapperDescriptor(_), _) => Ordering::Less,
@@ -275,6 +275,12 @@ fn dynamic_elements_ordering(left: DynamicType, right: DynamicType) -> Ordering 
 
         (DynamicType::TodoTypeAlias, _) => Ordering::Less,
         (_, DynamicType::TodoTypeAlias) => Ordering::Greater,
+
+        (DynamicType::Divergent(left), DynamicType::Divergent(right)) => {
+            left.scope.cmp(&right.scope)
+        }
+        (DynamicType::Divergent(_), _) => Ordering::Less,
+        (_, DynamicType::Divergent(_)) => Ordering::Greater,
     }
 }
 

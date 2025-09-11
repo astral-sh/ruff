@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/airflow/mod.rs
 ---
-AIR002 DAG should have an explicit `schedule` argument
+AIR002 `DAG` or `@dag` should have an explicit `schedule` argument
  --> AIR002.py:4:1
   |
 2 | from airflow.timetables.simple import NullTimetable
@@ -12,7 +12,7 @@ AIR002 DAG should have an explicit `schedule` argument
 6 | DAG(dag_id="class_schedule", schedule="@hourly")
   |
 
-AIR002 DAG should have an explicit `schedule` argument
+AIR002 `DAG` or `@dag` should have an explicit `schedule` argument
   --> AIR002.py:13:2
    |
 13 | @dag()

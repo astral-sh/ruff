@@ -480,6 +480,7 @@ help: Replace with `Path(...).name`
 32 | dirname(p)
 33 | samefile(p)
 34 | splitext(p)
+note: This is an unsafe fix and may change runtime behavior
 
 PTH120 [*] `os.path.dirname()` should be replaced by `Path.parent`
   --> import_from.py:31:1
@@ -508,6 +509,7 @@ help: Replace with `Path(...).parent`
 33 | samefile(p)
 34 | splitext(p)
 35 | with open(p) as fp:
+note: This is an unsafe fix and may change runtime behavior
 
 PTH121 `os.path.samefile()` should be replaced by `Path.samefile()`
   --> import_from.py:32:1

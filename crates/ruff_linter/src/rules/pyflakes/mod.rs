@@ -788,7 +788,7 @@ mod tests {
             &parsed,
             target_version,
         );
-        messages.sort_by_key(|diagnostic| diagnostic.expect_range().start());
+        messages.sort_by(Diagnostic::ruff_start_ordering);
         let actual = messages
             .iter()
             .filter(|msg| !msg.is_invalid_syntax())

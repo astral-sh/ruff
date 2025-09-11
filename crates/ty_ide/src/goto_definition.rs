@@ -469,6 +469,22 @@ class MyOtherClass:
         3 | x = MyClass(0)
           |     ^^^^^^^
           |
+
+        info[goto-definition]: Definition
+         --> mymodule.py:3:9
+          |
+        2 | class MyClass:
+        3 |     def __init__(self, val):
+          |         ^^^^^^^^
+        4 |         self.val = val
+          |
+        info: Source
+         --> main.py:3:5
+          |
+        2 | from mymodule import MyClass
+        3 | x = MyClass(0)
+          |     ^^^^^^^
+          |
         ");
     }
 
@@ -800,6 +816,318 @@ my_func(my_other_func(a<CURSOR>b=5, y=2), 0)
                     .map(|target| GotoDefinitionDiagnostic::new(source, &target)),
             )
         }
+    }
+
+    #[test]
+    fn goto_definition_overload_type_disambiguated1() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from mymodule import ab
+
+a<CURSOR>b(1)
+",
+            )
+            .source(
+                "mymodule.py",
+                r#"
+def ab(a):
+    """the real implementation!"""
+"#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+from typing import overload
+
+@overload
+def ab(a: int): ...
+
+@overload
+def ab(a: str): ...
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r#"
+        info[goto-definition]: Definition
+         --> mymodule.py:2:5
+          |
+        2 | def ab(a):
+          |     ^^
+        3 |     """the real implementation!"""
+          |
+        info: Source
+         --> main.py:4:1
+          |
+        2 | from mymodule import ab
+        3 |
+        4 | ab(1)
+          | ^^
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_definition_overload_type_disambiguated2() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+from mymodule import ab
+
+a<CURSOR>b("hello")
+"#,
+            )
+            .source(
+                "mymodule.py",
+                r#"
+def ab(a):
+    """the real implementation!"""
+"#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+from typing import overload
+
+@overload
+def ab(a: int): ...
+
+@overload
+def ab(a: str): ...
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r#"
+        info[goto-definition]: Definition
+         --> mymodule.py:2:5
+          |
+        2 | def ab(a):
+          |     ^^
+        3 |     """the real implementation!"""
+          |
+        info: Source
+         --> main.py:4:1
+          |
+        2 | from mymodule import ab
+        3 |
+        4 | ab("hello")
+          | ^^
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_definition_overload_arity_disambiguated1() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from mymodule import ab
+
+a<CURSOR>b(1, 2)
+",
+            )
+            .source(
+                "mymodule.py",
+                r#"
+def ab(a, b = None):
+    """the real implementation!"""
+"#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+from typing import overload
+
+@overload
+def ab(a: int, b: int): ...
+
+@overload
+def ab(a: int): ...
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r#"
+        info[goto-definition]: Definition
+         --> mymodule.py:2:5
+          |
+        2 | def ab(a, b = None):
+          |     ^^
+        3 |     """the real implementation!"""
+          |
+        info: Source
+         --> main.py:4:1
+          |
+        2 | from mymodule import ab
+        3 |
+        4 | ab(1, 2)
+          | ^^
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_definition_overload_arity_disambiguated2() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from mymodule import ab
+
+a<CURSOR>b(1)
+",
+            )
+            .source(
+                "mymodule.py",
+                r#"
+def ab(a, b = None):
+    """the real implementation!"""
+"#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+from typing import overload
+
+@overload
+def ab(a: int, b: int): ...
+
+@overload
+def ab(a: int): ...
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r#"
+        info[goto-definition]: Definition
+         --> mymodule.py:2:5
+          |
+        2 | def ab(a, b = None):
+          |     ^^
+        3 |     """the real implementation!"""
+          |
+        info: Source
+         --> main.py:4:1
+          |
+        2 | from mymodule import ab
+        3 |
+        4 | ab(1)
+          | ^^
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_definition_overload_keyword_disambiguated1() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from mymodule import ab
+
+a<CURSOR>b(1, b=2)
+",
+            )
+            .source(
+                "mymodule.py",
+                r#"
+def ab(a, *, b = None, c = None):
+    """the real implementation!"""
+"#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+from typing import overload
+
+@overload
+def ab(a: int): ...
+
+@overload
+def ab(a: int, *, b: int): ...
+
+@overload
+def ab(a: int, *, c: int): ...
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r#"
+        info[goto-definition]: Definition
+         --> mymodule.py:2:5
+          |
+        2 | def ab(a, *, b = None, c = None):
+          |     ^^
+        3 |     """the real implementation!"""
+          |
+        info: Source
+         --> main.py:4:1
+          |
+        2 | from mymodule import ab
+        3 |
+        4 | ab(1, b=2)
+          | ^^
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_definition_overload_keyword_disambiguated2() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from mymodule import ab
+
+a<CURSOR>b(1, c=2)
+",
+            )
+            .source(
+                "mymodule.py",
+                r#"
+def ab(a, *, b = None, c = None):
+    """the real implementation!"""
+"#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+from typing import overload
+
+@overload
+def ab(a: int): ...
+
+@overload
+def ab(a: int, *, b: int): ...
+
+@overload
+def ab(a: int, *, c: int): ...
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r#"
+        info[goto-definition]: Definition
+         --> mymodule.py:2:5
+          |
+        2 | def ab(a, *, b = None, c = None):
+          |     ^^
+        3 |     """the real implementation!"""
+          |
+        info: Source
+         --> main.py:4:1
+          |
+        2 | from mymodule import ab
+        3 |
+        4 | ab(1, c=2)
+          | ^^
+          |
+        "#);
     }
 
     struct GotoDefinitionDiagnostic {

@@ -19,8 +19,8 @@ use crate::{
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral,
         FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, KnownFunction,
-        MaterializationKind, NormalizedVisitor, PropertyInstanceType, Signature, Type, TypeMapping,
-        TypeQualifiers, TypeRelation, VarianceInferable,
+        NormalizedVisitor, PropertyInstanceType, Signature, Type, TypeMapping, TypeQualifiers,
+        TypeRelation, VarianceInferable,
         constraints::{Constraints, IteratorConstraintsExtension},
         signatures::{Parameter, Parameters},
     },
@@ -227,22 +227,24 @@ impl<'db> ProtocolInterface<'db> {
                 place: Place::bound(member.ty()),
                 qualifiers: member.qualifiers(),
             })
-            .unwrap_or_else(|| Type::object(db).instance_member(db, name))
+            .unwrap_or_else(|| Type::object().member(db, name))
     }
 
-    /// Return `true` if if all members on `self` are also members of `other`.
+    /// Return `true` if `self` extends the interface of `other`, i.e.,
+    /// all members on `other` are also members of `self`.
     ///
     /// TODO: this method should consider the types of the members as well as their names.
-    pub(super) fn is_sub_interface_of<C: Constraints<'db>>(
+    pub(super) fn extends_interface_of<C: Constraints<'db>>(
         self,
         db: &'db dyn Db,
         other: Self,
+        _relation: TypeRelation,
         _visitor: &HasRelationToVisitor<'db, C>,
     ) -> C {
         // TODO: This could just return a bool as written, but this form is what will be needed to
         // combine the constraints when we do assignability checks on each member.
-        self.inner(db).keys().when_all(db, |member_name| {
-            C::from_bool(db, other.inner(db).contains_key(member_name))
+        other.inner(db).keys().when_all(db, |member_name| {
+            C::from_bool(db, self.inner(db).contains_key(member_name))
         })
     }
 
@@ -252,20 +254,6 @@ impl<'db> ProtocolInterface<'db> {
             self.inner(db)
                 .iter()
                 .map(|(name, data)| (name.clone(), data.normalized_impl(db, visitor)))
-                .collect::<BTreeMap<_, _>>(),
-        )
-    }
-
-    pub(super) fn materialize(
-        self,
-        db: &'db dyn Db,
-        materialization_kind: MaterializationKind,
-    ) -> Self {
-        Self::new(
-            db,
-            self.inner(db)
-                .iter()
-                .map(|(name, data)| (name.clone(), data.materialize(db, materialization_kind)))
                 .collect::<BTreeMap<_, _>>(),
         )
     }
@@ -382,13 +370,6 @@ impl<'db> ProtocolMemberData<'db> {
             .find_legacy_typevars_impl(db, binding_context, typevars, visitor);
     }
 
-    fn materialize(&self, db: &'db dyn Db, materialization_kind: MaterializationKind) -> Self {
-        Self {
-            kind: self.kind.materialize(db, materialization_kind),
-            qualifiers: self.qualifiers,
-        }
-    }
-
     fn display(&self, db: &'db dyn Db) -> impl std::fmt::Display {
         struct ProtocolMemberDataDisplay<'db> {
             db: &'db dyn Db,
@@ -489,20 +470,6 @@ impl<'db> ProtocolMemberKind<'db> {
             }
             ProtocolMemberKind::Other(ty) => {
                 ty.find_legacy_typevars(db, binding_context, typevars);
-            }
-        }
-    }
-
-    fn materialize(self, db: &'db dyn Db, materialization_kind: MaterializationKind) -> Self {
-        match self {
-            ProtocolMemberKind::Method(callable) => {
-                ProtocolMemberKind::Method(callable.materialize(db, materialization_kind))
-            }
-            ProtocolMemberKind::Property(property) => {
-                ProtocolMemberKind::Property(property.materialize(db, materialization_kind))
-            }
-            ProtocolMemberKind::Other(ty) => {
-                ProtocolMemberKind::Other(ty.materialize(db, materialization_kind))
             }
         }
     }

@@ -709,6 +709,16 @@ impl SemanticSyntaxChecker {
             }
             Expr::YieldFrom(_) => {
                 Self::yield_outside_function(ctx, expr, YieldOutsideFunctionKind::YieldFrom);
+                if ctx.in_function_scope() && ctx.in_async_context() {
+                    // test_err yield_from_in_async_function
+                    // async def f(): yield from x
+
+                    Self::add_error(
+                        ctx,
+                        SemanticSyntaxErrorKind::YieldFromInAsyncFunction,
+                        expr.range(),
+                    );
+                }
             }
             Expr::Await(_) => {
                 Self::yield_outside_function(ctx, expr, YieldOutsideFunctionKind::Await);
@@ -988,6 +998,9 @@ impl Display for SemanticSyntaxError {
             }
             SemanticSyntaxErrorKind::AnnotatedNonlocal(name) => {
                 write!(f, "annotated name `{name}` can't be nonlocal")
+            }
+            SemanticSyntaxErrorKind::YieldFromInAsyncFunction => {
+                f.write_str("`yield from` statement in async function; use `async for` instead")
             }
         }
     }
@@ -1346,6 +1359,9 @@ pub enum SemanticSyntaxErrorKind {
 
     /// Represents a type annotation on a variable that's been declared nonlocal
     AnnotatedNonlocal(String),
+
+    /// Represents the use of `yield from` inside an asynchronous function.
+    YieldFromInAsyncFunction,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]

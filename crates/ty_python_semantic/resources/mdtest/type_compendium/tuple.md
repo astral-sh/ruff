@@ -36,13 +36,22 @@ reveal_type(tuple[int, *tuple[str, ...]]((1,)))  # revealed: tuple[int, *tuple[s
 reveal_type(().__class__())  # revealed: tuple[()]
 reveal_type((1, 2).__class__((1, 2)))  # revealed: tuple[Literal[1], Literal[2]]
 
-def f(x: Iterable[int], y: list[str], z: Never, aa: list[Never]):
+class LiskovUncompliantIterable(Iterable[int]):
+    # TODO we should emit an error here about the Liskov violation
+    __iter__ = None
+
+def f(x: Iterable[int], y: list[str], z: Never, aa: list[Never], bb: LiskovUncompliantIterable):
     reveal_type(tuple(x))  # revealed: tuple[int, ...]
     reveal_type(tuple(y))  # revealed: tuple[str, ...]
     reveal_type(tuple(z))  # revealed: tuple[Unknown, ...]
 
     # This is correct as the only inhabitants of `list[Never]` can be empty lists
     reveal_type(tuple(aa))  # revealed: tuple[()]
+
+    # `tuple[int, ...] would probably also be fine here since `LiskovUncompliantIterable`
+    # inherits from `Iterable[int]`. Ultimately all bets are off when the Liskov Principle is
+    # violated, though -- this test is really just to make sure we don't crash in this situation.
+    reveal_type(tuple(bb))  # revealed: tuple[Unknown, ...]
 
 reveal_type(tuple((1, 2)))  # revealed: tuple[Literal[1], Literal[2]]
 

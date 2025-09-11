@@ -7,7 +7,7 @@ use lsp_types::{
 };
 use ruff_db::source::{line_index, source_text};
 use ruff_source_file::OneIndexed;
-use ty_ide::completion;
+use ty_ide::{CompletionSettings, completion};
 use ty_project::ProjectDatabase;
 use ty_python_semantic::CompletionKind;
 
@@ -55,7 +55,10 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
             &line_index,
             snapshot.encoding(),
         );
-        let completions = completion(db, file, offset);
+        let settings = CompletionSettings {
+            auto_import: snapshot.global_settings().is_auto_import_enabled(),
+        };
+        let completions = completion(db, &settings, file, offset);
         if completions.is_empty() {
             return Ok(None);
         }
@@ -71,7 +74,7 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
                     label: comp.inner.name.into(),
                     kind,
                     sort_text: Some(format!("{i:-max_index_len$}")),
-                    detail: comp.inner.ty.display(db).to_string().into(),
+                    detail: comp.inner.ty.map(|ty| ty.display(db).to_string()),
                     documentation: comp
                         .documentation
                         .map(|docstring| Documentation::String(docstring.render_plaintext())),

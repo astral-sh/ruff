@@ -55,7 +55,7 @@ use bitflags::bitflags;
 use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity, Span};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast, ParameterWithDefault};
 use ruff_text_size::Ranged;
 
 use crate::module_resolver::{KnownModule, file_to_module};
@@ -63,9 +63,9 @@ use crate::place::{Boundness, Place, place_from_bindings};
 use crate::semantic_index::ast_ids::HasScopedUseId;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::ScopeId;
-use crate::semantic_index::semantic_index;
+use crate::semantic_index::{FileScopeId, SemanticIndex, semantic_index};
 use crate::types::call::{Binding, CallArguments};
-use crate::types::constraints::Constraints;
+use crate::types::constraints::{ConstraintSet, Constraints};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{
     INVALID_ARGUMENT_TYPE, REDUNDANT_CAST, STATIC_ASSERT_ERROR, TYPE_ASSERTION_FAILURE,
@@ -79,8 +79,9 @@ use crate::types::visitor::any_over_type;
 use crate::types::{
     BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, ClassType,
     DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
-    IsEquivalentVisitor, KnownClass, NormalizedVisitor, SpecialFormType, Truthiness, Type,
-    TypeMapping, TypeRelation, UnionBuilder, all_members, walk_type_mapping,
+    IsEquivalentVisitor, KnownClass, KnownInstanceType, NormalizedVisitor, SpecialFormType,
+    TrackedConstraintSet, Truthiness, Type, TypeMapping, TypeRelation, UnionBuilder, all_members,
+    binding_type, walk_type_mapping,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -141,17 +142,6 @@ impl FunctionDecorators {
             },
             _ => FunctionDecorators::empty(),
         }
-    }
-
-    pub(super) fn from_decorator_types<'db>(
-        db: &'db dyn Db,
-        types: impl IntoIterator<Item = Type<'db>>,
-    ) -> Self {
-        types
-            .into_iter()
-            .fold(FunctionDecorators::empty(), |acc, ty| {
-                acc | FunctionDecorators::from_decorator_type(db, ty)
-            })
     }
 }
 
@@ -247,6 +237,22 @@ impl<'db> OverloadLiteral<'db> {
         self.has_known_decorator(db, FunctionDecorators::OVERLOAD)
     }
 
+    /// Returns true if this overload is decorated with `@staticmethod`, or if it is implicitly a
+    /// staticmethod.
+    pub(crate) fn is_staticmethod(self, db: &dyn Db) -> bool {
+        self.has_known_decorator(db, FunctionDecorators::STATICMETHOD) || self.name(db) == "__new__"
+    }
+
+    /// Returns true if this overload is decorated with `@classmethod`, or if it is implicitly a
+    /// classmethod.
+    pub(crate) fn is_classmethod(self, db: &dyn Db) -> bool {
+        self.has_known_decorator(db, FunctionDecorators::CLASSMETHOD)
+            || matches!(
+                self.name(db).as_str(),
+                "__init_subclass__" | "__class_getitem__"
+            )
+    }
+
     fn node<'ast>(
         self,
         db: &dyn Db,
@@ -260,7 +266,7 @@ impl<'db> OverloadLiteral<'db> {
             the function is defined."
         );
 
-        self.body_scope(db).node(db).expect_function(module)
+        self.body_scope(db).node(db).expect_function().node(module)
     }
 
     /// Returns the [`FileRange`] of the function's name.
@@ -269,7 +275,8 @@ impl<'db> OverloadLiteral<'db> {
             self.file(db),
             self.body_scope(db)
                 .node(db)
-                .expect_function(module)
+                .expect_function()
+                .node(module)
                 .name
                 .range,
         )
@@ -285,9 +292,8 @@ impl<'db> OverloadLiteral<'db> {
     /// over-invalidation.
     fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         let body_scope = self.body_scope(db);
-        let module = parsed_module(db, self.file(db)).load(db);
         let index = semantic_index(db, body_scope.file(db));
-        index.expect_single_definition(body_scope.node(db).expect_function(&module))
+        index.expect_single_definition(body_scope.node(db).expect_function())
     }
 
     /// Returns the overload immediately before this one in the AST. Returns `None` if there is no
@@ -301,7 +307,8 @@ impl<'db> OverloadLiteral<'db> {
         let use_id = self
             .body_scope(db)
             .node(db)
-            .expect_function(&module)
+            .expect_function()
+            .node(&module)
             .name
             .scoped_use_id(db, scope);
 
@@ -336,17 +343,79 @@ impl<'db> OverloadLiteral<'db> {
         db: &'db dyn Db,
         inherited_generic_context: Option<GenericContext<'db>>,
     ) -> Signature<'db> {
+        /// `self` or `cls` can be implicitly positional-only if:
+        /// - It is a method AND
+        /// - No parameters in the method use PEP-570 syntax AND
+        /// - It is not a `@staticmethod` AND
+        /// - `self`/`cls` is not explicitly positional-only using the PEP-484 convention AND
+        /// - Either the next parameter after `self`/`cls` uses the PEP-484 convention,
+        ///   or the enclosing class is a `Protocol` class
+        fn has_implicitly_positional_only_first_param<'db>(
+            db: &'db dyn Db,
+            literal: OverloadLiteral<'db>,
+            node: &ast::StmtFunctionDef,
+            scope: FileScopeId,
+            index: &SemanticIndex,
+        ) -> bool {
+            let parameters = &node.parameters;
+
+            if !parameters.posonlyargs.is_empty() {
+                return false;
+            }
+
+            let Some(first_param) = parameters.args.first() else {
+                return false;
+            };
+
+            if first_param.uses_pep_484_positional_only_convention() {
+                return false;
+            }
+
+            if literal.is_staticmethod(db) {
+                return false;
+            }
+
+            let Some(class_definition) = index.class_definition_of_method(scope) else {
+                return false;
+            };
+
+            // `self` and `cls` are always positional-only if the next parameter uses the
+            // PEP-484 convention.
+            if parameters
+                .args
+                .get(1)
+                .is_some_and(ParameterWithDefault::uses_pep_484_positional_only_convention)
+            {
+                return true;
+            }
+
+            // If there isn't any parameter other than `self`/`cls`,
+            // or there is but it isn't using the PEP-484 convention,
+            // then `self`/`cls` are only implicitly positional-only if
+            // it is a protocol class.
+            let class_type = binding_type(db, class_definition);
+            class_type
+                .to_class_type(db)
+                .is_some_and(|class| class.is_protocol(db))
+        }
+
         let scope = self.body_scope(db);
         let module = parsed_module(db, self.file(db)).load(db);
-        let function_stmt_node = scope.node(db).expect_function(&module);
+        let function_stmt_node = scope.node(db).expect_function().node(&module);
         let definition = self.definition(db);
+        let index = semantic_index(db, scope.file(db));
         let generic_context = function_stmt_node.type_params.as_ref().map(|type_params| {
-            let index = semantic_index(db, scope.file(db));
             GenericContext::from_type_params(db, index, definition, type_params)
         });
-
-        let index = semantic_index(db, scope.file(db));
-        let is_generator = scope.file_scope_id(db).is_generator_function(index);
+        let file_scope_id = scope.file_scope_id(db);
+        let is_generator = file_scope_id.is_generator_function(index);
+        let has_implicitly_positional_first_parameter = has_implicitly_positional_only_first_param(
+            db,
+            self,
+            function_stmt_node,
+            file_scope_id,
+            index,
+        );
 
         Signature::from_function(
             db,
@@ -355,6 +424,7 @@ impl<'db> OverloadLiteral<'db> {
             definition,
             function_stmt_node,
             is_generator,
+            has_implicitly_positional_first_parameter,
         )
     }
 
@@ -367,7 +437,7 @@ impl<'db> OverloadLiteral<'db> {
         let span = Span::from(function_scope.file(db));
         let node = function_scope.node(db);
         let module = parsed_module(db, self.file(db)).load(db);
-        let func_def = node.as_function(&module)?;
+        let func_def = node.as_function()?.node(&module);
         let range = parameter_index
             .and_then(|parameter_index| {
                 func_def
@@ -387,7 +457,7 @@ impl<'db> OverloadLiteral<'db> {
         let span = Span::from(function_scope.file(db));
         let node = function_scope.node(db);
         let module = parsed_module(db, self.file(db)).load(db);
-        let func_def = node.as_function(&module)?;
+        let func_def = node.as_function()?.node(&module);
         let return_type_range = func_def.returns.as_ref().map(|returns| returns.range());
         let mut signature = func_def.name.range.cover(func_def.parameters.range);
         if let Some(return_type_range) = return_type_range {
@@ -721,6 +791,20 @@ impl<'db> FunctionType<'db> {
         self.literal(db).has_known_decorator(db, decorator)
     }
 
+    /// Returns true if this method is decorated with `@classmethod`, or if it is implicitly a
+    /// classmethod.
+    pub(crate) fn is_classmethod(self, db: &'db dyn Db) -> bool {
+        self.iter_overloads_and_implementation(db)
+            .any(|overload| overload.is_classmethod(db))
+    }
+
+    /// Returns true if this method is decorated with `@staticmethod`, or if it is implicitly a
+    /// static method.
+    pub(crate) fn is_staticmethod(self, db: &'db dyn Db) -> bool {
+        self.iter_overloads_and_implementation(db)
+            .any(|overload| overload.is_staticmethod(db))
+    }
+
     /// If the implementation of this function is deprecated, returns the `@warnings.deprecated`.
     ///
     /// Checking if an overload is deprecated requires deeper call analysis.
@@ -1012,7 +1096,7 @@ fn is_instance_truthiness<'db>(
         Type::TypeAlias(alias) => is_instance_truthiness(db, alias.value_type(db), class),
 
         Type::BoundMethod(..)
-        | Type::MethodWrapper(..)
+        | Type::KnownBoundMethod(..)
         | Type::WrapperDescriptor(..)
         | Type::DataclassDecorator(..)
         | Type::DataclassTransformer(..)
@@ -1049,10 +1133,10 @@ fn signature_cycle_recover<'db>(
 }
 
 fn signature_cycle_initial<'db>(
-    db: &'db dyn Db,
+    _db: &'db dyn Db,
     _function: FunctionType<'db>,
 ) -> CallableSignature<'db> {
-    CallableSignature::single(Signature::bottom(db))
+    CallableSignature::single(Signature::bottom())
 }
 
 fn last_definition_signature_cycle_recover<'db>(
@@ -1065,10 +1149,10 @@ fn last_definition_signature_cycle_recover<'db>(
 }
 
 fn last_definition_signature_cycle_initial<'db>(
-    db: &'db dyn Db,
+    _db: &'db dyn Db,
     _function: FunctionType<'db>,
 ) -> Signature<'db> {
-    Signature::bottom(db)
+    Signature::bottom()
 }
 
 /// Non-exhaustive enumeration of known functions (e.g. `builtins.reveal_type`, ...) that might
@@ -1172,6 +1256,12 @@ pub enum KnownFunction {
     HasMember,
     /// `ty_extensions.reveal_protocol_interface`
     RevealProtocolInterface,
+    /// `ty_extensions.range_constraint`
+    RangeConstraint,
+    /// `ty_extensions.not_equivalent_constraint`
+    NotEquivalentConstraint,
+    /// `ty_extensions.incomparable_constraint`
+    IncomparableConstraint,
 }
 
 impl KnownFunction {
@@ -1237,6 +1327,9 @@ impl KnownFunction {
             | Self::StaticAssert
             | Self::HasMember
             | Self::RevealProtocolInterface
+            | Self::RangeConstraint
+            | Self::NotEquivalentConstraint
+            | Self::IncomparableConstraint
             | Self::AllMembers => module.is_ty_extensions(),
             Self::ImportModule => module.is_importlib(),
         }
@@ -1532,6 +1625,84 @@ impl KnownFunction {
                 overload.set_return_type(Type::module_literal(db, file, module));
             }
 
+            KnownFunction::RangeConstraint => {
+                let [
+                    Some(lower),
+                    Some(Type::NonInferableTypeVar(typevar)),
+                    Some(upper),
+                ] = parameter_types
+                else {
+                    return;
+                };
+
+                let constraints = ConstraintSet::range(db, *lower, *typevar, *upper);
+                let tracked = TrackedConstraintSet::new(db, constraints);
+                overload.set_return_type(Type::KnownInstance(KnownInstanceType::ConstraintSet(
+                    tracked,
+                )));
+            }
+
+            KnownFunction::NotEquivalentConstraint => {
+                let [Some(Type::NonInferableTypeVar(typevar)), Some(hole)] = parameter_types else {
+                    return;
+                };
+
+                if !hole.is_equivalent_to(db, hole.top_materialization(db)) {
+                    if let Some(builder) =
+                        context.report_lint(&INVALID_ARGUMENT_TYPE, call_expression)
+                    {
+                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                            "Not-equivalent constraint must have a fully static type"
+                        ));
+                        diagnostic.annotate(
+                            Annotation::secondary(context.span(&call_expression.arguments.args[1]))
+                                .message(format_args!(
+                                    "Type `{}` is not fully static",
+                                    hole.display(db)
+                                )),
+                        );
+                    }
+                    return;
+                }
+
+                let constraints = ConstraintSet::not_equivalent(db, *typevar, *hole);
+                let tracked = TrackedConstraintSet::new(db, constraints);
+                overload.set_return_type(Type::KnownInstance(KnownInstanceType::ConstraintSet(
+                    tracked,
+                )));
+            }
+
+            KnownFunction::IncomparableConstraint => {
+                let [Some(Type::NonInferableTypeVar(typevar)), Some(pivot)] = parameter_types
+                else {
+                    return;
+                };
+
+                if !pivot.is_equivalent_to(db, pivot.top_materialization(db)) {
+                    if let Some(builder) =
+                        context.report_lint(&INVALID_ARGUMENT_TYPE, call_expression)
+                    {
+                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                            "Incomparable constraint must have a fully static type"
+                        ));
+                        diagnostic.annotate(
+                            Annotation::secondary(context.span(&call_expression.arguments.args[1]))
+                                .message(format_args!(
+                                    "Type `{}` is not fully static",
+                                    pivot.display(db)
+                                )),
+                        );
+                    }
+                    return;
+                }
+
+                let constraints = ConstraintSet::incomparable(db, *typevar, *pivot);
+                let tracked = TrackedConstraintSet::new(db, constraints);
+                overload.set_return_type(Type::KnownInstance(KnownInstanceType::ConstraintSet(
+                    tracked,
+                )));
+            }
+
             _ => {}
         }
     }
@@ -1592,6 +1763,9 @@ pub(crate) mod tests {
                 | KnownFunction::IsEquivalentTo
                 | KnownFunction::HasMember
                 | KnownFunction::RevealProtocolInterface
+                | KnownFunction::RangeConstraint
+                | KnownFunction::NotEquivalentConstraint
+                | KnownFunction::IncomparableConstraint
                 | KnownFunction::AllMembers => KnownModule::TyExtensions,
 
                 KnownFunction::ImportModule => KnownModule::ImportLib,

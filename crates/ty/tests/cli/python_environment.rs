@@ -1752,3 +1752,126 @@ fn default_root_tests_package() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn default_root_python_folder() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("src/foo.py", "foo = 10"),
+        ("python/bar.py", "bar = 20"),
+        (
+            "python/test_bar.py",
+            r#"
+            from foo import foo
+            from bar import bar
+
+            print(f"{foo} {bar}")
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    Ok(())
+}
+
+/// If `python/__init__.py` is present, it is considered a package and `python` is not added to search paths.
+#[test]
+fn default_root_python_package() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("src/foo.py", "foo = 10"),
+        ("python/__init__.py", ""),
+        ("python/bar.py", "bar = 20"),
+        (
+            "python/test_bar.py",
+            r#"
+            from foo import foo
+            from bar import bar  # expected unresolved import
+
+            print(f"{foo} {bar}")
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Cannot resolve imported module `bar`
+     --> python/test_bar.py:3:6
+      |
+    2 | from foo import foo
+    3 | from bar import bar  # expected unresolved import
+      |      ^^^
+    4 |
+    5 | print(f"{foo} {bar}")
+      |
+    info: Searched in the following paths during module resolution:
+    info:   1. <temp_dir>/ (first-party code)
+    info:   2. <temp_dir>/src (first-party code)
+    info:   3. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+    info: rule `unresolved-import` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    "#);
+
+    Ok(())
+}
+
+/// Similarly, if `python/__init__.pyi` is present, it is considered a package and `python` is not added to search paths.
+#[test]
+fn default_root_python_package_pyi() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("src/foo.py", "foo = 10"),
+        ("python/__init__.pyi", ""),
+        ("python/bar.py", "bar = 20"),
+        (
+            "python/test_bar.py",
+            r#"
+            from foo import foo
+            from bar import bar  # expected unresolved import
+
+            print(f"{foo} {bar}")
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Cannot resolve imported module `bar`
+     --> python/test_bar.py:3:6
+      |
+    2 | from foo import foo
+    3 | from bar import bar  # expected unresolved import
+      |      ^^^
+    4 |
+    5 | print(f"{foo} {bar}")
+      |
+    info: Searched in the following paths during module resolution:
+    info:   1. <temp_dir>/ (first-party code)
+    info:   2. <temp_dir>/src (first-party code)
+    info:   3. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+    info: rule `unresolved-import` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    "#);
+
+    Ok(())
+}

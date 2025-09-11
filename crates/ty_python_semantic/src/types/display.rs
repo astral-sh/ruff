@@ -16,8 +16,8 @@ use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::tuple::TupleSpec;
 use crate::types::{
-    BoundTypeVarInstance, CallableType, IntersectionType, KnownClass, MaterializationKind,
-    MethodWrapperKind, Protocol, ProtocolInstanceType, StringLiteralType, SubclassOfInner, Type,
+    BoundTypeVarInstance, CallableType, IntersectionType, KnownBoundMethodType, KnownClass,
+    MaterializationKind, Protocol, ProtocolInstanceType, StringLiteralType, SubclassOfInner, Type,
     UnionType, WrapperDescriptorKind,
 };
 use ruff_db::parsed::parsed_module;
@@ -90,9 +90,7 @@ impl DisplaySettings {
 fn type_to_class_literal<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<ClassLiteral<'db>> {
     match ty {
         Type::ClassLiteral(class) => Some(class),
-        Type::NominalInstance(instance) => {
-            type_to_class_literal(db, Type::from(instance.class(db)))
-        }
+        Type::NominalInstance(instance) => Some(instance.class_literal(db)),
         Type::EnumLiteral(enum_literal) => Some(enum_literal.enum_class(db)),
         Type::GenericAlias(alias) => Some(alias.origin(db)),
         Type::ProtocolInstance(ProtocolInstanceType {
@@ -200,15 +198,15 @@ impl ClassDisplay<'_> {
 
             match ancestor_scope.kind() {
                 ScopeKind::Class => {
-                    if let Some(class_def) = node.as_class(&module_ast) {
-                        name_parts.push(class_def.name.as_str().to_string());
+                    if let Some(class_def) = node.as_class() {
+                        name_parts.push(class_def.node(&module_ast).name.as_str().to_string());
                     }
                 }
                 ScopeKind::Function => {
-                    if let Some(function_def) = node.as_function(&module_ast) {
+                    if let Some(function_def) = node.as_function() {
                         name_parts.push(format!(
                             "<locals of function '{}'>",
-                            function_def.name.as_str()
+                            function_def.node(&module_ast).name.as_str()
                         ));
                     }
                 }
@@ -368,27 +366,27 @@ impl Display for DisplayRepresentation<'_> {
                     }
                 }
             }
-            Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(function)) => {
+            Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(function)) => {
                 write!(
                     f,
                     "<method-wrapper `__get__` of `{function}`>",
                     function = function.name(self.db),
                 )
             }
-            Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderCall(function)) => {
+            Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(function)) => {
                 write!(
                     f,
                     "<method-wrapper `__call__` of `{function}`>",
                     function = function.name(self.db),
                 )
             }
-            Type::MethodWrapper(MethodWrapperKind::PropertyDunderGet(_)) => {
+            Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderGet(_)) => {
                 f.write_str("<method-wrapper `__get__` of `property` object>")
             }
-            Type::MethodWrapper(MethodWrapperKind::PropertyDunderSet(_)) => {
+            Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderSet(_)) => {
                 f.write_str("<method-wrapper `__set__` of `property` object>")
             }
-            Type::MethodWrapper(MethodWrapperKind::StrStartswith(_)) => {
+            Type::KnownBoundMethod(KnownBoundMethodType::StrStartswith(_)) => {
                 f.write_str("<method-wrapper `startswith` of `str` object>")
             }
             Type::WrapperDescriptor(kind) => {
@@ -1353,7 +1351,7 @@ impl Display for DisplayMaybeParenthesizedType<'_> {
             |f: &mut Formatter<'_>| write!(f, "({})", self.ty.display_with(self.db, self.settings));
         match self.ty {
             Type::Callable(_)
-            | Type::MethodWrapper(_)
+            | Type::KnownBoundMethod(_)
             | Type::FunctionLiteral(_)
             | Type::BoundMethod(_)
             | Type::Union(_) => write_parentheses(f),
@@ -1648,7 +1646,7 @@ mod tests {
                         .with_annotated_type(KnownClass::Int.to_instance(&db))
                         .with_default_type(Type::IntLiteral(4)),
                     Parameter::variadic(Name::new_static("args"))
-                        .with_annotated_type(Type::object(&db)),
+                        .with_annotated_type(Type::object()),
                     Parameter::keyword_only(Name::new_static("g"))
                         .with_default_type(Type::IntLiteral(5)),
                     Parameter::keyword_only(Name::new_static("h"))
@@ -1804,7 +1802,7 @@ mod tests {
                         .with_annotated_type(KnownClass::Int.to_instance(&db))
                         .with_default_type(Type::IntLiteral(4)),
                     Parameter::variadic(Name::new_static("args"))
-                        .with_annotated_type(Type::object(&db)),
+                        .with_annotated_type(Type::object()),
                     Parameter::keyword_only(Name::new_static("g"))
                         .with_default_type(Type::IntLiteral(5)),
                     Parameter::keyword_only(Name::new_static("h"))

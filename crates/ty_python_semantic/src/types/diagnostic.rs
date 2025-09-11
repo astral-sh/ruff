@@ -6,7 +6,6 @@ use super::{
     add_inferred_python_version_hint_to_diagnostic,
 };
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
-use crate::semantic_index::SemanticIndex;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::place::{PlaceTable, ScopedPlaceId};
 use crate::suppression::FileSuppressionId;
@@ -19,7 +18,8 @@ use crate::types::string_annotation::{
     RAW_STRING_TYPE_ANNOTATION,
 };
 use crate::types::{
-    DynamicType, LintDiagnosticGuard, Protocol, ProtocolInstanceType, SubclassOfInner, binding_type,
+    ClassType, DynamicType, LintDiagnosticGuard, Protocol, ProtocolInstanceType, SubclassOfInner,
+    binding_type,
 };
 use crate::types::{SpecialFormType, Type, protocol_class::ProtocolClass};
 use crate::util::diagnostics::format_enumeration;
@@ -2088,7 +2088,7 @@ pub(super) fn report_implicit_return_type(
     range: impl Ranged,
     expected_ty: Type,
     has_empty_body: bool,
-    enclosing_class_of_method: Option<ClassLiteral>,
+    enclosing_class_of_method: Option<ClassType>,
     no_return: bool,
 ) {
     let Some(builder) = context.report_lint(&INVALID_RETURN_TYPE, range) else {
@@ -2122,7 +2122,7 @@ pub(super) fn report_implicit_return_type(
     let Some(class) = enclosing_class_of_method else {
         return;
     };
-    if class.iter_mro(db, None).contains(&ClassBase::Protocol) {
+    if class.iter_mro(db).contains(&ClassBase::Protocol) {
         diagnostic.info(format_args!(
             "Class `{}` has `typing.Protocol` in its MRO, but it is not a protocol class",
             class.name(db)
@@ -2886,16 +2886,13 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
 pub(super) fn report_namedtuple_field_without_default_after_field_with_default<'db>(
     context: &InferContext<'db, '_>,
     class: ClassLiteral<'db>,
-    index: &'db SemanticIndex<'db>,
-    field_name: &str,
-    field_with_default: &str,
+    (field, field_def): &(Name, Option<Definition<'db>>),
+    (field_with_default, field_with_default_def): &(Name, Option<Definition<'db>>),
 ) {
     let db = context.db();
     let module = context.module();
 
-    let diagnostic_range = class
-        .first_declaration_of_name(db, field_name, index)
-        .and_then(|definition| definition.declaration.definition())
+    let diagnostic_range = field_def
         .map(|definition| definition.kind(db).full_range(module))
         .unwrap_or_else(|| class.header_range(db));
 
@@ -2907,13 +2904,11 @@ pub(super) fn report_namedtuple_field_without_default_after_field_with_default<'
     ));
 
     diagnostic.set_primary_message(format_args!(
-        "Field `{field_name}` defined here without a default value"
+        "Field `{field}` defined here without a default value",
     ));
 
-    let Some(field_with_default_range) = class
-        .first_binding_of_name(db, field_with_default, index)
-        .and_then(|definition| definition.binding.definition())
-        .map(|definition| definition.kind(db).full_range(module))
+    let Some(field_with_default_range) =
+        field_with_default_def.map(|definition| definition.kind(db).full_range(module))
     else {
         return;
     };
@@ -2932,7 +2927,7 @@ pub(super) fn report_namedtuple_field_without_default_after_field_with_default<'
         );
     } else {
         diagnostic.info(format_args!(
-            "Earlier field `{field_with_default}` was defined with a default value"
+            "Earlier field `{field_with_default}` was defined with a default value",
         ));
     }
 }

@@ -1,9 +1,11 @@
+use ruff_diagnostics::Applicability;
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::ExprCall;
+
 use crate::checkers::ast::Checker;
 use crate::preview::is_fix_os_path_basename_enabled;
 use crate::rules::flake8_use_pathlib::helpers::check_os_pathlib_single_arg_calls;
 use crate::{FixAvailability, Violation};
-use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::ExprCall;
 
 /// ## What it does
 /// Checks for uses of `os.path.basename`.
@@ -34,7 +36,16 @@ use ruff_python_ast::ExprCall;
 /// especially on older versions of Python.
 ///
 /// ## Fix Safety
-/// This rule's fix is marked as unsafe if the replacement would remove comments attached to the original expression.
+/// This rule's fix is always marked as unsafe because the replacement is not always semantically
+/// equivalent to the original code. In particular, `pathlib` performs path normalization,
+/// which can alter the result compared to `os.path.basename`. For example, this normalization:
+///
+/// - Collapses consecutive slashes (e.g., `"a//b"` → `"a/b"`).
+/// - Removes trailing slashes (e.g., `"a/b/"` → `"a/b"`).
+/// - Eliminates `"."` (e.g., `"a/./b"` → `"a/b"`).
+///
+/// As a result, code relying on the exact string returned by `os.path.basename`
+/// may behave differently after the fix.
 ///
 /// ## References
 /// - [Python documentation: `PurePath.name`](https://docs.python.org/3/library/pathlib.html#pathlib.PurePath.name)
@@ -62,6 +73,7 @@ pub(crate) fn os_path_basename(checker: &Checker, call: &ExprCall, segments: &[&
     if segments != ["os", "path", "basename"] {
         return;
     }
+
     check_os_pathlib_single_arg_calls(
         checker,
         call,
@@ -69,5 +81,6 @@ pub(crate) fn os_path_basename(checker: &Checker, call: &ExprCall, segments: &[&
         "p",
         is_fix_os_path_basename_enabled(checker.settings()),
         OsPathBasename,
+        Some(Applicability::Unsafe),
     );
 }

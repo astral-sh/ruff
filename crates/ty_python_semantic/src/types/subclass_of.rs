@@ -80,35 +80,27 @@ impl<'db> SubclassOfType<'db> {
         subclass_of.is_dynamic()
     }
 
-    pub(super) fn materialize(
-        self,
-        db: &'db dyn Db,
-        materialization_kind: MaterializationKind,
-    ) -> Type<'db> {
-        match self.subclass_of {
-            SubclassOfInner::Dynamic(_) => match materialization_kind {
-                MaterializationKind::Top => KnownClass::Type.to_instance(db),
-                MaterializationKind::Bottom => Type::Never,
-            },
-            SubclassOfInner::Class(_) => Type::SubclassOf(self),
-        }
-    }
-
     pub(super) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
-    ) -> Self {
+    ) -> Type<'db> {
         match self.subclass_of {
-            SubclassOfInner::Class(class) => Self {
+            SubclassOfInner::Class(class) => Type::SubclassOf(Self {
                 subclass_of: SubclassOfInner::Class(class.apply_type_mapping_impl(
                     db,
                     type_mapping,
                     visitor,
                 )),
+            }),
+            SubclassOfInner::Dynamic(_) => match type_mapping {
+                TypeMapping::Materialize(materialization_kind) => match materialization_kind {
+                    MaterializationKind::Top => KnownClass::Type.to_instance(db),
+                    MaterializationKind::Bottom => Type::Never,
+                },
+                _ => Type::SubclassOf(self),
             },
-            SubclassOfInner::Dynamic(_) => self,
         }
     }
 
@@ -229,7 +221,7 @@ impl<'db> VarianceInferable<'db> for SubclassOfType<'db> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub(crate) enum SubclassOfInner<'db> {
     Class(ClassType<'db>),
-    Dynamic(DynamicType),
+    Dynamic(DynamicType<'db>),
 }
 
 impl<'db> SubclassOfInner<'db> {
@@ -248,7 +240,7 @@ impl<'db> SubclassOfInner<'db> {
         }
     }
 
-    pub(crate) const fn into_dynamic(self) -> Option<DynamicType> {
+    pub(crate) const fn into_dynamic(self) -> Option<DynamicType<'db>> {
         match self {
             Self::Class(_) => None,
             Self::Dynamic(dynamic) => Some(dynamic),
@@ -279,8 +271,8 @@ impl<'db> From<ClassType<'db>> for SubclassOfInner<'db> {
     }
 }
 
-impl From<DynamicType> for SubclassOfInner<'_> {
-    fn from(value: DynamicType) -> Self {
+impl<'db> From<DynamicType<'db>> for SubclassOfInner<'db> {
+    fn from(value: DynamicType<'db>) -> Self {
         SubclassOfInner::Dynamic(value)
     }
 }

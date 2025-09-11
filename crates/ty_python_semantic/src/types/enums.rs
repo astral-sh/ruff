@@ -130,7 +130,7 @@ pub(crate) fn enum_metadata<'db>(
                             // Some types are specifically disallowed for enum members.
                             return None;
                         }
-                        Type::NominalInstance(instance) => match instance.class(db).known(db) {
+                        Type::NominalInstance(instance) => match instance.known_class(db) {
                             // enum.nonmember
                             Some(KnownClass::Nonmember) => return None,
 
@@ -208,7 +208,7 @@ pub(crate) fn enum_metadata<'db>(
                 PlaceAndQualifiers {
                     place: Place::Type(Type::NominalInstance(instance), _),
                     ..
-                } if instance.class(db).is_known(db, KnownClass::Member) => {
+                } if instance.has_known_class(db, KnownClass::Member) => {
                     // If the attribute is specifically declared with `enum.member`, it is considered a member
                 }
                 _ => {

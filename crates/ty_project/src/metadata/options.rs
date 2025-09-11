@@ -259,11 +259,29 @@ impl Options {
                 vec![project_root.to_path_buf()]
             };
 
+            let python = project_root.join("python");
+            if system.is_directory(&python)
+                && !system.is_file(&python.join("__init__.py"))
+                && !system.is_file(&python.join("__init__.pyi"))
+                && !roots.contains(&python)
+            {
+                // If a `./python` directory exists, include it as a source root. This is the recommended layout
+                // for maturin-based rust/python projects [1].
+                //
+                // https://github.com/PyO3/maturin/blob/979fe1db42bb9e58bc150fa6fc45360b377288bf/README.md?plain=1#L88-L99
+                tracing::debug!(
+                    "Including `./python` in `environment.root` because a `./python` directory exists"
+                );
+
+                roots.push(python);
+            }
+
             // Considering pytest test discovery conventions,
             // we also include the `tests` directory if it exists and is not a package.
             let tests_dir = project_root.join("tests");
             if system.is_directory(&tests_dir)
                 && !system.is_file(&tests_dir.join("__init__.py"))
+                && !system.is_file(&tests_dir.join("__init__.pyi"))
                 && !roots.contains(&tests_dir)
             {
                 // If the `tests` directory exists and is not a package, include it as a source root.
@@ -428,7 +446,7 @@ pub struct EnvironmentOptions {
     /// * if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path
     /// * otherwise, default to `.` (flat layout)
     ///
-    /// Besides, if a `./tests` directory exists and is not a package (i.e. it does not contain an `__init__.py` file),
+    /// Besides, if a `./python` or `./tests` directory exists and is not a package (i.e. it does not contain an `__init__.py` or `__init__.pyi` file),
     /// it will also be included in the first party search path.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
@@ -1055,6 +1073,21 @@ pub enum OutputFormat {
     ///
     /// This may use color when printing to a `tty`.
     Concise,
+    /// Print diagnostics in the JSON format expected by GitLab [Code Quality] reports.
+    ///
+    /// [Code Quality]: https://docs.gitlab.com/ci/testing/code_quality/#code-quality-report-format
+    Gitlab,
+}
+
+impl OutputFormat {
+    /// Returns `true` if this format is intended for users to read directly, in contrast to
+    /// machine-readable or structured formats.
+    ///
+    /// This can be used to check whether information beyond the diagnostics, such as a header or
+    /// `Found N diagnostics` footer, should be included.
+    pub const fn is_human_readable(&self) -> bool {
+        matches!(self, OutputFormat::Full | OutputFormat::Concise)
+    }
 }
 
 impl From<OutputFormat> for DiagnosticFormat {
@@ -1062,6 +1095,7 @@ impl From<OutputFormat> for DiagnosticFormat {
         match value {
             OutputFormat::Full => Self::Full,
             OutputFormat::Concise => Self::Concise,
+            OutputFormat::Gitlab => Self::Gitlab,
         }
     }
 }
