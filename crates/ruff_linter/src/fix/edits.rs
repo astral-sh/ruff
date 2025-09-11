@@ -370,8 +370,8 @@ pub(crate) fn adjust_indentation(
 
     // If the range includes a multi-line string, use LibCST to ensure that we don't adjust the
     // whitespace _within_ the string.
-    let contains_multiline_string =
-        indexer.multiline_ranges().intersects(range) || indexer.fstring_ranges().intersects(range);
+    let contains_multiline_string = indexer.multiline_ranges().intersects(range)
+        || indexer.interpolated_string_ranges().intersects(range);
 
     // If the range has mixed indentation, we will use LibCST as well.
     let mixed_indentation = contents.universal_newlines().any(|line| {

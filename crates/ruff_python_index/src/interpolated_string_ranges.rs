@@ -3,17 +3,17 @@ use std::collections::BTreeMap;
 use ruff_python_parser::{Token, TokenKind};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-/// Stores the ranges of all f-strings in a file sorted by [`TextRange::start`].
-/// There can be multiple overlapping ranges for nested f-strings.
+/// Stores the ranges of all interpolated strings in a file sorted by [`TextRange::start`].
+/// There can be multiple overlapping ranges for nested interpolated strings.
 ///
-/// Note that the ranges for all unterminated f-strings are not stored.
+/// Note that the ranges for all unterminated interpolated strings are not stored.
 #[derive(Debug)]
-pub struct FStringRanges {
-    // Mapping from the f-string start location to its range.
+pub struct InterpolatedStringRanges {
+    // Mapping from the interpolated string start location to its range.
     raw: BTreeMap<TextSize, TextRange>,
 }
 
-impl FStringRanges {
+impl InterpolatedStringRanges {
     /// Returns `true` if the given range intersects with any f-string range.
     pub fn intersects(&self, target: TextRange) -> bool {
         self.raw
@@ -61,17 +61,17 @@ impl FStringRanges {
             .map(|(_, range)| *range)
     }
 
-    /// Returns an iterator over all f-string [`TextRange`] sorted by their
+    /// Returns an iterator over all interpolated string [`TextRange`] sorted by their
     /// start location.
     ///
-    /// For nested f-strings, the outermost f-string is yielded first, moving
+    /// For nested interpolated strings, the outermost interpolated string is yielded first, moving
     /// inwards with each iteration.
     #[inline]
     pub fn values(&self) -> impl Iterator<Item = &TextRange> + '_ {
         self.raw.values()
     }
 
-    /// Returns the number of f-string ranges stored.
+    /// Returns the number of interpolated string ranges stored.
     #[inline]
     pub fn len(&self) -> usize {
         self.raw.len()
@@ -79,18 +79,21 @@ impl FStringRanges {
 }
 
 #[derive(Default)]
-pub(crate) struct FStringRangesBuilder {
+pub(crate) struct InterpolatedStringRangesBuilder {
     start_locations: Vec<TextSize>,
     raw: BTreeMap<TextSize, TextRange>,
 }
 
-impl FStringRangesBuilder {
+impl InterpolatedStringRangesBuilder {
     pub(crate) fn visit_token(&mut self, token: &Token) {
+        // While the logic of this visitor makes it seem possible to pair, say,
+        // an `FStringStart` with a `TStringEnd`, it is not actually possible to
+        // encounter this in tokenized code free from lexical errors.
         match token.kind() {
-            TokenKind::FStringStart => {
+            TokenKind::FStringStart | TokenKind::TStringStart => {
                 self.start_locations.push(token.start());
             }
-            TokenKind::FStringEnd => {
+            TokenKind::FStringEnd | TokenKind::TStringEnd => {
                 if let Some(start) = self.start_locations.pop() {
                     self.raw.insert(start, TextRange::new(start, token.end()));
                 }
@@ -99,7 +102,7 @@ impl FStringRangesBuilder {
         }
     }
 
-    pub(crate) fn finish(self) -> FStringRanges {
-        FStringRanges { raw: self.raw }
+    pub(crate) fn finish(self) -> InterpolatedStringRanges {
+        InterpolatedStringRanges { raw: self.raw }
     }
 }
