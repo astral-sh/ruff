@@ -871,3 +871,219 @@ is_subtype_of(int, int, int)
 # error: [too-many-positional-arguments]
 is_subtype_of(int, int, int, int)
 ```
+
+## Keywords argument
+
+A double-starred argument (`**kwargs`) can be used to pass an argument that implements the mapping
+protocol. This is matched against any of the *unmatched* standard (positional or keyword),
+keyword-only, and keywords (`**kwargs`) parameters.
+
+### Empty
+
+```py
+def empty() -> None: ...
+def _(kwargs: dict[str, int]) -> None:
+    empty(**kwargs)
+
+empty(**{})
+empty(**dict())
+```
+
+### Single parameter
+
+```py
+from typing_extensions import TypedDict
+
+def f(**kwargs: int) -> None: ...
+
+class Foo(TypedDict):
+    a: int
+    b: int
+
+def _(kwargs: dict[str, int]) -> None:
+    f(**kwargs)
+
+f(**{"foo": 1})
+f(**dict(foo=1))
+f(**Foo(a=1, b=2))
+```
+
+### Positional-only and variadic parameters
+
+```py
+def f1(a: int, b: int, /) -> None: ...
+def f2(*args: int) -> None: ...
+def _(kwargs: dict[str, int]) -> None:
+    # error: [missing-argument] "No arguments provided for required parameters `a`, `b` of function `f1`"
+    f1(**kwargs)
+
+    # This doesn't raise an error because `*args` is an optional parameter and `**kwargs` can be empty.
+    f2(**kwargs)
+```
+
+### Standard parameters
+
+```py
+from typing_extensions import TypedDict
+
+class Foo(TypedDict):
+    a: int
+    b: int
+
+def f(a: int, b: int) -> None: ...
+def _(kwargs: dict[str, int]) -> None:
+    f(**kwargs)
+
+f(**{"a": 1, "b": 2})
+f(**dict(a=1, b=2))
+f(**Foo(a=1, b=2))
+```
+
+### Keyword-only parameters
+
+```py
+from typing_extensions import TypedDict
+
+class Foo(TypedDict):
+    a: int
+    b: int
+
+def f(*, a: int, b: int) -> None: ...
+def _(kwargs: dict[str, int]) -> None:
+    f(**kwargs)
+
+f(**{"a": 1, "b": 2})
+f(**dict(a=1, b=2))
+f(**Foo(a=1, b=2))
+```
+
+### Multiple keywords argument
+
+```py
+def f(**kwargs: int) -> None: ...
+def _(kwargs1: dict[str, int], kwargs2: dict[str, int], kwargs3: dict[str, str], kwargs4: dict[int, list]) -> None:
+    f(**kwargs1, **kwargs2)
+    # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `int`, found `str`"
+    f(**kwargs1, **kwargs3)
+    # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `int`, found `str`"
+    # error: [invalid-argument-type] "Argument expression after ** must be a mapping with `str` key type: Found `int`"
+    # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `int`, found `list[Unknown]`"
+    f(**kwargs3, **kwargs4)
+```
+
+### Keyword-only after keywords
+
+```py
+class B: ...
+
+def f(*, a: int, b: B, **kwargs: int) -> None: ...
+def _(kwargs: dict[str, int]):
+    # Make sure that the `b` argument is not being matched against `kwargs` by passing an integer
+    # instead of the annotated type which should raise an
+    # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `B`, found `Literal[2]`"
+    f(a=1, **kwargs, b=2)
+```
+
+### Mixed parameter kind
+
+```py
+def f1(*, a: int, b: int, **kwargs: int) -> None: ...
+def f2(a: int, *, b: int, **kwargs: int) -> None: ...
+def f3(a: int, /, *args: int, b: int, **kwargs: int) -> None: ...
+def _(kwargs1: dict[str, int], kwargs2: dict[str, str]):
+    f1(**kwargs1)
+    f2(**kwargs1)
+    f3(1, **kwargs1)
+```
+
+### TypedDict
+
+```py
+from typing_extensions import NotRequired, TypedDict
+
+class Foo1(TypedDict):
+    a: int
+    b: str
+
+class Foo2(TypedDict):
+    a: int
+    b: NotRequired[str]
+
+def f(**kwargs: int) -> None: ...
+
+# error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `int`, found `str`"
+f(**Foo1(a=1, b="b"))
+# error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `int`, found `str`"
+f(**Foo2(a=1))
+```
+
+### Keys must be strings
+
+The keys of the mapping passed to a double-starred argument must be strings.
+
+```py
+from collections.abc import Mapping
+
+def f(**kwargs: int) -> None: ...
+
+class DictSubclass(dict[int, int]): ...
+class MappingSubclass(Mapping[int, int]): ...
+
+class MappingProtocol:
+    def keys(self) -> list[int]:
+        return [1]
+
+    def __getitem__(self, key: int) -> int:
+        return 1
+
+def _(kwargs: dict[int, int]) -> None:
+    # error: [invalid-argument-type] "Argument expression after ** must be a mapping with `str` key type: Found `int`"
+    f(**kwargs)
+
+# error: [invalid-argument-type] "Argument expression after ** must be a mapping with `str` key type: Found `int`"
+f(**DictSubclass())
+# error: [invalid-argument-type] "Argument expression after ** must be a mapping with `str` key type: Found `int`"
+f(**MappingSubclass())
+# error: [invalid-argument-type] "Argument expression after ** must be a mapping with `str` key type: Found `int`"
+f(**MappingProtocol())
+```
+
+The key can also be a custom type that inherits from `str`.
+
+```py
+class SubStr(str): ...
+class SubInt(int): ...
+
+def _(kwargs1: dict[SubStr, int], kwargs2: dict[SubInt, int]) -> None:
+    f(**kwargs1)
+    # error: [invalid-argument-type] "Argument expression after ** must be a mapping with `str` key type: Found `SubInt`"
+    f(**kwargs2)
+```
+
+### Invalid value type
+
+```py
+from collections.abc import Mapping
+
+def f(**kwargs: str) -> None: ...
+
+class DictSubclass(dict[str, int]): ...
+class MappingSubclass(Mapping[str, int]): ...
+
+class MappingProtocol:
+    def keys(self) -> list[str]:
+        return ["foo"]
+
+    def __getitem__(self, key: str) -> int:
+        return 1
+
+def _(kwargs: dict[str, int]) -> None:
+    # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `str`, found `int`"
+    f(**kwargs)
+    # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `str`, found `int`"
+    f(**DictSubclass())
+    # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `str`, found `int`"
+    f(**MappingSubclass())
+    # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `str`, found `int`"
+    f(**MappingProtocol())
+```
