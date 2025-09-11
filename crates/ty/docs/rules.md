@@ -1838,62 +1838,6 @@ Use instead:
 a = 20 / 0  # type: ignore
 ```
 
-## `possibly-undeclared-attribute`
-
-<small>
-Default level: [`warn`](../rules.md#rule-levels "This lint has a default level of 'warn'.") ·
-[Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20possibly-unbound-attribute) ·
-[View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1327)
-</small>
-
-**What it does**
-
-Checks for possibly undeclared attributes.
-
-**Why is this bad?**
-
-Attempting to access an undeclared attribute will raise an `AttributeError` at runtime.
-
-**Examples**
-
-```python
-class A:
-    if b:
-        c = 0
-
-A.c  # AttributeError: type object 'A' has no attribute 'c'
-```
-
-## `possibly-undeclared-implicit-call`
-
-<small>
-Default level: [`warn`](../rules.md#rule-levels "This lint has a default level of 'warn'.") ·
-[Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20possibly-unbound-implicit-call) ·
-[View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L131)
-</small>
-
-**What it does**
-
-Checks for implicit calls to possibly undeclared methods.
-
-**Why is this bad?**
-
-Expressions such as `x[y]` and `x * y` call methods
-under the hood (`__getitem__` and `__mul__` respectively).
-Calling an unbound method will raise an `AttributeError` at runtime.
-
-**Examples**
-
-```python
-import datetime
-
-class A:
-    if datetime.date.today().weekday() != 6:
-        def __getitem__(self, v): ...
-
-A()[0]  # TypeError: 'A' object is not subscriptable
-```
-
 ## `possibly-unbound-import`
 
 <small>
@@ -1922,6 +1866,62 @@ if datetime.date.today().weekday() != 6:
 
 # main.py
 from module import a  # ImportError: cannot import name 'a' from 'module'
+```
+
+## `possibly-undeclared-attribute`
+
+<small>
+Default level: [`warn`](../rules.md#rule-levels "This lint has a default level of 'warn'.") ·
+[Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20possibly-undeclared-attribute) ·
+[View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1327)
+</small>
+
+**What it does**
+
+Checks for possibly undeclared attributes.
+
+**Why is this bad?**
+
+Attempting to access an undeclared attribute will raise an `AttributeError` at runtime.
+
+**Examples**
+
+```python
+class A:
+    if b:
+        c = 0
+
+A.c  # AttributeError: type object 'A' has no attribute 'c'
+```
+
+## `possibly-undeclared-implicit-call`
+
+<small>
+Default level: [`warn`](../rules.md#rule-levels "This lint has a default level of 'warn'.") ·
+[Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20possibly-undeclared-implicit-call) ·
+[View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L131)
+</small>
+
+**What it does**
+
+Checks for implicit calls to possibly undeclared methods.
+
+**Why is this bad?**
+
+Expressions such as `x[y]` and `x * y` call methods
+under the hood (`__getitem__` and `__mul__` respectively).
+Calling an undeclared method will raise an `AttributeError` at runtime.
+
+**Examples**
+
+```python
+import datetime
+
+class A:
+    if datetime.date.today().weekday() != 6:
+        def __getitem__(self, v): ...
+
+A()[0]  # TypeError: 'A' object is not subscriptable
 ```
 
 ## `redundant-cast`
