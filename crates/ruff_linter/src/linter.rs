@@ -513,10 +513,9 @@ fn diagnostics_to_messages(
                 .map(|error| create_syntax_error_diagnostic(source_file.clone(), error, error)),
         )
         .chain(diagnostics.into_iter().map(|mut diagnostic| {
-            let noqa_offset = directives
-                .noqa_line_for
-                .resolve(diagnostic.expect_range().start());
-            diagnostic.set_noqa_offset(noqa_offset);
+            if let Some(range) = diagnostic.range() {
+                diagnostic.set_noqa_offset(directives.noqa_line_for.resolve(range.start()));
+            }
             diagnostic
         }))
         .collect()
@@ -983,7 +982,7 @@ mod tests {
             &parsed,
             target_version,
         );
-        diagnostics.sort_by_key(|diagnostic| diagnostic.expect_range().start());
+        diagnostics.sort_by(Diagnostic::ruff_start_ordering);
         diagnostics
     }
 
