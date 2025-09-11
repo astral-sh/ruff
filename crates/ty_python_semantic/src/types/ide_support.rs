@@ -12,7 +12,10 @@ use crate::semantic_index::{
 };
 use crate::types::call::{CallArguments, MatchedArgument};
 use crate::types::signatures::Signature;
-use crate::types::{ClassBase, ClassLiteral, DynamicType, KnownClass, KnownInstanceType, Type};
+use crate::types::{
+    ClassBase, ClassLiteral, DynamicType, KnownClass, KnownInstanceType, Type,
+    class::CodeGeneratorKind,
+};
 use crate::{Db, HasType, NameKind, SemanticModel};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::parsed_module;
@@ -95,7 +98,17 @@ impl<'db> AllMembers<'db> {
             ),
 
             Type::NominalInstance(instance) => {
-                self.extend_with_instance_members(db, ty, instance.class_literal(db));
+                let class_lit = instance.class_literal(db);
+                self.extend_with_instance_members(db, ty, class_lit);
+
+                // If this is a NamedTuple instance, include members from NamedTupleFallback
+                if CodeGeneratorKind::NamedTuple.matches(db, class_lit) {
+                    if let Type::ClassLiteral(fallback) =
+                        KnownClass::NamedTupleFallback.to_class_literal(db)
+                    {
+                        self.extend_with_instance_members(db, ty, fallback);
+                    }
+                }
             }
 
             Type::ClassLiteral(class_literal) if class_literal.is_typed_dict(db) => {
