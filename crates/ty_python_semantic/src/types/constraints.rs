@@ -140,7 +140,7 @@ pub(crate) trait IteratorConstraintsExtension<T> {
     /// Returns the constraints under which any element of the iterator holds.
     ///
     /// This method short-circuits; if we encounter any element that
-    /// [`is_always_satisfied`][Constraints::is_always_satisfied] true, then the overall result
+    /// [`is_always_satisfied`][ConstraintSet::is_always_satisfied] true, then the overall result
     /// must be as well, and we stop consuming elements from the iterator.
     fn when_any<'db>(
         self,
@@ -151,8 +151,8 @@ pub(crate) trait IteratorConstraintsExtension<T> {
     /// Returns the constraints under which every element of the iterator holds.
     ///
     /// This method short-circuits; if we encounter any element that
-    /// [`is_never_satisfied`][Constraints::is_never_satisfied] true, then the overall result must
-    /// be as well, and we stop consuming elements from the iterator.
+    /// [`is_never_satisfied`][ConstraintSet::is_never_satisfied] true, then the overall result
+    /// must be as well, and we stop consuming elements from the iterator.
     fn when_all<'db>(
         self,
         db: &'db dyn Db,
