@@ -697,8 +697,8 @@ fn github_diagnostics() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    ::error title=Ruff (unresolved-reference),file=test.py,line=2,col=7,endLine=2,endColumn=8::test.py:2:7: unresolved-reference: Name `x` used when not defined
-    ::error title=Ruff (non-subscriptable),file=test.py,line=3,col=7,endLine=3,endColumn=8::test.py:3:7: non-subscriptable: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
+    ::error title=ty (unresolved-reference),file=test.py,line=2,col=7,endLine=2,endColumn=8::test.py:2:7: unresolved-reference: Name `x` used when not defined
+    ::error title=ty (non-subscriptable),file=test.py,line=3,col=7,endLine=3,endColumn=8::test.py:3:7: non-subscriptable: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
 
     ----- stderr -----
     WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.

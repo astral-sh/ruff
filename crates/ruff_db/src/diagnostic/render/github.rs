@@ -1,12 +1,13 @@
-use crate::diagnostic::{Diagnostic, FileResolver};
+use crate::diagnostic::{Diagnostic, DisplayDiagnosticConfig, FileResolver};
 
 pub(super) struct GithubRenderer<'a> {
     resolver: &'a dyn FileResolver,
+    config: &'a DisplayDiagnosticConfig,
 }
 
 impl<'a> GithubRenderer<'a> {
-    pub(super) fn new(resolver: &'a dyn FileResolver) -> Self {
-        Self { resolver }
+    pub(super) fn new(resolver: &'a dyn FileResolver, config: &'a DisplayDiagnosticConfig) -> Self {
+        Self { resolver, config }
     }
 
     pub(super) fn render(
@@ -17,7 +18,8 @@ impl<'a> GithubRenderer<'a> {
         for diagnostic in diagnostics {
             write!(
                 f,
-                "::error title=Ruff ({code})",
+                "::error title={program} ({code})",
+                program = self.config.program,
                 code = diagnostic.secondary_code_or_id()
             )?;
 
@@ -103,7 +105,7 @@ mod tests {
 
         insta::assert_snapshot!(
             env.render(&diag),
-            @"::error title=Ruff (test-diagnostic)::test-diagnostic: main diagnostic message",
+            @"::error title=ty (test-diagnostic)::test-diagnostic: main diagnostic message",
         );
     }
 }
