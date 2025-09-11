@@ -21,11 +21,11 @@ use crate::{Db, FxOrderSet};
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
 
 impl<'db> Type<'db> {
-    pub(crate) fn object() -> Self {
+    pub(crate) const fn object() -> Self {
         Type::NominalInstance(NominalInstanceType(NominalInstanceInner::Object))
     }
 
-    pub(crate) fn is_object(&self) -> bool {
+    pub(crate) const fn is_object(&self) -> bool {
         matches!(
             self,
             Type::NominalInstance(NominalInstanceType(NominalInstanceInner::Object))
@@ -208,11 +208,11 @@ impl<'db> NominalInstanceType<'db> {
         Some(class_literal)
     }
 
-    pub(super) fn known(&self, db: &'db dyn Db) -> Option<KnownClass> {
+    pub(super) fn known_class(&self, db: &'db dyn Db) -> Option<KnownClass> {
         self.class(db).and_then(|class| class.known(db))
     }
 
-    pub(super) fn is_known(&self, db: &'db dyn Db, known_class: KnownClass) -> bool {
+    pub(super) fn has_known_class(&self, db: &'db dyn Db, known_class: KnownClass) -> bool {
         self.known(db) == Some(known_class)
     }
 
