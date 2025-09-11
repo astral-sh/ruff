@@ -989,10 +989,10 @@ impl<'db> FunctionType<'db> {
         visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self.normalized(db) == other.normalized(db) {
-            return ConstraintSet::always_satisfiable();
+            return ConstraintSet::from(true);
         }
         if self.literal(db) != other.literal(db) {
-            return ConstraintSet::unsatisfiable();
+            return ConstraintSet::from(false);
         }
         let self_signature = self.signature(db);
         let other_signature = other.signature(db);

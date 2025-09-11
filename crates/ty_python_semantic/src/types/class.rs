@@ -555,7 +555,7 @@ impl<'db> ClassType<'db> {
                 },
 
                 // Protocol and Generic are not represented by a ClassType.
-                ClassBase::Protocol | ClassBase::Generic => ConstraintSet::unsatisfiable(),
+                ClassBase::Protocol | ClassBase::Generic => ConstraintSet::from(false),
 
                 ClassBase::Class(base) => match (base, other) {
                     (ClassType::NonGeneric(base), ClassType::NonGeneric(other)) => {
@@ -573,13 +573,13 @@ impl<'db> ClassType<'db> {
                     }
                     (ClassType::Generic(_), ClassType::NonGeneric(_))
                     | (ClassType::NonGeneric(_), ClassType::Generic(_)) => {
-                        ConstraintSet::unsatisfiable()
+                        ConstraintSet::from(false)
                     }
                 },
 
                 ClassBase::TypedDict => {
                     // TODO: Implement subclassing and assignability for TypedDicts.
-                    ConstraintSet::always_satisfiable()
+                    ConstraintSet::from(true)
                 }
             }
         })
@@ -592,14 +592,14 @@ impl<'db> ClassType<'db> {
         visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self == other {
-            return ConstraintSet::always_satisfiable();
+            return ConstraintSet::from(true);
         }
 
         match (self, other) {
             // A non-generic class is never equivalent to a generic class.
             // Two non-generic classes are only equivalent if they are equal (handled above).
             (ClassType::NonGeneric(_), _) | (_, ClassType::NonGeneric(_)) => {
-                ConstraintSet::unsatisfiable()
+                ConstraintSet::from(false)
             }
 
             (ClassType::Generic(this), ClassType::Generic(other)) => {

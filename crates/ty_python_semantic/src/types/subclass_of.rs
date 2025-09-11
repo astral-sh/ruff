@@ -167,7 +167,7 @@ impl<'db> SubclassOfType<'db> {
     ) -> ConstraintSet<'db> {
         match (self.subclass_of, other.subclass_of) {
             (SubclassOfInner::Dynamic(_), _) | (_, SubclassOfInner::Dynamic(_)) => {
-                ConstraintSet::unsatisfiable()
+                ConstraintSet::from(false)
             }
             (SubclassOfInner::Class(self_class), SubclassOfInner::Class(other_class)) => {
                 ConstraintSet::from(!self_class.could_coexist_in_mro_with(db, other_class))

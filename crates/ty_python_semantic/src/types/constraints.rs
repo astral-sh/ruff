@@ -110,12 +110,11 @@ fn incomparable<'db>(db: &'db dyn Db, left: Type<'db>, right: Type<'db>) -> bool
 
 /// An extension trait for building constraint sets from [`Option`] values.
 pub(crate) trait OptionConstraintsExtension<T> {
-    /// Returns [`always_satisfiable`][Constraints::always_satisfiable] if the option is `None`;
-    /// otherwise applies a function to determine under what constraints the value inside of it
-    /// holds.
+    /// Returns a constraint set that is always satisfiable if the option is `None`; otherwise
+    /// applies a function to determine under what constraints the value inside of it holds.
     fn when_none_or<'db>(self, f: impl FnOnce(T) -> ConstraintSet<'db>) -> ConstraintSet<'db>;
 
-    /// Returns [`unsatisfiable`][Constraints::unsatisfiable] if the option is `None`; otherwise
+    /// Returns a constraint set that is never satisfiable if the option is `None`; otherwise
     /// applies a function to determine under what constraints the value inside of it holds.
     fn when_some_and<'db>(self, f: impl FnOnce(T) -> ConstraintSet<'db>) -> ConstraintSet<'db>;
 }
@@ -124,14 +123,14 @@ impl<T> OptionConstraintsExtension<T> for Option<T> {
     fn when_none_or<'db>(self, f: impl FnOnce(T) -> ConstraintSet<'db>) -> ConstraintSet<'db> {
         match self {
             Some(value) => f(value),
-            None => ConstraintSet::always_satisfiable(),
+            None => ConstraintSet::always(),
         }
     }
 
     fn when_some_and<'db>(self, f: impl FnOnce(T) -> ConstraintSet<'db>) -> ConstraintSet<'db> {
         match self {
             Some(value) => f(value),
-            None => ConstraintSet::unsatisfiable(),
+            None => ConstraintSet::never(),
         }
     }
 }
@@ -170,7 +169,7 @@ where
         db: &'db dyn Db,
         mut f: impl FnMut(T) -> ConstraintSet<'db>,
     ) -> ConstraintSet<'db> {
-        let mut result = ConstraintSet::unsatisfiable();
+        let mut result = ConstraintSet::never();
         for child in self {
             if result.union(db, f(child)).is_always_satisfied() {
                 return result;
@@ -184,7 +183,7 @@ where
         db: &'db dyn Db,
         mut f: impl FnMut(T) -> ConstraintSet<'db>,
     ) -> ConstraintSet<'db> {
-        let mut result = ConstraintSet::always_satisfiable();
+        let mut result = ConstraintSet::always();
         for child in self {
             if result.intersect(db, &f(child)).is_never_satisfied() {
                 return result;
@@ -217,15 +216,13 @@ pub struct ConstraintSet<'db> {
 }
 
 impl<'db> ConstraintSet<'db> {
-    /// Returns a constraint set that never holds
-    pub(crate) fn unsatisfiable() -> Self {
+    fn never() -> Self {
         Self {
             clauses: smallvec![],
         }
     }
 
-    /// Returns a constraint set that always holds
-    pub(crate) fn always_satisfiable() -> Self {
+    fn always() -> Self {
         Self::singleton(ConstraintClause::always())
     }
 
@@ -253,7 +250,7 @@ impl<'db> ConstraintSet<'db> {
 
     /// Returns the negation of this constraint set.
     pub(crate) fn negate(self, db: &'db dyn Db) -> Self {
-        let mut result = Self::always_satisfiable();
+        let mut result = Self::always();
         for clause in self.clauses {
             result.intersect_set(db, &clause.negate(db));
         }
@@ -296,7 +293,7 @@ impl<'db> ConstraintSet<'db> {
         let lower = lower.bottom_materialization(db);
         let upper = upper.top_materialization(db);
         let constraint = Constraint::range(db, lower, upper).constrain(typevar);
-        let mut result = Self::unsatisfiable();
+        let mut result = Self::never();
         result.union_constraint(db, constraint);
         result
     }
@@ -307,7 +304,7 @@ impl<'db> ConstraintSet<'db> {
         hole: Type<'db>,
     ) -> Self {
         let constraint = Constraint::not_equivalent(db, hole).constrain(typevar);
-        let mut result = Self::unsatisfiable();
+        let mut result = Self::never();
         result.union_constraint(db, constraint);
         result
     }
@@ -318,7 +315,7 @@ impl<'db> ConstraintSet<'db> {
         pivot: Type<'db>,
     ) -> Self {
         let constraint = Constraint::incomparable(db, pivot).constrain(typevar);
-        let mut result = Self::unsatisfiable();
+        let mut result = Self::never();
         result.union_constraint(db, constraint);
         result
     }
@@ -444,11 +441,7 @@ impl<'db> ConstraintSet<'db> {
 
 impl From<bool> for ConstraintSet<'_> {
     fn from(b: bool) -> Self {
-        if b {
-            Self::always_satisfiable()
-        } else {
-            Self::unsatisfiable()
-        }
+        if b { Self::always() } else { Self::never() }
     }
 }
 
@@ -799,7 +792,7 @@ impl<'db> ConstraintClause<'db> {
     /// Returns the negation of this clause. The result is a set since negating an intersection
     /// produces a union.
     fn negate(&self, db: &'db dyn Db) -> ConstraintSet<'db> {
-        let mut result = ConstraintSet::unsatisfiable();
+        let mut result = ConstraintSet::never();
         for constraint in &self.constraints {
             constraint.negate_into(db, &mut result);
         }

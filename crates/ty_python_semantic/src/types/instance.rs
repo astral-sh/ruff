@@ -155,7 +155,7 @@ impl<'db> Type<'db> {
                     visitor,
                 )
             } else {
-                ConstraintSet::unsatisfiable()
+                ConstraintSet::from(false)
             }
         })
     }
@@ -344,7 +344,7 @@ impl<'db> NominalInstanceType<'db> {
         visitor: &HasRelationToVisitor<'db>,
     ) -> ConstraintSet<'db> {
         match (self.0, other.0) {
-            (_, NominalInstanceInner::Object) => ConstraintSet::always_satisfiable(),
+            (_, NominalInstanceInner::Object) => ConstraintSet::from(true),
             (
                 NominalInstanceInner::ExactTuple(tuple1),
                 NominalInstanceInner::ExactTuple(tuple2),
@@ -367,12 +367,12 @@ impl<'db> NominalInstanceType<'db> {
                 NominalInstanceInner::ExactTuple(tuple2),
             ) => tuple1.is_equivalent_to_impl(db, tuple2, visitor),
             (NominalInstanceInner::Object, NominalInstanceInner::Object) => {
-                ConstraintSet::always_satisfiable()
+                ConstraintSet::from(true)
             }
             (NominalInstanceInner::NonTuple(class1), NominalInstanceInner::NonTuple(class2)) => {
                 class1.is_equivalent_to_impl(db, class2, visitor)
             }
-            _ => ConstraintSet::unsatisfiable(),
+            _ => ConstraintSet::from(false),
         }
     }
 
@@ -383,9 +383,9 @@ impl<'db> NominalInstanceType<'db> {
         visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self.is_object() || other.is_object() {
-            return ConstraintSet::unsatisfiable();
+            return ConstraintSet::from(false);
         }
-        let mut result = ConstraintSet::unsatisfiable();
+        let mut result = ConstraintSet::from(false);
         if let Some(self_spec) = self.tuple_spec(db) {
             if let Some(other_spec) = other.tuple_spec(db) {
                 let compatible = self_spec.is_disjoint_from_impl(db, &other_spec, visitor);
@@ -645,11 +645,11 @@ impl<'db> ProtocolInstanceType<'db> {
         _visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self == other {
-            return ConstraintSet::always_satisfiable();
+            return ConstraintSet::from(true);
         }
         let self_normalized = self.normalized(db);
         if self_normalized == Type::ProtocolInstance(other) {
-            return ConstraintSet::always_satisfiable();
+            return ConstraintSet::from(true);
         }
         ConstraintSet::from(self_normalized == other.normalized(db))
     }
@@ -665,7 +665,7 @@ impl<'db> ProtocolInstanceType<'db> {
         _other: Self,
         _visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
-        ConstraintSet::unsatisfiable()
+        ConstraintSet::from(false)
     }
 
     pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {

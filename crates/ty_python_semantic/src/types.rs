@@ -187,7 +187,7 @@ pub(crate) type HasRelationToVisitor<'db> =
     CycleDetector<TypeRelation, (Type<'db>, Type<'db>, TypeRelation), ConstraintSet<'db>>;
 impl Default for HasRelationToVisitor<'_> {
     fn default() -> Self {
-        HasRelationToVisitor::new(ConstraintSet::always_satisfiable())
+        HasRelationToVisitor::new(ConstraintSet::from(true))
     }
 }
 
@@ -196,7 +196,7 @@ pub(crate) type IsDisjointVisitor<'db> = PairVisitor<'db, IsDisjoint, Constraint
 pub(crate) struct IsDisjoint;
 impl Default for IsDisjointVisitor<'_> {
     fn default() -> Self {
-        IsDisjointVisitor::new(ConstraintSet::unsatisfiable())
+        IsDisjointVisitor::new(ConstraintSet::from(false))
     }
 }
 
@@ -205,7 +205,7 @@ pub(crate) type IsEquivalentVisitor<'db> = PairVisitor<'db, IsEquivalent, Constr
 pub(crate) struct IsEquivalent;
 impl Default for IsEquivalentVisitor<'_> {
     fn default() -> Self {
-        IsEquivalentVisitor::new(ConstraintSet::always_satisfiable())
+        IsEquivalentVisitor::new(ConstraintSet::from(true))
     }
 }
 
@@ -562,27 +562,27 @@ impl<'db> PropertyInstanceType<'db> {
     ) -> ConstraintSet<'db> {
         let getter_equivalence = if let Some(getter) = self.getter(db) {
             let Some(other_getter) = other.getter(db) else {
-                return ConstraintSet::unsatisfiable();
+                return ConstraintSet::from(false);
             };
             getter.is_equivalent_to_impl(db, other_getter, visitor)
         } else {
             if other.getter(db).is_some() {
-                return ConstraintSet::unsatisfiable();
+                return ConstraintSet::from(false);
             }
-            ConstraintSet::always_satisfiable()
+            ConstraintSet::from(true)
         };
 
         let setter_equivalence = || {
             if let Some(setter) = self.setter(db) {
                 let Some(other_setter) = other.setter(db) else {
-                    return ConstraintSet::unsatisfiable();
+                    return ConstraintSet::from(false);
                 };
                 setter.is_equivalent_to_impl(db, other_setter, visitor)
             } else {
                 if other.setter(db).is_some() {
-                    return ConstraintSet::unsatisfiable();
+                    return ConstraintSet::from(false);
                 }
-                ConstraintSet::always_satisfiable()
+                ConstraintSet::from(true)
             }
         };
 
@@ -1442,21 +1442,21 @@ impl<'db> Type<'db> {
         // Note that we could do a full equivalence check here, but that would be both expensive
         // and unnecessary. This early return is only an optimisation.
         if (relation.is_assignability() || self.subtyping_is_always_reflexive()) && self == target {
-            return ConstraintSet::always_satisfiable();
+            return ConstraintSet::from(true);
         }
 
         match (self, target) {
             // Everything is a subtype of `object`.
             (_, Type::NominalInstance(instance)) if instance.is_object() => {
-                ConstraintSet::always_satisfiable()
+                ConstraintSet::from(true)
             }
             (_, Type::ProtocolInstance(target)) if target.is_equivalent_to_object(db) => {
-                ConstraintSet::always_satisfiable()
+                ConstraintSet::from(true)
             }
 
             // `Never` is the bottom type, the empty set.
             // It is a subtype of all other types.
-            (Type::Never, _) => ConstraintSet::always_satisfiable(),
+            (Type::Never, _) => ConstraintSet::from(true),
 
             // Dynamic is only a subtype of `object` and only a supertype of `Never`; both were
             // handled above. It's always assignable, though.
@@ -1501,17 +1501,17 @@ impl<'db> Type<'db> {
             (Type::NonInferableTypeVar(_), Type::Union(union))
                 if union.elements(db).contains(&self) =>
             {
-                ConstraintSet::always_satisfiable()
+                ConstraintSet::from(true)
             }
             (Type::Intersection(intersection), Type::NonInferableTypeVar(_))
                 if intersection.positive(db).contains(&target) =>
             {
-                ConstraintSet::always_satisfiable()
+                ConstraintSet::from(true)
             }
             (Type::Intersection(intersection), Type::NonInferableTypeVar(_))
                 if intersection.negative(db).contains(&target) =>
             {
-                ConstraintSet::always_satisfiable()
+                ConstraintSet::from(true)
             }
 
             // Two identical typevars must always solve to the same type, so they are always
@@ -1522,7 +1522,7 @@ impl<'db> Type<'db> {
             (
                 Type::NonInferableTypeVar(lhs_bound_typevar),
                 Type::NonInferableTypeVar(rhs_bound_typevar),
-            ) if lhs_bound_typevar == rhs_bound_typevar => ConstraintSet::always_satisfiable(),
+            ) if lhs_bound_typevar == rhs_bound_typevar => ConstraintSet::from(true),
 
             // A fully static typevar is a subtype of its upper bound, and to something similar to
             // the union of its constraints. An unbound, unconstrained, fully static typevar has an
@@ -1574,7 +1574,7 @@ impl<'db> Type<'db> {
             // `Never` is the bottom type, the empty set.
             // Other than one unlikely edge case (TypeVars bound to `Never`),
             // no other type is a subtype of or assignable to `Never`.
-            (_, Type::Never) => ConstraintSet::unsatisfiable(),
+            (_, Type::Never) => ConstraintSet::from(false),
 
             (Type::Union(union), _) => union.elements(db).iter().when_all(db, |&elem_ty| {
                 elem_ty.has_relation_to_impl(db, target, relation, visitor)
@@ -1608,10 +1608,10 @@ impl<'db> Type<'db> {
             // (If the typevar is bounded, it might be specialized to a smaller type than the
             // bound. This is true even if the bound is a final class, since the typevar can still
             // be specialized to `Never`.)
-            (_, Type::NonInferableTypeVar(_)) => ConstraintSet::unsatisfiable(),
+            (_, Type::NonInferableTypeVar(_)) => ConstraintSet::from(false),
 
             // TODO: Infer specializations here
-            (Type::TypeVar(_), _) | (_, Type::TypeVar(_)) => ConstraintSet::unsatisfiable(),
+            (Type::TypeVar(_), _) | (_, Type::TypeVar(_)) => ConstraintSet::from(false),
 
             // Note that the definition of `Type::AlwaysFalsy` depends on the return value of `__bool__`.
             // If `__bool__` always returns True or False, it can be treated as a subtype of `AlwaysTruthy` or `AlwaysFalsy`, respectively.
@@ -1656,7 +1656,7 @@ impl<'db> Type<'db> {
                 | Type::FunctionLiteral(_)
                 | Type::ModuleLiteral(_)
                 | Type::EnumLiteral(_),
-            ) => ConstraintSet::unsatisfiable(),
+            ) => ConstraintSet::from(false),
 
             (Type::Callable(self_callable), Type::Callable(other_callable)) => {
                 self_callable.has_relation_to_impl(db, other_callable, relation, visitor)
@@ -1671,16 +1671,16 @@ impl<'db> Type<'db> {
             }
 
             // A protocol instance can never be a subtype of a nominal type, with the *sole* exception of `object`.
-            (Type::ProtocolInstance(_), _) => ConstraintSet::unsatisfiable(),
+            (Type::ProtocolInstance(_), _) => ConstraintSet::from(false),
 
             // All `StringLiteral` types are a subtype of `LiteralString`.
-            (Type::StringLiteral(_), Type::LiteralString) => ConstraintSet::always_satisfiable(),
+            (Type::StringLiteral(_), Type::LiteralString) => ConstraintSet::from(true),
 
             // An instance is a subtype of an enum literal, if it is an instance of the enum class
             // and the enum has only one member.
             (Type::NominalInstance(_), Type::EnumLiteral(target_enum_literal)) => {
                 if target_enum_literal.enum_class_instance(db) != self {
-                    return ConstraintSet::unsatisfiable();
+                    return ConstraintSet::from(false);
                 }
 
                 ConstraintSet::from(is_single_member_enum(
@@ -1725,7 +1725,7 @@ impl<'db> Type<'db> {
 
             (Type::DataclassDecorator(_) | Type::DataclassTransformer(_), _) => {
                 // TODO: Implement subtyping using an equivalent `Callable` type.
-                ConstraintSet::unsatisfiable()
+                ConstraintSet::from(false)
             }
 
             // `TypeIs` is invariant.
@@ -1753,7 +1753,7 @@ impl<'db> Type<'db> {
                     .has_relation_to_impl(db, target, relation, visitor)
             }
 
-            (Type::Callable(_), _) => ConstraintSet::unsatisfiable(),
+            (Type::Callable(_), _) => ConstraintSet::from(false),
 
             (Type::BoundSuper(_), Type::BoundSuper(_)) => self.when_equivalent_to(db, target),
             (Type::BoundSuper(_), _) => KnownClass::Super
@@ -1872,7 +1872,7 @@ impl<'db> Type<'db> {
             // Other than the special cases enumerated above, `Instance` types and typevars are
             // never subtypes of any other variants
             (Type::NominalInstance(_) | Type::NonInferableTypeVar(_), _) => {
-                ConstraintSet::unsatisfiable()
+                ConstraintSet::from(false)
             }
         }
     }
@@ -1904,7 +1904,7 @@ impl<'db> Type<'db> {
         visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self == other {
-            return ConstraintSet::always_satisfiable();
+            return ConstraintSet::from(true);
         }
 
         match (self, other) {
@@ -1912,17 +1912,17 @@ impl<'db> Type<'db> {
             // which prevents `Divergent` from being eliminated during union reduction.
             (Type::Dynamic(_), Type::Dynamic(DynamicType::Divergent(_)))
             | (Type::Dynamic(DynamicType::Divergent(_)), Type::Dynamic(_)) => {
-                ConstraintSet::unsatisfiable()
+                ConstraintSet::from(false)
             }
-            (Type::Dynamic(_), Type::Dynamic(_)) => ConstraintSet::always_satisfiable(),
+            (Type::Dynamic(_), Type::Dynamic(_)) => ConstraintSet::from(true),
 
             (Type::SubclassOf(first), Type::SubclassOf(second)) => {
                 match (first.subclass_of(), second.subclass_of()) {
-                    (first, second) if first == second => ConstraintSet::always_satisfiable(),
+                    (first, second) if first == second => ConstraintSet::from(true),
                     (SubclassOfInner::Dynamic(_), SubclassOfInner::Dynamic(_)) => {
-                        ConstraintSet::always_satisfiable()
+                        ConstraintSet::from(true)
                     }
-                    _ => ConstraintSet::unsatisfiable(),
+                    _ => ConstraintSet::from(false),
                 }
             }
 
@@ -1977,7 +1977,7 @@ impl<'db> Type<'db> {
             (Type::NominalInstance(instance), Type::EnumLiteral(literal))
             | (Type::EnumLiteral(literal), Type::NominalInstance(instance)) => {
                 if literal.enum_class_instance(db) != Type::NominalInstance(instance) {
-                    return ConstraintSet::unsatisfiable();
+                    return ConstraintSet::from(false);
                 }
                 ConstraintSet::from(is_single_member_enum(db, instance.class_literal(db)))
             }
@@ -1986,7 +1986,7 @@ impl<'db> Type<'db> {
                 left.is_equivalent_to_impl(db, right, visitor)
             }
 
-            _ => ConstraintSet::unsatisfiable(),
+            _ => ConstraintSet::from(false),
         }
     }
 
@@ -2026,9 +2026,9 @@ impl<'db> Type<'db> {
         }
 
         match (self, other) {
-            (Type::Never, _) | (_, Type::Never) => ConstraintSet::always_satisfiable(),
+            (Type::Never, _) | (_, Type::Never) => ConstraintSet::from(true),
 
-            (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => ConstraintSet::unsatisfiable(),
+            (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => ConstraintSet::from(false),
 
             (Type::TypeAlias(alias), _) => {
                 let self_alias_ty = alias.value_type(db);
@@ -2046,7 +2046,7 @@ impl<'db> Type<'db> {
 
             (Type::TypedDict(_), _) | (_, Type::TypedDict(_)) => {
                 // TODO: Implement disjointness for TypedDict
-                ConstraintSet::unsatisfiable()
+                ConstraintSet::from(false)
             }
 
             // A typevar is never disjoint from itself, since all occurrences of the typevar must
@@ -2056,13 +2056,13 @@ impl<'db> Type<'db> {
             (
                 Type::NonInferableTypeVar(self_bound_typevar),
                 Type::NonInferableTypeVar(other_bound_typevar),
-            ) if self_bound_typevar == other_bound_typevar => ConstraintSet::unsatisfiable(),
+            ) if self_bound_typevar == other_bound_typevar => ConstraintSet::from(false),
 
             (tvar @ Type::NonInferableTypeVar(_), Type::Intersection(intersection))
             | (Type::Intersection(intersection), tvar @ Type::NonInferableTypeVar(_))
                 if intersection.negative(db).contains(&tvar) =>
             {
-                ConstraintSet::always_satisfiable()
+                ConstraintSet::from(true)
             }
 
             // An unbounded typevar is never disjoint from any other type, since it might be
@@ -2072,7 +2072,7 @@ impl<'db> Type<'db> {
             (Type::NonInferableTypeVar(bound_typevar), other)
             | (other, Type::NonInferableTypeVar(bound_typevar)) => {
                 match bound_typevar.typevar(db).bound_or_constraints(db) {
-                    None => ConstraintSet::unsatisfiable(),
+                    None => ConstraintSet::from(false),
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                         bound.is_disjoint_from_impl(db, other, visitor)
                     }
@@ -2085,7 +2085,7 @@ impl<'db> Type<'db> {
             }
 
             // TODO: Infer specializations here
-            (Type::TypeVar(_), _) | (_, Type::TypeVar(_)) => ConstraintSet::unsatisfiable(),
+            (Type::TypeVar(_), _) | (_, Type::TypeVar(_)) => ConstraintSet::from(false),
 
             (Type::Union(union), other) | (other, Type::Union(union)) => union
                 .elements(db)
@@ -2183,7 +2183,7 @@ impl<'db> Type<'db> {
                 | Type::WrapperDescriptor(..)
                 | Type::ModuleLiteral(..),
                 Type::SubclassOf(_),
-            ) => ConstraintSet::always_satisfiable(),
+            ) => ConstraintSet::from(true),
 
             (Type::AlwaysTruthy, ty) | (ty, Type::AlwaysTruthy) => {
                 // `Truthiness::Ambiguous` may include `AlwaysTrue` as a subset, so it's not guaranteed to be disjoint.
@@ -2297,7 +2297,7 @@ impl<'db> Type<'db> {
                         Place::Type(attribute_type, _) => {
                             member.has_disjoint_type_from(db, attribute_type, visitor)
                         }
-                        Place::Unbound => ConstraintSet::unsatisfiable(),
+                        Place::Unbound => ConstraintSet::from(false),
                     }
                 })
             }),
@@ -2305,7 +2305,7 @@ impl<'db> Type<'db> {
             (Type::SubclassOf(subclass_of_ty), Type::ClassLiteral(class_b))
             | (Type::ClassLiteral(class_b), Type::SubclassOf(subclass_of_ty)) => {
                 match subclass_of_ty.subclass_of() {
-                    SubclassOfInner::Dynamic(_) => ConstraintSet::unsatisfiable(),
+                    SubclassOfInner::Dynamic(_) => ConstraintSet::from(false),
                     SubclassOfInner::Class(class_a) => {
                         class_b.when_subclass_of(db, None, class_a).negate(db)
                     }
@@ -2315,7 +2315,7 @@ impl<'db> Type<'db> {
             (Type::SubclassOf(subclass_of_ty), Type::GenericAlias(alias_b))
             | (Type::GenericAlias(alias_b), Type::SubclassOf(subclass_of_ty)) => {
                 match subclass_of_ty.subclass_of() {
-                    SubclassOfInner::Dynamic(_) => ConstraintSet::unsatisfiable(),
+                    SubclassOfInner::Dynamic(_) => ConstraintSet::from(false),
                     SubclassOfInner::Class(class_a) => ClassType::from(alias_b)
                         .when_subclass_of(db, class_a)
                         .negate(db),
@@ -2358,9 +2358,7 @@ impl<'db> Type<'db> {
             }
 
             (Type::BooleanLiteral(..) | Type::TypeIs(_), _)
-            | (_, Type::BooleanLiteral(..) | Type::TypeIs(_)) => {
-                ConstraintSet::always_satisfiable()
-            }
+            | (_, Type::BooleanLiteral(..) | Type::TypeIs(_)) => ConstraintSet::from(true),
 
             (Type::IntLiteral(..), Type::NominalInstance(instance))
             | (Type::NominalInstance(instance), Type::IntLiteral(..)) => {
@@ -2371,12 +2369,10 @@ impl<'db> Type<'db> {
                     .negate(db)
             }
 
-            (Type::IntLiteral(..), _) | (_, Type::IntLiteral(..)) => {
-                ConstraintSet::always_satisfiable()
-            }
+            (Type::IntLiteral(..), _) | (_, Type::IntLiteral(..)) => ConstraintSet::from(true),
 
             (Type::StringLiteral(..), Type::LiteralString)
-            | (Type::LiteralString, Type::StringLiteral(..)) => ConstraintSet::unsatisfiable(),
+            | (Type::LiteralString, Type::StringLiteral(..)) => ConstraintSet::from(false),
 
             (Type::StringLiteral(..) | Type::LiteralString, Type::NominalInstance(instance))
             | (Type::NominalInstance(instance), Type::StringLiteral(..) | Type::LiteralString) => {
@@ -2387,10 +2383,8 @@ impl<'db> Type<'db> {
                     .negate(db)
             }
 
-            (Type::LiteralString, Type::LiteralString) => ConstraintSet::unsatisfiable(),
-            (Type::LiteralString, _) | (_, Type::LiteralString) => {
-                ConstraintSet::always_satisfiable()
-            }
+            (Type::LiteralString, Type::LiteralString) => ConstraintSet::from(false),
+            (Type::LiteralString, _) | (_, Type::LiteralString) => ConstraintSet::from(true),
 
             (Type::BytesLiteral(..), Type::NominalInstance(instance))
             | (Type::NominalInstance(instance), Type::BytesLiteral(..)) => {
@@ -2408,9 +2402,7 @@ impl<'db> Type<'db> {
                     .when_subtype_of(db, instance)
                     .negate(db)
             }
-            (Type::EnumLiteral(..), _) | (_, Type::EnumLiteral(..)) => {
-                ConstraintSet::always_satisfiable()
-            }
+            (Type::EnumLiteral(..), _) | (_, Type::EnumLiteral(..)) => ConstraintSet::from(true),
 
             // A class-literal type `X` is always disjoint from an instance type `Y`,
             // unless the type expressing "all instances of `Z`" is a subtype of of `Y`,
@@ -2459,7 +2451,7 @@ impl<'db> Type<'db> {
                 // No two callable types are ever disjoint because
                 // `(*args: object, **kwargs: object) -> Never` is a subtype of all fully static
                 // callable types.
-                ConstraintSet::unsatisfiable()
+                ConstraintSet::from(false)
             }
 
             (Type::Callable(_), Type::StringLiteral(_) | Type::BytesLiteral(_))
@@ -2467,7 +2459,7 @@ impl<'db> Type<'db> {
                 // A callable type is disjoint from other literal types. For example,
                 // `Type::StringLiteral` must be an instance of exactly `str`, not a subclass
                 // of `str`, and `str` is not callable. The same applies to other literal types.
-                ConstraintSet::always_satisfiable()
+                ConstraintSet::from(true)
             }
 
             (Type::Callable(_), Type::SpecialForm(special_form))
@@ -2509,7 +2501,7 @@ impl<'db> Type<'db> {
                 Type::Callable(_) | Type::DataclassDecorator(_) | Type::DataclassTransformer(_),
             ) => {
                 // TODO: Implement disjointness for general callable type with other types
-                ConstraintSet::unsatisfiable()
+                ConstraintSet::from(false)
             }
 
             (Type::ModuleLiteral(..), other @ Type::NominalInstance(..))
@@ -9139,7 +9131,7 @@ impl<'db> CallableType<'db> {
         visitor: &HasRelationToVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if other.is_function_like(db) && !self.is_function_like(db) {
-            return ConstraintSet::unsatisfiable();
+            return ConstraintSet::from(false);
         }
         self.signatures(db)
             .has_relation_to_impl(db, other.signatures(db), relation, visitor)
@@ -9155,7 +9147,7 @@ impl<'db> CallableType<'db> {
         visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self == other {
-            return ConstraintSet::always_satisfiable();
+            return ConstraintSet::from(true);
         }
 
         ConstraintSet::from(self.is_function_like(db) == other.is_function_like(db)).and(db, || {
@@ -9256,7 +9248,7 @@ impl<'db> KnownBoundMethodType<'db> {
                 | KnownBoundMethodType::PropertyDunderGet(_)
                 | KnownBoundMethodType::PropertyDunderSet(_)
                 | KnownBoundMethodType::StrStartswith(_),
-            ) => ConstraintSet::unsatisfiable(),
+            ) => ConstraintSet::from(false),
         }
     }
 
@@ -9301,7 +9293,7 @@ impl<'db> KnownBoundMethodType<'db> {
                 | KnownBoundMethodType::PropertyDunderGet(_)
                 | KnownBoundMethodType::PropertyDunderSet(_)
                 | KnownBoundMethodType::StrStartswith(_),
-            ) => ConstraintSet::unsatisfiable(),
+            ) => ConstraintSet::from(false),
         }
     }
 
@@ -10119,20 +10111,20 @@ impl<'db> UnionType<'db> {
         _visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self == other {
-            return ConstraintSet::always_satisfiable();
+            return ConstraintSet::from(true);
         }
 
         let self_elements = self.elements(db);
         let other_elements = other.elements(db);
 
         if self_elements.len() != other_elements.len() {
-            return ConstraintSet::unsatisfiable();
+            return ConstraintSet::from(false);
         }
 
         let sorted_self = self.normalized(db);
 
         if sorted_self == Type::Union(other) {
-            return ConstraintSet::always_satisfiable();
+            return ConstraintSet::from(true);
         }
 
         ConstraintSet::from(sorted_self == other.normalized(db))
@@ -10220,27 +10212,27 @@ impl<'db> IntersectionType<'db> {
         _visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self == other {
-            return ConstraintSet::always_satisfiable();
+            return ConstraintSet::from(true);
         }
 
         let self_positive = self.positive(db);
         let other_positive = other.positive(db);
 
         if self_positive.len() != other_positive.len() {
-            return ConstraintSet::unsatisfiable();
+            return ConstraintSet::from(false);
         }
 
         let self_negative = self.negative(db);
         let other_negative = other.negative(db);
 
         if self_negative.len() != other_negative.len() {
-            return ConstraintSet::unsatisfiable();
+            return ConstraintSet::from(false);
         }
 
         let sorted_self = self.normalized(db);
 
         if sorted_self == other {
-            return ConstraintSet::always_satisfiable();
+            return ConstraintSet::from(true);
         }
 
         ConstraintSet::from(sorted_self == other.normalized(db))
