@@ -327,6 +327,31 @@ e = Explicit()
 e.bad()
 ```
 
+## Type of Implicit Self
+
+The assigned type to self argument depends on the method signature. When the method is defined in a
+non-generic class and has no other mention of `typing.Self` (for example in return type) then type
+of `self` is instance of the class.
+
+```py
+from typing import Self
+
+class C:
+    def f(self) -> Self:
+        return self
+
+    def z(self) -> None: ...
+
+C.z(1)  # error: [invalid-argument-type] "Argument to function `z` is incorrect: Expected `C`, found `Literal[1]`"
+```
+
+```py
+# TODO: Currenty 1 is assignable to synthetic `typing.Self` annotation added. The check happens in
+# ArgumentTypeChecker::infer_specialization.
+# TODO: Should give error: [invalid-argument-type] "Argument to function `f` is incorrect: Argument type `Literal[1]` does not satisfy upper bound `C` of type variable `Self`"
+C.f(1)
+```
+
 ## Binding a method fixes `Self`
 
 When a method is bound, any instances of `Self` in its signature are "fixed", since we now know the
