@@ -28,5 +28,7 @@ jobs:
           pattern: wheels-*
           path: wheels
           merge-multiple: true
+      - name: Remove wheels unsupported by PyPI
+        run: rm wheels/*loong*
       - name: Publish to PyPi
         run: uv publish -v wheels/*
