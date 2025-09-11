@@ -1016,6 +1016,7 @@ help: Remove trailing comma
 664 + type X[T] = T
 665 | def f[T,](): pass
 666 | class C[T,]: pass
+667 | 
 
 COM819 [*] Trailing comma prohibited
    --> COM81.py:665:8
@@ -1032,6 +1033,8 @@ help: Remove trailing comma
     - def f[T,](): pass
 665 + def f[T](): pass
 666 | class C[T,]: pass
+667 | 
+668 | # t-string examples
 
 COM819 [*] Trailing comma prohibited
    --> COM81.py:666:10
@@ -1040,6 +1043,8 @@ COM819 [*] Trailing comma prohibited
 665 | def f[T,](): pass
 666 | class C[T,]: pass
     |          ^
+667 |
+668 | # t-string examples
     |
 help: Remove trailing comma
 663 | 
@@ -1047,3 +1052,44 @@ help: Remove trailing comma
 665 | def f[T,](): pass
     - class C[T,]: pass
 666 + class C[T]: pass
+667 | 
+668 | # t-string examples
+669 | kwargs.pop("remove", t"this {trailing_comma}",)
+
+COM819 [*] Trailing comma prohibited
+   --> COM81.py:669:46
+    |
+668 | # t-string examples
+669 | kwargs.pop("remove", t"this {trailing_comma}",)
+    |                                              ^
+670 | kwargs.pop("remove", t"this {f"{trailing_comma}"}",)
+    |
+help: Remove trailing comma
+666 | class C[T,]: pass
+667 | 
+668 | # t-string examples
+    - kwargs.pop("remove", t"this {trailing_comma}",)
+669 + kwargs.pop("remove", t"this {trailing_comma}")
+670 | kwargs.pop("remove", t"this {f"{trailing_comma}"}",)
+671 | 
+672 | t"""This is a test. {
+
+COM819 [*] Trailing comma prohibited
+   --> COM81.py:670:51
+    |
+668 | # t-string examples
+669 | kwargs.pop("remove", t"this {trailing_comma}",)
+670 | kwargs.pop("remove", t"this {f"{trailing_comma}"}",)
+    |                                                   ^
+671 |
+672 | t"""This is a test. {
+    |
+help: Remove trailing comma
+667 | 
+668 | # t-string examples
+669 | kwargs.pop("remove", t"this {trailing_comma}",)
+    - kwargs.pop("remove", t"this {f"{trailing_comma}"}",)
+670 + kwargs.pop("remove", t"this {f"{trailing_comma}"}")
+671 | 
+672 | t"""This is a test. {
+673 |     "Another sentence."
