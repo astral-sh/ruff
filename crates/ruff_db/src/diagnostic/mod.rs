@@ -494,13 +494,6 @@ impl Diagnostic {
         self.primary_span()?.range()
     }
 
-    /// Returns the [`TextRange`] for the diagnostic.
-    ///
-    /// Panics if the diagnostic has no primary span or if the span has no range.
-    pub fn expect_range(&self) -> TextRange {
-        self.range().expect("Expected a range for the primary span")
-    }
-
     /// Returns the ordering of diagnostics based on the start of their ranges, if they have any.
     ///
     /// Panics if either diagnostic has no primary span, or if its file is not a `SourceFile`.
