@@ -453,9 +453,17 @@ mod tests {
                 buf.insert_str(end_position, &hint_str);
             }
 
-            let rendered_diagnostics = self.render_diagnostics(diagnostics);
+            let mut rendered_diagnostics = self.render_diagnostics(diagnostics);
 
-            format!("{buf}\n\n{rendered_diagnostics}")
+            if !rendered_diagnostics.is_empty() {
+                rendered_diagnostics = format!(
+                    "{}{}",
+                    crate::MarkupKind::PlainText.horizontal_line(),
+                    rendered_diagnostics
+                );
+            }
+
+            format!("{buf}{rendered_diagnostics}",)
         }
 
         fn render_diagnostics<I, D>(&self, diagnostics: I) -> String
@@ -484,36 +492,28 @@ mod tests {
     fn test_assign_statement() {
         let test = inlay_hint_test("x = 1");
 
-        assert_snapshot!(test.inlay_hints(), @r"
-        x[: Literal[1]] = 1
-        ");
+        assert_snapshot!(test.inlay_hints(), @"x[: Literal[1]] = 1");
     }
 
     #[test]
     fn test_tuple_assignment() {
         let test = inlay_hint_test("x, y = (1, 'abc')");
 
-        assert_snapshot!(test.inlay_hints(), @r#"
-        x[: Literal[1]], y[: Literal["abc"]] = (1, 'abc')
-        "#);
+        assert_snapshot!(test.inlay_hints(), @r#"x[: Literal[1]], y[: Literal["abc"]] = (1, 'abc')"#);
     }
 
     #[test]
     fn test_nested_tuple_assignment() {
         let test = inlay_hint_test("x, (y, z) = (1, ('abc', 2))");
 
-        assert_snapshot!(test.inlay_hints(), @r#"
-        x[: Literal[1]], (y[: Literal["abc"]], z[: Literal[2]]) = (1, ('abc', 2))
-        "#);
+        assert_snapshot!(test.inlay_hints(), @r#"x[: Literal[1]], (y[: Literal["abc"]], z[: Literal[2]]) = (1, ('abc', 2))"#);
     }
 
     #[test]
     fn test_assign_statement_with_type_annotation() {
         let test = inlay_hint_test("x: int = 1");
 
-        assert_snapshot!(test.inlay_hints(), @r"
-        x: int = 1
-        ");
+        assert_snapshot!(test.inlay_hints(), @"x: int = 1");
     }
 
     #[test]
@@ -535,9 +535,7 @@ mod tests {
                 variable_types: false,
                 ..Default::default()
             }),
-            @r"
-        x = 1
-        "
+            @"x = 1"
         );
     }
 
@@ -552,7 +550,7 @@ mod tests {
         assert_snapshot!(test.inlay_hints(), @r"
         def foo(x: int): pass
         foo([x=]1)
-
+        ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
          --> main.py:2:9
           |
@@ -631,7 +629,7 @@ mod tests {
         assert_snapshot!(test.inlay_hints(), @r"
         def foo(x: int, /, y: int): pass
         foo(1, [y=]2)
-
+        ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
          --> main.py:2:20
           |
@@ -686,7 +684,7 @@ mod tests {
             def __init__(self, x: int): pass
         Foo([x=]1)
         f[: Foo] = Foo([x=]1)
-
+        ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
          --> main.py:3:24
           |
@@ -726,7 +724,7 @@ mod tests {
             def __new__(cls, x: int): pass
         Foo([x=]1)
         f[: Foo] = Foo([x=]1)
-
+        ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
          --> main.py:3:22
           |
@@ -768,7 +766,7 @@ mod tests {
         class Foo(metaclass=MetaFoo):
             pass
         Foo([x=]1)
-
+        ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
          --> main.py:3:24
           |
@@ -811,7 +809,7 @@ mod tests {
         class Foo:
             def bar(self, y: int): pass
         Foo().bar([y=]2)
-
+        ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
          --> main.py:3:19
           |
@@ -839,7 +837,7 @@ mod tests {
             @classmethod
             def bar(cls, y: int): pass
         Foo.bar([y=]2)
-
+        ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
          --> main.py:4:18
           |
@@ -868,7 +866,7 @@ mod tests {
             @staticmethod
             def bar(y: int): pass
         Foo.bar([y=]2)
-
+        ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
          --> main.py:4:13
           |
@@ -895,7 +893,7 @@ mod tests {
         def foo(x: int | str): pass
         foo([x=]1)
         foo([x=]'abc')
-
+        ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
          --> main.py:2:9
           |
@@ -929,7 +927,7 @@ mod tests {
         assert_snapshot!(test.inlay_hints(), @r"
         def foo(x: int, y: str, z: bool): pass
         foo([x=]1, [y=]'hello', [z=]True)
-
+        ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
          --> main.py:2:9
           |
@@ -970,7 +968,7 @@ mod tests {
         assert_snapshot!(test.inlay_hints(), @r"
         def foo(x: int, y: str, z: bool): pass
         foo([x=]1, z=True, y='hello')
-
+        ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
          --> main.py:2:9
           |
@@ -997,7 +995,7 @@ mod tests {
         foo([x=]1)
         foo([x=]1, [y=]'custom')
         foo([x=]1, [y=]'custom', [z=]True)
-
+        ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
          --> main.py:2:9
           |
@@ -1085,7 +1083,7 @@ mod tests {
         def baz(a: int, b: str, c: bool): pass
 
         baz([a=]foo([x=]5), [b=]bar([y=]bar([y=]'test')), [c=]True)
-
+        ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
           --> main.py:8:9
            |
@@ -1176,7 +1174,7 @@ mod tests {
                 return self
             def baz(self): pass
         A().foo([value=]42).bar([name=]'test').baz()
-
+        ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
          --> main.py:3:19
           |
@@ -1219,7 +1217,7 @@ mod tests {
         def bar(y: int): pass
         bar(y=foo([x=]'test'))
 
-
+        ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
          --> main.py:2:9
           |
@@ -1263,7 +1261,7 @@ mod tests {
         def foo(a: int, b: str, /, c: float, d: bool = True, *, e: int, f: str = 'default'): pass
         foo(1, 'pos', [c=]3.14, [d=]False, e=42)
         foo(1, 'pos', [c=]3.14, e=42, f='custom')
-
+        ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
          --> main.py:2:28
           |
@@ -1321,7 +1319,7 @@ mod tests {
 
         identity([x=]42)
         identity([x=]'hello')
-
+        ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
            --> stdlib/typing.pyi:278:13
             |
@@ -1387,7 +1385,7 @@ mod tests {
 
         foo([x=]42)
         foo([x=]'hello')
-
+        ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
          --> main.py:5:9
           |
@@ -1444,7 +1442,7 @@ mod tests {
         def bar(y: int): pass
         foo([x=]1)
         bar(2)
-
+        ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
          --> main.py:2:9
           |
@@ -1468,7 +1466,7 @@ mod tests {
         assert_snapshot!(test.inlay_hints(), @r"
         def foo(_x: int, y: int): pass
         foo(1, [y=]2)
-
+        ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
          --> main.py:2:18
           |
