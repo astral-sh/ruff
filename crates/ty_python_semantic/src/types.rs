@@ -1461,7 +1461,7 @@ impl<'db> Type<'db> {
             // Dynamic is only a subtype of `object` and only a supertype of `Never`; both were
             // handled above. It's always assignable, though.
             (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => {
-                ConstraintSet::from_bool(relation.is_assignability())
+                ConstraintSet::from(relation.is_assignability())
             }
 
             (Type::TypeAlias(self_alias), _) => visitor.visit((self, target, relation), || {
@@ -1487,7 +1487,7 @@ impl<'db> Type<'db> {
 
             (Type::TypedDict(_), _) | (_, Type::TypedDict(_)) => {
                 // TODO: Implement assignability and subtyping for TypedDict
-                ConstraintSet::from_bool(relation.is_assignability())
+                ConstraintSet::from(relation.is_assignability())
             }
 
             // In general, a TypeVar `T` is not a subtype of a type `S` unless one of the two conditions is satisfied:
@@ -1615,8 +1615,8 @@ impl<'db> Type<'db> {
 
             // Note that the definition of `Type::AlwaysFalsy` depends on the return value of `__bool__`.
             // If `__bool__` always returns True or False, it can be treated as a subtype of `AlwaysTruthy` or `AlwaysFalsy`, respectively.
-            (left, Type::AlwaysFalsy) => ConstraintSet::from_bool(left.bool(db).is_always_false()),
-            (left, Type::AlwaysTruthy) => ConstraintSet::from_bool(left.bool(db).is_always_true()),
+            (left, Type::AlwaysFalsy) => ConstraintSet::from(left.bool(db).is_always_false()),
+            (left, Type::AlwaysTruthy) => ConstraintSet::from(left.bool(db).is_always_true()),
             // Currently, the only supertype of `AlwaysFalsy` and `AlwaysTruthy` is the universal set (object instance).
             (Type::AlwaysFalsy | Type::AlwaysTruthy, _) => {
                 target.when_equivalent_to(db, Type::object())
@@ -1683,7 +1683,7 @@ impl<'db> Type<'db> {
                     return ConstraintSet::unsatisfiable();
                 }
 
-                ConstraintSet::from_bool(is_single_member_enum(
+                ConstraintSet::from(is_single_member_enum(
                     db,
                     target_enum_literal.enum_class(db),
                 ))
@@ -1773,7 +1773,7 @@ impl<'db> Type<'db> {
                         visitor,
                     )
                 })
-                .unwrap_or_else(|| ConstraintSet::from_bool(relation.is_assignability())),
+                .unwrap_or_else(|| ConstraintSet::from(relation.is_assignability())),
             (Type::GenericAlias(alias), Type::SubclassOf(target_subclass_ty)) => target_subclass_ty
                 .subclass_of()
                 .into_class()
@@ -1785,7 +1785,7 @@ impl<'db> Type<'db> {
                         visitor,
                     )
                 })
-                .unwrap_or_else(|| ConstraintSet::from_bool(relation.is_assignability())),
+                .unwrap_or_else(|| ConstraintSet::from(relation.is_assignability())),
 
             // This branch asks: given two types `type[T]` and `type[S]`, is `type[T]` a subtype of `type[S]`?
             (Type::SubclassOf(self_subclass_ty), Type::SubclassOf(target_subclass_ty)) => {
@@ -1808,7 +1808,7 @@ impl<'db> Type<'db> {
                     .to_instance(db)
                     .has_relation_to_impl(db, other, relation, visitor)
                     .or(db, || {
-                        ConstraintSet::from_bool(relation.is_assignability()).and(db, || {
+                        ConstraintSet::from(relation.is_assignability()).and(db, || {
                             other.has_relation_to_impl(
                                 db,
                                 KnownClass::Type.to_instance(db),
@@ -1970,7 +1970,7 @@ impl<'db> Type<'db> {
             }
             (Type::ProtocolInstance(protocol), nominal @ Type::NominalInstance(n))
             | (nominal @ Type::NominalInstance(n), Type::ProtocolInstance(protocol)) => {
-                ConstraintSet::from_bool(n.is_object() && protocol.normalized(db) == nominal)
+                ConstraintSet::from(n.is_object() && protocol.normalized(db) == nominal)
             }
             // An instance of an enum class is equivalent to an enum literal of that class,
             // if that enum has only has one member.
@@ -1979,7 +1979,7 @@ impl<'db> Type<'db> {
                 if literal.enum_class_instance(db) != Type::NominalInstance(instance) {
                     return ConstraintSet::unsatisfiable();
                 }
-                ConstraintSet::from_bool(is_single_member_enum(db, instance.class_literal(db)))
+                ConstraintSet::from(is_single_member_enum(db, instance.class_literal(db)))
             }
 
             (Type::PropertyInstance(left), Type::PropertyInstance(right)) => {
@@ -2154,7 +2154,7 @@ impl<'db> Type<'db> {
                 | Type::GenericAlias(..)
                 | Type::SpecialForm(..)
                 | Type::KnownInstance(..)),
-            ) => ConstraintSet::from_bool(left != right),
+            ) => ConstraintSet::from(left != right),
 
             (
                 Type::SubclassOf(_),
@@ -2188,11 +2188,11 @@ impl<'db> Type<'db> {
             (Type::AlwaysTruthy, ty) | (ty, Type::AlwaysTruthy) => {
                 // `Truthiness::Ambiguous` may include `AlwaysTrue` as a subset, so it's not guaranteed to be disjoint.
                 // Thus, they are only disjoint if `ty.bool() == AlwaysFalse`.
-                ConstraintSet::from_bool(ty.bool(db).is_always_false())
+                ConstraintSet::from(ty.bool(db).is_always_false())
             }
             (Type::AlwaysFalsy, ty) | (ty, Type::AlwaysFalsy) => {
                 // Similarly, they are only disjoint if `ty.bool() == AlwaysTrue`.
-                ConstraintSet::from_bool(ty.bool(db).is_always_true())
+                ConstraintSet::from(ty.bool(db).is_always_true())
             }
 
             (Type::ProtocolInstance(left), Type::ProtocolInstance(right)) => {
@@ -2340,12 +2340,12 @@ impl<'db> Type<'db> {
 
             (Type::SpecialForm(special_form), Type::NominalInstance(instance))
             | (Type::NominalInstance(instance), Type::SpecialForm(special_form)) => {
-                ConstraintSet::from_bool(!special_form.is_instance_of(db, instance.class(db)))
+                ConstraintSet::from(!special_form.is_instance_of(db, instance.class(db)))
             }
 
             (Type::KnownInstance(known_instance), Type::NominalInstance(instance))
             | (Type::NominalInstance(instance), Type::KnownInstance(known_instance)) => {
-                ConstraintSet::from_bool(!known_instance.is_instance_of(db, instance.class(db)))
+                ConstraintSet::from(!known_instance.is_instance_of(db, instance.class(db)))
             }
 
             (Type::BooleanLiteral(..) | Type::TypeIs(_), Type::NominalInstance(instance))
@@ -2476,7 +2476,7 @@ impl<'db> Type<'db> {
                 // that are callable (like TypedDict and collection constructors).
                 // Most special forms are type constructors/annotations (like `typing.Literal`,
                 // `typing.Union`, etc.) that are subscripted, not called.
-                ConstraintSet::from_bool(!special_form.is_callable())
+                ConstraintSet::from(!special_form.is_callable())
             }
 
             (
@@ -9158,13 +9158,10 @@ impl<'db> CallableType<'db> {
             return ConstraintSet::always_satisfiable();
         }
 
-        ConstraintSet::from_bool(self.is_function_like(db) == other.is_function_like(db)).and(
-            db,
-            || {
-                self.signatures(db)
-                    .is_equivalent_to_impl(db, other.signatures(db), visitor)
-            },
-        )
+        ConstraintSet::from(self.is_function_like(db) == other.is_function_like(db)).and(db, || {
+            self.signatures(db)
+                .is_equivalent_to_impl(db, other.signatures(db), visitor)
+        })
     }
 }
 
@@ -9245,7 +9242,7 @@ impl<'db> KnownBoundMethodType<'db> {
             ) => self_property.when_equivalent_to(db, other_property),
 
             (KnownBoundMethodType::StrStartswith(_), KnownBoundMethodType::StrStartswith(_)) => {
-                ConstraintSet::from_bool(self == other)
+                ConstraintSet::from(self == other)
             }
 
             (
@@ -9290,7 +9287,7 @@ impl<'db> KnownBoundMethodType<'db> {
             ) => self_property.is_equivalent_to_impl(db, other_property, visitor),
 
             (KnownBoundMethodType::StrStartswith(_), KnownBoundMethodType::StrStartswith(_)) => {
-                ConstraintSet::from_bool(self == other)
+                ConstraintSet::from(self == other)
             }
 
             (
@@ -10138,7 +10135,7 @@ impl<'db> UnionType<'db> {
             return ConstraintSet::always_satisfiable();
         }
 
-        ConstraintSet::from_bool(sorted_self == other.normalized(db))
+        ConstraintSet::from(sorted_self == other.normalized(db))
     }
 }
 
@@ -10246,7 +10243,7 @@ impl<'db> IntersectionType<'db> {
             return ConstraintSet::always_satisfiable();
         }
 
-        ConstraintSet::from_bool(sorted_self == other.normalized(db))
+        ConstraintSet::from(sorted_self == other.normalized(db))
     }
 
     /// Returns an iterator over the positive elements of the intersection. If

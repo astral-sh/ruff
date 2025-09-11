@@ -244,7 +244,7 @@ impl<'db> ProtocolInterface<'db> {
         // TODO: This could just return a bool as written, but this form is what will be needed to
         // combine the constraints when we do assignability checks on each member.
         other.inner(db).keys().when_all(db, |member_name| {
-            ConstraintSet::from_bool(self.inner(db).contains_key(member_name))
+            ConstraintSet::from(self.inner(db).contains_key(member_name))
         })
     }
 
@@ -540,13 +540,13 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
     ) -> ConstraintSet<'db> {
         match &self.kind {
             // TODO: consider the types of the attribute on `other` for method members
-            ProtocolMemberKind::Method(_) => ConstraintSet::from_bool(matches!(
+            ProtocolMemberKind::Method(_) => ConstraintSet::from(matches!(
                 other.to_meta_type(db).member(db, self.name).place,
                 Place::Type(ty, Boundness::Bound)
                 if ty.is_assignable_to(db, CallableType::single(db, Signature::dynamic(Type::any())))
             )),
             // TODO: consider the types of the attribute on `other` for property members
-            ProtocolMemberKind::Property(_) => ConstraintSet::from_bool(matches!(
+            ProtocolMemberKind::Property(_) => ConstraintSet::from(matches!(
                 other.member(db, self.name).place,
                 Place::Type(_, Boundness::Bound)
             )),

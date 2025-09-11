@@ -260,15 +260,6 @@ impl<'db> ConstraintSet<'db> {
         result
     }
 
-    /// Returns a constraint set representing a boolean condition.
-    pub(crate) fn from_bool(b: bool) -> Self {
-        if b {
-            Self::always_satisfiable()
-        } else {
-            Self::unsatisfiable()
-        }
-    }
-
     /// Returns the intersection of this constraint set and another. The other constraint set is
     /// provided as a thunk, to implement short-circuiting: the thunk is not forced if the
     /// constraint set is already saturated.
@@ -448,6 +439,16 @@ impl<'db> ConstraintSet<'db> {
         }
 
         DisplayConstraintSet { set: self, db }
+    }
+}
+
+impl From<bool> for ConstraintSet<'_> {
+    fn from(b: bool) -> Self {
+        if b {
+            Self::always_satisfiable()
+        } else {
+            Self::unsatisfiable()
+        }
     }
 }
 

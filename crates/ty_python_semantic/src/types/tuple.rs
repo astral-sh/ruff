@@ -420,7 +420,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
     ) -> ConstraintSet<'db> {
         match other {
             Tuple::Fixed(other) => {
-                ConstraintSet::from_bool(self.0.len() == other.0.len()).and(db, || {
+                ConstraintSet::from(self.0.len() == other.0.len()).and(db, || {
                     (self.0.iter().zip(&other.0)).when_all(db, |(self_ty, other_ty)| {
                         self_ty.has_relation_to_impl(db, *other_ty, relation, visitor)
                     })
@@ -476,7 +476,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         other: &Self,
         visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
-        ConstraintSet::from_bool(self.0.len() == other.0.len()).and(db, || {
+        ConstraintSet::from(self.0.len() == other.0.len()).and(db, || {
             (self.0.iter())
                 .zip(&other.0)
                 .when_all(db, |(self_ty, other_ty)| {

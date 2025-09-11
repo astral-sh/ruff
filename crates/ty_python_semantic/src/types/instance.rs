@@ -395,9 +395,7 @@ impl<'db> NominalInstanceType<'db> {
             }
         }
         result.or(db, || {
-            ConstraintSet::from_bool(
-                !(self.class(db)).could_coexist_in_mro_with(db, other.class(db)),
-            )
+            ConstraintSet::from(!(self.class(db)).could_coexist_in_mro_with(db, other.class(db)))
         })
     }
 
@@ -653,7 +651,7 @@ impl<'db> ProtocolInstanceType<'db> {
         if self_normalized == Type::ProtocolInstance(other) {
             return ConstraintSet::always_satisfiable();
         }
-        ConstraintSet::from_bool(self_normalized == other.normalized(db))
+        ConstraintSet::from(self_normalized == other.normalized(db))
     }
 
     /// Return `true` if this protocol type is disjoint from the protocol `other`.
