@@ -160,8 +160,6 @@ SIM910 [*] Use `dict.get("Cat")` instead of `dict.get("Cat", None)`
 56 |     dict = {"Tom": 23, "Maria": 23, "Dog": 11}
 57 |     age = dict.get("Cat", None)
    |           ^^^^^^^^^^^^^^^^^^^^^
-58 |
-59 | # https://github.com/astral-sh/ruff/issues/20341
    |
 help: Replace `dict.get("Cat", None)` with `dict.get("Cat")`
 54 | # https://github.com/astral-sh/ruff/issues/18777
@@ -169,21 +167,4 @@ help: Replace `dict.get("Cat", None)` with `dict.get("Cat")`
 56 |     dict = {"Tom": 23, "Maria": 23, "Dog": 11}
    -     age = dict.get("Cat", None)
 57 +     age = dict.get("Cat")
-58 | 
-59 | # https://github.com/astral-sh/ruff/issues/20341
-60 | ages = {"Tom": 23, "Maria": 23, "Dog": 11}
-
-SIM910 [*] Use `ages.get(key_source.get("Thomas", "Tom"))` instead of `ages.get(key_source.get("Thomas", "Tom"), None)`
-  --> SIM910.py:62:7
-   |
-60 | ages = {"Tom": 23, "Maria": 23, "Dog": 11}
-61 | key_source = {"Thomas": "Tom"}
-62 | age = ages.get(key_source.get("Thomas", "Tom"), None)
-   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
-help: Replace `ages.get(key_source.get("Thomas", "Tom"), None)` with `ages.get(key_source.get("Thomas", "Tom"))`
-59 | # https://github.com/astral-sh/ruff/issues/20341
-60 | ages = {"Tom": 23, "Maria": 23, "Dog": 11}
-61 | key_source = {"Thomas": "Tom"}
-   - age = ages.get(key_source.get("Thomas", "Tom"), None)
-62 + age = ages.get(key_source.get("Thomas", "Tom"))
+58 |
