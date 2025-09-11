@@ -249,9 +249,9 @@ impl<'db> ConstraintSet<'db> {
     }
 
     /// Returns the negation of this constraint set.
-    pub(crate) fn negate(self, db: &'db dyn Db) -> Self {
+    pub(crate) fn negate(&self, db: &'db dyn Db) -> Self {
         let mut result = Self::always();
-        for clause in self.clauses {
+        for clause in &self.clauses {
             result.intersect_set(db, &clause.negate(db));
         }
         result
