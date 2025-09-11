@@ -794,7 +794,7 @@ pub struct CallSignatureDetails<'db> {
     /// Offsets for each parameter in the signature definition.
     /// Each range specifies the start position and length of a parameter definition
     /// within the file containing the signature definition.
-    pub definition_parameter_offsets: Option<Vec<TextRange>>,
+    pub definition_parameter_offsets: Option<HashMap<String, TextRange>>,
 
     /// The names of the parameters in the signature, in order.
     /// This provides easy access to parameter names for documentation lookup.
@@ -812,13 +812,13 @@ pub struct CallSignatureDetails<'db> {
 fn definition_parameter_offsets(
     definition_kind: &DefinitionKind,
     module_ref: &ParsedModuleRef,
-) -> Option<Vec<TextRange>> {
+) -> Option<HashMap<String, TextRange>> {
     match definition_kind {
         DefinitionKind::Function(node) => Some(
             node.node(module_ref)
                 .parameters
                 .iter()
-                .map(|param| param.name().range())
+                .map(|param| (param.name().to_string(), param.name().range()))
                 .collect(),
         ),
         _ => None,
@@ -920,6 +920,7 @@ pub fn find_active_signature_from_details(
 
 #[derive(Default)]
 pub struct InlayHintFunctionArgumentDetails {
+    pub target_signature_file: Option<File>,
     pub argument_names: HashMap<usize, (String, Option<TextRange>)>,
 }
 
@@ -939,6 +940,12 @@ pub fn inlay_hint_function_argument_details<'db>(
     let call_signature_details = signature_details.get(active_signature_index)?;
 
     let parameters = call_signature_details.signature.parameters();
+
+    let target_signature_file = call_signature_details
+        .signature
+        .definition
+        .map(|definition| definition.file(db));
+
     let definition_parameter_offsets = &call_signature_details.definition_parameter_offsets;
     let mut argument_names = HashMap::new();
 
@@ -962,9 +969,13 @@ pub fn inlay_hint_function_argument_details<'db>(
             continue;
         };
 
-        let parameter_label_offset = definition_parameter_offsets
-            .as_ref()
-            .and_then(|offsets| offsets.get(*param_index));
+        let parameter_label_offset =
+            definition_parameter_offsets
+                .as_ref()
+                .and_then(|offsets| match param.name() {
+                    Some(name) => offsets.get(&name.to_string()),
+                    None => None,
+                });
 
         // Only add hints for parameters that can be specified by name
         if !param.is_positional_only() && !param.is_variadic() && !param.is_keyword_variadic() {
@@ -978,7 +989,10 @@ pub fn inlay_hint_function_argument_details<'db>(
         }
     }
 
-    Some(InlayHintFunctionArgumentDetails { argument_names })
+    Some(InlayHintFunctionArgumentDetails {
+        target_signature_file,
+        argument_names,
+    })
 }
 
 /// Find the text range of a specific parameter in function parameters by name.
