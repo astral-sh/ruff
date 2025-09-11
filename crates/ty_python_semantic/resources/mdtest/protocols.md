@@ -1814,8 +1814,8 @@ static_assert(not is_assignable_to(Foo, Iterable[Any]))
 ```
 
 Because method members are always looked up on the meta-type of an object when testing assignability
-and subtyping, we understand that `IterableClass` here is a subtype of `Iterable` even though
-`Foo.__iter__` resolves to a type with the wrong signature:
+and subtyping, we understand that `IterableClass` here is a subtype of `Iterable[int]` even though
+`IterableClass.__iter__` has the wrong signature:
 
 ```py
 from typing import Iterator, Iterable
