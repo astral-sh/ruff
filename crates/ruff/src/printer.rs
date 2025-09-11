@@ -14,9 +14,7 @@ use ruff_db::diagnostic::{
 };
 use ruff_linter::fs::relativize_path;
 use ruff_linter::logging::LogLevel;
-use ruff_linter::message::{
-    Emitter, EmitterContext, GithubEmitter, GroupedEmitter, SarifEmitter, TextEmitter,
-};
+use ruff_linter::message::{Emitter, EmitterContext, GroupedEmitter, SarifEmitter, TextEmitter};
 use ruff_linter::notify_user;
 use ruff_linter::settings::flags::{self};
 use ruff_linter::settings::types::{OutputFormat, UnsafeFixes};
@@ -290,7 +288,11 @@ impl Printer {
                 self.write_summary_text(writer, diagnostics)?;
             }
             OutputFormat::Github => {
-                GithubEmitter.emit(writer, &diagnostics.inner, &context)?;
+                let config = DisplayDiagnosticConfig::default()
+                    .format(DiagnosticFormat::Github)
+                    .preview(preview);
+                let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
+                write!(writer, "{value}")?;
             }
             OutputFormat::Gitlab => {
                 let config = DisplayDiagnosticConfig::default()
