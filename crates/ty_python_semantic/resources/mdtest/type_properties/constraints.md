@@ -718,6 +718,16 @@ def _[T]() -> None:
     reveal_type(~range_constraint(Never, T, object))
 ```
 
+The union of a range constraint and its negation should always be satisfiable.
+
+```py
+def _[T]() -> None:
+    constraint = range_constraint(Sub, T, Base)
+    # TODO: revealed: ty_extensions.ConstraintSet[always]
+    # revealed: ty_extensions.ConstraintSet[(Sub ≤ T@_ ≤ Base) ∨ ((T@_ ≤ Sub) ∧ (T@_ ≠ Sub)) ∨ (T@_ ≁ Sub) ∨ ((Base ≤ T@_) ∧ (T@_ ≠ Base)) ∨ (T@_ ≁ Base)]
+    reveal_type(constraint | ~constraint)
+```
+
 ### Negation of a not-equivalent constraint
 
 In the negation of a not-equivalent constrant, the typevar must specialize to a type that _is_
@@ -744,6 +754,15 @@ def _[T]() -> None:
     reveal_type(~not_equivalent_constraint(T, object))
 ```
 
+The union of a not-equivalent constraint and its negation should always be satisfiable.
+
+```py
+def _[T]() -> None:
+    constraint = not_equivalent_constraint(T, Base)
+    # revealed: ty_extensions.ConstraintSet[always]
+    reveal_type(constraint | ~constraint)
+```
+
 ### Negation of an incomparable constraint
 
 In the negation of an incomparable constraint, the typevar must specialize to a type that _is_
@@ -766,4 +785,14 @@ def _[T]() -> None:
     reveal_type(~incomparable_constraint(T, Never))
     # revealed: ty_extensions.ConstraintSet[always]
     reveal_type(~incomparable_constraint(T, object))
+```
+
+The union of an incomparable constraint and its negation should always be satisfiable.
+
+```py
+def _[T]() -> None:
+    constraint = incomparable_constraint(T, Base)
+    # TODO: revealed: ty_extensions.ConstraintSet[always]
+    # revealed: ty_extensions.ConstraintSet[(T@_ ≁ Base) ∨ (T@_ ≤ Base) ∨ (Base ≤ T@_)]
+    reveal_type(constraint | ~constraint)
 ```
