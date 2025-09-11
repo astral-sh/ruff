@@ -15,7 +15,7 @@ use crate::types::signatures::Signature;
 use crate::types::{ClassBase, ClassLiteral, DynamicType, KnownClass, KnownInstanceType, Type};
 use crate::{Db, HasType, NameKind, SemanticModel};
 use ruff_db::files::{File, FileRange};
-use ruff_db::parsed::parsed_module;
+use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast};
 use ruff_text_size::{Ranged, TextRange};
@@ -791,6 +791,11 @@ pub struct CallSignatureDetails<'db> {
     /// within the full signature string.
     pub parameter_label_offsets: Vec<TextRange>,
 
+    /// Offsets for each parameter in the signature definition.
+    /// Each range specifies the start position and length of a parameter definition
+    /// within the file containing the signature definition.
+    pub definition_parameter_offsets: Option<Vec<TextRange>>,
+
     /// The names of the parameters in the signature, in order.
     /// This provides easy access to parameter names for documentation lookup.
     pub parameter_names: Vec<String>,
@@ -802,6 +807,22 @@ pub struct CallSignatureDetails<'db> {
     /// Mapping from argument indices to parameter indices. This helps
     /// determine which parameter corresponds to which argument position.
     pub argument_to_parameter_mapping: Vec<MatchedArgument<'db>>,
+}
+
+fn definition_parameter_offsets(
+    definition_kind: &DefinitionKind,
+    module_ref: &ParsedModuleRef,
+) -> Option<Vec<TextRange>> {
+    match definition_kind {
+        DefinitionKind::Function(node) => Some(
+            node.node(module_ref)
+                .parameters
+                .iter()
+                .map(|param| param.name().range())
+                .collect(),
+        ),
+        _ => None,
+    }
 }
 
 /// Extract signature details from a function call expression.
@@ -834,11 +855,16 @@ pub fn call_signature_details<'db>(
                 let display_details = signature.display(db).to_string_parts();
                 let parameter_label_offsets = display_details.parameter_ranges.clone();
                 let parameter_names = display_details.parameter_names.clone();
+                let definition_parameter_offsets = signature.definition().and_then(|definition| {
+                    let module_ref = parsed_module(db, definition.file(db)).load(db);
+                    definition_parameter_offsets(definition.kind(db), &module_ref)
+                });
 
                 CallSignatureDetails {
                     signature: signature.clone(),
                     label: display_details.label,
                     parameter_label_offsets,
+                    definition_parameter_offsets,
                     parameter_names,
                     definition: signature.definition(),
                     argument_to_parameter_mapping: binding.argument_matches().to_vec(),
@@ -894,7 +920,7 @@ pub fn find_active_signature_from_details(
 
 #[derive(Default)]
 pub struct InlayHintFunctionArgumentDetails {
-    pub argument_names: HashMap<usize, String>,
+    pub argument_names: HashMap<usize, (String, Option<TextRange>)>,
 }
 
 pub fn inlay_hint_function_argument_details<'db>(
@@ -913,6 +939,7 @@ pub fn inlay_hint_function_argument_details<'db>(
     let call_signature_details = signature_details.get(active_signature_index)?;
 
     let parameters = call_signature_details.signature.parameters();
+    let definition_parameter_offsets = &call_signature_details.definition_parameter_offsets;
     let mut argument_names = HashMap::new();
 
     for arg_index in 0..call_expr.arguments.args.len() {
@@ -935,12 +962,19 @@ pub fn inlay_hint_function_argument_details<'db>(
             continue;
         };
 
+        let parameter_label_offset = definition_parameter_offsets
+            .as_ref()
+            .and_then(|offsets| offsets.get(*param_index));
+
         // Only add hints for parameters that can be specified by name
         if !param.is_positional_only() && !param.is_variadic() && !param.is_keyword_variadic() {
             let Some(name) = param.name() else {
                 continue;
             };
-            argument_names.insert(arg_index, name.to_string());
+            argument_names.insert(
+                arg_index,
+                (name.to_string(), parameter_label_offset.copied()),
+            );
         }
     }
 

@@ -28,6 +28,7 @@ import {
   DocumentHighlight,
   DocumentHighlightKind,
   InlayHintKind,
+  LocationLink,
 } from "ty_wasm";
 import { FileId, ReadonlyFiles } from "../Playground";
 import { isPythonFile } from "./Files";
@@ -419,7 +420,13 @@ class PlaygroundServer
     return {
       dispose: () => {},
       hints: inlayHints.map((hint) => ({
-        label: hint.markdown,
+        label: hint.label.map((part) => ({
+          label: part.label,
+          location:
+            part.location !== undefined
+              ? this.mapNavigationTarget(part.location)
+              : undefined,
+        })),
         position: {
           lineNumber: hint.position.line,
           column: hint.position.column,
@@ -736,57 +743,57 @@ class PlaygroundServer
     return null;
   }
 
-  private mapNavigationTargets(links: any[]): languages.LocationLink[] {
-    const result = links.map((link) => {
-      const uri = Uri.parse(link.path);
+  private mapNavigationTarget(link: LocationLink): languages.LocationLink {
+    const uri = Uri.parse(link.path);
 
-      // Pre-create models to ensure peek definition works
-      if (this.monaco.editor.getModel(uri) == null) {
-        if (uri.scheme === "vendored") {
-          // Handle vendored files
-          const vendoredPath = this.getVendoredPath(uri);
-          const fileHandle = this.getOrCreateVendoredFileHandle(vendoredPath);
-          const content = this.props.workspace.sourceText(fileHandle);
-          this.monaco.editor.createModel(content, "python", uri);
-        } else {
-          // Handle regular files
-          const fileId = this.props.files.index.find((file) => {
-            return Uri.file(file.name).toString() === uri.toString();
-          })?.id;
+    // Pre-create models to ensure peek definition works
+    if (this.monaco.editor.getModel(uri) == null) {
+      if (uri.scheme === "vendored") {
+        // Handle vendored files
+        const vendoredPath = this.getVendoredPath(uri);
+        const fileHandle = this.getOrCreateVendoredFileHandle(vendoredPath);
+        const content = this.props.workspace.sourceText(fileHandle);
+        this.monaco.editor.createModel(content, "python", uri);
+      } else {
+        // Handle regular files
+        const fileId = this.props.files.index.find((file) => {
+          return Uri.file(file.name).toString() === uri.toString();
+        })?.id;
 
-          if (fileId != null) {
-            const handle = this.props.files.handles[fileId];
-            if (handle != null) {
-              const language = isPythonFile(handle) ? "python" : undefined;
-              this.monaco.editor.createModel(
-                this.props.files.contents[fileId],
-                language,
-                uri,
-              );
-            }
+        if (fileId != null) {
+          const handle = this.props.files.handles[fileId];
+          if (handle != null) {
+            const language = isPythonFile(handle) ? "python" : undefined;
+            this.monaco.editor.createModel(
+              this.props.files.contents[fileId],
+              language,
+              uri,
+            );
           }
         }
       }
+    }
 
-      const targetSelection =
-        link.selection_range == null
-          ? undefined
-          : tyRangeToMonacoRange(link.selection_range);
+    const targetSelection =
+      link.selection_range == null
+        ? undefined
+        : tyRangeToMonacoRange(link.selection_range);
 
-      const originSelection =
-        link.origin_selection_range == null
-          ? undefined
-          : tyRangeToMonacoRange(link.origin_selection_range);
+    const originSelection =
+      link.origin_selection_range == null
+        ? undefined
+        : tyRangeToMonacoRange(link.origin_selection_range);
 
-      return {
-        uri: uri,
-        range: tyRangeToMonacoRange(link.full_range),
-        targetSelectionRange: targetSelection,
-        originSelectionRange: originSelection,
-      } as languages.LocationLink;
-    });
+    return {
+      uri: uri,
+      range: tyRangeToMonacoRange(link.full_range),
+      targetSelectionRange: targetSelection,
+      originSelectionRange: originSelection,
+    } as languages.LocationLink;
+  }
 
-    return result;
+  private mapNavigationTargets(links: any[]): languages.LocationLink[] {
+    return links.map(this.mapNavigationTarget);
   }
 
   dispose() {

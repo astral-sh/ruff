@@ -1,16 +1,16 @@
 use std::borrow::Cow;
 
-use crate::document::{RangeExt, TextSizeExt};
-use crate::server::api::traits::{
-    BackgroundDocumentRequestHandler, RequestHandler, RetriableRequestHandler,
-};
-use crate::session::DocumentSnapshot;
-use crate::session::client::Client;
 use lsp_types::request::InlayHintRequest;
 use lsp_types::{InlayHintParams, Url};
 use ruff_db::source::{line_index, source_text};
 use ty_ide::{InlayHintKind, InlayHintLabel, inlay_hints};
 use ty_project::ProjectDatabase;
+
+use crate::document::{RangeExt, TextSizeExt, ToLink};
+use crate::server::api::traits::{
+    BackgroundDocumentRequestHandler, RequestHandler, RetriableRequestHandler,
+};
+use crate::session::{DocumentSnapshot, client::Client};
 
 pub(crate) struct InlayHintRequestHandler;
 
@@ -55,7 +55,7 @@ impl BackgroundDocumentRequestHandler for InlayHintRequestHandler {
                 position: hint
                     .position
                     .to_position(&source, &index, snapshot.encoding()),
-                label: inlay_hint_label(&hint.label),
+                label: inlay_hint_label(&hint.label, db, snapshot),
                 kind: Some(inlay_hint_kind(&hint.kind)),
                 tooltip: None,
                 padding_left: None,
@@ -78,12 +78,20 @@ fn inlay_hint_kind(inlay_hint_kind: &InlayHintKind) -> lsp_types::InlayHintKind 
     }
 }
 
-fn inlay_hint_label(inlay_hint_label: &InlayHintLabel) -> lsp_types::InlayHintLabel {
+fn inlay_hint_label(
+    inlay_hint_label: &InlayHintLabel,
+    db: &ProjectDatabase,
+    snapshot: &DocumentSnapshot,
+) -> lsp_types::InlayHintLabel {
     let mut label_parts = Vec::new();
     for part in inlay_hint_label.parts() {
+        let location = part
+            .target()
+            .and_then(|target| target.to_location(db, snapshot.encoding()));
+
         label_parts.push(lsp_types::InlayHintLabelPart {
             value: part.text().into(),
-            location: None,
+            location,
             tooltip: None,
             command: None,
         });

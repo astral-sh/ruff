@@ -30,8 +30,15 @@ impl InlayHint {
         }
     }
 
-    fn call_argument_name(position: TextSize, name: &str) -> Self {
-        let label_parts = vec![InlayHintLabelPart::new(name), "=".into()];
+    fn call_argument_name(
+        position: TextSize,
+        name: &str,
+        navigation_target: Option<crate::NavigationTarget>,
+    ) -> Self {
+        let label_parts = vec![
+            InlayHintLabelPart::new(name).with_target(navigation_target),
+            "=".into(),
+        ];
 
         Self {
             position,
@@ -96,6 +103,13 @@ impl InlayHintLabelPart {
 
     pub fn target(&self) -> Option<&crate::NavigationTarget> {
         self.target.as_ref()
+    }
+
+    pub fn with_target(self, target: Option<crate::NavigationTarget>) -> Self {
+        Self {
+            text: self.text,
+            target,
+        }
     }
 }
 
@@ -171,6 +185,7 @@ impl Default for InlayHintSettings {
 
 struct InlayHintVisitor<'a, 'db> {
     db: &'db dyn Db,
+    file: File,
     model: SemanticModel<'db>,
     hints: Vec<InlayHint>,
     in_assignment: bool,
@@ -182,6 +197,7 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
     fn new(db: &'db dyn Db, file: File, range: TextRange, settings: &'a InlayHintSettings) -> Self {
         Self {
             db,
+            file,
             model: SemanticModel::new(db, file),
             hints: Vec::new(),
             in_assignment: false,
@@ -198,7 +214,12 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
             .push(InlayHint::variable_type(position, ty, self.db));
     }
 
-    fn add_call_argument_name(&mut self, position: TextSize, name: &str) {
+    fn add_call_argument_name(
+        &mut self,
+        position: TextSize,
+        name: &str,
+        parameter_label_offset: Option<TextRange>,
+    ) {
         if !self.settings.call_argument_names {
             return;
         }
@@ -206,9 +227,12 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
         if name.starts_with('_') {
             return;
         }
+        let navigation_target =
+            parameter_label_offset.map(|offset| crate::NavigationTarget::new(self.file, offset));
 
-        self.hints
-            .push(InlayHint::call_argument_name(position, name));
+        let inlay_hint = InlayHint::call_argument_name(position, name, navigation_target);
+
+        self.hints.push(inlay_hint);
     }
 }
 
@@ -273,8 +297,12 @@ impl SourceOrderVisitor<'_> for InlayHintVisitor<'_, '_> {
                 self.visit_expr(&call.func);
 
                 for (index, arg_or_keyword) in call.arguments.arguments_source_order().enumerate() {
-                    if let Some(name) = argument_names.get(&index) {
-                        self.add_call_argument_name(arg_or_keyword.range().start(), name);
+                    if let Some((name, parameter_label_offset)) = argument_names.get(&index) {
+                        self.add_call_argument_name(
+                            arg_or_keyword.range().start(),
+                            name,
+                            *parameter_label_offset,
+                        );
                     }
                     self.visit_expr(arg_or_keyword.value());
                 }
