@@ -801,7 +801,7 @@ impl<'db> Specialization<'db> {
     ) -> ConstraintSet<'db> {
         let generic_context = self.generic_context(db);
         if generic_context != other.generic_context(db) {
-            return ConstraintSet::unsatisfiable(db);
+            return ConstraintSet::unsatisfiable();
         }
 
         if let (Some(self_tuple), Some(other_tuple)) = (self.tuple_inner(db), other.tuple_inner(db))
@@ -812,7 +812,7 @@ impl<'db> Specialization<'db> {
         let self_materialization_kind = self.materialization_kind(db);
         let other_materialization_kind = other.materialization_kind(db);
 
-        let mut result = ConstraintSet::always_satisfiable(db);
+        let mut result = ConstraintSet::always_satisfiable();
         for ((bound_typevar, self_type), other_type) in (generic_context.variables(db).into_iter())
             .zip(self.types(db))
             .zip(other.types(db))
@@ -825,7 +825,7 @@ impl<'db> Specialization<'db> {
             {
                 match relation {
                     TypeRelation::Assignability => continue,
-                    TypeRelation::Subtyping => return ConstraintSet::unsatisfiable(db),
+                    TypeRelation::Subtyping => return ConstraintSet::unsatisfiable(),
                 }
             }
 
@@ -851,9 +851,9 @@ impl<'db> Specialization<'db> {
                 TypeVarVariance::Contravariant => {
                     other_type.has_relation_to_impl(db, *self_type, relation, visitor)
                 }
-                TypeVarVariance::Bivariant => ConstraintSet::always_satisfiable(db),
+                TypeVarVariance::Bivariant => ConstraintSet::always_satisfiable(),
             };
-            if result.intersect(db, &compatible).is_never_satisfied(db) {
+            if result.intersect(db, &compatible).is_never_satisfied() {
                 return result;
             }
         }
@@ -868,14 +868,14 @@ impl<'db> Specialization<'db> {
         visitor: &IsEquivalentVisitor<'db, ConstraintSet<'db>>,
     ) -> ConstraintSet<'db> {
         if self.materialization_kind(db) != other.materialization_kind(db) {
-            return ConstraintSet::unsatisfiable(db);
+            return ConstraintSet::unsatisfiable();
         }
         let generic_context = self.generic_context(db);
         if generic_context != other.generic_context(db) {
-            return ConstraintSet::unsatisfiable(db);
+            return ConstraintSet::unsatisfiable();
         }
 
-        let mut result = ConstraintSet::always_satisfiable(db);
+        let mut result = ConstraintSet::always_satisfiable();
         for ((bound_typevar, self_type), other_type) in (generic_context.variables(db).into_iter())
             .zip(self.types(db))
             .zip(other.types(db))
@@ -892,19 +892,19 @@ impl<'db> Specialization<'db> {
                 | TypeVarVariance::Contravariant => {
                     self_type.is_equivalent_to_impl(db, *other_type, visitor)
                 }
-                TypeVarVariance::Bivariant => ConstraintSet::always_satisfiable(db),
+                TypeVarVariance::Bivariant => ConstraintSet::always_satisfiable(),
             };
-            if result.intersect(db, &compatible).is_never_satisfied(db) {
+            if result.intersect(db, &compatible).is_never_satisfied() {
                 return result;
             }
         }
 
         match (self.tuple_inner(db), other.tuple_inner(db)) {
-            (Some(_), None) | (None, Some(_)) => return ConstraintSet::unsatisfiable(db),
+            (Some(_), None) | (None, Some(_)) => return ConstraintSet::unsatisfiable(),
             (None, None) => {}
             (Some(self_tuple), Some(other_tuple)) => {
                 let compatible = self_tuple.is_equivalent_to_impl(db, other_tuple, visitor);
-                if result.intersect(db, &compatible).is_never_satisfied(db) {
+                if result.intersect(db, &compatible).is_never_satisfied() {
                     return result;
                 }
             }

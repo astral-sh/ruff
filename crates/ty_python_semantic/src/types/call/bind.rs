@@ -2249,7 +2249,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             // building them in an earlier separate step.
             if argument_type
                 .when_assignable_to(self.db, expected_ty)
-                .is_never_satisfied(self.db)
+                .is_never_satisfied()
             {
                 let positional = matches!(argument, Argument::Positional | Argument::Synthetic)
                     && !parameter.is_variadic();

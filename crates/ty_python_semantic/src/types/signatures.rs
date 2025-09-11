@@ -112,7 +112,7 @@ impl<'db> CallableSignature<'db> {
     ///
     /// See [`Type::is_subtype_of`] for more details.
     pub(crate) fn is_subtype_of(&self, db: &'db dyn Db, other: &Self) -> bool {
-        self.is_subtype_of_impl(db, other).is_always_satisfied(db)
+        self.is_subtype_of_impl(db, other).is_always_satisfied()
     }
 
     fn is_subtype_of_impl(&self, db: &'db dyn Db, other: &Self) -> ConstraintSet<'db> {
@@ -120,7 +120,7 @@ impl<'db> CallableSignature<'db> {
             db,
             other,
             TypeRelation::Subtyping,
-            &HasRelationToVisitor::new(ConstraintSet::always_satisfiable(db)),
+            &HasRelationToVisitor::new(ConstraintSet::always_satisfiable()),
         )
     }
 
@@ -132,9 +132,9 @@ impl<'db> CallableSignature<'db> {
             db,
             other,
             TypeRelation::Assignability,
-            &HasRelationToVisitor::new(ConstraintSet::always_satisfiable(db)),
+            &HasRelationToVisitor::new(ConstraintSet::always_satisfiable()),
         )
-        .is_always_satisfied(db)
+        .is_always_satisfied()
     }
 
     pub(crate) fn has_relation_to_impl(
@@ -214,7 +214,7 @@ impl<'db> CallableSignature<'db> {
             }
             (_, _) => {
                 if self == other {
-                    return ConstraintSet::always_satisfiable(db);
+                    return ConstraintSet::always_satisfiable();
                 }
                 self.is_subtype_of_impl(db, other)
                     .and(db, || other.is_subtype_of_impl(db, self))
@@ -538,7 +538,7 @@ impl<'db> Signature<'db> {
         other: &Signature<'db>,
         visitor: &IsEquivalentVisitor<'db, ConstraintSet<'db>>,
     ) -> ConstraintSet<'db> {
-        let mut result = ConstraintSet::always_satisfiable(db);
+        let mut result = ConstraintSet::always_satisfiable();
         let mut check_types = |self_type: Option<Type<'db>>, other_type: Option<Type<'db>>| {
             let self_type = self_type.unwrap_or(Type::unknown());
             let other_type = other_type.unwrap_or(Type::unknown());
@@ -547,15 +547,15 @@ impl<'db> Signature<'db> {
                     db,
                     &self_type.is_equivalent_to_impl(db, other_type, visitor),
                 )
-                .is_never_satisfied(db)
+                .is_never_satisfied()
         };
 
         if self.parameters.is_gradual() != other.parameters.is_gradual() {
-            return ConstraintSet::unsatisfiable(db);
+            return ConstraintSet::unsatisfiable();
         }
 
         if self.parameters.len() != other.parameters.len() {
-            return ConstraintSet::unsatisfiable(db);
+            return ConstraintSet::unsatisfiable();
         }
 
         if !check_types(self.return_ty, other.return_ty) {
@@ -603,7 +603,7 @@ impl<'db> Signature<'db> {
 
                 (ParameterKind::KeywordVariadic { .. }, ParameterKind::KeywordVariadic { .. }) => {}
 
-                _ => return ConstraintSet::unsatisfiable(db),
+                _ => return ConstraintSet::unsatisfiable(),
             }
 
             if !check_types(
@@ -686,7 +686,7 @@ impl<'db> Signature<'db> {
             }
         }
 
-        let mut result = ConstraintSet::always_satisfiable(db);
+        let mut result = ConstraintSet::always_satisfiable();
         let mut check_types = |type1: Option<Type<'db>>, type2: Option<Type<'db>>| {
             let type1 = type1.unwrap_or(Type::unknown());
             let type2 = type2.unwrap_or(Type::unknown());
@@ -695,7 +695,7 @@ impl<'db> Signature<'db> {
                     db,
                     &type1.has_relation_to_impl(db, type2, relation, visitor),
                 )
-                .is_never_satisfied(db)
+                .is_never_satisfied()
         };
 
         // Return types are covariant.
@@ -715,13 +715,13 @@ impl<'db> Signature<'db> {
                 .keyword_variadic()
                 .is_some_and(|(_, param)| param.annotated_type().is_some_and(|ty| ty.is_object()))
         {
-            return ConstraintSet::always_satisfiable(db);
+            return ConstraintSet::always_satisfiable();
         }
 
         // If either of the parameter lists is gradual (`...`), then it is assignable to and from
         // any other parameter list, but not a subtype or supertype of any other parameter list.
         if self.parameters.is_gradual() || other.parameters.is_gradual() {
-            return ConstraintSet::from_bool(db, relation.is_assignability());
+            return ConstraintSet::from_bool(relation.is_assignability());
         }
 
         let mut parameters = ParametersZip {
@@ -759,7 +759,7 @@ impl<'db> Signature<'db> {
                         // `other`, then the non-variadic parameters in `self` must have a default
                         // value.
                         if default_type.is_none() {
-                            return ConstraintSet::unsatisfiable(db);
+                            return ConstraintSet::unsatisfiable();
                         }
                     }
                     ParameterKind::Variadic { .. } | ParameterKind::KeywordVariadic { .. } => {
@@ -771,7 +771,7 @@ impl<'db> Signature<'db> {
                 EitherOrBoth::Right(_) => {
                     // If there are more parameters in `other` than in `self`, then `self` is not a
                     // subtype of `other`.
-                    return ConstraintSet::unsatisfiable(db);
+                    return ConstraintSet::unsatisfiable();
                 }
 
                 EitherOrBoth::Both(self_parameter, other_parameter) => {
@@ -791,7 +791,7 @@ impl<'db> Signature<'db> {
                             },
                         ) => {
                             if self_default.is_none() && other_default.is_some() {
-                                return ConstraintSet::unsatisfiable(db);
+                                return ConstraintSet::unsatisfiable();
                             }
                             if !check_types(
                                 other_parameter.annotated_type(),
@@ -812,11 +812,11 @@ impl<'db> Signature<'db> {
                             },
                         ) => {
                             if self_name != other_name {
-                                return ConstraintSet::unsatisfiable(db);
+                                return ConstraintSet::unsatisfiable();
                             }
                             // The following checks are the same as positional-only parameters.
                             if self_default.is_none() && other_default.is_some() {
-                                return ConstraintSet::unsatisfiable(db);
+                                return ConstraintSet::unsatisfiable();
                             }
                             if !check_types(
                                 other_parameter.annotated_type(),
@@ -901,7 +901,7 @@ impl<'db> Signature<'db> {
                             break;
                         }
 
-                        _ => return ConstraintSet::unsatisfiable(db),
+                        _ => return ConstraintSet::unsatisfiable(),
                     }
                 }
             }
@@ -935,7 +935,7 @@ impl<'db> Signature<'db> {
                     // previous loop. They cannot be matched against any parameter in `other` which
                     // only contains keyword-only and keyword-variadic parameters so the subtype
                     // relation is invalid.
-                    return ConstraintSet::unsatisfiable(db);
+                    return ConstraintSet::unsatisfiable();
                 }
                 ParameterKind::Variadic { .. } => {}
             }
@@ -962,7 +962,7 @@ impl<'db> Signature<'db> {
                                 ..
                             } => {
                                 if self_default.is_none() && other_default.is_some() {
-                                    return ConstraintSet::unsatisfiable(db);
+                                    return ConstraintSet::unsatisfiable();
                                 }
                                 if !check_types(
                                     other_parameter.annotated_type(),
@@ -983,14 +983,14 @@ impl<'db> Signature<'db> {
                             return result;
                         }
                     } else {
-                        return ConstraintSet::unsatisfiable(db);
+                        return ConstraintSet::unsatisfiable();
                     }
                 }
                 ParameterKind::KeywordVariadic { .. } => {
                     let Some(self_keyword_variadic_type) = self_keyword_variadic else {
                         // For a `self <: other` relationship, if `other` has a keyword variadic
                         // parameter, `self` must also have a keyword variadic parameter.
-                        return ConstraintSet::unsatisfiable(db);
+                        return ConstraintSet::unsatisfiable();
                     };
                     if !check_types(other_parameter.annotated_type(), self_keyword_variadic_type) {
                         return result;
@@ -998,7 +998,7 @@ impl<'db> Signature<'db> {
                 }
                 _ => {
                     // This can only occur in case of a syntax error.
-                    return ConstraintSet::unsatisfiable(db);
+                    return ConstraintSet::unsatisfiable();
                 }
             }
         }
@@ -1007,7 +1007,7 @@ impl<'db> Signature<'db> {
         // optional otherwise the subtype relation is invalid.
         for (_, self_parameter) in self_keywords {
             if self_parameter.default_type().is_none() {
-                return ConstraintSet::unsatisfiable(db);
+                return ConstraintSet::unsatisfiable();
             }
         }
 

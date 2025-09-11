@@ -952,9 +952,9 @@ impl<'db> FunctionType<'db> {
         _visitor: &HasRelationToVisitor<'db, ConstraintSet<'db>>,
     ) -> ConstraintSet<'db> {
         match relation {
-            TypeRelation::Subtyping => ConstraintSet::from_bool(db, self.is_subtype_of(db, other)),
+            TypeRelation::Subtyping => ConstraintSet::from_bool(self.is_subtype_of(db, other)),
             TypeRelation::Assignability => {
-                ConstraintSet::from_bool(db, self.is_assignable_to(db, other))
+                ConstraintSet::from_bool(self.is_assignable_to(db, other))
             }
         }
     }
@@ -991,10 +991,10 @@ impl<'db> FunctionType<'db> {
         visitor: &IsEquivalentVisitor<'db, ConstraintSet<'db>>,
     ) -> ConstraintSet<'db> {
         if self.normalized(db) == other.normalized(db) {
-            return ConstraintSet::always_satisfiable(db);
+            return ConstraintSet::always_satisfiable();
         }
         if self.literal(db) != other.literal(db) {
-            return ConstraintSet::unsatisfiable(db);
+            return ConstraintSet::unsatisfiable();
         }
         let self_signature = self.signature(db);
         let other_signature = other.signature(db);
