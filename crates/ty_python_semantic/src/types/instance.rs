@@ -341,6 +341,7 @@ impl<'db> NominalInstanceType<'db> {
         visitor: &HasRelationToVisitor<'db, C>,
     ) -> C {
         match (self.0, other.0) {
+            (_, NominalInstanceInner::Object) => C::always_satisfiable(db),
             (
                 NominalInstanceInner::ExactTuple(tuple1),
                 NominalInstanceInner::ExactTuple(tuple2),
