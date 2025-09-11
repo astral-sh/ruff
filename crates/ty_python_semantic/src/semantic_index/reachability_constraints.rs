@@ -344,7 +344,7 @@ fn pattern_kind_to_type<'db>(db: &'db dyn Db, kind: &PatternPredicateKind<'db>) 
         PatternPredicateKind::As(pattern, _) => pattern
             .as_deref()
             .map(|p| pattern_kind_to_type(db, p))
-            .unwrap_or_else(|| Type::object(db)),
+            .unwrap_or_else(Type::object),
         PatternPredicateKind::Unsupported => Type::Never,
     }
 }

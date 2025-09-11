@@ -1521,9 +1521,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 if any_over_type(self.db(), self.infer_name_load(name), &|ty| match ty {
                     Type::Dynamic(DynamicType::TodoPEP695ParamSpec) => true,
-                    Type::NominalInstance(nominal) => nominal
-                        .class(self.db())
-                        .is_known(self.db(), KnownClass::ParamSpec),
+                    Type::NominalInstance(nominal) => {
+                        nominal.has_known_class(self.db(), KnownClass::ParamSpec)
+                    }
                     _ => false,
                 }) {
                     return Some(Parameters::todo());

@@ -1313,7 +1313,7 @@ impl<'db> Field<'db> {
     pub(crate) fn is_kw_only_sentinel(&self, db: &'db dyn Db) -> bool {
         self.declared_ty
             .into_nominal_instance()
-            .is_some_and(|instance| instance.class(db).is_known(db, KnownClass::KwOnly))
+            .is_some_and(|instance| instance.has_known_class(db, KnownClass::KwOnly))
     }
 }
 

@@ -242,8 +242,7 @@ impl<'db> UnionBuilder<'db> {
     /// Collapse the union to a single type: `object`.
     fn collapse_to_object(&mut self) {
         self.elements.clear();
-        self.elements
-            .push(UnionElement::Type(Type::object(self.db)));
+        self.elements.push(UnionElement::Type(Type::object()));
     }
 
     /// Adds a type to this union.
@@ -448,7 +447,7 @@ impl<'db> UnionBuilder<'db> {
                 }
             }
             // Adding `object` to a union results in `object`.
-            ty if ty.is_object(self.db) => {
+            ty if ty.is_object() => {
                 self.collapse_to_object();
             }
             _ => {
@@ -648,8 +647,7 @@ impl<'db> IntersectionBuilder<'db> {
                 self
             }
             Type::NominalInstance(instance)
-                if enum_metadata(self.db, instance.class(self.db).class_literal(self.db).0)
-                    .is_some() =>
+                if enum_metadata(self.db, instance.class_literal(self.db)).is_some() =>
             {
                 let mut contains_enum_literal_as_negative_element = false;
                 for intersection in &self.intersections {
@@ -674,7 +672,7 @@ impl<'db> IntersectionBuilder<'db> {
                     self.add_positive_impl(
                         Type::Union(UnionType::new(
                             db,
-                            enum_member_literals(db, instance.class(db).class_literal(db).0, None)
+                            enum_member_literals(db, instance.class_literal(db), None)
                                 .expect("Calling `enum_member_literals` on an enum class")
                                 .collect::<Box<[_]>>(),
                         )),
@@ -860,7 +858,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
             _ => {
                 let known_instance = new_positive
                     .into_nominal_instance()
-                    .and_then(|instance| instance.class(db).known(db));
+                    .and_then(|instance| instance.known_class(db));
 
                 if known_instance == Some(KnownClass::Object) {
                     // `object & T` -> `T`; it is always redundant to add `object` to an intersection
@@ -880,7 +878,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                             new_positive = Type::BooleanLiteral(false);
                         }
                         Type::NominalInstance(instance)
-                            if instance.class(db).is_known(db, KnownClass::Bool) =>
+                            if instance.has_known_class(db, KnownClass::Bool) =>
                         {
                             match new_positive {
                                 // `bool & AlwaysTruthy` -> `Literal[True]`
@@ -974,7 +972,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
             self.positive
                 .iter()
                 .filter_map(|ty| ty.into_nominal_instance())
-                .filter_map(|instance| instance.class(db).known(db))
+                .filter_map(|instance| instance.known_class(db))
                 .any(KnownClass::is_bool)
         };
 
@@ -990,7 +988,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
             Type::Never => {
                 // Adding ~Never to an intersection is a no-op.
             }
-            Type::NominalInstance(instance) if instance.is_object(db) => {
+            Type::NominalInstance(instance) if instance.is_object() => {
                 // Adding ~object to an intersection results in Never.
                 *self = Self::default();
                 self.positive.insert(Type::Never);
@@ -1152,7 +1150,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
     fn build(mut self, db: &'db dyn Db) -> Type<'db> {
         self.simplify_constrained_typevars(db);
         match (self.positive.len(), self.negative.len()) {
-            (0, 0) => Type::object(db),
+            (0, 0) => Type::object(),
             (1, 0) => self.positive[0],
             _ => {
                 self.positive.shrink_to_fit();
@@ -1208,7 +1206,7 @@ mod tests {
         let db = setup_db();
 
         let intersection = IntersectionBuilder::new(&db).build();
-        assert_eq!(intersection, Type::object(&db));
+        assert_eq!(intersection, Type::object());
     }
 
     #[test_case(Type::BooleanLiteral(true))]
@@ -1222,7 +1220,7 @@ mod tests {
         // We add t_object in various orders (in first or second position) in
         // the tests below to ensure that the boolean simplification eliminates
         // everything from the intersection, not just `bool`.
-        let t_object = Type::object(&db);
+        let t_object = Type::object();
         let t_bool = KnownClass::Bool.to_instance(&db);
 
         let ty = IntersectionBuilder::new(&db)
