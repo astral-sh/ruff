@@ -43,12 +43,10 @@
 //! — must be fully static. We take the bottom and top materializations of the types to remove any
 //! gradual forms if needed.
 //!
-//! NOTE: This module is currently in a transitional state: we've added a [`Constraints`] trait,
-//! and updated all of our type property implementations to work on any impl of that trait. We have
-//! added the DNF [`ConstraintSet`] representation, and updated all of our property checks to build
-//! up a constraint set and then check whether it is ever or always satisfiable, as appropriate. We
-//! are not yet inferring specializations from those constraints, and we will likely remove the
-//! [`Constraints`] trait once everything has stabilized.
+//! NOTE: This module is currently in a transitional state: added the DNF [`ConstraintSet`]
+//! representation, and updated all of our property checks to build up a constraint set and then
+//! check whether it is ever or always satisfiable, as appropriate. We are not yet inferring
+//! specializations from those constraints.
 //!
 //! ### Examples
 //!
@@ -110,86 +108,46 @@ fn incomparable<'db>(db: &'db dyn Db, left: Type<'db>, right: Type<'db>) -> bool
     !comparable(db, left, right)
 }
 
-/// Encodes the constraints under which a type property (e.g. assignability) holds.
-pub(crate) trait Constraints<'db>: Clone + Sized + std::fmt::Debug {
-    /// Returns a constraint set that never holds
-    fn unsatisfiable(db: &'db dyn Db) -> Self;
-
-    /// Returns a constraint set that always holds
-    fn always_satisfiable(db: &'db dyn Db) -> Self;
-
-    /// Returns whether this constraint set never holds
-    fn is_never_satisfied(&self, db: &'db dyn Db) -> bool;
-
-    /// Returns whether this constraint set always holds
-    fn is_always_satisfied(&self, db: &'db dyn Db) -> bool;
-
-    /// Updates this constraint set to hold the union of itself and another constraint set.
-    fn union(&mut self, db: &'db dyn Db, other: Self) -> &Self;
-
-    /// Updates this constraint set to hold the intersection of itself and another constraint set.
-    fn intersect(&mut self, db: &'db dyn Db, other: Self) -> &Self;
-
-    /// Returns the negation of this constraint set.
-    fn negate(self, db: &'db dyn Db) -> Self;
-
-    /// Returns a constraint set representing a boolean condition.
-    fn from_bool(db: &'db dyn Db, b: bool) -> Self {
-        if b {
-            Self::always_satisfiable(db)
-        } else {
-            Self::unsatisfiable(db)
-        }
-    }
-
-    /// Returns the intersection of this constraint set and another. The other constraint set is
-    /// provided as a thunk, to implement short-circuiting: the thunk is not forced if the
-    /// constraint set is already saturated.
-    fn and(mut self, db: &'db dyn Db, other: impl FnOnce() -> Self) -> Self {
-        if !self.is_never_satisfied(db) {
-            self.intersect(db, other());
-        }
-        self
-    }
-
-    /// Returns the union of this constraint set and another. The other constraint set is provided
-    /// as a thunk, to implement short-circuiting: the thunk is not forced if the constraint set is
-    /// already saturated.
-    fn or(mut self, db: &'db dyn Db, other: impl FnOnce() -> Self) -> Self {
-        if !self.is_always_satisfied(db) {
-            self.union(db, other());
-        }
-        self
-    }
-
-    // This is here so that we can easily print constraint sets when debugging.
-    fn display(&self, db: &'db dyn Db) -> impl Display;
-}
-
 /// An extension trait for building constraint sets from [`Option`] values.
 pub(crate) trait OptionConstraintsExtension<T> {
     /// Returns [`always_satisfiable`][Constraints::always_satisfiable] if the option is `None`;
     /// otherwise applies a function to determine under what constraints the value inside of it
     /// holds.
-    fn when_none_or<'db, C: Constraints<'db>>(self, db: &'db dyn Db, f: impl FnOnce(T) -> C) -> C;
+    fn when_none_or<'db>(
+        self,
+        db: &'db dyn Db,
+        f: impl FnOnce(T) -> ConstraintSet<'db>,
+    ) -> ConstraintSet<'db>;
 
     /// Returns [`unsatisfiable`][Constraints::unsatisfiable] if the option is `None`; otherwise
     /// applies a function to determine under what constraints the value inside of it holds.
-    fn when_some_and<'db, C: Constraints<'db>>(self, db: &'db dyn Db, f: impl FnOnce(T) -> C) -> C;
+    fn when_some_and<'db>(
+        self,
+        db: &'db dyn Db,
+        f: impl FnOnce(T) -> ConstraintSet<'db>,
+    ) -> ConstraintSet<'db>;
 }
 
 impl<T> OptionConstraintsExtension<T> for Option<T> {
-    fn when_none_or<'db, C: Constraints<'db>>(self, db: &'db dyn Db, f: impl FnOnce(T) -> C) -> C {
+    fn when_none_or<'db>(
+        self,
+        db: &'db dyn Db,
+        f: impl FnOnce(T) -> ConstraintSet<'db>,
+    ) -> ConstraintSet<'db> {
         match self {
             Some(value) => f(value),
-            None => C::always_satisfiable(db),
+            None => ConstraintSet::always_satisfiable(db),
         }
     }
 
-    fn when_some_and<'db, C: Constraints<'db>>(self, db: &'db dyn Db, f: impl FnOnce(T) -> C) -> C {
+    fn when_some_and<'db>(
+        self,
+        db: &'db dyn Db,
+        f: impl FnOnce(T) -> ConstraintSet<'db>,
+    ) -> ConstraintSet<'db> {
         match self {
             Some(value) => f(value),
-            None => C::unsatisfiable(db),
+            None => ConstraintSet::unsatisfiable(db),
         }
     }
 }
@@ -201,22 +159,34 @@ pub(crate) trait IteratorConstraintsExtension<T> {
     /// This method short-circuits; if we encounter any element that
     /// [`is_always_satisfied`][Constraints::is_always_satisfied] true, then the overall result
     /// must be as well, and we stop consuming elements from the iterator.
-    fn when_any<'db, C: Constraints<'db>>(self, db: &'db dyn Db, f: impl FnMut(T) -> C) -> C;
+    fn when_any<'db>(
+        self,
+        db: &'db dyn Db,
+        f: impl FnMut(T) -> ConstraintSet<'db>,
+    ) -> ConstraintSet<'db>;
 
     /// Returns the constraints under which every element of the iterator holds.
     ///
     /// This method short-circuits; if we encounter any element that
     /// [`is_never_satisfied`][Constraints::is_never_satisfied] true, then the overall result must
     /// be as well, and we stop consuming elements from the iterator.
-    fn when_all<'db, C: Constraints<'db>>(self, db: &'db dyn Db, f: impl FnMut(T) -> C) -> C;
+    fn when_all<'db>(
+        self,
+        db: &'db dyn Db,
+        f: impl FnMut(T) -> ConstraintSet<'db>,
+    ) -> ConstraintSet<'db>;
 }
 
 impl<I, T> IteratorConstraintsExtension<T> for I
 where
     I: Iterator<Item = T>,
 {
-    fn when_any<'db, C: Constraints<'db>>(self, db: &'db dyn Db, mut f: impl FnMut(T) -> C) -> C {
-        let mut result = C::unsatisfiable(db);
+    fn when_any<'db>(
+        self,
+        db: &'db dyn Db,
+        mut f: impl FnMut(T) -> ConstraintSet<'db>,
+    ) -> ConstraintSet<'db> {
+        let mut result = ConstraintSet::unsatisfiable(db);
         for child in self {
             if result.union(db, f(child)).is_always_satisfied(db) {
                 return result;
@@ -225,8 +195,12 @@ where
         result
     }
 
-    fn when_all<'db, C: Constraints<'db>>(self, db: &'db dyn Db, mut f: impl FnMut(T) -> C) -> C {
-        let mut result = C::always_satisfiable(db);
+    fn when_all<'db>(
+        self,
+        db: &'db dyn Db,
+        mut f: impl FnMut(T) -> ConstraintSet<'db>,
+    ) -> ConstraintSet<'db> {
+        let mut result = ConstraintSet::always_satisfiable(db);
         for child in self {
             if result.intersect(db, f(child)).is_never_satisfied(db) {
                 return result;
@@ -259,11 +233,76 @@ pub struct ConstraintSet<'db> {
 }
 
 impl<'db> ConstraintSet<'db> {
-    /// Returns the constraint set that is never satisfiable.
-    fn never() -> Self {
+    /// Returns a constraint set that never holds
+    pub(crate) fn unsatisfiable(_db: &'db dyn Db) -> Self {
         Self {
             clauses: smallvec![],
         }
+    }
+
+    /// Returns a constraint set that always holds
+    pub(crate) fn always_satisfiable(_db: &'db dyn Db) -> Self {
+        Self::singleton(ConstraintClause::always())
+    }
+
+    /// Returns whether this constraint set never holds
+    pub(crate) fn is_never_satisfied(&self, _db: &'db dyn Db) -> bool {
+        self.clauses.is_empty()
+    }
+
+    /// Returns whether this constraint set always holds
+    pub(crate) fn is_always_satisfied(&self, _db: &'db dyn Db) -> bool {
+        self.clauses.len() == 1 && self.clauses[0].is_always()
+    }
+
+    /// Updates this constraint set to hold the union of itself and another constraint set.
+    pub(crate) fn union(&mut self, db: &'db dyn Db, other: Self) -> &Self {
+        self.union_set(db, other);
+        self
+    }
+
+    /// Updates this constraint set to hold the intersection of itself and another constraint set.
+    pub(crate) fn intersect(&mut self, db: &'db dyn Db, other: Self) -> &Self {
+        self.intersect_set(db, &other);
+        self
+    }
+
+    /// Returns the negation of this constraint set.
+    pub(crate) fn negate(self, db: &'db dyn Db) -> Self {
+        let mut result = Self::always_satisfiable(db);
+        for clause in self.clauses {
+            result.intersect_set(db, &clause.negate(db));
+        }
+        result
+    }
+
+    /// Returns a constraint set representing a boolean condition.
+    pub(crate) fn from_bool(db: &'db dyn Db, b: bool) -> Self {
+        if b {
+            Self::always_satisfiable(db)
+        } else {
+            Self::unsatisfiable(db)
+        }
+    }
+
+    /// Returns the intersection of this constraint set and another. The other constraint set is
+    /// provided as a thunk, to implement short-circuiting: the thunk is not forced if the
+    /// constraint set is already saturated.
+    pub(crate) fn and(mut self, db: &'db dyn Db, other: impl FnOnce() -> Self) -> Self {
+        if !self.is_never_satisfied(db) {
+            self.intersect(db, other());
+        }
+        self
+    }
+
+    /// Returns the union of this constraint set and another. The other constraint set is provided
+    /// as a thunk, to implement short-circuiting: the thunk is not forced if the constraint set is
+    /// already saturated.
+    pub(crate) fn or(mut self, db: &'db dyn Db, other: impl FnOnce() -> Self) -> Self {
+        if !self.is_always_satisfied(db) {
+            self.union(db, other());
+        }
+        self
     }
 
     /// Returns a constraint set that contains a single clause.
@@ -401,42 +440,6 @@ impl<'db> ConstraintSet<'db> {
                 self.union_clause(db, self_clause.intersect_clause(db, other_clause));
             }
         }
-    }
-}
-
-impl<'db> Constraints<'db> for ConstraintSet<'db> {
-    fn unsatisfiable(_db: &'db dyn Db) -> Self {
-        Self::never()
-    }
-
-    fn always_satisfiable(_db: &'db dyn Db) -> Self {
-        Self::singleton(ConstraintClause::always())
-    }
-
-    fn is_never_satisfied(&self, _db: &'db dyn Db) -> bool {
-        self.clauses.is_empty()
-    }
-
-    fn is_always_satisfied(&self, _db: &'db dyn Db) -> bool {
-        self.clauses.len() == 1 && self.clauses[0].is_always()
-    }
-
-    fn union(&mut self, db: &'db dyn Db, other: Self) -> &Self {
-        self.union_set(db, other);
-        self
-    }
-
-    fn intersect(&mut self, db: &'db dyn Db, other: Self) -> &Self {
-        self.intersect_set(db, &other);
-        self
-    }
-
-    fn negate(self, db: &'db dyn Db) -> Self {
-        let mut result = Self::always_satisfiable(db);
-        for clause in self.clauses {
-            result.intersect_set(db, &clause.negate(db));
-        }
-        result
     }
 
     fn display(&self, db: &'db dyn Db) -> impl Display {
