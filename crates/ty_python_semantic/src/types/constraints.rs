@@ -321,7 +321,7 @@ impl<'db> ConstraintSet<'db> {
         let lower = lower.bottom_materialization(db);
         let upper = upper.top_materialization(db);
         let constraint = Constraint::range(db, lower, upper).constrain(typevar);
-        let mut result = Self::never();
+        let mut result = Self::unsatisfiable(db);
         result.union_constraint(db, constraint);
         result
     }
@@ -332,7 +332,7 @@ impl<'db> ConstraintSet<'db> {
         hole: Type<'db>,
     ) -> Self {
         let constraint = Constraint::not_equivalent(db, hole).constrain(typevar);
-        let mut result = Self::never();
+        let mut result = Self::unsatisfiable(db);
         result.union_constraint(db, constraint);
         result
     }
@@ -343,7 +343,7 @@ impl<'db> ConstraintSet<'db> {
         pivot: Type<'db>,
     ) -> Self {
         let constraint = Constraint::incomparable(db, pivot).constrain(typevar);
-        let mut result = Self::never();
+        let mut result = Self::unsatisfiable(db);
         result.union_constraint(db, constraint);
         result
     }
@@ -442,7 +442,7 @@ impl<'db> ConstraintSet<'db> {
         }
     }
 
-    fn display(&self, db: &'db dyn Db) -> impl Display {
+    pub(crate) fn display(&self, db: &'db dyn Db) -> impl Display {
         struct DisplayConstraintSet<'a, 'db> {
             set: &'a ConstraintSet<'db>,
             db: &'db dyn Db,
@@ -814,7 +814,7 @@ impl<'db> ConstraintClause<'db> {
     /// Returns the negation of this clause. The result is a set since negating an intersection
     /// produces a union.
     fn negate(&self, db: &'db dyn Db) -> ConstraintSet<'db> {
-        let mut result = ConstraintSet::never();
+        let mut result = ConstraintSet::unsatisfiable(db);
         for constraint in &self.constraints {
             constraint.negate_into(db, &mut result);
         }
