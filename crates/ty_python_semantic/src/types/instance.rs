@@ -345,6 +345,7 @@ impl<'db> NominalInstanceType<'db> {
     ) -> ConstraintSet<'db> {
         match (self.0, other.0) {
             (_, NominalInstanceInner::Object) => ConstraintSet::from(true),
+            (NominalInstanceInner::Object, _) => ConstraintSet::from(false),
             (
                 NominalInstanceInner::ExactTuple(tuple1),
                 NominalInstanceInner::ExactTuple(tuple2),
