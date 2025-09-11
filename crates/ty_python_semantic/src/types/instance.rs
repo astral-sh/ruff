@@ -362,10 +362,10 @@ impl<'db> NominalInstanceType<'db> {
                 NominalInstanceInner::ExactTuple(tuple1),
                 NominalInstanceInner::ExactTuple(tuple2),
             ) => tuple1.is_equivalent_to_impl(db, tuple2, visitor),
-            (
-                NominalInstanceInner::Object | NominalInstanceInner::NonTuple(_),
-                NominalInstanceInner::Object | NominalInstanceInner::NonTuple(_),
-            ) => (self.class(db)).is_equivalent_to_impl(db, other.class(db), visitor),
+            (NominalInstanceInner::Object, NominalInstanceInner::Object) => C::always_satisfiable(db),
+            (NominalInstanceInner::NonTuple(class1), NominalInstanceInner::NonTuple(class2)) => {
+                class1.is_equivalent_to_impl(db, class2, visitor)
+            }
             _ => C::unsatisfiable(db),
         }
     }
