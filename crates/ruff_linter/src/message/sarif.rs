@@ -153,6 +153,58 @@ struct SarifResult<'a> {
     start_column: OneIndexed,
     end_line: OneIndexed,
     end_column: OneIndexed,
+    fixes: Vec<SarifFix>,
+}
+
+#[derive(Debug, Serialize)]
+struct SarifFix {
+    description: RuleDescription,
+    #[serde(rename = "artifactChanges")]
+    artifact_changes: Vec<SarifArtifactChange>,
+}
+
+#[derive(Debug, Serialize)]
+
+struct RuleDescription {
+    text: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct SarifArtifactChange {
+    #[serde(rename = "artifactLocation")]
+    uri: SarifArtifactLocation,
+    replacements: Vec<SarifReplacement>,
+}
+
+#[derive(Debug, Serialize)]
+struct SarifArtifactLocation {
+    uri: String,
+}
+
+#[derive(Debug, Serialize)]
+struct SarifReplacement {
+    #[serde(rename = "deletedRegion")]
+    deleted_region: SarifRegion,
+    #[serde(rename = "insertedContent")]
+    inserted_content: InsertedContent,
+}
+
+#[derive(Debug, Serialize)]
+struct InsertedContent {
+    #[serde(rename = "text")]
+    inserted_content: String,
+}
+
+#[derive(Debug, Serialize)]
+struct SarifRegion {
+    #[serde(rename = "startLine")]
+    start_line: OneIndexed,
+    #[serde(rename = "startColumn")]
+    start_column: OneIndexed,
+    #[serde(rename = "endLine")]
+    end_line: OneIndexed,
+    #[serde(rename = "endColumn")]
+    end_column: OneIndexed,
 }
 
 impl<'a> SarifResult<'a> {
@@ -161,17 +213,60 @@ impl<'a> SarifResult<'a> {
         let start_location = message.ruff_start_location().unwrap_or_default();
         let end_location = message.ruff_end_location().unwrap_or_default();
         let path = normalize_path(&*message.expect_ruff_filename());
+        let uri = url::Url::from_file_path(&path)
+            .map_err(|()| anyhow::anyhow!("Failed to convert path to URL: {}", path.display()))?
+            .to_string();
+        let fixes = message
+            .fix()
+            .map(|fix| {
+                let fix_description = message
+                    .first_help_text()
+                    .map(std::string::ToString::to_string);
+
+                let replacements: Vec<SarifReplacement> = fix
+                    .edits()
+                    .iter()
+                    .map(|edit| SarifReplacement {
+                        deleted_region: SarifRegion {
+                            start_line: start_location.line,
+                            start_column: start_location.column,
+                            end_line: end_location.line,
+                            end_column: end_location.column,
+                        },
+                        inserted_content: InsertedContent {
+                            inserted_content: edit.content().unwrap_or("").to_string(),
+                        },
+                    })
+                    .collect();
+
+                let mut artifact_changes = Vec::new();
+                if !replacements.is_empty() {
+                    artifact_changes.push(SarifArtifactChange {
+                        uri: SarifArtifactLocation { uri: uri.clone() },
+                        replacements,
+                    });
+                }
+
+                SarifFix {
+                    description: RuleDescription {
+                        text: fix_description,
+                    },
+                    artifact_changes,
+                }
+            })
+            .into_iter()
+            .collect();
+
         Ok(Self {
             code: RuleCode::from(message),
             level: "error".to_string(),
             message: message.body().to_string(),
-            uri: url::Url::from_file_path(&path)
-                .map_err(|()| anyhow::anyhow!("Failed to convert path to URL: {}", path.display()))?
-                .to_string(),
+            uri,
             start_line: start_location.line,
             start_column: start_location.column,
             end_line: end_location.line,
             end_column: end_location.column,
+            fixes,
         })
     }
 
@@ -181,15 +276,58 @@ impl<'a> SarifResult<'a> {
         let start_location = message.ruff_start_location().unwrap_or_default();
         let end_location = message.ruff_end_location().unwrap_or_default();
         let path = normalize_path(&*message.expect_ruff_filename());
+        let uri = format!("file://{}", path.display());
+        let fixes = message
+            .fix()
+            .map(|fix| {
+                let fix_description = message
+                    .first_help_text()
+                    .map(std::string::ToString::to_string);
+
+                let replacements: Vec<SarifReplacement> = fix
+                    .edits()
+                    .iter()
+                    .map(|edit| SarifReplacement {
+                        deleted_region: SarifRegion {
+                            start_line: start_location.line,
+                            start_column: start_location.column,
+                            end_line: end_location.line,
+                            end_column: end_location.column,
+                        },
+                        inserted_content: InsertedContent {
+                            inserted_content: edit.content().unwrap_or("").to_string(),
+                        },
+                    })
+                    .collect();
+
+                let mut artifact_changes = Vec::new();
+                if !replacements.is_empty() {
+                    artifact_changes.push(SarifArtifactChange {
+                        uri: SarifArtifactLocation { uri: uri.clone() },
+                        replacements,
+                    });
+                }
+
+                SarifFix {
+                    description: RuleDescription {
+                        text: fix_description,
+                    },
+                    artifact_changes,
+                }
+            })
+            .into_iter()
+            .collect();
+
         Ok(Self {
             code: RuleCode::from(message),
             level: "error".to_string(),
             message: message.body().to_string(),
-            uri: path.display().to_string(),
+            uri,
             start_line: start_location.line,
             start_column: start_location.column,
             end_line: end_location.line,
             end_column: end_location.column,
+            fixes,
         })
     }
 }
@@ -199,7 +337,7 @@ impl Serialize for SarifResult<'_> {
     where
         S: Serializer,
     {
-        json!({
+        let mut value = json!({
             "level": self.level,
             "message": {
                 "text": self.message,
@@ -218,8 +356,11 @@ impl Serialize for SarifResult<'_> {
                 }
             }],
             "ruleId": self.code.as_str(),
-        })
-        .serialize(serializer)
+        });
+        if !self.fixes.is_empty() {
+            value["fixes"] = serde_json::to_value(&self.fixes).unwrap();
+        }
+        value.serialize(serializer)
     }
 }
 
@@ -256,6 +397,7 @@ mod tests {
         insta::assert_json_snapshot!(value, {
             ".runs[0].tool.driver.version" => "[VERSION]",
             ".runs[0].results[].locations[].physicalLocation.artifactLocation.uri" => "[URI]",
+            ".runs[0].results[].fixes[].artifactChanges[].artifactLocation.uri" => "[URI]",
         });
     }
 }

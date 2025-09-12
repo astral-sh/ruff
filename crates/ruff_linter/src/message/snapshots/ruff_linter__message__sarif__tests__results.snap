@@ -8,6 +8,33 @@ expression: value
     {
       "results": [
         {
+          "fixes": [
+            {
+              "artifactChanges": [
+                {
+                  "artifactLocation": {
+                    "uri": "[URI]"
+                  },
+                  "replacements": [
+                    {
+                      "deletedRegion": {
+                        "endColumn": 10,
+                        "endLine": 1,
+                        "startColumn": 8,
+                        "startLine": 1
+                      },
+                      "insertedContent": {
+                        "text": ""
+                      }
+                    }
+                  ]
+                }
+              ],
+              "description": {
+                "text": "Remove unused import: `os`"
+              }
+            }
+          ],
           "level": "error",
           "locations": [
             {
@@ -30,6 +57,33 @@ expression: value
           "ruleId": "F401"
         },
         {
+          "fixes": [
+            {
+              "artifactChanges": [
+                {
+                  "artifactLocation": {
+                    "uri": "[URI]"
+                  },
+                  "replacements": [
+                    {
+                      "deletedRegion": {
+                        "endColumn": 6,
+                        "endLine": 6,
+                        "startColumn": 5,
+                        "startLine": 6
+                      },
+                      "insertedContent": {
+                        "text": ""
+                      }
+                    }
+                  ]
+                }
+              ],
+              "description": {
+                "text": "Remove assignment to unused variable `x`"
+              }
+            }
+          ],
           "level": "error",
           "locations": [
             {
