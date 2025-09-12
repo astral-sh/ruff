@@ -72,8 +72,8 @@ use crate::types::diagnostic::{
 use crate::types::function::{
     FunctionDecorators, FunctionLiteral, FunctionType, KnownFunction, OverloadLiteral,
 };
-use crate::types::generics::LegacyGenericBase;
 use crate::types::generics::{GenericContext, bind_typevar};
+use crate::types::generics::{LegacyGenericBase, SpecializationBuilder};
 use crate::types::instance::SliceLiteral;
 use crate::types::mro::MroErrorKind;
 use crate::types::signatures::Signature;
@@ -5253,7 +5253,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         Type::heterogeneous_tuple(db, element_types)
     }
 
-    fn infer_list_expression(&mut self, list: &ast::ExprList, _tcx: TypeContext<'db>) -> Type<'db> {
+    fn infer_list_expression(&mut self, list: &ast::ExprList, tcx: TypeContext<'db>) -> Type<'db> {
         let ast::ExprList {
             range: _,
             node_index: _,
@@ -5261,7 +5261,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ctx: _,
         } = list;
 
-        // TODO: Use the type context for more precise inference.
+        if let Some(inferred) = self.infer_annotated_collection_literal(elts, tcx, KnownClass::List)
+        {
+            return inferred;
+        }
+
         for elt in elts {
             self.infer_expression(elt, TypeContext::default());
         }
@@ -5270,19 +5274,64 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .to_specialized_instance(self.db(), [todo_type!("list literal element type")])
     }
 
-    fn infer_set_expression(&mut self, set: &ast::ExprSet, _tcx: TypeContext<'db>) -> Type<'db> {
+    fn infer_set_expression(&mut self, set: &ast::ExprSet, tcx: TypeContext<'db>) -> Type<'db> {
         let ast::ExprSet {
             range: _,
             node_index: _,
             elts,
         } = set;
 
-        // TODO: Use the type context for more precise inference.
+        if let Some(inferred) = self.infer_annotated_collection_literal(elts, tcx, KnownClass::Set)
+        {
+            return inferred;
+        }
+
         for elt in elts {
             self.infer_expression(elt, TypeContext::default());
         }
 
         KnownClass::Set.to_specialized_instance(self.db(), [todo_type!("set literal element type")])
+    }
+
+    // Infer the type of a collection literal in an annotated assignment, e.g. `_: list[_] = [..]`.
+    fn infer_annotated_collection_literal(
+        &mut self,
+        elts: &[ast::Expr],
+        tcx: TypeContext<'db>,
+        collection_class: KnownClass,
+    ) -> Option<Type<'db>> {
+        // Extract the annotated type of `list[T]` in the type annotation.
+        let class_type = tcx.annotation?.into_nominal_instance()?.class(self.db());
+        if !class_type.is_known(self.db(), collection_class) {
+            return None;
+        }
+        let specialization = class_type.into_generic_alias()?.specialization(self.db());
+        let [annotated_elts_ty] = specialization.types(self.db()) else {
+            return None;
+        };
+
+        // Extract the type variable `T` from the definition of `list[T]`.
+        let class_literal = collection_class.try_to_class_literal(self.db())?;
+        let generic_context = class_literal.generic_context(self.db())?;
+        let variables = generic_context.variables(self.db());
+        let elts_ty = Type::TypeVar(*variables.iter().exactly_one().ok()?);
+
+        // Infer a precise type for `T`, based on,
+        let mut builder = SpecializationBuilder::new(self.db());
+
+        // the annotated type,
+        builder.infer(elts_ty, *annotated_elts_ty).ok()?;
+
+        // as well as the type of each element in the collection literal.
+        for elt in elts {
+            let inferred_elt_ty = self.infer_expression(elt, TypeContext::default());
+            builder.infer(elts_ty, inferred_elt_ty).ok()?;
+        }
+
+        let class_type = class_literal
+            .apply_specialization(self.db(), |generic_context| builder.build(generic_context));
+
+        Type::from(class_type).to_instance(self.db())
     }
 
     fn infer_dict_expression(&mut self, dict: &ast::ExprDict, _tcx: TypeContext<'db>) -> Type<'db> {
@@ -5306,6 +5355,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ],
         )
     }
+
     /// Infer the type of the `iter` expression of the first comprehension.
     fn infer_first_comprehension_iter(&mut self, comprehensions: &[ast::Comprehension]) {
         let mut comprehensions_iter = comprehensions.iter();
