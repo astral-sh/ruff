@@ -7340,6 +7340,12 @@ pub enum TypeVarKind {
     TypingSelf,
 }
 
+impl TypeVarKind {
+    pub const fn is_self(self) -> bool {
+        matches!(self, Self::TypingSelf)
+    }
+}
+
 /// A type variable that has not been bound to a generic context yet.
 ///
 /// This is usually not the type that you want; if you are working with a typevar, in a generic
