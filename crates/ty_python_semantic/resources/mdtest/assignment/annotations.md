@@ -79,6 +79,55 @@ b: tuple[int] = ("foo",)
 c: tuple[str | int, str] = ([], "foo")
 ```
 
+## Collection literal annotations are understood
+
+```py
+import typing
+
+a: list[int] = [1, 2, 3]
+reveal_type(a)  # revealed: list[int]
+
+b: list[int | str] = [1, 2, 3]
+reveal_type(b)  # revealed: list[int | str]
+
+c: typing.List[int] = [1, 2, 3]
+reveal_type(c)  # revealed: list[int]
+
+d: list[typing.Any] = []
+reveal_type(d)  # revealed: list[Any]
+
+e: set[int] = {1, 2, 3}
+reveal_type(e)  # revealed: set[int]
+
+f: set[int | str] = {1, 2, 3}
+reveal_type(f)  # revealed: set[int | str]
+
+g: typing.Set[int] = {1, 2, 3}
+reveal_type(g)  # revealed: set[int]
+
+h: list[list[int]] = [[], [42]]
+# TODO: revealed: list[list[int]]
+reveal_type(h)  # revealed: list[list[int] | list[Unknown] | list[Unknown | Literal[42]]]
+
+i: list[tuple[str | int, ...]] = [(1, 2), ("foo", "bar"), ()]
+reveal_type(i)  # revealed: list[tuple[str | int, ...]]
+
+j: list[tuple[list[typing.Any], ...]] = [([],), ([1, 2], [3, 4]), (["foo"], ["bar"])]
+# TODO: revealed: list[tuple[list[typing.Any], ...]]
+# revealed: list[tuple[list[Any], ...] | tuple[list[Unknown]] | tuple[list[Unknown | Literal[1, 2]], list[Unknown | Literal[3, 4]]] | tuple[list[Unknown | Literal["foo"]], list[Unknown | Literal["bar"]]]]
+reveal_type(j)
+```
+
+## Incorrect collection literal assignments are complained aobut
+
+```py
+# error: [invalid-assignment] "Object of type `list[Literal[1, 2, 3]]` is not assignable to `list[str]`"
+a: list[str] = [1, 2, 3]
+
+# error: [invalid-assignment] "Object of type `set[Literal[1, 2, "3"]]` is not assignable to `set[int]`"
+b: set[int] = {1, 2, "3"}
+```
+
 ## PEP-604 annotations are supported
 
 ```py
