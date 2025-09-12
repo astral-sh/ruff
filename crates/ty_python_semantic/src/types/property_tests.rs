@@ -158,7 +158,7 @@ mod stable {
     type_property_test!(
         bottom_callable_is_subtype_of_all_callable, db,
         forall types t. t.is_callable_type()
-            => CallableType::bottom(db).is_subtype_of(db, t)
+            => Type::Callable(CallableType::bottom(db)).is_subtype_of(db, t)
     );
 
     // `T` can be assigned to itself.
