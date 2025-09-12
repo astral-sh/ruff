@@ -516,6 +516,12 @@ z = f'another but {f'nested but {f'still single line'} nested'}'
         assert_eq!(noqa_mappings(contents), NoqaMapping::default());
 
         let contents = "x = 1
+y = t'normal'
+z = t'another but {t'nested but {t'still single line'} nested'}'
+";
+        assert_eq!(noqa_mappings(contents), NoqaMapping::default());
+
+        let contents = "x = 1
 y = f'normal'
 z = f'another but {t'nested but {f'still single line'} nested'}'
 ";
