@@ -1,3 +1,4 @@
+/// No-op change.
 use infer::nearest_enclosing_class;
 use itertools::{Either, Itertools};
 use ruff_db::parsed::parsed_module;
