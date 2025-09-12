@@ -8938,6 +8938,7 @@ fn walk_bound_method_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     visitor.visit_type(db, method.self_instance(db));
 }
 
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn into_callable_type_cycle_recover<'db>(
     _db: &'db dyn Db,
     _value: &CallableType<'db>,
