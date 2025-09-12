@@ -69,6 +69,10 @@ impl<'db> ClassBase<'db> {
             .map_or(Self::unknown(), Self::Class)
     }
 
+    pub(super) const fn is_typed_dict(self) -> bool {
+        matches!(self, ClassBase::TypedDict)
+    }
+
     /// Attempt to resolve `ty` into a `ClassBase`.
     ///
     /// Return `None` if `ty` is not an acceptable type for a class base.
