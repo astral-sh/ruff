@@ -624,6 +624,9 @@ impl<'db> ProtocolInstanceType<'db> {
         db: &'db dyn Db,
         visitor: &NormalizedVisitor<'db>,
     ) -> Type<'db> {
+        if visitor.is_recursive() {
+            return Type::ProtocolInstance(self);
+        }
         if self.is_equivalent_to_object(db) {
             return Type::object();
         }

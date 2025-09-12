@@ -433,7 +433,7 @@ impl<'db> Signature<'db> {
                 .map(|ctx| ctx.normalized_impl(db, visitor)),
             // Discard the definition when normalizing, so that two equivalent signatures
             // with different `Definition`s share the same Salsa ID when normalized
-            definition: None,
+            definition: visitor.is_recursive().then_some(self.definition).flatten(),
             parameters: self
                 .parameters
                 .iter()
@@ -1488,6 +1488,14 @@ impl<'db> Parameter<'db> {
             kind,
             form,
         } = self;
+
+        if visitor.is_recursive() {
+            return Self {
+                annotated_type: annotated_type.map(|ty| ty.normalized_impl(db, visitor)),
+                kind: kind.clone(),
+                form: *form,
+            };
+        }
 
         // Ensure unions and intersections are ordered in the annotated type (if there is one).
         // Ensure that a parameter without an annotation is treated equivalently to a parameter

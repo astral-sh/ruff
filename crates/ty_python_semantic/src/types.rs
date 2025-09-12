@@ -1286,7 +1286,10 @@ impl<'db> Type<'db> {
                 // TODO: Normalize TypedDicts
                 self
             }
-            Type::TypeAlias(alias) => alias.value_type(db).normalized_impl(db, visitor),
+            Type::TypeAlias(alias) if !visitor.is_recursive() => {
+                alias.value_type(db).normalized_impl(db, visitor)
+            }
+            Type::TypeAlias(_) => self,
             Type::LiteralString
             | Type::AlwaysFalsy
             | Type::AlwaysTruthy
@@ -7566,6 +7569,9 @@ impl<'db> TypeVarInstance<'db> {
     }
 
     pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+        if visitor.is_recursive() {
+            return self;
+        }
         Self::new(
             db,
             self.name(db),
