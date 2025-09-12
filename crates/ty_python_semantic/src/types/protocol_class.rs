@@ -563,16 +563,11 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                     return ConstraintSet::from(true);
                 }
 
-                visitor.visit(
-                    (attribute_type, proto_member_as_bound_method, relation),
-                    || {
-                        attribute_type.has_relation_to_impl(
-                            db,
-                            proto_member_as_bound_method,
-                            relation,
-                            visitor,
-                        )
-                    },
+                attribute_type.has_relation_to_impl(
+                    db,
+                    proto_member_as_bound_method,
+                    relation,
+                    visitor,
                 )
             }
             // TODO: consider the types of the attribute on `other` for property members

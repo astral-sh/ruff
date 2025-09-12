@@ -1658,12 +1658,15 @@ impl<'db> Type<'db> {
                 | Type::EnumLiteral(_),
             ) => ConstraintSet::from(false),
 
-            (Type::Callable(self_callable), Type::Callable(other_callable)) => {
-                self_callable.has_relation_to_impl(db, other_callable, relation, visitor)
-            }
+            (Type::Callable(self_callable), Type::Callable(other_callable)) => visitor
+                .visit((self, target, relation), || {
+                    self_callable.has_relation_to_impl(db, other_callable, relation, visitor)
+                }),
 
-            (_, Type::Callable(_)) => self.into_callable(db).when_some_and(|callable| {
-                callable.has_relation_to_impl(db, target, relation, visitor)
+            (_, Type::Callable(_)) => visitor.visit((self, target, relation), || {
+                self.into_callable(db).when_some_and(|callable| {
+                    callable.has_relation_to_impl(db, target, relation, visitor)
+                })
             }),
 
             (_, Type::ProtocolInstance(protocol)) => {
