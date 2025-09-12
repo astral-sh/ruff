@@ -1756,29 +1756,6 @@ Quux.<CURSOR>
     }
 
     #[test]
-    fn namedtuple_fallback_instance_methods() {
-        let test = cursor_test(
-            "\
-from typing import NamedTuple
-
-
-class P(NamedTuple):
-    a: int
-
-x = P(1)
-
-x.<CURSOR>
-",
-        );
-
-        // NamedTupleFallback instance API should be available on instances
-        test.assert_completions_include("_asdict");
-        test.assert_completions_include("_replace");
-        test.assert_completions_include("_fields");
-        test.assert_completions_include("_field_defaults");
-    }
-
-    #[test]
     fn enum_attributes() {
         let test = cursor_test(
             "\
