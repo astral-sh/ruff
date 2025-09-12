@@ -616,7 +616,6 @@ pub(crate) struct DefinitionInference<'db> {
     expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
 
     /// The scope this region is part of.
-    #[cfg(debug_assertions)]
     scope: ScopeId<'db>,
 
     /// The types of every binding in this region.
@@ -659,7 +658,6 @@ impl<'db> DefinitionInference<'db> {
             expressions: FxHashMap::default(),
             bindings: Box::default(),
             declarations: Box::default(),
-            #[cfg(debug_assertions)]
             scope,
             extra: Some(Box::new(DefinitionInferenceExtra {
                 cycle_fallback: true,
@@ -754,7 +752,6 @@ pub(crate) struct ExpressionInference<'db> {
     extra: Option<Box<ExpressionInferenceExtra<'db>>>,
 
     /// The scope this region is part of.
-    #[cfg(debug_assertions)]
     scope: ScopeId<'db>,
 }
 
@@ -778,7 +775,6 @@ struct ExpressionInferenceExtra<'db> {
 
 impl<'db> ExpressionInference<'db> {
     fn cycle_initial(scope: ScopeId<'db>) -> Self {
-        let _ = scope;
         Self {
             extra: Some(Box::new(ExpressionInferenceExtra {
                 cycle_fallback: true,
@@ -787,7 +783,6 @@ impl<'db> ExpressionInference<'db> {
             })),
             expressions: FxHashMap::default(),
 
-            #[cfg(debug_assertions)]
             scope,
         }
     }
