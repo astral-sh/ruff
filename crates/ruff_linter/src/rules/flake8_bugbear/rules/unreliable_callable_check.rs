@@ -50,7 +50,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// assert callable(A()) is False
 /// ```
 ///
-/// If there are comments in the `hasattr` call expression, then comments may be removed:
+/// Additionally, if there are comments in the `hasattr` call expression, they may be removed:
 /// ```python
 /// hasattr(
 ///     # comment 1
