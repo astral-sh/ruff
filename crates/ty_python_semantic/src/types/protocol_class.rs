@@ -541,17 +541,25 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
     ) -> ConstraintSet<'db> {
         match &self.kind {
             ProtocolMemberKind::Method(method) => {
-                let Place::Type(attribute_type, Boundness::Bound) = other
-                    .invoke_descriptor_protocol(
-                        db,
-                        self.name,
-                        Place::Unbound.into(),
-                        InstanceFallbackShadowsNonDataDescriptor::No,
-                        MemberLookupPolicy::default(),
-                    )
-                    .place
-                else {
-                    return ConstraintSet::from(false);
+                let attribute_type = if self.name == "__call__" {
+                    let Some(attribute_type) = other.into_callable(db) else {
+                        return ConstraintSet::from(false);
+                    };
+                    attribute_type
+                } else {
+                    let Place::Type(attribute_type, Boundness::Bound) = other
+                        .invoke_descriptor_protocol(
+                            db,
+                            self.name,
+                            Place::Unbound.into(),
+                            InstanceFallbackShadowsNonDataDescriptor::No,
+                            MemberLookupPolicy::default(),
+                        )
+                        .place
+                    else {
+                        return ConstraintSet::from(false);
+                    };
+                    attribute_type
                 };
 
                 let proto_member_as_bound_method = method.bind_self(db);
