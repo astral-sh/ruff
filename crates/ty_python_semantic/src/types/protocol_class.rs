@@ -560,7 +560,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                     matches!(t, Type::TypeVar(_))
                 }) {
                     // TODO: proper validation for generic methods on protocols
-                    return ConstraintSet::from(false);
+                    return ConstraintSet::from(true);
                 }
 
                 visitor.visit(
