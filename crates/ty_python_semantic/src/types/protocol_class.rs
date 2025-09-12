@@ -21,7 +21,7 @@ use crate::{
         FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, KnownFunction,
         NormalizedVisitor, PropertyInstanceType, Signature, Type, TypeMapping, TypeQualifiers,
         TypeRelation, VarianceInferable,
-        constraints::{Constraints, IteratorConstraintsExtension},
+        constraints::{ConstraintSet, IteratorConstraintsExtension},
         signatures::{Parameter, Parameters},
     },
 };
@@ -234,17 +234,17 @@ impl<'db> ProtocolInterface<'db> {
     /// all members on `other` are also members of `self`.
     ///
     /// TODO: this method should consider the types of the members as well as their names.
-    pub(super) fn extends_interface_of<C: Constraints<'db>>(
+    pub(super) fn extends_interface_of(
         self,
         db: &'db dyn Db,
         other: Self,
         _relation: TypeRelation,
-        _visitor: &HasRelationToVisitor<'db, C>,
-    ) -> C {
+        _visitor: &HasRelationToVisitor<'db>,
+    ) -> ConstraintSet<'db> {
         // TODO: This could just return a bool as written, but this form is what will be needed to
         // combine the constraints when we do assignability checks on each member.
         other.inner(db).keys().when_all(db, |member_name| {
-            C::from_bool(db, self.inner(db).contains_key(member_name))
+            ConstraintSet::from(self.inner(db).contains_key(member_name))
         })
     }
 
@@ -514,51 +514,47 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         }
     }
 
-    pub(super) fn has_disjoint_type_from<C: Constraints<'db>>(
+    pub(super) fn has_disjoint_type_from(
         &self,
         db: &'db dyn Db,
         other: Type<'db>,
-        visitor: &IsDisjointVisitor<'db, C>,
-    ) -> C {
+        visitor: &IsDisjointVisitor<'db>,
+    ) -> ConstraintSet<'db> {
         match &self.kind {
             // TODO: implement disjointness for property/method members as well as attribute members
-            ProtocolMemberKind::Property(_) | ProtocolMemberKind::Method(_) => C::unsatisfiable(db),
+            ProtocolMemberKind::Property(_) | ProtocolMemberKind::Method(_) => {
+                ConstraintSet::from(false)
+            }
             ProtocolMemberKind::Other(ty) => ty.is_disjoint_from_impl(db, other, visitor),
         }
     }
 
     /// Return `true` if `other` contains an attribute/method/property that satisfies
     /// the part of the interface defined by this protocol member.
-    pub(super) fn is_satisfied_by<C: Constraints<'db>>(
+    pub(super) fn is_satisfied_by(
         &self,
         db: &'db dyn Db,
         other: Type<'db>,
         relation: TypeRelation,
-        visitor: &HasRelationToVisitor<'db, C>,
-    ) -> C {
+        visitor: &HasRelationToVisitor<'db>,
+    ) -> ConstraintSet<'db> {
         match &self.kind {
             // TODO: consider the types of the attribute on `other` for method members
-            ProtocolMemberKind::Method(_) => C::from_bool(
-                db,
-                matches!(
-                    other.to_meta_type(db).member(db, self.name).place,
-                    Place::Type(ty, Boundness::Bound)
-                    if ty.is_assignable_to(db, CallableType::single(db, Signature::dynamic(Type::any())))
-                ),
-            ),
+            ProtocolMemberKind::Method(_) => ConstraintSet::from(matches!(
+                other.to_meta_type(db).member(db, self.name).place,
+                Place::Type(ty, Boundness::Bound)
+                if ty.is_assignable_to(db, CallableType::single(db, Signature::dynamic(Type::any())))
+            )),
             // TODO: consider the types of the attribute on `other` for property members
-            ProtocolMemberKind::Property(_) => C::from_bool(
-                db,
-                matches!(
-                    other.member(db, self.name).place,
-                    Place::Type(_, Boundness::Bound)
-                ),
-            ),
+            ProtocolMemberKind::Property(_) => ConstraintSet::from(matches!(
+                other.member(db, self.name).place,
+                Place::Type(_, Boundness::Bound)
+            )),
             ProtocolMemberKind::Other(member_type) => {
                 let Place::Type(attribute_type, Boundness::Bound) =
                     other.member(db, self.name).place
                 else {
-                    return C::unsatisfiable(db);
+                    return ConstraintSet::from(false);
                 };
                 member_type
                     .has_relation_to_impl(db, attribute_type, relation, visitor)
