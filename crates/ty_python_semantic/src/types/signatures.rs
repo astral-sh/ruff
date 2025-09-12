@@ -466,7 +466,20 @@ impl<'db> Signature<'db> {
             _ => type_mapping,
         };
         Self {
-            generic_context: self.generic_context,
+            generic_context: if let TypeMapping::BindSelf(_) = type_mapping {
+                self.generic_context.map(|context| {
+                    GenericContext::from_typevar_instances(
+                        db,
+                        context
+                            .variables(db)
+                            .iter()
+                            .filter(|var| !var.typevar(db).kind(db).is_self())
+                            .copied(),
+                    )
+                })
+            } else {
+                self.generic_context
+            },
             inherited_generic_context: self.inherited_generic_context,
             definition: self.definition,
             parameters: self
