@@ -47,9 +47,7 @@ fn infer_method_information<'db>(
     let index = semantic_index(db, file);
 
     let class_scope = index.scope(class_scope_id.file_scope_id(db));
-    let Some(class_node) = class_scope.node().as_class() else {
-        return None;
-    };
+    let class_node = class_scope.node().as_class()?;
 
     let method_type = infer_definition_types(db, definition)
         .declaration_type(definition)
@@ -1286,8 +1284,7 @@ impl<'db> Parameters<'db> {
                     });
                 let implicit_annotation =
                     if !method_has_self_in_generic_context && class.is_not_generic() {
-                        let c = Some(Type::instance(db, class));
-                        c
+                        Some(Type::instance(db, class))
                     } else {
                         Type::SpecialForm(SpecialFormType::TypingSelf)
                             .in_type_expression(db, definition.scope(db), Some(definition))
