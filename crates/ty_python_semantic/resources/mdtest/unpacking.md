@@ -213,9 +213,8 @@ reveal_type(d)  # revealed: Literal[2]
 
 ```py
 a, b = [1, 2]
-# TODO: should be `int` for both `a` and `b`
-reveal_type(a)  # revealed: @Todo(list literal element type)
-reveal_type(b)  # revealed: @Todo(list literal element type)
+reveal_type(a)  # revealed: Unknown | Literal[1, 2]
+reveal_type(b)  # revealed: Unknown | Literal[1, 2]
 ```
 
 ### Simple unpacking

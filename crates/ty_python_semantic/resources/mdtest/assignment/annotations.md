@@ -107,24 +107,24 @@ reveal_type(g)  # revealed: set[int]
 
 h: list[list[int]] = [[], [42]]
 # TODO: revealed: list[list[int]]
-reveal_type(h)  # revealed: list[list[int] | list[@Todo(list literal element type)]]
+reveal_type(h)  # revealed: list[list[int] | list[Unknown] | list[Unknown | Literal[42]]]
 
 i: list[tuple[str | int, ...]] = [(1, 2), ("foo", "bar"), ()]
 reveal_type(i)  # revealed: list[tuple[str | int, ...]]
 
 j: list[tuple[list[typing.Any], ...]] = [([],), ([1, 2], [3, 4]), (["foo"], ["bar"])]
 # TODO: revealed: list[tuple[list[typing.Any], ...]]
-# revealed: list[tuple[list[Any], ...] | tuple[list[@Todo(list literal element type)]] | tuple[list[@Todo(list literal element type)], list[@Todo(list literal element type)]]]
+# revealed: list[tuple[list[Any], ...] | tuple[list[Unknown]] | tuple[list[Unknown | Literal[1, 2]], list[Unknown | Literal[3, 4]]] | tuple[list[Unknown | Literal["foo"]], list[Unknown | Literal["bar"]]]]
 reveal_type(j)
 ```
 
 ## Incorrect collection literal assignments are complained aobut
 
 ```py
-# error: [invalid-assignment] "Object of type `list[str | Literal[1, 2, 3]]` is not assignable to `list[str]`"
+# error: [invalid-assignment] "Object of type `list[Literal[1, 2, 3]]` is not assignable to `list[str]`"
 a: list[str] = [1, 2, 3]
 
-# error: [invalid-assignment] "Object of type `set[int | Literal["3"]]` is not assignable to `set[int]`"
+# error: [invalid-assignment] "Object of type `set[Literal[1, 2, "3"]]` is not assignable to `set[int]`"
 b: set[int] = {1, 2, "3"}
 ```
 

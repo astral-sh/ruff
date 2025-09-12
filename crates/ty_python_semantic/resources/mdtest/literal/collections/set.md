@@ -3,7 +3,7 @@
 ## Basic set
 
 ```py
-reveal_type({1, 2})  # revealed: set[@Todo(set literal element type)]
+reveal_type({1, 2})  # revealed: set[Unknown | Literal[1, 2]]
 ```
 
 ## Set comprehensions

@@ -783,9 +783,8 @@ class A: ...
 ```py
 from subexporter import *
 
-# TODO: Should be `list[str]`
 # TODO: Should we avoid including `Unknown` for this case?
-reveal_type(__all__)  # revealed: Unknown | list[@Todo(list literal element type)]
+reveal_type(__all__)  # revealed: Unknown | list[Unknown | Literal["A", "__all__"]]
 
 __all__.append("B")
 

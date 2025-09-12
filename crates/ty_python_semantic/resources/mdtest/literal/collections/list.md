@@ -3,7 +3,7 @@
 ## Empty list
 
 ```py
-reveal_type([])  # revealed: list[@Todo(list literal element type)]
+reveal_type([])  # revealed: list[Unknown]
 ```
 
 ## List comprehensions
