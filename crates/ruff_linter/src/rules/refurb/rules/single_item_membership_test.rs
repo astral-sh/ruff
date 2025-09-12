@@ -6,7 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::pad;
-use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for membership tests against single-item containers.
@@ -28,6 +28,9 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 ///
 /// ## Fix safety
 /// The fix is always marked as unsafe.
+///
+/// When the right-hand side is a string, this fix can change the behavior of your program.
+/// This is because `c in "a"` is true both when `c` is `"a"` and when `c` is the empty string,
 ///
 /// Converting `in`/`not in` against a single-item container to `==`/`!=` can
 /// change runtime behavior: `in` may consider identity (e.g., `NaN`), it always
@@ -99,9 +102,7 @@ pub(crate) fn single_item_membership_test(
     );
 
     // All supported cases can change runtime behavior; mark as unsafe.
-    let applicability = Applicability::Unsafe;
-
-    let fix = Fix::applicable_edit(edit, applicability);
+    let fix = Fix::unsafe_edit(edit);
 
     checker
         .report_diagnostic(SingleItemMembershipTest { membership_test }, expr.range())
