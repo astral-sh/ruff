@@ -86,5 +86,5 @@ walltime = ["ruff_db/os", "ty_project", "divan"]
 [target.'cfg(target_os = "windows")'.dev-dependencies]
 mimalloc = { workspace = true }
 
-[target.'cfg(all(not(target_os = "windows"), not(target_os = "openbsd"), any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "powerpc64", target_arch = "riscv64")))'.dev-dependencies]
+[target.'cfg(all(not(target_os = "windows"), not(target_os = "openbsd"), any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "powerpc64", target_arch = "riscv64", target_arch = "loongarch64")))'.dev-dependencies]
 tikv-jemallocator = { workspace = true }
