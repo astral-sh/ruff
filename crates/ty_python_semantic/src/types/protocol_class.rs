@@ -18,7 +18,7 @@ use crate::{
         InstanceFallbackShadowsNonDataDescriptor, IsDisjointVisitor, KnownFunction,
         MemberLookupPolicy, NormalizedVisitor, PropertyInstanceType, Signature, Type, TypeMapping,
         TypeQualifiers, TypeRelation, TypeVarVariance, VarianceInferable,
-        constraints::{ConstraintSet, IteratorConstraintsExtension},
+        constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension},
         context::InferContext,
         diagnostic::report_undeclared_protocol_member,
         signatures::{Parameter, Parameters},
@@ -230,21 +230,98 @@ impl<'db> ProtocolInterface<'db> {
             .unwrap_or_else(|| Type::object().member(db, name))
     }
 
-    /// Return `true` if `self` extends the interface of `other`, i.e.,
-    /// all members on `other` are also members of `self`.
-    ///
-    /// TODO: this method should consider the types of the members as well as their names.
-    pub(super) fn extends_interface_of(
+    pub(super) fn has_relation_to_impl(
         self,
         db: &'db dyn Db,
         other: Self,
-        _relation: TypeRelation,
-        _visitor: &HasRelationToVisitor<'db>,
+        relation: TypeRelation,
+        relation_visitor: &HasRelationToVisitor<'db>,
+        disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
-        // TODO: This could just return a bool as written, but this form is what will be needed to
-        // combine the constraints when we do assignability checks on each member.
-        other.inner(db).keys().when_all(db, |member_name| {
-            ConstraintSet::from(self.inner(db).contains_key(member_name))
+        other.members(db).when_all(db, |other_member| {
+            self.member_by_name(db, other_member.name)
+                .when_some_and(|our_member| match (our_member.kind, other_member.kind) {
+                    // Method members are always immutable;
+                    // they can never be subtypes of/assignable to mutable attribute members.
+                    (ProtocolMemberKind::Method(_), ProtocolMemberKind::Other(_)) => {
+                        ConstraintSet::from(false)
+                    }
+
+                    // A property member can only be a subtype of an attribute member
+                    // if the property is readable *and* writable.
+                    //
+                    // TODO: this should also consider the types of the members on both sides.
+                    (ProtocolMemberKind::Property(property), ProtocolMemberKind::Other(_)) => {
+                        ConstraintSet::from(
+                            property.getter(db).is_some() && property.setter(db).is_some(),
+                        )
+                    }
+
+                    // A `@property` member can never be a subtype of a method member, as it is not necessarily
+                    // accessible on the meta-type, whereas a method member must be.
+                    (ProtocolMemberKind::Property(_), ProtocolMemberKind::Method(_)) => {
+                        ConstraintSet::from(false)
+                    }
+
+                    // But an attribute member *can* be a subtype of a method member,
+                    // providing it is marked `ClassVar`
+                    (
+                        ProtocolMemberKind::Other(our_type),
+                        ProtocolMemberKind::Method(other_type),
+                    ) => ConstraintSet::from(
+                        our_member.qualifiers.contains(TypeQualifiers::CLASS_VAR),
+                    )
+                    .and(db, || {
+                        our_type.has_relation_to_impl(
+                            db,
+                            Type::Callable(other_type.bind_self(db)),
+                            relation,
+                            relation_visitor,
+                            disjointness_visitor,
+                        )
+                    }),
+
+                    (
+                        ProtocolMemberKind::Method(our_method),
+                        ProtocolMemberKind::Method(other_method),
+                    ) => our_method.bind_self(db).has_relation_to_impl(
+                        db,
+                        other_method.bind_self(db),
+                        relation,
+                        relation_visitor,
+                        disjointness_visitor,
+                    ),
+
+                    (
+                        ProtocolMemberKind::Other(our_type),
+                        ProtocolMemberKind::Other(other_type),
+                    ) => our_type
+                        .has_relation_to_impl(
+                            db,
+                            other_type,
+                            relation,
+                            relation_visitor,
+                            disjointness_visitor,
+                        )
+                        .and(db, || {
+                            other_type.has_relation_to_impl(
+                                db,
+                                our_type,
+                                relation,
+                                relation_visitor,
+                                disjointness_visitor,
+                            )
+                        }),
+
+                    // TODO: finish assignability/subtyping between two `@property` members,
+                    // and between a `@property` member and a member of a different kind.
+                    (
+                        ProtocolMemberKind::Property(_)
+                        | ProtocolMemberKind::Method(_)
+                        | ProtocolMemberKind::Other(_),
+                        ProtocolMemberKind::Property(_),
+                    ) => ConstraintSet::from(true),
+                })
         })
     }
 
@@ -518,14 +595,17 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         &self,
         db: &'db dyn Db,
         other: Type<'db>,
-        visitor: &IsDisjointVisitor<'db>,
+        disjointness_visitor: &IsDisjointVisitor<'db>,
+        relation_visitor: &HasRelationToVisitor<'db>,
     ) -> ConstraintSet<'db> {
         match &self.kind {
             // TODO: implement disjointness for property/method members as well as attribute members
             ProtocolMemberKind::Property(_) | ProtocolMemberKind::Method(_) => {
                 ConstraintSet::from(false)
             }
-            ProtocolMemberKind::Other(ty) => ty.is_disjoint_from_impl(db, other, visitor),
+            ProtocolMemberKind::Other(ty) => {
+                ty.is_disjoint_from_impl(db, other, disjointness_visitor, relation_visitor)
+            }
         }
     }
 
@@ -536,7 +616,8 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         db: &'db dyn Db,
         other: Type<'db>,
         relation: TypeRelation,
-        visitor: &HasRelationToVisitor<'db>,
+        relation_visitor: &HasRelationToVisitor<'db>,
+        disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
         match &self.kind {
             ProtocolMemberKind::Method(method) => {
@@ -570,7 +651,13 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                     attribute_type
                 };
 
-                attribute_type.has_relation_to_impl(db, method.bind_self(db), relation, visitor)
+                attribute_type.has_relation_to_impl(
+                    db,
+                    Type::Callable(method.bind_self(db)),
+                    relation,
+                    relation_visitor,
+                    disjointness_visitor,
+                )
             }
             // TODO: consider the types of the attribute on `other` for property members
             ProtocolMemberKind::Property(_) => ConstraintSet::from(matches!(
@@ -584,9 +671,21 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                     return ConstraintSet::from(false);
                 };
                 member_type
-                    .has_relation_to_impl(db, attribute_type, relation, visitor)
+                    .has_relation_to_impl(
+                        db,
+                        attribute_type,
+                        relation,
+                        relation_visitor,
+                        disjointness_visitor,
+                    )
                     .and(db, || {
-                        attribute_type.has_relation_to_impl(db, *member_type, relation, visitor)
+                        attribute_type.has_relation_to_impl(
+                            db,
+                            *member_type,
+                            relation,
+                            relation_visitor,
+                            disjointness_visitor,
+                        )
                     })
             }
         }

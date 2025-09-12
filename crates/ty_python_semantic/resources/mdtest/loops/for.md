@@ -247,8 +247,7 @@ class StrIterator:
 
 def f(x: IntIterator | StrIterator):
     for a in x:
-        # TODO: this should be `int | str` (https://github.com/astral-sh/ty/issues/1089)
-        reveal_type(a)  # revealed: int
+        reveal_type(a)  # revealed: int | str
 ```
 
 Most real-world iterable types use `Iterator` as the return annotation of their `__iter__` methods:
@@ -260,14 +259,11 @@ def g(
     c: Literal["foo", b"bar"],
 ):
     for x in a:
-        # TODO: should be `int | str` (https://github.com/astral-sh/ty/issues/1089)
-        reveal_type(x)  # revealed: int
+        reveal_type(x)  # revealed: int | str
     for y in b:
-        # TODO: should be `str | int` (https://github.com/astral-sh/ty/issues/1089)
-        reveal_type(y)  # revealed: str
+        reveal_type(y)  # revealed: str | int
     for z in c:
-        # TODO: should be `LiteralString | int` (https://github.com/astral-sh/ty/issues/1089)
-        reveal_type(z)  # revealed: LiteralString
+        reveal_type(z)  # revealed: LiteralString | int
 ```
 
 ## Union type as iterable where one union element has no `__iter__` method
