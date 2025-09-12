@@ -79,6 +79,49 @@ b: tuple[int] = ("foo",)
 c: tuple[str | int, str] = ([], "foo")
 ```
 
+## Collection literal annotations are understood
+
+`module.py`:
+
+```py
+import typing
+
+a: list[int] = [1, 2, 3]
+b: list[int | str] = [1, 2, 3]
+c: typing.List[int] = [1, 2, 3]
+d: list[typing.Any] = []
+
+e: set[int] = {1, 2, 3}
+f: set[int | str] = {1, 2, 3}
+g: typing.Set[int] = {1, 2, 3}
+```
+
+`script.py`:
+
+```py
+import typing
+from module import a, b, c, d, e, f, g
+
+reveal_type(a)  # revealed: list[int]
+reveal_type(b)  # revealed: list[int | str]
+reveal_type(c)  # revealed: list[int]
+reveal_type(d)  # revealed: list[Any]
+
+reveal_type(e)  # revealed: set[int]
+reveal_type(f)  # revealed: set[int | str]
+reveal_type(g)  # revealed: set[int]
+```
+
+## Incorrect collection literal assignments are complained aobut
+
+```py
+# error: [invalid-assignment] "Object of type `list[str | Literal[1, 2, 3]]` is not assignable to `list[str]`"
+a: list[str] = [1, 2, 3]
+
+# error: [invalid-assignment] "Object of type `set[int | Literal["3"]]` is not assignable to `set[int]`"
+b: set[int] = {1, 2, "3"}
+```
+
 ## PEP-604 annotations are supported
 
 ```py
