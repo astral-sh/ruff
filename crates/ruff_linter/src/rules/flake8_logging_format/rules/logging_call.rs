@@ -1,5 +1,6 @@
-use ruff_python_ast::InterpolatedStringElement;
+use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Arguments, Expr, Keyword, Operator, StringFlags};
+use ruff_python_ast::{FStringPart, InterpolatedStringElement};
 use ruff_python_semantic::analyze::logging;
 use ruff_python_stdlib::logging::LoggingLevel;
 use ruff_text_size::Ranged;
@@ -37,44 +38,52 @@ fn logging_f_string(
     let mut format_string = String::new();
     let mut args: Vec<&str> = Vec::new();
 
+    let f_string_flags = f_string.value.f_strings().next().map(|f| f.flags);
+    let is_raw = f_string_flags.is_some_and(|flags| flags.prefix().is_raw());
+
     // Try to reuse the first part's quote style when building the replacement.
     // Default to double quotes if we can't determine it.
-    let quote_str = f_string
-        .value
-        .f_strings()
-        .next()
-        .map(|f| f.flags.quote_str())
-        .unwrap_or("\"");
+    let quote_str = f_string_flags.map(StringFlags::quote_str).unwrap_or("\"");
 
-    for f in f_string.value.f_strings() {
-        for element in &f.elements {
-            match element {
-                InterpolatedStringElement::Literal(lit) => {
-                    // If the literal text contains a '%' placeholder, bail out: mixing
-                    // f-string interpolation with '%' placeholders is ambiguous for our
-                    // automatic conversion, so don't offer a fix for this case.
-                    if lit.value.as_ref().contains('%') {
-                        return;
-                    }
-                    format_string.push_str(lit.value.as_ref());
-                }
-                InterpolatedStringElement::Interpolation(interpolated) => {
-                    if interpolated.format_spec.is_some()
-                        || !matches!(
-                            interpolated.conversion,
-                            ruff_python_ast::ConversionFlag::None
-                        )
-                    {
-                        return;
-                    }
-                    match interpolated.expression.as_ref() {
-                        Expr::Name(name) => {
-                            format_string.push_str("%s");
-                            args.push(name.id.as_str());
+    for part in &f_string.value {
+        match part {
+            FStringPart::FString(f) => {
+                for element in &f.elements {
+                    match element {
+                        InterpolatedStringElement::Literal(lit) => {
+                            // If the literal text contains a '%' placeholder, bail out: mixing
+                            // f-string interpolation with '%' placeholders is ambiguous for our
+                            // automatic conversion, so don't offer a fix for this case.
+                            if lit.value.as_ref().contains('%') {
+                                return;
+                            }
+                            format_string.push_str(lit.value.as_ref());
                         }
-                        _ => return,
+                        InterpolatedStringElement::Interpolation(interpolated) => {
+                            if interpolated.format_spec.is_some()
+                                || !matches!(
+                                    interpolated.conversion,
+                                    ruff_python_ast::ConversionFlag::None
+                                )
+                            {
+                                return;
+                            }
+                            match interpolated.expression.as_ref() {
+                                Expr::Name(name) => {
+                                    format_string.push_str("%s");
+                                    args.push(name.id.as_str());
+                                }
+                                _ => return,
+                            }
+                        }
                     }
                 }
+            }
+            FStringPart::Literal(lit) => {
+                if lit.value.as_ref().contains('%') {
+                    return;
+                }
+                format_string.push_str(lit.value.as_ref());
             }
         }
     }
@@ -84,13 +93,23 @@ fn logging_f_string(
     }
 
     let replacement = format!(
-        "{q}{format_string}{q}, {args}",
+        "{prefix}{q}{format_string}{q}, {args}",
+        prefix = if is_raw { "r" } else { "" },
         q = quote_str,
-        format_string = format_string,
         args = args.join(", ")
     );
 
-    let fix = Fix::safe_edit(Edit::range_replacement(replacement, msg.range()));
+    // Replace the full message argument, including redundant grouping parentheses
+    // around the f-string expression (e.g., `logging.warning((f"{Ellipsis}"))`).
+    let replace_range = parenthesized_range(
+        msg.into(),
+        (arguments).into(),
+        checker.comment_ranges(),
+        checker.source(),
+    )
+    .unwrap_or_else(|| msg.range());
+
+    let fix = Fix::safe_edit(Edit::range_replacement(replacement, replace_range));
     diagnostic.set_fix(fix);
 }
 
