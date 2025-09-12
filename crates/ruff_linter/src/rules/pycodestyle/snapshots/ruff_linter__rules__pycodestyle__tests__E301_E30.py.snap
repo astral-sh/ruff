@@ -94,3 +94,22 @@ help: Add missing blank line
 527 |     def bar(self, x: int | str) -> int | str:
 528 |         return x
 529 | # end
+
+E301 [*] Expected 1 blank line, found 0
+   --> E30.py:993:9
+    |
+991 |     if True:
+992 |         print("conditional")
+993 |         def test():
+    |         ^^^
+994 |             pass
+995 | # end
+    |
+help: Add missing blank line
+990 | class Foo:
+991 |     if True:
+992 |         print("conditional")
+993 + 
+994 |         def test():
+995 |             pass
+996 | # end
