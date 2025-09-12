@@ -18,6 +18,7 @@ help: Convert to equality test
 4 |     print("Single-element set")
 5 | 
 6 | if 1 in set((1,)):
+note: This is an unsafe fix and may change runtime behavior
 
 FURB171 [*] Membership test against single-item container
  --> FURB171_1.py:6:4
@@ -37,6 +38,7 @@ help: Convert to equality test
 7 |     print("Single-element set")
 8 | 
 9 | if 1 in set({1}):
+note: This is an unsafe fix and may change runtime behavior
 
 FURB171 [*] Membership test against single-item container
   --> FURB171_1.py:9:4
@@ -56,6 +58,7 @@ help: Convert to equality test
 10 |     print("Single-element set")
 11 | 
 12 | if 1 in frozenset([1]):
+note: This is an unsafe fix and may change runtime behavior
 
 FURB171 [*] Membership test against single-item container
   --> FURB171_1.py:12:4
@@ -75,6 +78,7 @@ help: Convert to equality test
 13 |     print("Single-element set")
 14 | 
 15 | if 1 in frozenset((1,)):
+note: This is an unsafe fix and may change runtime behavior
 
 FURB171 [*] Membership test against single-item container
   --> FURB171_1.py:15:4
@@ -94,6 +98,7 @@ help: Convert to equality test
 16 |     print("Single-element set")
 17 | 
 18 | if 1 in frozenset({1}):
+note: This is an unsafe fix and may change runtime behavior
 
 FURB171 [*] Membership test against single-item container
   --> FURB171_1.py:18:4
@@ -113,6 +118,7 @@ help: Convert to equality test
 19 |     print("Single-element set")
 20 | 
 21 | if 1 in set(set([1])):
+note: This is an unsafe fix and may change runtime behavior
 
 FURB171 [*] Membership test against single-item container
   --> FURB171_1.py:21:4
@@ -131,4 +137,42 @@ help: Convert to equality test
 21 + if 1 == 1:
 22 |     print('Recursive solution')
 23 | 
-24 |
+24 | 
+note: This is an unsafe fix and may change runtime behavior
+
+FURB171 [*] Membership test against single-item container
+  --> FURB171_1.py:59:4
+   |
+58 | # set() and frozenset() with NaN
+59 | if math.nan in set([math.nan]):
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+60 |     print("This should be marked unsafe")
+   |
+help: Convert to equality test
+56 | import math
+57 | 
+58 | # set() and frozenset() with NaN
+   - if math.nan in set([math.nan]):
+59 + if math.nan == math.nan:
+60 |     print("This should be marked unsafe")
+61 | 
+62 | if math.nan in frozenset([math.nan]):
+note: This is an unsafe fix and may change runtime behavior
+
+FURB171 [*] Membership test against single-item container
+  --> FURB171_1.py:62:4
+   |
+60 |     print("This should be marked unsafe")
+61 |
+62 | if math.nan in frozenset([math.nan]):
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+63 |     print("This should be marked unsafe")
+   |
+help: Convert to equality test
+59 | if math.nan in set([math.nan]):
+60 |     print("This should be marked unsafe")
+61 | 
+   - if math.nan in frozenset([math.nan]):
+62 + if math.nan == math.nan:
+63 |     print("This should be marked unsafe")
+note: This is an unsafe fix and may change runtime behavior
