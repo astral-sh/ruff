@@ -183,7 +183,7 @@ impl fmt::Display for CheckableExprType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::FString => f.write_str("str"),
-            Self::TString => f.write_str("str"),
+            Self::TString => f.write_str("Template"),
             Self::StringLiteral => f.write_str("str"),
             Self::BytesLiteral => f.write_str("bytes"),
             Self::IntLiteral => f.write_str("int"),
