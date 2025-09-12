@@ -857,7 +857,9 @@ pub fn call_signature_details<'db>(
                 let parameter_label_offsets = display_details.parameter_ranges.clone();
                 let parameter_names = display_details.parameter_names.clone();
                 let definition_parameter_offsets = signature.definition().and_then(|definition| {
-                    let module_ref = parsed_module(db, definition.file(db)).load(db);
+                    let file = definition.file(db);
+                    let module_ref = parsed_module(db, file).load(db);
+
                     definition_parameter_offsets(definition.kind(db), &module_ref)
                 });
 
@@ -920,7 +922,7 @@ pub fn find_active_signature_from_details(
 }
 
 #[derive(Default)]
-pub struct InlayHintFunctionArgumentDetails {
+pub struct InlayHintCallArgumentDetails {
     /// The file containing the signature derived from the [`ast::ExprCall`].
     ///
     /// This is [`None`] if the signature does not have a definition.
@@ -931,11 +933,11 @@ pub struct InlayHintFunctionArgumentDetails {
     pub argument_names: HashMap<usize, (String, Option<TextRange>)>,
 }
 
-pub fn inlay_hint_function_argument_details<'db>(
+pub fn inlay_hint_call_argument_details<'db>(
     db: &'db dyn Db,
     model: &SemanticModel<'db>,
     call_expr: &ast::ExprCall,
-) -> Option<InlayHintFunctionArgumentDetails> {
+) -> Option<InlayHintCallArgumentDetails> {
     let signature_details = call_signature_details(db, model, call_expr);
 
     if signature_details.is_empty() {
@@ -949,11 +951,11 @@ pub fn inlay_hint_function_argument_details<'db>(
     let parameters = call_signature_details.signature.parameters();
 
     let target_signature_file = call_signature_details
-        .signature
         .definition
         .map(|definition| definition.file(db));
 
     let definition_parameter_offsets = &call_signature_details.definition_parameter_offsets;
+
     let mut argument_names = HashMap::new();
 
     for arg_index in 0..call_expr.arguments.args.len() {
@@ -996,7 +998,7 @@ pub fn inlay_hint_function_argument_details<'db>(
         }
     }
 
-    Some(InlayHintFunctionArgumentDetails {
+    Some(InlayHintCallArgumentDetails {
         target_signature_file,
         argument_names,
     })

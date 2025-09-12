@@ -6,7 +6,7 @@ use ruff_db::parsed::parsed_module;
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor, TraversalSignal};
 use ruff_python_ast::{AnyNodeRef, Expr, Stmt};
 use ruff_text_size::{Ranged, TextRange, TextSize};
-use ty_python_semantic::types::{Type, inlay_hint_function_argument_details};
+use ty_python_semantic::types::{Type, inlay_hint_call_argument_details};
 use ty_python_semantic::{HasType, SemanticModel};
 
 #[derive(Debug, Clone)]
@@ -33,7 +33,7 @@ impl InlayHint {
     fn call_argument_name(
         position: TextSize,
         name: &str,
-        navigation_target: Option<crate::NavigationTarget>,
+        navigation_target: Option<NavigationTarget>,
     ) -> Self {
         let label_parts = vec![
             InlayHintLabelPart::new(name).with_target(navigation_target),
@@ -86,7 +86,7 @@ impl fmt::Display for InlayHintDisplay<'_> {
 pub struct InlayHintLabelPart {
     text: String,
 
-    target: Option<crate::NavigationTarget>,
+    target: Option<NavigationTarget>,
 }
 
 impl InlayHintLabelPart {
@@ -101,11 +101,11 @@ impl InlayHintLabelPart {
         &self.text
     }
 
-    pub fn target(&self) -> Option<&crate::NavigationTarget> {
+    pub fn target(&self) -> Option<&NavigationTarget> {
         self.target.as_ref()
     }
 
-    pub fn with_target(self, target: Option<crate::NavigationTarget>) -> Self {
+    pub fn with_target(self, target: Option<NavigationTarget>) -> Self {
         Self {
             text: self.text,
             target,
@@ -208,8 +208,10 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
         if !self.settings.variable_types {
             return;
         }
-        self.hints
-            .push(InlayHint::variable_type(position, ty, self.db));
+
+        let inlay_hint = InlayHint::variable_type(position, ty, self.db);
+
+        self.hints.push(inlay_hint);
     }
 
     fn add_call_argument_name(
@@ -285,25 +287,19 @@ impl SourceOrderVisitor<'_> for InlayHintVisitor<'_, '_> {
                 source_order::walk_expr(self, expr);
             }
             Expr::Call(call) => {
-                let inlay_hint_function_argument_details =
-                    inlay_hint_function_argument_details(self.db, &self.model, call)
-                        .unwrap_or_default();
+                let details = inlay_hint_call_argument_details(self.db, &self.model, call)
+                    .unwrap_or_default();
 
                 self.visit_expr(&call.func);
 
                 for (index, arg_or_keyword) in call.arguments.arguments_source_order().enumerate() {
-                    if let Some((name, parameter_label_offset)) =
-                        inlay_hint_function_argument_details
-                            .argument_names
-                            .get(&index)
+                    if let Some((name, parameter_label_offset)) = details.argument_names.get(&index)
                     {
-                        let navigation_target = parameter_label_offset
-                            .map(|offset| {
-                                inlay_hint_function_argument_details
-                                    .target_signature_file
-                                    .map(|file| crate::NavigationTarget::new(file, offset))
-                            })
-                            .flatten();
+                        let navigation_target = parameter_label_offset.and_then(|offset| {
+                            details
+                                .target_signature_file
+                                .map(|file| NavigationTarget::new(file, offset))
+                        });
 
                         self.add_call_argument_name(
                             arg_or_keyword.range().start(),
