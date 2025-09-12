@@ -5064,24 +5064,24 @@ fn flake8_import_convention_unused_aliased_import_no_conflict() {
 fn pyupgrade_up026_respects_isort_required_import_fix() {
     assert_cmd_snapshot!(
         Command::new(get_cargo_bin(BIN_NAME))
-            .arg("check")
-            .arg("--no-cache")
             .arg("--isolated")
-            .arg("--fix")
-            .arg("--config")
-            .arg(r#"lint.isort.required-imports = ["import mock"]"#)
-            .args(["--select", "I002,UP026"])
-            .args(["--stdin-filename", "test.py"])
+            .arg("check")
             .arg("-")
-            .pass_stdin("import mock\n"),
+            .args(["--select", "I002,UP026"])
+            .arg("--config")
+            .arg(r#"lint.isort.required-imports=["import mock"]"#)
+            .arg("--fix")
+            .arg("--no-cache")
+            .pass_stdin("1\n"),
         @r"
     success: true
     exit_code: 0
     ----- stdout -----
     import mock
+    1
 
     ----- stderr -----
-    All checks passed!
+    Found 1 error (1 fixed, 0 remaining).
     "
     );
 }
@@ -5091,15 +5091,14 @@ fn pyupgrade_up026_respects_isort_required_import_fix() {
 fn pyupgrade_up026_respects_isort_required_import_from_fix() {
     assert_cmd_snapshot!(
         Command::new(get_cargo_bin(BIN_NAME))
-            .arg("check")
-            .arg("--no-cache")
             .arg("--isolated")
-            .arg("--fix")
+            .arg("check")
+            .arg("-")
+            .args(["--select", "I002,UP026"])
             .arg("--config")
             .arg(r#"lint.isort.required-imports = ["from mock import mock"]"#)
-            .args(["--select", "UP026"])
-            .args(["--stdin-filename", "test.py"])
-            .arg("-")
+            .arg("--fix")
+            .arg("--no-cache")
             .pass_stdin("from mock import mock\n"),
         @r"
     success: true
