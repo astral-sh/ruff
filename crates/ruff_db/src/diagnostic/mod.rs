@@ -454,24 +454,26 @@ impl Diagnostic {
 
     /// Computes the start source location for the message.
     ///
-    /// Panics if the diagnostic has no primary span, if its file is not a `SourceFile`, or if the
-    /// span has no range.
-    pub fn expect_ruff_start_location(&self) -> LineColumn {
-        self.expect_primary_span()
-            .expect_ruff_file()
-            .to_source_code()
-            .line_column(self.expect_range().start())
+    /// Returns None if the diagnostic has no primary span, if its file is not a `SourceFile`,
+    /// or if the span has no range.
+    pub fn ruff_start_location(&self) -> Option<LineColumn> {
+        Some(
+            self.ruff_source_file()?
+                .to_source_code()
+                .line_column(self.range()?.start()),
+        )
     }
 
     /// Computes the end source location for the message.
     ///
-    /// Panics if the diagnostic has no primary span, if its file is not a `SourceFile`, or if the
-    /// span has no range.
-    pub fn expect_ruff_end_location(&self) -> LineColumn {
-        self.expect_primary_span()
-            .expect_ruff_file()
-            .to_source_code()
-            .line_column(self.expect_range().end())
+    /// Returns None if the diagnostic has no primary span, if its file is not a `SourceFile`,
+    /// or if the span has no range.
+    pub fn ruff_end_location(&self) -> Option<LineColumn> {
+        Some(
+            self.ruff_source_file()?
+                .to_source_code()
+                .line_column(self.range()?.end()),
+        )
     }
 
     /// Returns the [`SourceFile`] which the message belongs to.
@@ -490,13 +492,6 @@ impl Diagnostic {
     /// Returns the [`TextRange`] for the diagnostic.
     pub fn range(&self) -> Option<TextRange> {
         self.primary_span()?.range()
-    }
-
-    /// Returns the [`TextRange`] for the diagnostic.
-    ///
-    /// Panics if the diagnostic has no primary span or if the span has no range.
-    pub fn expect_range(&self) -> TextRange {
-        self.range().expect("Expected a range for the primary span")
     }
 
     /// Returns the ordering of diagnostics based on the start of their ranges, if they have any.
@@ -1452,6 +1447,11 @@ pub enum DiagnosticFormat {
     /// [Code Quality]: https://docs.gitlab.com/ci/testing/code_quality/#code-quality-report-format
     #[cfg(feature = "serde")]
     Gitlab,
+
+    /// Print diagnostics in the format used by [GitHub Actions] workflow error annotations.
+    ///
+    /// [GitHub Actions]: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#setting-an-error-message
+    Github,
 }
 
 /// A representation of the kinds of messages inside a diagnostic.

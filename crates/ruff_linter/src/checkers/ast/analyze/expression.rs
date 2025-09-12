@@ -8,7 +8,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::preview::{
-    is_assert_raises_exception_call_enabled, is_optional_as_none_in_union_enabled,
+    is_optional_as_none_in_union_enabled, is_unnecessary_default_type_args_stubs_enabled,
 };
 use crate::registry::Rule;
 use crate::rules::{
@@ -142,7 +142,10 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             }
 
             if checker.is_rule_enabled(Rule::UnnecessaryDefaultTypeArgs) {
-                if checker.target_version() >= PythonVersion::PY313 {
+                if checker.target_version() >= PythonVersion::PY313
+                    || is_unnecessary_default_type_args_stubs_enabled(checker.settings())
+                        && checker.semantic().in_stub_file()
+                {
                     pyupgrade::rules::unnecessary_default_type_args(checker, expr);
                 }
             }
@@ -1292,9 +1295,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::NonOctalPermissions) {
                 ruff::rules::non_octal_permissions(checker, call);
             }
-            if checker.is_rule_enabled(Rule::AssertRaisesException)
-                && is_assert_raises_exception_call_enabled(checker.settings())
-            {
+            if checker.is_rule_enabled(Rule::AssertRaisesException) {
                 flake8_bugbear::rules::assert_raises_exception_call(checker, call);
             }
         }

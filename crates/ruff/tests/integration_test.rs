@@ -1489,6 +1489,8 @@ fn deprecated_direct() {
 
 #[test]
 fn deprecated_multiple_direct() {
+    // Multiple deprecated rules selected by exact code should be included
+    // but a warning should be displayed
     let mut cmd = RuffCheck::default()
         .args(["--select", "RUF920", "--select", "RUF921"])
         .build();
@@ -1516,16 +1518,10 @@ fn deprecated_indirect() {
     // since it is not a "direct" selection
     let mut cmd = RuffCheck::default().args(["--select", "RUF92"]).build();
     assert_cmd_snapshot!(cmd, @r"
-    success: false
-    exit_code: 1
+    success: true
+    exit_code: 0
     ----- stdout -----
-    RUF920 Hey this is a deprecated test rule.
-    --> -:1:1
-
-    RUF921 Hey this is another deprecated test rule.
-    --> -:1:1
-
-    Found 2 errors.
+    All checks passed!
 
     ----- stderr -----
     ");
@@ -2155,16 +2151,10 @@ extend-safe-fixes = ["RUF9"]
     RUF903 Hey this is a stable test rule with a display only fix.
     --> -:1:1
 
-    RUF920 Hey this is a deprecated test rule.
-    --> -:1:1
-
-    RUF921 Hey this is another deprecated test rule.
-    --> -:1:1
-
     RUF950 Hey this is a test rule that was redirected from another.
     --> -:1:1
 
-    Found 7 errors.
+    Found 5 errors.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
     ----- stderr -----

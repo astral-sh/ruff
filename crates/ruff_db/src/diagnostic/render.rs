@@ -25,11 +25,13 @@ use super::{
 
 use azure::AzureRenderer;
 use concise::ConciseRenderer;
+use github::GithubRenderer;
 use pylint::PylintRenderer;
 
 mod azure;
 mod concise;
 mod full;
+mod github;
 #[cfg(feature = "serde")]
 mod gitlab;
 #[cfg(feature = "serde")]
@@ -141,6 +143,9 @@ impl std::fmt::Display for DisplayDiagnostics<'_> {
             #[cfg(feature = "serde")]
             DiagnosticFormat::Gitlab => {
                 gitlab::GitlabRenderer::new(self.resolver).render(f, self.diagnostics)?;
+            }
+            DiagnosticFormat::Github => {
+                GithubRenderer::new(self.resolver).render(f, self.diagnostics)?;
             }
         }
 

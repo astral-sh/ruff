@@ -1,5 +1,7 @@
 use std::borrow::Cow;
 
+use crate::types::constraints::ConstraintSet;
+
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_python_ast as ast;
 use rustc_hash::FxHashMap;
@@ -9,7 +11,6 @@ use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::{FileScopeId, NodeWithScopeKind};
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
-use crate::types::constraints::Constraints;
 use crate::types::infer::infer_definition_types;
 use crate::types::instance::{Protocol, ProtocolInstanceType};
 use crate::types::signatures::{Parameter, Parameters, Signature};
@@ -47,6 +48,13 @@ fn enclosing_generic_contexts<'db>(
                     .into_function_literal()?
                     .last_definition_signature(db)
                     .generic_context
+            }
+            NodeWithScopeKind::TypeAlias(type_alias) => {
+                let definition = index.expect_single_definition(type_alias.node(module));
+                binding_type(db, definition)
+                    .into_type_alias()?
+                    .into_pep_695_type_alias()?
+                    .generic_context(db)
             }
             _ => None,
         })
@@ -132,6 +140,18 @@ impl<'db> GenericContext<'db> {
         type_params: impl IntoIterator<Item = BoundTypeVarInstance<'db>>,
     ) -> Self {
         Self::new(db, type_params.into_iter().collect::<FxOrderSet<_>>())
+    }
+
+    /// Merge this generic context with another, returning a new generic context that
+    /// contains type variables from both contexts.
+    pub(crate) fn merge(self, db: &'db dyn Db, other: Self) -> Self {
+        Self::from_typevar_instances(
+            db,
+            self.variables(db)
+                .iter()
+                .chain(other.variables(db).iter())
+                .copied(),
+        )
     }
 
     fn variable_from_type_param(
@@ -445,14 +465,14 @@ pub(super) fn walk_specialization<'db, V: super::visitor::TypeVisitor<'db> + ?Si
     }
 }
 
-fn is_subtype_in_invariant_position<'db, C: Constraints<'db>>(
+fn is_subtype_in_invariant_position<'db>(
     db: &'db dyn Db,
     derived_type: &Type<'db>,
     derived_materialization: MaterializationKind,
     base_type: &Type<'db>,
     base_materialization: MaterializationKind,
-    visitor: &HasRelationToVisitor<'db, C>,
-) -> C {
+    visitor: &HasRelationToVisitor<'db>,
+) -> ConstraintSet<'db> {
     let derived_top = derived_type.top_materialization(db);
     let derived_bottom = derived_type.bottom_materialization(db);
     let base_top = base_type.top_materialization(db);
@@ -501,15 +521,15 @@ fn is_subtype_in_invariant_position<'db, C: Constraints<'db>>(
 /// Whether two types encountered in an invariant position
 /// have a relation (subtyping or assignability), taking into account
 /// that the two types may come from a top or bottom materialization.
-fn has_relation_in_invariant_position<'db, C: Constraints<'db>>(
+fn has_relation_in_invariant_position<'db>(
     db: &'db dyn Db,
     derived_type: &Type<'db>,
     derived_materialization: Option<MaterializationKind>,
     base_type: &Type<'db>,
     base_materialization: Option<MaterializationKind>,
     relation: TypeRelation,
-    visitor: &HasRelationToVisitor<'db, C>,
-) -> C {
+    visitor: &HasRelationToVisitor<'db>,
+) -> ConstraintSet<'db> {
     match (derived_materialization, base_materialization, relation) {
         // Top and bottom materializations are fully static types, so subtyping
         // is the same as assignability.
@@ -772,16 +792,16 @@ impl<'db> Specialization<'db> {
         )
     }
 
-    pub(crate) fn has_relation_to_impl<C: Constraints<'db>>(
+    pub(crate) fn has_relation_to_impl(
         self,
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
-        visitor: &HasRelationToVisitor<'db, C>,
-    ) -> C {
+        visitor: &HasRelationToVisitor<'db>,
+    ) -> ConstraintSet<'db> {
         let generic_context = self.generic_context(db);
         if generic_context != other.generic_context(db) {
-            return C::unsatisfiable(db);
+            return ConstraintSet::from(false);
         }
 
         if let (Some(self_tuple), Some(other_tuple)) = (self.tuple_inner(db), other.tuple_inner(db))
@@ -792,7 +812,7 @@ impl<'db> Specialization<'db> {
         let self_materialization_kind = self.materialization_kind(db);
         let other_materialization_kind = other.materialization_kind(db);
 
-        let mut result = C::always_satisfiable(db);
+        let mut result = ConstraintSet::from(true);
         for ((bound_typevar, self_type), other_type) in (generic_context.variables(db).into_iter())
             .zip(self.types(db))
             .zip(other.types(db))
@@ -805,7 +825,7 @@ impl<'db> Specialization<'db> {
             {
                 match relation {
                     TypeRelation::Assignability => continue,
-                    TypeRelation::Subtyping => return C::unsatisfiable(db),
+                    TypeRelation::Subtyping => return ConstraintSet::from(false),
                 }
             }
 
@@ -831,9 +851,9 @@ impl<'db> Specialization<'db> {
                 TypeVarVariance::Contravariant => {
                     other_type.has_relation_to_impl(db, *self_type, relation, visitor)
                 }
-                TypeVarVariance::Bivariant => C::always_satisfiable(db),
+                TypeVarVariance::Bivariant => ConstraintSet::from(true),
             };
-            if result.intersect(db, compatible).is_never_satisfied(db) {
+            if result.intersect(db, &compatible).is_never_satisfied() {
                 return result;
             }
         }
@@ -841,21 +861,21 @@ impl<'db> Specialization<'db> {
         result
     }
 
-    pub(crate) fn is_equivalent_to_impl<C: Constraints<'db>>(
+    pub(crate) fn is_equivalent_to_impl(
         self,
         db: &'db dyn Db,
         other: Specialization<'db>,
-        visitor: &IsEquivalentVisitor<'db, C>,
-    ) -> C {
+        visitor: &IsEquivalentVisitor<'db>,
+    ) -> ConstraintSet<'db> {
         if self.materialization_kind(db) != other.materialization_kind(db) {
-            return C::unsatisfiable(db);
+            return ConstraintSet::from(false);
         }
         let generic_context = self.generic_context(db);
         if generic_context != other.generic_context(db) {
-            return C::unsatisfiable(db);
+            return ConstraintSet::from(false);
         }
 
-        let mut result = C::always_satisfiable(db);
+        let mut result = ConstraintSet::from(true);
         for ((bound_typevar, self_type), other_type) in (generic_context.variables(db).into_iter())
             .zip(self.types(db))
             .zip(other.types(db))
@@ -872,19 +892,19 @@ impl<'db> Specialization<'db> {
                 | TypeVarVariance::Contravariant => {
                     self_type.is_equivalent_to_impl(db, *other_type, visitor)
                 }
-                TypeVarVariance::Bivariant => C::always_satisfiable(db),
+                TypeVarVariance::Bivariant => ConstraintSet::from(true),
             };
-            if result.intersect(db, compatible).is_never_satisfied(db) {
+            if result.intersect(db, &compatible).is_never_satisfied() {
                 return result;
             }
         }
 
         match (self.tuple_inner(db), other.tuple_inner(db)) {
-            (Some(_), None) | (None, Some(_)) => return C::unsatisfiable(db),
+            (Some(_), None) | (None, Some(_)) => return ConstraintSet::from(false),
             (None, None) => {}
             (Some(self_tuple), Some(other_tuple)) => {
                 let compatible = self_tuple.is_equivalent_to_impl(db, other_tuple, visitor);
-                if result.intersect(db, compatible).is_never_satisfied(db) {
+                if result.intersect(db, &compatible).is_never_satisfied() {
                     return result;
                 }
             }

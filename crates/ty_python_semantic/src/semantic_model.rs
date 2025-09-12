@@ -11,7 +11,7 @@ use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::FileScopeId;
 use crate::semantic_index::semantic_index;
 use crate::types::ide_support::all_declarations_and_bindings;
-use crate::types::{Type, binding_type, infer_scope_types};
+use crate::types::{CycleDetector, Type, binding_type, infer_scope_types};
 
 pub struct SemanticModel<'db> {
     db: &'db dyn Db,
@@ -319,14 +319,18 @@ impl<'db> Completion<'db> {
     /// the client uses this information to help improve the UX (perhaps by
     /// assigning an icon of some kind to the completion).
     pub fn kind(&self, db: &'db dyn Db) -> Option<CompletionKind> {
-        fn imp<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<CompletionKind> {
+        fn imp<'db>(
+            db: &'db dyn Db,
+            ty: Type<'db>,
+            visitor: &CompletionKindVisitor<'db>,
+        ) -> Option<CompletionKind> {
             Some(match ty {
                 Type::FunctionLiteral(_)
                 | Type::DataclassDecorator(_)
                 | Type::WrapperDescriptor(_)
                 | Type::DataclassTransformer(_)
                 | Type::Callable(_) => CompletionKind::Function,
-                Type::BoundMethod(_) | Type::MethodWrapper(_) => CompletionKind::Method,
+                Type::BoundMethod(_) | Type::KnownBoundMethod(_) => CompletionKind::Method,
                 Type::ModuleLiteral(_) => CompletionKind::Module,
                 Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => {
                     CompletionKind::Class
@@ -346,22 +350,32 @@ impl<'db> Completion<'db> {
                 Type::EnumLiteral(_) => CompletionKind::Enum,
                 Type::ProtocolInstance(_) => CompletionKind::Interface,
                 Type::NonInferableTypeVar(_) | Type::TypeVar(_) => CompletionKind::TypeParameter,
-                Type::Union(union) => union.elements(db).iter().find_map(|&ty| imp(db, ty))?,
-                Type::Intersection(intersection) => {
-                    intersection.iter_positive(db).find_map(|ty| imp(db, ty))?
-                }
+                Type::Union(union) => union
+                    .elements(db)
+                    .iter()
+                    .find_map(|&ty| imp(db, ty, visitor))?,
+                Type::Intersection(intersection) => intersection
+                    .iter_positive(db)
+                    .find_map(|ty| imp(db, ty, visitor))?,
                 Type::Dynamic(_)
                 | Type::Never
                 | Type::SpecialForm(_)
                 | Type::KnownInstance(_)
                 | Type::AlwaysTruthy
                 | Type::AlwaysFalsy => return None,
-                Type::TypeAlias(alias) => imp(db, alias.value_type(db))?,
+                Type::TypeAlias(alias) => {
+                    visitor.visit(ty, || imp(db, alias.value_type(db), visitor))?
+                }
             })
         }
-        self.kind.or_else(|| self.ty.and_then(|ty| imp(db, ty)))
+        self.kind.or_else(|| {
+            self.ty
+                .and_then(|ty| imp(db, ty, &CompletionKindVisitor::default()))
+        })
     }
 }
+
+type CompletionKindVisitor<'db> = CycleDetector<CompletionKind, Type<'db>, Option<CompletionKind>>;
 
 /// The "kind" of a completion.
 ///
@@ -372,7 +386,7 @@ impl<'db> Completion<'db> {
 /// `Type` (and possibly other information), which might be interesting and
 /// contentious. Then the outer edges map this to the LSP types, which is
 /// expected to be mundane and boring.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CompletionKind {
     Text,
     Method,

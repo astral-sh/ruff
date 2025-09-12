@@ -1,6 +1,6 @@
 use crate::place::PlaceAndQualifiers;
 use crate::semantic_index::definition::Definition;
-use crate::types::constraints::Constraints;
+use crate::types::constraints::ConstraintSet;
 use crate::types::variance::VarianceInferable;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, DynamicType,
@@ -129,22 +129,22 @@ impl<'db> SubclassOfType<'db> {
     }
 
     /// Return `true` if `self` has a certain relation to `other`.
-    pub(crate) fn has_relation_to_impl<C: Constraints<'db>>(
+    pub(crate) fn has_relation_to_impl(
         self,
         db: &'db dyn Db,
         other: SubclassOfType<'db>,
         relation: TypeRelation,
-        visitor: &HasRelationToVisitor<'db, C>,
-    ) -> C {
+        visitor: &HasRelationToVisitor<'db>,
+    ) -> ConstraintSet<'db> {
         match (self.subclass_of, other.subclass_of) {
             (SubclassOfInner::Dynamic(_), SubclassOfInner::Dynamic(_)) => {
-                C::from_bool(db, relation.is_assignability())
+                ConstraintSet::from(relation.is_assignability())
             }
             (SubclassOfInner::Dynamic(_), SubclassOfInner::Class(other_class)) => {
-                C::from_bool(db, other_class.is_object(db) || relation.is_assignability())
+                ConstraintSet::from(other_class.is_object(db) || relation.is_assignability())
             }
             (SubclassOfInner::Class(_), SubclassOfInner::Dynamic(_)) => {
-                C::from_bool(db, relation.is_assignability())
+                ConstraintSet::from(relation.is_assignability())
             }
 
             // For example, `type[bool]` describes all possible runtime subclasses of the class `bool`,
@@ -159,18 +159,18 @@ impl<'db> SubclassOfType<'db> {
     /// Return` true` if `self` is a disjoint type from `other`.
     ///
     /// See [`Type::is_disjoint_from`] for more details.
-    pub(crate) fn is_disjoint_from_impl<C: Constraints<'db>>(
+    pub(crate) fn is_disjoint_from_impl(
         self,
         db: &'db dyn Db,
         other: Self,
-        _visitor: &IsDisjointVisitor<'db, C>,
-    ) -> C {
+        _visitor: &IsDisjointVisitor<'db>,
+    ) -> ConstraintSet<'db> {
         match (self.subclass_of, other.subclass_of) {
             (SubclassOfInner::Dynamic(_), _) | (_, SubclassOfInner::Dynamic(_)) => {
-                C::unsatisfiable(db)
+                ConstraintSet::from(false)
             }
             (SubclassOfInner::Class(self_class), SubclassOfInner::Class(other_class)) => {
-                C::from_bool(db, !self_class.could_coexist_in_mro_with(db, other_class))
+                ConstraintSet::from(!self_class.could_coexist_in_mro_with(db, other_class))
             }
         }
     }
@@ -221,7 +221,7 @@ impl<'db> VarianceInferable<'db> for SubclassOfType<'db> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub(crate) enum SubclassOfInner<'db> {
     Class(ClassType<'db>),
-    Dynamic(DynamicType),
+    Dynamic(DynamicType<'db>),
 }
 
 impl<'db> SubclassOfInner<'db> {
@@ -240,7 +240,7 @@ impl<'db> SubclassOfInner<'db> {
         }
     }
 
-    pub(crate) const fn into_dynamic(self) -> Option<DynamicType> {
+    pub(crate) const fn into_dynamic(self) -> Option<DynamicType<'db>> {
         match self {
             Self::Class(_) => None,
             Self::Dynamic(dynamic) => Some(dynamic),
@@ -271,8 +271,8 @@ impl<'db> From<ClassType<'db>> for SubclassOfInner<'db> {
     }
 }
 
-impl From<DynamicType> for SubclassOfInner<'_> {
-    fn from(value: DynamicType) -> Self {
+impl<'db> From<DynamicType<'db>> for SubclassOfInner<'db> {
+    fn from(value: DynamicType<'db>) -> Self {
         SubclassOfInner::Dynamic(value)
     }
 }

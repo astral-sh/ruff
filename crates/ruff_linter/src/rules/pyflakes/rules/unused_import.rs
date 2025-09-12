@@ -15,11 +15,8 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix;
-use crate::preview::{
-    is_dunder_init_fix_unused_import_enabled, is_full_path_match_source_strategy_enabled,
-};
+use crate::preview::is_dunder_init_fix_unused_import_enabled;
 use crate::registry::Rule;
-use crate::rules::isort::categorize::MatchSourceStrategy;
 use crate::rules::{isort, isort::ImportSection, isort::ImportType};
 use crate::{Applicability, Fix, FixAvailability, Violation};
 
@@ -63,6 +60,10 @@ use crate::{Applicability, Fix, FixAvailability, Violation};
 /// to remove third-party and standard library imports -- the fix is unsafe because the module's
 /// interface changes.
 ///
+/// See [this FAQ section](https://docs.astral.sh/ruff/faq/#how-does-ruff-determine-which-of-my-imports-are-first-party-third-party-etc)
+/// for more details on how Ruff
+/// determines whether an import is first or third-party.
+///
 /// ## Example
 ///
 /// ```python
@@ -90,11 +91,6 @@ use crate::{Applicability, Fix, FixAvailability, Violation};
 /// else:
 ///     print("numpy is not installed")
 /// ```
-///
-/// ## Preview
-/// When [preview](https://docs.astral.sh/ruff/preview/) is enabled,
-/// the criterion for determining whether an import is first-party
-/// is stricter, which could affect the suggested fix. See [this FAQ section](https://docs.astral.sh/ruff/faq/#how-does-ruff-determine-which-of-my-imports-are-first-party-third-party-etc) for more details.
 ///
 /// ## Options
 /// - `lint.ignore-init-module-imports`
@@ -231,11 +227,6 @@ enum UnusedImportContext {
 
 fn is_first_party(import: &AnyImport, checker: &Checker) -> bool {
     let source_name = import.source_name().join(".");
-    let match_source_strategy = if is_full_path_match_source_strategy_enabled(checker.settings()) {
-        MatchSourceStrategy::FullPath
-    } else {
-        MatchSourceStrategy::Root
-    };
     let category = isort::categorize(
         &source_name,
         import.qualified_name().is_unresolved_import(),
@@ -247,7 +238,6 @@ fn is_first_party(import: &AnyImport, checker: &Checker) -> bool {
         checker.settings().isort.no_sections,
         &checker.settings().isort.section_order,
         &checker.settings().isort.default_section,
-        match_source_strategy,
     );
     matches! {
         category,

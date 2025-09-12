@@ -8,6 +8,7 @@ use ruff_workspace::options::Options;
 
 use crate::{
     ClientOptions,
+    format::FormatBackend,
     session::{
         Client,
         options::{ClientConfiguration, ConfigurationPreference},
@@ -84,6 +85,7 @@ pub(crate) struct EditorSettings {
     pub(super) configuration: Option<ResolvedConfiguration>,
     pub(super) lint_preview: Option<bool>,
     pub(super) format_preview: Option<bool>,
+    pub(super) format_backend: Option<FormatBackend>,
     pub(super) select: Option<Vec<RuleSelector>>,
     pub(super) extend_select: Option<Vec<RuleSelector>>,
     pub(super) ignore: Option<Vec<RuleSelector>>,
@@ -161,5 +163,11 @@ impl ClientSettings {
 
     pub(crate) fn editor_settings(&self) -> &EditorSettings {
         &self.editor_settings
+    }
+}
+
+impl EditorSettings {
+    pub(crate) fn format_backend(&self) -> FormatBackend {
+        self.format_backend.unwrap_or_default()
     }
 }

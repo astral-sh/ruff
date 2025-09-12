@@ -139,4 +139,16 @@ impl LineEnding {
             LineEnding::CarriageReturn => "\r",
         }
     }
+
+    /// Returns the string used to configure this line ending.
+    ///
+    /// See [`LineEnding::as_str`] for the actual string representation of the line ending.
+    #[inline]
+    pub const fn as_setting_str(&self) -> &'static str {
+        match self {
+            LineEnding::LineFeed => "lf",
+            LineEnding::CarriageReturnLineFeed => "crlf",
+            LineEnding::CarriageReturn => "cr",
+        }
+    }
 }

@@ -115,7 +115,7 @@ jiff = { version = "0.2.0" }
 js-sys = { version = "0.3.69" }
 jod-thread = { version = "1.0.0" }
 libc = { version = "0.2.153" }
-libcst = { version = "1.1.0", default-features = false }
+libcst = { version = "1.8.4", default-features = false }
 log = { version = "0.4.17" }
 lsp-server = { version = "0.7.6" }
 lsp-types = { git = "https://github.com/astral-sh/lsp-types.git", rev = "3512a9f", features = [
@@ -143,7 +143,7 @@ regex-automata = { version = "0.4.9" }
 rustc-hash = { version = "2.0.0" }
 rustc-stable-hash = { version = "0.1.2" }
 # When updating salsa, make sure to also update the revision in `fuzz/Cargo.toml`
-salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "a3ffa22cb26756473d56f867aedec3fd907c4dd9", default-features = false, features = [
+salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "3713cd7eb30821c0c086591832dd6f59f2af7fe7", default-features = false, features = [
     "compact_str",
     "macros",
     "salsa_unstable",
@@ -251,6 +251,14 @@ rest_pat_in_fully_bound_structs = "warn"
 redundant_clone = "warn"
 debug_assert_with_mut_call = "warn"
 unused_peekable = "warn"
+# This lint sometimes flags code whose `if` and `else`
+# bodies could be flipped when a `!` operator is removed.
+# While perhaps sometimes a good idea, it is also often
+# not a good idea due to other factors impacting
+# readability. For example, if flipping the bodies results
+# in the `if` being an order of magnitude bigger than the
+# `else`, then some might consider that harder to read.
+if_not_else = "allow"
 
 # Diagnostics are not actionable: Enable once https://github.com/rust-lang/rust-clippy/issues/13774 is resolved.
 large_stack_arrays = "allow"

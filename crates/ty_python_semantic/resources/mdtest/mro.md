@@ -165,7 +165,9 @@ from does_not_exist import DoesNotExist  # error: [unresolved-import]
 reveal_type(DoesNotExist)  # revealed: Unknown
 
 if hasattr(DoesNotExist, "__mro__"):
-    reveal_type(DoesNotExist)  # revealed: Unknown & <Protocol with members '__mro__'>
+    # TODO: this should be `Unknown & <Protocol with members '__mro__'>` or similar
+    # (The second part of the intersection is incorrectly simplified to `object` due to https://github.com/astral-sh/ty/issues/986)
+    reveal_type(DoesNotExist)  # revealed: Unknown
 
     class Foo(DoesNotExist): ...  # no error!
     reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]

@@ -118,7 +118,8 @@ def _(
 
 ```py
 from enum import Enum
-from typing import Literal
+from typing import Literal, Any
+from ty_extensions import Intersection
 
 class Color(Enum):
     RED = "red"
@@ -139,6 +140,13 @@ def _(
     reveal_type(u4)  # revealed: Literal[Color.RED, Color.GREEN]
     reveal_type(u5)  # revealed: Color
     reveal_type(u6)  # revealed: Color
+
+def _(
+    u1: Intersection[Literal[Color.RED], Any] | Literal[Color.RED],
+    u2: Literal[Color.RED] | Intersection[Literal[Color.RED], Any],
+):
+    reveal_type(u1)  # revealed: Literal[Color.RED]
+    reveal_type(u2)  # revealed: Literal[Color.RED]
 ```
 
 ## Do not erase `Unknown`

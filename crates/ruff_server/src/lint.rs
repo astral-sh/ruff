@@ -234,7 +234,7 @@ fn to_lsp_diagnostic(
     index: &LineIndex,
     encoding: PositionEncoding,
 ) -> (usize, lsp_types::Diagnostic) {
-    let diagnostic_range = diagnostic.expect_range();
+    let diagnostic_range = diagnostic.range().unwrap_or_default();
     let name = diagnostic.name();
     let body = diagnostic.body().to_string();
     let fix = diagnostic.fix();
