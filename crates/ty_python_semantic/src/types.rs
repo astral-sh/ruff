@@ -5968,6 +5968,13 @@ impl<'db> Type<'db> {
                         self
                     }
                 }
+                TypeMapping::ReplaceSelf(new_self) => {
+                    if bound_typevar.typevar(db).is_self(db) {
+                        Type::TypeVar(*new_self)
+                    } else {
+                        self
+                    }
+                }
                 TypeMapping::PromoteLiterals | TypeMapping::BindLegacyTypevars(_) |
                 TypeMapping::MarkTypeVarsInferable(_) => self,
                 TypeMapping::Materialize(materialization_kind)  => {
@@ -5991,7 +5998,8 @@ impl<'db> Type<'db> {
                 }
                 TypeMapping::PromoteLiterals |
                 TypeMapping::BindLegacyTypevars(_) |
-                TypeMapping::BindSelf(_)
+                TypeMapping::BindSelf(_) |
+                TypeMapping::ReplaceSelf(_)
                     => self,
                 TypeMapping::Materialize(materialization_kind)  => Type::NonInferableTypeVar(bound_typevar.materialize_impl(db, *materialization_kind, visitor))
 
@@ -6005,6 +6013,7 @@ impl<'db> Type<'db> {
                 TypeMapping::PartialSpecialization(_) |
                 TypeMapping::PromoteLiterals |
                 TypeMapping::BindSelf(_) |
+                TypeMapping::ReplaceSelf(_) |
                 TypeMapping::MarkTypeVarsInferable(_) |
                 TypeMapping::Materialize(_) => self,
             }
@@ -6113,6 +6122,7 @@ impl<'db> Type<'db> {
                 TypeMapping::PartialSpecialization(_) |
                 TypeMapping::BindLegacyTypevars(_) |
                 TypeMapping::BindSelf(_) |
+                TypeMapping::ReplaceSelf(_) |
                 TypeMapping::MarkTypeVarsInferable(_) |
                 TypeMapping::Materialize(_) => self,
                 TypeMapping::PromoteLiterals => self.literal_fallback_instance(db)
@@ -6124,6 +6134,7 @@ impl<'db> Type<'db> {
                 TypeMapping::PartialSpecialization(_) |
                 TypeMapping::BindLegacyTypevars(_) |
                 TypeMapping::BindSelf(_) |
+                TypeMapping::ReplaceSelf(_) |
                 TypeMapping::MarkTypeVarsInferable(_) |
                 TypeMapping::PromoteLiterals => self,
                 TypeMapping::Materialize(materialization_kind) => match materialization_kind {
@@ -6659,6 +6670,8 @@ pub enum TypeMapping<'a, 'db> {
     BindLegacyTypevars(BindingContext<'db>),
     /// Binds any `typing.Self` typevar with a particular `self` class.
     BindSelf(Type<'db>),
+    /// Replaces occurrences of `typing.Self` with a new `Self` type variable.
+    ReplaceSelf(BoundTypeVarInstance<'db>),
     /// Marks the typevars that are bound by a generic class or function as inferable.
     MarkTypeVarsInferable(BindingContext<'db>),
     /// Create the top or bottom materialization of a type.
@@ -6679,6 +6692,9 @@ fn walk_type_mapping<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
         }
         TypeMapping::BindSelf(self_type) => {
             visitor.visit_type(db, *self_type);
+        }
+        TypeMapping::ReplaceSelf(new_self) => {
+            visitor.visit_bound_type_var_type(db, *new_self);
         }
         TypeMapping::PromoteLiterals
         | TypeMapping::BindLegacyTypevars(_)
@@ -6701,6 +6717,9 @@ impl<'db> TypeMapping<'_, 'db> {
                 TypeMapping::BindLegacyTypevars(*binding_context)
             }
             TypeMapping::BindSelf(self_type) => TypeMapping::BindSelf(*self_type),
+            TypeMapping::ReplaceSelf(replacement_type) => {
+                TypeMapping::ReplaceSelf(*replacement_type)
+            }
             TypeMapping::MarkTypeVarsInferable(binding_context) => {
                 TypeMapping::MarkTypeVarsInferable(*binding_context)
             }
@@ -6724,6 +6743,9 @@ impl<'db> TypeMapping<'_, 'db> {
             }
             TypeMapping::BindSelf(self_type) => {
                 TypeMapping::BindSelf(self_type.normalized_impl(db, visitor))
+            }
+            TypeMapping::ReplaceSelf(replacement_type) => {
+                TypeMapping::ReplaceSelf(replacement_type.normalized_impl(db, visitor))
             }
             TypeMapping::MarkTypeVarsInferable(binding_context) => {
                 TypeMapping::MarkTypeVarsInferable(*binding_context)
@@ -7655,6 +7677,23 @@ impl<'db> BoundTypeVarInstance<'db> {
                 Some(variance),
                 None, // _default
                 TypeVarKind::Pep695,
+            ),
+            BindingContext::Synthetic,
+        )
+    }
+
+    /// Create a new synthetic `Self` type variable with the given upper bound.
+    pub(crate) fn synthetic_self(db: &'db dyn Db, upper_bound: Type<'db>) -> Self {
+        Self::new(
+            db,
+            TypeVarInstance::new(
+                db,
+                Name::new_static("Self"),
+                None,
+                Some(TypeVarBoundOrConstraints::UpperBound(upper_bound).into()),
+                Some(TypeVarVariance::Invariant),
+                None,
+                TypeVarKind::TypingSelf,
             ),
             BindingContext::Synthetic,
         )
@@ -10815,6 +10854,29 @@ impl<'db> TypeIsType<'db> {
     pub(crate) fn is_bound(self, db: &'db dyn Db) -> bool {
         self.place_info(db).is_some()
     }
+}
+
+/// Walk the MRO of this class and return the last class just before the specified known base.
+/// This can be used to determine upper bounds for `Self` type variables on methods that are
+/// being added to the given class.
+pub(super) fn find_upper_bound<'db>(
+    db: &'db dyn Db,
+    class_literal: ClassLiteral<'db>,
+    specialization: Option<Specialization<'db>>,
+    is_known_base: impl Fn(ClassBase<'db>) -> bool,
+) -> Type<'db> {
+    let mut upper_bound = class_literal.unknown_specialization(db);
+    for base in class_literal.iter_mro(db, specialization) {
+        if is_known_base(base) {
+            break;
+        }
+
+        if let Some(superclass) = base.into_class() {
+            upper_bound = superclass;
+        }
+    }
+
+    Type::instance(db, upper_bound)
 }
 
 // Make sure that the `Type` enum does not grow unexpectedly.

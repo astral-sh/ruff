@@ -627,6 +627,18 @@ alice: Employee = {"name": "Alice", "employee_id": 1}
 
 # error: [missing-typed-dict-key] "Missing required key 'employee_id' in TypedDict `Employee` constructor"
 eve: Employee = {"name": "Eve"}
+
+def combine(p: Person, e: Employee):
+    # TODO: Should be `Person` once we support the implicit type of self
+    reveal_type(p.copy())  # revealed: Unknown
+    # TODO: Should be `Employee` once we support the implicit type of self
+    reveal_type(e.copy())  # revealed: Unknown
+
+    reveal_type(p | p)  # revealed: Person
+    reveal_type(e | e)  # revealed: Employee
+
+    # TODO: Should be `Person` once we support the implicit type of self and subtyping for TypedDicts
+    reveal_type(p | e)  # revealed: Employee
 ```
 
 When inheriting from a `TypedDict` with a different `total` setting, inherited fields maintain their
