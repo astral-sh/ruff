@@ -223,3 +223,8 @@ pub(crate) const fn is_unnecessary_default_type_args_stubs_enabled(
 pub(crate) const fn is_sim910_expanded_key_support_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
+
+// https://github.com/astral-sh/ruff/pull/20200
+pub(crate) const fn is_refined_submodule_import_match_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
