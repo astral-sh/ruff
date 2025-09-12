@@ -229,7 +229,7 @@ pub(crate) const fn is_fix_builtin_open_enabled(settings: &LinterSettings) -> bo
     settings.preview.is_enabled()
 }
 
-// TODO
+// https://github.com/astral-sh/ruff/pull/20200
 pub(crate) const fn is_refined_submodule_import_match_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
