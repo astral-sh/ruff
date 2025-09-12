@@ -140,10 +140,8 @@ pub(crate) fn implicit(
                     None => continue,
                 }
             }
-            (
-                TokenKind::FStringEnd | TokenKind::TStringEnd,
-                TokenKind::FStringStart | TokenKind::TStringStart,
-            ) => {
+            (TokenKind::FStringEnd, TokenKind::FStringStart)
+            | (TokenKind::TStringEnd, TokenKind::TStringStart) => {
                 match (
                     indexer
                         .interpolated_string_ranges()
