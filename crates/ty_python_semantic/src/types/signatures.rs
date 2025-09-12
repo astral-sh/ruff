@@ -43,6 +43,10 @@ impl<'db> CallableSignature<'db> {
         }
     }
 
+    pub(crate) fn bottom() -> Self {
+        Self::single(Signature::bottom())
+    }
+
     /// Creates a new `CallableSignature` from an iterator of [`Signature`]s. Returns a
     /// non-callable signature if the iterator is empty.
     pub(crate) fn from_overloads<I>(overloads: I) -> Self
