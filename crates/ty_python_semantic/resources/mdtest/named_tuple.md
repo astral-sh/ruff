@@ -270,16 +270,34 @@ reveal_type(Person._field_defaults)  # revealed: dict[str, Any]
 reveal_type(Person._fields)  # revealed: tuple[str, ...]
 reveal_type(Person._make)  # revealed: bound method <class 'Person'>._make(iterable: Iterable[Any]) -> Person
 reveal_type(Person._asdict)  # revealed: def _asdict(self) -> dict[str, Any]
-reveal_type(Person._replace)  # revealed: def _replace(self, **kwargs: Any) -> Self@_replace
+reveal_type(Person._replace)  # revealed: def _replace(self, **kwargs: Any) -> Self
 
-# TODO: should be `Person` once we support `Self`
+# TODO: should be `Person` once we support implicit type of `self`
 reveal_type(Person._make(("Alice", 42)))  # revealed: Unknown
 
 person = Person("Alice", 42)
 
 reveal_type(person._asdict())  # revealed: dict[str, Any]
-# TODO: should be `Person` once we support `Self`
+# TODO: should be `Person` once we support implicit type of `self`
 reveal_type(person._replace(name="Bob"))  # revealed: Unknown
+```
+
+When accessing them on child classes of generic `NamedTuple`s, the return type is specialized
+accordingly:
+
+```py
+from typing import NamedTuple, Generic, TypeVar
+
+T = TypeVar("T")
+
+class Box(NamedTuple, Generic[T]):
+    content: T
+
+class IntBox(Box[int]):
+    pass
+
+# TODO: should be `IntBox` once we support the implicit type of `self`
+reveal_type(IntBox(1)._replace(content=42))  # revealed: Unknown
 ```
 
 ## `collections.namedtuple`
@@ -355,7 +373,7 @@ class Point(NamedTuple):
 
 reveal_type(Point._make)  # revealed: bound method <class 'Point'>._make(iterable: Iterable[Any]) -> Point
 reveal_type(Point._asdict)  # revealed: def _asdict(self) -> dict[str, Any]
-reveal_type(Point._replace)  # revealed: def _replace(self, **kwargs: Any) -> Self@_replace
+reveal_type(Point._replace)  # revealed: def _replace(self, **kwargs: Any) -> Self
 
 static_assert(is_assignable_to(Point, NamedTuple))
 
