@@ -198,7 +198,7 @@ import sys
 
 if sys.platform == "win32":
     # TODO: we should not emit an error here
-    # error: [possibly-unbound-attribute]
+    # error: [possibly-undeclared-attribute]
     sys.getwindowsversion()
 ```
 

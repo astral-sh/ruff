@@ -219,7 +219,7 @@ def f(x: C | D):
     s = super(A, x)
     reveal_type(s)  # revealed: <super: <class 'A'>, C> | <super: <class 'A'>, D>
 
-    # error: [possibly-unbound-attribute] "Attribute `b` on type `<super: <class 'A'>, C> | <super: <class 'A'>, D>` is possibly unbound"
+    # error: [possibly-undeclared-attribute] "Attribute `b` on type `<super: <class 'A'>, C> | <super: <class 'A'>, D>` is possibly undeclared"
     s.b
 
 def f(flag: bool):
@@ -259,7 +259,7 @@ def f(flag: bool):
     reveal_type(s.x)  # revealed: Unknown | Literal[1, 2]
     reveal_type(s.y)  # revealed: int | str
 
-    # error: [possibly-unbound-attribute] "Attribute `a` on type `<super: <class 'B'>, B> | <super: <class 'D'>, D>` is possibly unbound"
+    # error: [possibly-undeclared-attribute] "Attribute `a` on type `<super: <class 'B'>, B> | <super: <class 'D'>, D>` is possibly undeclared"
     reveal_type(s.a)  # revealed: str
 ```
 

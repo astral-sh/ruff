@@ -161,7 +161,7 @@ class _:
     a.b = B()
 
     class _:
-        # error: [possibly-unbound-attribute]
+        # error: [possibly-undeclared-attribute]
         reveal_type(a.b.c1.d)  # revealed: D | None
         reveal_type(a.b.c1)  # revealed: C | None
 ```
