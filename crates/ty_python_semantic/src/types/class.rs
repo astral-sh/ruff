@@ -14,7 +14,7 @@ use crate::semantic_index::symbol::Symbol;
 use crate::semantic_index::{
     DeclarationWithConstraint, SemanticIndex, attribute_declarations, attribute_scopes,
 };
-use crate::types::constraints::{ConstraintSet, Constraints, IteratorConstraintsExtension};
+use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{INVALID_LEGACY_TYPE_VARIABLE, INVALID_TYPE_ALIAS_TYPE};
 use crate::types::enums::enum_metadata;
@@ -28,9 +28,9 @@ use crate::types::{
     ApplyTypeMappingVisitor, Binding, BoundSuperError, BoundSuperType, CallableType,
     DataclassParams, DeprecatedInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
     IsEquivalentVisitor, KnownInstanceType, ManualPEP695TypeAliasType, MaterializationKind,
-    NormalizedVisitor, PropertyInstanceType, StringLiteralType, TypeAliasType, TypeMapping,
-    TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, TypedDictParams,
-    UnionBuilder, VarianceInferable, declaration_type, infer_definition_types,
+    NormalizedVisitor, PropertyInstanceType, StringLiteralType, TypeAliasType, TypeContext,
+    TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind,
+    TypedDictParams, UnionBuilder, VarianceInferable, declaration_type, infer_definition_types,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet, Program,
@@ -537,46 +537,45 @@ impl<'db> ClassType<'db> {
 
     /// Return `true` if `other` is present in this class's MRO.
     pub(super) fn is_subclass_of(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
-        self.when_subclass_of::<ConstraintSet>(db, other)
-            .is_always_satisfied(db)
+        self.when_subclass_of(db, other).is_always_satisfied()
     }
 
-    pub(super) fn when_subclass_of<C: Constraints<'db>>(
+    pub(super) fn when_subclass_of(
         self,
         db: &'db dyn Db,
         other: ClassType<'db>,
-    ) -> C {
+    ) -> ConstraintSet<'db> {
         self.has_relation_to_impl(
             db,
             other,
             TypeRelation::Subtyping,
-            &HasRelationToVisitor::new(C::always_satisfiable(db)),
+            &HasRelationToVisitor::default(),
         )
     }
 
-    pub(super) fn has_relation_to_impl<C: Constraints<'db>>(
+    pub(super) fn has_relation_to_impl(
         self,
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
-        visitor: &HasRelationToVisitor<'db, C>,
-    ) -> C {
+        visitor: &HasRelationToVisitor<'db>,
+    ) -> ConstraintSet<'db> {
         self.iter_mro(db).when_any(db, |base| {
             match base {
                 ClassBase::Dynamic(_) => match relation {
-                    TypeRelation::Subtyping => C::from_bool(db, other.is_object(db)),
-                    TypeRelation::Assignability => C::from_bool(db, !other.is_final(db)),
+                    TypeRelation::Subtyping => ConstraintSet::from(other.is_object(db)),
+                    TypeRelation::Assignability => ConstraintSet::from(!other.is_final(db)),
                 },
 
                 // Protocol and Generic are not represented by a ClassType.
-                ClassBase::Protocol | ClassBase::Generic => C::unsatisfiable(db),
+                ClassBase::Protocol | ClassBase::Generic => ConstraintSet::from(false),
 
                 ClassBase::Class(base) => match (base, other) {
                     (ClassType::NonGeneric(base), ClassType::NonGeneric(other)) => {
-                        C::from_bool(db, base == other)
+                        ConstraintSet::from(base == other)
                     }
                     (ClassType::Generic(base), ClassType::Generic(other)) => {
-                        C::from_bool(db, base.origin(db) == other.origin(db)).and(db, || {
+                        ConstraintSet::from(base.origin(db) == other.origin(db)).and(db, || {
                             base.specialization(db).has_relation_to_impl(
                                 db,
                                 other.specialization(db),
@@ -586,34 +585,38 @@ impl<'db> ClassType<'db> {
                         })
                     }
                     (ClassType::Generic(_), ClassType::NonGeneric(_))
-                    | (ClassType::NonGeneric(_), ClassType::Generic(_)) => C::unsatisfiable(db),
+                    | (ClassType::NonGeneric(_), ClassType::Generic(_)) => {
+                        ConstraintSet::from(false)
+                    }
                 },
 
                 ClassBase::TypedDict => {
                     // TODO: Implement subclassing and assignability for TypedDicts.
-                    C::always_satisfiable(db)
+                    ConstraintSet::from(true)
                 }
             }
         })
     }
 
-    pub(super) fn is_equivalent_to_impl<C: Constraints<'db>>(
+    pub(super) fn is_equivalent_to_impl(
         self,
         db: &'db dyn Db,
         other: ClassType<'db>,
-        visitor: &IsEquivalentVisitor<'db, C>,
-    ) -> C {
+        visitor: &IsEquivalentVisitor<'db>,
+    ) -> ConstraintSet<'db> {
         if self == other {
-            return C::always_satisfiable(db);
+            return ConstraintSet::from(true);
         }
 
         match (self, other) {
             // A non-generic class is never equivalent to a generic class.
             // Two non-generic classes are only equivalent if they are equal (handled above).
-            (ClassType::NonGeneric(_), _) | (_, ClassType::NonGeneric(_)) => C::unsatisfiable(db),
+            (ClassType::NonGeneric(_), _) | (_, ClassType::NonGeneric(_)) => {
+                ConstraintSet::from(false)
+            }
 
             (ClassType::Generic(this), ClassType::Generic(other)) => {
-                C::from_bool(db, this.origin(db) == other.origin(db)).and(db, || {
+                ConstraintSet::from(this.origin(db) == other.origin(db)).and(db, || {
                     this.specialization(db).is_equivalent_to_impl(
                         db,
                         other.specialization(db),
@@ -1326,7 +1329,7 @@ impl<'db> Field<'db> {
     pub(crate) fn is_kw_only_sentinel(&self, db: &'db dyn Db) -> bool {
         self.declared_ty
             .into_nominal_instance()
-            .is_some_and(|instance| instance.class(db).is_known(db, KnownClass::KwOnly))
+            .is_some_and(|instance| instance.has_known_class(db, KnownClass::KwOnly))
     }
 }
 
@@ -1714,13 +1717,13 @@ impl<'db> ClassLiteral<'db> {
             .contains(&ClassBase::Class(other))
     }
 
-    pub(super) fn when_subclass_of<C: Constraints<'db>>(
+    pub(super) fn when_subclass_of(
         self,
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
         other: ClassType<'db>,
-    ) -> C {
-        C::from_bool(db, self.is_subclass_of(db, specialization, other))
+    ) -> ConstraintSet<'db> {
+        ConstraintSet::from(self.is_subclass_of(db, specialization, other))
     }
 
     /// Return `true` if this class constitutes a typed dict specification (inherits from
@@ -2939,7 +2942,11 @@ impl<'db> ClassLiteral<'db> {
                         // `self.SOME_CONSTANT: Final = 1`, infer the type from the value
                         // on the right-hand side.
 
-                        let inferred_ty = infer_expression_type(db, index.expression(value));
+                        let inferred_ty = infer_expression_type(
+                            db,
+                            index.expression(value),
+                            TypeContext::default(),
+                        );
                         return Place::bound(inferred_ty).with_qualifiers(all_qualifiers);
                     }
 
@@ -3027,6 +3034,7 @@ impl<'db> ClassLiteral<'db> {
                                 let inferred_ty = infer_expression_type(
                                     db,
                                     index.expression(assign.value(&module)),
+                                    TypeContext::default(),
                                 );
 
                                 union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
@@ -3054,6 +3062,7 @@ impl<'db> ClassLiteral<'db> {
                                 let iterable_ty = infer_expression_type(
                                     db,
                                     index.expression(for_stmt.iterable(&module)),
+                                    TypeContext::default(),
                                 );
                                 // TODO: Potential diagnostics resulting from the iterable are currently not reported.
                                 let inferred_ty =
@@ -3084,6 +3093,7 @@ impl<'db> ClassLiteral<'db> {
                                 let context_ty = infer_expression_type(
                                     db,
                                     index.expression(with_item.context_expr(&module)),
+                                    TypeContext::default(),
                                 );
                                 let inferred_ty = if with_item.is_async() {
                                     context_ty.aenter(db)
@@ -3117,6 +3127,7 @@ impl<'db> ClassLiteral<'db> {
                                 let iterable_ty = infer_expression_type(
                                     db,
                                     index.expression(comprehension.iterable(&module)),
+                                    TypeContext::default(),
                                 );
                                 // TODO: Potential diagnostics resulting from the iterable are currently not reported.
                                 let inferred_ty =
@@ -4365,12 +4376,12 @@ impl KnownClass {
             .is_ok_and(|class| class.is_subclass_of(db, None, other))
     }
 
-    pub(super) fn when_subclass_of<'db, C: Constraints<'db>>(
+    pub(super) fn when_subclass_of<'db>(
         self,
         db: &'db dyn Db,
         other: ClassType<'db>,
-    ) -> C {
-        C::from_bool(db, self.is_subclass_of(db, other))
+    ) -> ConstraintSet<'db> {
+        ConstraintSet::from(self.is_subclass_of(db, other))
     }
 
     /// Return the module in which we should look up the definition for this class

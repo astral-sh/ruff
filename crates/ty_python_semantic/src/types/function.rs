@@ -65,7 +65,7 @@ use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{FileScopeId, SemanticIndex, semantic_index};
 use crate::types::call::{Binding, CallArguments};
-use crate::types::constraints::{ConstraintSet, Constraints};
+use crate::types::constraints::ConstraintSet;
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{
     INVALID_ARGUMENT_TYPE, REDUNDANT_CAST, STATIC_ASSERT_ERROR, TYPE_ASSERTION_FAILURE,
@@ -960,16 +960,16 @@ impl<'db> FunctionType<'db> {
         BoundMethodType::new(db, self, self_instance)
     }
 
-    pub(crate) fn has_relation_to_impl<C: Constraints<'db>>(
+    pub(crate) fn has_relation_to_impl(
         self,
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
-        _visitor: &HasRelationToVisitor<'db, C>,
-    ) -> C {
+        _visitor: &HasRelationToVisitor<'db>,
+    ) -> ConstraintSet<'db> {
         match relation {
-            TypeRelation::Subtyping => C::from_bool(db, self.is_subtype_of(db, other)),
-            TypeRelation::Assignability => C::from_bool(db, self.is_assignable_to(db, other)),
+            TypeRelation::Subtyping => ConstraintSet::from(self.is_subtype_of(db, other)),
+            TypeRelation::Assignability => ConstraintSet::from(self.is_assignable_to(db, other)),
         }
     }
 
@@ -998,17 +998,17 @@ impl<'db> FunctionType<'db> {
             && self.signature(db).is_assignable_to(db, other.signature(db))
     }
 
-    pub(crate) fn is_equivalent_to_impl<C: Constraints<'db>>(
+    pub(crate) fn is_equivalent_to_impl(
         self,
         db: &'db dyn Db,
         other: Self,
-        visitor: &IsEquivalentVisitor<'db, C>,
-    ) -> C {
+        visitor: &IsEquivalentVisitor<'db>,
+    ) -> ConstraintSet<'db> {
         if self.normalized(db) == other.normalized(db) {
-            return C::always_satisfiable(db);
+            return ConstraintSet::from(true);
         }
         if self.literal(db) != other.literal(db) {
-            return C::unsatisfiable(db);
+            return ConstraintSet::from(false);
         }
         let self_signature = self.signature(db);
         let other_signature = other.signature(db);
@@ -1157,10 +1157,10 @@ fn signature_cycle_recover<'db>(
 }
 
 fn signature_cycle_initial<'db>(
-    db: &'db dyn Db,
+    _db: &'db dyn Db,
     _function: FunctionType<'db>,
 ) -> CallableSignature<'db> {
-    CallableSignature::single(Signature::bottom(db))
+    CallableSignature::single(Signature::bottom())
 }
 
 fn last_definition_signature_cycle_recover<'db>(
@@ -1173,10 +1173,10 @@ fn last_definition_signature_cycle_recover<'db>(
 }
 
 fn last_definition_signature_cycle_initial<'db>(
-    db: &'db dyn Db,
+    _db: &'db dyn Db,
     _function: FunctionType<'db>,
 ) -> Signature<'db> {
-    Signature::bottom(db)
+    Signature::bottom()
 }
 
 /// Non-exhaustive enumeration of known functions (e.g. `builtins.reveal_type`, ...) that might

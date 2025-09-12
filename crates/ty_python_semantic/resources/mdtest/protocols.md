@@ -1766,9 +1766,7 @@ class DefinitelyNotSubtype:
 
 static_assert(is_subtype_of(NominalSubtype, P))
 static_assert(not is_subtype_of(DefinitelyNotSubtype, P))
-
-# TODO: should pass
-static_assert(not is_subtype_of(NotSubtype, P))  # error: [static-assert-error]
+static_assert(not is_subtype_of(NotSubtype, P))
 ```
 
 A callable instance attribute is not sufficient for a type to satisfy a protocol with a method
@@ -1813,9 +1811,28 @@ class Foo:
 static_assert(not is_assignable_to(Foo, Iterable[Any]))
 ```
 
-Because method members must always be available on the class, it is safe to access a method on
-`type[P]`, where `P` is a protocol class, just like it is generally safe to access a method on
-`type[C]` where `C` is a nominal class:
+Because method members are always looked up on the meta-type of an object when testing assignability
+and subtyping, we understand that `IterableClass` here is a subtype of `Iterable[int]` even though
+`IterableClass.__iter__` has the wrong signature:
+
+```py
+from typing import Iterator, Iterable
+from ty_extensions import static_assert, is_subtype_of, TypeOf
+
+class Meta(type):
+    def __iter__(self) -> Iterator[int]:
+        yield from range(42)
+
+class IterableClass(metaclass=Meta):
+    def __iter__(self) -> Iterator[str]:
+        yield from "abc"
+
+static_assert(is_subtype_of(TypeOf[IterableClass], Iterable[int]))
+```
+
+Enforcing that members must always be available on the class also means that it is safe to access a
+method on `type[P]`, where `P` is a protocol class, just like it is generally safe to access a
+method on `type[C]` where `C` is a nominal class:
 
 ```py
 from typing import Protocol
@@ -1905,27 +1922,22 @@ static_assert(is_assignable_to(NominalGeneric, LegacyClassScoped[int]))
 # and there exist fully static materializations of `NewStyleClassScoped[Unknown]`
 # where `Nominal` would not be a subtype of the given materialization,
 # hence there is no subtyping relation:
-#
-# TODO: these should pass
-static_assert(not is_subtype_of(NominalConcrete, NewStyleClassScoped))  # error: [static-assert-error]
-static_assert(not is_subtype_of(NominalConcrete, LegacyClassScoped))  # error: [static-assert-error]
+static_assert(not is_subtype_of(NominalConcrete, NewStyleClassScoped))
+static_assert(not is_subtype_of(NominalConcrete, LegacyClassScoped))
 
 # Similarly, `NominalGeneric` is implicitly `NominalGeneric[Unknown`]
-#
-# TODO: these should pass
-static_assert(not is_subtype_of(NominalGeneric, NewStyleClassScoped[int]))  # error: [static-assert-error]
-static_assert(not is_subtype_of(NominalGeneric, LegacyClassScoped[int]))  # error: [static-assert-error]
+static_assert(not is_subtype_of(NominalGeneric, NewStyleClassScoped[int]))
+static_assert(not is_subtype_of(NominalGeneric, LegacyClassScoped[int]))
 
 static_assert(is_subtype_of(NominalConcrete, NewStyleClassScoped[int]))
 static_assert(is_subtype_of(NominalConcrete, LegacyClassScoped[int]))
 static_assert(is_subtype_of(NominalGeneric[int], NewStyleClassScoped[int]))
 static_assert(is_subtype_of(NominalGeneric[int], LegacyClassScoped[int]))
 
-# TODO: these should pass
-static_assert(not is_assignable_to(NominalConcrete, NewStyleClassScoped[str]))  # error: [static-assert-error]
-static_assert(not is_assignable_to(NominalConcrete, LegacyClassScoped[str]))  # error: [static-assert-error]
-static_assert(not is_subtype_of(NominalGeneric[int], NewStyleClassScoped[str]))  # error: [static-assert-error]
-static_assert(not is_subtype_of(NominalGeneric[int], LegacyClassScoped[str]))  # error: [static-assert-error]
+static_assert(not is_assignable_to(NominalConcrete, NewStyleClassScoped[str]))
+static_assert(not is_assignable_to(NominalConcrete, LegacyClassScoped[str]))
+static_assert(not is_subtype_of(NominalGeneric[int], NewStyleClassScoped[str]))
+static_assert(not is_subtype_of(NominalGeneric[int], LegacyClassScoped[str]))
 ```
 
 And they can also have generic contexts scoped to the method:
@@ -2200,24 +2212,24 @@ class Foo(Protocol):
 static_assert(is_subtype_of(Callable[[int], str], Foo))
 static_assert(is_assignable_to(Callable[[int], str], Foo))
 
-# TODO: these should pass
-static_assert(not is_subtype_of(Callable[[str], str], Foo))  # error: [static-assert-error]
-static_assert(not is_assignable_to(Callable[[str], str], Foo))  # error: [static-assert-error]
-static_assert(not is_subtype_of(Callable[[CallMeMaybe, int], str], Foo))  # error: [static-assert-error]
-static_assert(not is_assignable_to(Callable[[CallMeMaybe, int], str], Foo))  # error: [static-assert-error]
+static_assert(not is_subtype_of(Callable[[str], str], Foo))
+static_assert(not is_assignable_to(Callable[[str], str], Foo))
+static_assert(not is_subtype_of(Callable[[CallMeMaybe, int], str], Foo))
+static_assert(not is_assignable_to(Callable[[CallMeMaybe, int], str], Foo))
 
 def h(obj: Callable[[int], str], obj2: Foo, obj3: Callable[[str], str]):
     obj2 = obj
 
-    # TODO: we should emit [invalid-assignment] here because the signature of `obj3` is not assignable
-    # to the declared type of `obj2`
+    # error: [invalid-assignment] "Object of type `(str, /) -> str` is not assignable to `Foo`"
     obj2 = obj3
 
 def satisfies_foo(x: int) -> str:
     return "foo"
 
-static_assert(is_subtype_of(TypeOf[satisfies_foo], Foo))
 static_assert(is_assignable_to(TypeOf[satisfies_foo], Foo))
+
+# TODO: this should pass
+static_assert(is_subtype_of(TypeOf[satisfies_foo], Foo))  # error: [static-assert-error]
 ```
 
 ## Nominal subtyping of protocols

@@ -1447,6 +1447,11 @@ pub enum DiagnosticFormat {
     /// [Code Quality]: https://docs.gitlab.com/ci/testing/code_quality/#code-quality-report-format
     #[cfg(feature = "serde")]
     Gitlab,
+
+    /// Print diagnostics in the format used by [GitHub Actions] workflow error annotations.
+    ///
+    /// [GitHub Actions]: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#setting-an-error-message
+    Github,
 }
 
 /// A representation of the kinds of messages inside a diagnostic.

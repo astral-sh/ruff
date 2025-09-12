@@ -551,6 +551,8 @@ mod tests {
 
     use super::{CompletionSettings, token_suffix_by_kinds};
 
+    use ty_python_semantic::CompletionKind;
+
     #[test]
     fn token_suffixes_match() {
         insta::assert_debug_snapshot!(
@@ -3091,6 +3093,27 @@ from os.<CURSOR>
             test.completions_without_builtins(),
             @"<No completions found after filtering out completions>",
         );
+    }
+
+    #[test]
+    fn completion_kind_recursive_type_alias() {
+        let test = cursor_test(
+            r#"
+            type T = T | None
+            def f(rec: T):
+                re<CURSOR>
+            "#,
+        );
+
+        let completions = completion(
+            &test.db,
+            &CompletionSettings::default(),
+            test.cursor.file,
+            test.cursor.offset,
+        );
+        let completion = completions.iter().find(|c| c.name == "rec").unwrap();
+
+        assert_eq!(completion.kind(&test.db), Some(CompletionKind::Struct));
     }
 
     // NOTE: The methods below are getting somewhat ridiculous.

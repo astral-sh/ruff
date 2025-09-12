@@ -12,7 +12,7 @@ use crate::types::function::KnownFunction;
 use crate::types::infer::infer_same_file_expression_type;
 use crate::types::{
     ClassLiteral, ClassType, IntersectionBuilder, KnownClass, SubclassOfInner, SubclassOfType,
-    Truthiness, Type, TypeVarBoundOrConstraints, UnionBuilder, infer_expression_types,
+    Truthiness, Type, TypeContext, TypeVarBoundOrConstraints, UnionBuilder, infer_expression_types,
 };
 
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
@@ -292,13 +292,13 @@ fn merge_constraints_or<'db>(
                 *entry.get_mut() = UnionBuilder::new(db).add(*entry.get()).add(*value).build();
             }
             Entry::Vacant(entry) => {
-                entry.insert(Type::object(db));
+                entry.insert(Type::object());
             }
         }
     }
     for (key, value) in into.iter_mut() {
         if !from.contains_key(key) {
-            *value = Type::object(db);
+            *value = Type::object();
         }
     }
 }
@@ -554,7 +554,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     }
                     // Treat `bool` as `Literal[True, False]`.
                     Type::NominalInstance(instance)
-                        if instance.class(db).is_known(db, KnownClass::Bool) =>
+                        if instance.has_known_class(db, KnownClass::Bool) =>
                     {
                         UnionType::from_elements(
                             db,
@@ -565,11 +565,11 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     }
                     // Treat enums as a union of their members.
                     Type::NominalInstance(instance)
-                        if enum_metadata(db, instance.class(db).class_literal(db).0).is_some() =>
+                        if enum_metadata(db, instance.class_literal(db)).is_some() =>
                     {
                         UnionType::from_elements(
                             db,
-                            enum_member_literals(db, instance.class(db).class_literal(db).0, None)
+                            enum_member_literals(db, instance.class_literal(db), None)
                                 .expect("Calling `enum_member_literals` on an enum class")
                                 .map(|ty| filter_to_cannot_be_equal(db, ty, rhs_ty)),
                         )
@@ -596,7 +596,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     fn evaluate_expr_ne(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
         match (lhs_ty, rhs_ty) {
             (Type::NominalInstance(instance), Type::IntLiteral(i))
-                if instance.class(self.db).is_known(self.db, KnownClass::Bool) =>
+                if instance.has_known_class(self.db, KnownClass::Bool) =>
             {
                 if i == 0 {
                     Some(Type::BooleanLiteral(false).negate(self.db))
@@ -773,7 +773,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             return None;
         }
 
-        let inference = infer_expression_types(self.db, expression);
+        let inference = infer_expression_types(self.db, expression, TypeContext::default());
 
         let comparator_tuples = std::iter::once(&**left)
             .chain(comparators)
@@ -863,7 +863,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         expression: Expression<'db>,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
-        let inference = infer_expression_types(self.db, expression);
+        let inference = infer_expression_types(self.db, expression, TypeContext::default());
 
         let callable_ty = inference.expression_type(&*expr_call.func);
 
@@ -912,10 +912,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
                     // Since `hasattr` only checks if an attribute is readable,
                     // the type of the protocol member should be a read-only property that returns `object`.
-                    let constraint = Type::protocol_with_readonly_members(
-                        self.db,
-                        [(attr, Type::object(self.db))],
-                    );
+                    let constraint =
+                        Type::protocol_with_readonly_members(self.db, [(attr, Type::object())]);
 
                     return Some(NarrowingConstraints::from_iter([(
                         place,
@@ -985,7 +983,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         let subject = place_expr(subject.node_ref(self.db, self.module))?;
         let place = self.expect_place(&subject);
 
-        let ty = infer_same_file_expression_type(self.db, cls, self.module).to_instance(self.db)?;
+        let ty = infer_same_file_expression_type(self.db, cls, TypeContext::default(), self.module)
+            .to_instance(self.db)?;
 
         Some(NarrowingConstraints::from_iter([(place, ty)]))
     }
@@ -998,7 +997,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         let subject = place_expr(subject.node_ref(self.db, self.module))?;
         let place = self.expect_place(&subject);
 
-        let ty = infer_same_file_expression_type(self.db, value, self.module);
+        let ty =
+            infer_same_file_expression_type(self.db, value, TypeContext::default(), self.module);
         Some(NarrowingConstraints::from_iter([(place, ty)]))
     }
 
@@ -1027,7 +1027,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         expression: Expression<'db>,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
-        let inference = infer_expression_types(self.db, expression);
+        let inference = infer_expression_types(self.db, expression, TypeContext::default());
         let mut sub_constraints = expr_bool_op
             .values
             .iter()
