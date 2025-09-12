@@ -145,7 +145,7 @@ impl std::fmt::Display for DisplayDiagnostics<'_> {
                 gitlab::GitlabRenderer::new(self.resolver).render(f, self.diagnostics)?;
             }
             DiagnosticFormat::Github => {
-                GithubRenderer::new(self.resolver).render(f, self.diagnostics)?;
+                GithubRenderer::new(self.resolver, self.config).render(f, self.diagnostics)?;
             }
         }
 

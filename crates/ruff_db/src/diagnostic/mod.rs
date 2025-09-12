@@ -1312,6 +1312,10 @@ pub struct DisplayDiagnosticConfig {
     show_fix_diff: bool,
     /// The lowest applicability that should be shown when reporting diagnostics.
     fix_applicability: Applicability,
+    /// The program for which diagnostics are being rendered (Ruff or ty).
+    ///
+    /// This is currently only used by the GitHub output format and defaults to `Program::Ty`.
+    program: Program,
 }
 
 impl DisplayDiagnosticConfig {
@@ -1377,6 +1381,13 @@ impl DisplayDiagnosticConfig {
             ..self
         }
     }
+
+    /// Set the [`Program`] for which diagnostics are being displayed.
+    ///
+    /// This is currently only used by [`DiagnosticFormat::Github`].
+    pub fn program(self, program: Program) -> DisplayDiagnosticConfig {
+        DisplayDiagnosticConfig { program, ..self }
+    }
 }
 
 impl Default for DisplayDiagnosticConfig {
@@ -1390,6 +1401,7 @@ impl Default for DisplayDiagnosticConfig {
             show_fix_status: false,
             show_fix_diff: false,
             fix_applicability: Applicability::Safe,
+            program: Program::Ty,
         }
     }
 }
@@ -1452,6 +1464,21 @@ pub enum DiagnosticFormat {
     ///
     /// [GitHub Actions]: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#setting-an-error-message
     Github,
+}
+
+#[derive(Clone, Debug)]
+pub enum Program {
+    Ruff,
+    Ty,
+}
+
+impl std::fmt::Display for Program {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Program::Ruff => f.write_str("Ruff"),
+            Program::Ty => f.write_str("ty"),
+        }
+    }
 }
 
 /// A representation of the kinds of messages inside a diagnostic.

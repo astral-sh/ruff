@@ -324,6 +324,9 @@ pub enum OutputFormat {
     /// Print diagnostics in the JSON format expected by GitLab Code Quality reports.
     #[value(name = "gitlab")]
     Gitlab,
+    #[value(name = "github")]
+    /// Print diagnostics in the format used by GitHub Actions workflow error annotations.
+    Github,
 }
 
 impl From<OutputFormat> for ty_project::metadata::options::OutputFormat {
@@ -332,6 +335,7 @@ impl From<OutputFormat> for ty_project::metadata::options::OutputFormat {
             OutputFormat::Full => Self::Full,
             OutputFormat::Concise => Self::Concise,
             OutputFormat::Gitlab => Self::Gitlab,
+            OutputFormat::Github => Self::Github,
         }
     }
 }

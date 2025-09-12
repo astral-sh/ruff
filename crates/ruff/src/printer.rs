@@ -10,7 +10,8 @@ use ruff_linter::linter::FixTable;
 use serde::Serialize;
 
 use ruff_db::diagnostic::{
-    Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, DisplayDiagnostics, SecondaryCode,
+    Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, DisplayDiagnostics, Program,
+    SecondaryCode,
 };
 use ruff_linter::fs::relativize_path;
 use ruff_linter::logging::LogLevel;
@@ -224,32 +225,28 @@ impl Printer {
         let context = EmitterContext::new(&diagnostics.notebook_indexes);
         let fixables = FixableStatistics::try_from(diagnostics, self.unsafe_fixes);
 
+        let config = DisplayDiagnosticConfig::default()
+            .preview(preview)
+            .program(Program::Ruff);
+
         match self.format {
             OutputFormat::Json => {
-                let config = DisplayDiagnosticConfig::default()
-                    .format(DiagnosticFormat::Json)
-                    .preview(preview);
+                let config = config.format(DiagnosticFormat::Json);
                 let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
                 write!(writer, "{value}")?;
             }
             OutputFormat::Rdjson => {
-                let config = DisplayDiagnosticConfig::default()
-                    .format(DiagnosticFormat::Rdjson)
-                    .preview(preview);
+                let config = config.format(DiagnosticFormat::Rdjson);
                 let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
                 write!(writer, "{value}")?;
             }
             OutputFormat::JsonLines => {
-                let config = DisplayDiagnosticConfig::default()
-                    .format(DiagnosticFormat::JsonLines)
-                    .preview(preview);
+                let config = config.format(DiagnosticFormat::JsonLines);
                 let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
                 write!(writer, "{value}")?;
             }
             OutputFormat::Junit => {
-                let config = DisplayDiagnosticConfig::default()
-                    .format(DiagnosticFormat::Junit)
-                    .preview(preview);
+                let config = config.format(DiagnosticFormat::Junit);
                 let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
                 write!(writer, "{value}")?;
             }
@@ -288,30 +285,22 @@ impl Printer {
                 self.write_summary_text(writer, diagnostics)?;
             }
             OutputFormat::Github => {
-                let config = DisplayDiagnosticConfig::default()
-                    .format(DiagnosticFormat::Github)
-                    .preview(preview);
+                let config = config.format(DiagnosticFormat::Github);
                 let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
                 write!(writer, "{value}")?;
             }
             OutputFormat::Gitlab => {
-                let config = DisplayDiagnosticConfig::default()
-                    .format(DiagnosticFormat::Gitlab)
-                    .preview(preview);
+                let config = config.format(DiagnosticFormat::Gitlab);
                 let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
                 write!(writer, "{value}")?;
             }
             OutputFormat::Pylint => {
-                let config = DisplayDiagnosticConfig::default()
-                    .format(DiagnosticFormat::Pylint)
-                    .preview(preview);
+                let config = config.format(DiagnosticFormat::Pylint);
                 let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
                 write!(writer, "{value}")?;
             }
             OutputFormat::Azure => {
-                let config = DisplayDiagnosticConfig::default()
-                    .format(DiagnosticFormat::Azure)
-                    .preview(preview);
+                let config = config.format(DiagnosticFormat::Azure);
                 let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
                 write!(writer, "{value}")?;
             }

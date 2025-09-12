@@ -1077,6 +1077,10 @@ pub enum OutputFormat {
     ///
     /// [Code Quality]: https://docs.gitlab.com/ci/testing/code_quality/#code-quality-report-format
     Gitlab,
+    /// Print diagnostics in the format used by [GitHub Actions] workflow error annotations.
+    ///
+    /// [GitHub Actions]: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#setting-an-error-message
+    Github,
 }
 
 impl OutputFormat {
@@ -1096,6 +1100,7 @@ impl From<OutputFormat> for DiagnosticFormat {
             OutputFormat::Full => Self::Full,
             OutputFormat::Concise => Self::Concise,
             OutputFormat::Gitlab => Self::Gitlab,
+            OutputFormat::Github => Self::Github,
         }
     }
 }
