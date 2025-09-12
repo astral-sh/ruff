@@ -27,8 +27,8 @@ use crate::types::generics::{GenericContext, typing_self, walk_generic_context};
 use crate::types::infer::nearest_enclosing_class;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassLiteral, FindLegacyTypeVarsVisitor,
-    HasRelationToVisitor, IsEquivalentVisitor, KnownClass, MaterializationKind, NormalizedVisitor,
-    TypeMapping, TypeRelation, VarianceInferable, todo_type,
+    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownClass, MaterializationKind,
+    NormalizedVisitor, TypeMapping, TypeRelation, VarianceInferable, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -185,6 +185,7 @@ impl<'db> CallableSignature<'db> {
             other,
             TypeRelation::Subtyping,
             &HasRelationToVisitor::default(),
+            &IsDisjointVisitor::default(),
         )
     }
 
@@ -197,6 +198,7 @@ impl<'db> CallableSignature<'db> {
             other,
             TypeRelation::Assignability,
             &HasRelationToVisitor::default(),
+            &IsDisjointVisitor::default(),
         )
         .is_always_satisfied()
     }
@@ -206,9 +208,17 @@ impl<'db> CallableSignature<'db> {
         db: &'db dyn Db,
         other: &Self,
         relation: TypeRelation,
-        visitor: &HasRelationToVisitor<'db>,
+        relation_visitor: &HasRelationToVisitor<'db>,
+        disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
-        Self::has_relation_to_inner(db, &self.overloads, &other.overloads, relation, visitor)
+        Self::has_relation_to_inner(
+            db,
+            &self.overloads,
+            &other.overloads,
+            relation,
+            relation_visitor,
+            disjointness_visitor,
+        )
     }
 
     /// Implementation of subtyping and assignability between two, possible overloaded, callable
@@ -218,12 +228,19 @@ impl<'db> CallableSignature<'db> {
         self_signatures: &[Signature<'db>],
         other_signatures: &[Signature<'db>],
         relation: TypeRelation,
-        visitor: &HasRelationToVisitor<'db>,
+        relation_visitor: &HasRelationToVisitor<'db>,
+        disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
         match (self_signatures, other_signatures) {
             ([self_signature], [other_signature]) => {
                 // Base case: both callable types contain a single signature.
-                self_signature.has_relation_to_impl(db, other_signature, relation, visitor)
+                self_signature.has_relation_to_impl(
+                    db,
+                    other_signature,
+                    relation,
+                    relation_visitor,
+                    disjointness_visitor,
+                )
             }
 
             // `self` is possibly overloaded while `other` is definitely not overloaded.
@@ -233,7 +250,8 @@ impl<'db> CallableSignature<'db> {
                     std::slice::from_ref(self_signature),
                     other_signatures,
                     relation,
-                    visitor,
+                    relation_visitor,
+                    disjointness_visitor,
                 )
             }),
 
@@ -244,7 +262,8 @@ impl<'db> CallableSignature<'db> {
                     self_signatures,
                     std::slice::from_ref(other_signature),
                     relation,
-                    visitor,
+                    relation_visitor,
+                    disjointness_visitor,
                 )
             }),
 
@@ -255,7 +274,8 @@ impl<'db> CallableSignature<'db> {
                     self_signatures,
                     std::slice::from_ref(other_signature),
                     relation,
-                    visitor,
+                    relation_visitor,
+                    disjointness_visitor,
                 )
             }),
         }
@@ -666,7 +686,8 @@ impl<'db> Signature<'db> {
         db: &'db dyn Db,
         other: &Signature<'db>,
         relation: TypeRelation,
-        visitor: &HasRelationToVisitor<'db>,
+        relation_visitor: &HasRelationToVisitor<'db>,
+        disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
         /// A helper struct to zip two slices of parameters together that provides control over the
         /// two iterators individually. It also keeps track of the current parameter in each
@@ -734,7 +755,16 @@ impl<'db> Signature<'db> {
             let type1 = type1.unwrap_or(Type::unknown());
             let type2 = type2.unwrap_or(Type::unknown());
             !result
-                .intersect(db, type1.has_relation_to_impl(db, type2, relation, visitor))
+                .intersect(
+                    db,
+                    type1.has_relation_to_impl(
+                        db,
+                        type2,
+                        relation,
+                        relation_visitor,
+                        disjointness_visitor,
+                    ),
+                )
                 .is_never_satisfied()
         };
 

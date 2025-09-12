@@ -27,11 +27,11 @@ use crate::types::typed_dict::typed_dict_params_from_class_def;
 use crate::types::{
     ApplyTypeMappingVisitor, Binding, BoundSuperError, BoundSuperType, CallableType,
     DataclassParams, DeprecatedInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
-    IsEquivalentVisitor, KnownInstanceType, ManualPEP695TypeAliasType, MaterializationKind,
-    NormalizedVisitor, PropertyInstanceType, StringLiteralType, TypeAliasType, TypeContext,
-    TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind,
-    TypedDictParams, UnionBuilder, VarianceInferable, declaration_type, determine_upper_bound,
-    infer_definition_types,
+    IsDisjointVisitor, IsEquivalentVisitor, KnownInstanceType, ManualPEP695TypeAliasType,
+    MaterializationKind, NormalizedVisitor, PropertyInstanceType, StringLiteralType, TypeAliasType,
+    TypeContext, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance,
+    TypeVarKind, TypedDictParams, UnionBuilder, VarianceInferable, declaration_type,
+    determine_upper_bound, infer_definition_types,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet, Program,
@@ -537,6 +537,7 @@ impl<'db> ClassType<'db> {
             other,
             TypeRelation::Subtyping,
             &HasRelationToVisitor::default(),
+            &IsDisjointVisitor::default(),
         )
     }
 
@@ -545,7 +546,8 @@ impl<'db> ClassType<'db> {
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
-        visitor: &HasRelationToVisitor<'db>,
+        relation_visitor: &HasRelationToVisitor<'db>,
+        disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
         self.iter_mro(db).when_any(db, |base| {
             match base {
@@ -569,7 +571,8 @@ impl<'db> ClassType<'db> {
                                 db,
                                 other.specialization(db),
                                 relation,
-                                visitor,
+                                relation_visitor,
+                                disjointness_visitor,
                             )
                         })
                     }
