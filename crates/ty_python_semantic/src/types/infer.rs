@@ -210,22 +210,13 @@ fn infer_expression_types_impl<'db>(
     .finish_expression()
 }
 
-/// How many fixpoint iterations to allow before falling back to Divergent type.
-const ITERATIONS_BEFORE_FALLBACK: u32 = 10;
-
 fn expression_cycle_recover<'db>(
-    db: &'db dyn Db,
+    _db: &'db dyn Db,
     _value: &ExpressionInference<'db>,
-    count: u32,
-    input: InferExpression<'db>,
+    _count: u32,
+    _input: InferExpression<'db>,
 ) -> salsa::CycleRecoveryAction<ExpressionInference<'db>> {
-    if count == ITERATIONS_BEFORE_FALLBACK {
-        salsa::CycleRecoveryAction::Fallback(ExpressionInference::cycle_fallback(
-            input.expression(db).scope(db),
-        ))
-    } else {
-        salsa::CycleRecoveryAction::Iterate
-    }
+    salsa::CycleRecoveryAction::Iterate
 }
 
 fn expression_cycle_initial<'db>(
@@ -480,35 +471,6 @@ impl<'db> InferenceRegion<'db> {
     }
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, get_size2::GetSize, salsa::Update)]
-enum CycleRecovery<'db> {
-    /// An initial-value for fixpoint iteration; all types are `Type::Never`.
-    Initial,
-    /// A divergence-fallback value for fixpoint iteration; all types are `Divergent`.
-    Divergent(ScopeId<'db>),
-}
-
-impl<'db> CycleRecovery<'db> {
-    fn merge(self, other: Option<CycleRecovery<'db>>) -> Self {
-        if let Some(other) = other {
-            match (self, other) {
-                // It's important here that we keep the scope of `self` if merging two `Divergent`.
-                (Self::Divergent(scope), _) | (_, Self::Divergent(scope)) => Self::Divergent(scope),
-                _ => Self::Initial,
-            }
-        } else {
-            self
-        }
-    }
-
-    fn fallback_type(self) -> Type<'db> {
-        match self {
-            Self::Initial => Type::Never,
-            Self::Divergent(scope) => Type::divergent(scope),
-        }
-    }
-}
-
 /// The inferred types for a scope region.
 #[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct ScopeInference<'db> {
@@ -516,15 +478,15 @@ pub(crate) struct ScopeInference<'db> {
     expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
 
     /// The extra data that is only present for few inference regions.
-    extra: Option<Box<ScopeInferenceExtra<'db>>>,
+    extra: Option<Box<ScopeInferenceExtra>>,
 
     scope: ScopeId<'db>,
 }
 
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::Update, Default)]
-struct ScopeInferenceExtra<'db> {
-    /// Is this a cycle-recovery inference result, and if so, what kind?
-    cycle_recovery: Option<CycleRecovery<'db>>,
+struct ScopeInferenceExtra {
+    /// Whether to use the fallback type for missing expressions/bindings/declarations or recursive type inference.
+    cycle_fallback: bool,
 
     /// The diagnostics for this region.
     diagnostics: TypeCheckDiagnostics,
@@ -539,7 +501,7 @@ impl<'db> ScopeInference<'db> {
     fn cycle_initial(scope: ScopeId<'db>) -> Self {
         Self {
             extra: Some(Box::new(ScopeInferenceExtra {
-                cycle_recovery: Some(CycleRecovery::Initial),
+                cycle_fallback: true,
                 ..ScopeInferenceExtra::default()
             })),
             expressions: FxHashMap::default(),
@@ -566,15 +528,10 @@ impl<'db> ScopeInference<'db> {
             .or_else(|| self.fallback_type())
     }
 
-    fn is_cycle_callback(&self) -> bool {
+    fn fallback_type(&self) -> Option<Type<'db>> {
         self.extra
             .as_ref()
-            .and_then(|extra| extra.cycle_recovery)
-            .is_some()
-    }
-
-    fn fallback_type(&self) -> Option<Type<'db>> {
-        self.is_cycle_callback()
+            .is_some_and(|extra| extra.cycle_fallback)
             .then_some(Type::Dynamic(DynamicType::Divergent(DivergentType {
                 scope: self.scope,
             })))
@@ -681,8 +638,8 @@ pub(crate) struct DefinitionInference<'db> {
 
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::Update, Default)]
 struct DefinitionInferenceExtra<'db> {
-    /// Is this a cycle-recovery inference result, and if so, what kind?
-    cycle_recovery: Option<CycleRecovery<'db>>,
+    /// Whether to use the fallback type for missing expressions/bindings/declarations or recursive type inference.
+    cycle_fallback: bool,
 
     /// The definitions that are deferred.
     deferred: Box<[Definition<'db>]>,
@@ -705,7 +662,7 @@ impl<'db> DefinitionInference<'db> {
             #[cfg(debug_assertions)]
             scope,
             extra: Some(Box::new(DefinitionInferenceExtra {
-                cycle_recovery: Some(CycleRecovery::Initial),
+                cycle_fallback: true,
                 ..DefinitionInferenceExtra::default()
             })),
         }
@@ -777,7 +734,10 @@ impl<'db> DefinitionInference<'db> {
     fn fallback_type(&self) -> Option<Type<'db>> {
         self.extra
             .as_ref()
-            .and_then(|extra| extra.cycle_recovery.map(CycleRecovery::fallback_type))
+            .is_some_and(|extra| extra.cycle_fallback)
+            .then_some(Type::Dynamic(DynamicType::Divergent(DivergentType {
+                scope: self.scope,
+            })))
     }
 
     pub(crate) fn undecorated_type(&self) -> Option<Type<'db>> {
@@ -809,8 +769,8 @@ struct ExpressionInferenceExtra<'db> {
     /// The diagnostics for this region.
     diagnostics: TypeCheckDiagnostics,
 
-    /// Is this a cycle recovery inference result, and if so, what kind?
-    cycle_recovery: Option<CycleRecovery<'db>>,
+    /// Whether to use the fallback type for missing expressions/bindings/declarations or recursive type inference.
+    cycle_fallback: bool,
 
     /// `true` if all places in this expression are definitely bound
     all_definitely_bound: bool,
@@ -821,22 +781,7 @@ impl<'db> ExpressionInference<'db> {
         let _ = scope;
         Self {
             extra: Some(Box::new(ExpressionInferenceExtra {
-                cycle_recovery: Some(CycleRecovery::Initial),
-                all_definitely_bound: true,
-                ..ExpressionInferenceExtra::default()
-            })),
-            expressions: FxHashMap::default(),
-
-            #[cfg(debug_assertions)]
-            scope,
-        }
-    }
-
-    fn cycle_fallback(scope: ScopeId<'db>) -> Self {
-        let _ = scope;
-        Self {
-            extra: Some(Box::new(ExpressionInferenceExtra {
-                cycle_recovery: Some(CycleRecovery::Divergent(scope)),
+                cycle_fallback: true,
                 all_definitely_bound: true,
                 ..ExpressionInferenceExtra::default()
             })),
@@ -865,7 +810,10 @@ impl<'db> ExpressionInference<'db> {
     fn fallback_type(&self) -> Option<Type<'db>> {
         self.extra
             .as_ref()
-            .and_then(|extra| extra.cycle_recovery.map(CycleRecovery::fallback_type))
+            .is_some_and(|extra| extra.cycle_fallback)
+            .then_some(Type::Dynamic(DynamicType::Divergent(DivergentType {
+                scope: self.scope,
+            })))
     }
 
     /// Returns true if all places in this expression are definitely bound.
