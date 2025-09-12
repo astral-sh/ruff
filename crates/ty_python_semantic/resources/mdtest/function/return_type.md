@@ -317,6 +317,11 @@ reveal_type(coroutine())  # revealed: Unknown
 The return type of a recursive function is also inferred. When the return type inference would
 diverge, it is truncated and replaced with the special dynamic type `Divergent`.
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ```py
 def fibonacci(n: int):
     if n == 0:
@@ -357,13 +362,26 @@ def divergent(value):
     else:
         return None
 
-# tuple[tuple[tuple[...] | None] | None] | None => tuple[Unknown] | None
-reveal_type(divergent((1,)))  # revealed: None | Divergent
+# tuple[tuple[tuple[...] | None] | None] | None => tuple[Divergent] | None
+reveal_type(divergent((1,)))  # revealed: tuple[Divergent] | None
 
 def call_divergent(x: int):
     return (divergent((1, 2, 3)), x)
 
-reveal_type(call_divergent(1))  # revealed: tuple[None | Divergent, int]
+reveal_type(call_divergent(1))  # revealed: tuple[tuple[Divergent] | None, int]
+
+def list1[T](x: T) -> list[T]:
+    return [x]
+
+def divergent2(value):
+    if type(value) is tuple:
+        return (divergent2(value[0]),)
+    elif type(value) is list:
+        return list1(divergent2(value[0]))
+    else:
+        return None
+
+reveal_type(divergent2((1,)))  # revealed: tuple[Divergent] | list[Divergent] | None
 
 def tuple_obj(cond: bool):
     if cond:
@@ -381,7 +399,7 @@ def get_non_empty(node):
             return node
     return None
 
-reveal_type(get_non_empty(None))  # revealed: None | Divergent
+reveal_type(get_non_empty(None))  # revealed: (Divergent & ~None) | None
 
 def nested_scope():
     def inner():

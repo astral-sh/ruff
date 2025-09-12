@@ -51,7 +51,8 @@ use crate::semantic_index::{SemanticIndex, semantic_index, use_def_map};
 use crate::types::diagnostic::TypeCheckDiagnostics;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    ClassLiteral, DivergentType, DynamicType, Truthiness, Type, TypeAndQualifiers, UnionBuilder,
+    ClassLiteral, DivergentType, DynamicType, NormalizedVisitor, Truthiness, Type,
+    TypeAndQualifiers, UnionBuilder,
 };
 use crate::unpack::Unpack;
 use builder::TypeInferenceBuilder;
@@ -468,6 +469,7 @@ impl<'db> ScopeInference<'db> {
         if let Some(fallback_type) = self.fallback_type() {
             union = union.add(fallback_type);
         }
+        let visitor = NormalizedVisitor::default().recursive(div);
         // Here, we use the dynamic type `Divergent` to detect divergent type inference and ensure that we obtain finite results.
         // For example, consider the following recursive function:
         // ```py
@@ -479,33 +481,16 @@ impl<'db> ScopeInference<'db> {
         // ```
         // If we try to infer the return type of this function naively, we will get `tuple[tuple[tuple[...] | None] | None] | None`, which never converges.
         // So, when we detect a cycle, we set the cycle initial type to `Divergent`. Then the type obtained in the first cycle is `tuple[Divergent] | None`.
-        // Next, if there is a type containing `Divergent`, we replace it with the `Divergent` type itself.
-        // All types containing `Divergent` are flattened in the next cycle, resulting in a convergence of the return type in finite cycles.
+        // Let's call such a type containing `Divergent` a "recursive type".
+        // Next, if there is a type containing a recursive type (let's call this a nested recursive type), we replace the inner recursive type with the `Divergent` type.
+        // All recursive types are flattened in the next cycle, resulting in a convergence of the return type in finite cycles.
         // 0th: Divergent
-        // 1st: tuple[Divergent] | None => Divergent | None
-        // 2nd: tuple[Divergent | None] | None => Divergent | None
-        let mut union_add = |ty: Type<'db>| {
-            if ty == div {
-                // `Divergent` appearing in a union does not mean true divergence, so it can be removed.
-            } else if ty.has_divergent_type(db, div) {
-                if let Type::Union(union_ty) = ty {
-                    let union_ty = union_ty.filter(db, |ty| **ty != div);
-                    if union_ty.has_divergent_type(db, div) {
-                        union = std::mem::replace(&mut union, UnionBuilder::new(db)).add(div);
-                    } else {
-                        union = std::mem::replace(&mut union, UnionBuilder::new(db)).add(union_ty);
-                    }
-                } else {
-                    union = std::mem::replace(&mut union, UnionBuilder::new(db)).add(div);
-                }
-            } else {
-                union = std::mem::replace(&mut union, UnionBuilder::new(db)).add(ty);
-            }
-        };
+        // 1st: tuple[Divergent] | None
+        // 2nd: tuple[tuple[Divergent] | None] | None => tuple[Divergent] | None
         let previous_type = callee_ty.infer_return_type(db).unwrap();
         // In fixed-point iteration of return type inference, the return type must be monotonically widened and not "oscillate".
         // Here, monotonicity is guaranteed by pre-unioning the type of the previous iteration into the current result.
-        union_add(previous_type);
+        union = union.add(previous_type.normalized_impl(db, &visitor));
 
         let Some(extra) = &self.extra else {
             unreachable!(
@@ -516,18 +501,23 @@ impl<'db> ScopeInference<'db> {
             let ty = returnee.map_or(Type::none(db), |expression| {
                 self.expression_type(expression)
             });
-            union_add(ty);
+            union = union.add(ty.normalized_impl(db, &visitor));
         }
         let use_def = use_def_map(db, self.scope);
         if use_def.can_implicitly_return_none(db) {
-            union_add(Type::none(db));
+            union = union.add(Type::none(db));
         }
         if let Type::BoundMethod(method_ty) = callee_ty {
             // If the method is not final and the typing is implicit, the inferred return type should be unioned with `Unknown`.
             // If any method in a base class does not have an annotated return type, `base_return_type` will include `Unknown`.
             // On the other hand, if the return types of all methods in the base classes are annotated, there is no need to include `Unknown`.
             if !method_ty.is_final(db) {
-                union_add(method_ty.base_return_type(db).unwrap_or(Type::unknown()));
+                union = union.add(
+                    method_ty
+                        .base_return_type(db)
+                        .unwrap_or(Type::unknown())
+                        .normalized_impl(db, &visitor),
+                );
             }
         }
 

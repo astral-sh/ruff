@@ -222,9 +222,55 @@ pub(crate) type TryBoolVisitor<'db> =
     CycleDetector<TryBool, Type<'db>, Result<Truthiness, BoolError<'db>>>;
 pub(crate) struct TryBool;
 
+#[derive(Default)]
+pub(crate) enum NormalizationKind<'db> {
+    #[default]
+    Normal,
+    Recursive(Type<'db>),
+}
+
+impl NormalizationKind<'_> {
+    pub(crate) fn is_recursive(&self) -> bool {
+        matches!(self, Self::Recursive(_))
+    }
+}
+
 /// A [`TypeTransformer`] that is used in `normalized` methods.
-pub(crate) type NormalizedVisitor<'db> = TypeTransformer<'db, Normalized>;
+#[derive(Default)]
+pub(crate) struct NormalizedVisitor<'db> {
+    transformer: TypeTransformer<'db, Normalized>,
+    /// If this is [`NormalizationKind::Recursive`], calling [`Type::normalized_impl`] will normalize the recursive type.
+    /// A recursive type here means a type that contains a `Divergent` type.
+    /// Normalizing recursive types allows recursive type inference for divergent functions to converge.
+    kind: NormalizationKind<'db>,
+}
 pub(crate) struct Normalized;
+
+impl<'db> NormalizedVisitor<'db> {
+    fn recursive(self, div: Type<'db>) -> Self {
+        debug_assert!(matches!(div, Type::Dynamic(DynamicType::Divergent(_))));
+        Self {
+            transformer: self.transformer,
+            kind: NormalizationKind::Recursive(div),
+        }
+    }
+
+    fn visit(&self, item: Type<'db>, func: impl FnOnce() -> Type<'db>) -> Type<'db> {
+        self.transformer.visit(item, func)
+    }
+
+    fn visit_no_shift(&self, item: Type<'db>, func: impl FnOnce() -> Type<'db>) -> Type<'db> {
+        self.transformer.visit_no_shift(item, func)
+    }
+
+    fn level(&self) -> usize {
+        self.transformer.level()
+    }
+
+    fn is_recursive(&self) -> bool {
+        self.kind.is_recursive()
+    }
+}
 
 /// How a generic type has been specialized.
 ///
@@ -1166,8 +1212,21 @@ impl<'db> Type<'db> {
 
     #[must_use]
     pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+        if let NormalizationKind::Recursive(div) = visitor.kind {
+            if visitor.level() == 0 && self == div {
+                // int | Divergent = int | (int | (int | ...)) = int
+                return Type::Never;
+            } else if visitor.level() >= 1 && self.has_divergent_type(db, div) {
+                // G[G[Divergent]] = G[Divergent]
+                return div;
+            }
+        }
         match self {
-            Type::Union(union) => visitor.visit(self, || union.normalized_impl(db, visitor)),
+            Type::Union(union) => {
+                // As explained above, `Divergent` in a union type does not mean true divergence,
+                // so we normalize the type while keeping the nesting level the same.
+                visitor.visit_no_shift(self, || union.normalized_impl(db, visitor))
+            }
             Type::Intersection(intersection) => visitor.visit(self, || {
                 Type::Intersection(intersection.normalized_impl(db, visitor))
             }),
@@ -1213,7 +1272,7 @@ impl<'db> Type<'db> {
             Type::TypeIs(type_is) => visitor.visit(self, || {
                 type_is.with_type(db, type_is.return_type(db).normalized_impl(db, visitor))
             }),
-            Type::Dynamic(dynamic) => Type::Dynamic(dynamic.normalized()),
+            Type::Dynamic(dynamic) => Type::Dynamic(dynamic.normalized(visitor.is_recursive())),
             Type::EnumLiteral(enum_literal)
                 if is_single_member_enum(db, enum_literal.enum_class(db)) =>
             {
@@ -7022,7 +7081,10 @@ pub enum DynamicType<'db> {
 }
 
 impl DynamicType<'_> {
-    fn normalized(self) -> Self {
+    fn normalized(self, is_recursive: bool) -> Self {
+        if is_recursive {
+            return self;
+        }
         if matches!(self, Self::Divergent(_)) {
             self
         } else {
@@ -10208,7 +10270,7 @@ impl<'db> UnionType<'db> {
             .map(|ty| ty.normalized_impl(db, visitor))
             .fold(
                 UnionBuilder::new(db)
-                    .order_elements(true)
+                    .order_elements(!visitor.is_recursive())
                     .unpack_aliases(true),
                 UnionBuilder::add,
             )
@@ -10580,7 +10642,9 @@ pub enum SuperOwnerKind<'db> {
 impl<'db> SuperOwnerKind<'db> {
     fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         match self {
-            SuperOwnerKind::Dynamic(dynamic) => SuperOwnerKind::Dynamic(dynamic.normalized()),
+            SuperOwnerKind::Dynamic(dynamic) => {
+                SuperOwnerKind::Dynamic(dynamic.normalized(visitor.is_recursive()))
+            }
             SuperOwnerKind::Class(class) => {
                 SuperOwnerKind::Class(class.normalized_impl(db, visitor))
             }
@@ -11119,6 +11183,27 @@ pub(crate) mod tests {
 
         let union = UnionType::from_elements(&db, [KnownClass::Object.to_instance(&db), div]);
         assert_eq!(union.display(&db).to_string(), "object");
+
+        let visitor = NormalizedVisitor::default().recursive(div);
+        let recursice = UnionType::from_elements(
+            &db,
+            [
+                KnownClass::List.to_specialized_instance(&db, [div]),
+                Type::none(&db),
+            ],
+        );
+        let nested_rec = KnownClass::List.to_specialized_instance(&db, [recursice]);
+        assert_eq!(
+            nested_rec.display(&db).to_string(),
+            "list[list[Divergent] | None]"
+        );
+        let normalized = nested_rec.normalized_impl(&db, &visitor);
+        assert_eq!(normalized.display(&db).to_string(), "list[Divergent]");
+
+        let union = UnionType::from_elements(&db, [div, KnownClass::Int.to_instance(&db)]);
+        assert_eq!(union.display(&db).to_string(), "Divergent | int");
+        let normalized = union.normalized_impl(&db, &visitor);
+        assert_eq!(normalized.display(&db).to_string(), "int");
 
         // The same can be said about intersections for the `Never` type.
         let intersection = IntersectionBuilder::new(&db)
