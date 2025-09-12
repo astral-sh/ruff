@@ -1658,12 +1658,15 @@ impl<'db> Type<'db> {
                 | Type::EnumLiteral(_),
             ) => ConstraintSet::from(false),
 
-            (Type::Callable(self_callable), Type::Callable(other_callable)) => {
-                self_callable.has_relation_to_impl(db, other_callable, relation, visitor)
-            }
+            (Type::Callable(self_callable), Type::Callable(other_callable)) => visitor
+                .visit((self, target, relation), || {
+                    self_callable.has_relation_to_impl(db, other_callable, relation, visitor)
+                }),
 
-            (_, Type::Callable(_)) => self.into_callable(db).when_some_and(|callable| {
-                callable.has_relation_to_impl(db, target, relation, visitor)
+            (_, Type::Callable(_)) => visitor.visit((self, target, relation), || {
+                self.into_callable(db).when_some_and(|callable| {
+                    callable.has_relation_to_impl(db, target, relation, visitor)
+                })
             }),
 
             (_, Type::ProtocolInstance(protocol)) => {
@@ -3265,6 +3268,13 @@ impl<'db> Type<'db> {
         policy: InstanceFallbackShadowsNonDataDescriptor,
         member_policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
+        // TODO: this is a workaround for the fact that looking up the `__call__` attribute on the
+        // meta-type of a `Callable` type currently returns `Unbound`. We should fix this by inferring
+        // a more sophisticated meta-type for `Callable` types; that would allow us to remove this branch.
+        if name == "__call__" && matches!(self, Type::Callable(_) | Type::DataclassTransformer(_)) {
+            return Place::bound(self).into();
+        }
+
         let (
             PlaceAndQualifiers {
                 place: meta_attr,
