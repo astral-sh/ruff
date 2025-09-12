@@ -18,7 +18,7 @@ pub struct Indexer {
     /// Stores the start offset of continuation lines.
     continuation_lines: Vec<TextSize>,
 
-    /// The range of all interpolated string in the source document.
+    /// The range of all interpolated strings in the source document.
     interpolated_string_ranges: InterpolatedStringRanges,
 
     /// The range of all multiline strings in the source document.
