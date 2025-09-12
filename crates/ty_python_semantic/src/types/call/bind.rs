@@ -51,9 +51,7 @@ pub(crate) struct Bindings<'db> {
     elements: SmallVec<[CallableBinding<'db>; 1]>,
 
     /// Whether each argument will be used as a value and/or a type form in this call.
-    pub(crate) argument_forms: Box<[Option<ParameterForm>]>,
-
-    conflicting_forms: Box<[bool]>,
+    argument_forms: ArgumentForms,
 }
 
 impl<'db> Bindings<'db> {
@@ -71,8 +69,7 @@ impl<'db> Bindings<'db> {
         Self {
             callable_type,
             elements,
-            argument_forms: Box::from([]),
-            conflicting_forms: Box::from([]),
+            argument_forms: ArgumentForms::new(0),
         }
     }
 
@@ -89,6 +86,10 @@ impl<'db> Bindings<'db> {
         for binding in &mut self.elements {
             binding.dunder_call_is_possibly_unbound = true;
         }
+    }
+
+    pub(crate) fn argument_forms(&self) -> &[Option<ParameterForm>] {
+        &self.argument_forms.values
     }
 
     /// Match the arguments of a call site against the parameters of a collection of possibly
@@ -109,7 +110,8 @@ impl<'db> Bindings<'db> {
         for binding in &mut self.elements {
             binding.match_parameters(db, arguments, &mut argument_forms);
         }
-        (self.argument_forms, self.conflicting_forms) = argument_forms.into_boxed_slice();
+        argument_forms.shrink_to_fit();
+        self.argument_forms = argument_forms;
         self
     }
 
@@ -128,11 +130,11 @@ impl<'db> Bindings<'db> {
         argument_types: &CallArguments<'_, 'db>,
     ) -> Result<Self, CallError<'db>> {
         for element in &mut self.elements {
-            if let Some(updated_argument_forms) = element.check_types(db, argument_types) {
+            if let Some(mut updated_argument_forms) = element.check_types(db, argument_types) {
                 // If this element returned a new set of argument forms (indicating successful
                 // argument type expansion), update the `Bindings` with these forms.
-                (self.argument_forms, self.conflicting_forms) =
-                    updated_argument_forms.into_boxed_slice();
+                updated_argument_forms.shrink_to_fit();
+                self.argument_forms = updated_argument_forms;
             }
         }
 
@@ -156,7 +158,7 @@ impl<'db> Bindings<'db> {
         let mut all_ok = true;
         let mut any_binding_error = false;
         let mut all_not_callable = true;
-        if self.conflicting_forms.contains(&true) {
+        if self.argument_forms.conflicting.contains(&true) {
             all_ok = false;
             any_binding_error = true;
             all_not_callable = false;
@@ -229,7 +231,7 @@ impl<'db> Bindings<'db> {
             return;
         }
 
-        for (index, conflicting_form) in self.conflicting_forms.iter().enumerate() {
+        for (index, conflicting_form) in self.argument_forms.conflicting.iter().enumerate() {
             if *conflicting_form {
                 let node = BindingError::get_node(node, Some(index));
                 if let Some(builder) = context.report_lint(&CONFLICTING_ARGUMENT_FORMS, node) {
@@ -1106,8 +1108,7 @@ impl<'db> From<CallableBinding<'db>> for Bindings<'db> {
         Bindings {
             callable_type: from.callable_type,
             elements: smallvec_inline![from],
-            argument_forms: Box::from([]),
-            conflicting_forms: Box::from([]),
+            argument_forms: ArgumentForms::new(0),
         }
     }
 }
@@ -1128,8 +1129,7 @@ impl<'db> From<Binding<'db>> for Bindings<'db> {
         Bindings {
             callable_type,
             elements: smallvec_inline![callable_binding],
-            argument_forms: Box::from([]),
-            conflicting_forms: Box::from([]),
+            argument_forms: ArgumentForms::new(0),
         }
     }
 }
@@ -1911,7 +1911,7 @@ enum MatchingOverloadIndex {
     Multiple(Vec<usize>),
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 struct ArgumentForms {
     values: Vec<Option<ParameterForm>>,
     conflicting: Vec<bool>,
@@ -1955,11 +1955,9 @@ impl ArgumentForms {
         }
     }
 
-    fn into_boxed_slice(self) -> (Box<[Option<ParameterForm>]>, Box<[bool]>) {
-        (
-            self.values.into_boxed_slice(),
-            self.conflicting.into_boxed_slice(),
-        )
+    fn shrink_to_fit(&mut self) {
+        self.values.shrink_to_fit();
+        self.conflicting.shrink_to_fit();
     }
 }
 

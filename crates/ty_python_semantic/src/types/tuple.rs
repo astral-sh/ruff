@@ -1015,12 +1015,6 @@ impl<'db> Tuple<Type<'db>> {
         UnionType::from_elements(db, self.all_elements())
     }
 
-    /// Concatenates another tuple to the end of this tuple, returning a new tuple.
-    #[expect(dead_code)]
-    pub(crate) fn concat(&self, db: &'db dyn Db, other: &Self) -> Self {
-        TupleSpecBuilder::from(self).concat(db, other).build()
-    }
-
     /// Resizes this tuple to a different length, if possible. If this tuple cannot satisfy the
     /// desired minimum or maximum length, we return an error. If we return an `Ok` result, the
     /// [`len`][Self::len] of the resulting tuple is guaranteed to be equal to `new_length`.
