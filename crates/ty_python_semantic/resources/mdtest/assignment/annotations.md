@@ -81,35 +81,41 @@ c: tuple[str | int, str] = ([], "foo")
 
 ## Collection literal annotations are understood
 
-`module.py`:
-
 ```py
 import typing
 
 a: list[int] = [1, 2, 3]
-b: list[int | str] = [1, 2, 3]
-c: typing.List[int] = [1, 2, 3]
-d: list[typing.Any] = []
-
-e: set[int] = {1, 2, 3}
-f: set[int | str] = {1, 2, 3}
-g: typing.Set[int] = {1, 2, 3}
-```
-
-`script.py`:
-
-```py
-import typing
-from module import a, b, c, d, e, f, g
-
 reveal_type(a)  # revealed: list[int]
+
+b: list[int | str] = [1, 2, 3]
 reveal_type(b)  # revealed: list[int | str]
+
+c: typing.List[int] = [1, 2, 3]
 reveal_type(c)  # revealed: list[int]
+
+d: list[typing.Any] = []
 reveal_type(d)  # revealed: list[Any]
 
+e: set[int] = {1, 2, 3}
 reveal_type(e)  # revealed: set[int]
+
+f: set[int | str] = {1, 2, 3}
 reveal_type(f)  # revealed: set[int | str]
+
+g: typing.Set[int] = {1, 2, 3}
 reveal_type(g)  # revealed: set[int]
+
+h: list[list[int]] = [[], [42]]
+# TODO: revealed: list[list[int]]
+reveal_type(h)  # revealed: list[list[int] | list[@Todo(list literal element type)]]
+
+i: list[tuple[str | int, ...]] = [(1, 2), ("foo", "bar"), ()]
+reveal_type(i)  # revealed: list[tuple[str | int, ...]]
+
+j: list[tuple[list[typing.Any], ...]] = [([],), ([1, 2], [3, 4]), (["foo"], ["bar"])]
+# TODO: revealed: list[tuple[list[typing.Any], ...]]
+# revealed: list[tuple[list[Any], ...] | tuple[list[@Todo(list literal element type)]] | tuple[list[@Todo(list literal element type)], list[@Todo(list literal element type)]]]
+reveal_type(j)
 ```
 
 ## Incorrect collection literal assignments are complained aobut
