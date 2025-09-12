@@ -46,6 +46,7 @@ pub(crate) const TEST_RULES: &[Rule] = &[
     Rule::RedirectedFromTestRule,
     Rule::RedirectedToTestRule,
     Rule::RedirectedFromPrefixTestRule,
+    Rule::PanicyTestRule,
 ];
 
 pub(crate) trait TestRule {
@@ -474,6 +475,42 @@ impl TestRule for RedirectedFromPrefixTestRule {
         context.report_diagnostic(
             RedirectedFromPrefixTestRule,
             ruff_text_size::TextRange::default(),
+        );
+    }
+}
+
+/// # What it does
+/// Fake rule for testing panics.
+///
+/// # Why is this bad?
+/// Panics are bad.
+///
+/// # Example
+/// ```python
+/// foo
+/// ```
+///
+/// Use instead:
+/// ```python
+/// bar
+/// ```
+#[derive(ViolationMetadata)]
+pub(crate) struct PanicyTestRule;
+
+impl Violation for PanicyTestRule {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::None;
+
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        "If you see this, maybe panic!".to_string()
+    }
+}
+
+impl TestRule for PanicyTestRule {
+    fn diagnostic(_locator: &Locator, _comment_ranges: &CommentRanges, context: &LintContext) {
+        assert!(
+            !context.source_file().name().ends_with("panic.py"),
+            "This is a fake panic for testing."
         );
     }
 }
