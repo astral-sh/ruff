@@ -1372,6 +1372,7 @@ SIM905 Consider using a list literal instead of `str.split`
 171 | " a b c d ".split(maxsplit=2)  # ["a", "b", "c d "]
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 172 | " a b c d ".rsplit(maxsplit=2)  # [" a b", "c", "d"]
+173 | "a  b".split(maxsplit=1)  # ["a", "b"]
     |
 help: Replace with list literal
 
@@ -1382,5 +1383,16 @@ SIM905 Consider using a list literal instead of `str.split`
 171 | " a b c d ".split(maxsplit=2)  # ["a", "b", "c d "]
 172 | " a b c d ".rsplit(maxsplit=2)  # [" a b", "c", "d"]
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+173 | "a  b".split(maxsplit=1)  # ["a", "b"]
+    |
+help: Replace with list literal
+
+SIM905 Consider using a list literal instead of `str.split`
+   --> SIM905.py:173:1
+    |
+171 | " a b c d ".split(maxsplit=2)  # ["a", "b", "c d "]
+172 | " a b c d ".rsplit(maxsplit=2)  # [" a b", "c", "d"]
+173 | "a  b".split(maxsplit=1)  # ["a", "b"]
+    | ^^^^^^^^^^^^^^^^^^^^^^^^
     |
 help: Replace with list literal
