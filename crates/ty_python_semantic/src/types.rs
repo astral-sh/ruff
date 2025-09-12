@@ -3268,13 +3268,6 @@ impl<'db> Type<'db> {
         policy: InstanceFallbackShadowsNonDataDescriptor,
         member_policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
-        // TODO: this is a workaround for the fact that looking up the `__call__` attribute on the
-        // meta-type of a `Callable` type currently returns `Unbound`. We should fix this by inferring
-        // a more sophisticated meta-type for `Callable` types; that would allow us to remove this branch.
-        if name == "__call__" && matches!(self, Type::Callable(_) | Type::DataclassTransformer(_)) {
-            return Place::bound(self).into();
-        }
-
         let (
             PlaceAndQualifiers {
                 place: meta_attr,

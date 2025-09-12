@@ -541,17 +541,34 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
     ) -> ConstraintSet<'db> {
         match &self.kind {
             ProtocolMemberKind::Method(method) => {
-                let Place::Type(attribute_type, Boundness::Bound) = other
-                    .invoke_descriptor_protocol(
-                        db,
-                        self.name,
-                        Place::Unbound.into(),
-                        InstanceFallbackShadowsNonDataDescriptor::No,
-                        MemberLookupPolicy::default(),
-                    )
-                    .place
-                else {
-                    return ConstraintSet::from(false);
+                // `__call__` members must be special cased for several reasons:
+                //
+                // 1. Looking up `__call__` on the meta-type of a `Callable` type returns `Place::Unbound` currently
+                // 2. Looking up `__call__` on the meta-type of a function-literal type currently returns a type that
+                //    has an extremely vague signature (`(*args, **kwargs) -> Any`), which is not useful for protocol
+                //    checking.
+                // 3. Looking up `__call__` on the meta-type of a class-literal, generic-alias or subclass-of type is
+                //    unfortunately not sufficient to obtain the `Callable` supertypes of these types, due to the
+                //    complex interaction between `__new__`, `__init__` and metaclass `__call__`.
+                let attribute_type = if self.name == "__call__" {
+                    let Some(attribute_type) = other.into_callable(db) else {
+                        return ConstraintSet::from(false);
+                    };
+                    attribute_type
+                } else {
+                    let Place::Type(attribute_type, Boundness::Bound) = other
+                        .invoke_descriptor_protocol(
+                            db,
+                            self.name,
+                            Place::Unbound.into(),
+                            InstanceFallbackShadowsNonDataDescriptor::No,
+                            MemberLookupPolicy::default(),
+                        )
+                        .place
+                    else {
+                        return ConstraintSet::from(false);
+                    };
+                    attribute_type
                 };
 
                 let proto_member_as_bound_method = method.bind_self(db);
