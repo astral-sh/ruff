@@ -5261,17 +5261,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ctx: _,
         } = list;
 
-        if let Some(inferred) = self.infer_annotated_collection_literal(elts, tcx, KnownClass::List)
-        {
-            return inferred;
-        }
-
-        for elt in elts {
-            self.infer_expression(elt, TypeContext::default());
-        }
-
-        KnownClass::List
-            .to_specialized_instance(self.db(), [todo_type!("list literal element type")])
+        self.infer_collection_literal(elts, tcx, KnownClass::List)
+            .unwrap_or_else(|| {
+                KnownClass::List.to_specialized_instance(self.db(), [Type::unknown()])
+            })
     }
 
     fn infer_set_expression(&mut self, set: &ast::ExprSet, tcx: TypeContext<'db>) -> Type<'db> {
@@ -5281,50 +5274,92 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             elts,
         } = set;
 
-        if let Some(inferred) = self.infer_annotated_collection_literal(elts, tcx, KnownClass::Set)
-        {
-            return inferred;
-        }
-
-        for elt in elts {
-            self.infer_expression(elt, TypeContext::default());
-        }
-
-        KnownClass::Set.to_specialized_instance(self.db(), [todo_type!("set literal element type")])
+        self.infer_collection_literal(elts, tcx, KnownClass::Set)
+            .unwrap_or_else(|| {
+                KnownClass::Set.to_specialized_instance(self.db(), [Type::unknown()])
+            })
     }
 
-    // Infer the type of a collection literal in an annotated assignment, e.g. `_: list[_] = [..]`.
-    fn infer_annotated_collection_literal(
+    // Infer the type of a collection literal expression.
+    fn infer_collection_literal(
         &mut self,
         elts: &[ast::Expr],
         tcx: TypeContext<'db>,
         collection_class: KnownClass,
     ) -> Option<Type<'db>> {
-        // Extract the annotated type of `list[T]` in the type annotation.
-        let class_type = tcx.annotation?.into_nominal_instance()?.class(self.db());
-        if !class_type.is_known(self.db(), collection_class) {
-            return None;
+        // Extract `T` from a type annotation of the form `list[T]`.
+        fn annotated_elts_ty<'db>(
+            tcx: TypeContext<'db>,
+            collection_class: KnownClass,
+            db: &'db dyn Db,
+        ) -> Option<Type<'db>> {
+            let class_type = tcx.annotation?.into_nominal_instance()?.class(db);
+            if !class_type.is_known(db, collection_class) {
+                return None;
+            }
+            let specialization = class_type.into_generic_alias()?.specialization(db);
+            let [annotated_elts_ty] = specialization.types(db) else {
+                return None;
+            };
+
+            Some(*annotated_elts_ty)
         }
-        let specialization = class_type.into_generic_alias()?.specialization(self.db());
-        let [annotated_elts_ty] = specialization.types(self.db()) else {
-            return None;
-        };
 
-        // Extract the type variable `T` from the definition of `list[T]`.
-        let class_literal = collection_class.try_to_class_literal(self.db())?;
-        let generic_context = class_literal.generic_context(self.db())?;
-        let variables = generic_context.variables(self.db());
-        let elts_ty = Type::TypeVar(*variables.iter().exactly_one().ok()?);
+        // Extract the type variable `T` from `list[T]` in typeshed.
+        fn elts_ty(
+            collection_class: KnownClass,
+            db: &dyn Db,
+        ) -> Option<(ClassLiteral<'_>, Type<'_>)> {
+            let class_literal = collection_class.try_to_class_literal(db)?;
+            let generic_context = class_literal.generic_context(db)?;
+            let variables = generic_context.variables(db);
+            let elts_ty = variables.iter().exactly_one().ok()?;
+            Some((class_literal, Type::TypeVar(*elts_ty)))
+        }
 
-        // Infer a precise type for `T`, based on,
-        let mut builder = SpecializationBuilder::new(self.db());
+        let annotated_elts_ty = annotated_elts_ty(tcx, collection_class, self.db());
+        let (class_literal, elts_ty) = elts_ty(collection_class, self.db()).unwrap_or_else(|| {
+            let name = collection_class.name(self.db());
+            panic!("Typeshed should always have a `{name}` class in `builtins.pyi` with a single type variable")
+        });
 
-        // the annotated type,
-        builder.infer(elts_ty, *annotated_elts_ty).ok()?;
+        let mut elements_are_assignable = true;
+        let mut inferred_elt_tys = Vec::with_capacity(elts.len());
 
-        // as well as the type of each element in the collection literal.
+        // Infer the type of each element in the collection literal.
         for elt in elts {
             let inferred_elt_ty = self.infer_expression(elt, TypeContext::default());
+            inferred_elt_tys.push(inferred_elt_ty);
+
+            if let Some(annotated_elts_ty) = annotated_elts_ty {
+                elements_are_assignable &=
+                    inferred_elt_ty.is_assignable_to(self.db(), annotated_elts_ty);
+            }
+        }
+
+        // Create a set of constraints to infer a precise type for `T`.
+        let mut builder = SpecializationBuilder::new(self.db());
+
+        match annotated_elts_ty {
+            // If the inferred type of any element is not assignable to the type annotation, we
+            // ignore it, as to provide a more precise error message.
+            Some(_) if !elements_are_assignable => {}
+
+            // Otherwise, the annotated type acts as a constraint for `T`.
+            //
+            // Note that we infer the annotated type _before_ the elements, to closer match the order
+            // of any unions written in the type annotation.
+            Some(annotated_elts_ty) => {
+                builder.infer(elts_ty, annotated_elts_ty).ok()?;
+            }
+
+            // If a valid type annotation was not provided, avoid restricting the type of the collection
+            // by unioning the inferred type with `Unknown`.
+            None => builder.infer(elts_ty, Type::unknown()).ok()?,
+        }
+
+        // The inferred type of each element acts as an additional constraint on `T`.
+        for inferred_elt_ty in inferred_elt_tys {
             builder.infer(elts_ty, inferred_elt_ty).ok()?;
         }
 
