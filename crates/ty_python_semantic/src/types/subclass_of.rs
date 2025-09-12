@@ -134,7 +134,8 @@ impl<'db> SubclassOfType<'db> {
         db: &'db dyn Db,
         other: SubclassOfType<'db>,
         relation: TypeRelation,
-        visitor: &HasRelationToVisitor<'db>,
+        relation_visitor: &HasRelationToVisitor<'db>,
+        disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
         match (self.subclass_of, other.subclass_of) {
             (SubclassOfInner::Dynamic(_), SubclassOfInner::Dynamic(_)) => {
@@ -150,9 +151,14 @@ impl<'db> SubclassOfType<'db> {
             // For example, `type[bool]` describes all possible runtime subclasses of the class `bool`,
             // and `type[int]` describes all possible runtime subclasses of the class `int`.
             // The first set is a subset of the second set, because `bool` is itself a subclass of `int`.
-            (SubclassOfInner::Class(self_class), SubclassOfInner::Class(other_class)) => {
-                self_class.has_relation_to_impl(db, other_class, relation, visitor)
-            }
+            (SubclassOfInner::Class(self_class), SubclassOfInner::Class(other_class)) => self_class
+                .has_relation_to_impl(
+                    db,
+                    other_class,
+                    relation,
+                    relation_visitor,
+                    disjointness_visitor,
+                ),
         }
     }
 
