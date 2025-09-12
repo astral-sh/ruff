@@ -300,14 +300,13 @@ pub(crate) fn deprecated_mock_import(checker: &Checker, stmt: &Stmt) {
 
                 // Add a `Diagnostic` for each `mock` import.
                 for name in names {
-                    if is_import_required_by_isort(
-                        &checker.settings().isort.required_imports,
-                        stmt.into(),
-                        name,
-                    ) {
-                        continue;
-                    }
-                    if &name.name == "mock" || &name.name == "mock.mock" {
+                    if (&name.name == "mock" || &name.name == "mock.mock")
+                        && !is_import_required_by_isort(
+                            &checker.settings().isort.required_imports,
+                            stmt.into(),
+                            name,
+                        )
+                    {
                         let mut diagnostic = checker.report_diagnostic(
                             DeprecatedMockImport {
                                 reference_type: MockReference::Import,
@@ -336,11 +335,12 @@ pub(crate) fn deprecated_mock_import(checker: &Checker, stmt: &Stmt) {
 
             if module == "mock" {
                 if names.iter().any(|alias| {
-                    is_import_required_by_isort(
-                        &checker.settings().isort.required_imports,
-                        stmt.into(),
-                        alias,
-                    )
+                    alias.name.as_str() == "mock"
+                        && is_import_required_by_isort(
+                            &checker.settings().isort.required_imports,
+                            stmt.into(),
+                            alias,
+                        )
                 }) {
                     return;
                 }
