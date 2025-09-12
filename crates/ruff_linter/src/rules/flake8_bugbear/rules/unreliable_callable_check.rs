@@ -28,10 +28,29 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ```
 ///
 /// ## Fix safety
-/// This rule's fix is marked as unsafe if there's comments in the `hasattr` call
-/// expression, as comments may be removed.
+/// This rule's fix is marked as unsafe because the replacement may not be semantically
+/// equivalent to the original expression, potentially changing the behavior of the code.
 ///
-/// For example, the fix would be marked as unsafe in the following case:
+/// For example, an imported module may have a `__call__` attribute but is not considered
+/// a callable object:
+/// ```python
+/// import operator
+///
+/// assert hasattr(operator, "__call__")
+/// assert callable(operator) is False
+/// ```
+/// Additionally, `__call__` may be defined only as an instance method:
+/// ```python
+/// class A:
+///     def __init__(self):
+///         self.__call__ = None
+///
+///
+/// assert hasattr(A(), "__call__")
+/// assert callable(A()) is False
+/// ```
+///
+/// Additionally, if there are comments in the `hasattr` call expression, they may be removed:
 /// ```python
 /// hasattr(
 ///     # comment 1
@@ -103,11 +122,7 @@ pub(crate) fn unreliable_callable_check(
             Ok(Fix::applicable_edits(
                 binding_edit,
                 import_edit,
-                if checker.comment_ranges().intersects(expr.range()) {
-                    Applicability::Unsafe
-                } else {
-                    Applicability::Safe
-                },
+                Applicability::Unsafe,
             ))
         });
     }
