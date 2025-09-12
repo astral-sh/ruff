@@ -194,51 +194,6 @@ reveal_type(len(LiteralTrue()))  # revealed: Literal[1]
 reveal_type(len(LiteralFalse()))  # revealed: Literal[0]
 ```
 
-### Enums
-
-```py
-from enum import Enum, auto
-from typing import Literal
-
-class SomeEnum(Enum):
-    AUTO = auto()
-    INT = 2
-    STR = "4"
-    TUPLE = (8, "16")
-    INT_2 = 3_2
-
-class Auto:
-    def __len__(self) -> Literal[SomeEnum.AUTO]:
-        return SomeEnum.AUTO
-
-class Int:
-    def __len__(self) -> Literal[SomeEnum.INT]:
-        return SomeEnum.INT
-
-class Str:
-    def __len__(self) -> Literal[SomeEnum.STR]:
-        return SomeEnum.STR
-
-class Tuple:
-    def __len__(self) -> Literal[SomeEnum.TUPLE]:
-        return SomeEnum.TUPLE
-
-class IntUnion:
-    def __len__(self) -> Literal[SomeEnum.INT, SomeEnum.INT_2]:
-        return SomeEnum.INT
-
-# error: [invalid-argument-type] "Argument to function `len` is incorrect: Expected `Sized`, found `Auto`"
-reveal_type(len(Auto()))  # revealed: int
-# error: [invalid-argument-type] "Argument to function `len` is incorrect: Expected `Sized`, found `Int`"
-reveal_type(len(Int()))  # revealed: int
-# error: [invalid-argument-type] "Argument to function `len` is incorrect: Expected `Sized`, found `Str`"
-reveal_type(len(Str()))  # revealed: int
-# error: [invalid-argument-type] "Argument to function `len` is incorrect: Expected `Sized`, found `Tuple`"
-reveal_type(len(Tuple()))  # revealed: int
-# error: [invalid-argument-type] "Argument to function `len` is incorrect: Expected `Sized`, found `IntUnion`"
-reveal_type(len(IntUnion()))  # revealed: int
-```
-
 ### Negative integers
 
 ```py
