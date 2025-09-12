@@ -891,7 +891,7 @@ impl TypeChecker for IoBaseChecker {
 pub struct PathlibPathChecker;
 
 impl PathlibPathChecker {
-    fn is_pathlib_path_constructor(semantic: &SemanticModel, expr: &Expr) -> bool {
+    pub fn is_pathlib_path_constructor(semantic: &SemanticModel, expr: &Expr) -> bool {
         let Some(qualified_name) = semantic.resolve_qualified_name(expr) else {
             return false;
         };
@@ -913,7 +913,21 @@ impl PathlibPathChecker {
 
 impl TypeChecker for PathlibPathChecker {
     fn match_annotation(annotation: &Expr, semantic: &SemanticModel) -> bool {
-        Self::is_pathlib_path_constructor(semantic, annotation)
+        if Self::is_pathlib_path_constructor(semantic, annotation) {
+            return true;
+        }
+
+        let mut found = false;
+        traverse_union_and_optional(
+            &mut |inner_expr, _| {
+                if Self::is_pathlib_path_constructor(semantic, inner_expr) {
+                    found = true;
+                }
+            },
+            semantic,
+            annotation,
+        );
+        found
     }
 
     fn match_initializer(initializer: &Expr, semantic: &SemanticModel) -> bool {
