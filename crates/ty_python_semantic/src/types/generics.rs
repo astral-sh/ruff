@@ -18,8 +18,8 @@ use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
     IsEquivalentVisitor, KnownClass, KnownInstanceType, MaterializationKind, NormalizedVisitor,
-    Type, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarVariance,
-    UnionType, binding_type, declaration_type,
+    Type, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind,
+    TypeVarVariance, UnionType, binding_type, declaration_type,
 };
 use crate::{Db, FxOrderSet};
 
@@ -82,6 +82,11 @@ pub(crate) fn bind_typevar<'db>(
     typevar_binding_context: Option<Definition<'db>>,
     typevar: TypeVarInstance<'db>,
 ) -> Option<BoundTypeVarInstance<'db>> {
+    if matches!(typevar.kind(db), TypeVarKind::TypingSelf) {
+        if let Some(typevar_binding_context) = typevar_binding_context {
+            return Some(typevar.with_binding_context(db, typevar_binding_context));
+        }
+    }
     enclosing_generic_contexts(db, module, index, containing_scope)
         .find_map(|enclosing_context| enclosing_context.binds_typevar(db, typevar))
         .or_else(|| {

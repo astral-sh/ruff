@@ -25,13 +25,11 @@ class Shape:
     def nested_func(self: Self) -> Self:
         def inner() -> Self:
             reveal_type(self)  # revealed: Self@nested_func
-            return self
+            return self  # error: [invalid-return-type] "Return type does not match returned value: expected `Self@inner`, found `Self@nested_func`"
         return inner()
 
     def nested_func_without_enclosing_binding(self):
         def inner(x: Self):
-            # TODO: revealed: Self@nested_func_without_enclosing_binding
-            # (The outer method binds an implicit `Self`)
             reveal_type(x)  # revealed: Self@inner
         inner(self)
 
@@ -237,6 +235,29 @@ class D(C): ...
 reveal_type(D().instance_method)
 # revealed: bound method <class 'D'>.class_method() -> D
 reveal_type(D.class_method)
+```
+
+In nested functions self bounds to the method. So in the following example the `self` in `C.b` is
+bound at `C.f`.
+
+```py
+from typing import Self
+
+class C[T]():
+    def f(self: Self):
+        def b(x: Self):
+            reveal_type(x)  # revealed: Self@b
+```
+
+Even if the `Self` annotation appears first in the nested function. We have the same behavior.
+
+```py
+from typing import Self
+
+class C:
+    def f(self: "C"):
+        def b(x: Self):
+            reveal_type(x)  # revealed: Self@b
 ```
 
 [self attribute]: https://typing.python.org/en/latest/spec/generics.html#use-in-attribute-annotations
