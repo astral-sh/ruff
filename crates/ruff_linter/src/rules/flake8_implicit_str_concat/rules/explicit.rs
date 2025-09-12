@@ -74,6 +74,7 @@ pub(crate) fn explicit(checker: &Checker, expr: &Expr) {
                     Expr::StringLiteral(_) | Expr::FString(_),
                     Expr::StringLiteral(_) | Expr::FString(_)
                 ) | (Expr::BytesLiteral(_), Expr::BytesLiteral(_))
+                    | (Expr::TString(_), Expr::TString(_))
             );
             if concatable
                 && checker
