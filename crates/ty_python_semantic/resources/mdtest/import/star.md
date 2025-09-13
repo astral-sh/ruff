@@ -1399,7 +1399,7 @@ X: bool = True
 
 ```py
 def f():
-    # TODO: we should emit a syntax error here (tracked by https://github.com/astral-sh/ruff/issues/17412)
+    # error: [invalid-syntax]
     from exporter import *
 
     # error: [unresolved-reference]
