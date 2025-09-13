@@ -205,3 +205,14 @@ pub(crate) fn has_unknown_keywords_or_starred_expr(
         None => true,
     })
 }
+
+/// Returns `true` if argument `name` is set to a non-default `None` value.
+pub(crate) fn is_argument_non_default(
+    arguments: &ast::Arguments,
+    name: &str,
+    position: usize,
+) -> bool {
+    arguments
+        .find_argument_value(name, position)
+        .is_some_and(|expr| !expr.is_none_literal_expr())
+}

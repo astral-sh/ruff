@@ -305,6 +305,7 @@ PTH123 `open()` should be replaced by `Path.open()`
 35 |     fp.read()
 36 | open(p).close()
    |
+help: Replace with `Path.open()`
 
 PTH123 `open()` should be replaced by `Path.open()`
   --> import_from.py:36:1
@@ -314,6 +315,7 @@ PTH123 `open()` should be replaced by `Path.open()`
 36 | open(p).close()
    | ^^^^
    |
+help: Replace with `Path.open()`
 
 PTH123 `open()` should be replaced by `Path.open()`
   --> import_from.py:43:10
@@ -323,6 +325,7 @@ PTH123 `open()` should be replaced by `Path.open()`
 43 |     with open(p) as _: ...  # Error
    |          ^^^^
    |
+help: Replace with `Path.open()`
 
 PTH104 `os.rename()` should be replaced by `Path.rename()`
   --> import_from.py:53:1

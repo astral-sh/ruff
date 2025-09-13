@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr, ExprBooleanLiteral, ExprCall};
+use ruff_python_ast::{Expr, ExprCall};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -7,7 +7,7 @@ use crate::rules::flake8_use_pathlib::helpers::{
 };
 use crate::rules::flake8_use_pathlib::{
     rules::Glob,
-    violations::{BuiltinOpen, Joiner, OsListdir, OsPathJoin, OsPathSplitext, OsStat, PyPath},
+    violations::{Joiner, OsListdir, OsPathJoin, OsPathSplitext, OsStat, PyPath},
 };
 
 pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
@@ -60,42 +60,6 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
         ),
         // PTH122
         ["os", "path", "splitext"] => checker.report_diagnostic_if_enabled(OsPathSplitext, range),
-        // PTH123
-        ["" | "builtins", "open"] => {
-            // `closefd` and `opener` are not supported by pathlib, so check if they
-            // are set to non-default values.
-            // https://github.com/astral-sh/ruff/issues/7620
-            // Signature as of Python 3.11 (https://docs.python.org/3/library/functions.html#open):
-            // ```text
-            //      0     1         2             3              4            5
-            // open(file, mode='r', buffering=-1, encoding=None, errors=None, newline=None,
-            //      6             7
-            //      closefd=True, opener=None)
-            //              ^^^^         ^^^^
-            // ```
-            // For `pathlib` (https://docs.python.org/3/library/pathlib.html#pathlib.Path.open):
-            // ```text
-            // Path.open(mode='r', buffering=-1, encoding=None, errors=None, newline=None)
-            // ```
-            if call
-                .arguments
-                .find_argument_value("closefd", 6)
-                .is_some_and(|expr| {
-                    !matches!(
-                        expr,
-                        Expr::BooleanLiteral(ExprBooleanLiteral { value: true, .. })
-                    )
-                })
-                || is_argument_non_default(&call.arguments, "opener", 7)
-                || call
-                    .arguments
-                    .find_argument_value("file", 0)
-                    .is_some_and(|expr| is_file_descriptor(expr, checker.semantic()))
-            {
-                return;
-            }
-            checker.report_diagnostic_if_enabled(BuiltinOpen, range)
-        }
         // PTH124
         ["py", "path", "local"] => checker.report_diagnostic_if_enabled(PyPath, range),
         // PTH207
@@ -150,11 +114,4 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
 
         _ => return,
     };
-}
-
-/// Returns `true` if argument `name` is set to a non-default `None` value.
-fn is_argument_non_default(arguments: &ast::Arguments, name: &str, position: usize) -> bool {
-    arguments
-        .find_argument_value(name, position)
-        .is_some_and(|expr| !expr.is_none_literal_expr())
 }

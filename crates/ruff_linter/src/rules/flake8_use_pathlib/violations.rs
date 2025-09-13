@@ -175,50 +175,6 @@ impl Violation for OsPathSplitext {
 }
 
 /// ## What it does
-/// Checks for uses of the `open()` builtin.
-///
-/// ## Why is this bad?
-/// `pathlib` offers a high-level API for path manipulation. When possible,
-/// using `Path` object methods such as `Path.open()` can improve readability
-/// over the `open` builtin.
-///
-/// ## Examples
-/// ```python
-/// with open("f1.py", "wb") as fp:
-///     ...
-/// ```
-///
-/// Use instead:
-/// ```python
-/// from pathlib import Path
-///
-/// with Path("f1.py").open("wb") as fp:
-///     ...
-/// ```
-///
-/// ## Known issues
-/// While using `pathlib` can improve the readability and type safety of your code,
-/// it can be less performant than working directly with strings,
-/// especially on older versions of Python.
-///
-/// ## References
-/// - [Python documentation: `Path.open`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.open)
-/// - [Python documentation: `open`](https://docs.python.org/3/library/functions.html#open)
-/// - [PEP 428 – The pathlib module – object-oriented filesystem paths](https://peps.python.org/pep-0428/)
-/// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#corresponding-tools)
-/// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
-/// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
-#[derive(ViolationMetadata)]
-pub(crate) struct BuiltinOpen;
-
-impl Violation for BuiltinOpen {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        "`open()` should be replaced by `Path.open()`".to_string()
-    }
-}
-
-/// ## What it does
 /// Checks for uses of the `py.path` library.
 ///
 /// ## Why is this bad?
