@@ -546,7 +546,7 @@ help: Replace with `Path.open()`
 35 | open(p).close()
 36 | os.getcwdb(p)
 
-PTH123 `open()` should be replaced by `Path.open()`
+PTH123 [*] `open()` should be replaced by `Path.open()`
   --> full_name.py:34:1
    |
 32 | with open(p) as fp:
@@ -557,6 +557,21 @@ PTH123 `open()` should be replaced by `Path.open()`
 36 | os.path.join(p, *q)
    |
 help: Replace with `Path.open()`
+1  | import os
+2  | import os.path
+3  + import pathlib
+4  | 
+5  | p = "/foo"
+6  | q = "bar"
+--------------------------------------------------------------------------------
+32 | os.path.splitext(p)
+33 | with open(p) as fp:
+34 |     fp.read()
+   - open(p).close()
+35 + pathlib.Path(p).open().close()
+36 | os.getcwdb(p)
+37 | os.path.join(p, *q)
+38 | os.sep.join(p, *q)
 
 PTH109 `os.getcwd()` should be replaced by `Path.cwd()`
   --> full_name.py:35:1

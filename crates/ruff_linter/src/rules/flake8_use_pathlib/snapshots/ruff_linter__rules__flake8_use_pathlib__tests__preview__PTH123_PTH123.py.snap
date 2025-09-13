@@ -174,7 +174,7 @@ help: Replace with `Path.open()`
 15 | open(_file, mode="r+", buffering=-1, encoding=None, errors=None, newline=None)
 16 | open(_file, f"  {r_plus}      ", -  1)
    - open(buffering=-      1, file=_file, encoding=         "utf-8")
-17 + Path(_file).open(buffering=-      1, encoding="utf-8")
+17 + Path(_file).open(buffering=-      1, encoding=         "utf-8")
 18 | 
 19 | # Only diagnostic
 20 | open()

@@ -562,7 +562,7 @@ help: Replace with `Path.open()`
 37 | open(p).close()
 38 | 
 
-PTH123 `open()` should be replaced by `Path.open()`
+PTH123 [*] `open()` should be replaced by `Path.open()`
   --> import_from.py:36:1
    |
 34 | with open(p) as fp:
@@ -571,6 +571,22 @@ PTH123 `open()` should be replaced by `Path.open()`
    | ^^^^
    |
 help: Replace with `Path.open()`
+2  | from os import remove, unlink, getcwd, readlink, stat
+3  | from os.path import abspath, exists, expanduser, isdir, isfile, islink
+4  | from os.path import isabs, join, basename, dirname, samefile, splitext
+5  + import pathlib
+6  | 
+7  | p = "/foo"
+8  | q = "bar"
+--------------------------------------------------------------------------------
+34 | splitext(p)
+35 | with open(p) as fp:
+36 |     fp.read()
+   - open(p).close()
+37 + pathlib.Path(p).open().close()
+38 | 
+39 | 
+40 | # https://github.com/astral-sh/ruff/issues/15442
 
 PTH123 [*] `open()` should be replaced by `Path.open()`
   --> import_from.py:43:10

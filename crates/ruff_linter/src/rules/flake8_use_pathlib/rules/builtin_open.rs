@@ -114,14 +114,6 @@ pub(crate) fn builtin_open(checker: &Checker, call: &ExprCall, segments: &[&str]
         return;
     }
 
-    if checker
-        .semantic()
-        .current_expression_grandparent()
-        .is_some_and(|expr| matches!(expr, Expr::Call(_) | Expr::Attribute(_)))
-    {
-        return;
-    }
-
     let Some(file) = file_arg else {
         return;
     };
@@ -161,13 +153,8 @@ pub(crate) fn builtin_open(checker: &Checker, call: &ExprCall, segments: &[&str]
                 }
             }
             ArgOrKeyword::Keyword(kw) => match kw.arg.as_deref() {
-                Some(arg)
-                    if matches!(
-                        arg,
-                        "mode" | "buffering" | "encoding" | "errors" | "newline"
-                    ) =>
-                {
-                    Some(format!("{arg}={}", locator.slice(&kw.value)))
+                Some("mode" | "buffering" | "encoding" | "errors" | "newline") => {
+                    Some(locator.slice(kw).to_string())
                 }
                 _ => None,
             },
