@@ -13,7 +13,6 @@
 use std::{collections::HashMap, slice::Iter};
 
 use itertools::{EitherOrBoth, Itertools};
-use ruff_db::parsed::parsed_module;
 use smallvec::{SmallVec, smallvec_inline};
 
 use super::{
@@ -21,10 +20,9 @@ use super::{
     semantic_index,
 };
 use crate::semantic_index::definition::Definition;
-use crate::semantic_index::scope::ScopeId;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::function::FunctionType;
-use crate::types::generics::{GenericContext, bind_typevar, get_self_type, walk_generic_context};
+use crate::types::generics::{GenericContext, get_self_type, walk_generic_context};
 use crate::types::infer::nearest_enclosing_class;
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, ClassType,
