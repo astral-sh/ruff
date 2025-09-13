@@ -247,6 +247,59 @@ fn string_detection() -> Result<()> {
 }
 
 #[test]
+fn string_detection_from_config() -> Result<()> {
+    let tempdir = TempDir::new()?;
+
+    let root = ChildPath::new(tempdir.path());
+
+    // Configure string import detection with a lower min-dots via ruff.toml
+    root.child("ruff.toml").write_str(indoc::indoc! {r#"
+        [analyze]
+        detect-string-imports = true
+        string-imports-min-dots = 1
+    "#})?;
+
+    root.child("ruff").child("__init__.py").write_str("")?;
+    root.child("ruff")
+        .child("a.py")
+        .write_str(indoc::indoc! {r#"
+        import ruff.b
+    "#})?;
+    root.child("ruff")
+        .child("b.py")
+        .write_str(indoc::indoc! {r#"
+        import importlib
+
+        importlib.import_module("ruff.c")
+    "#})?;
+    root.child("ruff").child("c.py").write_str("")?;
+
+    insta::with_settings!({
+        filters => INSTA_FILTERS.to_vec(),
+    }, {
+        assert_cmd_snapshot!(command().current_dir(&root), @r#"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        {
+          "ruff/__init__.py": [],
+          "ruff/a.py": [
+            "ruff/b.py"
+          ],
+          "ruff/b.py": [
+            "ruff/c.py"
+          ],
+          "ruff/c.py": []
+        }
+
+        ----- stderr -----
+        "#);
+    });
+
+    Ok(())
+}
+
+#[test]
 fn globs() -> Result<()> {
     let tempdir = TempDir::new()?;
 
