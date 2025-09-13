@@ -1,0 +1,3 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
