@@ -50,8 +50,8 @@ use crate::types::function::{
     DataclassTransformerParams, FunctionSpans, FunctionType, KnownFunction,
 };
 use crate::types::generics::{
-    GenericContext, PartialSpecialization, Specialization, bind_typevar, walk_generic_context,
-    walk_partial_specialization, walk_specialization,
+    GenericContext, PartialSpecialization, Specialization, bind_typevar, get_self_type,
+    walk_generic_context, walk_partial_specialization, walk_specialization,
 };
 pub use crate::types::ide_support::{
     CallSignatureDetails, Member, all_members, call_signature_details, definition_kind_for_name,
@@ -5642,7 +5642,6 @@ impl<'db> Type<'db> {
                     .build()),
 
                 SpecialFormType::TypingSelf => {
-                    let module = parsed_module(db, scope_id.file(db)).load(db);
                     let index = semantic_index(db, scope_id.file(db));
                     let Some(class) = nearest_enclosing_class(db, index, scope_id) else {
                         return Err(InvalidTypeExpressionError {
@@ -5652,30 +5651,8 @@ impl<'db> Type<'db> {
                             ],
                         });
                     };
-                    let instance = Type::instance(db, class.unknown_specialization(db));
-                    let class_definition = class.definition(db);
-                    let typevar = TypeVarInstance::new(
-                        db,
-                        ast::name::Name::new_static("Self"),
-                        Some(class_definition),
-                        Some(TypeVarBoundOrConstraints::UpperBound(instance).into()),
-                        // According to the [spec], we can consider `Self`
-                        // equivalent to an invariant type variable
-                        // [spec]: https://typing.python.org/en/latest/spec/generics.html#self
-                        Some(TypeVarVariance::Invariant),
-                        None,
-                        TypeVarKind::TypingSelf,
-                    );
-                    Ok(bind_typevar(
-                        db,
-                        &module,
-                        index,
-                        scope_id.file_scope_id(db),
-                        typevar_binding_context,
-                        typevar,
-                    )
-                    .map(Type::NonInferableTypeVar)
-                    .unwrap_or(*self))
+                    let self_type = get_self_type(db, scope_id, typevar_binding_context, class);
+                    Ok(self_type.map(Type::NonInferableTypeVar).unwrap_or(*self))
                 }
                 SpecialFormType::TypeAlias => Ok(Type::Dynamic(DynamicType::TodoTypeAlias)),
                 SpecialFormType::TypedDict => Err(InvalidTypeExpressionError {
