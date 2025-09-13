@@ -82,7 +82,7 @@ class A:
 
 a = A()
 # TODO: Should reveal Self@implicit_self. Requires implicit self in method body(https://github.com/astral-sh/ruff/pull/18473)
-reveal_type(a.implicit_self())  # revealed: Unknown
+reveal_type(a.implicit_self())  # revealed: A
 reveal_type(a.implicit_self)  # revealed: bound method A.implicit_self() -> A
 ```
 
@@ -133,7 +133,7 @@ class G(Generic[T]):
 g = G[int]()
 
 # TODO: Should reveal Self@id Requires implicit self in method body(https://github.com/astral-sh/ruff/pull/18473)
-reveal_type(G[int].id(g))  # revealed: Unknown
+reveal_type(G[int].id(g))  # revealed: G[int]
 ```
 
 Free functions and nested functions do not use implicit `Self`:
@@ -346,9 +346,7 @@ C.z(1)  # error: [invalid-argument-type] "Argument to function `z` is incorrect:
 ```
 
 ```py
-# TODO: Currenty 1 is assignable to synthetic `typing.Self` annotation added. The check happens in
-# ArgumentTypeChecker::infer_specialization.
-# TODO: Should give error: [invalid-argument-type] "Argument to function `f` is incorrect: Argument type `Literal[1]` does not satisfy upper bound `C` of type variable `Self`"
+# error: [invalid-argument-type] "Argument to function `f` is incorrect: Argument type `Literal[1]` does not satisfy upper bound `C` of type variable `Self`"
 C.f(1)
 ```
 
