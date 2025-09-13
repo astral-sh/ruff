@@ -660,7 +660,7 @@ impl SemanticSyntaxContext for Checker<'_> {
                     self.report_diagnostic(YieldOutsideFunction::new(kind), error.range);
                 }
             }
-            SemanticSyntaxErrorKind::UndefinedLocalWithNestedImportStarUsage(name) => {
+            SemanticSyntaxErrorKind::NonModuleImportStar(name) => {
                 if self.is_rule_enabled(Rule::UndefinedLocalWithNestedImportStarUsage) {
                     self.report_diagnostic(
                         UndefinedLocalWithNestedImportStarUsage { name },

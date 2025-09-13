@@ -8,22 +8,22 @@ input_file: crates/ruff_python_parser/resources/inline/err/import_from_star.py
 Module(
     ModModule {
         node_index: NodeIndex(None),
-        range: 0..34,
+        range: 0..106,
         body: [
             FunctionDef(
                 StmtFunctionDef {
                     node_index: NodeIndex(None),
-                    range: 0..33,
+                    range: 0..34,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: Name("f"),
-                        range: 4..5,
+                        id: Name("f1"),
+                        range: 4..6,
                         node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {
-                        range: 5..7,
+                        range: 6..8,
                         node_index: NodeIndex(None),
                         posonlyargs: [],
                         args: [],
@@ -36,27 +36,121 @@ Module(
                         ImportFrom(
                             StmtImportFrom {
                                 node_index: NodeIndex(None),
-                                range: 13..33,
+                                range: 14..34,
                                 module: Some(
                                     Identifier {
                                         id: Name("module"),
-                                        range: 18..24,
+                                        range: 19..25,
                                         node_index: NodeIndex(None),
                                     },
                                 ),
                                 names: [
                                     Alias {
-                                        range: 32..33,
+                                        range: 33..34,
                                         node_index: NodeIndex(None),
                                         name: Identifier {
                                             id: Name("*"),
-                                            range: 32..33,
+                                            range: 33..34,
                                             node_index: NodeIndex(None),
                                         },
                                         asname: None,
                                     },
                                 ],
                                 level: 0,
+                            },
+                        ),
+                    ],
+                },
+            ),
+            ClassDef(
+                StmtClassDef {
+                    node_index: NodeIndex(None),
+                    range: 35..68,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("C"),
+                        range: 41..42,
+                        node_index: NodeIndex(None),
+                    },
+                    type_params: None,
+                    arguments: None,
+                    body: [
+                        ImportFrom(
+                            StmtImportFrom {
+                                node_index: NodeIndex(None),
+                                range: 48..68,
+                                module: Some(
+                                    Identifier {
+                                        id: Name("module"),
+                                        range: 53..59,
+                                        node_index: NodeIndex(None),
+                                    },
+                                ),
+                                names: [
+                                    Alias {
+                                        range: 67..68,
+                                        node_index: NodeIndex(None),
+                                        name: Identifier {
+                                            id: Name("*"),
+                                            range: 67..68,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        asname: None,
+                                    },
+                                ],
+                                level: 0,
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    node_index: NodeIndex(None),
+                    range: 69..105,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("f2"),
+                        range: 73..75,
+                        node_index: NodeIndex(None),
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 75..77,
+                        node_index: NodeIndex(None),
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        ImportFrom(
+                            StmtImportFrom {
+                                node_index: NodeIndex(None),
+                                range: 83..105,
+                                module: Some(
+                                    Identifier {
+                                        id: Name("module"),
+                                        range: 90..96,
+                                        node_index: NodeIndex(None),
+                                    },
+                                ),
+                                names: [
+                                    Alias {
+                                        range: 104..105,
+                                        node_index: NodeIndex(None),
+                                        name: Identifier {
+                                            id: Name("*"),
+                                            range: 104..105,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        asname: None,
+                                    },
+                                ],
+                                level: 2,
                             },
                         ),
                     ],
@@ -69,7 +163,27 @@ Module(
 ## Semantic Syntax Errors
 
   |
-1 | def f():
+1 | def f1():
 2 |     from module import *
   |     ^^^^^^^^^^^^^^^^^^^^ Syntax Error: `from module import *` only allowed at module level
+3 | class C:
+4 |     from module import *
+  |
+
+
+  |
+2 |     from module import *
+3 | class C:
+4 |     from module import *
+  |     ^^^^^^^^^^^^^^^^^^^^ Syntax Error: `from module import *` only allowed at module level
+5 | def f2():
+6 |     from ..module import *
+  |
+
+
+  |
+4 |     from module import *
+5 | def f2():
+6 |     from ..module import *
+  |     ^^^^^^^^^^^^^^^^^^^^^^ Syntax Error: `from ..module import *` only allowed at module level
   |

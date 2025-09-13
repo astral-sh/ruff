@@ -7,6 +7,7 @@ use ruff_python_ast::{
     self as ast, Expr, ExprContext, IrrefutablePatternKind, Pattern, PythonVersion, Stmt, StmtExpr,
     StmtImportFrom,
     comparable::ComparableExpr,
+    helpers,
     visitor::{Visitor, walk_expr},
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -60,6 +61,7 @@ impl SemanticSyntaxChecker {
             Stmt::ImportFrom(StmtImportFrom {
                 range,
                 module,
+                level,
                 names,
                 ..
             }) => {
@@ -69,15 +71,19 @@ impl SemanticSyntaxChecker {
                 for alias in names {
                     if alias.name.as_str() == "*" && !ctx.in_module_scope() {
                         // test_err import_from_star
-                        // def f():
+                        // def f1():
                         //     from module import *
+                        // class C:
+                        //     from module import *
+                        // def f2():
+                        //     from ..module import *
 
                         // test_ok import_from_star
                         // from module import *
                         Self::add_error(
                             ctx,
-                            SemanticSyntaxErrorKind::UndefinedLocalWithNestedImportStarUsage(
-                                module.as_deref().unwrap_or_default().to_string(),
+                            SemanticSyntaxErrorKind::NonModuleImportStar(
+                                helpers::format_import_from(*level, module.as_deref()).to_string(),
                             ),
                             *range,
                         );
@@ -1024,7 +1030,7 @@ impl Display for SemanticSyntaxError {
             SemanticSyntaxErrorKind::YieldFromInAsyncFunction => {
                 f.write_str("`yield from` statement in async function; use `async for` instead")
             }
-            SemanticSyntaxErrorKind::UndefinedLocalWithNestedImportStarUsage(name) => {
+            SemanticSyntaxErrorKind::NonModuleImportStar(name) => {
                 write!(f, "`from {name} import *` only allowed at module level")
             }
         }
@@ -1389,7 +1395,7 @@ pub enum SemanticSyntaxErrorKind {
     YieldFromInAsyncFunction,
 
     /// Represents the use of `from <module> import *` outside module scope.
-    UndefinedLocalWithNestedImportStarUsage(String),
+    NonModuleImportStar(String),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
