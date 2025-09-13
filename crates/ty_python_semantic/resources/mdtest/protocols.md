@@ -2227,9 +2227,32 @@ def satisfies_foo(x: int) -> str:
     return "foo"
 
 static_assert(is_assignable_to(TypeOf[satisfies_foo], Foo))
+static_assert(is_subtype_of(TypeOf[satisfies_foo], Foo))
 
-# TODO: this should pass
-static_assert(is_subtype_of(TypeOf[satisfies_foo], Foo))  # error: [static-assert-error]
+def doesnt_satisfy_foo(x: str) -> int:
+    return 42
+
+static_assert(not is_assignable_to(TypeOf[doesnt_satisfy_foo], Foo))
+static_assert(not is_subtype_of(TypeOf[doesnt_satisfy_foo], Foo))
+```
+
+Class-literals and generic aliases can also be subtypes of callback protocols:
+
+```py
+from typing import Sequence, TypeVar
+
+static_assert(is_subtype_of(TypeOf[str], Foo))
+
+T = TypeVar("T")
+
+class SequenceMaker(Protocol[T]):
+    def __call__(self, arg: Sequence[T], /) -> Sequence[T]: ...
+
+static_assert(is_subtype_of(TypeOf[list[int]], SequenceMaker[int]))
+
+# TODO: these should pass
+static_assert(is_subtype_of(TypeOf[tuple[str, ...]], SequenceMaker[str]))  # error: [static-assert-error]
+static_assert(is_subtype_of(TypeOf[tuple[str, ...]], SequenceMaker[int | str]))  # error: [static-assert-error]
 ```
 
 ## Nominal subtyping of protocols

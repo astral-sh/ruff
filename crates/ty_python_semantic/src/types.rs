@@ -126,23 +126,6 @@ fn return_type_cycle_initial<'db>(db: &'db dyn Db, method: BoundMethodType<'db>)
     }))
 }
 
-#[allow(clippy::trivially_copy_pass_by_ref)]
-fn into_callable_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &CallableType<'db>,
-    _count: u32,
-    _self: BoundMethodType<'db>,
-) -> salsa::CycleRecoveryAction<CallableType<'db>> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
-fn into_callable_type_cycle_initial<'db>(
-    db: &'db dyn Db,
-    _method: BoundMethodType<'db>,
-) -> CallableType<'db> {
-    CallableType::new(db, CallableSignature::single(Signature::bottom()), false)
-}
-
 pub fn check_types(db: &dyn Db, file: File) -> Vec<Diagnostic> {
     let _span = tracing::trace_span!("check_types", ?file).entered();
 
@@ -3366,13 +3349,6 @@ impl<'db> Type<'db> {
         policy: InstanceFallbackShadowsNonDataDescriptor,
         member_policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
-        // TODO: this is a workaround for the fact that looking up the `__call__` attribute on the
-        // meta-type of a `Callable` type currently returns `Unbound`. We should fix this by inferring
-        // a more sophisticated meta-type for `Callable` types; that would allow us to remove this branch.
-        if name == "__call__" && matches!(self, Type::Callable(_) | Type::DataclassTransformer(_)) {
-            return Place::bound(self).into();
-        }
-
         let (
             PlaceAndQualifiers {
                 place: meta_attr,
@@ -9052,6 +9028,23 @@ fn walk_bound_method_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     visitor.visit_type(db, method.self_instance(db));
 }
 
+#[allow(clippy::trivially_copy_pass_by_ref)]
+fn into_callable_type_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &CallableType<'db>,
+    _count: u32,
+    _self: BoundMethodType<'db>,
+) -> salsa::CycleRecoveryAction<CallableType<'db>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn into_callable_type_cycle_initial<'db>(
+    db: &'db dyn Db,
+    _self: BoundMethodType<'db>,
+) -> CallableType<'db> {
+    CallableType::bottom(db)
+}
+
 #[salsa::tracked]
 impl<'db> BoundMethodType<'db> {
     /// Returns the type that replaces any `typing.Self` annotations in the bound method signature.
@@ -9065,7 +9058,7 @@ impl<'db> BoundMethodType<'db> {
         self_instance
     }
 
-    #[salsa::tracked(cycle_fn=into_callable_cycle_recover, cycle_initial=into_callable_type_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(cycle_fn=into_callable_type_cycle_recover, cycle_initial=into_callable_type_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> CallableType<'db> {
         let function = self.function(db);
         let self_instance = self.typing_self_type(db);
@@ -9274,8 +9267,8 @@ impl<'db> CallableType<'db> {
     ///
     /// Specifically, this represents a callable type with a single signature:
     /// `(*args: object, **kwargs: object) -> Never`.
-    pub(crate) fn bottom(db: &'db dyn Db) -> Type<'db> {
-        Self::single(db, Signature::bottom())
+    pub(crate) fn bottom(db: &'db dyn Db) -> CallableType<'db> {
+        Self::new(db, CallableSignature::bottom(), false)
     }
 
     /// Return a "normalized" version of this `Callable` type.

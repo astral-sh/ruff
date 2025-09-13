@@ -181,7 +181,7 @@ fn into_callable_cycle_recover<'db>(
 }
 
 fn into_callable_cycle_initial<'db>(db: &'db dyn Db, _self: ClassType<'db>) -> Type<'db> {
-    CallableType::bottom(db)
+    Type::Callable(CallableType::bottom(db))
 }
 
 /// A category of classes with code generation capabilities (with synthesized methods).
