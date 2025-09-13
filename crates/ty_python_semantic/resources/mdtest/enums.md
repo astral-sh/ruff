@@ -4,6 +4,7 @@
 
 ```py
 from enum import Enum
+from typing import Literal
 
 class Color(Enum):
     RED = 1
@@ -11,8 +12,14 @@ class Color(Enum):
     BLUE = 3
 
 reveal_type(Color.RED)  # revealed: Literal[Color.RED]
-# TODO: This could be `Literal[1]`
-reveal_type(Color.RED.value)  # revealed: Any
+
+reveal_type(Color.RED.value)  # revealed: Literal[1]
+
+reveal_type(Color.RED._value_)  # revealed: Literal[1]
+
+reveal_type(Color.RED.name)  # revealed: Literal["RED"]
+
+reveal_type(Color.RED._name_)  # revealed: Literal["RED"]
 
 # TODO: Should be `Color` or `Literal[Color.RED]`
 reveal_type(Color["RED"])  # revealed: Unknown
@@ -21,6 +28,13 @@ reveal_type(Color["RED"])  # revealed: Unknown
 reveal_type(Color(1))  # revealed: Color
 
 reveal_type(Color.RED in Color)  # revealed: bool
+
+def func1(red_or_blue: Literal[Color.RED, Color.BLUE]):
+    reveal_type(red_or_blue.name)  # revealed: Literal["RED", "BLUE"]
+
+def func2(any_color: Color):
+    # TODO: Literal["RED", "GREEN", "BLUE"]
+    reveal_type(any_color.name)  # revealed: Any
 ```
 
 ## Enum members

@@ -427,7 +427,10 @@ impl<'db> UnionBuilder<'db> {
                     .collect::<FxOrderSet<_>>();
 
                 let all_members_are_in_union = metadata
-                    .members
+                    .members(self.db)
+                    .keys()
+                    .cloned()
+                    .collect::<FxOrderSet<_>>()
                     .difference(&enum_members_in_union)
                     .next()
                     .is_none();

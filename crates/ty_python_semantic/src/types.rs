@@ -3528,6 +3528,21 @@ impl<'db> Type<'db> {
                 .value_type(db)
                 .member_lookup_with_policy(db, name, policy),
 
+            Type::EnumLiteral(enum_literal) if matches!(name_str, "name" | "_name_") => {
+                Place::bound(Type::StringLiteral(StringLiteralType::new(
+                    db,
+                    enum_literal.name(db).as_str(),
+                )))
+                .into()
+            }
+
+            Type::EnumLiteral(enum_literal) if matches!(name_str, "value" | "_value_") => {
+                enum_metadata(db, enum_literal.enum_class(db))
+                    .and_then(|metadata| metadata.members(db).get(enum_literal.name(db)))
+                    .map_or_else(|| Place::Unbound, Place::bound)
+                    .into()
+            }
+
             Type::NominalInstance(..)
             | Type::ProtocolInstance(..)
             | Type::BooleanLiteral(..)
@@ -3645,7 +3660,7 @@ impl<'db> Type<'db> {
                     _ => None,
                 } {
                     if let Some(metadata) = enum_metadata(db, enum_class) {
-                        if let Some(resolved_name) = metadata.resolve_member(&name) {
+                        if let Some(resolved_name) = metadata.resolve_member(db, &name) {
                             return Place::Type(
                                 Type::EnumLiteral(EnumLiteralType::new(
                                     db,
