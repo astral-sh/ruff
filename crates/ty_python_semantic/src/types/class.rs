@@ -180,8 +180,8 @@ fn into_callable_cycle_recover<'db>(
     salsa::CycleRecoveryAction::Iterate
 }
 
-fn into_callable_cycle_initial<'db>(_db: &'db dyn Db, _self: ClassType<'db>) -> Type<'db> {
-    Type::Never
+fn into_callable_cycle_initial<'db>(db: &'db dyn Db, _self: ClassType<'db>) -> Type<'db> {
+    CallableType::bottom(db)
 }
 
 /// A category of classes with code generation capabilities (with synthesized methods).

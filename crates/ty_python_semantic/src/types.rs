@@ -126,6 +126,23 @@ fn return_type_cycle_initial<'db>(db: &'db dyn Db, method: BoundMethodType<'db>)
     }))
 }
 
+#[allow(clippy::trivially_copy_pass_by_ref)]
+fn into_callable_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &CallableType<'db>,
+    _count: u32,
+    _self: BoundMethodType<'db>,
+) -> salsa::CycleRecoveryAction<CallableType<'db>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn into_callable_type_cycle_initial<'db>(
+    db: &'db dyn Db,
+    _method: BoundMethodType<'db>,
+) -> CallableType<'db> {
+    CallableType::new(db, CallableSignature::single(Signature::bottom()), false)
+}
+
 pub fn check_types(db: &dyn Db, file: File) -> Vec<Diagnostic> {
     let _span = tracing::trace_span!("check_types", ?file).entered();
 
@@ -9048,7 +9065,7 @@ impl<'db> BoundMethodType<'db> {
         self_instance
     }
 
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(cycle_fn=into_callable_cycle_recover, cycle_initial=into_callable_type_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> CallableType<'db> {
         let function = self.function(db);
         let self_instance = self.typing_self_type(db);
@@ -9257,7 +9274,6 @@ impl<'db> CallableType<'db> {
     ///
     /// Specifically, this represents a callable type with a single signature:
     /// `(*args: object, **kwargs: object) -> Never`.
-    #[cfg(test)]
     pub(crate) fn bottom(db: &'db dyn Db) -> Type<'db> {
         Self::single(db, Signature::bottom())
     }
