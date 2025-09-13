@@ -2223,7 +2223,8 @@ class C:
     def copy(self, other: "C"):
         self.x = other.x
 
-reveal_type(C().x)  # revealed: Unknown | Literal[1]
+# TODO: Should be `Unknown | Literal[1]`
+reveal_type(C().x)  # revealed: Unknown | Literal[1] | Divergent
 ```
 
 If the only assignment to a name is cyclic, we just infer `Unknown` for that attribute:

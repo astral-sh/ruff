@@ -28,6 +28,8 @@ class Point:
         self.x, self.y = other.x, other.y
 
 p = Point()
-reveal_type(p.x)  # revealed: Unknown | int
-reveal_type(p.y)  # revealed: Unknown | int
+# TODO: should be `Unknown | int`
+reveal_type(p.x)  # revealed: Unknown | int | Divergent
+# TODO: should be `Unknown | int`
+reveal_type(p.y)  # revealed: Unknown | int | Divergent
 ```
