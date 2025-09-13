@@ -1266,25 +1266,27 @@ impl<'db> Parameters<'db> {
                 method_type: method,
                 class_type: class,
             }) = method_info
-                && !is_staticmethod
-                && !is_classmethod
-                && arg.parameter.annotation().is_none()
-                && parameters.index(arg.name().id()) == Some(0)
             {
-                let method_has_self_in_generic_context =
-                    method.signature(db).overloads.iter().any(|s| {
-                        if let Some(context) = s.generic_context {
-                            context
-                                .variables(db)
-                                .iter()
-                                .any(|v| v.typevar(db).kind(db) == TypeVarKind::TypingSelf);
-                            true
-                        } else {
-                            false
-                        }
-                    });
-                let implicit_annotation =
-                    if !method_has_self_in_generic_context && class.is_not_generic() {
+                if !is_staticmethod
+                    && !is_classmethod
+                    && arg.parameter.annotation().is_none()
+                    && parameters.index(arg.name().id()) == Some(0)
+                {
+                    let method_has_self_in_generic_context =
+                        method.signature(db).overloads.iter().any(|s| {
+                            if let Some(context) = s.generic_context {
+                                context
+                                    .variables(db)
+                                    .iter()
+                                    .any(|v| v.typevar(db).kind(db) == TypeVarKind::TypingSelf);
+                                true
+                            } else {
+                                false
+                            }
+                        });
+                    let implicit_annotation = if !method_has_self_in_generic_context
+                        && class.is_not_generic()
+                    {
                         Type::instance(db, class)
                     } else {
                         let scope_id = definition.scope(db);
@@ -1295,14 +1297,25 @@ impl<'db> Parameters<'db> {
                             get_self_type(db, scope_id, typevar_binding_context, class).unwrap(),
                         )
                     };
-                Parameter {
-                    annotated_type: Some(implicit_annotation),
-                    synthetic_annotation: true,
-                    kind: ParameterKind::PositionalOrKeyword {
-                        name: arg.parameter.name.id.clone(),
-                        default_type: default_type(arg),
-                    },
-                    form: ParameterForm::Value,
+                    Parameter {
+                        annotated_type: Some(implicit_annotation),
+                        synthetic_annotation: true,
+                        kind: ParameterKind::PositionalOrKeyword {
+                            name: arg.parameter.name.id.clone(),
+                            default_type: default_type(arg),
+                        },
+                        form: ParameterForm::Value,
+                    }
+                } else {
+                    Parameter::from_node_and_kind(
+                        db,
+                        definition,
+                        &arg.parameter,
+                        ParameterKind::PositionalOrKeyword {
+                            name: arg.parameter.name.id.clone(),
+                            default_type: default_type(arg),
+                        },
+                    )
                 }
             } else {
                 Parameter::from_node_and_kind(
