@@ -13,6 +13,7 @@
 use std::{collections::HashMap, slice::Iter};
 
 use itertools::{EitherOrBoth, Itertools};
+use ruff_db::parsed::parsed_module;
 use smallvec::{SmallVec, smallvec_inline};
 
 use super::{
@@ -20,14 +21,16 @@ use super::{
     semantic_index,
 };
 use crate::semantic_index::definition::Definition;
-use crate::types::constraints::{ConstraintSet, Constraints, IteratorConstraintsExtension};
+use crate::semantic_index::scope::ScopeId;
+use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::function::FunctionType;
-use crate::types::generics::{GenericContext, walk_generic_context};
+use crate::types::generics::{GenericContext, bind_typevar, get_self_type, walk_generic_context};
+use crate::types::infer::nearest_enclosing_class;
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, ClassType,
     FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsEquivalentVisitor, KnownClass,
-    MaterializationKind, NormalizedVisitor, SpecialFormType, TypeMapping, TypeRelation,
-    TypeVarKind, VarianceInferable, todo_type,
+    MaterializationKind, NormalizedVisitor, TypeMapping, TypeRelation, TypeVarKind,
+    VarianceInferable, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -1284,14 +1287,18 @@ impl<'db> Parameters<'db> {
                     });
                 let implicit_annotation =
                     if !method_has_self_in_generic_context && class.is_not_generic() {
-                        Some(Type::instance(db, class))
+                        Type::instance(db, class)
                     } else {
-                        Type::SpecialForm(SpecialFormType::TypingSelf)
-                            .in_type_expression(db, definition.scope(db), Some(definition))
-                            .ok()
+                        let scope_id = definition.scope(db);
+                        let typevar_binding_context = Some(definition);
+                        let index = semantic_index(db, scope_id.file(db));
+                        let class = nearest_enclosing_class(db, index, scope_id).unwrap();
+                        Type::TypeVar(
+                            get_self_type(db, scope_id, typevar_binding_context, class).unwrap(),
+                        )
                     };
                 Parameter {
-                    annotated_type: implicit_annotation,
+                    annotated_type: Some(implicit_annotation),
                     synthetic_annotation: true,
                     kind: ParameterKind::PositionalOrKeyword {
                         name: arg.parameter.name.id.clone(),

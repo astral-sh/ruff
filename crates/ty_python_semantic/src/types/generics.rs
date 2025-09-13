@@ -2,24 +2,24 @@ use std::borrow::Cow;
 
 use crate::types::constraints::ConstraintSet;
 
-use ruff_db::parsed::ParsedModuleRef;
+use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast as ast;
 use rustc_hash::FxHashMap;
 
-use crate::semantic_index::SemanticIndex;
 use crate::semantic_index::definition::Definition;
-use crate::semantic_index::scope::{FileScopeId, NodeWithScopeKind};
+use crate::semantic_index::scope::{FileScopeId, NodeWithScopeKind, ScopeId};
+use crate::semantic_index::{SemanticIndex, semantic_index};
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
-use crate::types::infer::infer_definition_types;
+use crate::types::infer::{infer_definition_types, nearest_enclosing_class};
 use crate::types::instance::{Protocol, ProtocolInstanceType};
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
-    IsEquivalentVisitor, KnownClass, KnownInstanceType, MaterializationKind, NormalizedVisitor,
-    Type, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarVariance,
-    UnionType, binding_type, declaration_type,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassLiteral, FindLegacyTypeVarsVisitor,
+    HasRelationToVisitor, IsEquivalentVisitor, KnownClass, KnownInstanceType, MaterializationKind,
+    NormalizedVisitor, Type, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance,
+    TypeVarKind, TypeVarVariance, UnionType, binding_type, declaration_type,
 };
 use crate::{Db, FxOrderSet};
 
@@ -89,6 +89,44 @@ pub(crate) fn bind_typevar<'db>(
                 typevar.with_binding_context(db, typevar_binding_context)
             })
         })
+}
+
+pub(crate) fn get_self_type<'db>(
+    db: &'db dyn Db,
+    scope_id: ScopeId,
+    typevar_binding_context: Option<Definition<'db>>,
+    class: ClassLiteral<'db>,
+) -> Option<BoundTypeVarInstance<'db>> {
+    // TODO: remove duplication with Type::in_type_expression
+    let module = parsed_module(db, scope_id.file(db)).load(db);
+    let index = semantic_index(db, scope_id.file(db));
+    // NOTE: Older lambda in signatures.rs was using .to_instance but types.rs is using
+    // unknown specialization which seems fine here.
+    // let instance = Type::ClassLiteral(class)
+    //     .to_instance(db)
+    //     .expect("nearest_enclosing_class must return type that can be instantiated");
+    let instance = Type::instance(db, class.unknown_specialization(db));
+    let class_definition = class.definition(db);
+    let typevar = TypeVarInstance::new(
+        db,
+        ast::name::Name::new_static("Self"),
+        Some(class_definition),
+        Some(TypeVarBoundOrConstraints::UpperBound(instance).into()),
+        // According to the [spec], we can consider `Self`
+        // equivalent to an invariant type variable
+        // [spec]: https://typing.python.org/en/latest/spec/generics.html#self
+        Some(TypeVarVariance::Invariant),
+        None,
+        TypeVarKind::TypingSelf,
+    );
+    bind_typevar(
+        db,
+        &module,
+        index,
+        scope_id.file_scope_id(db),
+        typevar_binding_context,
+        typevar,
+    )
 }
 
 /// A list of formal type variables for a generic function, class, or type alias.
