@@ -1,5 +1,4 @@
 use itertools::Itertools;
-use regex::Regex;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::{map_callable, map_subscript};
 use ruff_python_ast::name::QualifiedName;
@@ -1053,7 +1052,6 @@ fn is_generator_function_annotated_as_returning_none(
 fn parameters_from_signature<'a>(
     docstring: &'a Docstring,
     semantic: &'a SemanticModel,
-    dummy_variable_rgx: &'a Regex,
 ) -> Vec<&'a str> {
     let mut parameters = Vec::new();
     let Some(function) = docstring.definition.as_function_def() else {
@@ -1065,9 +1063,7 @@ fn parameters_from_signature<'a>(
     for param in function.parameters.iter().skip(usize::from(
         docstring.definition.is_method() && !is_staticmethod(&function.decorator_list, semantic),
     )) {
-        if !dummy_variable_rgx.is_match(param.name()) {
-            parameters.push(param.name());
-        }
+        parameters.push(param.name());
     }
     parameters
 }
@@ -1125,8 +1121,7 @@ pub(crate) fn check_docstring(
         visitor.finish()
     };
 
-    let signature_parameters =
-        parameters_from_signature(docstring, semantic, &checker.settings().dummy_variable_rgx);
+    let signature_parameters = parameters_from_signature(docstring, semantic);
 
     // DOC201
     if checker.is_rule_enabled(Rule::DocstringMissingReturns) {
