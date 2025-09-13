@@ -4058,56 +4058,26 @@ impl<'db> Type<'db> {
                 )
                 .into(),
 
-                Some(KnownFunction::RangeConstraint) => Binding::single(
-                    self,
-                    Signature::new(
-                        Parameters::new([
-                            Parameter::positional_only(Some(Name::new_static("lower_bound")))
-                                .type_form()
-                                .with_annotated_type(Type::any()),
-                            Parameter::positional_only(Some(Name::new_static("typevar")))
-                                .type_form()
-                                .with_annotated_type(Type::any()),
-                            Parameter::positional_only(Some(Name::new_static("upper_bound")))
-                                .type_form()
-                                .with_annotated_type(Type::any()),
-                        ]),
-                        Some(KnownClass::ConstraintSet.to_instance(db)),
-                    ),
-                )
-                .into(),
-
-                Some(KnownFunction::NotEquivalentConstraint) => Binding::single(
-                    self,
-                    Signature::new(
-                        Parameters::new([
-                            Parameter::positional_only(Some(Name::new_static("typevar")))
-                                .type_form()
-                                .with_annotated_type(Type::any()),
-                            Parameter::positional_only(Some(Name::new_static("hole")))
-                                .type_form()
-                                .with_annotated_type(Type::any()),
-                        ]),
-                        Some(KnownClass::ConstraintSet.to_instance(db)),
-                    ),
-                )
-                .into(),
-
-                Some(KnownFunction::IncomparableConstraint) => Binding::single(
-                    self,
-                    Signature::new(
-                        Parameters::new([
-                            Parameter::positional_only(Some(Name::new_static("typevar")))
-                                .type_form()
-                                .with_annotated_type(Type::any()),
-                            Parameter::positional_only(Some(Name::new_static("pivot")))
-                                .type_form()
-                                .with_annotated_type(Type::any()),
-                        ]),
-                        Some(KnownClass::ConstraintSet.to_instance(db)),
-                    ),
-                )
-                .into(),
+                Some(KnownFunction::RangeConstraint | KnownFunction::NegatedRangeConstraint) => {
+                    Binding::single(
+                        self,
+                        Signature::new(
+                            Parameters::new([
+                                Parameter::positional_only(Some(Name::new_static("lower_bound")))
+                                    .type_form()
+                                    .with_annotated_type(Type::any()),
+                                Parameter::positional_only(Some(Name::new_static("typevar")))
+                                    .type_form()
+                                    .with_annotated_type(Type::any()),
+                                Parameter::positional_only(Some(Name::new_static("upper_bound")))
+                                    .type_form()
+                                    .with_annotated_type(Type::any()),
+                            ]),
+                            Some(KnownClass::ConstraintSet.to_instance(db)),
+                        ),
+                    )
+                    .into()
+                }
 
                 Some(KnownFunction::IsSingleton | KnownFunction::IsSingleValued) => {
                     Binding::single(

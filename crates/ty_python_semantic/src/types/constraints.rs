@@ -298,23 +298,15 @@ impl<'db> ConstraintSet<'db> {
         result
     }
 
-    pub(crate) fn not_equivalent(
+    pub(crate) fn negated_range(
         db: &'db dyn Db,
+        lower: Type<'db>,
         typevar: BoundTypeVarInstance<'db>,
-        hole: Type<'db>,
+        upper: Type<'db>,
     ) -> Self {
-        let constraint = Constraint::not_equivalent(db, hole).constrain(typevar);
-        let mut result = Self::never();
-        result.union_constraint(db, constraint);
-        result
-    }
-
-    pub(crate) fn incomparable(
-        db: &'db dyn Db,
-        typevar: BoundTypeVarInstance<'db>,
-        pivot: Type<'db>,
-    ) -> Self {
-        let constraint = Constraint::incomparable(db, pivot).constrain(typevar);
+        let lower = lower.bottom_materialization(db);
+        let upper = upper.top_materialization(db);
+        let constraint = Constraint::negated_range(db, lower, upper).constrain(typevar);
         let mut result = Self::never();
         result.union_constraint(db, constraint);
         result
@@ -469,23 +461,6 @@ impl<'db> ConstraintClause<'db> {
         Self {
             constraints: smallvec![constraint],
         }
-    }
-
-    /// Returns a clause that is the intersection of an iterator of constraints.
-    fn from_constraints(
-        db: &'db dyn Db,
-        constraints: impl IntoIterator<Item = Satisfiable<ConstrainedTypeVar<'db>>>,
-    ) -> Satisfiable<Self> {
-        let mut result = Self::always();
-        for constraint in constraints {
-            if result.intersect_constraint(db, constraint) == Satisfiable::Never {
-                return Satisfiable::Never;
-            }
-        }
-        if result.is_always() {
-            return Satisfiable::Always;
-        }
-        Satisfiable::Constrained(result)
     }
 
     /// Returns whether this constraint is always satisfiable.
@@ -881,8 +856,7 @@ impl<'db> ConstrainedTypeVar<'db> {
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
 pub(crate) enum Constraint<'db> {
     Range(RangeConstraint<'db>),
-    NotEquivalent(NotEquivalentConstraint<'db>),
-    Incomparable(IncomparableConstraint<'db>),
+    NegatedRange(NegatedRangeConstraint<'db>),
 }
 
 impl<'db> Constraint<'db> {
@@ -897,27 +871,13 @@ impl<'db> Constraint<'db> {
         match (self, other) {
             (Constraint::Range(left), Constraint::Range(right)) => left.intersect_range(db, right),
 
-            (Constraint::Range(range), Constraint::NotEquivalent(not_equivalent))
-            | (Constraint::NotEquivalent(not_equivalent), Constraint::Range(range)) => {
-                range.intersect_not_equivalent(db, not_equivalent)
+            (Constraint::Range(range), Constraint::NegatedRange(negated_range))
+            | (Constraint::NegatedRange(negated_range), Constraint::Range(range)) => {
+                range.intersect_negated_range(db, negated_range)
             }
 
-            (Constraint::Range(range), Constraint::Incomparable(incomparable))
-            | (Constraint::Incomparable(incomparable), Constraint::Range(range)) => {
-                range.intersect_incomparable(db, incomparable)
-            }
-
-            (Constraint::NotEquivalent(left), Constraint::NotEquivalent(right)) => {
-                left.intersect_not_equivalent(db, right)
-            }
-
-            (Constraint::NotEquivalent(not_equivalent), Constraint::Incomparable(incomparable))
-            | (Constraint::Incomparable(incomparable), Constraint::NotEquivalent(not_equivalent)) => {
-                not_equivalent.intersect_incomparable(db, incomparable)
-            }
-
-            (Constraint::Incomparable(left), Constraint::Incomparable(right)) => {
-                left.intersect_incomparable(db, right)
+            (Constraint::NegatedRange(left), Constraint::NegatedRange(right)) => {
+                left.intersect_negated_range(db, right)
             }
         }
     }
@@ -926,27 +886,13 @@ impl<'db> Constraint<'db> {
         match (self, other) {
             (Constraint::Range(left), Constraint::Range(right)) => left.union_range(db, right),
 
-            (Constraint::Range(range), Constraint::NotEquivalent(not_equivalent))
-            | (Constraint::NotEquivalent(not_equivalent), Constraint::Range(range)) => {
-                range.union_not_equivalent(db, not_equivalent)
+            (Constraint::Range(range), Constraint::NegatedRange(negated_range))
+            | (Constraint::NegatedRange(negated_range), Constraint::Range(range)) => {
+                range.union_negated_range(db, negated_range)
             }
 
-            (Constraint::Range(range), Constraint::Incomparable(incomparable))
-            | (Constraint::Incomparable(incomparable), Constraint::Range(range)) => {
-                range.union_incomparable(db, incomparable)
-            }
-
-            (Constraint::NotEquivalent(left), Constraint::NotEquivalent(right)) => {
-                left.union_not_equivalent(db, right)
-            }
-
-            (Constraint::NotEquivalent(not_equivalent), Constraint::Incomparable(incomparable))
-            | (Constraint::Incomparable(incomparable), Constraint::NotEquivalent(not_equivalent)) => {
-                not_equivalent.union_incomparable(db, incomparable)
-            }
-
-            (Constraint::Incomparable(left), Constraint::Incomparable(right)) => {
-                left.union_incomparable(db, right)
+            (Constraint::NegatedRange(left), Constraint::NegatedRange(right)) => {
+                left.union_negated_range(db, right)
             }
         }
     }
@@ -959,8 +905,7 @@ impl<'db> Constraint<'db> {
     ) {
         match self {
             Constraint::Range(constraint) => constraint.negate_into(db, typevar, set),
-            Constraint::NotEquivalent(constraint) => constraint.negate_into(db, typevar, set),
-            Constraint::Incomparable(constraint) => constraint.negate_into(db, typevar, set),
+            Constraint::NegatedRange(constraint) => constraint.negate_into(db, typevar, set),
         }
     }
 
@@ -977,10 +922,7 @@ impl<'db> Constraint<'db> {
                     Constraint::Range(constraint) => {
                         constraint.display(self.db, &self.typevar).fmt(f)
                     }
-                    Constraint::NotEquivalent(constraint) => {
-                        constraint.display(self.db, &self.typevar).fmt(f)
-                    }
-                    Constraint::Incomparable(constraint) => {
+                    Constraint::NegatedRange(constraint) => {
                         constraint.display(self.db, &self.typevar).fmt(f)
                     }
                 }
@@ -1037,7 +979,7 @@ impl<'db> RangeConstraint<'db> {
         db: &'db dyn Db,
         other: &RangeConstraint<'db>,
     ) -> Simplifiable<Constraint<'db>> {
-        // (s₁ ≤ α ≤ t₁) ∧ (s₂ ≤ α ≤ t₂) = (s₁ ∪ s₂) ≤ α (t₁ ∩ t₂)
+        // (s₁ ≤ α ≤ t₁) ∧ (s₂ ≤ α ≤ t₂) = (s₁ ∪ s₂) ≤ α ≤ (t₁ ∩ t₂))
         Simplifiable::from_one(Constraint::range(
             db,
             UnionType::from_elements(db, [self.lower, other.lower]),
@@ -1045,44 +987,32 @@ impl<'db> RangeConstraint<'db> {
         ))
     }
 
-    fn intersect_not_equivalent(
+    fn intersect_negated_range(
         &self,
         db: &'db dyn Db,
-        other: &NotEquivalentConstraint<'db>,
+        other: &NegatedRangeConstraint<'db>,
     ) -> Simplifiable<Constraint<'db>> {
-        // If the range constraint says that the typevar must be equivalent to some type, and the
-        // not-equivalent type says that it must not, we have a contradiction.
-        if self.lower.is_equivalent_to(db, self.upper) && self.lower.is_equivalent_to(db, other.ty)
-        {
+        // If the negative range completely contains the positive range, then the intersection is
+        // empty.
+        if other.lower.is_subtype_of(db, self.lower) && self.upper.is_subtype_of(db, other.upper) {
             return Simplifiable::NeverSatisfiable;
         }
 
-        // If the "hole" of the not-equivalent type is not contained in the range, the the
-        // intersection simplifies to the range.
-        if !self.lower.is_subtype_of(db, other.ty) || !other.ty.is_subtype_of(db, self.upper) {
+        // If the negative range is disjoint from the positive range, the negative range doesn't
+        // remove anything; the intersection is the positive range.
+        if incomparable(db, self.lower, other.upper) || incomparable(db, other.lower, self.upper) {
             return Simplifiable::Simplified(Constraint::Range(self.clone()));
         }
 
-        // Otherwise the result cannot be simplified.
-        Simplifiable::NotSimplified(
-            Constraint::Range(self.clone()),
-            Constraint::NotEquivalent(other.clone()),
-        )
-    }
-
-    fn intersect_incomparable(
-        &self,
-        db: &'db dyn Db,
-        other: &IncomparableConstraint<'db>,
-    ) -> Simplifiable<Constraint<'db>> {
-        if other.ty.is_subtype_of(db, self.lower) || self.upper.is_subtype_of(db, other.ty) {
-            return Simplifiable::NeverSatisfiable;
-        }
-
-        // A range constraint and an incomparable constraint cannot be simplified.
-        Simplifiable::NotSimplified(
-            Constraint::Range(self.clone()),
-            Constraint::Incomparable(other.clone()),
+        // Otherwise we clip the negative constraint to the mininum range that overlaps with the
+        // positive range.
+        Simplifiable::from_intersection(
+            Satisfiable::Constrained(Constraint::Range(self.clone())),
+            Constraint::negated_range(
+                db,
+                UnionType::from_elements(db, [self.lower, other.lower]),
+                IntersectionType::from_elements(db, [self.upper, other.upper]),
+            ),
         )
     }
 
@@ -1107,36 +1037,32 @@ impl<'db> RangeConstraint<'db> {
         )
     }
 
-    fn union_not_equivalent(
+    fn union_negated_range(
         &self,
         db: &'db dyn Db,
-        other: &NotEquivalentConstraint<'db>,
+        other: &NegatedRangeConstraint<'db>,
     ) -> Simplifiable<Constraint<'db>> {
-        // When the range constraint contains the "hole" from the non-equivalent constraint, then
-        // the range constraint fills in the hole, and the result is always satisfiable.
-        if self.lower.is_subtype_of(db, other.ty) && other.ty.is_subtype_of(db, self.upper) {
+        // If the positive range completely contains the negative range, then the union is always
+        // satisfied.
+        if self.lower.is_subtype_of(db, other.lower) && other.upper.is_subtype_of(db, self.upper) {
             return Simplifiable::AlwaysSatisfiable;
         }
 
-        // Otherwise the range constraint is subsumed by the non-equivalent constraint.
-        Simplifiable::Simplified(Constraint::NotEquivalent(other.clone()))
-    }
-
-    fn union_incomparable(
-        &self,
-        db: &'db dyn Db,
-        other: &IncomparableConstraint<'db>,
-    ) -> Simplifiable<Constraint<'db>> {
-        // When the "pivot" of the incomparable constraint is not comparable with either bound of
-        // the range constraint, the incomparable constraint subsumes the range constraint.
-        if incomparable(db, self.lower, other.ty) && incomparable(db, self.upper, other.ty) {
-            return Simplifiable::Simplified(Constraint::Incomparable(other.clone()));
+        // If the positive range is disjoint from the negative range, the positive range doesn't
+        // add anything; the union is the negative range.
+        if incomparable(db, self.lower, other.upper) || incomparable(db, other.lower, self.upper) {
+            return Simplifiable::Simplified(Constraint::NegatedRange(other.clone()));
         }
 
-        // Otherwise the result cannot be simplified.
-        Simplifiable::NotSimplified(
-            Constraint::Range(self.clone()),
-            Constraint::Incomparable(other.clone()),
+        // Otherwise we clip the positive constraint to the mininum range that overlaps with the
+        // negative range.
+        Simplifiable::from_intersection(
+            Constraint::range(
+                db,
+                UnionType::from_elements(db, [self.lower, other.lower]),
+                IntersectionType::from_elements(db, [self.upper, other.upper]),
+            ),
+            Satisfiable::Constrained(Constraint::NegatedRange(other.clone())),
         )
     }
 
@@ -1146,38 +1072,9 @@ impl<'db> RangeConstraint<'db> {
         typevar: BoundTypeVarInstance<'db>,
         set: &mut ConstraintSet<'db>,
     ) {
-        // Lower bound:
-        // ¬(s ≤ α) = ((α ≤ s) ∧ α ≠ s) ∨ (a ≁ s)
-        set.union_clause(
-            db,
-            ConstraintClause::from_constraints(
-                db,
-                [
-                    Constraint::range(db, Type::Never, self.lower).constrain(typevar),
-                    Constraint::not_equivalent(db, self.lower).constrain(typevar),
-                ],
-            ),
-        );
         set.union_constraint(
             db,
-            Constraint::incomparable(db, self.lower).constrain(typevar),
-        );
-
-        // Upper bound:
-        // ¬(α ≤ t) = ((t ≤ α) ∧ α ≠ t) ∨ (a ≁ t)
-        set.union_clause(
-            db,
-            ConstraintClause::from_constraints(
-                db,
-                [
-                    Constraint::range(db, self.upper, Type::object()).constrain(typevar),
-                    Constraint::not_equivalent(db, self.upper).constrain(typevar),
-                ],
-            ),
-        );
-        set.union_constraint(
-            db,
-            Constraint::incomparable(db, self.upper).constrain(typevar),
+            Constraint::negated_range(db, self.lower, self.upper).constrain(typevar),
         );
     }
 
@@ -1211,167 +1108,75 @@ impl<'db> RangeConstraint<'db> {
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
-pub(crate) struct NotEquivalentConstraint<'db> {
-    ty: Type<'db>,
+pub(crate) struct NegatedRangeConstraint<'db> {
+    lower: Type<'db>,
+    upper: Type<'db>,
 }
 
 impl<'db> Constraint<'db> {
-    /// Returns a new not-equivalent constraint.
+    /// Returns a new negated_range constraint.
     ///
-    /// Panics if `ty` is not fully static.
-    fn not_equivalent(db: &'db dyn Db, ty: Type<'db>) -> Satisfiable<Constraint<'db>> {
-        debug_assert_eq!(ty, ty.top_materialization(db));
-        Satisfiable::Constrained(Constraint::NotEquivalent(NotEquivalentConstraint { ty }))
-    }
-}
-
-impl<'db> NotEquivalentConstraint<'db> {
-    fn intersect_not_equivalent(
-        &self,
+    /// Panics if `lower` and `upper` are not both fully static.
+    fn negated_range(
         db: &'db dyn Db,
-        other: &NotEquivalentConstraint<'db>,
-    ) -> Simplifiable<Constraint<'db>> {
-        if self.ty.is_equivalent_to(db, other.ty) {
-            return Simplifiable::Simplified(Constraint::NotEquivalent(self.clone()));
-        }
-        Simplifiable::NotSimplified(
-            Constraint::NotEquivalent(self.clone()),
-            Constraint::NotEquivalent(other.clone()),
-        )
-    }
+        lower: Type<'db>,
+        upper: Type<'db>,
+    ) -> Satisfiable<Constraint<'db>> {
+        debug_assert_eq!(lower, lower.bottom_materialization(db));
+        debug_assert_eq!(upper, upper.top_materialization(db));
 
-    fn intersect_incomparable(
-        &self,
-        db: &'db dyn Db,
-        other: &IncomparableConstraint<'db>,
-    ) -> Simplifiable<Constraint<'db>> {
-        // If the hole and pivot are comparable, then removing the hole from the incomparable
-        // constraint doesn't do anything.
-        if comparable(db, self.ty, other.ty) {
-            return Simplifiable::Simplified(Constraint::Incomparable(other.clone()));
-        }
-        Simplifiable::NotSimplified(
-            Constraint::NotEquivalent(self.clone()),
-            Constraint::Incomparable(other.clone()),
-        )
-    }
-
-    fn union_not_equivalent(
-        &self,
-        db: &'db dyn Db,
-        other: &NotEquivalentConstraint<'db>,
-    ) -> Simplifiable<Constraint<'db>> {
-        if self.ty.is_equivalent_to(db, other.ty) {
-            return Simplifiable::Simplified(Constraint::NotEquivalent(self.clone()));
-        }
-        Simplifiable::AlwaysSatisfiable
-    }
-
-    fn union_incomparable(
-        &self,
-        db: &'db dyn Db,
-        other: &IncomparableConstraint<'db>,
-    ) -> Simplifiable<Constraint<'db>> {
-        // When the "hole" of the non-equivalent constraint and the "pivot" of the incomparable
-        // constraint are not comparable, then the hole is covered by the incomparable constraint,
-        // and the union is therefore always satisfied.
-        if incomparable(db, self.ty, other.ty) {
-            return Simplifiable::AlwaysSatisfiable;
+        // If `lower ≰ upper`, then the constraint cannot be satisfied, since there is no type that
+        // is both greater than `lower`, and less than `upper`.
+        if !lower.is_subtype_of(db, upper) {
+            return Satisfiable::Always;
         }
 
-        // Otherwise, the hole and pivot are comparable, and the non-equivalent constraint subsumes
-        // the incomparable constraint.
-        Simplifiable::Simplified(Constraint::NotEquivalent(self.clone()))
-    }
-
-    fn negate_into(
-        &self,
-        db: &'db dyn Db,
-        typevar: BoundTypeVarInstance<'db>,
-        set: &mut ConstraintSet<'db>,
-    ) {
-        // Not equivalent:
-        // ¬(α ≠ t) = (t ≤ α ≤ t)
-        set.union_constraint(
-            db,
-            Constraint::range(db, self.ty, self.ty).constrain(typevar),
-        );
-    }
-
-    fn display(&self, db: &'db dyn Db, typevar: impl Display) -> impl Display {
-        struct DisplayNotEquivalentConstraint<'a, 'db, D> {
-            constraint: &'a NotEquivalentConstraint<'db>,
-            typevar: D,
-            db: &'db dyn Db,
-        }
-
-        impl<D: Display> Display for DisplayNotEquivalentConstraint<'_, '_, D> {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                write!(
-                    f,
-                    "({} ≠ {})",
-                    self.typevar,
-                    self.constraint.ty.display(self.db)
-                )
-            }
-        }
-
-        DisplayNotEquivalentConstraint {
-            constraint: self,
-            typevar,
-            db,
-        }
-    }
-}
-
-#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
-pub(crate) struct IncomparableConstraint<'db> {
-    ty: Type<'db>,
-}
-
-impl<'db> Constraint<'db> {
-    /// Returns a new incomparable constraint.
-    ///
-    /// Panics if `ty` is not fully static.
-    fn incomparable(db: &'db dyn Db, ty: Type<'db>) -> Satisfiable<Constraint<'db>> {
-        debug_assert_eq!(ty, ty.top_materialization(db));
-
-        // Every type is comparable to Never and to object.
-        if ty.is_never() || ty.is_object() {
+        // If the requested constraint is `Never ≤ T ≤ object`, then the typevar can be specialized
+        // to _any_ type, and the constraint does nothing.
+        if lower.is_never() && upper.is_object() {
             return Satisfiable::Never;
         }
 
-        Satisfiable::Constrained(Constraint::Incomparable(IncomparableConstraint { ty }))
+        Satisfiable::Constrained(Constraint::NegatedRange(NegatedRangeConstraint {
+            lower,
+            upper,
+        }))
     }
 }
 
-impl<'db> IncomparableConstraint<'db> {
-    fn intersect_incomparable(
+impl<'db> NegatedRangeConstraint<'db> {
+    fn intersect_negated_range(
         &self,
         db: &'db dyn Db,
-        other: &IncomparableConstraint<'db>,
+        other: &NegatedRangeConstraint<'db>,
     ) -> Simplifiable<Constraint<'db>> {
-        if self.ty.is_equivalent_to(db, other.ty) {
-            return Simplifiable::Simplified(Constraint::Incomparable(other.clone()));
+        // When one of the bounds is entirely contained within the other, the intersection
+        // simplifies to the larger hole.
+        if self.lower.is_subtype_of(db, other.lower) && other.upper.is_subtype_of(db, self.upper) {
+            return Simplifiable::Simplified(Constraint::NegatedRange(self.clone()));
         }
+        if other.lower.is_subtype_of(db, self.lower) && self.upper.is_subtype_of(db, other.upper) {
+            return Simplifiable::Simplified(Constraint::NegatedRange(other.clone()));
+        }
+
+        // Otherwise the result cannot be simplified.
         Simplifiable::NotSimplified(
-            Constraint::Incomparable(self.clone()),
-            Constraint::Incomparable(other.clone()),
+            Constraint::NegatedRange(self.clone()),
+            Constraint::NegatedRange(other.clone()),
         )
     }
 
-    fn union_incomparable(
+    fn union_negated_range(
         &self,
         db: &'db dyn Db,
-        other: &IncomparableConstraint<'db>,
+        other: &NegatedRangeConstraint<'db>,
     ) -> Simplifiable<Constraint<'db>> {
-        if self.ty.is_equivalent_to(db, other.ty) {
-            return Simplifiable::Simplified(Constraint::Incomparable(other.clone()));
-        }
-        Simplifiable::NotSimplified(
-            Constraint::Incomparable(self.clone()),
-            Constraint::Incomparable(other.clone()),
-        )
+        // ¬(s₁ ≤ α ≤ t₁) ∨ ¬(s₂ ≤ α ≤ t₂) = ¬((s₁ ∪ s₂) ≤ α ≤ (t₁ ∩ t₂))
+        Simplifiable::from_one(Constraint::negated_range(
+            db,
+            UnionType::from_elements(db, [self.lower, other.lower]),
+            IntersectionType::from_elements(db, [self.upper, other.upper]),
+        ))
     }
 
     fn negate_into(
@@ -1380,37 +1185,34 @@ impl<'db> IncomparableConstraint<'db> {
         typevar: BoundTypeVarInstance<'db>,
         set: &mut ConstraintSet<'db>,
     ) {
-        // Not comparable:
-        // ¬(α ≁ t) = (t ≤ α) ∨ (α ≤ t)
         set.union_constraint(
             db,
-            Constraint::range(db, Type::Never, self.ty).constrain(typevar),
-        );
-        set.union_constraint(
-            db,
-            Constraint::range(db, self.ty, Type::object()).constrain(typevar),
+            Constraint::range(db, self.lower, self.upper).constrain(typevar),
         );
     }
 
     fn display(&self, db: &'db dyn Db, typevar: impl Display) -> impl Display {
-        struct DisplayIncomparableConstraint<'a, 'db, D> {
-            constraint: &'a IncomparableConstraint<'db>,
+        struct DisplayNegatedRangeConstraint<'a, 'db, D> {
+            constraint: &'a NegatedRangeConstraint<'db>,
             typevar: D,
             db: &'db dyn Db,
         }
 
-        impl<D: Display> Display for DisplayIncomparableConstraint<'_, '_, D> {
+        impl<D: Display> Display for DisplayNegatedRangeConstraint<'_, '_, D> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                write!(
-                    f,
-                    "({} ≁ {})",
-                    self.typevar,
-                    self.constraint.ty.display(self.db)
-                )
+                f.write_str("¬(")?;
+                if !self.constraint.lower.is_never() {
+                    write!(f, "{} ≤ ", self.constraint.lower.display(self.db))?;
+                }
+                self.typevar.fmt(f)?;
+                if !self.constraint.upper.is_object() {
+                    write!(f, " ≤ {}", self.constraint.upper.display(self.db))?;
+                }
+                f.write_str(")")
             }
         }
 
-        DisplayIncomparableConstraint {
+        DisplayNegatedRangeConstraint {
             constraint: self,
             typevar,
             db,
@@ -1454,6 +1256,20 @@ impl<T> Simplifiable<T> {
             Satisfiable::Never => Simplifiable::NeverSatisfiable,
             Satisfiable::Always => Simplifiable::AlwaysSatisfiable,
             Satisfiable::Constrained(constraint) => Simplifiable::Simplified(constraint),
+        }
+    }
+
+    fn from_intersection(first: Satisfiable<T>, second: Satisfiable<T>) -> Self {
+        match (first, second) {
+            (Satisfiable::Never, _) | (_, Satisfiable::Never) => Simplifiable::NeverSatisfiable,
+            (Satisfiable::Always, Satisfiable::Always) => Simplifiable::AlwaysSatisfiable,
+            (Satisfiable::Always, Satisfiable::Constrained(constraint))
+            | (Satisfiable::Constrained(constraint), Satisfiable::Always) => {
+                Simplifiable::Simplified(constraint)
+            }
+            (Satisfiable::Constrained(first), Satisfiable::Constrained(second)) => {
+                Simplifiable::NotSimplified(first, second)
+            }
         }
     }
 
