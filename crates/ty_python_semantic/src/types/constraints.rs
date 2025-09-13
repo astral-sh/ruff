@@ -226,6 +226,24 @@ impl<'db> ConstraintSet<'db> {
         Self::singleton(ConstraintClause::always())
     }
 
+    /// Returns a constraint set that constraints a typevar to a particular range of types.
+    pub(crate) fn constrain_typevar(
+        db: &'db dyn Db,
+        typevar: BoundTypeVarInstance<'db>,
+        lower: Type<'db>,
+        upper: Type<'db>,
+    ) -> Self {
+        let lower = lower.bottom_materialization(db);
+        let upper = upper.top_materialization(db);
+        match Constraint::range(db, lower, upper) {
+            Satisfiable::Never => Self::never(),
+            Satisfiable::Always => Self::always(),
+            Satisfiable::Constrained(constraint) => {
+                Self::singleton(ConstraintClause::singleton(constraint.constrain(typevar)))
+            }
+        }
+    }
+
     /// Returns whether this constraint set never holds
     pub(crate) fn is_never_satisfied(&self) -> bool {
         self.clauses.is_empty()
