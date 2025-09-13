@@ -7,7 +7,7 @@ use super::protocol_class::ProtocolInterface;
 use super::{BoundTypeVarInstance, ClassType, KnownClass, SubclassOfType, Type, TypeVarVariance};
 use crate::place::PlaceAndQualifiers;
 use crate::semantic_index::definition::Definition;
-use crate::types::constraints::{ConstraintSet, Constraints, IteratorConstraintsExtension};
+use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::enums::is_single_member_enum;
 use crate::types::protocol_class::walk_protocol_interface;
 use crate::types::tuple::{TupleSpec, TupleType};
@@ -116,13 +116,13 @@ impl<'db> Type<'db> {
     }
 
     /// Return `true` if `self` conforms to the interface described by `protocol`.
-    pub(super) fn satisfies_protocol<C: Constraints<'db>>(
+    pub(super) fn satisfies_protocol(
         self,
         db: &'db dyn Db,
         protocol: ProtocolInstanceType<'db>,
         relation: TypeRelation,
-        visitor: &HasRelationToVisitor<'db, C>,
-    ) -> C {
+        visitor: &HasRelationToVisitor<'db>,
+    ) -> ConstraintSet<'db> {
         let structurally_satisfied = if let Type::ProtocolInstance(self_protocol) = self {
             self_protocol.interface(db).extends_interface_of(
                 db,
@@ -155,7 +155,7 @@ impl<'db> Type<'db> {
                     visitor,
                 )
             } else {
-                C::unsatisfiable(db)
+                ConstraintSet::from(false)
             }
         })
     }
@@ -336,15 +336,15 @@ impl<'db> NominalInstanceType<'db> {
         }
     }
 
-    pub(super) fn has_relation_to_impl<C: Constraints<'db>>(
+    pub(super) fn has_relation_to_impl(
         self,
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
-        visitor: &HasRelationToVisitor<'db, C>,
-    ) -> C {
+        visitor: &HasRelationToVisitor<'db>,
+    ) -> ConstraintSet<'db> {
         match (self.0, other.0) {
-            (_, NominalInstanceInner::Object) => C::always_satisfiable(db),
+            (_, NominalInstanceInner::Object) => ConstraintSet::from(true),
             (
                 NominalInstanceInner::ExactTuple(tuple1),
                 NominalInstanceInner::ExactTuple(tuple2),
@@ -355,50 +355,47 @@ impl<'db> NominalInstanceType<'db> {
         }
     }
 
-    pub(super) fn is_equivalent_to_impl<C: Constraints<'db>>(
+    pub(super) fn is_equivalent_to_impl(
         self,
         db: &'db dyn Db,
         other: Self,
-        visitor: &IsEquivalentVisitor<'db, C>,
-    ) -> C {
+        visitor: &IsEquivalentVisitor<'db>,
+    ) -> ConstraintSet<'db> {
         match (self.0, other.0) {
             (
                 NominalInstanceInner::ExactTuple(tuple1),
                 NominalInstanceInner::ExactTuple(tuple2),
             ) => tuple1.is_equivalent_to_impl(db, tuple2, visitor),
             (NominalInstanceInner::Object, NominalInstanceInner::Object) => {
-                C::always_satisfiable(db)
+                ConstraintSet::from(true)
             }
             (NominalInstanceInner::NonTuple(class1), NominalInstanceInner::NonTuple(class2)) => {
                 class1.is_equivalent_to_impl(db, class2, visitor)
             }
-            _ => C::unsatisfiable(db),
+            _ => ConstraintSet::from(false),
         }
     }
 
-    pub(super) fn is_disjoint_from_impl<C: Constraints<'db>>(
+    pub(super) fn is_disjoint_from_impl(
         self,
         db: &'db dyn Db,
         other: Self,
-        visitor: &IsDisjointVisitor<'db, C>,
-    ) -> C {
+        visitor: &IsDisjointVisitor<'db>,
+    ) -> ConstraintSet<'db> {
         if self.is_object() || other.is_object() {
-            return C::unsatisfiable(db);
+            return ConstraintSet::from(false);
         }
-        let mut result = C::unsatisfiable(db);
+        let mut result = ConstraintSet::from(false);
         if let Some(self_spec) = self.tuple_spec(db) {
             if let Some(other_spec) = other.tuple_spec(db) {
                 let compatible = self_spec.is_disjoint_from_impl(db, &other_spec, visitor);
-                if result.union(db, compatible).is_always_satisfied(db) {
+                if result.union(db, compatible).is_always_satisfied() {
                     return result;
                 }
             }
         }
         result.or(db, || {
-            C::from_bool(
-                db,
-                !(self.class(db)).could_coexist_in_mro_with(db, other.class(db)),
-            )
+            ConstraintSet::from(!(self.class(db)).could_coexist_in_mro_with(db, other.class(db)))
         })
     }
 
@@ -589,9 +586,9 @@ impl<'db> ProtocolInstanceType<'db> {
                     db,
                     protocol,
                     TypeRelation::Subtyping,
-                    &HasRelationToVisitor::new(ConstraintSet::always_satisfiable(db)),
+                    &HasRelationToVisitor::default(),
                 )
-                .is_always_satisfied(db)
+                .is_always_satisfied()
         }
 
         #[expect(clippy::trivially_copy_pass_by_ref)]
@@ -641,20 +638,20 @@ impl<'db> ProtocolInstanceType<'db> {
     /// Return `true` if this protocol type is equivalent to the protocol `other`.
     ///
     /// TODO: consider the types of the members as well as their existence
-    pub(super) fn is_equivalent_to_impl<C: Constraints<'db>>(
+    pub(super) fn is_equivalent_to_impl(
         self,
         db: &'db dyn Db,
         other: Self,
-        _visitor: &IsEquivalentVisitor<'db, C>,
-    ) -> C {
+        _visitor: &IsEquivalentVisitor<'db>,
+    ) -> ConstraintSet<'db> {
         if self == other {
-            return C::always_satisfiable(db);
+            return ConstraintSet::from(true);
         }
         let self_normalized = self.normalized(db);
         if self_normalized == Type::ProtocolInstance(other) {
-            return C::always_satisfiable(db);
+            return ConstraintSet::from(true);
         }
-        C::from_bool(db, self_normalized == other.normalized(db))
+        ConstraintSet::from(self_normalized == other.normalized(db))
     }
 
     /// Return `true` if this protocol type is disjoint from the protocol `other`.
@@ -662,13 +659,13 @@ impl<'db> ProtocolInstanceType<'db> {
     /// TODO: a protocol `X` is disjoint from a protocol `Y` if `X` and `Y`
     /// have a member with the same name but disjoint types
     #[expect(clippy::unused_self)]
-    pub(super) fn is_disjoint_from_impl<C: Constraints<'db>>(
+    pub(super) fn is_disjoint_from_impl(
         self,
-        db: &'db dyn Db,
+        _db: &'db dyn Db,
         _other: Self,
-        _visitor: &IsDisjointVisitor<'db, C>,
-    ) -> C {
-        C::unsatisfiable(db)
+        _visitor: &IsDisjointVisitor<'db>,
+    ) -> ConstraintSet<'db> {
+        ConstraintSet::from(false)
     }
 
     pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {

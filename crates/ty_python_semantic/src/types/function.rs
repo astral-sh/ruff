@@ -65,7 +65,7 @@ use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{FileScopeId, SemanticIndex, semantic_index};
 use crate::types::call::{Binding, CallArguments};
-use crate::types::constraints::{ConstraintSet, Constraints};
+use crate::types::constraints::ConstraintSet;
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{
     INVALID_ARGUMENT_TYPE, REDUNDANT_CAST, STATIC_ASSERT_ERROR, TYPE_ASSERTION_FAILURE,
@@ -81,7 +81,7 @@ use crate::types::{
     DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
     IsEquivalentVisitor, KnownClass, KnownInstanceType, NormalizedVisitor, SpecialFormType,
     TrackedConstraintSet, Truthiness, Type, TypeMapping, TypeRelation, UnionBuilder, all_members,
-    binding_type, walk_type_mapping,
+    binding_type, todo_type, walk_type_mapping,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -944,16 +944,16 @@ impl<'db> FunctionType<'db> {
         BoundMethodType::new(db, self, self_instance)
     }
 
-    pub(crate) fn has_relation_to_impl<C: Constraints<'db>>(
+    pub(crate) fn has_relation_to_impl(
         self,
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
-        _visitor: &HasRelationToVisitor<'db, C>,
-    ) -> C {
+        _visitor: &HasRelationToVisitor<'db>,
+    ) -> ConstraintSet<'db> {
         match relation {
-            TypeRelation::Subtyping => C::from_bool(db, self.is_subtype_of(db, other)),
-            TypeRelation::Assignability => C::from_bool(db, self.is_assignable_to(db, other)),
+            TypeRelation::Subtyping => ConstraintSet::from(self.is_subtype_of(db, other)),
+            TypeRelation::Assignability => ConstraintSet::from(self.is_assignable_to(db, other)),
         }
     }
 
@@ -982,17 +982,17 @@ impl<'db> FunctionType<'db> {
             && self.signature(db).is_assignable_to(db, other.signature(db))
     }
 
-    pub(crate) fn is_equivalent_to_impl<C: Constraints<'db>>(
+    pub(crate) fn is_equivalent_to_impl(
         self,
         db: &'db dyn Db,
         other: Self,
-        visitor: &IsEquivalentVisitor<'db, C>,
-    ) -> C {
+        visitor: &IsEquivalentVisitor<'db>,
+    ) -> ConstraintSet<'db> {
         if self.normalized(db) == other.normalized(db) {
-            return C::always_satisfiable(db);
+            return ConstraintSet::from(true);
         }
         if self.literal(db) != other.literal(db) {
-            return C::unsatisfiable(db);
+            return ConstraintSet::from(false);
         }
         let self_signature = self.signature(db);
         let other_signature = other.signature(db);
@@ -1191,6 +1191,7 @@ pub enum KnownFunction {
     DunderImport,
     /// `importlib.import_module`, which returns the submodule.
     ImportModule,
+    Open,
 
     /// `typing(_extensions).final`
     Final,
@@ -1292,6 +1293,7 @@ impl KnownFunction {
             | Self::HasAttr
             | Self::Len
             | Self::Repr
+            | Self::Open
             | Self::DunderImport => module.is_builtins(),
             Self::AssertType
             | Self::AssertNever
@@ -1703,6 +1705,76 @@ impl KnownFunction {
                 )));
             }
 
+            KnownFunction::Open => {
+                // Temporary special-casing for `builtins.open` to avoid an excessive number of false positives
+                // in lieu of proper support for PEP-614 type aliases.
+                if let [_, Some(mode), ..] = parameter_types {
+                    // Infer `Todo` for any argument that doesn't match typeshed's
+                    // `OpenTextMode` type alias (<https://github.com/python/typeshed/blob/6937a9b193bfc2f0696452d58aad96d7627aa29a/stdlib/_typeshed/__init__.pyi#L220>).
+                    // Without this special-casing, we'd just always select the first overload in our current state,
+                    // which leads to lots of false positives.
+                    if mode.into_string_literal().is_none_or(|mode| {
+                        !matches!(
+                            mode.value(db),
+                            "r+" | "+r"
+                                | "rt+"
+                                | "r+t"
+                                | "+rt"
+                                | "tr+"
+                                | "t+r"
+                                | "+tr"
+                                | "w+"
+                                | "+w"
+                                | "wt+"
+                                | "w+t"
+                                | "+wt"
+                                | "tw+"
+                                | "t+w"
+                                | "+tw"
+                                | "a+"
+                                | "+a"
+                                | "at+"
+                                | "a+t"
+                                | "+at"
+                                | "ta+"
+                                | "t+a"
+                                | "+ta"
+                                | "x+"
+                                | "+x"
+                                | "xt+"
+                                | "x+t"
+                                | "+xt"
+                                | "tx+"
+                                | "t+x"
+                                | "+tx"
+                                | "w"
+                                | "wt"
+                                | "tw"
+                                | "a"
+                                | "at"
+                                | "ta"
+                                | "x"
+                                | "xt"
+                                | "tx"
+                                | "r"
+                                | "rt"
+                                | "tr"
+                                | "U"
+                                | "rU"
+                                | "Ur"
+                                | "rtU"
+                                | "rUt"
+                                | "Urt"
+                                | "trU"
+                                | "tUr"
+                                | "Utr"
+                        )
+                    }) {
+                        overload.set_return_type(todo_type!("`builtins.open` return type"));
+                    }
+                }
+            }
+
             _ => {}
         }
     }
@@ -1729,6 +1801,7 @@ pub(crate) mod tests {
                 | KnownFunction::IsInstance
                 | KnownFunction::HasAttr
                 | KnownFunction::IsSubclass
+                | KnownFunction::Open
                 | KnownFunction::DunderImport => KnownModule::Builtins,
 
                 KnownFunction::AbstractMethod => KnownModule::Abc,
