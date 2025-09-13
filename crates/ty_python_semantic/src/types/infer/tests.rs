@@ -442,10 +442,11 @@ fn dependency_implicit_instance_attribute() -> anyhow::Result<()> {
         assert_eq!(attr_ty.display(&db).to_string(), "Unknown | str | None");
         db.take_salsa_events()
     };
+    let div = DivergentType::todo(&db, global_scope(&db, file_main));
     assert_function_query_was_run(
         &db,
         infer_expression_types_impl,
-        InferExpression::Bare(x_rhs_expression(&db)),
+        InferExpression::with_divergent(&db, x_rhs_expression(&db), div),
         &events,
     );
 
@@ -466,11 +467,11 @@ fn dependency_implicit_instance_attribute() -> anyhow::Result<()> {
         assert_eq!(attr_ty.display(&db).to_string(), "Unknown | str | None");
         db.take_salsa_events()
     };
-
+    let div = DivergentType::todo(&db, global_scope(&db, file_main));
     assert_function_query_was_not_run(
         &db,
         infer_expression_types_impl,
-        InferExpression::Bare(x_rhs_expression(&db)),
+        InferExpression::with_divergent(&db, x_rhs_expression(&db), div),
         &events,
     );
 
@@ -534,10 +535,11 @@ fn dependency_own_instance_member() -> anyhow::Result<()> {
         assert_eq!(attr_ty.display(&db).to_string(), "Unknown | str | None");
         db.take_salsa_events()
     };
+    let div = DivergentType::todo(&db, global_scope(&db, file_main));
     assert_function_query_was_run(
         &db,
         infer_expression_types_impl,
-        InferExpression::Bare(x_rhs_expression(&db)),
+        InferExpression::with_divergent(&db, x_rhs_expression(&db), div),
         &events,
     );
 
@@ -560,11 +562,11 @@ fn dependency_own_instance_member() -> anyhow::Result<()> {
         assert_eq!(attr_ty.display(&db).to_string(), "Unknown | str | None");
         db.take_salsa_events()
     };
-
+    let div = DivergentType::todo(&db, global_scope(&db, file_main));
     assert_function_query_was_not_run(
         &db,
         infer_expression_types_impl,
-        InferExpression::Bare(x_rhs_expression(&db)),
+        InferExpression::with_divergent(&db, x_rhs_expression(&db), div),
         &events,
     );
 
@@ -631,10 +633,11 @@ fn dependency_implicit_class_member() -> anyhow::Result<()> {
         assert_eq!(attr_ty.display(&db).to_string(), "Unknown | str");
         db.take_salsa_events()
     };
+    let div = DivergentType::todo(&db, global_scope(&db, file_main));
     assert_function_query_was_run(
         &db,
         infer_expression_types_impl,
-        InferExpression::Bare(x_rhs_expression(&db)),
+        InferExpression::with_divergent(&db, x_rhs_expression(&db), div),
         &events,
     );
 
@@ -659,11 +662,11 @@ fn dependency_implicit_class_member() -> anyhow::Result<()> {
         assert_eq!(attr_ty.display(&db).to_string(), "Unknown | str");
         db.take_salsa_events()
     };
-
+    let div = DivergentType::todo(&db, global_scope(&db, file_main));
     assert_function_query_was_not_run(
         &db,
         infer_expression_types_impl,
-        InferExpression::Bare(x_rhs_expression(&db)),
+        InferExpression::with_divergent(&db, x_rhs_expression(&db), div),
         &events,
     );
 
@@ -705,10 +708,11 @@ fn call_type_doesnt_rerun_when_only_callee_changed() -> anyhow::Result<()> {
     let call = &*module.syntax().body[1].as_assign_stmt().unwrap().value;
     let foo_call = semantic_index(&db, bar).expression(call);
 
+    let div = DivergentType::todo(&db, global_scope(&db, bar));
     assert_function_query_was_run(
         &db,
         infer_expression_types_impl,
-        InferExpression::Bare(foo_call),
+        InferExpression::with_divergent(&db, foo_call, div),
         &events,
     );
 
@@ -736,10 +740,11 @@ fn call_type_doesnt_rerun_when_only_callee_changed() -> anyhow::Result<()> {
     let call = &*module.syntax().body[1].as_assign_stmt().unwrap().value;
     let foo_call = semantic_index(&db, bar).expression(call);
 
+    let div = DivergentType::todo(&db, global_scope(&db, bar));
     assert_function_query_was_not_run(
         &db,
         infer_expression_types_impl,
-        InferExpression::Bare(foo_call),
+        InferExpression::with_divergent(&db, foo_call, div),
         &events,
     );
 

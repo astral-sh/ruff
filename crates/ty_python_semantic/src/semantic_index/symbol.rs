@@ -149,7 +149,7 @@ impl Symbol {
 ///
 /// Allows lookup by name and a symbol's ID.
 #[derive(Default, get_size2::GetSize)]
-pub(super) struct SymbolTable {
+pub(crate) struct SymbolTable {
     symbols: IndexVec<ScopedSymbolId, Symbol>,
 
     /// Map from symbol name to its ID.
@@ -268,3 +268,7 @@ impl DerefMut for SymbolTableBuilder {
         &mut self.table
     }
 }
+
+pub(crate) type ScopedImplicitAttributeId = ScopedSymbolId;
+pub(crate) type ImplicitAttributeTable = SymbolTable;
+pub(super) type ImplicitAttributeTableBuilder = SymbolTableBuilder;

@@ -25,7 +25,9 @@ pub use crate::semantic_index::scope::FileScopeId;
 use crate::semantic_index::scope::{
     NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopeKind, ScopeLaziness,
 };
-use crate::semantic_index::symbol::ScopedSymbolId;
+use crate::semantic_index::symbol::{
+    ImplicitAttributeTable, ImplicitAttributeTableBuilder, ScopedSymbolId, Symbol,
+};
 use crate::semantic_index::use_def::{EnclosingSnapshotKey, ScopedEnclosingSnapshotId, UseDefMap};
 use crate::semantic_model::HasTrackedScope;
 
@@ -71,6 +73,29 @@ pub(crate) fn place_table<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<Plac
     let _span = tracing::trace_span!("place_table", scope=?scope.as_id(), ?file).entered();
     let index = semantic_index(db, file);
     Arc::clone(&index.place_tables[scope.file_scope_id(db)])
+}
+
+#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+pub(crate) fn implicit_attribute_table<'db>(
+    db: &'db dyn Db,
+    class_body_scope: ScopeId<'db>,
+) -> ImplicitAttributeTable {
+    let mut table = ImplicitAttributeTableBuilder::default();
+
+    let file = class_body_scope.file(db);
+    let index = semantic_index(db, file);
+
+    for function_scope_id in attribute_scopes(db, class_body_scope) {
+        let function_place_table = index.place_table(function_scope_id);
+        for member in function_place_table.members() {
+            if let Some(attr) = member.as_instance_attribute() {
+                let symbol = Symbol::new(attr.into());
+                table.add(symbol);
+            }
+        }
+    }
+
+    table.build()
 }
 
 /// Returns the set of modules that are imported anywhere in `file`.

@@ -73,6 +73,7 @@ use crate::types::diagnostic::{
     report_runtime_check_against_non_runtime_checkable_protocol,
 };
 use crate::types::generics::GenericContext;
+use crate::types::infer::infer_function_scope_types;
 use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::any_over_type;
@@ -81,8 +82,7 @@ use crate::types::{
     DeprecatedInstance, DivergentType, DynamicType, FindLegacyTypeVarsVisitor,
     HasRelationToVisitor, IsEquivalentVisitor, KnownClass, KnownInstanceType, NormalizedVisitor,
     SpecialFormType, TrackedConstraintSet, Truthiness, Type, TypeMapping, TypeRelation,
-    UnionBuilder, all_members, binding_type, infer_scope_types, todo_type, walk_generic_context,
-    walk_type_mapping,
+    UnionBuilder, all_members, binding_type, todo_type, walk_generic_context, walk_type_mapping,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -96,9 +96,10 @@ fn return_type_cycle_recover<'db>(
 }
 
 fn return_type_cycle_initial<'db>(db: &'db dyn Db, function: FunctionType<'db>) -> Type<'db> {
-    Type::Dynamic(DynamicType::Divergent(DivergentType {
-        scope: function.literal(db).last_definition(db).body_scope(db),
-    }))
+    Type::Dynamic(DynamicType::Divergent(DivergentType::function_return_type(
+        db,
+        function.literal(db).last_definition(db).body_scope(db),
+    )))
 }
 
 /// A collection of useful spans for annotating functions.
@@ -1045,7 +1046,8 @@ impl<'db> FunctionType<'db> {
     #[salsa::tracked(cycle_fn=return_type_cycle_recover, cycle_initial=return_type_cycle_initial, heap_size=get_size2::heap_size)]
     pub(crate) fn infer_return_type(self, db: &'db dyn Db) -> Type<'db> {
         let scope = self.literal(db).last_definition(db).body_scope(db);
-        let inference = infer_scope_types(db, scope);
+        let inference =
+            infer_function_scope_types(db, scope, DivergentType::function_return_type(db, scope));
         inference.infer_return_type(db, Type::FunctionLiteral(self))
     }
 }

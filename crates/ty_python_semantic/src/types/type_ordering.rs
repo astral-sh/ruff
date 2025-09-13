@@ -118,7 +118,7 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 (SubclassOfInner::Class(_), _) => Ordering::Less,
                 (_, SubclassOfInner::Class(_)) => Ordering::Greater,
                 (SubclassOfInner::Dynamic(left), SubclassOfInner::Dynamic(right)) => {
-                    dynamic_elements_ordering(left, right)
+                    dynamic_elements_ordering(db, left, right)
                 }
             }
         }
@@ -172,7 +172,7 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 (_, ClassBase::TypedDict) => Ordering::Greater,
 
                 (ClassBase::Dynamic(left), ClassBase::Dynamic(right)) => {
-                    dynamic_elements_ordering(left, right)
+                    dynamic_elements_ordering(db, left, right)
                 }
             })
             .then_with(|| match (left.owner(db), right.owner(db)) {
@@ -185,7 +185,7 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 (SuperOwnerKind::Instance(_), _) => Ordering::Less,
                 (_, SuperOwnerKind::Instance(_)) => Ordering::Greater,
                 (SuperOwnerKind::Dynamic(left), SuperOwnerKind::Dynamic(right)) => {
-                    dynamic_elements_ordering(left, right)
+                    dynamic_elements_ordering(db, left, right)
                 }
             })
         }
@@ -204,7 +204,7 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::PropertyInstance(_), _) => Ordering::Less,
         (_, Type::PropertyInstance(_)) => Ordering::Greater,
 
-        (Type::Dynamic(left), Type::Dynamic(right)) => dynamic_elements_ordering(*left, *right),
+        (Type::Dynamic(left), Type::Dynamic(right)) => dynamic_elements_ordering(db, *left, *right),
         (Type::Dynamic(_), _) => Ordering::Less,
         (_, Type::Dynamic(_)) => Ordering::Greater,
 
@@ -253,7 +253,11 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
 }
 
 /// Determine a canonical order for two instances of [`DynamicType`].
-fn dynamic_elements_ordering(left: DynamicType, right: DynamicType) -> Ordering {
+fn dynamic_elements_ordering<'db>(
+    db: &'db dyn Db,
+    left: DynamicType<'db>,
+    right: DynamicType<'db>,
+) -> Ordering {
     match (left, right) {
         (DynamicType::Any, _) => Ordering::Less,
         (_, DynamicType::Any) => Ordering::Greater,
@@ -277,7 +281,7 @@ fn dynamic_elements_ordering(left: DynamicType, right: DynamicType) -> Ordering 
         (_, DynamicType::TodoTypeAlias) => Ordering::Greater,
 
         (DynamicType::Divergent(left), DynamicType::Divergent(right)) => {
-            left.scope.cmp(&right.scope)
+            left.scope(db).cmp(&right.scope(db))
         }
         (DynamicType::Divergent(_), _) => Ordering::Less,
         (_, DynamicType::Divergent(_)) => Ordering::Greater,

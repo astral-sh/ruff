@@ -4,7 +4,7 @@ use super::TypeVarVariance;
 use super::{
     BoundTypeVarInstance, IntersectionBuilder, MemberLookupPolicy, Mro, MroError, MroIterator,
     SpecialFormType, SubclassOfType, Truthiness, Type, TypeQualifiers, class_base::ClassBase,
-    function::FunctionType, infer_expression_type, infer_unpack_types,
+    function::FunctionType,
 };
 use crate::FxOrderMap;
 use crate::module_resolver::KnownModule;
@@ -13,6 +13,7 @@ use crate::semantic_index::scope::NodeWithScopeKind;
 use crate::semantic_index::symbol::Symbol;
 use crate::semantic_index::{
     DeclarationWithConstraint, SemanticIndex, attribute_declarations, attribute_scopes,
+    implicit_attribute_table,
 };
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::context::InferContext;
@@ -20,17 +21,21 @@ use crate::types::diagnostic::{INVALID_LEGACY_TYPE_VARIABLE, INVALID_TYPE_ALIAS_
 use crate::types::enums::enum_metadata;
 use crate::types::function::{DataclassTransformerParams, KnownFunction};
 use crate::types::generics::{GenericContext, Specialization, walk_specialization};
-use crate::types::infer::nearest_enclosing_class;
+use crate::types::infer::{
+    infer_implicit_attribute_expression_type, infer_unpack_implicit_attribute_types,
+    nearest_enclosing_class,
+};
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::typed_dict::typed_dict_params_from_class_def;
 use crate::types::{
     ApplyTypeMappingVisitor, Binding, BoundSuperError, BoundSuperType, CallableType,
-    DataclassParams, DeprecatedInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
-    IsEquivalentVisitor, KnownInstanceType, ManualPEP695TypeAliasType, MaterializationKind,
-    NormalizedVisitor, PropertyInstanceType, StringLiteralType, TypeAliasType, TypeContext,
-    TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind,
-    TypedDictParams, UnionBuilder, VarianceInferable, declaration_type, infer_definition_types,
+    DataclassParams, DeprecatedInstance, DivergentType, FindLegacyTypeVarsVisitor,
+    HasRelationToVisitor, IsEquivalentVisitor, KnownInstanceType, ManualPEP695TypeAliasType,
+    MaterializationKind, NormalizedVisitor, PropertyInstanceType, StringLiteralType, TypeAliasType,
+    TypeContext, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance,
+    TypeVarKind, TypedDictParams, UnionBuilder, VarianceInferable, declaration_type,
+    infer_definition_types,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet, Program,
@@ -105,13 +110,23 @@ fn implicit_attribute_recover<'db>(
     salsa::CycleRecoveryAction::Iterate
 }
 
+#[allow(clippy::needless_pass_by_value)]
 fn implicit_attribute_initial<'db>(
-    _db: &'db dyn Db,
-    _class_body_scope: ScopeId<'db>,
-    _name: String,
+    db: &'db dyn Db,
+    class_body_scope: ScopeId<'db>,
+    name: String,
     _target_method_decorator: MethodDecorator,
 ) -> PlaceAndQualifiers<'db> {
-    Place::Unbound.into()
+    let implicit_attribute_table = implicit_attribute_table(db, class_body_scope);
+    let implicit_attr_id = implicit_attribute_table
+        .symbol_id(&name)
+        .expect("Implicit attribute must exist in the table");
+    Place::bound(Type::divergent(DivergentType::implicit_attribute(
+        db,
+        class_body_scope,
+        implicit_attr_id,
+    )))
+    .into()
 }
 
 fn try_mro_cycle_recover<'db>(
@@ -2890,6 +2905,14 @@ impl<'db> ClassLiteral<'db> {
         let index = semantic_index(db, file);
         let class_map = use_def_map(db, class_body_scope);
         let class_table = place_table(db, class_body_scope);
+        let implicit_attr_table = implicit_attribute_table(db, class_body_scope);
+        let div = if let Some(implicit_attr) = implicit_attr_table.symbol_id(&name) {
+            DivergentType::implicit_attribute(db, class_body_scope, implicit_attr)
+        } else {
+            // Implicit attributes should either not exist or have a type declaration, and should not diverge.
+            DivergentType::todo(db, class_body_scope)
+        };
+        let visitor = NormalizedVisitor::default().recursive(Type::divergent(div));
 
         let is_valid_scope = |method_scope: ScopeId<'db>| {
             if let Some(method_def) = method_scope.node(db).as_function() {
@@ -2942,12 +2965,14 @@ impl<'db> ClassLiteral<'db> {
                         // `self.SOME_CONSTANT: Final = 1`, infer the type from the value
                         // on the right-hand side.
 
-                        let inferred_ty = infer_expression_type(
+                        let inferred_ty = infer_implicit_attribute_expression_type(
                             db,
                             index.expression(value),
                             TypeContext::default(),
+                            div,
                         );
-                        return Place::bound(inferred_ty).with_qualifiers(all_qualifiers);
+                        return Place::bound(inferred_ty.normalized_impl(db, &visitor))
+                            .with_qualifiers(all_qualifiers);
                     }
 
                     // If there is no right-hand side, just record that we saw a `Final` qualifier
@@ -3020,24 +3045,28 @@ impl<'db> ClassLiteral<'db> {
                                 //     (.., self.name, ..) = <value>
                                 //     [.., self.name, ..] = <value>
 
-                                let unpacked = infer_unpack_types(db, unpack);
+                                let unpacked =
+                                    infer_unpack_implicit_attribute_types(db, unpack, div);
 
                                 let inferred_ty = unpacked.expression_type(assign.target(&module));
 
-                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
+                                union_of_inferred_types = union_of_inferred_types
+                                    .add(inferred_ty.normalized_impl(db, &visitor));
                             }
                             TargetKind::Single => {
                                 // We found an un-annotated attribute assignment of the form:
                                 //
                                 //     self.name = <value>
 
-                                let inferred_ty = infer_expression_type(
+                                let inferred_ty = infer_implicit_attribute_expression_type(
                                     db,
                                     index.expression(assign.value(&module)),
                                     TypeContext::default(),
+                                    div,
                                 );
 
-                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
+                                union_of_inferred_types = union_of_inferred_types
+                                    .add(inferred_ty.normalized_impl(db, &visitor));
                             }
                         }
                     }
@@ -3048,27 +3077,31 @@ impl<'db> ClassLiteral<'db> {
                                 //
                                 //     for .., self.name, .. in <iterable>:
 
-                                let unpacked = infer_unpack_types(db, unpack);
+                                let unpacked =
+                                    infer_unpack_implicit_attribute_types(db, unpack, div);
                                 let inferred_ty =
                                     unpacked.expression_type(for_stmt.target(&module));
 
-                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
+                                union_of_inferred_types = union_of_inferred_types
+                                    .add(inferred_ty.normalized_impl(db, &visitor));
                             }
                             TargetKind::Single => {
                                 // We found an attribute assignment like:
                                 //
                                 //     for self.name in <iterable>:
 
-                                let iterable_ty = infer_expression_type(
+                                let iterable_ty = infer_implicit_attribute_expression_type(
                                     db,
                                     index.expression(for_stmt.iterable(&module)),
                                     TypeContext::default(),
+                                    div,
                                 );
                                 // TODO: Potential diagnostics resulting from the iterable are currently not reported.
                                 let inferred_ty =
                                     iterable_ty.iterate(db).homogeneous_element_type(db);
 
-                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
+                                union_of_inferred_types = union_of_inferred_types
+                                    .add(inferred_ty.normalized_impl(db, &visitor));
                             }
                         }
                     }
@@ -3079,21 +3112,24 @@ impl<'db> ClassLiteral<'db> {
                                 //
                                 //     with <context_manager> as .., self.name, ..:
 
-                                let unpacked = infer_unpack_types(db, unpack);
+                                let unpacked =
+                                    infer_unpack_implicit_attribute_types(db, unpack, div);
                                 let inferred_ty =
                                     unpacked.expression_type(with_item.target(&module));
 
-                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
+                                union_of_inferred_types = union_of_inferred_types
+                                    .add(inferred_ty.normalized_impl(db, &visitor));
                             }
                             TargetKind::Single => {
                                 // We found an attribute assignment like:
                                 //
                                 //     with <context_manager> as self.name:
 
-                                let context_ty = infer_expression_type(
+                                let context_ty = infer_implicit_attribute_expression_type(
                                     db,
                                     index.expression(with_item.context_expr(&module)),
                                     TypeContext::default(),
+                                    div,
                                 );
                                 let inferred_ty = if with_item.is_async() {
                                     context_ty.aenter(db)
@@ -3101,7 +3137,8 @@ impl<'db> ClassLiteral<'db> {
                                     context_ty.enter(db)
                                 };
 
-                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
+                                union_of_inferred_types = union_of_inferred_types
+                                    .add(inferred_ty.normalized_impl(db, &visitor));
                             }
                         }
                     }
@@ -3112,28 +3149,32 @@ impl<'db> ClassLiteral<'db> {
                                 //
                                 //     [... for .., self.name, .. in <iterable>]
 
-                                let unpacked = infer_unpack_types(db, unpack);
+                                let unpacked =
+                                    infer_unpack_implicit_attribute_types(db, unpack, div);
 
                                 let inferred_ty =
                                     unpacked.expression_type(comprehension.target(&module));
 
-                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
+                                union_of_inferred_types = union_of_inferred_types
+                                    .add(inferred_ty.normalized_impl(db, &visitor));
                             }
                             TargetKind::Single => {
                                 // We found an attribute assignment like:
                                 //
                                 //     [... for self.name in <iterable>]
 
-                                let iterable_ty = infer_expression_type(
+                                let iterable_ty = infer_implicit_attribute_expression_type(
                                     db,
                                     index.expression(comprehension.iterable(&module)),
                                     TypeContext::default(),
+                                    div,
                                 );
                                 // TODO: Potential diagnostics resulting from the iterable are currently not reported.
                                 let inferred_ty =
                                     iterable_ty.iterate(db).homogeneous_element_type(db);
 
-                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
+                                union_of_inferred_types = union_of_inferred_types
+                                    .add(inferred_ty.normalized_impl(db, &visitor));
                             }
                         }
                     }

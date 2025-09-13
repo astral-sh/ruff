@@ -34,7 +34,10 @@ use crate::place::{Boundness, Place, PlaceAndQualifiers, imported_symbol};
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::place::ScopedPlaceId;
 use crate::semantic_index::scope::ScopeId;
-use crate::semantic_index::{imported_modules, place_table, semantic_index};
+use crate::semantic_index::symbol::ScopedImplicitAttributeId;
+use crate::semantic_index::{
+    implicit_attribute_table, imported_modules, place_table, semantic_index,
+};
 use crate::suppression::check_suppressions;
 use crate::types::call::{Binding, Bindings, CallArguments, CallableBinding};
 pub(crate) use crate::types::class_base::ClassBase;
@@ -58,7 +61,7 @@ pub use crate::types::ide_support::{
     definitions_for_attribute, definitions_for_imported_symbol, definitions_for_keyword_argument,
     definitions_for_name, find_active_signature_from_details, inlay_hint_function_argument_details,
 };
-use crate::types::infer::infer_unpack_types;
+use crate::types::infer::infer_function_scope_types;
 use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
 use crate::types::signatures::{Parameter, ParameterForm, Parameters, walk_signature};
@@ -117,13 +120,14 @@ fn return_type_cycle_recover<'db>(
 }
 
 fn return_type_cycle_initial<'db>(db: &'db dyn Db, method: BoundMethodType<'db>) -> Type<'db> {
-    Type::Dynamic(DynamicType::Divergent(DivergentType {
-        scope: method
+    Type::divergent(DivergentType::function_return_type(
+        db,
+        method
             .function(db)
             .literal(db)
             .last_definition(db)
             .body_scope(db),
-    }))
+    ))
 }
 
 pub fn check_types(db: &dyn Db, file: File) -> Vec<Diagnostic> {
@@ -420,13 +424,32 @@ fn member_lookup_cycle_recover<'db>(
     salsa::CycleRecoveryAction::Iterate
 }
 
+#[allow(clippy::needless_pass_by_value)]
 fn member_lookup_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _self: Type<'db>,
-    _name: Name,
+    db: &'db dyn Db,
+    self_ty: Type<'db>,
+    name: Name,
     _policy: MemberLookupPolicy,
 ) -> PlaceAndQualifiers<'db> {
-    Place::bound(Type::Never).into()
+    let class_body_scope = match self_ty {
+        Type::NominalInstance(instance) => instance.class_literal(db).body_scope(db),
+        Type::GenericAlias(alias) => alias.origin(db).body_scope(db),
+        Type::ClassLiteral(class) => class.body_scope(db),
+        _ => {
+            return Place::bound(Type::Never).into();
+        }
+    };
+    let implicit_attribute_table = implicit_attribute_table(db, class_body_scope);
+    let initial = if let Some(implicit_attribute) = implicit_attribute_table.symbol_id(&name) {
+        Type::divergent(DivergentType::implicit_attribute(
+            db,
+            class_body_scope,
+            implicit_attribute,
+        ))
+    } else {
+        Type::Never
+    };
+    Place::bound(initial).into()
 }
 
 fn class_lookup_cycle_recover<'db>(
@@ -440,13 +463,32 @@ fn class_lookup_cycle_recover<'db>(
     salsa::CycleRecoveryAction::Iterate
 }
 
+#[allow(clippy::needless_pass_by_value)]
 fn class_lookup_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _self: Type<'db>,
-    _name: Name,
+    db: &'db dyn Db,
+    self_ty: Type<'db>,
+    name: Name,
     _policy: MemberLookupPolicy,
 ) -> PlaceAndQualifiers<'db> {
-    Place::bound(Type::Never).into()
+    let class_body_scope = match self_ty {
+        Type::NominalInstance(instance) => instance.class_literal(db).body_scope(db),
+        Type::GenericAlias(alias) => alias.origin(db).body_scope(db),
+        Type::ClassLiteral(class) => class.body_scope(db),
+        _ => {
+            return Place::bound(Type::Never).into();
+        }
+    };
+    let implicit_attribute_table = implicit_attribute_table(db, class_body_scope);
+    let initial = if let Some(implicit_attribute) = implicit_attribute_table.symbol_id(&name) {
+        Type::divergent(DivergentType::implicit_attribute(
+            db,
+            class_body_scope,
+            implicit_attribute,
+        ))
+    } else {
+        Type::Never
+    };
+    Place::bound(initial).into()
 }
 
 #[allow(clippy::trivially_copy_pass_by_ref)]
@@ -838,8 +880,8 @@ impl<'db> Type<'db> {
         Self::Dynamic(DynamicType::Unknown)
     }
 
-    pub(crate) fn divergent(scope: ScopeId<'db>) -> Self {
-        Self::Dynamic(DynamicType::Divergent(DivergentType { scope }))
+    pub(crate) fn divergent(divergent: DivergentType<'db>) -> Self {
+        Self::Dynamic(DynamicType::Divergent(divergent))
     }
 
     pub const fn is_unknown(&self) -> bool {
@@ -7036,15 +7078,56 @@ impl<'db> KnownInstanceType<'db> {
     }
 }
 
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+pub enum DivergenceKind {
+    /// Divergence in function return type inference.
+    FunctionReturnType,
+    /// Divergence in implicit attribute type inference.
+    ImplicitAttribute(ScopedImplicitAttributeId),
+    /// Unknown divergence that we have not yet handled.
+    Todo,
+}
+
+impl DivergenceKind {
+    pub fn is_todo(self) -> bool {
+        matches!(self, Self::Todo)
+    }
+}
+
 /// A type that is determined to be divergent during recursive type inference.
 /// This type must never be eliminated by dynamic type reduction
 /// (e.g. `Divergent` is assignable to `@Todo`, but `@Todo | Divergent` must not be reducted to `@Todo`).
 /// Otherwise, type inference cannot converge properly.
 /// For detailed properties of this type, see the unit test at the end of the file.
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct DivergentType<'db> {
     /// The scope where this divergence was detected.
+    /// * The function scope in case of function return type inference
+    /// * The class body scope in case of implicit attribute type inference
     scope: ScopeId<'db>,
+    /// The kind of divergence.
+    kind: DivergenceKind,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for DivergentType<'_> {}
+
+impl<'db> DivergentType<'db> {
+    pub(crate) fn function_return_type(db: &'db dyn Db, scope: ScopeId<'db>) -> Self {
+        Self::new(db, scope, DivergenceKind::FunctionReturnType)
+    }
+
+    pub(crate) fn implicit_attribute(
+        db: &'db dyn Db,
+        scope: ScopeId<'db>,
+        attribute: ScopedImplicitAttributeId,
+    ) -> Self {
+        Self::new(db, scope, DivergenceKind::ImplicitAttribute(attribute))
+    }
+
+    pub(crate) fn todo(db: &'db dyn Db, scope: ScopeId<'db>) -> Self {
+        Self::new(db, scope, DivergenceKind::Todo)
+    }
 }
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
@@ -9084,7 +9167,8 @@ impl<'db> BoundMethodType<'db> {
             .literal(db)
             .last_definition(db)
             .body_scope(db);
-        let inference = infer_scope_types(db, scope);
+        let inference =
+            infer_function_scope_types(db, scope, DivergentType::function_return_type(db, scope));
         inference.infer_return_type(db, Type::BoundMethod(self))
     }
 
@@ -11113,7 +11197,7 @@ pub(crate) mod tests {
         let file_scope_id = FileScopeId::global();
         let scope = file_scope_id.to_scope_id(&db, file);
 
-        let div = Type::Dynamic(DynamicType::Divergent(DivergentType { scope }));
+        let div = Type::divergent(DivergentType::function_return_type(&db, scope));
 
         // The `Divergent` type must not be eliminated in union with other dynamic types,
         // as this would prevent detection of divergent type inference using `Divergent`.
