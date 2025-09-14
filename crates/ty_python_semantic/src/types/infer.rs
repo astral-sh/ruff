@@ -31,7 +31,7 @@
 //!
 //! Many of our type inference Salsa queries implement cycle recovery via fixed-point iteration. In
 //! general, they initiate fixed-point iteration by returning an `Inference` type that returns
-//! `Type::Never` for all expressions, bindings, and declarations, and then they continue iterating
+//! the `Divergent` type for all expressions, bindings, and declarations, and then they continue iterating
 //! the query cycle until a fixed-point is reached. Salsa has a built-in fixed limit on the number
 //! of iterations, so if we fail to converge, Salsa will eventually panic. (This should of course
 //! be considered a bug.)
@@ -61,11 +61,24 @@ mod builder;
 #[cfg(test)]
 mod tests;
 
+/// A scope that may be recursive.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub(super) struct PossiblyRecursiveScope<'db> {
+    scope: ScopeId<'db>,
+    divergent: DivergentType<'db>,
+}
+
+/// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
+/// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
+/// scope.
 pub(crate) fn infer_scope_types<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
 ) -> &'db ScopeInference<'db> {
-    infer_scope_types_impl(db, scope, DivergentType::todo(db, scope))
+    infer_scope_types_impl(
+        db,
+        PossiblyRecursiveScope::new(db, scope, DivergentType::todo(db, scope)),
+    )
 }
 
 pub(crate) fn infer_function_scope_types<'db>(
@@ -73,19 +86,15 @@ pub(crate) fn infer_function_scope_types<'db>(
     scope: ScopeId<'db>,
     divergent: DivergentType<'db>,
 ) -> &'db ScopeInference<'db> {
-    infer_scope_types_impl(db, scope, divergent)
+    infer_scope_types_impl(db, PossiblyRecursiveScope::new(db, scope, divergent))
 }
 
-/// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
-/// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
-/// scope.
 #[salsa::tracked(returns(ref), cycle_fn=scope_cycle_recover, cycle_initial=scope_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
 fn infer_scope_types_impl<'db>(
     db: &'db dyn Db,
-    scope: ScopeId<'db>,
-    _divergent: DivergentType<'db>,
+    scope: PossiblyRecursiveScope<'db>,
 ) -> ScopeInference<'db> {
-    let file = scope.file(db);
+    let file = scope.scope(db).file(db);
     let _span = tracing::trace_span!("infer_scope_types", scope=?scope.as_id(), ?file).entered();
 
     let module = parsed_module(db, file).load(db);
@@ -94,77 +103,91 @@ fn infer_scope_types_impl<'db>(
     // The isolation of the query is by the return inferred types.
     let index = semantic_index(db, file);
 
-    TypeInferenceBuilder::new(db, InferenceRegion::Scope(scope), index, &module).finish_scope()
+    TypeInferenceBuilder::new(db, InferenceRegion::Scope(scope.scope(db)), index, &module)
+        .finish_scope()
 }
 
 fn scope_cycle_recover<'db>(
     _db: &'db dyn Db,
     _value: &ScopeInference<'db>,
     _count: u32,
-    _scope: ScopeId<'db>,
-    _divergent: DivergentType<'db>,
+    _scope: PossiblyRecursiveScope<'db>,
 ) -> salsa::CycleRecoveryAction<ScopeInference<'db>> {
     salsa::CycleRecoveryAction::Iterate
 }
 
 fn scope_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    scope: ScopeId<'db>,
-    divergent: DivergentType<'db>,
+    db: &'db dyn Db,
+    scope: PossiblyRecursiveScope<'db>,
 ) -> ScopeInference<'db> {
-    ScopeInference::cycle_initial(divergent, scope)
+    ScopeInference::cycle_initial(scope.divergent(db), scope.scope(db))
 }
 
+/// A [`Definition`] that may be recursive.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub(super) struct PossiblyRecursiveDefinition<'db> {
+    definition: Definition<'db>,
+    divergent: DivergentType<'db>,
+}
+
+/// Infer all types for a [`Definition`] (including sub-expressions).
+/// Use when resolving a place use or public type of a place.
 pub(crate) fn infer_definition_types<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> &'db DefinitionInference<'db> {
     infer_definition_types_impl(
         db,
-        definition,
-        DivergentType::todo(db, definition.scope(db)),
+        PossiblyRecursiveDefinition::new(
+            db,
+            definition,
+            DivergentType::todo(db, definition.scope(db)),
+        ),
     )
 }
 
-/// Infer all types for a [`Definition`] (including sub-expressions).
-/// Use when resolving a place use or public type of a place.
 #[salsa::tracked(returns(ref), cycle_fn=definition_cycle_recover, cycle_initial=definition_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
 fn infer_definition_types_impl<'db>(
     db: &'db dyn Db,
-    definition: Definition<'db>,
-    _divergent: DivergentType<'db>,
+    definition: PossiblyRecursiveDefinition<'db>,
 ) -> DefinitionInference<'db> {
-    let file = definition.file(db);
+    let file = definition.definition(db).file(db);
     let module = parsed_module(db, file).load(db);
     let _span = tracing::trace_span!(
         "infer_definition_types",
-        range = ?definition.kind(db).target_range(&module),
+        range = ?definition.definition(db).kind(db).target_range(&module),
         ?file
     )
     .entered();
 
     let index = semantic_index(db, file);
 
-    TypeInferenceBuilder::new(db, InferenceRegion::Definition(definition), index, &module)
-        .finish_definition()
+    TypeInferenceBuilder::new(
+        db,
+        InferenceRegion::Definition(definition.definition(db)),
+        index,
+        &module,
+    )
+    .finish_definition()
 }
 
 fn definition_cycle_recover<'db>(
     _db: &'db dyn Db,
     _value: &DefinitionInference<'db>,
     _count: u32,
-    _definition: Definition<'db>,
-    _divergent: DivergentType<'db>,
+    _definition: PossiblyRecursiveDefinition<'db>,
 ) -> salsa::CycleRecoveryAction<DefinitionInference<'db>> {
     salsa::CycleRecoveryAction::Iterate
 }
 
 fn definition_cycle_initial<'db>(
     db: &'db dyn Db,
-    definition: Definition<'db>,
-    divergent: DivergentType<'db>,
+    definition: PossiblyRecursiveDefinition<'db>,
 ) -> DefinitionInference<'db> {
-    DefinitionInference::cycle_initial(definition.scope(db), divergent)
+    DefinitionInference::cycle_initial(
+        definition.definition(db).scope(db),
+        definition.divergent(db),
+    )
 }
 
 /// Infer types for all deferred type expressions in a [`Definition`].
@@ -351,8 +374,8 @@ fn single_expression_cycle_initial<'db>(db: &'db dyn Db, input: InferExpression<
 /// interning an `ExpressionWithContext` unnecessarily when no type context is provided.
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, salsa::Supertype, salsa::Update)]
 pub(super) enum InferExpression<'db> {
-    WithDivergent(ExpressionWithDivergent<'db>),
-    WithContextAndDivergent(ExpressionWithContextAndDivergent<'db>),
+    Bare(PossiblyRecursiveExpression<'db>),
+    WithContext(PossiblyRecursiveExpressionWithContext<'db>),
 }
 
 impl<'db> InferExpression<'db> {
@@ -363,12 +386,12 @@ impl<'db> InferExpression<'db> {
         divergent: DivergentType<'db>,
     ) -> InferExpression<'db> {
         if tcx.annotation.is_some() {
-            InferExpression::WithContextAndDivergent(ExpressionWithContextAndDivergent::new(
+            InferExpression::WithContext(PossiblyRecursiveExpressionWithContext::new(
                 db, expression, tcx, divergent,
             ))
         } else {
             // Drop the empty `TypeContext` to avoid the interning cost.
-            InferExpression::WithDivergent(ExpressionWithDivergent::new(db, expression, divergent))
+            InferExpression::Bare(PossiblyRecursiveExpression::new(db, expression, divergent))
         }
     }
 
@@ -378,13 +401,13 @@ impl<'db> InferExpression<'db> {
         expression: Expression<'db>,
         divergent: DivergentType<'db>,
     ) -> InferExpression<'db> {
-        InferExpression::WithDivergent(ExpressionWithDivergent::new(db, expression, divergent))
+        InferExpression::Bare(PossiblyRecursiveExpression::new(db, expression, divergent))
     }
 
     fn expression(self, db: &'db dyn Db) -> Expression<'db> {
         match self {
-            InferExpression::WithDivergent(bare) => bare.expression(db),
-            InferExpression::WithContextAndDivergent(expression_with_context) => {
+            InferExpression::Bare(bare) => bare.expression(db),
+            InferExpression::WithContext(expression_with_context) => {
                 expression_with_context.expression(db)
             }
         }
@@ -392,8 +415,8 @@ impl<'db> InferExpression<'db> {
 
     fn tcx(self, db: &'db dyn Db) -> TypeContext<'db> {
         match self {
-            InferExpression::WithDivergent(_) => TypeContext::default(),
-            InferExpression::WithContextAndDivergent(expression_with_context) => {
+            InferExpression::Bare(_) => TypeContext::default(),
+            InferExpression::WithContext(expression_with_context) => {
                 expression_with_context.tcx(db)
             }
         }
@@ -401,24 +424,24 @@ impl<'db> InferExpression<'db> {
 
     fn divergent(self, db: &'db dyn Db) -> DivergentType<'db> {
         match self {
-            InferExpression::WithDivergent(bare) => bare.divergent(db),
-            InferExpression::WithContextAndDivergent(expression_with_context) => {
+            InferExpression::Bare(bare) => bare.divergent(db),
+            InferExpression::WithContext(expression_with_context) => {
                 expression_with_context.divergent(db)
             }
         }
     }
 }
 
-/// An `Expression` with a `DivergentType`.
+/// An [`Expression`] that may be recursive.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-pub(super) struct ExpressionWithDivergent<'db> {
+pub(super) struct PossiblyRecursiveExpression<'db> {
     expression: Expression<'db>,
     divergent: DivergentType<'db>,
 }
 
-/// An `Expression` with a `TypeContext` and a `DivergentType`.
+/// An [`Expression`] with a [`TypeContext`], that may be recursive.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-pub(super) struct ExpressionWithContextAndDivergent<'db> {
+pub(super) struct PossiblyRecursiveExpressionWithContext<'db> {
     expression: Expression<'db>,
     tcx: TypeContext<'db>,
     divergent: DivergentType<'db>,
@@ -453,7 +476,7 @@ pub(crate) fn static_expression_truthiness<'db>(
 ) -> Truthiness {
     let inference = infer_expression_types_impl(
         db,
-        InferExpression::WithDivergent(ExpressionWithDivergent::new(
+        InferExpression::Bare(PossiblyRecursiveExpression::new(
             db,
             expression,
             DivergentType::todo(db, expression.scope(db)),
