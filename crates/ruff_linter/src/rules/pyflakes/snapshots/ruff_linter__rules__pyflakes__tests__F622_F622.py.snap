@@ -9,12 +9,3 @@ F622 Two starred expressions in assignment
 2 | *a, b, c = (1, 2, 3)
 3 | a, b, *c = (1, 2, 3)
   |
-
-F622 Two starred expressions in assignment
- --> F622.py:1:1
-  |
-1 | *a, *b, c = (1, 2, 3)
-  | ^^^^^^^^^
-2 | *a, b, c = (1, 2, 3)
-3 | a, b, *c = (1, 2, 3)
-  |
