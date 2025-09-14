@@ -1081,7 +1081,7 @@ fn is_one_line(docstring: &Docstring) -> bool {
     true
 }
 
-/// DOC201, DOC202, DOC402, DOC403, DOC501, DOC502
+/// DOC102, DOC201, DOC202, DOC402, DOC403, DOC501, DOC502
 pub(crate) fn check_docstring(
     checker: &Checker,
     definition: &Definition,
@@ -1214,7 +1214,7 @@ pub(crate) fn check_docstring(
     // DOC102
     if checker.is_rule_enabled(Rule::DocstringExtraneousParameter) {
         // Don't report extraneous parameters if the signature defines **kwargs
-        if !function_def.parameters.kwarg.is_some() {
+        if function_def.parameters.kwarg.is_none() {
             if let Some(docstring_params) = docstring_sections.parameters {
                 let mut extraneous_parameters = Vec::new();
                 for docstring_param in &docstring_params.parameters {
