@@ -725,18 +725,19 @@ impl<'db> ConstraintClause<'db> {
                     if self_constraint == other_constraint {
                         continue;
                     }
-                    let union_constraint = match self_constraint.union(db, other_constraint) {
-                        Simplifiable::NotSimplified(_, _) => {
-                            // The constraints for this typevar are not identical, nor do they
-                            // simplify.
-                            return None;
-                        }
-                        Simplifiable::Simplified(union_constraint) => Some(union_constraint),
-                        Simplifiable::AlwaysSatisfiable => None,
-                        Simplifiable::NeverSatisfiable => {
-                            panic!("unioning two non-never constraints should not be never")
-                        }
-                    };
+                    let union_constraint =
+                        match self_constraint.simplified_union(db, other_constraint) {
+                            Simplifiable::NotSimplified(_, _) => {
+                                // The constraints for this typevar are not identical, nor do they
+                                // simplify.
+                                return None;
+                            }
+                            Simplifiable::Simplified(union_constraint) => Some(union_constraint),
+                            Simplifiable::AlwaysSatisfiable => None,
+                            Simplifiable::NeverSatisfiable => {
+                                panic!("unioning two non-never constraints should not be never")
+                            }
+                        };
                     if simplified_index
                         .replace((index, union_constraint))
                         .is_some()
@@ -786,7 +787,10 @@ impl<'db> ConstraintClause<'db> {
                     return f.write_str("1");
                 }
 
-                if self.clause.constraints.len() > 1 {
+                let clause_count: usize = (self.clause.constraints.iter())
+                    .map(ConstrainedTypeVar::clause_count)
+                    .sum();
+                if clause_count > 1 {
                     f.write_str("(")?;
                 }
                 for (i, constraint) in self.clause.constraints.iter().enumerate() {
@@ -795,7 +799,7 @@ impl<'db> ConstraintClause<'db> {
                     }
                     constraint.display(self.db).fmt(f)?;
                 }
-                if self.clause.constraints.len() > 1 {
+                if clause_count > 1 {
                     f.write_str(")")?;
                 }
                 Ok(())
@@ -813,24 +817,27 @@ pub(crate) struct ConstrainedTypeVar<'db> {
 }
 
 impl<'db> ConstrainedTypeVar<'db> {
+    fn clause_count(&self) -> usize {
+        self.constraint.clause_count()
+    }
+
     /// Returns the intersection of this individual constraint and another.
     fn intersect(&self, db: &'db dyn Db, other: &Self) -> Simplifiable<Self> {
         if self.typevar != other.typevar {
             return Simplifiable::NotSimplified(self.clone(), other.clone());
         }
-        self.constraint
-            .intersect(db, &other.constraint)
+        Simplifiable::from_one(self.constraint.intersect(db, &other.constraint))
             .map(|constraint| constraint.constrain(self.typevar))
     }
 
     /// Returns the union of this individual constraint and another.
-    fn union(&self, db: &'db dyn Db, other: &Self) -> Simplifiable<Self> {
+    fn simplified_union(&self, db: &'db dyn Db, other: &Self) -> Simplifiable<Self, ()> {
         if self.typevar != other.typevar {
-            return Simplifiable::NotSimplified(self.clone(), other.clone());
+            return Simplifiable::NotSimplified((), ());
         }
         self.constraint
-            .union(db, &other.constraint)
-            .map(|constraint| constraint.constrain(self.typevar))
+            .simplified_union(db, &other.constraint)
+            .map_one(|constraint| constraint.constrain(self.typevar))
     }
 
     /// Adds the negation of this individual constraint to a constraint set.
@@ -854,9 +861,9 @@ impl<'db> ConstrainedTypeVar<'db> {
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
-pub(crate) enum Constraint<'db> {
-    Range(RangeConstraint<'db>),
-    NegatedRange(NegatedRangeConstraint<'db>),
+pub(crate) struct Constraint<'db> {
+    positive: RangeConstraint<'db>,
+    negative: SmallVec<[RangeConstraint<'db>; 1]>,
 }
 
 impl<'db> Constraint<'db> {
@@ -867,34 +874,120 @@ impl<'db> Constraint<'db> {
         }
     }
 
-    fn intersect(&self, db: &'db dyn Db, other: &Constraint<'db>) -> Simplifiable<Constraint<'db>> {
-        match (self, other) {
-            (Constraint::Range(left), Constraint::Range(right)) => left.intersect_range(db, right),
-
-            (Constraint::Range(range), Constraint::NegatedRange(negated_range))
-            | (Constraint::NegatedRange(negated_range), Constraint::Range(range)) => {
-                range.intersect_negated_range(db, negated_range)
-            }
-
-            (Constraint::NegatedRange(left), Constraint::NegatedRange(right)) => {
-                left.intersect_negated_range(db, right)
-            }
-        }
+    fn clause_count(&self) -> usize {
+        (!self.positive.is_always() as usize) + self.negative.len()
     }
 
-    fn union(&self, db: &'db dyn Db, other: &Constraint<'db>) -> Simplifiable<Constraint<'db>> {
-        match (self, other) {
-            (Constraint::Range(left), Constraint::Range(right)) => left.union_range(db, right),
+    fn intersect(&self, db: &'db dyn Db, other: &Constraint<'db>) -> Satisfiable<Constraint<'db>> {
+        let Some(positive) = self.positive.intersect(db, &other.positive) else {
+            // If the positive intersection is empty, none of the negative holes matter, since
+            // there are no types for the holes to remove.
+            return Satisfiable::Never;
+        };
 
-            (Constraint::Range(range), Constraint::NegatedRange(negated_range))
-            | (Constraint::NegatedRange(negated_range), Constraint::Range(range)) => {
-                range.union_negated_range(db, negated_range)
+        // The negative portion of the intersection is given by
+        //
+        //   ¬(s₁ ≤ α ≤ t₁) ∧ ¬(s₂ ≤ α ≤ t₂) = ¬((s₁ ≤ α ≤ t₁) ∨ (s₂ ≤ α ≤ t₂))
+        //
+        // That is, we union together the holes from `self` and `other`. If any of the holes
+        // entirely contain another, we can simplify those two down to the larger hole. We use the
+        // same trick as above in `union_clause` and `intersect_constraint` to look for pairs that
+        // we can simplify.
+        //
+        // We also want to clip each negative hole to the minimum range that overlaps with the
+        // positive range. We'll do that now to all of the holes from `self`, and we'll do that to
+        // holes from `other` below when we try to simplify them.
+        let mut previous: SmallVec<[RangeConstraint<'db>; 1]> = SmallVec::new();
+        let mut current: SmallVec<_> = (self.negative.iter())
+            .filter_map(|negative| negative.intersect(db, &positive))
+            .collect();
+        'outer: for other_negative in other.negative.iter() {
+            let Some(mut other_negative) = other_negative.intersect(db, &positive) else {
+                continue;
+            };
+            std::mem::swap(&mut previous, &mut current);
+            let mut previous_negative = previous.iter();
+            for self_negative in previous_negative.by_ref() {
+                match self_negative.union(db, &other_negative) {
+                    Simplifiable::NeverSatisfiable => {
+                        // If two holes cancel out to 0, then we can remove them from the list. It
+                        // does NOT cause the entire list to become 0. We need to keep whatever
+                        // holes have already been added to the result, and also need to copy over
+                        // any later holes that we hadn't processed yet.
+                        current.extend(previous_negative.cloned());
+                        continue 'outer;
+                    }
+
+                    Simplifiable::AlwaysSatisfiable => {
+                        // If two holes cancel out to 1, that makes the entire list 1, and all
+                        // existing holes are simplified away. A hole of 1 removes every type from
+                        // the constraint, regardless of what is in the positive portion, resulting
+                        // in an empty constraint for the overall result.
+                        return Satisfiable::Never;
+                    }
+
+                    Simplifiable::NotSimplified(existing, h) => {
+                        // We couldn't simplify the new hole relative to this existing holes, so
+                        // add the existing hole to the result. Continue trying to simplify the new
+                        // hole against the later existing holes.
+                        current.push(existing);
+                        other_negative = h;
+                    }
+
+                    Simplifiable::Simplified(h) => {
+                        // We were able to simplify the new hole relative to this existing hole.
+                        // Don't add it to the result yet; instead, try to simplify the result
+                        // further against later existing holes.
+                        other_negative = h;
+                    }
+                }
             }
 
-            (Constraint::NegatedRange(left), Constraint::NegatedRange(right)) => {
-                left.union_negated_range(db, right)
+            // If we fall through then we need to add the new hole to the hole list (either because
+            // we couldn't simplify it with anything, or because we did without it canceling out).
+            current.push(other_negative);
+        }
+
+        // current now contains the simplified list of holes for the intersection result. If the
+        // positive portion is 1, and the negative portion is 0, then the constraint is always
+        // satisfied.
+        if positive.is_always() && current.is_empty() {
+            return Satisfiable::Always;
+        }
+
+        Satisfiable::Constrained(Self {
+            positive,
+            negative: current,
+        })
+    }
+
+    fn simplified_union(
+        &self,
+        db: &'db dyn Db,
+        other: &Constraint<'db>,
+    ) -> Simplifiable<Constraint<'db>, ()> {
+        // For a union of two constraints to simplify to a single constraint, the positive portion
+        // of one must completely contain the positive portion of the other; and each negative
+        // hole of the larger must be completely contained by some negative hole for the smaller,
+        // or must be disjoint from the smaller positive portion.
+        let (larger, smaller) = if self.positive.contains(db, &other.positive) {
+            (self, other)
+        } else if other.positive.contains(db, &self.positive) {
+            (other, self)
+        } else {
+            return Simplifiable::NotSimplified((), ());
+        };
+
+        for larger_negative in &larger.negative {
+            let satisfied = (smaller.negative.iter())
+                .any(|smaller_negative| smaller_negative.contains(db, larger_negative))
+                || larger_negative.is_disjoint_from(db, &smaller.positive);
+            if !satisfied {
+                return Simplifiable::NotSimplified((), ());
             }
         }
+
+        Simplifiable::Simplified(larger.clone())
     }
 
     fn negate_into(
@@ -903,10 +996,17 @@ impl<'db> Constraint<'db> {
         typevar: BoundTypeVarInstance<'db>,
         set: &mut ConstraintSet<'db>,
     ) {
-        match self {
-            Constraint::Range(constraint) => constraint.negate_into(db, typevar, set),
-            Constraint::NegatedRange(constraint) => constraint.negate_into(db, typevar, set),
+        for negative in &self.negative {
+            set.union_constraint(
+                db,
+                Constraint::range(db, negative.lower, negative.upper).constrain(typevar),
+            );
         }
+        set.union_constraint(
+            db,
+            Constraint::negated_range(db, self.positive.lower, self.positive.upper)
+                .constrain(typevar),
+        );
     }
 
     fn display(&self, db: &'db dyn Db, typevar: impl Display) -> impl Display {
@@ -918,14 +1018,23 @@ impl<'db> Constraint<'db> {
 
         impl<D: Display> Display for DisplayConstraint<'_, '_, D> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                match self.constraint {
-                    Constraint::Range(constraint) => {
-                        constraint.display(self.db, &self.typevar).fmt(f)
-                    }
-                    Constraint::NegatedRange(constraint) => {
-                        constraint.display(self.db, &self.typevar).fmt(f)
-                    }
+                let mut first = true;
+                if !self.constraint.positive.is_always() {
+                    (self.constraint.positive)
+                        .display(self.db, &self.typevar)
+                        .fmt(f)?;
+                    first = false;
                 }
+                for negative in &self.constraint.negative {
+                    if first {
+                        first = false;
+                        f.write_str("¬")?;
+                    } else {
+                        f.write_str(" ∧ ¬")?;
+                    }
+                    negative.display(self.db, &self.typevar).fmt(f)?;
+                }
+                Ok(())
             }
         }
 
@@ -965,117 +1074,95 @@ impl<'db> Constraint<'db> {
 
         // If the requested constraint is `Never ≤ T ≤ object`, then the typevar can be specialized
         // to _any_ type, and the constraint does nothing.
-        if lower.is_never() && upper.is_object() {
+        let positive = RangeConstraint { lower, upper };
+        if positive.is_always() {
             return Satisfiable::Always;
         }
 
-        Satisfiable::Constrained(Constraint::Range(RangeConstraint { lower, upper }))
+        Satisfiable::Constrained(Constraint {
+            positive,
+            negative: smallvec![],
+        })
+    }
+
+    /// Returns a new negated range constraint.
+    ///
+    /// Panics if `lower` and `upper` are not both fully static.
+    fn negated_range(
+        db: &'db dyn Db,
+        lower: Type<'db>,
+        upper: Type<'db>,
+    ) -> Satisfiable<Constraint<'db>> {
+        debug_assert_eq!(lower, lower.bottom_materialization(db));
+        debug_assert_eq!(upper, upper.top_materialization(db));
+
+        // If `lower ≰ upper`, then the negated constraint is always satisfied, since there is no
+        // type that is both greater than `lower`, and less than `upper`.
+        if !lower.is_subtype_of(db, upper) {
+            return Satisfiable::Always;
+        }
+
+        // If the requested constraint is `¬(Never ≤ T ≤ object)`, then the constraint cannot be
+        // satisfied.
+        let negative = RangeConstraint { lower, upper };
+        if negative.is_always() {
+            return Satisfiable::Never;
+        }
+
+        Satisfiable::Constrained(Constraint {
+            positive: RangeConstraint::always(),
+            negative: smallvec![negative],
+        })
     }
 }
 
 impl<'db> RangeConstraint<'db> {
-    fn intersect_range(
-        &self,
-        db: &'db dyn Db,
-        other: &RangeConstraint<'db>,
-    ) -> Simplifiable<Constraint<'db>> {
+    fn always() -> Self {
+        Self {
+            lower: Type::Never,
+            upper: Type::object(),
+        }
+    }
+
+    fn contains(&self, db: &'db dyn Db, other: &RangeConstraint<'db>) -> bool {
+        self.lower.is_subtype_of(db, other.lower) && other.upper.is_subtype_of(db, self.upper)
+    }
+
+    fn is_always(&self) -> bool {
+        self.lower.is_never() && self.upper.is_object()
+    }
+
+    fn is_disjoint_from(&self, db: &'db dyn Db, other: &RangeConstraint<'db>) -> bool {
+        incomparable(db, self.lower, other.upper) || incomparable(db, other.lower, self.upper)
+    }
+
+    /// Returns the intersection of two range constraints, or `None` if the intersection is empty.
+    fn intersect(&self, db: &'db dyn Db, other: &RangeConstraint<'db>) -> Option<Self> {
         // (s₁ ≤ α ≤ t₁) ∧ (s₂ ≤ α ≤ t₂) = (s₁ ∪ s₂) ≤ α ≤ (t₁ ∩ t₂))
-        Simplifiable::from_one(Constraint::range(
-            db,
-            UnionType::from_elements(db, [self.lower, other.lower]),
-            IntersectionType::from_elements(db, [self.upper, other.upper]),
-        ))
-    }
+        let lower = UnionType::from_elements(db, [self.lower, other.lower]);
+        let upper = IntersectionType::from_elements(db, [self.upper, other.upper]);
 
-    fn intersect_negated_range(
-        &self,
-        db: &'db dyn Db,
-        other: &NegatedRangeConstraint<'db>,
-    ) -> Simplifiable<Constraint<'db>> {
-        // If the negative range completely contains the positive range, then the intersection is
-        // empty.
-        if other.lower.is_subtype_of(db, self.lower) && self.upper.is_subtype_of(db, other.upper) {
-            return Simplifiable::NeverSatisfiable;
+        // If `lower ≰ upper`, then the intersection is empty, since there is no type that is both
+        // greater than `lower`, and less than `upper`.
+        if !lower.is_subtype_of(db, upper) {
+            return None;
         }
 
-        // If the negative range is disjoint from the positive range, the negative range doesn't
-        // remove anything; the intersection is the positive range.
-        if incomparable(db, self.lower, other.upper) || incomparable(db, other.lower, self.upper) {
-            return Simplifiable::Simplified(Constraint::Range(self.clone()));
-        }
-
-        // Otherwise we clip the negative constraint to the mininum range that overlaps with the
-        // positive range.
-        Simplifiable::from_intersection(
-            Satisfiable::Constrained(Constraint::Range(self.clone())),
-            Constraint::negated_range(
-                db,
-                UnionType::from_elements(db, [self.lower, other.lower]),
-                IntersectionType::from_elements(db, [self.upper, other.upper]),
-            ),
-        )
+        Some(Self { lower, upper })
     }
 
-    fn union_range(
-        &self,
-        db: &'db dyn Db,
-        other: &RangeConstraint<'db>,
-    ) -> Simplifiable<Constraint<'db>> {
+    fn union(&self, db: &'db dyn Db, other: &RangeConstraint<'db>) -> Simplifiable<Self> {
         // When one of the bounds is entirely contained within the other, the union simplifies to
         // the larger bounds.
         if self.lower.is_subtype_of(db, other.lower) && other.upper.is_subtype_of(db, self.upper) {
-            return Simplifiable::Simplified(Constraint::Range(self.clone()));
+            return Simplifiable::Simplified(self.clone());
         }
         if other.lower.is_subtype_of(db, self.lower) && self.upper.is_subtype_of(db, other.upper) {
-            return Simplifiable::Simplified(Constraint::Range(other.clone()));
+            return Simplifiable::Simplified(other.clone());
         }
 
         // Otherwise the result cannot be simplified.
-        Simplifiable::NotSimplified(
-            Constraint::Range(self.clone()),
-            Constraint::Range(other.clone()),
-        )
-    }
-
-    fn union_negated_range(
-        &self,
-        db: &'db dyn Db,
-        other: &NegatedRangeConstraint<'db>,
-    ) -> Simplifiable<Constraint<'db>> {
-        // If the positive range completely contains the negative range, then the union is always
-        // satisfied.
-        if self.lower.is_subtype_of(db, other.lower) && other.upper.is_subtype_of(db, self.upper) {
-            return Simplifiable::AlwaysSatisfiable;
-        }
-
-        // If the positive range is disjoint from the negative range, the positive range doesn't
-        // add anything; the union is the negative range.
-        if incomparable(db, self.lower, other.upper) || incomparable(db, other.lower, self.upper) {
-            return Simplifiable::Simplified(Constraint::NegatedRange(other.clone()));
-        }
-
-        // Otherwise we clip the positive constraint to the mininum range that overlaps with the
-        // negative range.
-        Simplifiable::from_intersection(
-            Constraint::range(
-                db,
-                UnionType::from_elements(db, [self.lower, other.lower]),
-                IntersectionType::from_elements(db, [self.upper, other.upper]),
-            ),
-            Satisfiable::Constrained(Constraint::NegatedRange(other.clone())),
-        )
-    }
-
-    fn negate_into(
-        &self,
-        db: &'db dyn Db,
-        typevar: BoundTypeVarInstance<'db>,
-        set: &mut ConstraintSet<'db>,
-    ) {
-        set.union_constraint(
-            db,
-            Constraint::negated_range(db, self.lower, self.upper).constrain(typevar),
-        );
+        Simplifiable::NotSimplified(self.clone(), other.clone())
     }
 
     fn display(&self, db: &'db dyn Db, typevar: impl Display) -> impl Display {
@@ -1100,119 +1187,6 @@ impl<'db> RangeConstraint<'db> {
         }
 
         DisplayRangeConstraint {
-            constraint: self,
-            typevar,
-            db,
-        }
-    }
-}
-
-#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
-pub(crate) struct NegatedRangeConstraint<'db> {
-    lower: Type<'db>,
-    upper: Type<'db>,
-}
-
-impl<'db> Constraint<'db> {
-    /// Returns a new negated_range constraint.
-    ///
-    /// Panics if `lower` and `upper` are not both fully static.
-    fn negated_range(
-        db: &'db dyn Db,
-        lower: Type<'db>,
-        upper: Type<'db>,
-    ) -> Satisfiable<Constraint<'db>> {
-        debug_assert_eq!(lower, lower.bottom_materialization(db));
-        debug_assert_eq!(upper, upper.top_materialization(db));
-
-        // If `lower ≰ upper`, then the constraint cannot be satisfied, since there is no type that
-        // is both greater than `lower`, and less than `upper`.
-        if !lower.is_subtype_of(db, upper) {
-            return Satisfiable::Always;
-        }
-
-        // If the requested constraint is `Never ≤ T ≤ object`, then the typevar can be specialized
-        // to _any_ type, and the constraint does nothing.
-        if lower.is_never() && upper.is_object() {
-            return Satisfiable::Never;
-        }
-
-        Satisfiable::Constrained(Constraint::NegatedRange(NegatedRangeConstraint {
-            lower,
-            upper,
-        }))
-    }
-}
-
-impl<'db> NegatedRangeConstraint<'db> {
-    fn intersect_negated_range(
-        &self,
-        db: &'db dyn Db,
-        other: &NegatedRangeConstraint<'db>,
-    ) -> Simplifiable<Constraint<'db>> {
-        // When one of the bounds is entirely contained within the other, the intersection
-        // simplifies to the larger hole.
-        if self.lower.is_subtype_of(db, other.lower) && other.upper.is_subtype_of(db, self.upper) {
-            return Simplifiable::Simplified(Constraint::NegatedRange(self.clone()));
-        }
-        if other.lower.is_subtype_of(db, self.lower) && self.upper.is_subtype_of(db, other.upper) {
-            return Simplifiable::Simplified(Constraint::NegatedRange(other.clone()));
-        }
-
-        // Otherwise the result cannot be simplified.
-        Simplifiable::NotSimplified(
-            Constraint::NegatedRange(self.clone()),
-            Constraint::NegatedRange(other.clone()),
-        )
-    }
-
-    fn union_negated_range(
-        &self,
-        db: &'db dyn Db,
-        other: &NegatedRangeConstraint<'db>,
-    ) -> Simplifiable<Constraint<'db>> {
-        // ¬(s₁ ≤ α ≤ t₁) ∨ ¬(s₂ ≤ α ≤ t₂) = ¬((s₁ ∪ s₂) ≤ α ≤ (t₁ ∩ t₂))
-        Simplifiable::from_one(Constraint::negated_range(
-            db,
-            UnionType::from_elements(db, [self.lower, other.lower]),
-            IntersectionType::from_elements(db, [self.upper, other.upper]),
-        ))
-    }
-
-    fn negate_into(
-        &self,
-        db: &'db dyn Db,
-        typevar: BoundTypeVarInstance<'db>,
-        set: &mut ConstraintSet<'db>,
-    ) {
-        set.union_constraint(
-            db,
-            Constraint::range(db, self.lower, self.upper).constrain(typevar),
-        );
-    }
-
-    fn display(&self, db: &'db dyn Db, typevar: impl Display) -> impl Display {
-        struct DisplayNegatedRangeConstraint<'a, 'db, D> {
-            constraint: &'a NegatedRangeConstraint<'db>,
-            typevar: D,
-            db: &'db dyn Db,
-        }
-
-        impl<D: Display> Display for DisplayNegatedRangeConstraint<'_, '_, D> {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                f.write_str("¬(")?;
-                if !self.constraint.lower.is_never() {
-                    write!(f, "{} ≤ ", self.constraint.lower.display(self.db))?;
-                }
-                self.typevar.fmt(f)?;
-                if !self.constraint.upper.is_object() {
-                    write!(f, " ≤ {}", self.constraint.upper.display(self.db))?;
-                }
-                f.write_str(")")
-            }
-        }
-
-        DisplayNegatedRangeConstraint {
             constraint: self,
             typevar,
             db,
@@ -1279,6 +1253,17 @@ impl<T> Simplifiable<T> {
             Simplifiable::AlwaysSatisfiable => Simplifiable::AlwaysSatisfiable,
             Simplifiable::Simplified(t) => Simplifiable::Simplified(f(t)),
             Simplifiable::NotSimplified(t1, t2) => Simplifiable::NotSimplified(f(t1), f(t2)),
+        }
+    }
+}
+
+impl<One, Two> Simplifiable<One, Two> {
+    fn map_one<U>(self, mut f: impl FnMut(One) -> U) -> Simplifiable<U, Two> {
+        match self {
+            Simplifiable::NeverSatisfiable => Simplifiable::NeverSatisfiable,
+            Simplifiable::AlwaysSatisfiable => Simplifiable::AlwaysSatisfiable,
+            Simplifiable::Simplified(t) => Simplifiable::Simplified(f(t)),
+            Simplifiable::NotSimplified(t1, t2) => Simplifiable::NotSimplified(t1, t2),
         }
     }
 }
