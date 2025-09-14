@@ -317,6 +317,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn extend_definition(&mut self, inference: &DefinitionInference<'db>) {
+        #[cfg(debug_assertions)]
         assert_eq!(self.scope, inference.scope);
 
         self.expressions.extend(inference.expressions.iter());
@@ -334,6 +335,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn extend_expression(&mut self, inference: &ExpressionInference<'db>) {
+        #[cfg(debug_assertions)]
         assert_eq!(self.scope, inference.scope);
 
         self.extend_expression_unchecked(inference);

@@ -118,9 +118,9 @@ fn implicit_attribute_initial<'db>(
     _target_method_decorator: MethodDecorator,
 ) -> PlaceAndQualifiers<'db> {
     let implicit_attribute_table = implicit_attribute_table(db, class_body_scope);
-    let implicit_attr_id = implicit_attribute_table
-        .symbol_id(&name)
-        .expect("Implicit attribute must exist in the table");
+    let Some(implicit_attr_id) = implicit_attribute_table.symbol_id(&name) else {
+        return Place::bound(Type::divergent(DivergentType::todo(db, class_body_scope))).into();
+    };
     Place::bound(Type::divergent(DivergentType::implicit_attribute(
         db,
         class_body_scope,
@@ -2885,7 +2885,7 @@ impl<'db> ClassLiteral<'db> {
         cycle_initial=implicit_attribute_initial,
         heap_size=ruff_memory_usage::heap_size,
     )]
-    fn implicit_attribute_inner(
+    pub(super) fn implicit_attribute_inner(
         db: &'db dyn Db,
         class_body_scope: ScopeId<'db>,
         name: String,
@@ -2986,6 +2986,19 @@ impl<'db> ClassLiteral<'db> {
 
         if !qualifiers.contains(TypeQualifiers::FINAL) {
             union_of_inferred_types = union_of_inferred_types.add(Type::unknown());
+        }
+        if let Place::Type(previous_cycle_type, _) = Self::implicit_attribute_inner(
+            db,
+            class_body_scope,
+            name.clone(),
+            target_method_decorator,
+        )
+        .place
+        {
+            // In fixed-point iteration of type inference, the attribute type must be monotonically widened and not "oscillate".
+            // Here, monotonicity is guaranteed by pre-unioning the type of the previous iteration into the current result.
+            union_of_inferred_types =
+                union_of_inferred_types.add(previous_cycle_type.normalized_impl(db, &visitor));
         }
 
         for (attribute_assignments, method_scope_id) in

@@ -3025,7 +3025,7 @@ impl<'db> Type<'db> {
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
         tracing::trace!("class_member: {}.{}", self.display(db), name);
-        match self {
+        let result = match self {
             Type::Union(union) => union.map_with_boundness_and_qualifiers(db, |elem| {
                 elem.class_member_with_policy(db, name.clone(), policy)
             }),
@@ -3043,7 +3043,28 @@ impl<'db> Type<'db> {
                 .expect(
                     "`Type::find_name_in_mro()` should return `Some()` when called on a meta-type",
                 ),
-        }
+        };
+        result.map_type(|ty| {
+            // In fixed-point iteration of type inference, the member type must be monotonically widened and not "oscillate".
+            // Here, monotonicity is guaranteed by pre-unioning the type of the previous iteration into the current result.
+            let previous_cycle_value = self.class_member_with_policy(db, name.clone(), policy);
+
+            let ty = if let Some(previous_ty) = previous_cycle_value.place.ignore_possibly_unbound()
+            {
+                UnionType::from_elements(db, [ty, previous_ty])
+            } else {
+                ty
+            };
+
+            if let Place::Type(div @ Type::Dynamic(DynamicType::Divergent(_)), _) =
+                class_lookup_cycle_initial(db, self, name, policy).place
+            {
+                let visitor = NormalizedVisitor::default().recursive(div);
+                ty.normalized_impl(db, &visitor)
+            } else {
+                ty
+            }
+        })
     }
 
     /// This function roughly corresponds to looking up an attribute in the `__dict__` of an object.
@@ -3497,7 +3518,7 @@ impl<'db> Type<'db> {
 
         let name_str = name.as_str();
 
-        match self {
+        let result = match self {
             Type::Union(union) => union.map_with_boundness_and_qualifiers(db, |elem| {
                 elem.member_lookup_with_policy(db, name_str.into(), policy)
             }),
@@ -3565,20 +3586,20 @@ impl<'db> Type<'db> {
                             // If an attribute is not available on the bound method object,
                             // it will be looked up on the underlying function object:
                             Type::FunctionLiteral(bound_method.function(db))
-                                .member_lookup_with_policy(db, name, policy)
+                                .member_lookup_with_policy(db, name.clone(), policy)
                         })
                 }
             },
             Type::KnownBoundMethod(method) => method
                 .class()
                 .to_instance(db)
-                .member_lookup_with_policy(db, name, policy),
+                .member_lookup_with_policy(db, name.clone(), policy),
             Type::WrapperDescriptor(_) => KnownClass::WrapperDescriptorType
                 .to_instance(db)
-                .member_lookup_with_policy(db, name, policy),
+                .member_lookup_with_policy(db, name.clone(), policy),
             Type::DataclassDecorator(_) => KnownClass::FunctionType
                 .to_instance(db)
-                .member_lookup_with_policy(db, name, policy),
+                .member_lookup_with_policy(db, name.clone(), policy),
 
             Type::Callable(_) | Type::DataclassTransformer(_) if name_str == "__call__" => {
                 Place::bound(self).into()
@@ -3586,10 +3607,10 @@ impl<'db> Type<'db> {
 
             Type::Callable(callable) if callable.is_function_like(db) => KnownClass::FunctionType
                 .to_instance(db)
-                .member_lookup_with_policy(db, name, policy),
+                .member_lookup_with_policy(db, name.clone(), policy),
 
             Type::Callable(_) | Type::DataclassTransformer(_) => {
-                Type::object().member_lookup_with_policy(db, name, policy)
+                Type::object().member_lookup_with_policy(db, name.clone(), policy)
             }
 
             Type::NominalInstance(instance)
@@ -3647,9 +3668,11 @@ impl<'db> Type<'db> {
                 policy,
             ),
 
-            Type::TypeAlias(alias) => alias
-                .value_type(db)
-                .member_lookup_with_policy(db, name, policy),
+            Type::TypeAlias(alias) => {
+                alias
+                    .value_type(db)
+                    .member_lookup_with_policy(db, name.clone(), policy)
+            }
 
             Type::NominalInstance(..)
             | Type::ProtocolInstance(..)
@@ -3811,7 +3834,28 @@ impl<'db> Type<'db> {
                     .try_call_dunder_get_on_attribute(db, owner_attr.clone())
                     .unwrap_or(owner_attr)
             }
-        }
+        };
+        result.map_type(|ty| {
+            // In fixed-point iteration of type inference, the member type must be monotonically widened and not "oscillate".
+            // Here, monotonicity is guaranteed by pre-unioning the type of the previous iteration into the current result.
+            let previous_cycle_value = self.member_lookup_with_policy(db, name.clone(), policy);
+
+            let ty = if let Some(previous_ty) = previous_cycle_value.place.ignore_possibly_unbound()
+            {
+                UnionType::from_elements(db, [ty, previous_ty])
+            } else {
+                ty
+            };
+
+            if let Place::Type(div @ Type::Dynamic(DynamicType::Divergent(_)), _) =
+                member_lookup_cycle_initial(db, self, name, policy).place
+            {
+                let visotor = NormalizedVisitor::default().recursive(div);
+                ty.normalized_impl(db, &visotor)
+            } else {
+                ty
+            }
+        })
     }
 
     /// Resolves the boolean value of the type and falls back to [`Truthiness::Ambiguous`] if the type doesn't implement `__bool__` correctly.
