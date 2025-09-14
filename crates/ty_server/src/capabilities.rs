@@ -10,6 +10,8 @@ use lsp_types::{
 
 use crate::PositionEncoding;
 use crate::session::GlobalSettings;
+use lsp_types as types;
+use std::str::FromStr;
 
 bitflags::bitflags! {
     /// Represents the resolved client capabilities for the language server.
@@ -34,6 +36,36 @@ bitflags::bitflags! {
         const DIAGNOSTIC_DYNAMIC_REGISTRATION = 1 << 14;
         const WORKSPACE_CONFIGURATION = 1 << 15;
         const RENAME_DYNAMIC_REGISTRATION = 1 << 16;
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) enum SupportedCommand {
+    Debug,
+}
+
+impl SupportedCommand {
+    /// Returns the identifier of the command.
+    const fn identifier(self) -> &'static str {
+        match self {
+            SupportedCommand::Debug => "ty.printDebugInformation",
+        }
+    }
+
+    /// Returns all the commands that the server currently supports.
+    const fn all() -> [SupportedCommand; 1] {
+        [SupportedCommand::Debug]
+    }
+}
+
+impl FromStr for SupportedCommand {
+    type Err = anyhow::Error;
+
+    fn from_str(name: &str) -> anyhow::Result<Self, Self::Err> {
+        Ok(match name {
+            "ty.printDebugInformation" => Self::Debug,
+            _ => return Err(anyhow::anyhow!("Invalid command `{name}`")),
+        })
     }
 }
 
@@ -319,6 +351,15 @@ pub(crate) fn server_capabilities(
 
     ServerCapabilities {
         position_encoding: Some(position_encoding.into()),
+        execute_command_provider: Some(types::ExecuteCommandOptions {
+            commands: SupportedCommand::all()
+                .map(|command| command.identifier().to_string())
+                .to_vec(),
+            work_done_progress_options: WorkDoneProgressOptions {
+                work_done_progress: Some(false),
+            },
+        }),
+
         diagnostic_provider,
         text_document_sync: Some(TextDocumentSyncCapability::Options(
             TextDocumentSyncOptions {

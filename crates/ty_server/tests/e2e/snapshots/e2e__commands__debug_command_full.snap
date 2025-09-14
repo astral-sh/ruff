@@ -1,0 +1,8 @@
+---
+source: crates/ty_server/tests/e2e/commands.rs
+assertion_line: 99
+expression: response
+---
+Some(
+    String("report type: full\n=======SALSA STRUCTS=======\n`Program`                                          metadata=0.00MB   fields=0.02MB   count=1\n`Project`                                          metadata=0.00MB   fields=0.00MB   count=1\n`FileRoot`                                         metadata=0.00MB   fields=0.00MB   count=1\n=======SALSA QUERIES=======\n=======SALSA SUMMARY=======/nTOTAL MEMORY USAGE: 0.02MB\n    struct metadata = 0.00MB\n    struct fields = 0.02MB\n    memo metadata = 0.00MB\n    memo fields = 0.00MB\n\n"),
+)
