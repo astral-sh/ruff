@@ -281,7 +281,11 @@ fn dynamic_elements_ordering<'db>(
         (_, DynamicType::TodoTypeAlias) => Ordering::Greater,
 
         (DynamicType::Divergent(left), DynamicType::Divergent(right)) => {
-            left.scope(db).cmp(&right.scope(db))
+            left.file(db).cmp(&right.file(db)).then_with(|| {
+                left.file_scope(db)
+                    .index()
+                    .cmp(&right.file_scope(db).index())
+            })
         }
         (DynamicType::Divergent(_), _) => Ordering::Less,
         (_, DynamicType::Divergent(_)) => Ordering::Greater,

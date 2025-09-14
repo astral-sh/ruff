@@ -36,7 +36,7 @@ use crate::semantic_index::place::ScopedPlaceId;
 use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::symbol::ScopedImplicitAttributeId;
 use crate::semantic_index::{
-    implicit_attribute_table, imported_modules, place_table, semantic_index,
+    FileScopeId, implicit_attribute_table, imported_modules, place_table, semantic_index,
 };
 use crate::suppression::check_suppressions;
 use crate::types::call::{Binding, Bindings, CallArguments, CallableBinding};
@@ -7145,10 +7145,14 @@ impl DivergenceKind {
 /// For detailed properties of this type, see the unit test at the end of the file.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct DivergentType<'db> {
+    /// The file in which the divergence occurs.
+    file: File,
+
     /// The scope where this divergence was detected.
     /// * The function scope in case of function return type inference
     /// * The class body scope in case of implicit attribute type inference
-    scope: ScopeId<'db>,
+    file_scope: FileScopeId,
+
     /// The kind of divergence.
     kind: DivergenceKind,
 }
@@ -7158,7 +7162,12 @@ impl get_size2::GetSize for DivergentType<'_> {}
 
 impl<'db> DivergentType<'db> {
     pub(crate) fn function_return_type(db: &'db dyn Db, scope: ScopeId<'db>) -> Self {
-        Self::new(db, scope, DivergenceKind::FunctionReturnType)
+        Self::new(
+            db,
+            scope.file(db),
+            scope.file_scope_id(db),
+            DivergenceKind::FunctionReturnType,
+        )
     }
 
     pub(crate) fn implicit_attribute(
@@ -7166,11 +7175,21 @@ impl<'db> DivergentType<'db> {
         scope: ScopeId<'db>,
         attribute: ScopedImplicitAttributeId,
     ) -> Self {
-        Self::new(db, scope, DivergenceKind::ImplicitAttribute(attribute))
+        Self::new(
+            db,
+            scope.file(db),
+            scope.file_scope_id(db),
+            DivergenceKind::ImplicitAttribute(attribute),
+        )
     }
 
     pub(crate) fn todo(db: &'db dyn Db, scope: ScopeId<'db>) -> Self {
-        Self::new(db, scope, DivergenceKind::Todo)
+        Self::new(
+            db,
+            scope.file(db),
+            scope.file_scope_id(db),
+            DivergenceKind::Todo,
+        )
     }
 }
 
