@@ -1583,6 +1583,67 @@ impl<'db> TupleSpecBuilder<'db> {
         }
     }
 
+    fn all_elements(&self) -> impl Iterator<Item = &Type<'db>> {
+        match self {
+            TupleSpecBuilder::Fixed(elements) => Either::Left(elements.iter()),
+            TupleSpecBuilder::Variable {
+                prefix,
+                variable,
+                suffix,
+            } => Either::Right(prefix.iter().chain(suffix).chain(std::iter::once(variable))),
+        }
+    }
+
+    pub(crate) fn union(mut self, db: &'db dyn Db, other: &TupleSpec<'db>) -> Self {
+        match (&mut self, other) {
+            (TupleSpecBuilder::Fixed(our_elements), TupleSpec::Fixed(new_elements))
+                if our_elements.len() == new_elements.len() =>
+            {
+                for (existing, new) in our_elements.iter_mut().zip(new_elements.elements()) {
+                    *existing = UnionType::from_elements(db, [*existing, *new]);
+                }
+                self
+            }
+
+            (
+                TupleSpecBuilder::Variable {
+                    prefix: prefix1,
+                    variable: variable1,
+                    suffix: suffix1,
+                },
+                Tuple::Variable(VariableLengthTuple {
+                    prefix: prefix2,
+                    variable: variable2,
+                    suffix: suffix2,
+                }),
+            ) if prefix1.len() == prefix2.len() && suffix1.len() == suffix2.len() => {
+                TupleSpecBuilder::Variable {
+                    prefix: prefix1
+                        .iter()
+                        .zip(prefix2)
+                        .map(|(elem1, elem2)| UnionType::from_elements(db, [elem1, elem2]))
+                        .collect(),
+                    variable: UnionType::from_elements(db, [variable1, variable2]),
+                    suffix: suffix1
+                        .iter()
+                        .zip(suffix2)
+                        .map(|(elem1, elem2)| UnionType::from_elements(db, [elem1, elem2]))
+                        .collect(),
+                }
+            }
+
+            _ => {
+                let unioned =
+                    UnionType::from_elements(db, self.all_elements().chain(other.all_elements()));
+                TupleSpecBuilder::Variable {
+                    prefix: vec![],
+                    variable: unioned,
+                    suffix: vec![],
+                }
+            }
+        }
+    }
+
     pub(super) fn build(self) -> TupleSpec<'db> {
         match self {
             TupleSpecBuilder::Fixed(elements) => {

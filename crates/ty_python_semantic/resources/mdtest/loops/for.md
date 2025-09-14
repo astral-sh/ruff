@@ -261,7 +261,7 @@ def g(
     for y in b:
         reveal_type(y)  # revealed: str | int
     for z in c:
-        reveal_type(z)  # revealed: LiteralString | int
+        reveal_type(z)  # revealed: Literal["f", "o", 98, 97, 114]
 ```
 
 ## Union type as iterable where one union element has no `__iter__` method

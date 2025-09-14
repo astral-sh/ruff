@@ -60,7 +60,7 @@ use crate::types::infer::infer_unpack_types;
 use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
 use crate::types::signatures::{ParameterForm, walk_signature};
-use crate::types::tuple::TupleSpec;
+use crate::types::tuple::{TupleSpec, TupleSpecBuilder};
 pub(crate) use crate::types::typed_dict::{TypedDictParams, TypedDictType, walk_typed_dict_type};
 use crate::types::variance::{TypeVarVariance, VarianceInferable};
 use crate::types::visitor::any_over_type;
@@ -5528,11 +5528,117 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         mode: EvaluationMode,
     ) -> Result<Cow<'db, TupleSpec<'db>>, IterationError<'db>> {
-        // We will not infer precise heterogeneous tuple specs for literals with lengths above this threshold.
-        // The threshold here is somewhat arbitrary and conservative; it could be increased if needed.
-        // However, it's probably very rare to need heterogeneous unpacking inference for long string literals
-        // or bytes literals, and creating long heterogeneous tuple specs has a performance cost.
-        const MAX_TUPLE_LENGTH: usize = 128;
+        fn non_async_special_case<'db>(
+            db: &'db dyn Db,
+            ty: Type<'db>,
+        ) -> Option<Cow<'db, TupleSpec<'db>>> {
+            // We will not infer precise heterogeneous tuple specs for literals with lengths above this threshold.
+            // The threshold here is somewhat arbitrary and conservative; it could be increased if needed.
+            // However, it's probably very rare to need heterogeneous unpacking inference for long string literals
+            // or bytes literals, and creating long heterogeneous tuple specs has a performance cost.
+            const MAX_TUPLE_LENGTH: usize = 128;
+
+            match ty {
+                Type::NominalInstance(nominal) => nominal.tuple_spec(db),
+                Type::GenericAlias(alias) if alias.origin(db).is_tuple(db) => {
+                    Some(Cow::Owned(TupleSpec::homogeneous(todo_type!(
+                        "*tuple[] annotations"
+                    ))))
+                }
+                Type::StringLiteral(string_literal_ty) => {
+                    let string_literal = string_literal_ty.value(db);
+                    let spec = if string_literal.len() < MAX_TUPLE_LENGTH {
+                        TupleSpec::heterogeneous(
+                            string_literal
+                                .chars()
+                                .map(|c| Type::string_literal(db, &c.to_string())),
+                        )
+                    } else {
+                        TupleSpec::homogeneous(Type::LiteralString)
+                    };
+                    Some(Cow::Owned(spec))
+                }
+                Type::BytesLiteral(bytes) => {
+                    let bytes_literal = bytes.value(db);
+                    let spec = if bytes_literal.len() < MAX_TUPLE_LENGTH {
+                        TupleSpec::heterogeneous(
+                            bytes_literal
+                                .iter()
+                                .map(|b| Type::IntLiteral(i64::from(*b))),
+                        )
+                    } else {
+                        TupleSpec::homogeneous(KnownClass::Int.to_instance(db))
+                    };
+                    Some(Cow::Owned(spec))
+                }
+                Type::Never => {
+                    // The dunder logic below would have us return `tuple[Never, ...]`, which eagerly
+                    // simplifies to `tuple[()]`. That will will cause us to emit false positives if we
+                    // index into the tuple. Using `tuple[Unknown, ...]` avoids these false positives.
+                    // TODO: Consider removing this special case, and instead hide the indexing
+                    // diagnostic in unreachable code.
+                    Some(Cow::Owned(TupleSpec::homogeneous(Type::unknown())))
+                }
+                Type::TypeAlias(alias) => {
+                    non_async_special_case(db, alias.value_type(db))
+                }
+                Type::NonInferableTypeVar(tvar) => match tvar.typevar(db).bound_or_constraints(db)? {
+                    TypeVarBoundOrConstraints::UpperBound(bound) => {
+                        non_async_special_case(db, bound)
+                    }
+                    TypeVarBoundOrConstraints::Constraints(union) => non_async_special_case(db, Type::Union(union)),
+                },
+                Type::TypeVar(_) => unreachable!(
+                    "should not be able to iterate over type variable {} in inferable position",
+                    ty.display(db)
+                ),
+                Type::Union(union) => {
+                    let elements = union.elements(db);
+                    if elements.len() < MAX_TUPLE_LENGTH {
+                        let mut elements_iter = elements.iter();
+                        let first_element_spec = non_async_special_case(db, *elements_iter.next()?)?;
+                        let mut builder = TupleSpecBuilder::from(&*first_element_spec);
+                        for element in elements_iter {
+                            builder = builder.union(db, non_async_special_case(db, *element).as_deref()?);
+                        }
+                        Some(Cow::Owned(builder.build()))
+                    } else {
+                        None
+                    }
+                }
+                // N.B. These special cases aren't strictly necessary, they're just obvious optimizations
+                Type::LiteralString | Type::Dynamic(_) => Some(Cow::Owned(TupleSpec::homogeneous(ty))),
+
+                Type::FunctionLiteral(_)
+                | Type::GenericAlias(_)
+                | Type::BoundMethod(_)
+                | Type::KnownBoundMethod(_)
+                | Type::WrapperDescriptor(_)
+                | Type::DataclassDecorator(_)
+                | Type::DataclassTransformer(_)
+                | Type::Callable(_)
+                | Type::ModuleLiteral(_)
+                // We could infer a precise tuple spec for enum classes with members,
+                // but it's not clear whether that's worth the added complexity:
+                // you'd have to check that `EnumMeta.__iter__` is not overridden for it to be sound
+                // (enums can have `EnumMeta` subclasses as their metaclasses).
+                | Type::ClassLiteral(_)
+                | Type::SubclassOf(_)
+                | Type::ProtocolInstance(_)
+                | Type::SpecialForm(_)
+                | Type::KnownInstance(_)
+                | Type::PropertyInstance(_)
+                | Type::Intersection(_)
+                | Type::AlwaysTruthy
+                | Type::AlwaysFalsy
+                | Type::IntLiteral(_)
+                | Type::BooleanLiteral(_)
+                | Type::EnumLiteral(_)
+                | Type::BoundSuper(_)
+                | Type::TypeIs(_)
+                | Type::TypedDict(_) => None
+            }
+        }
 
         if mode.is_async() {
             let try_call_dunder_anext_on_iterator = |iterator: Type<'db>| -> Result<
@@ -5599,97 +5705,7 @@ impl<'db> Type<'db> {
             };
         }
 
-        let special_case = match self {
-            Type::NominalInstance(nominal) => nominal.tuple_spec(db),
-            Type::GenericAlias(alias) if alias.origin(db).is_tuple(db) => {
-                Some(Cow::Owned(TupleSpec::homogeneous(todo_type!(
-                    "*tuple[] annotations"
-                ))))
-            }
-            Type::StringLiteral(string_literal_ty) => {
-                let string_literal = string_literal_ty.value(db);
-                let spec = if string_literal.len() < MAX_TUPLE_LENGTH {
-                    TupleSpec::heterogeneous(
-                        string_literal
-                            .chars()
-                            .map(|c| Type::string_literal(db, &c.to_string())),
-                    )
-                } else {
-                    TupleSpec::homogeneous(Type::LiteralString)
-                };
-                Some(Cow::Owned(spec))
-            }
-            Type::BytesLiteral(bytes) => {
-                let bytes_literal = bytes.value(db);
-                let spec = if bytes_literal.len() < MAX_TUPLE_LENGTH {
-                    TupleSpec::heterogeneous(
-                        bytes_literal
-                            .iter()
-                            .map(|b| Type::IntLiteral(i64::from(*b))),
-                    )
-                } else {
-                    TupleSpec::homogeneous(KnownClass::Int.to_instance(db))
-                };
-                Some(Cow::Owned(spec))
-            }
-            Type::Never => {
-                // The dunder logic below would have us return `tuple[Never, ...]`, which eagerly
-                // simplifies to `tuple[()]`. That will will cause us to emit false positives if we
-                // index into the tuple. Using `tuple[Unknown, ...]` avoids these false positives.
-                // TODO: Consider removing this special case, and instead hide the indexing
-                // diagnostic in unreachable code.
-                Some(Cow::Owned(TupleSpec::homogeneous(Type::unknown())))
-            }
-            Type::TypeAlias(alias) => {
-                Some(alias.value_type(db).try_iterate_with_mode(db, mode)?)
-            }
-            Type::NonInferableTypeVar(tvar) => match tvar.typevar(db).bound_or_constraints(db) {
-                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                    Some(bound.try_iterate_with_mode(db, mode)?)
-                }
-                // TODO: could we create a "union of tuple specs"...?
-                // (Same question applies to the `Type::Union()` branch lower down)
-                Some(TypeVarBoundOrConstraints::Constraints(_)) | None => None
-            },
-            Type::TypeVar(_) => unreachable!(
-                "should not be able to iterate over type variable {} in inferable position",
-                self.display(db)
-            ),
-            // N.B. These special cases aren't strictly necessary, they're just obvious optimizations
-            Type::LiteralString | Type::Dynamic(_) => Some(Cow::Owned(TupleSpec::homogeneous(self))),
-
-            Type::FunctionLiteral(_)
-            | Type::GenericAlias(_)
-            | Type::BoundMethod(_)
-            | Type::KnownBoundMethod(_)
-            | Type::WrapperDescriptor(_)
-            | Type::DataclassDecorator(_)
-            | Type::DataclassTransformer(_)
-            | Type::Callable(_)
-            | Type::ModuleLiteral(_)
-            // We could infer a precise tuple spec for enum classes with members,
-            // but it's not clear whether that's worth the added complexity:
-            // you'd have to check that `EnumMeta.__iter__` is not overridden for it to be sound
-            // (enums can have `EnumMeta` subclasses as their metaclasses).
-            | Type::ClassLiteral(_)
-            | Type::SubclassOf(_)
-            | Type::ProtocolInstance(_)
-            | Type::SpecialForm(_)
-            | Type::KnownInstance(_)
-            | Type::PropertyInstance(_)
-            | Type::Union(_)
-            | Type::Intersection(_)
-            | Type::AlwaysTruthy
-            | Type::AlwaysFalsy
-            | Type::IntLiteral(_)
-            | Type::BooleanLiteral(_)
-            | Type::EnumLiteral(_)
-            | Type::BoundSuper(_)
-            | Type::TypeIs(_)
-            | Type::TypedDict(_) => None
-        };
-
-        if let Some(special_case) = special_case {
+        if let Some(special_case) = non_async_special_case(db, self) {
             return Ok(special_case);
         }
 
