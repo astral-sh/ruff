@@ -135,20 +135,7 @@ impl SemanticSyntaxChecker {
                     );
                 }
                 for target in targets {
-                    let mut count = 0;
-                    Self::multiple_star_expression(target, ctx, &mut count);
-                    if count > 1 {
-                        // test_err multiple_starred_assignment_target
-                        // (*a, *b) = (1, 2)
-                        // [*a, *b] = (1, 2)
-                        // (*a, *b, c) = (1, 2, 3)
-                        // [*a, *b, c] = (1, 2, 3)
-                        Self::add_error(
-                            ctx,
-                            SemanticSyntaxErrorKind::MultipleStarredExpressions,
-                            target.range(),
-                        );
-                    }
+                    Self::multiple_star_expression(target, ctx);
                 }
 
                 // test_ok assign_stmt_starred_expr_value
@@ -404,18 +391,33 @@ impl SemanticSyntaxChecker {
             );
         }
     }
-    fn multiple_star_expression<Ctx: SemanticSyntaxContext>(
-        expr: &Expr,
-        ctx: &Ctx,
-        count: &mut usize,
-    ) {
+    fn multiple_star_expression<Ctx: SemanticSyntaxContext>(expr: &Expr, ctx: &Ctx) {
         match expr {
-            Expr::Starred(_) => {
-                *count += 1;
-            }
-            Expr::Tuple(ast::ExprTuple { elts, .. }) | Expr::List(ast::ExprList { elts, .. }) => {
+            Expr::Tuple(ast::ExprTuple { elts, range, .. })
+            | Expr::List(ast::ExprList { elts, range, .. }) => {
+                let mut count = 0;
                 for elt in elts {
-                    Self::multiple_star_expression(elt, ctx, count);
+                    if matches!(elt, Expr::Starred(_)) {
+                        count += 1;
+                    }
+                    Self::multiple_star_expression(elt, ctx);
+                }
+                if count > 1 {
+                    // test_err multiple_starred_assignment_target
+                    // (*a, *b) = (1, 2)
+                    // [*a, *b] = (1, 2)
+                    // (*a, *b, c) = (1, 2, 3)
+                    // [*a, *b, c] = (1, 2, 3)
+
+                    // test_ok multiple_starred_assignment_target
+                    // (*a, b) = (1, 2)
+                    // (*_, normed), *_ = [(1,), 2]
+
+                    Self::add_error(
+                        ctx,
+                        SemanticSyntaxErrorKind::MultipleStarredExpressions,
+                        *range,
+                    );
                 }
             }
             _ => {}
@@ -1299,10 +1301,7 @@ pub enum SemanticSyntaxErrorKind {
     /// to be very rare and not worth the additional complexity to detect.
     ///
     /// [#111123]: https://github.com/python/cpython/issues/111123
-    LoadBeforeGlobalDeclaration {
-        name: String,
-        start: TextSize,
-    },
+    LoadBeforeGlobalDeclaration { name: String, start: TextSize },
 
     /// Represents the use of a `nonlocal` variable before its `nonlocal` declaration.
     ///
@@ -1320,10 +1319,7 @@ pub enum SemanticSyntaxErrorKind {
     /// ## Known Issues
     ///
     /// See [`LoadBeforeGlobalDeclaration`][Self::LoadBeforeGlobalDeclaration].
-    LoadBeforeNonlocalDeclaration {
-        name: String,
-        start: TextSize,
-    },
+    LoadBeforeNonlocalDeclaration { name: String, start: TextSize },
 
     /// Represents the use of a starred expression in an invalid location, such as a `return` or
     /// `yield` statement.
@@ -1440,6 +1436,12 @@ pub enum SemanticSyntaxErrorKind {
 
     /// Represents the use of `from <module> import *` outside module scope.
     NonModuleImportStar(String),
+
+    /// Represents the use of more than one starred expression in an assignment.
+    ///
+    /// Python only allows a single starred target when unpacking values on the
+    /// left-hand side of an assignment. Using multiple starred expressions makes
+    /// the statement invalid and results in a `SyntaxError`.
     MultipleStarredExpressions,
 }
 
