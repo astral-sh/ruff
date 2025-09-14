@@ -1243,11 +1243,11 @@ impl<T> Satisfiable<T> {
 /// we use distinct variants to represent when the simplification is never satisfiable or always
 /// satisfiable.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum Simplifiable<T> {
+pub(crate) enum Simplifiable<One, Two = One> {
     NeverSatisfiable,
     AlwaysSatisfiable,
-    Simplified(T),
-    NotSimplified(T, T),
+    Simplified(One),
+    NotSimplified(Two, Two),
 }
 
 impl<T> Simplifiable<T> {
