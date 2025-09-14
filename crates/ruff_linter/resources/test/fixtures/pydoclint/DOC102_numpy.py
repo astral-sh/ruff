@@ -255,3 +255,20 @@ class Calculator:
             True if the number is valid, False otherwise.
         """
         return isinstance(number, (int, float))
+
+# OK
+def function_with_kwargs(param1, param2, **kwargs):
+    """Function with **kwargs parameter.
+
+    Parameters
+    ----------
+    param1 : int
+        The first parameter.
+    param2 : str
+        The second parameter.
+    extra_param : str
+        An extra parameter that may be passed via **kwargs.
+    another_extra : int
+        Another extra parameter.
+    """
+    ...

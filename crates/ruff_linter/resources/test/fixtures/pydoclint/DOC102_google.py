@@ -223,3 +223,15 @@ def on_server_unloaded(self, server_context: ServerContext) -> None:
 
     '''
     return self._lifecycle_handler.on_server_unloaded(server_context)
+
+# OK
+def function_with_kwargs(param1, param2, **kwargs):
+    """Function with **kwargs parameter.
+
+    Args:
+        param1 (int): The first parameter.
+        param2 (str): The second parameter.
+        extra_param (str): An extra parameter that may be passed via **kwargs.
+        another_extra (int): Another extra parameter.
+    """
+    ...

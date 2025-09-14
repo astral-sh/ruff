@@ -1213,23 +1213,26 @@ pub(crate) fn check_docstring(
 
     // DOC102
     if checker.is_rule_enabled(Rule::DocstringExtraneousParameter) {
-        if let Some(docstring_params) = docstring_sections.parameters {
-            let mut extraneous_parameters = Vec::new();
-            for docstring_param in &docstring_params.parameters {
-                if !signature_parameters
-                    .iter()
-                    .any(|param| param == docstring_param)
-                {
-                    extraneous_parameters.push((*docstring_param).to_string());
+        // Don't report extraneous parameters if the signature defines **kwargs
+        if !function_def.parameters.kwarg.is_some() {
+            if let Some(docstring_params) = docstring_sections.parameters {
+                let mut extraneous_parameters = Vec::new();
+                for docstring_param in &docstring_params.parameters {
+                    if !signature_parameters
+                        .iter()
+                        .any(|param| param == docstring_param)
+                    {
+                        extraneous_parameters.push((*docstring_param).to_string());
+                    }
                 }
-            }
-            if !extraneous_parameters.is_empty() {
-                checker.report_diagnostic(
-                    DocstringExtraneousParameter {
-                        ids: extraneous_parameters,
-                    },
-                    docstring_params.range(),
-                );
+                if !extraneous_parameters.is_empty() {
+                    checker.report_diagnostic(
+                        DocstringExtraneousParameter {
+                            ids: extraneous_parameters,
+                        },
+                        docstring_params.range(),
+                    );
+                }
             }
         }
     }
