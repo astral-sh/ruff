@@ -1553,13 +1553,9 @@ impl<'db> ClassLiteral<'db> {
 
     /// Return `Some()` if this class is known to be a [`DisjointBase`], or `None` if it is not.
     pub(super) fn as_disjoint_base(self, db: &'db dyn Db) -> Option<DisjointBase<'db>> {
-        // TODO: Typeshed cannot add `@disjoint_base` to its `tuple` definition without breaking pyright.
-        // See <https://github.com/microsoft/pyright/issues/10836>.
-        // This should be fixed soon; we can remove this workaround then.
-        if self.is_known(db, KnownClass::Tuple)
-            || self
-                .known_function_decorators(db)
-                .contains(&KnownFunction::DisjointBase)
+        if self
+            .known_function_decorators(db)
+            .contains(&KnownFunction::DisjointBase)
         {
             Some(DisjointBase::due_to_decorator(self))
         } else if SlotsKind::from(db, self) == SlotsKind::NotEmpty {
