@@ -6777,8 +6777,15 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::PromoteLiterals
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::MarkTypeVarsInferable(_)
-            | TypeMapping::Materialize(_)
-            | TypeMapping::BindSelf(_) => context,
+            | TypeMapping::Materialize(_) => context,
+            TypeMapping::BindSelf(_) => GenericContext::from_typevar_instances(
+                db,
+                context
+                    .variables(db)
+                    .iter()
+                    .filter(|var| !var.typevar(db).is_self(db))
+                    .copied(),
+            ),
             TypeMapping::ReplaceSelf { new_upper_bound } => GenericContext::from_typevar_instances(
                 db,
                 context.variables(db).iter().map(|typevar| {
