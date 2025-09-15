@@ -5366,6 +5366,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // The inferred type of each element acts as an additional constraint on `T`.
         for inferred_elt_ty in inferred_elt_tys {
+            // Use the fallback instance type for element literals to avoid excessively large unions
+            // for large nested list literals, which the constraint solver struggles with.
+            let inferred_elt_ty = inferred_elt_ty
+                .literal_fallback_instance(self.db())
+                .unwrap_or(inferred_elt_ty);
+
             builder.infer(elts_ty, inferred_elt_ty).ok()?;
         }
 

@@ -9,11 +9,11 @@ A list can be indexed into with:
 
 ```py
 x = [1, 2, 3]
-reveal_type(x)  # revealed: list[Unknown | Literal[1, 2, 3]]
+reveal_type(x)  # revealed: list[Unknown | int]
 
-reveal_type(x[0])  # revealed: Unknown | Literal[1, 2, 3]
+reveal_type(x[0])  # revealed: Unknown | int
 
-reveal_type(x[0:1])  # revealed: list[Unknown | Literal[1, 2, 3]]
+reveal_type(x[0:1])  # revealed: list[Unknown | int]
 
 # error: [invalid-argument-type]
 reveal_type(x["a"])  # revealed: Unknown
