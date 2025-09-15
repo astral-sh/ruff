@@ -470,7 +470,9 @@ impl<'db> Signature<'db> {
             _ => type_mapping,
         };
         Self {
-            generic_context: self.generic_context,
+            generic_context: self
+                .generic_context
+                .map(|context| type_mapping.update_signature_generic_context(db, context)),
             inherited_generic_context: self.inherited_generic_context,
             definition: self.definition,
             parameters: self
