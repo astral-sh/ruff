@@ -1,13 +1,13 @@
 use crate::diagnostic::{Diagnostic, DisplayDiagnosticConfig, FileResolver, Severity};
 
-pub(super) struct GithubRenderer<'a> {
+pub struct GithubRenderer<'a> {
     resolver: &'a dyn FileResolver,
     config: &'a DisplayDiagnosticConfig,
     diagnostics: &'a [Diagnostic],
 }
 
 impl<'a> GithubRenderer<'a> {
-    pub(super) fn new(
+    pub fn new(
         resolver: &'a dyn FileResolver,
         config: &'a DisplayDiagnosticConfig,
         diagnostics: &'a [Diagnostic],

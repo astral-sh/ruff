@@ -31,7 +31,7 @@ use pylint::PylintRenderer;
 mod azure;
 mod concise;
 mod full;
-mod github;
+pub mod github;
 #[cfg(feature = "serde")]
 mod gitlab;
 #[cfg(feature = "serde")]
