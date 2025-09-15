@@ -54,41 +54,43 @@ impl AlwaysFixableViolation for MissingRequiredImport {
     }
 }
 
-/// Return `true` if the [`Stmt`] includes the given [`AnyImportRef`].
+/// Return `true` if the [`Stmt`] includes the given [`NameImport`].
+/// This function checks for equivalent imports regardless of whether they use
+/// `import` or `from import` syntax, as long as the bound name and qualified name match.
 fn includes_import(stmt: &Stmt, target: &NameImport) -> bool {
-    match target {
-        NameImport::Import(target) => {
-            let Stmt::Import(ast::StmtImport {
-                names,
-                range: _,
-                node_index: _,
-            }) = &stmt
-            else {
-                return false;
-            };
+    let target_bound_name = target.bound_name();
+    let target_qualified_name = target.qualified_name();
+    
+    match stmt {
+        Stmt::Import(ast::StmtImport {
+            names,
+            range: _,
+            node_index: _,
+        }) => {
             names.iter().any(|alias| {
-                alias.name == target.name.name
-                    && alias.asname.as_deref() == target.name.as_name.as_deref()
+                let bound_name = alias.asname.as_deref().unwrap_or(&alias.name);
+                let qualified_name = ruff_python_ast::name::QualifiedName::user_defined(&alias.name);
+                bound_name == target_bound_name && qualified_name == target_qualified_name
             })
         }
-        NameImport::ImportFrom(target) => {
-            let Stmt::ImportFrom(ast::StmtImportFrom {
-                module,
-                names,
-                level,
-                range: _,
-                node_index: _,
-            }) = &stmt
-            else {
-                return false;
-            };
-            module.as_deref() == target.module.as_deref()
-                && *level == target.level
-                && names.iter().any(|alias| {
-                    alias.name == target.name.name
-                        && alias.asname.as_deref() == target.name.as_name.as_deref()
-                })
+        Stmt::ImportFrom(ast::StmtImportFrom {
+            module,
+            names,
+            level,
+            range: _,
+            node_index: _,
+        }) => {
+            names.iter().any(|alias| {
+                let bound_name = alias.asname.as_deref().unwrap_or(&alias.name);
+                let qualified_name = ruff_python_ast::helpers::collect_import_from_member(
+                    *level,
+                    module.as_deref(),
+                    &alias.name,
+                );
+                bound_name == target_bound_name && qualified_name == target_qualified_name
+            })
         }
+        _ => false,
     }
 }
 
