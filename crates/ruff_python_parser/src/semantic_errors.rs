@@ -126,12 +126,35 @@ impl SemanticSyntaxChecker {
             Stmt::FunctionDef(ast::StmtFunctionDef {
                 type_params,
                 parameters,
+                body,
                 ..
             }) => {
                 if let Some(type_params) = type_params {
                     Self::duplicate_type_parameter_name(type_params, ctx);
                 }
                 Self::duplicate_parameter_name(parameters, ctx);
+
+                let mut param_names = FxHashSet::default();
+                for param in parameters {
+                    let cur_name = param.name().as_str();
+                    param_names.insert(cur_name);
+                }
+
+                for stmt in body {
+                    if let Stmt::Global(global_stmt) = stmt {
+                        for name in &global_stmt.names {
+                            if param_names.contains(name.as_str()) {
+                                // test_err global_parameter
+                                // def f(a): global a
+                                Self::add_error(
+                                    ctx,
+                                    SemanticSyntaxErrorKind::GlobalParameter(name.to_string()),
+                                    name.range,
+                                );
+                            }
+                        }
+                    }
+                }
             }
             Stmt::ClassDef(ast::StmtClassDef { type_params, .. })
             | Stmt::TypeAlias(ast::StmtTypeAlias { type_params, .. }) => {
@@ -1137,6 +1160,9 @@ impl Display for SemanticSyntaxError {
             }
             SemanticSyntaxErrorKind::BreakOutsideLoop => f.write_str("`break` outside loop"),
             SemanticSyntaxErrorKind::ContinueOutsideLoop => f.write_str("`continue` outside loop"),
+            SemanticSyntaxErrorKind::GlobalParameter(name) => {
+                write!(f, "name `{name}` is parameter and global")
+            }
         }
     }
 }
@@ -1365,7 +1391,10 @@ pub enum SemanticSyntaxErrorKind {
     /// to be very rare and not worth the additional complexity to detect.
     ///
     /// [#111123]: https://github.com/python/cpython/issues/111123
-    LoadBeforeGlobalDeclaration { name: String, start: TextSize },
+    LoadBeforeGlobalDeclaration {
+        name: String,
+        start: TextSize,
+    },
 
     /// Represents the use of a `nonlocal` variable before its `nonlocal` declaration.
     ///
@@ -1383,7 +1412,10 @@ pub enum SemanticSyntaxErrorKind {
     /// ## Known Issues
     ///
     /// See [`LoadBeforeGlobalDeclaration`][Self::LoadBeforeGlobalDeclaration].
-    LoadBeforeNonlocalDeclaration { name: String, start: TextSize },
+    LoadBeforeNonlocalDeclaration {
+        name: String,
+        start: TextSize,
+    },
 
     /// Represents the use of a starred expression in an invalid location, such as a `return` or
     /// `yield` statement.
@@ -1516,6 +1548,7 @@ pub enum SemanticSyntaxErrorKind {
 
     /// Represents the use of a `continue` statement outside of a loop.
     ContinueOutsideLoop,
+    GlobalParameter(String),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
