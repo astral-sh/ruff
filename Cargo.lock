@@ -2126,9 +2126,9 @@ checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
 
 [[package]]
 name = "ordermap"
-version = "0.5.9"
+version = "0.5.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2fd6fedcd996c8c97932075cc3811d83f53280f48d5620e4e3cab7f6a12678c4"
+checksum = "0dcd63f1ae4b091e314a26627c467dd8810d674ba798abc0e566679955776c63"
 dependencies = [
  "indexmap",
  "serde",
