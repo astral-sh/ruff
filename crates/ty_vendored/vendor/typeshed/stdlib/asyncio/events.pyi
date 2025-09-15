@@ -939,35 +939,42 @@ class AbstractEventLoop:
     async def shutdown_default_executor(self) -> None:
         """Schedule the shutdown of the default executor."""
 
-# This class does not exist at runtime, but stubtest complains if it's marked as
-# @type_check_only because it has an alias that does exist at runtime. See mypy#19568.
-# @type_check_only
-class _AbstractEventLoopPolicy:
-    """Abstract policy for accessing the event loop."""
+if sys.version_info >= (3, 14):
+    class _AbstractEventLoopPolicy:
+        """Abstract policy for accessing the event loop."""
 
-    @abstractmethod
-    def get_event_loop(self) -> AbstractEventLoop:
-        """Get the event loop for the current context.
+        @abstractmethod
+        def get_event_loop(self) -> AbstractEventLoop:
+            """Get the event loop for the current context.
 
-        Returns an event loop object implementing the AbstractEventLoop interface,
-        or raises an exception in case no event loop has been set for the
-        current context and the current policy does not specify to create one.
+            Returns an event loop object implementing the AbstractEventLoop interface,
+            or raises an exception in case no event loop has been set for the
+            current context and the current policy does not specify to create one.
 
-        It should never return None.
-        """
+            It should never return None.
+            """
 
-    @abstractmethod
-    def set_event_loop(self, loop: AbstractEventLoop | None) -> None:
-        """Set the event loop for the current context to loop."""
+        @abstractmethod
+        def set_event_loop(self, loop: AbstractEventLoop | None) -> None:
+            """Set the event loop for the current context to loop."""
 
-    @abstractmethod
-    def new_event_loop(self) -> AbstractEventLoop:
-        """Create and return a new event loop object according to this
-        policy's rules. If there's need to set this loop as the event loop for
-        the current context, set_event_loop must be called explicitly.
-        """
-    # Child processes handling (Unix only).
-    if sys.version_info < (3, 14):
+        @abstractmethod
+        def new_event_loop(self) -> AbstractEventLoop:
+            """Create and return a new event loop object according to this
+            policy's rules. If there's need to set this loop as the event loop for
+            the current context, set_event_loop must be called explicitly.
+            """
+
+else:
+    @type_check_only
+    class _AbstractEventLoopPolicy:
+        @abstractmethod
+        def get_event_loop(self) -> AbstractEventLoop: ...
+        @abstractmethod
+        def set_event_loop(self, loop: AbstractEventLoop | None) -> None: ...
+        @abstractmethod
+        def new_event_loop(self) -> AbstractEventLoop: ...
+        # Child processes handling (Unix only).
         if sys.version_info >= (3, 12):
             @abstractmethod
             @deprecated("Deprecated since Python 3.12; removed in Python 3.14.")
@@ -981,7 +988,6 @@ class _AbstractEventLoopPolicy:
             @abstractmethod
             def set_child_watcher(self, watcher: AbstractChildWatcher) -> None: ...
 
-if sys.version_info < (3, 14):
     AbstractEventLoopPolicy = _AbstractEventLoopPolicy
 
 if sys.version_info >= (3, 14):

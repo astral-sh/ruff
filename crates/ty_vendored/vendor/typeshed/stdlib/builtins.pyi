@@ -2687,8 +2687,7 @@ class slice(Generic[_StartT_co, _StopT_co, _StepT_co]):
         handling of normal slices.
         """
 
-# Making this a disjoint_base upsets pyright
-# @disjoint_base
+@disjoint_base
 class tuple(Sequence[_T_co]):
     """Built-in immutable sequence.
 
@@ -3355,10 +3354,8 @@ class property:
     def __delete__(self, instance: Any, /) -> None:
         """Delete an attribute of instance."""
 
-# This class does not exist at runtime, but stubtest complains if it's marked as
-# @type_check_only because it has an alias that does exist at runtime. See mypy#19568.
-# @type_check_only
 @final
+@type_check_only
 class _NotImplementedType(Any):
     __call__: None
 
