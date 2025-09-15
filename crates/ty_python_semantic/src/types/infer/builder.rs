@@ -5293,7 +5293,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             collection_class: KnownClass,
             db: &'db dyn Db,
         ) -> Option<Type<'db>> {
-            let class_type = tcx.annotation?.into_nominal_instance()?.class(db);
+            let class_type = match tcx.annotation? {
+                Type::NominalInstance(instance) => instance,
+                Type::TypeAlias(alias) => alias.value_type(db).into_nominal_instance()?,
+                _ => return None,
+            }
+            .class(db);
+
             if !class_type.is_known(db, collection_class) {
                 return None;
             }

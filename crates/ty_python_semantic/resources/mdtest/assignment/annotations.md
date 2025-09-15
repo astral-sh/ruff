@@ -81,6 +81,11 @@ c: tuple[str | int, str] = ([], "foo")
 
 ## Collection literal annotations are understood
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ```py
 import typing
 
@@ -116,6 +121,11 @@ j: list[tuple[list[typing.Any], ...]] = [([],), ([1, 2], [3, 4]), (["foo"], ["ba
 # TODO: revealed: list[tuple[list[typing.Any], ...]]
 # revealed: list[tuple[list[Any], ...] | tuple[list[Unknown]] | tuple[list[Unknown | Literal[1, 2]], list[Unknown | Literal[3, 4]]] | tuple[list[Unknown | Literal["foo"]], list[Unknown | Literal["bar"]]]]
 reveal_type(j)
+
+type IntList = list[int]
+
+k: IntList = [1, 2, 3]
+reveal_type(a)  # revealed: list[int]
 ```
 
 ## Incorrect collection literal assignments are complained aobut
