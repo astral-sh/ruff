@@ -1047,7 +1047,7 @@ impl<'a, 'b> BlankLinesChecker<'a, 'b> {
         }
 
         if line.preceding_blank_lines == 0
-            // Apply to nested definitions: within any function body
+            // Only apply to nested functions.
             && matches!(state.fn_status, Status::Inside(_))
             && line.kind.is_class_function_or_decorator()
             // Allow following a decorator (if there is an error it will be triggered on the first decorator).
