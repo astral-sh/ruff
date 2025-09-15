@@ -120,11 +120,11 @@ impl<'db> AllMembers<'db> {
             }
 
             Type::ClassLiteral(class_literal) => {
+                self.extend_with_class_members(db, ty, class_literal);
+
                 if CodeGeneratorKind::NamedTuple.matches(db, class_literal) {
                     self.extend_with_type(db, KnownClass::NamedTupleFallback.to_class_literal(db));
                 }
-
-                self.extend_with_class_members(db, ty, class_literal);
 
                 if let Type::ClassLiteral(meta_class_literal) = ty.to_meta_type(db) {
                     self.extend_with_class_members(db, ty, meta_class_literal);
@@ -140,8 +140,16 @@ impl<'db> AllMembers<'db> {
             }
 
             Type::SubclassOf(subclass_of_type) => {
-                if let Some(class_literal) = subclass_of_type.subclass_of().into_class() {
-                    self.extend_with_class_members(db, ty, class_literal.class_literal(db).0);
+                if let Some(class_type) = subclass_of_type.subclass_of().into_class() {
+                    let class_literal = class_type.class_literal(db).0;
+                    self.extend_with_class_members(db, ty, class_literal);
+
+                    if CodeGeneratorKind::NamedTuple.matches(db, class_literal) {
+                        self.extend_with_type(
+                            db,
+                            KnownClass::NamedTupleFallback.to_class_literal(db),
+                        );
+                    }
                 }
             }
 
