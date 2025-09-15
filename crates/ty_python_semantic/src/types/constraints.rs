@@ -883,7 +883,7 @@ impl<'db> ConstrainedTypeVar<'db> {
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
 pub(crate) struct Constraint<'db> {
     positive: RangeConstraint<'db>,
-    negative: SmallVec<[RangeConstraint<'db>; 1]>,
+    negative: SmallVec<[NegatedRangeConstraint<'db>; 1]>,
 }
 
 impl<'db> Constraint<'db> {
@@ -902,7 +902,7 @@ impl<'db> Constraint<'db> {
         if self.positive.is_always() && self.negative.is_empty() {
             return Satisfiable::Always;
         }
-        if (self.negative.iter()).any(|negative| negative.contains(db, &self.positive)) {
+        if (self.negative.iter()).any(|negative| negative.hole.contains(db, &self.positive)) {
             return Satisfiable::Never;
         }
         Satisfiable::Constrained(self)
@@ -927,18 +927,18 @@ impl<'db> Constraint<'db> {
         // We also want to clip each negative hole to the minimum range that overlaps with the
         // positive range. We'll do that now to all of the holes from `self`, and we'll do that to
         // holes from `other` below when we try to simplify them.
-        let mut previous: SmallVec<[RangeConstraint<'db>; 1]> = SmallVec::new();
+        let mut previous: SmallVec<[NegatedRangeConstraint<'db>; 1]> = SmallVec::new();
         let mut current: SmallVec<_> = (self.negative.iter())
-            .filter_map(|negative| negative.intersect(db, &positive))
+            .filter_map(|negative| negative.intersect_positive(db, &positive))
             .collect();
         for other_negative in &other.negative {
-            let Some(mut other_negative) = other_negative.intersect(db, &positive) else {
+            let Some(mut other_negative) = other_negative.intersect_positive(db, &positive) else {
                 continue;
             };
             std::mem::swap(&mut previous, &mut current);
             let mut previous_negative = previous.iter();
             for self_negative in previous_negative.by_ref() {
-                match self_negative.union(db, &other_negative) {
+                match self_negative.union_negative(db, &other_negative) {
                     None => {
                         // We couldn't simplify the new hole relative to this existing holes, so
                         // add the existing hole to the result. Continue trying to simplify the new
@@ -1006,7 +1006,7 @@ impl<'db> Constraint<'db> {
             fn add_negated_range(
                 &mut self,
                 db: &'db dyn Db,
-                negative: Option<RangeConstraint<'db>>,
+                negative: Option<NegatedRangeConstraint<'db>>,
             ) {
                 let negative = match negative {
                     Some(negative) => Constraint {
@@ -1090,7 +1090,7 @@ impl<'db> Constraint<'db> {
         }
         for self_negative in &self.negative {
             for other_negative in &other.negative {
-                results.add_negated_range(db, self_negative.intersect(db, other_negative));
+                results.add_negated_range(db, self_negative.intersect_negative(db, other_negative));
             }
         }
 
@@ -1106,7 +1106,7 @@ impl<'db> Constraint<'db> {
         for negative in &self.negative {
             set.union_constraint(
                 db,
-                Constraint::range(db, negative.lower, negative.upper).constrain(typevar),
+                Constraint::range(db, negative.hole.lower, negative.hole.upper).constrain(typevar),
             );
         }
         set.union_constraint(
@@ -1135,9 +1135,8 @@ impl<'db> Constraint<'db> {
                 for negative in &self.constraint.negative {
                     if first {
                         first = false;
-                        f.write_str("¬")?;
                     } else {
-                        f.write_str(" ∧ ¬")?;
+                        f.write_str(" ∧ ")?;
                     }
                     negative.display(self.db, &self.typevar).fmt(f)?;
                 }
@@ -1191,36 +1190,6 @@ impl<'db> Constraint<'db> {
             negative: smallvec![],
         })
     }
-
-    /// Returns a new negated range constraint.
-    ///
-    /// Panics if `lower` and `upper` are not both fully static.
-    fn negated_range(
-        db: &'db dyn Db,
-        lower: Type<'db>,
-        upper: Type<'db>,
-    ) -> Satisfiable<Constraint<'db>> {
-        debug_assert_eq!(lower, lower.bottom_materialization(db));
-        debug_assert_eq!(upper, upper.top_materialization(db));
-
-        // If `lower ≰ upper`, then the negated constraint is always satisfied, since there is no
-        // type that is both greater than `lower`, and less than `upper`.
-        if !lower.is_subtype_of(db, upper) {
-            return Satisfiable::Always;
-        }
-
-        // If the requested constraint is `¬(Never ≤ T ≤ object)`, then the constraint cannot be
-        // satisfied.
-        let negative = RangeConstraint { lower, upper };
-        if negative.is_always() {
-            return Satisfiable::Never;
-        }
-
-        Satisfiable::Constrained(Constraint {
-            positive: RangeConstraint::always(),
-            negative: smallvec![negative],
-        })
-    }
 }
 
 impl<'db> RangeConstraint<'db> {
@@ -1271,23 +1240,23 @@ impl<'db> RangeConstraint<'db> {
     fn union_negated_range(
         &self,
         db: &'db dyn Db,
-        negated: &RangeConstraint<'db>,
+        negated: &NegatedRangeConstraint<'db>,
     ) -> Simplifiable<Constraint<'db>> {
         // If the positive range completely contains the negative range, then the union is always
         // satisfied.
-        if self.contains(db, negated) {
+        if self.contains(db, &negated.hole) {
             return Simplifiable::AlwaysSatisfiable;
         }
 
         // If the positive range is disjoint from the negative range, the positive range doesn't
         // add anything; the union is the negative range.
-        if incomparable(db, self.lower, negated.upper)
-            || incomparable(db, negated.lower, self.upper)
+        if incomparable(db, self.lower, negated.hole.upper)
+            || incomparable(db, negated.hole.lower, self.upper)
         {
             return Simplifiable::from_one(Constraint::negated_range(
                 db,
-                negated.lower,
-                negated.upper,
+                negated.hole.lower,
+                negated.hole.upper,
             ));
         }
 
@@ -1296,10 +1265,10 @@ impl<'db> RangeConstraint<'db> {
         Simplifiable::from_union(
             Constraint::range(
                 db,
-                UnionType::from_elements(db, [self.lower, negated.lower]),
-                IntersectionType::from_elements(db, [self.upper, negated.upper]),
+                UnionType::from_elements(db, [self.lower, negated.hole.lower]),
+                IntersectionType::from_elements(db, [self.upper, negated.hole.upper]),
             ),
-            Constraint::negated_range(db, negated.lower, negated.upper),
+            Constraint::negated_range(db, negated.hole.lower, negated.hole.upper),
         )
     }
 
@@ -1325,6 +1294,90 @@ impl<'db> RangeConstraint<'db> {
         }
 
         DisplayRangeConstraint {
+            constraint: self,
+            typevar,
+            db,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
+pub(crate) struct NegatedRangeConstraint<'db> {
+    hole: RangeConstraint<'db>,
+}
+
+impl<'db> Constraint<'db> {
+    /// Returns a new negated range constraint.
+    ///
+    /// Panics if `lower` and `upper` are not both fully static.
+    fn negated_range(
+        db: &'db dyn Db,
+        lower: Type<'db>,
+        upper: Type<'db>,
+    ) -> Satisfiable<Constraint<'db>> {
+        debug_assert_eq!(lower, lower.bottom_materialization(db));
+        debug_assert_eq!(upper, upper.top_materialization(db));
+
+        // If `lower ≰ upper`, then the negated constraint is always satisfied, since there is no
+        // type that is both greater than `lower`, and less than `upper`.
+        if !lower.is_subtype_of(db, upper) {
+            return Satisfiable::Always;
+        }
+
+        // If the requested constraint is `¬(Never ≤ T ≤ object)`, then the constraint cannot be
+        // satisfied.
+        let negative = NegatedRangeConstraint {
+            hole: RangeConstraint { lower, upper },
+        };
+        if negative.hole.is_always() {
+            return Satisfiable::Never;
+        }
+
+        Satisfiable::Constrained(Constraint {
+            positive: RangeConstraint::always(),
+            negative: smallvec![negative],
+        })
+    }
+}
+
+impl<'db> NegatedRangeConstraint<'db> {
+    fn intersect_positive(&self, db: &'db dyn Db, positive: &RangeConstraint<'db>) -> Option<Self> {
+        self.hole
+            .intersect(db, positive)
+            .map(|hole| NegatedRangeConstraint { hole })
+    }
+
+    fn intersect_negative(
+        &self,
+        db: &'db dyn Db,
+        positive: &NegatedRangeConstraint<'db>,
+    ) -> Option<Self> {
+        self.hole
+            .intersect(db, &positive.hole)
+            .map(|hole| NegatedRangeConstraint { hole })
+    }
+
+    fn union_negative(&self, db: &'db dyn Db, other: &NegatedRangeConstraint<'db>) -> Option<Self> {
+        self.hole
+            .union(db, &other.hole)
+            .map(|hole| NegatedRangeConstraint { hole })
+    }
+
+    fn display(&self, db: &'db dyn Db, typevar: impl Display) -> impl Display {
+        struct DisplayNegatedRangeConstraint<'a, 'db, D> {
+            constraint: &'a NegatedRangeConstraint<'db>,
+            typevar: D,
+            db: &'db dyn Db,
+        }
+
+        impl<D: Display> Display for DisplayNegatedRangeConstraint<'_, '_, D> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str("¬")?;
+                self.constraint.hole.display(self.db, &self.typevar).fmt(f)
+            }
+        }
+
+        DisplayNegatedRangeConstraint {
             constraint: self,
             typevar,
             db,
