@@ -208,22 +208,3 @@ help: Add missing blank line
 926 |     async def b():
 927 |         pass
 928 | # end
-
-E306 [*] Expected 1 blank line before a nested definition, found 0
-   --> E30.py:983:9
-    |
-981 |     async def recv(self, *, length=65536):
-982 |         loop = asyncio.get_event_loop()
-983 |         def callback():
-    |         ^^^
-984 |             loop.remove_reader(self._fd)
-985 |         loop.add_reader(self._fd, callback)
-    |
-help: Add missing blank line
-980 | class foo:
-981 |     async def recv(self, *, length=65536):
-982 |         loop = asyncio.get_event_loop()
-983 + 
-984 |         def callback():
-985 |             loop.remove_reader(self._fd)
-986 |         loop.add_reader(self._fd, callback)

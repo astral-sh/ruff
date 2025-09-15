@@ -993,3 +993,20 @@ class Foo:
         def test():
             pass
 # end
+
+
+# Test case for nested class scenario
+class Bar:
+    def f():
+        x = 1
+        def g():
+            return 1
+        return 2
+
+    def f():
+        class Baz:
+            x = 1
+            def g():
+                return 1
+            return 2
+# end
