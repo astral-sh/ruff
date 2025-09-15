@@ -12,7 +12,10 @@ use crate::semantic_index::{
 };
 use crate::types::call::{CallArguments, MatchedArgument};
 use crate::types::signatures::Signature;
-use crate::types::{ClassBase, ClassLiteral, DynamicType, KnownClass, KnownInstanceType, Type};
+use crate::types::{
+    ClassBase, ClassLiteral, DynamicType, KnownClass, KnownInstanceType, Type,
+    class::CodeGeneratorKind,
+};
 use crate::{Db, HasType, NameKind, SemanticModel};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::parsed_module;
@@ -95,7 +98,13 @@ impl<'db> AllMembers<'db> {
             ),
 
             Type::NominalInstance(instance) => {
-                self.extend_with_instance_members(db, ty, instance.class_literal(db));
+                let class_literal = instance.class_literal(db);
+                self.extend_with_instance_members(db, ty, class_literal);
+
+                // If this is a NamedTuple instance, include members from NamedTupleFallback
+                if CodeGeneratorKind::NamedTuple.matches(db, class_literal) {
+                    self.extend_with_type(db, KnownClass::NamedTupleFallback.to_class_literal(db));
+                }
             }
 
             Type::ClassLiteral(class_literal) if class_literal.is_typed_dict(db) => {
@@ -113,6 +122,10 @@ impl<'db> AllMembers<'db> {
             Type::ClassLiteral(class_literal) => {
                 self.extend_with_class_members(db, ty, class_literal);
 
+                if CodeGeneratorKind::NamedTuple.matches(db, class_literal) {
+                    self.extend_with_type(db, KnownClass::NamedTupleFallback.to_class_literal(db));
+                }
+
                 if let Type::ClassLiteral(meta_class_literal) = ty.to_meta_type(db) {
                     self.extend_with_class_members(db, ty, meta_class_literal);
                 }
@@ -120,12 +133,23 @@ impl<'db> AllMembers<'db> {
 
             Type::GenericAlias(generic_alias) => {
                 let class_literal = generic_alias.origin(db);
+                if CodeGeneratorKind::NamedTuple.matches(db, class_literal) {
+                    self.extend_with_type(db, KnownClass::NamedTupleFallback.to_class_literal(db));
+                }
                 self.extend_with_class_members(db, ty, class_literal);
             }
 
             Type::SubclassOf(subclass_of_type) => {
-                if let Some(class_literal) = subclass_of_type.subclass_of().into_class() {
-                    self.extend_with_class_members(db, ty, class_literal.class_literal(db).0);
+                if let Some(class_type) = subclass_of_type.subclass_of().into_class() {
+                    let class_literal = class_type.class_literal(db).0;
+                    self.extend_with_class_members(db, ty, class_literal);
+
+                    if CodeGeneratorKind::NamedTuple.matches(db, class_literal) {
+                        self.extend_with_type(
+                            db,
+                            KnownClass::NamedTupleFallback.to_class_literal(db),
+                        );
+                    }
                 }
             }
 
