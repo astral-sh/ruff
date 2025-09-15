@@ -1133,6 +1133,27 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Promotes any literals within this instance type, or returns the type unchanged if there are
+    /// no literals to be promoted.
+    pub(crate) fn promote_literals(self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            // Promote literals within generic aliases, e.g. `tuple[Literal[1]]` to `tuple[int]`.
+            Type::NominalInstance(instance) => match instance.class(db).into_generic_alias() {
+                Some(alias) => {
+                    let alias = alias.apply_type_mapping_impl(
+                        db,
+                        &TypeMapping::PromoteLiterals,
+                        &ApplyTypeMappingVisitor::default(),
+                    );
+
+                    Type::instance(db, ClassType::Generic(alias))
+                }
+                _ => self,
+            },
+            _ => self.literal_fallback_instance(db).unwrap_or(self),
+        }
+    }
+
     /// Return a "normalized" version of `self` that ensures that equivalent types have the same Salsa ID.
     ///
     /// A normalized type:

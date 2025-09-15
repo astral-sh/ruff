@@ -6,6 +6,19 @@
 reveal_type([])  # revealed: list[Unknown]
 ```
 
+## List of tuples
+
+```py
+reveal_type([(1, 2), (3, 4)])  # revealed: list[Unknown | tuple[int, int]]
+```
+
+## Mixed list
+
+```py
+# revealed: list[Unknown | int | tuple[int, int] | tuple[int, int, int]]
+reveal_type([1, (1, 2), (1, 2, 3)])
+```
+
 ## List comprehensions
 
 ```py
