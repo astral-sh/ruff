@@ -377,7 +377,7 @@ jobs:
         run: rustup target add wasm32-unknown-unknown
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: 20
+          node-version: 22
           cache: "npm"
           cache-dependency-path: playground/package-lock.json
       - uses: jetli/wasm-pack-action@0d096b08b4e5a7de8c28de67e11e945404e9eefa # v0.4.0
