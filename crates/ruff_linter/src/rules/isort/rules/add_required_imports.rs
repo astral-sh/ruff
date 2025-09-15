@@ -60,36 +60,32 @@ impl AlwaysFixableViolation for MissingRequiredImport {
 fn includes_import(stmt: &Stmt, target: &NameImport) -> bool {
     let target_bound_name = target.bound_name();
     let target_qualified_name = target.qualified_name();
-    
+
     match stmt {
         Stmt::Import(ast::StmtImport {
             names,
             range: _,
             node_index: _,
-        }) => {
-            names.iter().any(|alias| {
-                let bound_name = alias.asname.as_deref().unwrap_or(&alias.name);
-                let qualified_name = ruff_python_ast::name::QualifiedName::user_defined(&alias.name);
-                bound_name == target_bound_name && qualified_name == target_qualified_name
-            })
-        }
+        }) => names.iter().any(|alias| {
+            let bound_name = alias.asname.as_deref().unwrap_or(&alias.name);
+            let qualified_name = ruff_python_ast::name::QualifiedName::user_defined(&alias.name);
+            bound_name == target_bound_name && qualified_name == target_qualified_name
+        }),
         Stmt::ImportFrom(ast::StmtImportFrom {
             module,
             names,
             level,
             range: _,
             node_index: _,
-        }) => {
-            names.iter().any(|alias| {
-                let bound_name = alias.asname.as_deref().unwrap_or(&alias.name);
-                let qualified_name = ruff_python_ast::helpers::collect_import_from_member(
-                    *level,
-                    module.as_deref(),
-                    &alias.name,
-                );
-                bound_name == target_bound_name && qualified_name == target_qualified_name
-            })
-        }
+        }) => names.iter().any(|alias| {
+            let bound_name = alias.asname.as_deref().unwrap_or(&alias.name);
+            let qualified_name = ruff_python_ast::helpers::collect_import_from_member(
+                *level,
+                module.as_deref(),
+                &alias.name,
+            );
+            bound_name == target_bound_name && qualified_name == target_qualified_name
+        }),
         _ => false,
     }
 }

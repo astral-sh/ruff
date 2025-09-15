@@ -993,7 +993,10 @@ mod tests {
 
     #[test_case(Path::new("equivalent_imports.py"))]
     fn required_import_equivalent_imports(path: &Path) -> Result<()> {
-        let snapshot = format!("required_import_equivalent_imports_{}", path.to_string_lossy());
+        let snapshot = format!(
+            "required_import_equivalent_imports_{}",
+            path.to_string_lossy()
+        );
         let diagnostics = test_path(
             Path::new("isort/required_imports").join(path).as_path(),
             &LinterSettings {
