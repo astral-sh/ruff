@@ -857,31 +857,6 @@ impl<'a, 'b> BlankLinesChecker<'a, 'b> {
                     self.locator.line_start(state.last_non_comment_line_end),
                 )));
             }
-        } else if line.preceding_blank_lines == 0
-            // Apply to nested definitions: within any function body
-            && matches!(state.fn_status, Status::Inside(_))
-            && line.kind.is_class_function_or_decorator()
-            // Allow following a decorator (if there is an error it will be triggered on the first decorator).
-            && !matches!(state.follows, Follows::Decorator)
-            // The class's docstring can directly precede the first function.
-            && !matches!(state.follows, Follows::Docstring)
-            // Do not trigger when the def/class follows an "indenting token" (if/while/etc...).
-            && prev_indent_length.is_some_and(|prev_indent_length| prev_indent_length >= line.indent_length)
-            // Allow groups of one-liners.
-            && !(state.follows.is_any_def() && line.last_token != TokenKind::Colon)
-            && !state.follows.follows_def_with_dummy_body()
-            // Blank lines in stub files are only used for grouping. Don't enforce blank lines.
-            && !self.source_type.is_stub()
-        {
-            // E306
-            if let Some(mut diagnostic) =
-                self.report_diagnostic(BlankLinesBeforeNestedDefinition, line.first_token_range)
-            {
-                diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
-                    self.stylist.line_ending().to_string(),
-                    self.locator.line_start(line.first_token_range.start()),
-                )));
-            }
         }
 
         // Blank lines in stub files are used to group definitions. Don't enforce blank lines.
@@ -1068,6 +1043,33 @@ impl<'a, 'b> BlankLinesChecker<'a, 'b> {
                         self.locator.line_start(state.last_non_comment_line_end),
                     )));
                 }
+            }
+        }
+
+        if line.preceding_blank_lines == 0
+            // Apply to nested definitions: within any function body
+            && matches!(state.fn_status, Status::Inside(_))
+            && line.kind.is_class_function_or_decorator()
+            // Allow following a decorator (if there is an error it will be triggered on the first decorator).
+            && !matches!(state.follows, Follows::Decorator)
+            // The class's docstring can directly precede the first function.
+            && !matches!(state.follows, Follows::Docstring)
+            // Do not trigger when the def/class follows an "indenting token" (if/while/etc...).
+            && prev_indent_length.is_some_and(|prev_indent_length| prev_indent_length >= line.indent_length)
+            // Allow groups of one-liners.
+            && !(state.follows.is_any_def() && line.last_token != TokenKind::Colon)
+            && !state.follows.follows_def_with_dummy_body()
+            // Blank lines in stub files are only used for grouping. Don't enforce blank lines.
+            && !self.source_type.is_stub()
+        {
+            // E306
+            if let Some(mut diagnostic) =
+                self.report_diagnostic(BlankLinesBeforeNestedDefinition, line.first_token_range)
+            {
+                diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
+                    self.stylist.line_ending().to_string(),
+                    self.locator.line_start(line.first_token_range.start()),
+                )));
             }
         }
     }
