@@ -1291,7 +1291,7 @@ impl<'db> RangeConstraint<'db> {
             ));
         }
 
-        // Otherwise we clip the positive constraint to the mininum range that overlaps with the
+        // Otherwise we clip the positive constraint to the minimum range that overlaps with the
         // negative range.
         Simplifiable::from_union(
             Constraint::range(
