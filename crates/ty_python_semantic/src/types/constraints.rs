@@ -449,6 +449,14 @@ pub(crate) struct ConstraintClause<'db> {
 }
 
 impl<'db> ConstraintClause<'db> {
+    fn new(constraints: SmallVec<[ConstrainedTypeVar<'db>; 1]>) -> Satisfiable<Self> {
+        if constraints.is_empty() {
+            Satisfiable::Always
+        } else {
+            Satisfiable::Constrained(Self { constraints })
+        }
+    }
+
     /// Returns the clause that is always satisfiable.
     fn always() -> Self {
         Self {
@@ -653,10 +661,7 @@ impl<'db> ConstraintClause<'db> {
         //     x: A[X1, Y1, Z2] | A[X2, Y2, Z2]
         // ```
         if let Some(simplified) = self.simplifies_via_distribution(db, &other) {
-            if simplified.is_always() {
-                return Simplifiable::AlwaysSatisfiable;
-            }
-            return Simplifiable::Simplified(simplified);
+            return simplified;
         }
 
         // Can't be simplified
@@ -701,7 +706,11 @@ impl<'db> ConstraintClause<'db> {
     /// union. This happens when (a) they mention the same set of typevars, (b) the union of the
     /// constraints for exactly one typevar simplifies to a single constraint, and (c) the
     /// constraints for all other typevars are identical. Otherwise returns `None`.
-    fn simplifies_via_distribution(&self, db: &'db dyn Db, other: &Self) -> Option<Self> {
+    fn simplifies_via_distribution(
+        &self,
+        db: &'db dyn Db,
+        other: &Self,
+    ) -> Option<Simplifiable<Self>> {
         // See the notes in `simplify_clauses` for more details on distribution, including Python
         // examples that cause it to fire.
 
@@ -732,11 +741,7 @@ impl<'db> ConstraintClause<'db> {
                                 // simplify.
                                 return None;
                             }
-                            Simplifiable::Simplified(union_constraint) => Some(union_constraint),
-                            Simplifiable::AlwaysSatisfiable => None,
-                            Simplifiable::NeverSatisfiable => {
-                                panic!("unioning two non-never constraints should not be never")
-                            }
+                            c @ _ => c,
                         };
                     if simplified_index
                         .replace((index, union_constraint))
@@ -755,14 +760,32 @@ impl<'db> ConstraintClause<'db> {
             return None;
         };
         let mut constraints = self.constraints.clone();
-        if let Some(union_constraint) = union_constraint {
-            constraints[index] = union_constraint;
-        } else {
-            // If the simplified union of constraints is Always, then we can remove this typevar
-            // from the constraint completely.
-            constraints.remove(index);
+        match union_constraint {
+            Simplifiable::NeverSatisfiable => {
+                panic!("unioning two non-never constraints should not be never")
+            }
+            Simplifiable::AlwaysSatisfiable => {
+                // If the simplified union of constraints is Always, then we can remove this typevar
+                // from the constraint completely.
+                constraints.remove(index);
+                Some(Simplifiable::from_one(Self::new(constraints)))
+            }
+            Simplifiable::Simplified(union_constraint) => {
+                constraints[index] = union_constraint;
+                Some(Simplifiable::from_one(Self::new(constraints)))
+            }
+            Simplifiable::NotSimplified((), ()) => None,
+            /*
+            Simplifiable::NotSimplified(left, right) => {
+                let mut left_constraints = constraints.clone();
+                let mut right_constraints = constraints;
+                left_constraints[index] = left;
+                right_constraints[index] = right;
+                Simplifiable::from_union(Self::new(left_constraints), Self::new(right_constraints))
+                Simplifiable::NotSimplified(self, other)
+            }
+            */
         }
-        Some(Self { constraints })
     }
 
     /// Returns the negation of this clause. The result is a set since negating an intersection
@@ -1209,9 +1232,7 @@ impl<'db> RangeConstraint<'db> {
     ) -> Simplifiable<Constraint<'db>, ()> {
         // If the positive range completely contains the negative range, then the union is always
         // satisfied.
-        if self.lower.is_subtype_of(db, negated.lower)
-            && negated.upper.is_subtype_of(db, self.upper)
-        {
+        if self.contains(db, negated) {
             return Simplifiable::AlwaysSatisfiable;
         }
 
@@ -1308,6 +1329,20 @@ impl<T> Simplifiable<T> {
             (Satisfiable::Always, Satisfiable::Always) => Simplifiable::AlwaysSatisfiable,
             (Satisfiable::Always, Satisfiable::Constrained(constraint))
             | (Satisfiable::Constrained(constraint), Satisfiable::Always) => {
+                Simplifiable::Simplified(constraint)
+            }
+            (Satisfiable::Constrained(first), Satisfiable::Constrained(second)) => {
+                Simplifiable::NotSimplified(first, second)
+            }
+        }
+    }
+
+    fn from_union(first: Satisfiable<T>, second: Satisfiable<T>) -> Self {
+        match (first, second) {
+            (Satisfiable::Always, _) | (_, Satisfiable::Always) => Simplifiable::AlwaysSatisfiable,
+            (Satisfiable::Never, Satisfiable::Never) => Simplifiable::NeverSatisfiable,
+            (Satisfiable::Never, Satisfiable::Constrained(constraint))
+            | (Satisfiable::Constrained(constraint), Satisfiable::Never) => {
                 Simplifiable::Simplified(constraint)
             }
             (Satisfiable::Constrained(first), Satisfiable::Constrained(second)) => {
