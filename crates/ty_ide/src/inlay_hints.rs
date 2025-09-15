@@ -106,10 +106,7 @@ impl InlayHintLabelPart {
     }
 
     pub fn with_target(self, target: Option<NavigationTarget>) -> Self {
-        Self {
-            text: self.text,
-            target,
-        }
+        Self { target, ..self }
     }
 }
 

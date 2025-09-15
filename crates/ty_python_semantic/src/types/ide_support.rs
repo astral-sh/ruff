@@ -792,8 +792,6 @@ pub struct CallSignatureDetails<'db> {
     pub parameter_label_offsets: Vec<TextRange>,
 
     /// Offsets for each parameter in the signature definition.
-    /// Each range specifies the start position and length of a parameter definition
-    /// within the file containing the signature definition.
     pub definition_parameter_offsets: Option<HashMap<String, TextRange>>,
 
     /// The names of the parameters in the signature, in order.
