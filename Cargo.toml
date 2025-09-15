@@ -95,7 +95,7 @@ get-size2 = { version = "0.6.2", features = [
 glob = { version = "0.3.1" }
 globset = { version = "0.4.14" }
 globwalk = { version = "0.9.1" }
-hashbrown = { version = "0.15.0", default-features = false, features = [
+hashbrown = { version = "0.16.0", default-features = false, features = [
     "raw-entry",
     "equivalent",
     "inline-more",
