@@ -1347,15 +1347,15 @@ impl<T> Satisfiable<T> {
 /// we use distinct variants to represent when the simplification is never satisfiable or always
 /// satisfiable.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum Simplifiable<One, Two = One> {
+pub(crate) enum Simplifiable<T> {
     NeverSatisfiable,
     AlwaysSatisfiable,
-    Simplified(One),
-    NotSimplified(Two, Two),
+    Simplified(T),
+    NotSimplified(T, T),
 }
 
-impl<One, Two> Simplifiable<One, Two> {
-    fn from_one(constraint: Satisfiable<One>) -> Self {
+impl<T> Simplifiable<T> {
+    fn from_one(constraint: Satisfiable<T>) -> Self {
         match constraint {
             Satisfiable::Never => Simplifiable::NeverSatisfiable,
             Satisfiable::Always => Simplifiable::AlwaysSatisfiable,
