@@ -488,8 +488,7 @@ range.
 
 ```py
 def _[T]() -> None:
-    # TODO: revealed: ty_extensions.ConstraintSet[¬(SubSub ≤ T@_ ≤ Base) ∨ (Sub ≤ T@_ ≤ Base)]
-    # revealed: ty_extensions.ConstraintSet[¬(SubSub ≤ T@_ ≤ Base) ∨ (Sub ≤ T@_ ≤ Super)]
+    # revealed: ty_extensions.ConstraintSet[¬(SubSub ≤ T@_ ≤ Base) ∨ (Sub ≤ T@_ ≤ Base)]
     reveal_type(negated_range_constraint(SubSub, T, Base) | range_constraint(Sub, T, Super))
     # revealed: ty_extensions.ConstraintSet[¬(SubSub ≤ T@_ ≤ Super) ∨ (Sub ≤ T@_ ≤ Base)]
     reveal_type(negated_range_constraint(SubSub, T, Super) | range_constraint(Sub, T, Base))

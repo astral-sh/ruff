@@ -1078,7 +1078,15 @@ impl<'db> Constraint<'db> {
             results.add_two_constraints(db, self.positive.union_negated_range(db, other_negative));
         }
         for self_negative in &self.negative {
-            results.add_two_constraints(db, other.positive.union_negated_range(db, self_negative));
+            // Reverse the results here so that we always add items from `self` first. This ensures
+            // that the output we produce is ordered consistently with the input we receive.
+            results.add_two_constraints(
+                db,
+                other
+                    .positive
+                    .union_negated_range(db, self_negative)
+                    .reverse(),
+            );
         }
         for self_negative in &self.negative {
             for other_negative in &other.negative {
@@ -1385,6 +1393,15 @@ impl<T> Simplifiable<T> {
             Simplifiable::AlwaysSatisfiable => Simplifiable::AlwaysSatisfiable,
             Simplifiable::Simplified(t) => Simplifiable::Simplified(f(t)),
             Simplifiable::NotSimplified(t1, t2) => Simplifiable::NotSimplified(f(t1), f(t2)),
+        }
+    }
+
+    fn reverse(self) -> Self {
+        match self {
+            Simplifiable::NeverSatisfiable
+            | Simplifiable::AlwaysSatisfiable
+            | Simplifiable::Simplified(_) => self,
+            Simplifiable::NotSimplified(t1, t2) => Simplifiable::NotSimplified(t2, t1),
         }
     }
 }
