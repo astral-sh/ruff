@@ -838,6 +838,8 @@ impl<'a, 'b> BlankLinesChecker<'a, 'b> {
             && !state.follows.follows_def_with_dummy_body()
             // Only for class scope: we must be inside a class block
             && matches!(state.class_status, Status::Inside(_))
+            // But NOT inside a function body; nested defs inside methods are handled by E306
+            && matches!(state.fn_status, Status::Outside | Status::CommentAfter(_))
             // The class/parent method's docstring can directly precede the def.
             // Allow following a decorator (if there is an error it will be triggered on the first decorator).
             && !matches!(state.follows, Follows::Docstring | Follows::Decorator)
@@ -856,7 +858,7 @@ impl<'a, 'b> BlankLinesChecker<'a, 'b> {
                 )));
             }
         } else if line.preceding_blank_lines == 0
-            // Apply to nested definitions: within any function body that's not inside a class
+            // Apply to nested definitions: within any function body
             && matches!(state.fn_status, Status::Inside(_))
             && line.kind.is_class_function_or_decorator()
             // Allow following a decorator (if there is an error it will be triggered on the first decorator).
@@ -868,8 +870,6 @@ impl<'a, 'b> BlankLinesChecker<'a, 'b> {
             // Allow groups of one-liners.
             && !(state.follows.is_any_def() && line.last_token != TokenKind::Colon)
             && !state.follows.follows_def_with_dummy_body()
-            // Only apply E306 to nested functions that are NOT inside a class
-            && matches!(state.class_status, Status::Outside)
             // Blank lines in stub files are only used for grouping. Don't enforce blank lines.
             && !self.source_type.is_stub()
         {

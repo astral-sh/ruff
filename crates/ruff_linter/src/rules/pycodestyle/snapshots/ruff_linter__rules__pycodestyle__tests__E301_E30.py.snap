@@ -96,25 +96,6 @@ help: Add missing blank line
 529 | # end
 
 E301 [*] Expected 1 blank line, found 0
-   --> E30.py:983:9
-    |
-981 |     async def recv(self, *, length=65536):
-982 |         loop = asyncio.get_event_loop()
-983 |         def callback():
-    |         ^^^
-984 |             loop.remove_reader(self._fd)
-985 |         loop.add_reader(self._fd, callback)
-    |
-help: Add missing blank line
-980 | class foo:
-981 |     async def recv(self, *, length=65536):
-982 |         loop = asyncio.get_event_loop()
-983 + 
-984 |         def callback():
-985 |             loop.remove_reader(self._fd)
-986 |         loop.add_reader(self._fd, callback)
-
-E301 [*] Expected 1 blank line, found 0
    --> E30.py:993:9
     |
 991 |     if True:
@@ -132,41 +113,3 @@ help: Add missing blank line
 994 |         def test():
 995 |             pass
 996 | # end
-
-E301 [*] Expected 1 blank line, found 0
-    --> E30.py:1002:9
-     |
-1000 |     def f():
-1001 |         x = 1
-1002 |         def g():
-     |         ^^^
-1003 |             return 1
-1004 |         return 2
-     |
-help: Add missing blank line
-999  | class Bar:
-1000 |     def f():
-1001 |         x = 1
-1002 + 
-1003 |         def g():
-1004 |             return 1
-1005 |         return 2
-
-E301 [*] Expected 1 blank line, found 0
-    --> E30.py:1009:13
-     |
-1007 |         class Baz:
-1008 |             x = 1
-1009 |             def g():
-     |             ^^^
-1010 |                 return 1
-1011 |             return 2
-     |
-help: Add missing blank line
-1006 |     def f():
-1007 |         class Baz:
-1008 |             x = 1
-1009 + 
-1010 |             def g():
-1011 |                 return 1
-1012 |             return 2
