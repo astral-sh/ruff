@@ -734,15 +734,13 @@ impl<'db> ConstraintClause<'db> {
                     if self_constraint == other_constraint {
                         continue;
                     }
-                    let union_constraint =
-                        match self_constraint.simplified_union(db, other_constraint) {
-                            None => {
-                                // The constraints for this typevar are not identical, nor do they
-                                // simplify.
-                                return None;
-                            }
-                            Some(c) => c,
-                        };
+                    let Some(union_constraint) =
+                        self_constraint.simplified_union(db, other_constraint)
+                    else {
+                        // The constraints for this typevar are not identical, nor do they
+                        // simplify.
+                        return None;
+                    };
                     if simplified_index
                         .replace((index, union_constraint))
                         .is_some()
@@ -897,7 +895,7 @@ impl<'db> Constraint<'db> {
     }
 
     fn clause_count(&self) -> usize {
-        (!self.positive.is_always() as usize) + self.negative.len()
+        usize::from(!self.positive.is_always()) + self.negative.len()
     }
 
     fn satisfiable(self, db: &'db dyn Db) -> Satisfiable<Self> {
@@ -933,7 +931,7 @@ impl<'db> Constraint<'db> {
         let mut current: SmallVec<_> = (self.negative.iter())
             .filter_map(|negative| negative.intersect(db, &positive))
             .collect();
-        for other_negative in other.negative.iter() {
+        for other_negative in &other.negative {
             let Some(mut other_negative) = other_negative.intersect(db, &positive) else {
                 continue;
             };
@@ -992,9 +990,9 @@ impl<'db> Constraint<'db> {
                 self.next.clear();
             }
 
-            fn add_constraint(&mut self, db: &'db dyn Db, constraint: Constraint<'db>) {
+            fn add_constraint(&mut self, db: &'db dyn Db, constraint: &Constraint<'db>) {
                 self.next.extend(self.results.iter().filter_map(|result| {
-                    match result.intersect(db, &constraint) {
+                    match result.intersect(db, constraint) {
                         Satisfiable::Never => None,
                         Satisfiable::Always => Some(Constraint {
                             positive: RangeConstraint::always(),
@@ -1019,7 +1017,7 @@ impl<'db> Constraint<'db> {
                     // anything from the final union.
                     None => return,
                 };
-                self.add_constraint(db, negative);
+                self.add_constraint(db, &negative);
                 self.flip();
             }
 
@@ -1037,13 +1035,13 @@ impl<'db> Constraint<'db> {
                         return;
                     }
                     Simplifiable::Simplified(constraint) => {
-                        self.add_constraint(db, constraint);
+                        self.add_constraint(db, &constraint);
                     }
                     Simplifiable::NotSimplified(first, second) => {
-                        self.add_constraint(db, first);
-                        self.add_constraint(db, second);
+                        self.add_constraint(db, &first);
+                        self.add_constraint(db, &second);
                     }
-                };
+                }
                 self.flip();
             }
 
@@ -1233,10 +1231,6 @@ impl<'db> RangeConstraint<'db> {
         self.lower.is_never() && self.upper.is_object()
     }
 
-    fn is_disjoint_from(&self, db: &'db dyn Db, other: &RangeConstraint<'db>) -> bool {
-        incomparable(db, self.lower, other.upper) || incomparable(db, other.lower, self.upper)
-    }
-
     /// Returns the intersection of two range constraints, or `None` if the intersection is empty.
     fn intersect(&self, db: &'db dyn Db, other: &RangeConstraint<'db>) -> Option<Self> {
         // (s₁ ≤ α ≤ t₁) ∧ (s₂ ≤ α ≤ t₂) = (s₁ ∪ s₂) ≤ α ≤ (t₁ ∩ t₂))
@@ -1371,20 +1365,6 @@ impl<One, Two> Simplifiable<One, Two> {
 }
 
 impl<T> Simplifiable<T> {
-    fn from_intersection(first: Satisfiable<T>, second: Satisfiable<T>) -> Self {
-        match (first, second) {
-            (Satisfiable::Never, _) | (_, Satisfiable::Never) => Simplifiable::NeverSatisfiable,
-            (Satisfiable::Always, Satisfiable::Always) => Simplifiable::AlwaysSatisfiable,
-            (Satisfiable::Always, Satisfiable::Constrained(constraint))
-            | (Satisfiable::Constrained(constraint), Satisfiable::Always) => {
-                Simplifiable::Simplified(constraint)
-            }
-            (Satisfiable::Constrained(first), Satisfiable::Constrained(second)) => {
-                Simplifiable::NotSimplified(first, second)
-            }
-        }
-    }
-
     fn from_union(first: Satisfiable<T>, second: Satisfiable<T>) -> Self {
         match (first, second) {
             (Satisfiable::Always, _) | (_, Satisfiable::Always) => Simplifiable::AlwaysSatisfiable,
@@ -1405,17 +1385,6 @@ impl<T> Simplifiable<T> {
             Simplifiable::AlwaysSatisfiable => Simplifiable::AlwaysSatisfiable,
             Simplifiable::Simplified(t) => Simplifiable::Simplified(f(t)),
             Simplifiable::NotSimplified(t1, t2) => Simplifiable::NotSimplified(f(t1), f(t2)),
-        }
-    }
-}
-
-impl<One, Two> Simplifiable<One, Two> {
-    fn map_one<U>(self, mut f: impl FnMut(One) -> U) -> Simplifiable<U, Two> {
-        match self {
-            Simplifiable::NeverSatisfiable => Simplifiable::NeverSatisfiable,
-            Simplifiable::AlwaysSatisfiable => Simplifiable::AlwaysSatisfiable,
-            Simplifiable::Simplified(t) => Simplifiable::Simplified(f(t)),
-            Simplifiable::NotSimplified(t1, t2) => Simplifiable::NotSimplified(t1, t2),
         }
     }
 }
