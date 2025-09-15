@@ -3,19 +3,26 @@ use crate::diagnostic::{Diagnostic, DisplayDiagnosticConfig, FileResolver, Sever
 pub(super) struct GithubRenderer<'a> {
     resolver: &'a dyn FileResolver,
     config: &'a DisplayDiagnosticConfig,
+    diagnostics: &'a [Diagnostic],
 }
 
 impl<'a> GithubRenderer<'a> {
-    pub(super) fn new(resolver: &'a dyn FileResolver, config: &'a DisplayDiagnosticConfig) -> Self {
-        Self { resolver, config }
+    pub(super) fn new(
+        resolver: &'a dyn FileResolver,
+        config: &'a DisplayDiagnosticConfig,
+        diagnostics: &'a [Diagnostic],
+    ) -> Self {
+        Self {
+            resolver,
+            config,
+            diagnostics,
+        }
     }
+}
 
-    pub(super) fn render(
-        &self,
-        f: &mut std::fmt::Formatter,
-        diagnostics: &[Diagnostic],
-    ) -> std::fmt::Result {
-        for diagnostic in diagnostics {
+impl std::fmt::Display for GithubRenderer<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        for diagnostic in self.diagnostics {
             let severity = match diagnostic.severity() {
                 Severity::Info => "notice",
                 Severity::Warning => "warning",
