@@ -878,6 +878,16 @@ impl<'db> Constraint<'db> {
         (!self.positive.is_always() as usize) + self.negative.len()
     }
 
+    fn satisfiable(self, db: &'db dyn Db) -> Satisfiable<Self> {
+        if self.positive.is_always() && self.negative.is_empty() {
+            return Satisfiable::Always;
+        }
+        if (self.negative.iter()).any(|negative| negative.contains(db, &self.positive)) {
+            return Satisfiable::Never;
+        }
+        Satisfiable::Constrained(self)
+    }
+
     fn intersect(&self, db: &'db dyn Db, other: &Constraint<'db>) -> Satisfiable<Constraint<'db>> {
         let Some(positive) = self.positive.intersect(db, &other.positive) else {
             // If the positive intersection is empty, none of the negative holes matter, since
@@ -901,7 +911,7 @@ impl<'db> Constraint<'db> {
         let mut current: SmallVec<_> = (self.negative.iter())
             .filter_map(|negative| negative.intersect(db, &positive))
             .collect();
-        'outer: for other_negative in other.negative.iter() {
+        for other_negative in other.negative.iter() {
             let Some(mut other_negative) = other_negative.intersect(db, &positive) else {
                 continue;
             };
@@ -909,36 +919,18 @@ impl<'db> Constraint<'db> {
             let mut previous_negative = previous.iter();
             for self_negative in previous_negative.by_ref() {
                 match self_negative.union(db, &other_negative) {
-                    Simplifiable::NeverSatisfiable => {
-                        // If two holes cancel out to 0, then we can remove them from the list. It
-                        // does NOT cause the entire list to become 0. We need to keep whatever
-                        // holes have already been added to the result, and also need to copy over
-                        // any later holes that we hadn't processed yet.
-                        current.extend(previous_negative.cloned());
-                        continue 'outer;
-                    }
-
-                    Simplifiable::AlwaysSatisfiable => {
-                        // If two holes cancel out to 1, that makes the entire list 1, and all
-                        // existing holes are simplified away. A hole of 1 removes every type from
-                        // the constraint, regardless of what is in the positive portion, resulting
-                        // in an empty constraint for the overall result.
-                        return Satisfiable::Never;
-                    }
-
-                    Simplifiable::NotSimplified(existing, h) => {
+                    None => {
                         // We couldn't simplify the new hole relative to this existing holes, so
                         // add the existing hole to the result. Continue trying to simplify the new
                         // hole against the later existing holes.
-                        current.push(existing);
-                        other_negative = h;
+                        current.push(self_negative.clone());
                     }
 
-                    Simplifiable::Simplified(h) => {
+                    Some(union) => {
                         // We were able to simplify the new hole relative to this existing hole.
                         // Don't add it to the result yet; instead, try to simplify the result
                         // further against later existing holes.
-                        other_negative = h;
+                        other_negative = union.clone();
                     }
                 }
             }
@@ -948,17 +940,11 @@ impl<'db> Constraint<'db> {
             current.push(other_negative);
         }
 
-        // current now contains the simplified list of holes for the intersection result. If the
-        // positive portion is 1, and the negative portion is 0, then the constraint is always
-        // satisfied.
-        if positive.is_always() && current.is_empty() {
-            return Satisfiable::Always;
-        }
-
-        Satisfiable::Constrained(Self {
+        let result = Self {
             positive,
             negative: current,
-        })
+        };
+        result.satisfiable(db)
     }
 
     fn simplified_union(
@@ -966,28 +952,79 @@ impl<'db> Constraint<'db> {
         db: &'db dyn Db,
         other: &Constraint<'db>,
     ) -> Simplifiable<Constraint<'db>, ()> {
-        // For a union of two constraints to simplify to a single constraint, the positive portion
-        // of one must completely contain the positive portion of the other; and each negative
-        // hole of the larger must be completely contained by some negative hole for the smaller,
-        // or must be disjoint from the smaller positive portion.
-        let (larger, smaller) = if self.positive.contains(db, &other.positive) {
-            (self, other)
-        } else if other.positive.contains(db, &self.positive) {
-            (other, self)
-        } else {
-            return Simplifiable::NotSimplified((), ());
+        // (ap ∧ ¬an₁ ∧ ¬an₂ ∧ ...) ∨ (bp ∧ ¬bn₁ ∧ ¬bn₂ ∧ ...)
+        //   = (ap ∨ bp) ∧ (ap ∨ ¬bn₁) ∧ (ap ∨ ¬bn₂) ∧ ...
+        //   ∧ (¬an₁ ∨ bp) ∧ (¬an₁ ∨ ¬bn₁) ∧ (¬an₁ ∨ ¬bn₂) ∧ ...
+        //   ∧ (¬an₂ ∨ bp) ∧ (¬an₂ ∨ ¬bn₁) ∧ (¬an₂ ∨ ¬bn₂) ∧ ...
+        //
+        // We only have to return an actual result if all of this simplifies down to a single
+        // constraint. If at any point it becomes complex enough to spill over into a union of
+        // constraints, we can return `NotSimplified`.
+        let mut result = match self.positive.union(db, &other.positive) {
+            Some(positive) => Constraint {
+                positive: positive.clone(),
+                negative: smallvec![],
+            },
+            None => return Simplifiable::NotSimplified((), ()),
         };
 
-        for larger_negative in &larger.negative {
-            let satisfied = (smaller.negative.iter())
-                .any(|smaller_negative| smaller_negative.contains(db, larger_negative))
-                || larger_negative.is_disjoint_from(db, &smaller.positive);
-            if !satisfied {
-                return Simplifiable::NotSimplified((), ());
+        for other_negative in &other.negative {
+            let union = match self.positive.union_negated_range(db, other_negative) {
+                Simplifiable::NeverSatisfiable => return Simplifiable::NeverSatisfiable,
+                Simplifiable::AlwaysSatisfiable => continue,
+                Simplifiable::Simplified(constraint) => constraint,
+                Simplifiable::NotSimplified((), ()) => return Simplifiable::NotSimplified((), ()),
+            };
+            result = match result.intersect(db, &union) {
+                Satisfiable::Never => return Simplifiable::NeverSatisfiable,
+                Satisfiable::Always => Constraint {
+                    positive: RangeConstraint::always(),
+                    negative: smallvec![],
+                },
+                Satisfiable::Constrained(constraint) => constraint,
+            };
+        }
+
+        for self_negative in &self.negative {
+            let union = match other.positive.union_negated_range(db, self_negative) {
+                Simplifiable::NeverSatisfiable => return Simplifiable::NeverSatisfiable,
+                Simplifiable::AlwaysSatisfiable => continue,
+                Simplifiable::Simplified(constraint) => constraint,
+                Simplifiable::NotSimplified((), ()) => return Simplifiable::NotSimplified((), ()),
+            };
+            result = match result.intersect(db, &union) {
+                Satisfiable::Never => return Simplifiable::NeverSatisfiable,
+                Satisfiable::Always => Constraint {
+                    positive: RangeConstraint::always(),
+                    negative: smallvec![],
+                },
+                Satisfiable::Constrained(constraint) => constraint,
+            };
+        }
+
+        for self_negative in &self.negative {
+            for other_negative in &other.negative {
+                let negative = match self_negative.intersect(db, other_negative) {
+                    Some(negative) => Constraint {
+                        positive: RangeConstraint::always(),
+                        negative: smallvec![negative],
+                    },
+                    // If the intersection of these two holes is empty, then they don't remove
+                    // anything from the final union.
+                    None => continue,
+                };
+                result = match result.intersect(db, &negative) {
+                    Satisfiable::Never => return Simplifiable::NeverSatisfiable,
+                    Satisfiable::Always => Constraint {
+                        positive: RangeConstraint::always(),
+                        negative: smallvec![],
+                    },
+                    Satisfiable::Constrained(constraint) => constraint,
+                };
             }
         }
 
-        Simplifiable::Simplified(larger.clone())
+        Simplifiable::from_one(result.satisfiable(db))
     }
 
     fn negate_into(
@@ -1151,18 +1188,48 @@ impl<'db> RangeConstraint<'db> {
         Some(Self { lower, upper })
     }
 
-    fn union(&self, db: &'db dyn Db, other: &RangeConstraint<'db>) -> Simplifiable<Self> {
+    fn union(&self, db: &'db dyn Db, other: &RangeConstraint<'db>) -> Option<Self> {
         // When one of the bounds is entirely contained within the other, the union simplifies to
         // the larger bounds.
         if self.lower.is_subtype_of(db, other.lower) && other.upper.is_subtype_of(db, self.upper) {
-            return Simplifiable::Simplified(self.clone());
+            return Some(self.clone());
         }
         if other.lower.is_subtype_of(db, self.lower) && self.upper.is_subtype_of(db, other.upper) {
-            return Simplifiable::Simplified(other.clone());
+            return Some(other.clone());
         }
 
         // Otherwise the result cannot be simplified.
-        Simplifiable::NotSimplified(self.clone(), other.clone())
+        None
+    }
+
+    fn union_negated_range(
+        &self,
+        db: &'db dyn Db,
+        negated: &RangeConstraint<'db>,
+    ) -> Simplifiable<Constraint<'db>, ()> {
+        // If the positive range completely contains the negative range, then the union is always
+        // satisfied.
+        if self.lower.is_subtype_of(db, negated.lower)
+            && negated.upper.is_subtype_of(db, self.upper)
+        {
+            return Simplifiable::AlwaysSatisfiable;
+        }
+
+        // If the positive range is disjoint from the negative range, the positive range doesn't
+        // add anything; the union is the negative range.
+        if incomparable(db, self.lower, negated.upper)
+            || incomparable(db, negated.lower, self.upper)
+        {
+            return Simplifiable::from_one(Constraint::negated_range(
+                db,
+                negated.lower,
+                negated.upper,
+            ));
+        }
+
+        // Otherwise we clip the positive constraint to the mininum range that overlaps with the
+        // negative range.
+        Simplifiable::NotSimplified((), ())
     }
 
     fn display(&self, db: &'db dyn Db, typevar: impl Display) -> impl Display {
@@ -1224,15 +1291,17 @@ pub(crate) enum Simplifiable<One, Two = One> {
     NotSimplified(Two, Two),
 }
 
-impl<T> Simplifiable<T> {
-    fn from_one(constraint: Satisfiable<T>) -> Self {
+impl<One, Two> Simplifiable<One, Two> {
+    fn from_one(constraint: Satisfiable<One>) -> Self {
         match constraint {
             Satisfiable::Never => Simplifiable::NeverSatisfiable,
             Satisfiable::Always => Simplifiable::AlwaysSatisfiable,
             Satisfiable::Constrained(constraint) => Simplifiable::Simplified(constraint),
         }
     }
+}
 
+impl<T> Simplifiable<T> {
     fn from_intersection(first: Satisfiable<T>, second: Satisfiable<T>) -> Self {
         match (first, second) {
             (Satisfiable::Never, _) | (_, Satisfiable::Never) => Simplifiable::NeverSatisfiable,
