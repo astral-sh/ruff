@@ -91,7 +91,7 @@ that specific type.
 
 ```py
 def _[T]() -> None:
-    # revealed: ty_extensions.ConstraintSet[(Base ≤ T@_ ≤ Base)]
+    # revealed: ty_extensions.ConstraintSet[(T@_ = Base)]
     reveal_type(range_constraint(Base, T, Base))
 ```
 
@@ -176,7 +176,7 @@ type other than that specific type.
 
 ```py
 def _[T]() -> None:
-    # revealed: ty_extensions.ConstraintSet[¬(Base ≤ T@_ ≤ Base)]
+    # revealed: ty_extensions.ConstraintSet[(T@_ ≠ Base)]
     reveal_type(negated_range_constraint(Base, T, Base))
 ```
 
@@ -242,7 +242,7 @@ def _[T]() -> None:
     reveal_type(range_constraint(SubSub, T, Base) & range_constraint(Sub, T, Super))
     # revealed: ty_extensions.ConstraintSet[(Sub ≤ T@_ ≤ Base)]
     reveal_type(range_constraint(SubSub, T, Super) & range_constraint(Sub, T, Base))
-    # revealed: ty_extensions.ConstraintSet[(Base ≤ T@_ ≤ Base)]
+    # revealed: ty_extensions.ConstraintSet[(T@_ = Base)]
     reveal_type(range_constraint(Sub, T, Base) & range_constraint(Base, T, Super))
     # revealed: ty_extensions.ConstraintSet[(Sub ≤ T@_ ≤ Super)]
     reveal_type(range_constraint(Sub, T, Super) & range_constraint(Sub, T, Super))
@@ -515,7 +515,7 @@ def _[T]() -> None:
     reveal_type(negated_range_constraint(SubSub, T, Base) | negated_range_constraint(Sub, T, Super))
     # revealed: ty_extensions.ConstraintSet[¬(Sub ≤ T@_ ≤ Base)]
     reveal_type(negated_range_constraint(SubSub, T, Super) | negated_range_constraint(Sub, T, Base))
-    # revealed: ty_extensions.ConstraintSet[¬(Base ≤ T@_ ≤ Base)]
+    # revealed: ty_extensions.ConstraintSet[(T@_ ≠ Base)]
     reveal_type(negated_range_constraint(Sub, T, Base) | negated_range_constraint(Base, T, Super))
     # revealed: ty_extensions.ConstraintSet[¬(Sub ≤ T@_ ≤ Super)]
     reveal_type(negated_range_constraint(Sub, T, Super) | negated_range_constraint(Sub, T, Super))

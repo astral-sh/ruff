@@ -1281,6 +1281,15 @@ impl<'db> RangeConstraint<'db> {
 
         impl<D: Display> Display for DisplayRangeConstraint<'_, '_, D> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                if (self.constraint.lower).is_equivalent_to(self.db, self.constraint.upper) {
+                    return write!(
+                        f,
+                        "({} = {})",
+                        &self.typevar,
+                        self.constraint.lower.display(self.db)
+                    );
+                }
+
                 f.write_str("(")?;
                 if !self.constraint.lower.is_never() {
                     write!(f, "{} ≤ ", self.constraint.lower.display(self.db))?;
@@ -1372,6 +1381,17 @@ impl<'db> NegatedRangeConstraint<'db> {
 
         impl<D: Display> Display for DisplayNegatedRangeConstraint<'_, '_, D> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                if (self.constraint.hole.lower)
+                    .is_equivalent_to(self.db, self.constraint.hole.upper)
+                {
+                    return write!(
+                        f,
+                        "({} ≠ {})",
+                        &self.typevar,
+                        self.constraint.hole.lower.display(self.db)
+                    );
+                }
+
                 f.write_str("¬")?;
                 self.constraint.hole.display(self.db, &self.typevar).fmt(f)
             }
