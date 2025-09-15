@@ -10884,17 +10884,12 @@ pub(super) fn find_upper_bound<'db>(
     specialization: Option<Specialization<'db>>,
     is_known_base: impl Fn(ClassBase<'db>) -> bool,
 ) -> Type<'db> {
-    let mut upper_bound = class_literal.unknown_specialization(db);
-    for base in class_literal.iter_mro(db, specialization) {
-        if is_known_base(base) {
-            break;
-        }
-
-        if let Some(superclass) = base.into_class() {
-            upper_bound = superclass;
-        }
-    }
-
+    let upper_bound = class_literal
+        .iter_mro(db, specialization)
+        .take_while(|base| !is_known_base(*base))
+        .filter_map(ClassBase::into_class)
+        .last()
+        .unwrap_or_else(|| class_literal.unknown_specialization(db));
     Type::instance(db, upper_bound)
 }
 
