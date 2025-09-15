@@ -42,6 +42,53 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &mut self,
         annotation: &ast::Expr,
     ) -> TypeAndQualifiers<'db> {
+        fn infer_name_or_attribute<'db>(
+            ty: Type<'db>,
+            annotation: &ast::Expr,
+            builder: &TypeInferenceBuilder<'db, '_>,
+        ) -> TypeAndQualifiers<'db> {
+            match ty {
+                Type::SpecialForm(SpecialFormType::ClassVar) => {
+                    TypeAndQualifiers::new(Type::unknown(), TypeQualifiers::CLASS_VAR)
+                }
+                Type::SpecialForm(SpecialFormType::Final) => {
+                    TypeAndQualifiers::new(Type::unknown(), TypeQualifiers::FINAL)
+                }
+                Type::SpecialForm(SpecialFormType::Required) => {
+                    TypeAndQualifiers::new(Type::unknown(), TypeQualifiers::REQUIRED)
+                }
+                Type::SpecialForm(SpecialFormType::NotRequired) => {
+                    TypeAndQualifiers::new(Type::unknown(), TypeQualifiers::NOT_REQUIRED)
+                }
+                Type::SpecialForm(SpecialFormType::ReadOnly) => {
+                    TypeAndQualifiers::new(Type::unknown(), TypeQualifiers::READ_ONLY)
+                }
+                Type::ClassLiteral(class) if class.is_known(builder.db(), KnownClass::InitVar) => {
+                    if let Some(builder) =
+                        builder.context.report_lint(&INVALID_TYPE_FORM, annotation)
+                    {
+                        builder
+                            .into_diagnostic("`InitVar` may not be used without a type argument");
+                    }
+                    TypeAndQualifiers::new(Type::unknown(), TypeQualifiers::INIT_VAR)
+                }
+                _ => ty
+                    .in_type_expression(
+                        builder.db(),
+                        builder.scope(),
+                        builder.typevar_binding_context,
+                    )
+                    .unwrap_or_else(|error| {
+                        error.into_fallback_type(
+                            &builder.context,
+                            annotation,
+                            builder.is_reachable(annotation),
+                        )
+                    })
+                    .into(),
+            }
+        }
+
         // https://typing.python.org/en/latest/spec/annotations.html#grammar-token-expression-grammar-annotation_expression
         let annotation_ty = match annotation {
             // String annotations: https://typing.python.org/en/latest/spec/annotations.html#string-annotations
@@ -68,52 +115,21 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 TypeAndQualifiers::unknown()
             }
 
+            ast::Expr::Attribute(attribute) => match attribute.ctx {
+                ast::ExprContext::Load => infer_name_or_attribute(
+                    self.infer_attribute_expression(attribute),
+                    annotation,
+                    self,
+                ),
+                ast::ExprContext::Invalid => TypeAndQualifiers::unknown(),
+                ast::ExprContext::Store | ast::ExprContext::Del => {
+                    todo_type!("Attribute expression annotation in Store/Del context").into()
+                }
+            },
+
             ast::Expr::Name(name) => match name.ctx {
                 ast::ExprContext::Load => {
-                    let name_expr_ty = self.infer_name_expression(name);
-                    match name_expr_ty {
-                        Type::SpecialForm(SpecialFormType::ClassVar) => {
-                            TypeAndQualifiers::new(Type::unknown(), TypeQualifiers::CLASS_VAR)
-                        }
-                        Type::SpecialForm(SpecialFormType::Final) => {
-                            TypeAndQualifiers::new(Type::unknown(), TypeQualifiers::FINAL)
-                        }
-                        Type::SpecialForm(SpecialFormType::Required) => {
-                            TypeAndQualifiers::new(Type::unknown(), TypeQualifiers::REQUIRED)
-                        }
-                        Type::SpecialForm(SpecialFormType::NotRequired) => {
-                            TypeAndQualifiers::new(Type::unknown(), TypeQualifiers::NOT_REQUIRED)
-                        }
-                        Type::SpecialForm(SpecialFormType::ReadOnly) => {
-                            TypeAndQualifiers::new(Type::unknown(), TypeQualifiers::READ_ONLY)
-                        }
-                        Type::ClassLiteral(class)
-                            if class.is_known(self.db(), KnownClass::InitVar) =>
-                        {
-                            if let Some(builder) =
-                                self.context.report_lint(&INVALID_TYPE_FORM, annotation)
-                            {
-                                builder.into_diagnostic(
-                                    "`InitVar` may not be used without a type argument",
-                                );
-                            }
-                            TypeAndQualifiers::new(Type::unknown(), TypeQualifiers::INIT_VAR)
-                        }
-                        _ => name_expr_ty
-                            .in_type_expression(
-                                self.db(),
-                                self.scope(),
-                                self.typevar_binding_context,
-                            )
-                            .unwrap_or_else(|error| {
-                                error.into_fallback_type(
-                                    &self.context,
-                                    annotation,
-                                    self.is_reachable(annotation),
-                                )
-                            })
-                            .into(),
-                    }
+                    infer_name_or_attribute(self.infer_name_expression(name), annotation, self)
                 }
                 ast::ExprContext::Invalid => TypeAndQualifiers::unknown(),
                 ast::ExprContext::Store | ast::ExprContext::Del => {
