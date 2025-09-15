@@ -77,6 +77,8 @@ impl SemanticSyntaxChecker {
                         //     from module import *
                         // def f2():
                         //     from ..module import *
+                        // def f3():
+                        //     from module import *, *
 
                         // test_ok import_from_star
                         // from module import *

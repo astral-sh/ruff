@@ -8,7 +8,7 @@ input_file: crates/ruff_python_parser/resources/inline/err/import_from_star.py
 Module(
     ModModule {
         node_index: NodeIndex(None),
-        range: 0..106,
+        range: 0..144,
         body: [
             FunctionDef(
                 StmtFunctionDef {
@@ -156,10 +156,82 @@ Module(
                     ],
                 },
             ),
+            FunctionDef(
+                StmtFunctionDef {
+                    node_index: NodeIndex(None),
+                    range: 106..143,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("f3"),
+                        range: 110..112,
+                        node_index: NodeIndex(None),
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 112..114,
+                        node_index: NodeIndex(None),
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        ImportFrom(
+                            StmtImportFrom {
+                                node_index: NodeIndex(None),
+                                range: 120..143,
+                                module: Some(
+                                    Identifier {
+                                        id: Name("module"),
+                                        range: 125..131,
+                                        node_index: NodeIndex(None),
+                                    },
+                                ),
+                                names: [
+                                    Alias {
+                                        range: 139..140,
+                                        node_index: NodeIndex(None),
+                                        name: Identifier {
+                                            id: Name("*"),
+                                            range: 139..140,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        asname: None,
+                                    },
+                                    Alias {
+                                        range: 142..143,
+                                        node_index: NodeIndex(None),
+                                        name: Identifier {
+                                            id: Name("*"),
+                                            range: 142..143,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        asname: None,
+                                    },
+                                ],
+                                level: 0,
+                            },
+                        ),
+                    ],
+                },
+            ),
         ],
     },
 )
 ```
+## Errors
+
+  |
+6 |     from ..module import *
+7 | def f3():
+8 |     from module import *, *
+  |                        ^^^^ Syntax Error: Star import must be the only import
+  |
+
+
 ## Semantic Syntax Errors
 
   |
@@ -186,4 +258,14 @@ Module(
 5 | def f2():
 6 |     from ..module import *
   |     ^^^^^^^^^^^^^^^^^^^^^^ Syntax Error: `from ..module import *` only allowed at module level
+7 | def f3():
+8 |     from module import *, *
+  |
+
+
+  |
+6 |     from ..module import *
+7 | def f3():
+8 |     from module import *, *
+  |     ^^^^^^^^^^^^^^^^^^^^^^^ Syntax Error: `from module import *` only allowed at module level
   |
