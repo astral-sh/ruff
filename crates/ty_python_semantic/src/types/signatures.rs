@@ -470,13 +470,13 @@ impl<'db> Signature<'db> {
             _ => type_mapping,
         };
         Self {
-            generic_context: if let TypeMapping::ReplaceSelf(new_self) = type_mapping {
+            generic_context: if let TypeMapping::ReplaceSelf { new_upper_bound } = type_mapping {
                 self.generic_context.map(|context| {
                     GenericContext::from_typevar_instances(
                         db,
                         context.variables(db).iter().map(|var| {
                             if var.typevar(db).kind(db) == TypeVarKind::TypingSelf {
-                                *new_self
+                                BoundTypeVarInstance::synthetic_self(db, *new_upper_bound)
                             } else {
                                 *var
                             }

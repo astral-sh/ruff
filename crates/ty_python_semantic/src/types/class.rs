@@ -1984,10 +1984,14 @@ impl<'db> ClassLiteral<'db> {
                         .map_type(|ty| {
                             ty.apply_type_mapping(
                                 db,
-                                &TypeMapping::ReplaceSelf(BoundTypeVarInstance::synthetic_self(
-                                    db,
-                                    find_upper_bound(db, self, None, ClassBase::is_typed_dict),
-                                )),
+                                &TypeMapping::ReplaceSelf {
+                                    new_upper_bound: find_upper_bound(
+                                        db,
+                                        self,
+                                        None,
+                                        ClassBase::is_typed_dict,
+                                    ),
+                                },
                             )
                         });
                 }
@@ -2273,13 +2277,17 @@ impl<'db> ClassLiteral<'db> {
                     .map(|ty| {
                         ty.apply_type_mapping(
                             db,
-                            &TypeMapping::ReplaceSelf(BoundTypeVarInstance::synthetic_self(
-                                db,
-                                find_upper_bound(db, self, specialization, |base| {
-                                    base.into_class()
-                                        .is_some_and(|c| c.is_known(db, KnownClass::Tuple))
-                                }),
-                            )),
+                            &TypeMapping::ReplaceSelf {
+                                new_upper_bound: find_upper_bound(
+                                    db,
+                                    self,
+                                    specialization,
+                                    |base| {
+                                        base.into_class()
+                                            .is_some_and(|c| c.is_known(db, KnownClass::Tuple))
+                                    },
+                                ),
+                            },
                         )
                     })
             }
@@ -2607,10 +2615,7 @@ impl<'db> ClassLiteral<'db> {
                 .map_type(|ty|
                     ty.apply_type_mapping(
                         db,
-                        &TypeMapping::ReplaceSelf(BoundTypeVarInstance::synthetic_self(
-                            db,
-                            find_upper_bound(db, self, specialization, ClassBase::is_typed_dict)
-                        ))
+                        &TypeMapping::ReplaceSelf {new_upper_bound: find_upper_bound(db, self, specialization, ClassBase::is_typed_dict) }
                     )
                 )
         }
@@ -2854,10 +2859,12 @@ impl<'db> ClassLiteral<'db> {
                         .map_type(|ty| {
                             ty.apply_type_mapping(
                                 db,
-                                &TypeMapping::ReplaceSelf(BoundTypeVarInstance::synthetic_self(
-                                    db,
-                                    Type::instance(db, self.unknown_specialization(db)),
-                                )),
+                                &TypeMapping::ReplaceSelf {
+                                    new_upper_bound: Type::instance(
+                                        db,
+                                        self.unknown_specialization(db),
+                                    ),
+                                },
                             )
                         });
                 }

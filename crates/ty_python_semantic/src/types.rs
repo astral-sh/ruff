@@ -5971,9 +5971,9 @@ impl<'db> Type<'db> {
                         self
                     }
                 }
-                TypeMapping::ReplaceSelf(new_self) => {
+                TypeMapping::ReplaceSelf { new_upper_bound } => {
                     if bound_typevar.typevar(db).is_self(db) {
-                        Type::TypeVar(*new_self)
+                        Type::TypeVar(BoundTypeVarInstance::synthetic_self(db, *new_upper_bound))
                     } else {
                         self
                     }
@@ -6002,7 +6002,7 @@ impl<'db> Type<'db> {
                 TypeMapping::PromoteLiterals |
                 TypeMapping::BindLegacyTypevars(_) |
                 TypeMapping::BindSelf(_) |
-                TypeMapping::ReplaceSelf(_)
+                TypeMapping::ReplaceSelf { new_upper_bound: _ }
                     => self,
                 TypeMapping::Materialize(materialization_kind)  => Type::NonInferableTypeVar(bound_typevar.materialize_impl(db, *materialization_kind, visitor))
 
@@ -6016,7 +6016,7 @@ impl<'db> Type<'db> {
                 TypeMapping::PartialSpecialization(_) |
                 TypeMapping::PromoteLiterals |
                 TypeMapping::BindSelf(_) |
-                TypeMapping::ReplaceSelf(_) |
+                TypeMapping::ReplaceSelf { new_upper_bound: _ } |
                 TypeMapping::MarkTypeVarsInferable(_) |
                 TypeMapping::Materialize(_) => self,
             }
@@ -6125,7 +6125,7 @@ impl<'db> Type<'db> {
                 TypeMapping::PartialSpecialization(_) |
                 TypeMapping::BindLegacyTypevars(_) |
                 TypeMapping::BindSelf(_) |
-                TypeMapping::ReplaceSelf(_) |
+                TypeMapping::ReplaceSelf { new_upper_bound: _ } |
                 TypeMapping::MarkTypeVarsInferable(_) |
                 TypeMapping::Materialize(_) => self,
                 TypeMapping::PromoteLiterals => self.literal_fallback_instance(db)
@@ -6137,7 +6137,7 @@ impl<'db> Type<'db> {
                 TypeMapping::PartialSpecialization(_) |
                 TypeMapping::BindLegacyTypevars(_) |
                 TypeMapping::BindSelf(_) |
-                TypeMapping::ReplaceSelf(_) |
+                TypeMapping::ReplaceSelf { new_upper_bound: _ } |
                 TypeMapping::MarkTypeVarsInferable(_) |
                 TypeMapping::PromoteLiterals => self,
                 TypeMapping::Materialize(materialization_kind) => match materialization_kind {
@@ -6673,8 +6673,8 @@ pub enum TypeMapping<'a, 'db> {
     BindLegacyTypevars(BindingContext<'db>),
     /// Binds any `typing.Self` typevar with a particular `self` class.
     BindSelf(Type<'db>),
-    /// Replaces occurrences of `typing.Self` with a new `Self` type variable.
-    ReplaceSelf(BoundTypeVarInstance<'db>),
+    /// Replaces occurrences of `typing.Self` with a new `Self` type variable that has the given upper bound.
+    ReplaceSelf { new_upper_bound: Type<'db> },
     /// Marks the typevars that are bound by a generic class or function as inferable.
     MarkTypeVarsInferable(BindingContext<'db>),
     /// Create the top or bottom materialization of a type.
@@ -6696,8 +6696,8 @@ fn walk_type_mapping<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
         TypeMapping::BindSelf(self_type) => {
             visitor.visit_type(db, *self_type);
         }
-        TypeMapping::ReplaceSelf(new_self) => {
-            visitor.visit_bound_type_var_type(db, *new_self);
+        TypeMapping::ReplaceSelf { new_upper_bound } => {
+            visitor.visit_type(db, *new_upper_bound);
         }
         TypeMapping::PromoteLiterals
         | TypeMapping::BindLegacyTypevars(_)
@@ -6720,9 +6720,11 @@ impl<'db> TypeMapping<'_, 'db> {
                 TypeMapping::BindLegacyTypevars(*binding_context)
             }
             TypeMapping::BindSelf(self_type) => TypeMapping::BindSelf(*self_type),
-            TypeMapping::ReplaceSelf(replacement_type) => {
-                TypeMapping::ReplaceSelf(*replacement_type)
-            }
+            TypeMapping::ReplaceSelf {
+                new_upper_bound: replacement_type,
+            } => TypeMapping::ReplaceSelf {
+                new_upper_bound: *replacement_type,
+            },
             TypeMapping::MarkTypeVarsInferable(binding_context) => {
                 TypeMapping::MarkTypeVarsInferable(*binding_context)
             }
@@ -6747,9 +6749,11 @@ impl<'db> TypeMapping<'_, 'db> {
             TypeMapping::BindSelf(self_type) => {
                 TypeMapping::BindSelf(self_type.normalized_impl(db, visitor))
             }
-            TypeMapping::ReplaceSelf(replacement_type) => {
-                TypeMapping::ReplaceSelf(replacement_type.normalized_impl(db, visitor))
-            }
+            TypeMapping::ReplaceSelf {
+                new_upper_bound: replacement_type,
+            } => TypeMapping::ReplaceSelf {
+                new_upper_bound: replacement_type.normalized_impl(db, visitor),
+            },
             TypeMapping::MarkTypeVarsInferable(binding_context) => {
                 TypeMapping::MarkTypeVarsInferable(*binding_context)
             }
