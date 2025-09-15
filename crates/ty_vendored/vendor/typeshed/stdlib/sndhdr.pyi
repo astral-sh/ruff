@@ -26,14 +26,15 @@ argument is "." (testing all files in the current directory).  The
 option -r tells it to recurse down directories found inside
 explicitly given directories.
 """
+
 from _typeshed import StrOrBytesPath
 from typing import NamedTuple
 
 __all__ = ["what", "whathdr"]
 
 class SndHeaders(NamedTuple):
-    """SndHeaders(filetype, framerate, nchannels, nframes, sampwidth)
-"""
+    """SndHeaders(filetype, framerate, nchannels, nframes, sampwidth)"""
+
     filetype: str
     framerate: int
     nchannels: int
@@ -41,8 +42,7 @@ class SndHeaders(NamedTuple):
     sampwidth: int | str
 
 def what(filename: StrOrBytesPath) -> SndHeaders | None:
-    """Guess the type of a sound file.
-"""
+    """Guess the type of a sound file."""
+
 def whathdr(filename: StrOrBytesPath) -> SndHeaders | None:
-    """Recognize sound headers.
-"""
+    """Recognize sound headers."""

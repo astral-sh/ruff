@@ -7,6 +7,7 @@ additional features:
     create a complete usage summary
   * options set attributes of a passed-in object
 """
+
 from collections.abc import Iterable, Mapping
 from getopt import _SliceableT, _StrSequenceT_co
 from re import Pattern
@@ -31,6 +32,7 @@ class FancyGetopt:
         --quiet is the "negative alias" of --verbose, then "--quiet"
         on the command line sets 'verbose' to false
     """
+
     def __init__(self, option_table: list[_Option] | None = None) -> None: ...
     # TODO: kinda wrong, `getopt(object=object())` is invalid
     @overload
@@ -47,6 +49,7 @@ class FancyGetopt:
         'args' is a modified copy of the passed-in 'args' list, which
         is left untouched.
         """
+
     @overload
     def getopt(
         self, args: _SliceableT[_StrSequenceT_co] | None, object: Any
@@ -56,6 +59,7 @@ class FancyGetopt:
         previous run of 'getopt()'.  Raises RuntimeError if
         'getopt()' hasn't been called yet.
         """
+
     def generate_help(self, header: str | None = None) -> list[str]:
         """Generate help text (a list of strings, one per suggested line of
         output) from the option table for this FancyGetopt object.
@@ -79,6 +83,7 @@ def wrap_text(text: str, width: int) -> list[str]:
     Split 'text' into multiple lines of no more than 'width' characters
     each, and return the list of strings that results.
     """
+
 def translate_longopt(opt: str) -> str:
     """Convert a long option name to a valid Python identifier by
     changing "-" to "_".
@@ -87,8 +92,9 @@ def translate_longopt(opt: str) -> str:
 class OptionDummy:
     """Dummy class just used as a place to hold command-line option
     values as instance attributes.
-"""
+    """
+
     def __init__(self, options: Iterable[str] = []) -> None:
         """Create a new OptionDummy instance.  The attributes listed in
         'options' will be initialized to None.
-"""
+        """
