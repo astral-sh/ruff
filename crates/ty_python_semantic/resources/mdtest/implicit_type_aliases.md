@@ -24,7 +24,10 @@ f(1)
 ```py
 from typing import Union
 
-T = list[Union["T", None]]
+Recursive = list[Union["Recursive", None]]
+
+def _(r: Recursive):
+    reveal_type(r)  # revealed: list[Divergent]
 ```
 
 ### New union syntax
@@ -35,5 +38,8 @@ python-version = "3.12"
 ```
 
 ```py
-T = list["T" | None]
+Recursive = list["Recursive" | None]
+
+def _(r: Recursive):
+    reveal_type(r)  # revealed: list[Divergent]
 ```
