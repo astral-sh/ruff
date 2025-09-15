@@ -30,7 +30,7 @@ use crate::types::{
     IsEquivalentVisitor, KnownInstanceType, ManualPEP695TypeAliasType, MaterializationKind,
     NormalizedVisitor, PropertyInstanceType, StringLiteralType, TypeAliasType, TypeContext,
     TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind,
-    TypedDictParams, UnionBuilder, VarianceInferable, declaration_type, find_upper_bound,
+    TypedDictParams, UnionBuilder, VarianceInferable, declaration_type, determine_upper_bound,
     infer_definition_types,
 };
 use crate::{
@@ -1985,7 +1985,7 @@ impl<'db> ClassLiteral<'db> {
                             ty.apply_type_mapping(
                                 db,
                                 &TypeMapping::ReplaceSelf {
-                                    new_upper_bound: find_upper_bound(
+                                    new_upper_bound: determine_upper_bound(
                                         db,
                                         self,
                                         None,
@@ -2278,7 +2278,7 @@ impl<'db> ClassLiteral<'db> {
                         ty.apply_type_mapping(
                             db,
                             &TypeMapping::ReplaceSelf {
-                                new_upper_bound: find_upper_bound(
+                                new_upper_bound: determine_upper_bound(
                                     db,
                                     self,
                                     specialization,
@@ -2615,7 +2615,7 @@ impl<'db> ClassLiteral<'db> {
                 .map_type(|ty|
                     ty.apply_type_mapping(
                         db,
-                        &TypeMapping::ReplaceSelf {new_upper_bound: find_upper_bound(db, self, specialization, ClassBase::is_typed_dict) }
+                        &TypeMapping::ReplaceSelf {new_upper_bound: determine_upper_bound(db, self, specialization, ClassBase::is_typed_dict) }
                     )
                 )
         }

@@ -6008,7 +6008,7 @@ impl<'db> Type<'db> {
                 TypeMapping::PromoteLiterals |
                 TypeMapping::BindLegacyTypevars(_) |
                 TypeMapping::BindSelf(_) |
-                TypeMapping::ReplaceSelf { new_upper_bound: _ }
+                TypeMapping::ReplaceSelf { .. }
                     => self,
                 TypeMapping::Materialize(materialization_kind)  => Type::NonInferableTypeVar(bound_typevar.materialize_impl(db, *materialization_kind, visitor))
 
@@ -6022,7 +6022,7 @@ impl<'db> Type<'db> {
                 TypeMapping::PartialSpecialization(_) |
                 TypeMapping::PromoteLiterals |
                 TypeMapping::BindSelf(_) |
-                TypeMapping::ReplaceSelf { new_upper_bound: _ } |
+                TypeMapping::ReplaceSelf { .. } |
                 TypeMapping::MarkTypeVarsInferable(_) |
                 TypeMapping::Materialize(_) => self,
             }
@@ -6131,7 +6131,7 @@ impl<'db> Type<'db> {
                 TypeMapping::PartialSpecialization(_) |
                 TypeMapping::BindLegacyTypevars(_) |
                 TypeMapping::BindSelf(_) |
-                TypeMapping::ReplaceSelf { new_upper_bound: _ } |
+                TypeMapping::ReplaceSelf { .. } |
                 TypeMapping::MarkTypeVarsInferable(_) |
                 TypeMapping::Materialize(_) => self,
                 TypeMapping::PromoteLiterals => self.literal_fallback_instance(db)
@@ -6143,7 +6143,7 @@ impl<'db> Type<'db> {
                 TypeMapping::PartialSpecialization(_) |
                 TypeMapping::BindLegacyTypevars(_) |
                 TypeMapping::BindSelf(_) |
-                TypeMapping::ReplaceSelf { new_upper_bound: _ } |
+                TypeMapping::ReplaceSelf { .. } |
                 TypeMapping::MarkTypeVarsInferable(_) |
                 TypeMapping::PromoteLiterals => self,
                 TypeMapping::Materialize(materialization_kind) => match materialization_kind {
@@ -6679,7 +6679,7 @@ pub enum TypeMapping<'a, 'db> {
     BindLegacyTypevars(BindingContext<'db>),
     /// Binds any `typing.Self` typevar with a particular `self` class.
     BindSelf(Type<'db>),
-    /// Replaces occurrences of `typing.Self` with a new `Self` type variable that has the given upper bound.
+    /// Replaces occurrences of `typing.Self` with a new `Self` type variable with the given upper bound.
     ReplaceSelf { new_upper_bound: Type<'db> },
     /// Marks the typevars that are bound by a generic class or function as inferable.
     MarkTypeVarsInferable(BindingContext<'db>),
@@ -6726,10 +6726,8 @@ impl<'db> TypeMapping<'_, 'db> {
                 TypeMapping::BindLegacyTypevars(*binding_context)
             }
             TypeMapping::BindSelf(self_type) => TypeMapping::BindSelf(*self_type),
-            TypeMapping::ReplaceSelf {
-                new_upper_bound: replacement_type,
-            } => TypeMapping::ReplaceSelf {
-                new_upper_bound: *replacement_type,
+            TypeMapping::ReplaceSelf { new_upper_bound } => TypeMapping::ReplaceSelf {
+                new_upper_bound: *new_upper_bound,
             },
             TypeMapping::MarkTypeVarsInferable(binding_context) => {
                 TypeMapping::MarkTypeVarsInferable(*binding_context)
@@ -6755,10 +6753,8 @@ impl<'db> TypeMapping<'_, 'db> {
             TypeMapping::BindSelf(self_type) => {
                 TypeMapping::BindSelf(self_type.normalized_impl(db, visitor))
             }
-            TypeMapping::ReplaceSelf {
-                new_upper_bound: replacement_type,
-            } => TypeMapping::ReplaceSelf {
-                new_upper_bound: replacement_type.normalized_impl(db, visitor),
+            TypeMapping::ReplaceSelf { new_upper_bound } => TypeMapping::ReplaceSelf {
+                new_upper_bound: new_upper_bound.normalized_impl(db, visitor),
             },
             TypeMapping::MarkTypeVarsInferable(binding_context) => {
                 TypeMapping::MarkTypeVarsInferable(*binding_context)
@@ -10923,7 +10919,7 @@ impl<'db> TypeIsType<'db> {
 /// Walk the MRO of this class and return the last class just before the specified known base.
 /// This can be used to determine upper bounds for `Self` type variables on methods that are
 /// being added to the given class.
-pub(super) fn find_upper_bound<'db>(
+pub(super) fn determine_upper_bound<'db>(
     db: &'db dyn Db,
     class_literal: ClassLiteral<'db>,
     specialization: Option<Specialization<'db>>,
