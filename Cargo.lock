@@ -2475,16 +2475,16 @@ dependencies = [
 
 [[package]]
 name = "pyproject-toml"
-version = "0.13.5"
+version = "0.13.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b0f6160dc48298b9260d9b958ad1d7f96f6cd0b9df200b22329204e09334663"
+checksum = "ec768e063102b426e8962989758115e8659485124de9207bc365fab524125d65"
 dependencies = [
  "indexmap",
  "pep440_rs",
  "pep508_rs",
  "serde",
  "thiserror 2.0.16",
- "toml 0.8.23",
+ "toml",
 ]
 
 [[package]]
@@ -2773,7 +2773,7 @@ dependencies = [
  "test-case",
  "thiserror 2.0.16",
  "tikv-jemallocator",
- "toml 0.9.5",
+ "toml",
  "tracing",
  "walkdir",
  "wild",
@@ -2789,7 +2789,7 @@ dependencies = [
  "ruff_annotate_snippets",
  "serde",
  "snapbox",
- "toml 0.9.5",
+ "toml",
  "tryfn",
  "unicode-width 0.2.1",
 ]
@@ -2908,7 +2908,7 @@ dependencies = [
  "similar",
  "strum",
  "tempfile",
- "toml 0.9.5",
+ "toml",
  "tracing",
  "tracing-indicatif",
  "tracing-subscriber",
@@ -3028,7 +3028,7 @@ dependencies = [
  "tempfile",
  "test-case",
  "thiserror 2.0.16",
- "toml 0.9.5",
+ "toml",
  "typed-arena",
  "unicode-normalization",
  "unicode-width 0.2.1",
@@ -3286,7 +3286,7 @@ dependencies = [
  "serde_json",
  "shellexpand",
  "thiserror 2.0.16",
- "toml 0.9.5",
+ "toml",
  "tracing",
  "tracing-log",
  "tracing-subscriber",
@@ -3376,7 +3376,7 @@ dependencies = [
  "shellexpand",
  "strum",
  "tempfile",
- "toml 0.9.5",
+ "toml",
  "unicode-normalization",
 ]
 
@@ -3575,15 +3575,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "serde_spanned"
-version = "0.6.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bf41e0cfaf7226dca15e8197172c295a782857fcb97fad1808a166870dee75a3"
-dependencies = [
- "serde",
 ]
 
 [[package]]
@@ -3999,25 +3990,13 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
 name = "toml"
-version = "0.8.23"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dc1beb996b9d83529a9e75c17a1686767d148d70663143c7854d8b4a09ced362"
-dependencies = [
- "serde",
- "serde_spanned 0.6.9",
- "toml_datetime 0.6.11",
- "toml_edit",
-]
-
-[[package]]
-name = "toml"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "75129e1dc5000bfbaa9fee9d1b21f974f9fbad9daec557a521ee6e080825f6e8"
 dependencies = [
  "indexmap",
  "serde",
- "serde_spanned 1.0.0",
+ "serde_spanned",
  "toml_datetime 0.7.0",
  "toml_parser",
  "toml_writer",
@@ -4029,9 +4008,6 @@ name = "toml_datetime"
 version = "0.6.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "22cddaf88f4fbc13c51aebbf5f8eceb5c7c5a9da2ac40a13519eb5b0a0e8f11c"
-dependencies = [
- "serde",
-]
 
 [[package]]
 name = "toml_datetime"
@@ -4049,8 +4025,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "41fe8c660ae4257887cf66394862d21dbca4a6ddd26f04a3560410406a2f819a"
 dependencies = [
  "indexmap",
- "serde",
- "serde_spanned 0.6.9",
  "toml_datetime 0.6.11",
  "winnow",
 ]
@@ -4192,7 +4166,7 @@ dependencies = [
  "ruff_python_trivia",
  "salsa",
  "tempfile",
- "toml 0.9.5",
+ "toml",
  "tracing",
  "tracing-flame",
  "tracing-subscriber",
@@ -4271,7 +4245,7 @@ dependencies = [
  "schemars",
  "serde",
  "thiserror 2.0.16",
- "toml 0.9.5",
+ "toml",
  "tracing",
  "ty_combine",
  "ty_python_semantic",
@@ -4399,7 +4373,7 @@ dependencies = [
  "smallvec",
  "tempfile",
  "thiserror 2.0.16",
- "toml 0.9.5",
+ "toml",
  "tracing",
  "ty_python_semantic",
  "ty_static",
