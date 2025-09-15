@@ -145,6 +145,15 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
         return;
     }
 
+    // If the first argument matches the class name, check if it's a local variable
+    // that shadows the class name. If so, don't apply UP008.
+    if first_arg_id == parent_name.as_str() {
+        let scope = checker.semantic().current_scope();
+        if scope.has(first_arg_id) {
+            return;
+        }
+    }
+
     drop(parents);
 
     // If the class is an `@dataclass` with `slots=True`, calling `super()` without arguments raises
