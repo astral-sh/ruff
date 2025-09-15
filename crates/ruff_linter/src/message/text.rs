@@ -1,7 +1,7 @@
 use std::io::Write;
 
 use ruff_db::diagnostic::{
-    Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, DisplayDiagnostics, Program,
+    Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, DisplayDiagnostics,
 };
 use ruff_diagnostics::Applicability;
 
@@ -17,8 +17,7 @@ impl Default for TextEmitter {
             config: DisplayDiagnosticConfig::default()
                 .format(DiagnosticFormat::Concise)
                 .hide_severity(true)
-                .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize())
-                .program(Program::Ruff),
+                .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize()),
         }
     }
 }

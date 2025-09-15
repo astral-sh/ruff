@@ -1,20 +1,20 @@
-use crate::diagnostic::{Diagnostic, DisplayDiagnosticConfig, FileResolver, Severity};
+use crate::diagnostic::{Diagnostic, FileResolver, Severity};
 
 pub struct GithubRenderer<'a> {
     resolver: &'a dyn FileResolver,
-    config: &'a DisplayDiagnosticConfig,
+    program: &'a str,
     diagnostics: &'a [Diagnostic],
 }
 
 impl<'a> GithubRenderer<'a> {
     pub fn new(
         resolver: &'a dyn FileResolver,
-        config: &'a DisplayDiagnosticConfig,
+        program: &'a str,
         diagnostics: &'a [Diagnostic],
     ) -> Self {
         Self {
             resolver,
-            config,
+            program,
             diagnostics,
         }
     }
@@ -31,7 +31,7 @@ impl std::fmt::Display for GithubRenderer<'_> {
             write!(
                 f,
                 "::{severity} title={program} ({code})",
-                program = self.config.program,
+                program = self.program,
                 code = diagnostic.secondary_code_or_id()
             )?;
 

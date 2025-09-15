@@ -11,7 +11,7 @@ use serde::Serialize;
 
 use ruff_db::diagnostic::{
     Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, DisplayDiagnostics, GithubRenderer,
-    Program, SecondaryCode,
+    SecondaryCode,
 };
 use ruff_linter::fs::relativize_path;
 use ruff_linter::logging::LogLevel;
@@ -225,9 +225,7 @@ impl Printer {
         let context = EmitterContext::new(&diagnostics.notebook_indexes);
         let fixables = FixableStatistics::try_from(diagnostics, self.unsafe_fixes);
 
-        let config = DisplayDiagnosticConfig::default()
-            .preview(preview)
-            .program(Program::Ruff);
+        let config = DisplayDiagnosticConfig::default().preview(preview);
 
         match self.format {
             OutputFormat::Json => {
@@ -285,8 +283,7 @@ impl Printer {
                 self.write_summary_text(writer, diagnostics)?;
             }
             OutputFormat::Github => {
-                let config = config.format(DiagnosticFormat::Github);
-                let value = GithubRenderer::new(&context, &config, &diagnostics.inner);
+                let value = GithubRenderer::new(&context, "Ruff", &diagnostics.inner);
                 write!(writer, "{value}")?;
             }
             OutputFormat::Gitlab => {
