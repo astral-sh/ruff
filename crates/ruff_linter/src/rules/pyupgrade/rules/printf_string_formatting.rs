@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::fmt::Write;
 use std::str::FromStr;
 
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, AnyStringFlags, Expr, StringFlags, whitespace::indentation};
 use ruff_python_codegen::Stylist;
@@ -416,22 +417,31 @@ pub(crate) fn printf_string_formatting(
     }
 
     // Parse the parameters.
-    let params_string = match right {
+    let (applicability, params_string) = match right {
         Expr::StringLiteral(_)
         | Expr::BytesLiteral(_)
         | Expr::NumberLiteral(_)
         | Expr::BooleanLiteral(_)
         | Expr::NoneLiteral(_)
         | Expr::EllipsisLiteral(_)
-        | Expr::FString(_) => Cow::Owned(format!("({})", checker.locator().slice(right))),
+        | Expr::FString(_) => (
+            Applicability::Safe,
+            Cow::Owned(format!("({})", checker.locator().slice(right))),
+        ),
         Expr::Name(_) | Expr::Attribute(_) | Expr::Subscript(_) | Expr::Call(_) => {
             if num_keyword_arguments > 0 {
                 // If we have _any_ named fields, assume the right-hand side is a mapping.
-                Cow::Owned(format!("(**{})", checker.locator().slice(right)))
+                (
+                    Applicability::Safe,
+                    Cow::Owned(format!("(**{})", checker.locator().slice(right))),
+                )
             } else if num_positional_arguments > 1 {
                 // If we have multiple fields, but no named fields, assume the right-hand side is a
                 // tuple.
-                Cow::Owned(format!("(*{})", checker.locator().slice(right)))
+                (
+                    Applicability::Safe,
+                    Cow::Owned(format!("(*{})", checker.locator().slice(right))),
+                )
             } else {
                 // Otherwise, if we have a single field, we can't make any assumptions about the
                 // right-hand side. It _could_ be a tuple, but it could also be a single value,
@@ -443,10 +453,16 @@ pub(crate) fn printf_string_formatting(
                 // print("{}".format(x))
                 // ```
                 // So we offer an unsafe fix:
-                Cow::Owned(format!("({})", checker.locator().slice(right)))
+                (
+                    Applicability::Unsafe,
+                    Cow::Owned(format!("({})", checker.locator().slice(right))),
+                )
             }
         }
-        Expr::Tuple(_) => clean_params_tuple(right, checker.locator()),
+        Expr::Tuple(_) => (
+            Applicability::Safe,
+            clean_params_tuple(right, checker.locator()),
+        ),
         Expr::Dict(_) => {
             let Some(params_string) =
                 clean_params_dictionary(right, checker.locator(), checker.stylist())
@@ -454,7 +470,7 @@ pub(crate) fn printf_string_formatting(
                 checker.report_diagnostic(PrintfStringFormatting, string_expr.range());
                 return;
             };
-            Cow::Owned(params_string)
+            (Applicability::Safe, Cow::Owned(params_string))
         }
         _ => return,
     };
@@ -507,10 +523,10 @@ pub(crate) fn printf_string_formatting(
     let _ = write!(&mut contents, ".format{params_string}");
 
     let mut diagnostic = checker.report_diagnostic(PrintfStringFormatting, bin_op.range());
-    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-        contents,
-        bin_op.range(),
-    )));
+    diagnostic.set_fix(Fix::applicable_edit(
+        Edit::range_replacement(contents, bin_op.range()),
+        applicability,
+    ));
 }
 
 #[cfg(test)]
