@@ -23,25 +23,15 @@
 //! set that contains a single clause, where that clause contains no constraints, is always
 //! satisfiable (`⋃ {⋂ {}} = 1`).
 //!
-//! There are three possible individual constraints:
+//! An individual constraint consists of a _positive range_ and zero or more _negative holes_. The
+//! positive range and each negative hole consists of a lower and upper bound. A type is within a
+//! lower and upper bound if it is a supertype of the lower bound and a subtype of the upper bound.
+//! The typevar can specialize to any type that is within the positive range, and is not within any
+//! of the negative holes. (You can think of the constraint as the set of types that are within the
+//! positive range, with the negative holes "removed" from that set.)
 //!
-//! - A _range_ constraint requires the typevar to be within a particular lower and upper bound:
-//!   the typevar can only specialize to a type that is a supertype of the lower bound, and a
-//!   subtype of the upper bound.
-//!
-//! - A _not-equivalent_ constraint requires the typevar to specialize to anything _other_ than a
-//!   particular type (the "hole").
-//!
-//! - An _incomparable_ constraint requires the typevar to specialize to any type that is neither a
-//!   subtype nor a supertype of a particular type (the "pivot").
-//!
-//! Not-equivalent and incomparable constraints are usually not constructed directly; instead, they
-//! typically arise when building up complex combinations of range constraints.
-//!
-//! Note that all of the types that a constraint compares against — the bounds of a range
-//! constraint, the hole of not-equivalent constraint, and the pivot of an incomparable constraint
-//! — must be fully static. We take the bottom and top materializations of the types to remove any
-//! gradual forms if needed.
+//! Note that all lower and upper bounds in a constraint must be fully static. We take the bottom
+//! and top materializations of the types to remove any gradual forms if needed.
 //!
 //! NOTE: This module is currently in a transitional state. We've added the DNF [`ConstraintSet`]
 //! representation, and updated all of our property checks to build up a constraint set and then
@@ -70,27 +60,6 @@
 //! constraint `(int ≤ T ≤ int) ∪ (str ≤ T ≤ str)`. When the lower and upper bounds are the same,
 //! the constraint says that the typevar must specialize to that _exact_ type, not to a subtype or
 //! supertype of it.
-//!
-//! Python does not give us an easy way to construct this, but we can also consider a typevar that
-//! can specialize to any type that `T` _cannot_ specialize to — that is, the negation of `T`'s
-//! constraint. Another way to write `Never ≤ V ≤ B` is `Never ≤ V ∩ V ≤ B`; if we negate that, we
-//! get `¬(Never ≤ V) ∪ ¬(V ≤ B)`, or
-//!
-//! ```text
-//! ((V ≤ Never ∩ V ≠ Never) ∪ V ≁ Never) ∪ ((B ≤ V ∩ V ≠ B) ∪ V ≁ B)
-//! ```
-//!
-//! The first constraint in the union indicates that `V` can specialize to any type that is a
-//! subtype of `Never` or incomparable with `Never`, but not to `Never` itself.
-//!
-//! The second constraint in the union indicates that `V` can specialize to any type that is a
-//! supertype of `B` or incomparable with `B`, but not to `B` itself. (For instance, it _can_
-//! specialize to `A`.)
-//!
-//! There aren't any types that satisfy the first constraint in the union (the type would have to
-//! somehow contain a negative number of values). You can think of a constraint that cannot be
-//! satisfied as an empty set (of types), which means we can simplify it out of the union. That
-//! gives us a final constraint of `(B ≤ V ∩ V ≠ B) ∪ V ≁ B` for the negation of `T`'s constraint.
 
 use std::fmt::Display;
 
@@ -703,9 +672,23 @@ impl<'db> ConstraintClause<'db> {
     }
 
     /// If the union of two clauses is simpler than either of the individual clauses, returns the
-    /// union. This happens when (a) they mention the same set of typevars, (b) the union of the
-    /// constraints for exactly one typevar simplifies to a single constraint, and (c) the
-    /// constraints for all other typevars are identical. Otherwise returns `None`.
+    /// union. This happens when they mention the same set of typevars and the constraints for all
+    /// but one typevar are identical. Moreover, for the other typevar, the union of the
+    /// constraints for that typevar simplifies to (a) a single constraint, or (b) two constraints
+    /// where one of them is smaller than before. That is,
+    ///
+    /// ```text
+    /// (A₁ ∩ B ∩ C) ∪ (A₂ ∩ B ∩ C) = A₁₂ ∩ B ∩ C
+    ///                            or (A₁' ∪ A₂) ∩ B ∩ C
+    ///                            or (A₁ ∪ A₂') ∩ B ∩ C
+    /// ```
+    ///
+    /// where `B` and `C` are the constraints that are identical for all but one typevar, and `A₁`
+    /// and `A₂` are the constraints for the other typevar; and where `A₁ ∪ A₂` either simplifies
+    /// to a single constraint (`A₁₂`), or to a union where either `A₁` or `A₂` becomes smaller
+    /// (`A₁'` or `A₂'`, respectively).
+    ///
+    /// Otherwise returns `None`.
     fn simplifies_via_distribution(
         &self,
         db: &'db dyn Db,
@@ -842,6 +825,7 @@ impl<'db> ConstrainedTypeVar<'db> {
     }
 
     /// Returns the intersection of this individual constraint and another.
+    /// XXX Satisfiable
     fn intersect(&self, db: &'db dyn Db, other: &Self) -> Simplifiable<Self> {
         if self.typevar != other.typevar {
             return Simplifiable::NotSimplified(self.clone(), other.clone());
@@ -850,7 +834,9 @@ impl<'db> ConstrainedTypeVar<'db> {
             .map(|constraint| constraint.constrain(self.typevar))
     }
 
-    /// Returns the union of this individual constraint and another.
+    /// Returns the union of this individual constraint and another, if it can be simplified two a
+    /// union of two constraints or fewer. Returns `None` if the union cannot be simplified that
+    /// much.
     fn simplified_union(&self, db: &'db dyn Db, other: &Self) -> Option<Simplifiable<Self>> {
         if self.typevar != other.typevar {
             return None;
@@ -929,16 +915,16 @@ impl<'db> Constraint<'db> {
         // holes from `other` below when we try to simplify them.
         let mut previous: SmallVec<[NegatedRangeConstraint<'db>; 1]> = SmallVec::new();
         let mut current: SmallVec<_> = (self.negative.iter())
-            .filter_map(|negative| negative.intersect_positive(db, &positive))
+            .filter_map(|negative| negative.clip_to_positive(db, &positive))
             .collect();
         for other_negative in &other.negative {
-            let Some(mut other_negative) = other_negative.intersect_positive(db, &positive) else {
+            let Some(mut other_negative) = other_negative.clip_to_positive(db, &positive) else {
                 continue;
             };
             std::mem::swap(&mut previous, &mut current);
             let mut previous_negative = previous.iter();
             for self_negative in previous_negative.by_ref() {
-                match self_negative.union_negative(db, &other_negative) {
+                match self_negative.intersect_negative(db, &other_negative) {
                     None => {
                         // We couldn't simplify the new hole relative to this existing holes, so
                         // add the existing hole to the result. Continue trying to simplify the new
@@ -972,6 +958,18 @@ impl<'db> Constraint<'db> {
         db: &'db dyn Db,
         other: &Constraint<'db>,
     ) -> Option<Simplifiable<Constraint<'db>>> {
+        // (ap ∧ ¬an₁ ∧ ¬an₂ ∧ ...) ∨ (bp ∧ ¬bn₁ ∧ ¬bn₂ ∧ ...)
+        //   = (ap ∨ bp) ∧ (ap ∨ ¬bn₁) ∧ (ap ∨ ¬bn₂) ∧ ...
+        //   ∧ (¬an₁ ∨ bp) ∧ (¬an₁ ∨ ¬bn₁) ∧ (¬an₁ ∨ ¬bn₂) ∧ ...
+        //   ∧ (¬an₂ ∨ bp) ∧ (¬an₂ ∨ ¬bn₁) ∧ (¬an₂ ∨ ¬bn₂) ∧ ...
+        //
+        // We use a helper type to build up the result of the union of two constraints, since we
+        // need to calculate the Cartesian product of the the positive and negative portions of the
+        // two inputs. We cannot use `ConstraintSet` for this, since it would try to invoke the
+        // `simplify_union` logic, which this method is part of the definition of! So we have to
+        // reproduce some of that logic here, in a simplified form since we know we're only ever
+        // looking at pairs of individual constraints at a time.
+
         struct Results<'db> {
             next: Vec<Constraint<'db>>,
             results: Vec<Constraint<'db>>,
@@ -990,6 +988,7 @@ impl<'db> Constraint<'db> {
                 self.next.clear();
             }
 
+            /// Adds a constraint by intersecting it with any currently pending results.
             fn add_constraint(&mut self, db: &'db dyn Db, constraint: &Constraint<'db>) {
                 self.next.extend(self.results.iter().filter_map(|result| {
                     match result.intersect(db, constraint) {
@@ -1003,6 +1002,7 @@ impl<'db> Constraint<'db> {
                 }));
             }
 
+            /// Adds a single negative range constraint to the pending results.
             fn add_negated_range(
                 &mut self,
                 db: &'db dyn Db,
@@ -1021,7 +1021,12 @@ impl<'db> Constraint<'db> {
                 self.flip();
             }
 
-            fn add_two_constraints(
+            /// Adds a possibly simplified constraint to the pending results. If the parameter has
+            /// been simplified to a single constraint, it is intersected with each currently
+            /// pending result. If it could not be simplified (i.e., it is the union of two
+            /// constraints), then we duplicate any pending results, so that we can _separately_
+            /// intersect each non-simplified constraint with the results.
+            fn add_simplified_constraint(
                 &mut self,
                 db: &'db dyn Db,
                 constraints: Simplifiable<Constraint<'db>>,
@@ -1045,6 +1050,9 @@ impl<'db> Constraint<'db> {
                 self.flip();
             }
 
+            /// If there are two or fewer final results, translates them into a [`Simplifiable`]
+            /// result. Otherwise returns `None`, indicating that the union cannot be simplified
+            /// enough for our purposes.
             fn into_result(self, db: &'db dyn Db) -> Option<Simplifiable<Constraint<'db>>> {
                 let mut results = self.results.into_iter();
                 let Some(first) = results.next() else {
@@ -1063,10 +1071,6 @@ impl<'db> Constraint<'db> {
             }
         }
 
-        // (ap ∧ ¬an₁ ∧ ¬an₂ ∧ ...) ∨ (bp ∧ ¬bn₁ ∧ ¬bn₂ ∧ ...)
-        //   = (ap ∨ bp) ∧ (ap ∨ ¬bn₁) ∧ (ap ∨ ¬bn₂) ∧ ...
-        //   ∧ (¬an₁ ∨ bp) ∧ (¬an₁ ∨ ¬bn₁) ∧ (¬an₁ ∨ ¬bn₂) ∧ ...
-        //   ∧ (¬an₂ ∨ bp) ∧ (¬an₂ ∨ ¬bn₁) ∧ (¬an₂ ∨ ¬bn₂) ∧ ...
         let mut results = match self.positive.union(db, &other.positive) {
             Some(positive) => Results::new(Constraint {
                 positive: positive.clone(),
@@ -1075,12 +1079,15 @@ impl<'db> Constraint<'db> {
             None => return None,
         };
         for other_negative in &other.negative {
-            results.add_two_constraints(db, self.positive.union_negated_range(db, other_negative));
+            results.add_simplified_constraint(
+                db,
+                self.positive.union_negated_range(db, other_negative),
+            );
         }
         for self_negative in &self.negative {
             // Reverse the results here so that we always add items from `self` first. This ensures
             // that the output we produce is ordered consistently with the input we receive.
-            results.add_two_constraints(
+            results.add_simplified_constraint(
                 db,
                 other
                     .positive
@@ -1090,7 +1097,7 @@ impl<'db> Constraint<'db> {
         }
         for self_negative in &self.negative {
             for other_negative in &other.negative {
-                results.add_negated_range(db, self_negative.intersect_negative(db, other_negative));
+                results.add_negated_range(db, self_negative.union_negative(db, other_negative));
             }
         }
 
@@ -1223,6 +1230,8 @@ impl<'db> RangeConstraint<'db> {
         Some(Self { lower, upper })
     }
 
+    /// Returns the union of two range constraints if it can be simplified to a single constraint.
+    /// Otherwise returns `None`.
     fn union(&self, db: &'db dyn Db, other: &RangeConstraint<'db>) -> Option<Self> {
         // When one of the bounds is entirely contained within the other, the union simplifies to
         // the larger bounds.
@@ -1237,6 +1246,7 @@ impl<'db> RangeConstraint<'db> {
         None
     }
 
+    /// Returns the union of a positive range with a negative hole.
     fn union_negated_range(
         &self,
         db: &'db dyn Db,
@@ -1350,13 +1360,17 @@ impl<'db> Constraint<'db> {
 }
 
 impl<'db> NegatedRangeConstraint<'db> {
-    fn intersect_positive(&self, db: &'db dyn Db, positive: &RangeConstraint<'db>) -> Option<Self> {
+    /// Clips this negative hole to be the smallest hole that removes the same types from the given
+    /// positive range.
+    fn clip_to_positive(&self, db: &'db dyn Db, positive: &RangeConstraint<'db>) -> Option<Self> {
         self.hole
             .intersect(db, positive)
             .map(|hole| NegatedRangeConstraint { hole })
     }
 
-    fn intersect_negative(
+    /// Returns the union of two negative constraints. (This this is _intersection_ of the
+    /// constraints' holes.)
+    fn union_negative(
         &self,
         db: &'db dyn Db,
         positive: &NegatedRangeConstraint<'db>,
@@ -1366,7 +1380,13 @@ impl<'db> NegatedRangeConstraint<'db> {
             .map(|hole| NegatedRangeConstraint { hole })
     }
 
-    fn union_negative(&self, db: &'db dyn Db, other: &NegatedRangeConstraint<'db>) -> Option<Self> {
+    /// Returns the intersection of two negative constraints. (This this is _union_ of the
+    /// constraints' holes.)
+    fn intersect_negative(
+        &self,
+        db: &'db dyn Db,
+        other: &NegatedRangeConstraint<'db>,
+    ) -> Option<Self> {
         self.hole
             .union(db, &other.hole)
             .map(|hole| NegatedRangeConstraint { hole })
