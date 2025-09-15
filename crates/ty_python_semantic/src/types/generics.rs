@@ -2,13 +2,14 @@ use std::borrow::Cow;
 
 use crate::types::constraints::ConstraintSet;
 
+use itertools::Itertools;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_python_ast as ast;
 use rustc_hash::FxHashMap;
 
 use crate::semantic_index::SemanticIndex;
 use crate::semantic_index::definition::Definition;
-use crate::semantic_index::scope::{FileScopeId, NodeWithScopeKind};
+use crate::semantic_index::scope::{FileScopeId, NodeWithScopeKind, ScopeKind};
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::infer::infer_definition_types;
@@ -83,8 +84,16 @@ pub(crate) fn bind_typevar<'db>(
     typevar: TypeVarInstance<'db>,
 ) -> Option<BoundTypeVarInstance<'db>> {
     if matches!(typevar.kind(db), TypeVarKind::TypingSelf) {
-        if let Some(typevar_binding_context) = typevar_binding_context {
-            return Some(typevar.with_binding_context(db, typevar_binding_context));
+        for ((_, inner), (_, outer)) in index.ancestor_scopes(containing_scope).tuple_windows() {
+            if outer.kind().is_class() {
+                match inner.node() {
+                    NodeWithScopeKind::Function(function) => {
+                        let definition = index.expect_single_definition(function.node(module));
+                        return Some(typevar.with_binding_context(db, definition));
+                    }
+                    _ => {}
+                }
+            }
         }
     }
     enclosing_generic_contexts(db, module, index, containing_scope)

@@ -25,12 +25,12 @@ class Shape:
     def nested_func(self: Self) -> Self:
         def inner() -> Self:
             reveal_type(self)  # revealed: Self@nested_func
-            return self  # error: [invalid-return-type] "Return type does not match returned value: expected `Self@inner`, found `Self@nested_func`"
+            return self
         return inner()
 
     def nested_func_without_enclosing_binding(self):
         def inner(x: Self):
-            reveal_type(x)  # revealed: Self@inner
+            reveal_type(x)  # revealed: Self@nested_func_without_enclosing_binding
         inner(self)
 
     def implicit_self(self) -> Self:
@@ -246,7 +246,7 @@ from typing import Self
 class C[T]():
     def f(self: Self):
         def b(x: Self):
-            reveal_type(x)  # revealed: Self@b
+            reveal_type(x)  # revealed: Self@f
 ```
 
 Even if the `Self` annotation appears first in the nested function. We have the same behavior.
@@ -257,7 +257,7 @@ from typing import Self
 class C:
     def f(self: "C"):
         def b(x: Self):
-            reveal_type(x)  # revealed: Self@b
+            reveal_type(x)  # revealed: Self@f
 ```
 
 [self attribute]: https://typing.python.org/en/latest/spec/generics.html#use-in-attribute-annotations
