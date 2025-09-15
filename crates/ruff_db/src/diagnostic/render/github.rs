@@ -1,4 +1,4 @@
-use crate::diagnostic::{Diagnostic, DisplayDiagnosticConfig, FileResolver};
+use crate::diagnostic::{Diagnostic, DisplayDiagnosticConfig, FileResolver, Severity};
 
 pub(super) struct GithubRenderer<'a> {
     resolver: &'a dyn FileResolver,
@@ -16,9 +16,14 @@ impl<'a> GithubRenderer<'a> {
         diagnostics: &[Diagnostic],
     ) -> std::fmt::Result {
         for diagnostic in diagnostics {
+            let severity = match diagnostic.severity() {
+                Severity::Info => "notice",
+                Severity::Warning => "warning",
+                Severity::Error | Severity::Fatal => "error",
+            };
             write!(
                 f,
-                "::error title={program} ({code})",
+                "::{severity} title={program} ({code})",
                 program = self.config.program,
                 code = diagnostic.secondary_code_or_id()
             )?;
