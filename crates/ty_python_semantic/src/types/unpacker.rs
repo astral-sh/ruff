@@ -47,7 +47,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
         &mut self,
         target: &ast::Expr,
         value: UnpackValue<'db>,
-        divergent: DivergentType<'db>,
+        cycle_recovery: DivergentType<'db>,
     ) {
         debug_assert!(
             matches!(target, ast::Expr::List(_) | ast::Expr::Tuple(_)),
@@ -58,7 +58,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
             self.db(),
             value.expression(),
             TypeContext::default(),
-            divergent,
+            cycle_recovery,
         );
         let value_type = infer_expression_types_impl(self.db(), input)
             .expression_type(value.expression().node_ref(self.db(), self.module()));
@@ -189,7 +189,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
         UnpackResult {
             diagnostics: self.context.finish(),
             targets: self.targets,
-            cycle_fallback_type: None,
+            cycle_recovery: None,
         }
     }
 }
@@ -202,7 +202,7 @@ pub(crate) struct UnpackResult<'db> {
     /// The fallback type for missing expressions.
     ///
     /// This is used only when constructing a cycle-recovery `UnpackResult`.
-    cycle_fallback_type: Option<Type<'db>>,
+    cycle_recovery: Option<Type<'db>>,
 }
 
 impl<'db> UnpackResult<'db> {
@@ -228,7 +228,7 @@ impl<'db> UnpackResult<'db> {
         self.targets
             .get(&expr.into())
             .copied()
-            .or(self.cycle_fallback_type)
+            .or(self.cycle_recovery)
     }
 
     /// Returns the diagnostics in this unpacking assignment.
@@ -236,11 +236,11 @@ impl<'db> UnpackResult<'db> {
         &self.diagnostics
     }
 
-    pub(crate) fn cycle_initial(cycle_fallback_type: Type<'db>) -> Self {
+    pub(crate) fn cycle_initial(cycle_recovery: Type<'db>) -> Self {
         Self {
             targets: FxHashMap::default(),
             diagnostics: TypeCheckDiagnostics::default(),
-            cycle_fallback_type: Some(cycle_fallback_type),
+            cycle_recovery: Some(cycle_recovery),
         }
     }
 }

@@ -98,6 +98,10 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
         self.diagnostics.get_mut().extend(other);
     }
 
+    pub(crate) fn take_diagnostics(&mut self) -> TypeCheckDiagnostics {
+        self.diagnostics.take()
+    }
+
     /// Optionally return a builder for a lint diagnostic guard.
     ///
     /// If the current context believes a diagnostic should be reported for

@@ -119,7 +119,11 @@ fn implicit_attribute_initial<'db>(
 ) -> PlaceAndQualifiers<'db> {
     let implicit_attribute_table = implicit_attribute_table(db, class_body_scope);
     let Some(implicit_attr_id) = implicit_attribute_table.symbol_id(&name) else {
-        return Place::bound(Type::divergent(DivergentType::todo(db, class_body_scope))).into();
+        return Place::bound(Type::divergent(DivergentType::should_not_diverge(
+            db,
+            class_body_scope,
+        )))
+        .into();
     };
     Place::bound(Type::divergent(DivergentType::implicit_attribute(
         db,
@@ -2910,7 +2914,7 @@ impl<'db> ClassLiteral<'db> {
             DivergentType::implicit_attribute(db, class_body_scope, implicit_attr)
         } else {
             // Implicit attributes should either not exist or have a type declaration, and should not diverge.
-            DivergentType::todo(db, class_body_scope)
+            DivergentType::should_not_diverge(db, class_body_scope)
         };
         let visitor = NormalizedVisitor::default().recursive(Type::divergent(div));
 

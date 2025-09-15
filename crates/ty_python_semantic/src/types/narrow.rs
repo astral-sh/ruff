@@ -11,8 +11,9 @@ use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::function::KnownFunction;
 use crate::types::infer::infer_same_file_expression_type;
 use crate::types::{
-    ClassLiteral, ClassType, IntersectionBuilder, KnownClass, SubclassOfInner, SubclassOfType,
-    Truthiness, Type, TypeContext, TypeVarBoundOrConstraints, UnionBuilder, infer_expression_types,
+    ClassLiteral, ClassType, DivergentType, IntersectionBuilder, KnownClass, SubclassOfInner,
+    SubclassOfType, Truthiness, Type, TypeContext, TypeVarBoundOrConstraints, UnionBuilder,
+    infer_expression_types,
 };
 
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
@@ -773,7 +774,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             return None;
         }
 
-        let inference = infer_expression_types(self.db, expression, TypeContext::default());
+        let cycle_recovery = DivergentType::should_not_diverge(self.db, expression.scope(self.db));
+        let inference =
+            infer_expression_types(self.db, expression, TypeContext::default(), cycle_recovery);
 
         let comparator_tuples = std::iter::once(&**left)
             .chain(comparators)
@@ -863,7 +866,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         expression: Expression<'db>,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
-        let inference = infer_expression_types(self.db, expression, TypeContext::default());
+        // QUESTION: Could there be a case for divergence here?
+        let cycle_recovery = DivergentType::should_not_diverge(self.db, expression.scope(self.db));
+        let inference =
+            infer_expression_types(self.db, expression, TypeContext::default(), cycle_recovery);
 
         let callable_ty = inference.expression_type(&*expr_call.func);
 
@@ -983,8 +989,15 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         let subject = place_expr(subject.node_ref(self.db, self.module))?;
         let place = self.expect_place(&subject);
 
-        let ty = infer_same_file_expression_type(self.db, cls, TypeContext::default(), self.module)
-            .to_instance(self.db)?;
+        let cycle_recovery = DivergentType::should_not_diverge(self.db, cls.scope(self.db));
+        let ty = infer_same_file_expression_type(
+            self.db,
+            cls,
+            TypeContext::default(),
+            cycle_recovery,
+            self.module,
+        )
+        .to_instance(self.db)?;
 
         Some(NarrowingConstraints::from_iter([(place, ty)]))
     }
@@ -997,8 +1010,15 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         let subject = place_expr(subject.node_ref(self.db, self.module))?;
         let place = self.expect_place(&subject);
 
-        let ty =
-            infer_same_file_expression_type(self.db, value, TypeContext::default(), self.module);
+        // QUESTION: Could there be a case for divergence here?
+        let cycle_recovery = DivergentType::should_not_diverge(self.db, value.scope(self.db));
+        let ty = infer_same_file_expression_type(
+            self.db,
+            value,
+            TypeContext::default(),
+            cycle_recovery,
+            self.module,
+        );
         Some(NarrowingConstraints::from_iter([(place, ty)]))
     }
 
@@ -1027,7 +1047,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         expression: Expression<'db>,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
-        let inference = infer_expression_types(self.db, expression, TypeContext::default());
+        let cycle_recovery = DivergentType::should_not_diverge(self.db, expression.scope(self.db));
+        let inference =
+            infer_expression_types(self.db, expression, TypeContext::default(), cycle_recovery);
         let mut sub_constraints = expr_bool_op
             .values
             .iter()

@@ -56,3 +56,14 @@ def unwrap(value):
             return tuple(result)
     else:
         raise TypeError()
+
+def descent(x: int, y: int):
+    if x > y:
+        y, x = descent(y, x)
+        return x, y
+    if x == 1:
+        return (1, 0)
+    if y == 1:
+        return (0, 1)
+    else:
+        return descent(x-1, y-1)

@@ -7128,13 +7128,14 @@ pub enum DivergenceKind {
     FunctionReturnType,
     /// Divergence in implicit attribute type inference.
     ImplicitAttribute(ScopedImplicitAttributeId),
-    /// Unknown divergence that we have not yet handled.
-    Todo,
+    /// Type inference should not diverge,
+    /// or it should be of a kind that we have not yet handled.
+    ShouldNotDiverge,
 }
 
 impl DivergenceKind {
-    pub fn is_todo(self) -> bool {
-        matches!(self, Self::Todo)
+    pub fn should_not_diverge(self) -> bool {
+        matches!(self, Self::ShouldNotDiverge)
     }
 }
 
@@ -7169,8 +7170,8 @@ impl<'db> DivergentType<'db> {
         Self::new(db, scope, DivergenceKind::ImplicitAttribute(attribute))
     }
 
-    pub(crate) fn todo(db: &'db dyn Db, scope: ScopeId<'db>) -> Self {
-        Self::new(db, scope, DivergenceKind::Todo)
+    pub(crate) fn should_not_diverge(db: &'db dyn Db, scope: ScopeId<'db>) -> Self {
+        Self::new(db, scope, DivergenceKind::ShouldNotDiverge)
     }
 }
 

@@ -65,7 +65,7 @@ mod tests;
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub(super) struct PossiblyRecursiveScope<'db> {
     scope: ScopeId<'db>,
-    divergent: DivergentType<'db>,
+    cycle_recovery: DivergentType<'db>,
 }
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
@@ -77,16 +77,16 @@ pub(crate) fn infer_scope_types<'db>(
 ) -> &'db ScopeInference<'db> {
     infer_scope_types_impl(
         db,
-        PossiblyRecursiveScope::new(db, scope, DivergentType::todo(db, scope)),
+        PossiblyRecursiveScope::new(db, scope, DivergentType::should_not_diverge(db, scope)),
     )
 }
 
 pub(crate) fn infer_function_scope_types<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
-    divergent: DivergentType<'db>,
+    cycle_recovery: DivergentType<'db>,
 ) -> &'db ScopeInference<'db> {
-    infer_scope_types_impl(db, PossiblyRecursiveScope::new(db, scope, divergent))
+    infer_scope_types_impl(db, PossiblyRecursiveScope::new(db, scope, cycle_recovery))
 }
 
 #[salsa::tracked(returns(ref), cycle_fn=scope_cycle_recover, cycle_initial=scope_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
@@ -120,14 +120,14 @@ fn scope_cycle_initial<'db>(
     db: &'db dyn Db,
     scope: PossiblyRecursiveScope<'db>,
 ) -> ScopeInference<'db> {
-    ScopeInference::cycle_initial(scope.divergent(db), scope.scope(db))
+    ScopeInference::cycle_initial(scope.cycle_recovery(db), scope.scope(db))
 }
 
 /// A [`Definition`] that may be recursive.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub(super) struct PossiblyRecursiveDefinition<'db> {
     definition: Definition<'db>,
-    divergent: DivergentType<'db>,
+    cycle_recovery: DivergentType<'db>,
 }
 
 /// Infer all types for a [`Definition`] (including sub-expressions).
@@ -141,7 +141,7 @@ pub(crate) fn infer_definition_types<'db>(
         PossiblyRecursiveDefinition::new(
             db,
             definition,
-            DivergentType::todo(db, definition.scope(db)),
+            DivergentType::should_not_diverge(db, definition.scope(db)),
         ),
     )
 }
@@ -186,7 +186,7 @@ fn definition_cycle_initial<'db>(
 ) -> DefinitionInference<'db> {
     DefinitionInference::cycle_initial(
         definition.definition(db).scope(db),
-        definition.divergent(db),
+        definition.cycle_recovery(db),
     )
 }
 
@@ -230,7 +230,7 @@ fn deferred_cycle_initial<'db>(
 ) -> DefinitionInference<'db> {
     DefinitionInference::cycle_initial(
         definition.scope(db),
-        DivergentType::todo(db, definition.scope(db)),
+        DivergentType::should_not_diverge(db, definition.scope(db)),
     )
 }
 
@@ -242,15 +242,11 @@ pub(crate) fn infer_expression_types<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
     tcx: TypeContext<'db>,
+    cycle_recovery: DivergentType<'db>,
 ) -> &'db ExpressionInference<'db> {
     infer_expression_types_impl(
         db,
-        InferExpression::new(
-            db,
-            expression,
-            tcx,
-            DivergentType::todo(db, expression.scope(db)),
-        ),
+        InferExpression::new(db, expression, tcx, cycle_recovery),
     )
 }
 
@@ -295,7 +291,7 @@ fn expression_cycle_initial<'db>(
     db: &'db dyn Db,
     input: InferExpression<'db>,
 ) -> ExpressionInference<'db> {
-    ExpressionInference::cycle_initial(input.expression(db).scope(db), input.divergent(db))
+    ExpressionInference::cycle_initial(input.expression(db).scope(db), input.cycle_recovery(db))
 }
 
 /// Infers the type of an `expression` that is guaranteed to be in the same file as the calling query.
@@ -307,9 +303,10 @@ pub(super) fn infer_same_file_expression_type<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
     tcx: TypeContext<'db>,
+    cycle_recovery: DivergentType<'db>,
     parsed: &ParsedModuleRef,
 ) -> Type<'db> {
-    let inference = infer_expression_types(db, expression, tcx);
+    let inference = infer_expression_types(db, expression, tcx, cycle_recovery);
     inference.expression_type(expression.node_ref(db, parsed))
 }
 
@@ -331,7 +328,7 @@ pub(crate) fn infer_expression_type<'db>(
             db,
             expression,
             tcx,
-            DivergentType::todo(db, expression.scope(db)),
+            DivergentType::should_not_diverge(db, expression.scope(db)),
         ),
     )
 }
@@ -340,9 +337,12 @@ pub(crate) fn infer_implicit_attribute_expression_type<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
     tcx: TypeContext<'db>,
-    divergent: DivergentType<'db>,
+    cycle_recovery: DivergentType<'db>,
 ) -> Type<'db> {
-    infer_expression_type_impl(db, InferExpression::new(db, expression, tcx, divergent))
+    infer_expression_type_impl(
+        db,
+        InferExpression::new(db, expression, tcx, cycle_recovery),
+    )
 }
 
 #[salsa::tracked(cycle_fn=single_expression_cycle_recover, cycle_initial=single_expression_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
@@ -365,7 +365,7 @@ fn single_expression_cycle_recover<'db>(
 }
 
 fn single_expression_cycle_initial<'db>(db: &'db dyn Db, input: InferExpression<'db>) -> Type<'db> {
-    Type::Dynamic(DynamicType::Divergent(input.divergent(db)))
+    Type::Dynamic(DynamicType::Divergent(input.cycle_recovery(db)))
 }
 
 /// An `Expression` with an optional `TypeContext`.
@@ -383,25 +383,36 @@ impl<'db> InferExpression<'db> {
         db: &'db dyn Db,
         expression: Expression<'db>,
         tcx: TypeContext<'db>,
-        divergent: DivergentType<'db>,
+        cycle_recovery: DivergentType<'db>,
     ) -> InferExpression<'db> {
         if tcx.annotation.is_some() {
             InferExpression::WithContext(PossiblyRecursiveExpressionWithContext::new(
-                db, expression, tcx, divergent,
+                db,
+                expression,
+                tcx,
+                cycle_recovery,
             ))
         } else {
             // Drop the empty `TypeContext` to avoid the interning cost.
-            InferExpression::Bare(PossiblyRecursiveExpression::new(db, expression, divergent))
+            InferExpression::Bare(PossiblyRecursiveExpression::new(
+                db,
+                expression,
+                cycle_recovery,
+            ))
         }
     }
 
     #[cfg(test)]
-    pub(super) fn with_divergent(
+    pub(super) fn bare(
         db: &'db dyn Db,
         expression: Expression<'db>,
-        divergent: DivergentType<'db>,
+        cycle_recovery: DivergentType<'db>,
     ) -> InferExpression<'db> {
-        InferExpression::Bare(PossiblyRecursiveExpression::new(db, expression, divergent))
+        InferExpression::Bare(PossiblyRecursiveExpression::new(
+            db,
+            expression,
+            cycle_recovery,
+        ))
     }
 
     fn expression(self, db: &'db dyn Db) -> Expression<'db> {
@@ -422,11 +433,11 @@ impl<'db> InferExpression<'db> {
         }
     }
 
-    fn divergent(self, db: &'db dyn Db) -> DivergentType<'db> {
+    fn cycle_recovery(self, db: &'db dyn Db) -> DivergentType<'db> {
         match self {
-            InferExpression::Bare(bare) => bare.divergent(db),
+            InferExpression::Bare(bare) => bare.cycle_recovery(db),
             InferExpression::WithContext(expression_with_context) => {
-                expression_with_context.divergent(db)
+                expression_with_context.cycle_recovery(db)
             }
         }
     }
@@ -436,7 +447,7 @@ impl<'db> InferExpression<'db> {
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub(super) struct PossiblyRecursiveExpression<'db> {
     expression: Expression<'db>,
-    divergent: DivergentType<'db>,
+    cycle_recovery: DivergentType<'db>,
 }
 
 /// An [`Expression`] with a [`TypeContext`], that may be recursive.
@@ -444,7 +455,7 @@ pub(super) struct PossiblyRecursiveExpression<'db> {
 pub(super) struct PossiblyRecursiveExpressionWithContext<'db> {
     expression: Expression<'db>,
     tcx: TypeContext<'db>,
-    divergent: DivergentType<'db>,
+    cycle_recovery: DivergentType<'db>,
 }
 
 /// The type context for a given expression, namely the type annotation
@@ -479,7 +490,7 @@ pub(crate) fn static_expression_truthiness<'db>(
         InferExpression::Bare(PossiblyRecursiveExpression::new(
             db,
             expression,
-            DivergentType::todo(db, expression.scope(db)),
+            DivergentType::should_not_diverge(db, expression.scope(db)),
         )),
     );
 
@@ -514,16 +525,20 @@ fn static_expression_truthiness_cycle_initial<'db>(
 pub(super) fn infer_unpack_implicit_attribute_types<'db>(
     db: &'db dyn Db,
     unpack: Unpack<'db>,
-    divergent: DivergentType<'db>,
+    cycle_recovery: DivergentType<'db>,
 ) -> &'db UnpackResult<'db> {
-    infer_unpack_types_impl(db, unpack, divergent)
+    infer_unpack_types_impl(db, unpack, cycle_recovery)
 }
 
 pub(super) fn infer_unpack_types<'db>(
     db: &'db dyn Db,
     unpack: Unpack<'db>,
 ) -> &'db UnpackResult<'db> {
-    infer_unpack_types_impl(db, unpack, DivergentType::todo(db, unpack.target_scope(db)))
+    infer_unpack_types_impl(
+        db,
+        unpack,
+        DivergentType::should_not_diverge(db, unpack.target_scope(db)),
+    )
 }
 
 /// Infer the types for an [`Unpack`] operation.
@@ -536,7 +551,7 @@ pub(super) fn infer_unpack_types<'db>(
 fn infer_unpack_types_impl<'db>(
     db: &'db dyn Db,
     unpack: Unpack<'db>,
-    divergent: DivergentType<'db>,
+    cycle_recovery: DivergentType<'db>,
 ) -> UnpackResult<'db> {
     let file = unpack.file(db);
     let module = parsed_module(db, file).load(db);
@@ -544,7 +559,7 @@ fn infer_unpack_types_impl<'db>(
         .entered();
 
     let mut unpacker = Unpacker::new(db, unpack.target_scope(db), &module);
-    unpacker.unpack(unpack.target(db, &module), unpack.value(db), divergent);
+    unpacker.unpack(unpack.target(db, &module), unpack.value(db), cycle_recovery);
     unpacker.finish()
 }
 
@@ -553,7 +568,7 @@ fn unpack_cycle_recover<'db>(
     _value: &UnpackResult<'db>,
     _count: u32,
     _unpack: Unpack<'db>,
-    _divergent: DivergentType<'db>,
+    _cycle_recovery: DivergentType<'db>,
 ) -> salsa::CycleRecoveryAction<UnpackResult<'db>> {
     salsa::CycleRecoveryAction::Iterate
 }
@@ -561,9 +576,9 @@ fn unpack_cycle_recover<'db>(
 fn unpack_cycle_initial<'db>(
     _db: &'db dyn Db,
     _unpack: Unpack<'db>,
-    divergent: DivergentType<'db>,
+    cycle_recovery: DivergentType<'db>,
 ) -> UnpackResult<'db> {
-    UnpackResult::cycle_initial(Type::divergent(divergent))
+    UnpackResult::cycle_initial(Type::divergent(cycle_recovery))
 }
 
 /// Returns the type of the nearest enclosing class for the given scope.
@@ -644,10 +659,10 @@ struct ScopeInferenceExtra<'db> {
 }
 
 impl<'db> ScopeInference<'db> {
-    fn cycle_initial(divergent: DivergentType<'db>, scope: ScopeId<'db>) -> Self {
+    fn cycle_initial(cycle_recovery: DivergentType<'db>, scope: ScopeId<'db>) -> Self {
         Self {
             extra: Some(Box::new(ScopeInferenceExtra {
-                cycle_recovery: Some(divergent),
+                cycle_recovery: Some(cycle_recovery),
                 ..ScopeInferenceExtra::default()
             })),
             expressions: FxHashMap::default(),
@@ -795,7 +810,7 @@ struct DefinitionInferenceExtra<'db> {
 }
 
 impl<'db> DefinitionInference<'db> {
-    fn cycle_initial(scope: ScopeId<'db>, divergent: DivergentType<'db>) -> Self {
+    fn cycle_initial(scope: ScopeId<'db>, cycle_recovery: DivergentType<'db>) -> Self {
         let _ = scope;
 
         Self {
@@ -805,7 +820,7 @@ impl<'db> DefinitionInference<'db> {
             #[cfg(debug_assertions)]
             scope,
             extra: Some(Box::new(DefinitionInferenceExtra {
-                cycle_recovery: Some(divergent),
+                cycle_recovery: Some(cycle_recovery),
                 ..DefinitionInferenceExtra::default()
             })),
         }
@@ -917,11 +932,11 @@ struct ExpressionInferenceExtra<'db> {
 }
 
 impl<'db> ExpressionInference<'db> {
-    fn cycle_initial(scope: ScopeId<'db>, divergent: DivergentType<'db>) -> Self {
+    fn cycle_initial(scope: ScopeId<'db>, cycle_recovery: DivergentType<'db>) -> Self {
         let _ = scope;
         Self {
             extra: Some(Box::new(ExpressionInferenceExtra {
-                cycle_recovery: Some(divergent),
+                cycle_recovery: Some(cycle_recovery),
                 all_definitely_bound: true,
                 ..ExpressionInferenceExtra::default()
             })),
