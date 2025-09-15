@@ -260,4 +260,12 @@ class C:
             reveal_type(x)  # revealed: Self@f
 ```
 
+Methods that have self argument will not get a generic context only because of self:
+
+```py
+from ty_extensions import generic_context
+
+reveal_type(generic_context(C.f))  # revealed: None
+```
+
 [self attribute]: https://typing.python.org/en/latest/spec/generics.html#use-in-attribute-annotations

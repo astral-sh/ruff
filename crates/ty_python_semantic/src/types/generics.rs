@@ -9,7 +9,7 @@ use rustc_hash::FxHashMap;
 
 use crate::semantic_index::SemanticIndex;
 use crate::semantic_index::definition::Definition;
-use crate::semantic_index::scope::{FileScopeId, NodeWithScopeKind, ScopeKind};
+use crate::semantic_index::scope::{FileScopeId, NodeWithScopeKind};
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::infer::infer_definition_types;
@@ -86,12 +86,9 @@ pub(crate) fn bind_typevar<'db>(
     if matches!(typevar.kind(db), TypeVarKind::TypingSelf) {
         for ((_, inner), (_, outer)) in index.ancestor_scopes(containing_scope).tuple_windows() {
             if outer.kind().is_class() {
-                match inner.node() {
-                    NodeWithScopeKind::Function(function) => {
-                        let definition = index.expect_single_definition(function.node(module));
-                        return Some(typevar.with_binding_context(db, definition));
-                    }
-                    _ => {}
+                if let NodeWithScopeKind::Function(function) = inner.node() {
+                    let definition = index.expect_single_definition(function.node(module));
+                    return Some(typevar.with_binding_context(db, definition));
                 }
             }
         }
