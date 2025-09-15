@@ -58,6 +58,9 @@ mod builder;
 #[cfg(test)]
 mod tests;
 
+/// How many fixpoint iterations to allow before falling back to Divergent type.
+const ITERATIONS_BEFORE_FALLBACK: u32 = 10;
+
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
 /// scope.
@@ -156,9 +159,6 @@ pub(crate) fn infer_deferred_types<'db>(
     TypeInferenceBuilder::new(db, InferenceRegion::Deferred(definition), index, &module)
         .finish_definition()
 }
-
-/// How many fixpoint iterations to allow before falling back to Divergent type.
-const ITERATIONS_BEFORE_FALLBACK: u32 = 10;
 
 fn deferred_cycle_recover<'db>(
     _db: &'db dyn Db,
