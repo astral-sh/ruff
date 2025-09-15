@@ -279,9 +279,7 @@ person = Person("Alice", 42)
 
 # error: [invalid-argument-type] "Argument to bound method `_asdict` is incorrect: Expected `NamedTupleFallback`, found `Person`"
 reveal_type(person._asdict())  # revealed: dict[str, Any]
-# TODO: should be `Person` once we support implicit type of `self`, should not be an error
-# error: [invalid-argument-type]
-reveal_type(person._replace(name="Bob"))  # revealed: Unknown
+reveal_type(person._replace(name="Bob"))  # revealed: Person
 ```
 
 When accessing them on child classes of generic `NamedTuple`s, the return type is specialized
@@ -298,8 +296,7 @@ class Box(NamedTuple, Generic[T]):
 class IntBox(Box[int]):
     pass
 
-# TODO: should be `IntBox` once we support the implicit type of `self`
-reveal_type(IntBox(1)._replace(content=42))  # revealed: Unknown
+reveal_type(IntBox(1)._replace(content=42))  # revealed: IntBox
 ```
 
 ## `collections.namedtuple`
