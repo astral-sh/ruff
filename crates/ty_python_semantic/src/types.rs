@@ -6768,6 +6768,37 @@ impl<'db> TypeMapping<'_, 'db> {
             }
         }
     }
+
+    /// Update the generic context of a [`Signature`] according to the current type mapping
+    pub(crate) fn update_signature_generic_context(
+        &self,
+        db: &'db dyn Db,
+        context: GenericContext<'db>,
+    ) -> GenericContext<'db> {
+        match self {
+            TypeMapping::Specialization(_)
+            | TypeMapping::PartialSpecialization(_)
+            | TypeMapping::PromoteLiterals
+            | TypeMapping::BindLegacyTypevars(_)
+            | TypeMapping::MarkTypeVarsInferable(_)
+            | TypeMapping::Materialize(_)
+            | TypeMapping::BindSelf(_) => context,
+            TypeMapping::ReplaceSelf { new_upper_bound } => GenericContext::from_typevar_instances(
+                db,
+                context.variables(db).iter().map(|typevar| {
+                    if typevar.typevar(db).is_self(db) {
+                        BoundTypeVarInstance::synthetic_self(
+                            db,
+                            *new_upper_bound,
+                            typevar.binding_context(db),
+                        )
+                    } else {
+                        *typevar
+                    }
+                }),
+            ),
+        }
+    }
 }
 
 /// A Salsa-tracked constraint set. This is only needed to have something appropriately small to

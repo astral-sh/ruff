@@ -470,26 +470,9 @@ impl<'db> Signature<'db> {
             _ => type_mapping,
         };
         Self {
-            generic_context: if let TypeMapping::ReplaceSelf { new_upper_bound } = type_mapping {
-                self.generic_context.map(|context| {
-                    GenericContext::from_typevar_instances(
-                        db,
-                        context.variables(db).iter().map(|typevar| {
-                            if typevar.typevar(db).is_self(db) {
-                                BoundTypeVarInstance::synthetic_self(
-                                    db,
-                                    *new_upper_bound,
-                                    typevar.binding_context(db),
-                                )
-                            } else {
-                                *typevar
-                            }
-                        }),
-                    )
-                })
-            } else {
-                self.generic_context
-            },
+            generic_context: self
+                .generic_context
+                .map(|context| type_mapping.update_signature_generic_context(db, context)),
             inherited_generic_context: self.inherited_generic_context,
             definition: self.definition,
             parameters: self
