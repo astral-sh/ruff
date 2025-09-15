@@ -22,7 +22,7 @@ use crate::types::generics::{GenericContext, walk_generic_context};
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, FindLegacyTypeVarsVisitor,
     HasRelationToVisitor, IsEquivalentVisitor, KnownClass, MaterializationKind, NormalizedVisitor,
-    TypeMapping, TypeRelation, TypeVarKind, VarianceInferable, todo_type,
+    TypeMapping, TypeRelation, VarianceInferable, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -474,11 +474,15 @@ impl<'db> Signature<'db> {
                 self.generic_context.map(|context| {
                     GenericContext::from_typevar_instances(
                         db,
-                        context.variables(db).iter().map(|var| {
-                            if var.typevar(db).kind(db) == TypeVarKind::TypingSelf {
-                                BoundTypeVarInstance::synthetic_self(db, *new_upper_bound)
+                        context.variables(db).iter().map(|typevar| {
+                            if typevar.typevar(db).is_self(db) {
+                                BoundTypeVarInstance::synthetic_self(
+                                    db,
+                                    *new_upper_bound,
+                                    typevar.binding_context(db),
+                                )
                             } else {
-                                *var
+                                *typevar
                             }
                         }),
                     )

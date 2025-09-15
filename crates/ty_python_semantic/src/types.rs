@@ -5973,7 +5973,13 @@ impl<'db> Type<'db> {
                 }
                 TypeMapping::ReplaceSelf { new_upper_bound } => {
                     if bound_typevar.typevar(db).is_self(db) {
-                        Type::TypeVar(BoundTypeVarInstance::synthetic_self(db, *new_upper_bound))
+                        Type::TypeVar(
+                            BoundTypeVarInstance::synthetic_self(
+                                db,
+                                *new_upper_bound,
+                                bound_typevar.binding_context(db)
+                            )
+                        )
                     } else {
                         self
                     }
@@ -7690,7 +7696,11 @@ impl<'db> BoundTypeVarInstance<'db> {
     }
 
     /// Create a new synthetic `Self` type variable with the given upper bound.
-    pub(crate) fn synthetic_self(db: &'db dyn Db, upper_bound: Type<'db>) -> Self {
+    pub(crate) fn synthetic_self(
+        db: &'db dyn Db,
+        upper_bound: Type<'db>,
+        binding_context: BindingContext<'db>,
+    ) -> Self {
         Self::new(
             db,
             TypeVarInstance::new(
@@ -7702,7 +7712,7 @@ impl<'db> BoundTypeVarInstance<'db> {
                 None,
                 TypeVarKind::TypingSelf,
             ),
-            BindingContext::Synthetic,
+            binding_context,
         )
     }
 
