@@ -75,6 +75,19 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// print("{}".format(val))  # "(1,)"
 /// ```
 ///
+/// It is also possible for the right-hand side to have values that implement
+/// `__format__` to not behave the same as `__str__` when `None` is passed:
+/// 
+/// ```python
+/// class C:
+///     def __format__(*args, **kwargs):
+///         print("called my format!")
+///         return ""
+/// 
+/// "{}".format(C())  # prints "called my format!", returns ""
+/// "%s" % C()  # '<__main__.C object at 0x7fd0f5757250>'
+/// ```
+///
 /// ## References
 /// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#old-string-formatting)
 /// - [Python documentation: `str.format`](https://docs.python.org/3/library/stdtypes.html#str.format)
