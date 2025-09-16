@@ -23,7 +23,7 @@ use thiserror::Error;
 use tracing::debug;
 
 use ruff_db::panic::{PanicError, catch_unwind};
-use ruff_diagnostics::SourceMap;
+use ruff_diagnostics::{Edit, Fix, SourceMap};
 use ruff_linter::fs;
 use ruff_linter::logging::{DisplayParseError, LogLevel};
 use ruff_linter::package::PackageRoot;
@@ -283,7 +283,10 @@ pub(crate) fn format_path(
     // Format the source.
     let format_result = match format_source(&unformatted, source_type, Some(path), settings, range)?
     {
-        FormattedSource::Formatted(formatted) => match mode {
+        FormattedSource::Formatted {
+            formatted,
+            unformatted,
+        } => match mode {
             FormatMode::Write => {
                 let mut writer = File::create(path).map_err(|err| {
                     FormatCommandError::Write(Some(path.to_path_buf()), err.into())
@@ -301,9 +304,15 @@ pub(crate) fn format_path(
                     }
                 }
 
-                FormatResult::Formatted
+                FormatResult::Formatted {
+                    unformatted,
+                    formatted,
+                }
             }
-            FormatMode::Check => FormatResult::Formatted,
+            FormatMode::Check => FormatResult::Formatted {
+                unformatted,
+                formatted,
+            },
             FormatMode::Diff => FormatResult::Diff {
                 unformatted,
                 formatted,
@@ -329,7 +338,10 @@ pub(crate) fn format_path(
 #[derive(Debug)]
 pub(crate) enum FormattedSource {
     /// The source was formatted, and the [`SourceKind`] contains the transformed source code.
-    Formatted(SourceKind),
+    Formatted {
+        formatted: SourceKind,
+        unformatted: SourceKind,
+    },
     /// The source was unchanged.
     Unchanged,
 }
@@ -337,7 +349,13 @@ pub(crate) enum FormattedSource {
 impl From<FormattedSource> for FormatResult {
     fn from(value: FormattedSource) -> Self {
         match value {
-            FormattedSource::Formatted(_) => FormatResult::Formatted,
+            FormattedSource::Formatted {
+                formatted,
+                unformatted,
+            } => FormatResult::Formatted {
+                formatted,
+                unformatted,
+            },
             FormattedSource::Unchanged => FormatResult::Unchanged,
         }
     }
@@ -390,7 +408,10 @@ pub(crate) fn format_source(
             if formatted.len() == unformatted.len() && formatted == *unformatted {
                 Ok(FormattedSource::Unchanged)
             } else {
-                Ok(FormattedSource::Formatted(SourceKind::Python(formatted)))
+                Ok(FormattedSource::Formatted {
+                    formatted: SourceKind::Python(formatted),
+                    unformatted: SourceKind::Python(unformatted.to_string()),
+                })
             }
         }
         SourceKind::IpyNotebook(notebook) => {
@@ -475,9 +496,10 @@ pub(crate) fn format_source(
             let mut formatted = notebook.clone();
             formatted.update(&source_map, output);
 
-            Ok(FormattedSource::Formatted(SourceKind::IpyNotebook(
-                formatted,
-            )))
+            Ok(FormattedSource::Formatted {
+                formatted: SourceKind::IpyNotebook(formatted),
+                unformatted: SourceKind::IpyNotebook(notebook.clone()),
+            })
         }
     }
 }
@@ -486,7 +508,10 @@ pub(crate) fn format_source(
 #[derive(Debug, Clone, is_macro::Is)]
 pub(crate) enum FormatResult {
     /// The file was formatted.
-    Formatted,
+    Formatted {
+        unformatted: SourceKind,
+        formatted: SourceKind,
+    },
 
     /// The file was formatted, [`SourceKind`] contains the formatted code
     Diff {
@@ -525,7 +550,7 @@ impl<'a> FormatResults<'a> {
     /// Returns `true` if any of the files require formatting.
     fn any_formatted(&self) -> bool {
         self.results.iter().any(|result| match result.result {
-            FormatResult::Formatted | FormatResult::Diff { .. } => true,
+            FormatResult::Formatted { .. } | FormatResult::Diff { .. } => true,
             FormatResult::Unchanged | FormatResult::Skipped => false,
         })
     }
@@ -572,23 +597,41 @@ impl<'a> FormatResults<'a> {
             OutputFormat::Azure => DiagnosticFormat::Azure,
             OutputFormat::Sarif => todo!(),
         };
-        let config = DisplayDiagnosticConfig::default().format(format);
+        let config = DisplayDiagnosticConfig::default()
+            .format(format)
+            .show_fix_diff(true)
+            .show_fix_status(true);
         for path in self
             .results
             .iter()
             .filter_map(|result| {
-                if result.result.is_formatted() {
+                if let FormatResult::Formatted {
+                    unformatted,
+                    formatted,
+                } = &result.result
+                {
                     let mut diagnostic = Diagnostic::new(
                         DiagnosticId::Unformatted,
                         Severity::Error,
                         "File would be reformatted",
                     );
-                    let source_file =
-                        SourceFileBuilder::new(result.path.to_string_lossy(), "").finish();
+                    let source_file = SourceFileBuilder::new(
+                        result.path.to_string_lossy(),
+                        unformatted.source_code(),
+                    )
+                    .finish();
                     let span = Span::from(source_file);
                     let mut annotation = Annotation::primary(span);
                     annotation.set_file_level(true);
                     diagnostic.annotate(annotation);
+
+                    // For now, report the edit as a replacement of the whole file's contents.
+                    let edit = Edit::range_replacement(
+                        formatted.source_code().to_string(),
+                        TextRange::up_to(unformatted.source_code().text_len()),
+                    );
+
+                    diagnostic.set_fix(Fix::safe_edit(edit));
 
                     Some(diagnostic)
                 } else {
@@ -610,7 +653,7 @@ impl<'a> FormatResults<'a> {
         let mut unchanged = 0u32;
         for result in self.results {
             match &result.result {
-                FormatResult::Formatted => {
+                FormatResult::Formatted { .. } => {
                     changed += 1;
                 }
                 FormatResult::Unchanged => unchanged += 1,

@@ -582,6 +582,42 @@ if __name__ == "__main__":
 }
 
 #[test]
+fn messages_full() -> Result<()> {
+    let tempdir = TempDir::new()?;
+
+    fs::write(
+        tempdir.path().join("main.py"),
+        r#"
+from test import say_hy
+
+if __name__ == "__main__":
+    say_hy("dear Ruff contributor")
+"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .current_dir(tempdir.path())
+        .args(["format", "--no-cache", "--isolated", "--check", "--output-format=full"])
+        .arg("main.py"), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unformatted][*]: File would be reformatted
+    --> main.py:1:1
+      - 
+    1 | from test import say_hy
+    2 | 
+    3 | if __name__ == "__main__":
+
+    1 file would be reformatted
+
+    ----- stderr -----
+    "#);
+
+    Ok(())
+}
+
+#[test]
 fn exit_non_zero_on_format() -> Result<()> {
     let tempdir = TempDir::new()?;
 
