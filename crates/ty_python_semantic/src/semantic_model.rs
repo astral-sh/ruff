@@ -236,9 +236,9 @@ impl<'db> SemanticModel<'db> {
         for (file_scope, _) in index.ancestor_scopes(file_scope) {
             completions.extend(
                 all_declarations_and_bindings(self.db, file_scope.to_scope_id(self.db, self.file))
-                    .map(|member| Completion {
-                        name: member.name,
-                        ty: Some(member.ty),
+                    .map(|memberdef| Completion {
+                        name: memberdef.member.name,
+                        ty: Some(memberdef.member.ty),
                         kind: None,
                         builtin: false,
                     }),
