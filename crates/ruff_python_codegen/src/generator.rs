@@ -68,8 +68,8 @@ pub struct Generator<'a> {
     indent: &'a Indentation,
     /// The line ending to use.
     line_ending: LineEnding,
-    /// Quote style to use.
-    quote: Quote,
+    /// Forced quote style to use.
+    quote: Option<Quote>,
     buffer: String,
     indent_depth: usize,
     num_newlines: usize,
@@ -81,7 +81,7 @@ impl<'a> From<&'a Stylist<'a>> for Generator<'a> {
         Self {
             indent: stylist.indentation(),
             line_ending: stylist.line_ending(),
-            quote: stylist.quote(),
+            quote: None,
             buffer: String::new(),
             indent_depth: 0,
             num_newlines: 0,
@@ -91,18 +91,24 @@ impl<'a> From<&'a Stylist<'a>> for Generator<'a> {
 }
 
 impl<'a> Generator<'a> {
-    pub const fn new(indent: &'a Indentation, line_ending: LineEnding, quote: Quote) -> Self {
+    pub const fn new(indent: &'a Indentation, line_ending: LineEnding) -> Self {
         Self {
             // Style preferences.
             indent,
             line_ending,
-            quote,
+            quote: None,
             // Internal state.
             buffer: String::new(),
             indent_depth: 0,
             num_newlines: 0,
             initial: true,
         }
+    }
+
+    /// Force quote style for generated source code
+    pub fn with_quote(mut self, quote: Quote) -> Self {
+        self.quote = Some(quote);
+        self
     }
 
     /// Generate source code from a [`Stmt`].
@@ -1398,7 +1404,11 @@ impl<'a> Generator<'a> {
 
     fn unparse_string_literal(&mut self, string_literal: &ast::StringLiteral) {
         let ast::StringLiteral { value, flags, .. } = string_literal;
-        let flags = flags.with_quote_style(self.quote);
+        let flags = if let Some(quote) = self.quote {
+            flags.with_quote_style(quote)
+        } else {
+            *flags
+        };
         self.p_str_repr(value, flags);
     }
 
@@ -1443,7 +1453,7 @@ impl<'a> Generator<'a> {
         spec: Option<&ast::InterpolatedStringFormatSpec>,
         flags: AnyStringFlags,
     ) {
-        let mut generator = Generator::new(self.indent, self.line_ending, self.quote);
+        let mut generator = Generator::new(self.indent, self.line_ending);
         generator.unparse_expr(val, precedence::FORMATTED_VALUE);
         let brace = if generator.buffer.starts_with('{') {
             // put a space to avoid escaping the bracket
@@ -1582,7 +1592,7 @@ mod tests {
         let indentation = Indentation::default();
         let line_ending = LineEnding::default();
         let module = parse_module(contents).unwrap();
-        let mut generator = Generator::new(&indentation, line_ending, Quote::default());
+        let mut generator = Generator::new(&indentation, line_ending);
         generator.unparse_suite(module.suite());
         generator.generate()
     }
@@ -1592,11 +1602,14 @@ mod tests {
     fn round_trip_with(
         indentation: &Indentation,
         line_ending: LineEnding,
-        quote: Quote,
+        quote: Option<Quote>,
         contents: &str,
     ) -> String {
         let module = parse_module(contents).unwrap();
-        let mut generator = Generator::new(indentation, line_ending, quote);
+        let mut generator = Generator::new(indentation, line_ending);
+        if let Some(quote) = quote {
+            generator = generator.with_quote(quote);
+        }
         generator.unparse_suite(module.suite());
         generator.generate()
     }
@@ -1612,7 +1625,7 @@ mod tests {
         let [stmt] = body.as_slice() else {
             panic!("Expected only one statement in source code")
         };
-        let mut generator = Generator::new(&indentation, line_ending, Quote::default());
+        let mut generator = Generator::new(&indentation, line_ending);
         generator.unparse_stmt(stmt);
         generator.generate()
     }
@@ -1982,7 +1995,7 @@ if True:
             round_trip_with(
                 &Indentation::new("    ".to_string()),
                 LineEnding::default(),
-                Quote::default(),
+                None,
                 r"
 if True:
   pass
@@ -2000,7 +2013,7 @@ if True:
             round_trip_with(
                 &Indentation::new("  ".to_string()),
                 LineEnding::default(),
-                Quote::default(),
+                None,
                 r"
 if True:
   pass
@@ -2018,7 +2031,7 @@ if True:
             round_trip_with(
                 &Indentation::new("\t".to_string()),
                 LineEnding::default(),
-                Quote::default(),
+                None,
                 r"
 if True:
   pass
@@ -2040,7 +2053,7 @@ if True:
             round_trip_with(
                 &Indentation::default(),
                 LineEnding::Lf,
-                Quote::default(),
+                None,
                 "if True:\n    print(42)",
             ),
             "if True:\n    print(42)",
@@ -2050,7 +2063,7 @@ if True:
             round_trip_with(
                 &Indentation::default(),
                 LineEnding::CrLf,
-                Quote::default(),
+                None,
                 "if True:\n    print(42)",
             ),
             "if True:\r\n    print(42)",
@@ -2060,7 +2073,7 @@ if True:
             round_trip_with(
                 &Indentation::default(),
                 LineEnding::Cr,
-                Quote::default(),
+                None,
                 "if True:\n    print(42)",
             ),
             "if True:\r    print(42)",
@@ -2073,7 +2086,7 @@ if True:
             round_trip_with(
                 &Indentation::default(),
                 LineEnding::default(),
-                Quote::default(),
+                None,
                 r#"x: list["str"]"#,
             ),
             r#"x: list["str"]"#,
@@ -2083,7 +2096,7 @@ if True:
             round_trip_with(
                 &Indentation::default(),
                 LineEnding::default(),
-                Quote::Single,
+                Some(Quote::Single),
                 r#"x: list["str"]"#,
             ),
             "x: list['str']",
@@ -2093,7 +2106,7 @@ if True:
             round_trip_with(
                 &Indentation::default(),
                 LineEnding::default(),
-                Quote::Single,
+                Some(Quote::Single),
                 r#"x = "1""#,
             ),
             "x = '1'",
