@@ -3,6 +3,7 @@ use ruff_db::source::line_index;
 use ruff_python_ast as ast;
 use ruff_python_ast::{Expr, ExprRef, HasNodeIndex, name::Name};
 use ruff_source_file::LineIndex;
+use rustc_hash::FxHashMap;
 
 use crate::Db;
 use crate::module_name::ModuleName;
@@ -35,6 +36,37 @@ impl<'db> SemanticModel<'db> {
 
     pub fn line_index(&self) -> LineIndex {
         line_index(self.db, self.file)
+    }
+
+    /// Returns a map from symbol name to that symbol's
+    /// type and definition site (if available).
+    ///
+    /// The symbols are the symbols in scope at the given
+    /// AST node.
+    pub fn members_in_scope_at(
+        &self,
+        node: ast::AnyNodeRef<'_>,
+    ) -> FxHashMap<Name, MemberDefinition<'db>> {
+        let index = semantic_index(self.db, self.file);
+        let mut members = FxHashMap::default();
+        let Some(file_scope) = self.scope(node) else {
+            return members;
+        };
+
+        for (file_scope, _) in index.ancestor_scopes(file_scope) {
+            for memberdef in
+                all_declarations_and_bindings(self.db, file_scope.to_scope_id(self.db, self.file))
+            {
+                members.insert(
+                    memberdef.member.name,
+                    MemberDefinition {
+                        ty: memberdef.member.ty,
+                        definition: memberdef.definition,
+                    },
+                );
+            }
+        }
+        members
     }
 
     pub fn resolve_module(&self, module_name: &ModuleName) -> Option<Module<'_>> {
@@ -212,20 +244,7 @@ impl<'db> SemanticModel<'db> {
     pub fn scoped_completions(&self, node: ast::AnyNodeRef<'_>) -> Vec<Completion<'db>> {
         let index = semantic_index(self.db, self.file);
 
-        // TODO: We currently use `try_expression_scope_id` here as a hotfix for [1].
-        // Revert this to use `expression_scope_id` once a proper fix is in place.
-        //
-        // [1] https://github.com/astral-sh/ty/issues/572
-        let Some(file_scope) = (match node {
-            ast::AnyNodeRef::Identifier(identifier) => index.try_expression_scope_id(identifier),
-            node => match node.as_expr_ref() {
-                // If we couldn't identify a specific
-                // expression that we're in, then just
-                // fall back to the global scope.
-                None => Some(FileScopeId::global()),
-                Some(expr) => index.try_expression_scope_id(&expr),
-            },
-        }) else {
+        let Some(file_scope) = self.scope(node) else {
             return vec![];
         };
         let mut completions = vec![];
@@ -244,6 +263,32 @@ impl<'db> SemanticModel<'db> {
         completions.extend(self.module_completions(&builtins));
         completions
     }
+
+    fn scope(&self, node: ast::AnyNodeRef<'_>) -> Option<FileScopeId> {
+        let index = semantic_index(self.db, self.file);
+
+        // TODO: We currently use `try_expression_scope_id` here as a hotfix for [1].
+        // Revert this to use `expression_scope_id` once a proper fix is in place.
+        //
+        // [1] https://github.com/astral-sh/ty/issues/572
+        match node {
+            ast::AnyNodeRef::Identifier(identifier) => index.try_expression_scope_id(identifier),
+            node => match node.as_expr_ref() {
+                // If we couldn't identify a specific
+                // expression that we're in, then just
+                // fall back to the global scope.
+                None => Some(FileScopeId::global()),
+                Some(expr) => index.try_expression_scope_id(&expr),
+            },
+        }
+    }
+}
+
+/// The type and definition (if available) of a symbol.
+#[derive(Clone, Debug)]
+pub struct MemberDefinition<'db> {
+    pub ty: Type<'db>,
+    pub definition: Option<Definition<'db>>,
 }
 
 /// A classification of symbol names.
