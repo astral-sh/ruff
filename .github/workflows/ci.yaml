@@ -1,10 +1,10 @@
 name: CI
 
-permissions: {}
+permissions: { }
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
   pull_request:
   workflow_dispatch:
 
@@ -912,6 +912,9 @@ jobs:
     needs: determine_changes
     if: ${{ github.repository == 'astral-sh/ruff' && !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 20
+    strategy:
+      matrix:
+        benchmark: [ "formatter lexer linter parser", "ty" ]
     steps:
       - name: "Checkout Branch"
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -930,7 +933,7 @@ jobs:
           tool: cargo-codspeed
 
       - name: "Build benchmarks"
-        run: cargo codspeed build --features "codspeed,instrumented" --no-default-features -p ruff_benchmark
+        run: cargo codspeed build --features "codspeed,instrumented" --no-default-features -p ruff_benchmark ${{matrix.benchmark}}
 
       - name: "Run benchmarks"
         uses: CodSpeedHQ/action@653fdc30e6c40ffd9739e40c8a0576f4f4523ca1 # v4.0.1
