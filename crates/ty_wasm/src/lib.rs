@@ -425,14 +425,11 @@ impl Workspace {
             .into_iter()
             .map(|completion| Completion {
                 kind: completion.kind(&self.db).map(CompletionKind::from),
-                name: completion.inner.name.into(),
+                name: completion.name.into(),
                 documentation: completion
                     .documentation
                     .map(|documentation| documentation.render_plaintext()),
-                detail: completion
-                    .inner
-                    .ty
-                    .map(|ty| ty.display(&self.db).to_string()),
+                detail: completion.ty.map(|ty| ty.display(&self.db).to_string()),
             })
             .collect())
     }
@@ -956,34 +953,34 @@ pub enum CompletionKind {
     TypeParameter,
 }
 
-impl From<ty_python_semantic::CompletionKind> for CompletionKind {
-    fn from(value: ty_python_semantic::CompletionKind) -> Self {
+impl From<ty_ide::CompletionKind> for CompletionKind {
+    fn from(value: ty_ide::CompletionKind) -> Self {
         match value {
-            ty_python_semantic::CompletionKind::Text => Self::Text,
-            ty_python_semantic::CompletionKind::Method => Self::Method,
-            ty_python_semantic::CompletionKind::Function => Self::Function,
-            ty_python_semantic::CompletionKind::Constructor => Self::Constructor,
-            ty_python_semantic::CompletionKind::Field => Self::Field,
-            ty_python_semantic::CompletionKind::Variable => Self::Variable,
-            ty_python_semantic::CompletionKind::Class => Self::Class,
-            ty_python_semantic::CompletionKind::Interface => Self::Interface,
-            ty_python_semantic::CompletionKind::Module => Self::Module,
-            ty_python_semantic::CompletionKind::Property => Self::Property,
-            ty_python_semantic::CompletionKind::Unit => Self::Unit,
-            ty_python_semantic::CompletionKind::Value => Self::Value,
-            ty_python_semantic::CompletionKind::Enum => Self::Enum,
-            ty_python_semantic::CompletionKind::Keyword => Self::Keyword,
-            ty_python_semantic::CompletionKind::Snippet => Self::Snippet,
-            ty_python_semantic::CompletionKind::Color => Self::Color,
-            ty_python_semantic::CompletionKind::File => Self::File,
-            ty_python_semantic::CompletionKind::Reference => Self::Reference,
-            ty_python_semantic::CompletionKind::Folder => Self::Folder,
-            ty_python_semantic::CompletionKind::EnumMember => Self::EnumMember,
-            ty_python_semantic::CompletionKind::Constant => Self::Constant,
-            ty_python_semantic::CompletionKind::Struct => Self::Struct,
-            ty_python_semantic::CompletionKind::Event => Self::Event,
-            ty_python_semantic::CompletionKind::Operator => Self::Operator,
-            ty_python_semantic::CompletionKind::TypeParameter => Self::TypeParameter,
+            ty_ide::CompletionKind::Text => Self::Text,
+            ty_ide::CompletionKind::Method => Self::Method,
+            ty_ide::CompletionKind::Function => Self::Function,
+            ty_ide::CompletionKind::Constructor => Self::Constructor,
+            ty_ide::CompletionKind::Field => Self::Field,
+            ty_ide::CompletionKind::Variable => Self::Variable,
+            ty_ide::CompletionKind::Class => Self::Class,
+            ty_ide::CompletionKind::Interface => Self::Interface,
+            ty_ide::CompletionKind::Module => Self::Module,
+            ty_ide::CompletionKind::Property => Self::Property,
+            ty_ide::CompletionKind::Unit => Self::Unit,
+            ty_ide::CompletionKind::Value => Self::Value,
+            ty_ide::CompletionKind::Enum => Self::Enum,
+            ty_ide::CompletionKind::Keyword => Self::Keyword,
+            ty_ide::CompletionKind::Snippet => Self::Snippet,
+            ty_ide::CompletionKind::Color => Self::Color,
+            ty_ide::CompletionKind::File => Self::File,
+            ty_ide::CompletionKind::Reference => Self::Reference,
+            ty_ide::CompletionKind::Folder => Self::Folder,
+            ty_ide::CompletionKind::EnumMember => Self::EnumMember,
+            ty_ide::CompletionKind::Constant => Self::Constant,
+            ty_ide::CompletionKind::Struct => Self::Struct,
+            ty_ide::CompletionKind::Event => Self::Event,
+            ty_ide::CompletionKind::Operator => Self::Operator,
+            ty_ide::CompletionKind::TypeParameter => Self::TypeParameter,
         }
     }
 }
