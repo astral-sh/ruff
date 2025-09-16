@@ -276,6 +276,7 @@ class B:
 
 reveal_type(generic_context(A.f))  # revealed: None
 reveal_type(generic_context(B.f))  # revealed: tuple[Self@f]
+# TODO: Also add a case with implicit self to explain what is the generic context of method with implicit self
 ```
 
 [self attribute]: https://typing.python.org/en/latest/spec/generics.html#use-in-attribute-annotations
