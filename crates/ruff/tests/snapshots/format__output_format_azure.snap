@@ -1,0 +1,18 @@
+---
+source: crates/ruff/tests/format.rs
+info:
+  program: ruff
+  args:
+    - format
+    - "--no-cache"
+    - "--output-format"
+    - azure
+    - "--check"
+    - input.py
+---
+success: false
+exit_code: 1
+----- stdout -----
+##vso[task.logissue type=error;sourcepath=[TMP]/input.py;code=unformatted;]File would be reformatted
+
+----- stderr -----

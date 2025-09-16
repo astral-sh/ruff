@@ -1,0 +1,83 @@
+---
+source: crates/ruff/tests/format.rs
+info:
+  program: ruff
+  args:
+    - format
+    - "--no-cache"
+    - "--output-format"
+    - sarif
+    - "--check"
+    - input.py
+---
+success: false
+exit_code: 1
+----- stdout -----
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "runs": [
+    {
+      "results": [
+        {
+          "fixes": [
+            {
+              "artifactChanges": [
+                {
+                  "artifactLocation": {
+                    "uri": "[TMP]/input.py"
+                  },
+                  "replacements": [
+                    {
+                      "deletedRegion": {
+                        "endColumn": 1,
+                        "endLine": 6,
+                        "startColumn": 1,
+                        "startLine": 1
+                      },
+                      "insertedContent": {
+                        "text": "from test import say_hy\n\nif __name__ == \"__main__\":\n    say_hy(\"dear Ruff contributor\")\n"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "description": {
+                "text": null
+              }
+            }
+          ],
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "[TMP]/input.py"
+                },
+                "region": {
+                  "endColumn": 1,
+                  "endLine": 1,
+                  "startColumn": 1,
+                  "startLine": 1
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "File would be reformatted"
+          },
+          "ruleId": "unformatted"
+        }
+      ],
+      "tool": {
+        "driver": {
+          "informationUri": "https://github.com/astral-sh/ruff",
+          "name": "ruff",
+          "rules": [],
+          "version": "[VERSION]"
+        }
+      }
+    }
+  ],
+  "version": "2.1.0"
+}
+----- stderr -----

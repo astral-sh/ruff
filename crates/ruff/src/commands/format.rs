@@ -11,13 +11,19 @@ use itertools::Itertools;
 use log::{error, warn};
 use rayon::iter::Either::{Left, Right};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use ruff_db::diagnostic::{
+    Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig,
+    DisplayDiagnostics, DisplayGithubDiagnostics, GithubRenderer, Severity, Span,
+};
+use ruff_linter::message::{Emitter, EmitterContext, GroupedEmitter, SarifEmitter};
+use ruff_linter::settings::types::OutputFormat;
 use ruff_python_parser::ParseError;
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 use thiserror::Error;
 use tracing::debug;
 
 use ruff_db::panic::{PanicError, catch_unwind};
-use ruff_diagnostics::SourceMap;
+use ruff_diagnostics::{Edit, Fix, SourceMap};
 use ruff_linter::fs;
 use ruff_linter::logging::{DisplayParseError, LogLevel};
 use ruff_linter::package::PackageRoot;
@@ -27,7 +33,7 @@ use ruff_linter::source_kind::{SourceError, SourceKind};
 use ruff_linter::warn_user_once;
 use ruff_python_ast::{PySourceType, SourceType};
 use ruff_python_formatter::{FormatModuleError, QuoteStyle, format_module_source, format_range};
-use ruff_source_file::LineIndex;
+use ruff_source_file::{LineIndex, SourceFileBuilder};
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use ruff_workspace::FormatterSettings;
 use ruff_workspace::resolver::{ResolvedFile, Resolver, match_exclusion, python_files_in_path};
@@ -68,6 +74,9 @@ pub(crate) fn format(
     let mode = FormatMode::from_cli(&cli);
     let files = resolve_default_files(cli.files, false);
     let (paths, resolver) = python_files_in_path(&files, &pyproject_config, config_arguments)?;
+
+    let output_format = pyproject_config.settings.output_format;
+    let preview = pyproject_config.settings.formatter.preview;
 
     if paths.is_empty() {
         warn_user_once!("No Python files found under the given path(s)");
@@ -194,7 +203,11 @@ pub(crate) fn format(
     match mode {
         FormatMode::Write => {}
         FormatMode::Check => {
-            results.write_changed(&mut stdout().lock())?;
+            if preview.is_enabled() {
+                results.write_changed_preview(&mut stdout().lock(), output_format)?;
+            } else {
+                results.write_changed(&mut stdout().lock())?;
+            }
         }
         FormatMode::Diff => {
             results.write_diff(&mut stdout().lock())?;
@@ -206,7 +219,7 @@ pub(crate) fn format(
         if mode.is_diff() {
             // Allow piping the diff to e.g. a file by writing the summary to stderr
             results.write_summary(&mut stderr().lock())?;
-        } else {
+        } else if !preview.is_enabled() || output_format.is_human_readable() {
             results.write_summary(&mut stdout().lock())?;
         }
     }
@@ -275,7 +288,10 @@ pub(crate) fn format_path(
     // Format the source.
     let format_result = match format_source(&unformatted, source_type, Some(path), settings, range)?
     {
-        FormattedSource::Formatted(formatted) => match mode {
+        FormattedSource::Formatted {
+            formatted,
+            unformatted,
+        } => match mode {
             FormatMode::Write => {
                 let mut writer = File::create(path).map_err(|err| {
                     FormatCommandError::Write(Some(path.to_path_buf()), err.into())
@@ -293,9 +309,15 @@ pub(crate) fn format_path(
                     }
                 }
 
-                FormatResult::Formatted
+                FormatResult::Formatted {
+                    unformatted,
+                    formatted,
+                }
             }
-            FormatMode::Check => FormatResult::Formatted,
+            FormatMode::Check => FormatResult::Formatted {
+                unformatted,
+                formatted,
+            },
             FormatMode::Diff => FormatResult::Diff {
                 unformatted,
                 formatted,
@@ -321,7 +343,10 @@ pub(crate) fn format_path(
 #[derive(Debug)]
 pub(crate) enum FormattedSource {
     /// The source was formatted, and the [`SourceKind`] contains the transformed source code.
-    Formatted(SourceKind),
+    Formatted {
+        formatted: SourceKind,
+        unformatted: SourceKind,
+    },
     /// The source was unchanged.
     Unchanged,
 }
@@ -329,7 +354,13 @@ pub(crate) enum FormattedSource {
 impl From<FormattedSource> for FormatResult {
     fn from(value: FormattedSource) -> Self {
         match value {
-            FormattedSource::Formatted(_) => FormatResult::Formatted,
+            FormattedSource::Formatted {
+                formatted,
+                unformatted,
+            } => FormatResult::Formatted {
+                formatted,
+                unformatted,
+            },
             FormattedSource::Unchanged => FormatResult::Unchanged,
         }
     }
@@ -382,7 +413,10 @@ pub(crate) fn format_source(
             if formatted.len() == unformatted.len() && formatted == *unformatted {
                 Ok(FormattedSource::Unchanged)
             } else {
-                Ok(FormattedSource::Formatted(SourceKind::Python(formatted)))
+                Ok(FormattedSource::Formatted {
+                    formatted: SourceKind::Python(formatted),
+                    unformatted: SourceKind::Python(unformatted.to_string()),
+                })
             }
         }
         SourceKind::IpyNotebook(notebook) => {
@@ -467,9 +501,10 @@ pub(crate) fn format_source(
             let mut formatted = notebook.clone();
             formatted.update(&source_map, output);
 
-            Ok(FormattedSource::Formatted(SourceKind::IpyNotebook(
-                formatted,
-            )))
+            Ok(FormattedSource::Formatted {
+                formatted: SourceKind::IpyNotebook(formatted),
+                unformatted: SourceKind::IpyNotebook(notebook.clone()),
+            })
         }
     }
 }
@@ -478,7 +513,10 @@ pub(crate) fn format_source(
 #[derive(Debug, Clone, is_macro::Is)]
 pub(crate) enum FormatResult {
     /// The file was formatted.
-    Formatted,
+    Formatted {
+        unformatted: SourceKind,
+        formatted: SourceKind,
+    },
 
     /// The file was formatted, [`SourceKind`] contains the formatted code
     Diff {
@@ -517,7 +555,7 @@ impl<'a> FormatResults<'a> {
     /// Returns `true` if any of the files require formatting.
     fn any_formatted(&self) -> bool {
         self.results.iter().any(|result| match result.result {
-            FormatResult::Formatted | FormatResult::Diff { .. } => true,
+            FormatResult::Formatted { .. } | FormatResult::Diff { .. } => true,
             FormatResult::Unchanged | FormatResult::Skipped => false,
         })
     }
@@ -566,6 +604,90 @@ impl<'a> FormatResults<'a> {
         Ok(())
     }
 
+    /// Write a list of the files that would be changed to the given writer.
+    fn write_changed_preview(
+        &self,
+        f: &mut impl Write,
+        output_format: OutputFormat,
+    ) -> io::Result<()> {
+        let notebook_index = FxHashMap::default();
+        let diagnostics: Vec<_> = self.to_diagnostics().collect();
+
+        let context = EmitterContext::new(&notebook_index);
+        let config = DisplayDiagnosticConfig::default();
+        match output_format {
+            OutputFormat::Concise => {
+                let config = config
+                    .format(DiagnosticFormat::Concise)
+                    .hide_severity(true)
+                    .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize());
+                let value = DisplayDiagnostics::new(&context, &config, &diagnostics);
+                write!(f, "{value}")?;
+            }
+            OutputFormat::Full => {
+                let config = config
+                    .format(DiagnosticFormat::Full)
+                    .hide_severity(true)
+                    .show_fix_diff(true)
+                    .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize());
+                let value = DisplayDiagnostics::new(&context, &config, &diagnostics);
+                write!(f, "{value}")?;
+            }
+            OutputFormat::Json => {
+                let config = config.format(DiagnosticFormat::Json);
+                let value = DisplayDiagnostics::new(&context, &config, &diagnostics);
+                write!(f, "{value}")?;
+            }
+            OutputFormat::JsonLines => {
+                let config = config.format(DiagnosticFormat::JsonLines);
+                let value = DisplayDiagnostics::new(&context, &config, &diagnostics);
+                write!(f, "{value}")?;
+            }
+            OutputFormat::Junit => {
+                let config = config.format(DiagnosticFormat::Junit);
+                let value = DisplayDiagnostics::new(&context, &config, &diagnostics);
+                write!(f, "{value}")?;
+            }
+            OutputFormat::Grouped => {
+                GroupedEmitter::default()
+                    .emit(f, &diagnostics, &context)
+                    .map_err(std::io::Error::other)?;
+            }
+            OutputFormat::Github => {
+                let renderer = GithubRenderer::new(&context, "Ruff");
+                let value = DisplayGithubDiagnostics::new(&renderer, &diagnostics);
+                write!(f, "{value}")?;
+            }
+            OutputFormat::Gitlab => {
+                let config = config.format(DiagnosticFormat::Gitlab);
+                let value = DisplayDiagnostics::new(&context, &config, &diagnostics);
+                write!(f, "{value}")?;
+            }
+            OutputFormat::Pylint => {
+                let config = config.format(DiagnosticFormat::Pylint);
+                let value = DisplayDiagnostics::new(&context, &config, &diagnostics);
+                write!(f, "{value}")?;
+            }
+            OutputFormat::Rdjson => {
+                let config = config.format(DiagnosticFormat::Rdjson);
+                let value = DisplayDiagnostics::new(&context, &config, &diagnostics);
+                write!(f, "{value}")?;
+            }
+            OutputFormat::Azure => {
+                let config = config.format(DiagnosticFormat::Azure);
+                let value = DisplayDiagnostics::new(&context, &config, &diagnostics);
+                write!(f, "{value}")?;
+            }
+            OutputFormat::Sarif => {
+                SarifEmitter
+                    .emit(f, &diagnostics, &context)
+                    .map_err(std::io::Error::other)?;
+            }
+        }
+
+        Ok(())
+    }
+
     /// Write a summary of the formatting results to the given writer.
     fn write_summary(&self, f: &mut impl Write) -> io::Result<()> {
         // Compute the number of changed and unchanged files.
@@ -573,7 +695,7 @@ impl<'a> FormatResults<'a> {
         let mut unchanged = 0u32;
         for result in self.results {
             match &result.result {
-                FormatResult::Formatted => {
+                FormatResult::Formatted { .. } => {
                     changed += 1;
                 }
                 FormatResult::Unchanged => unchanged += 1,
@@ -627,6 +749,44 @@ impl<'a> FormatResults<'a> {
         } else {
             Ok(())
         }
+    }
+
+    /// Convert formatted files into [`Diagnostic`]s.
+    fn to_diagnostics(&self) -> impl Iterator<Item = Diagnostic> {
+        self.results
+            .iter()
+            .filter_map(|result| {
+                let FormatResult::Formatted {
+                    unformatted,
+                    formatted,
+                } = &result.result
+                else {
+                    return None;
+                };
+
+                let mut diagnostic = Diagnostic::new(
+                    DiagnosticId::Unformatted,
+                    Severity::Error,
+                    "File would be reformatted",
+                );
+
+                let path = result.path.to_string_lossy();
+                // For now, report the edit as a replacement of the whole file's contents.
+                let fix = Fix::safe_edit(Edit::range_replacement(
+                    formatted.source_code().to_string(),
+                    TextRange::up_to(unformatted.source_code().text_len()),
+                ));
+
+                let source_file = SourceFileBuilder::new(path, unformatted.source_code()).finish();
+                let span = Span::from(source_file);
+                let mut annotation = Annotation::primary(span);
+                annotation.set_file_level(true);
+                diagnostic.annotate(annotation);
+                diagnostic.set_fix(fix);
+
+                Some(diagnostic)
+            })
+            .sorted_unstable_by(Diagnostic::ruff_start_ordering)
     }
 }
 

@@ -609,6 +609,61 @@ if __name__ == "__main__":
     Ok(())
 }
 
+#[test_case::test_case("concise")]
+#[test_case::test_case("full")]
+#[test_case::test_case("json")]
+#[test_case::test_case("json-lines")]
+#[test_case::test_case("junit")]
+#[test_case::test_case("grouped")]
+#[test_case::test_case("github")]
+#[test_case::test_case("gitlab")]
+#[test_case::test_case("pylint")]
+#[test_case::test_case("rdjson")]
+#[test_case::test_case("azure")]
+#[test_case::test_case("sarif")]
+fn output_format(output_format: &str) -> Result<()> {
+    const CONTENT: &str = r#"
+from test import say_hy
+
+if __name__ == "__main__":
+    say_hy("dear Ruff contributor")
+"#;
+
+    let tempdir = TempDir::new()?;
+    let input = tempdir.path().join("input.py");
+    fs::write(&input, CONTENT)?;
+
+    let snapshot = format!("output_format_{output_format}");
+
+    let project_dir = dunce::canonicalize(tempdir.path())?;
+
+    insta::with_settings!({
+        filters => vec![
+            (tempdir_filter(&project_dir).as_str(), "[TMP]/"),
+            (tempdir_filter(&tempdir).as_str(), "[TMP]/"),
+            (r#""[^"]+\\?/?input.py"#, r#""[TMP]/input.py"#),
+            (ruff_linter::VERSION, "[VERSION]"),
+        ]
+    }, {
+        assert_cmd_snapshot!(
+            snapshot,
+            Command::new(get_cargo_bin(BIN_NAME))
+                .args([
+                    "format",
+                    "--no-cache",
+                    "--output-format",
+                    output_format,
+                    "--preview",
+                    "--check",
+                    "input.py",
+                ])
+                .current_dir(&tempdir),
+        );
+    });
+
+    Ok(())
+}
+
 #[test]
 fn exit_non_zero_on_format() -> Result<()> {
     let tempdir = TempDir::new()?;
