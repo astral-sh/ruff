@@ -6521,8 +6521,11 @@ impl<'db> Type<'db> {
         div: Type<'db>,
         visitor: &HasDivergentTypeVisitor<'db>,
     ) -> bool {
-        // We don't use `any_over_type` here because we don't need/want to descend into lazy parts
-        // of types (typevar bounds/constraints, type alias values, etc) here.
+        // We don't use `any_over_type` here because we don't need/want to descend into lazy
+        // parts of types (typevar bounds/constraints, type alias values, etc) here. If it's a lazy
+        // aspect of the type, it won't cause a query cycle in type inference, and we shouldn't
+        // trigger unnecessary inference of it. (TODO: bounds/constraints of legacy typevars aren't
+        // yet lazy, but they should be.)
         match self {
             Type::Dynamic(DynamicType::Divergent(_)) => self == div,
             Type::Union(union) => union.has_divergent_type_impl(db, div, visitor),
