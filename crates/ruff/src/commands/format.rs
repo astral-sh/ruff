@@ -600,7 +600,12 @@ impl<'a> FormatResults<'a> {
         let config = DisplayDiagnosticConfig::default()
             .format(format)
             .show_fix_diff(true)
-            .show_fix_status(true);
+            .show_fix_status(true)
+            .color(
+                matches!(output_format, OutputFormat::Concise | OutputFormat::Full)
+                    && !cfg!(test)
+                    && colored::control::SHOULD_COLORIZE.should_colorize(),
+            );
         for path in self
             .results
             .iter()
