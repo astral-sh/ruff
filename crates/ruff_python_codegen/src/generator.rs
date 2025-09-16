@@ -1398,7 +1398,8 @@ impl<'a> Generator<'a> {
 
     fn unparse_string_literal(&mut self, string_literal: &ast::StringLiteral) {
         let ast::StringLiteral { value, flags, .. } = string_literal;
-        self.p_str_repr(value, *flags);
+        let flags = flags.with_quote_style(self.quote);
+        self.p_str_repr(value, flags);
     }
 
     fn unparse_string_literal_value(&mut self, value: &ast::StringLiteralValue) {
@@ -2063,6 +2064,39 @@ if True:
                 "if True:\n    print(42)",
             ),
             "if True:\r    print(42)",
+        );
+    }
+
+    #[test]
+    fn set_quote() {
+        assert_eq!(
+            round_trip_with(
+                &Indentation::default(),
+                LineEnding::default(),
+                Quote::default(),
+                r#"x: list["str"]"#,
+            ),
+            r#"x: list["str"]"#,
+        );
+
+        assert_eq!(
+            round_trip_with(
+                &Indentation::default(),
+                LineEnding::default(),
+                Quote::Single,
+                r#"x: list["str"]"#,
+            ),
+            "x: list['str']",
+        );
+
+        assert_eq!(
+            round_trip_with(
+                &Indentation::default(),
+                LineEnding::default(),
+                Quote::Single,
+                r#"x = "1""#,
+            ),
+            "x = '1'",
         );
     }
 }
