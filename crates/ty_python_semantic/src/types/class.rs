@@ -27,11 +27,11 @@ use crate::types::typed_dict::typed_dict_params_from_class_def;
 use crate::types::{
     ApplyTypeMappingVisitor, Binding, BoundSuperError, BoundSuperType, CallableType,
     DataclassParams, DeprecatedInstance, DivergenceKind, DivergentType, FindLegacyTypeVarsVisitor,
-    HasRelationToVisitor, IsEquivalentVisitor, KnownInstanceType, ManualPEP695TypeAliasType,
-    MaterializationKind, NormalizedVisitor, PropertyInstanceType, StringLiteralType, TypeAliasType,
-    TypeContext, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance,
-    TypeVarKind, TypedDictParams, UnionBuilder, VarianceInferable, declaration_type,
-    determine_upper_bound, infer_definition_types,
+    HasDivergentTypeVisitor, HasRelationToVisitor, IsEquivalentVisitor, KnownInstanceType,
+    ManualPEP695TypeAliasType, MaterializationKind, NormalizedVisitor, PropertyInstanceType,
+    StringLiteralType, TypeAliasType, TypeContext, TypeMapping, TypeRelation,
+    TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, TypedDictParams, UnionBuilder,
+    VarianceInferable, declaration_type, determine_upper_bound, infer_definition_types,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet, Program,
@@ -1242,6 +1242,20 @@ impl<'db> ClassType<'db> {
                     )
                 }
             }
+        }
+    }
+
+    pub(super) fn has_divergent_type_impl(
+        self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        visitor: &HasDivergentTypeVisitor<'db>,
+    ) -> bool {
+        match self {
+            ClassType::NonGeneric(_) => false,
+            ClassType::Generic(generic) => generic
+                .specialization(db)
+                .has_divergent_type_impl(db, div, visitor),
         }
     }
 

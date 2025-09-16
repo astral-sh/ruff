@@ -21,8 +21,9 @@ use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::generics::{GenericContext, walk_generic_context};
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, FindLegacyTypeVarsVisitor,
-    HasRelationToVisitor, IsEquivalentVisitor, KnownClass, MaterializationKind, NormalizedVisitor,
-    TypeMapping, TypeRelation, VarianceInferable, todo_type,
+    HasDivergentTypeVisitor, HasRelationToVisitor, IsEquivalentVisitor, KnownClass,
+    MaterializationKind, NormalizedVisitor, TypeMapping, TypeRelation, VarianceInferable,
+    todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -236,6 +237,17 @@ impl<'db> CallableSignature<'db> {
                     .and(db, || other.is_subtype_of_impl(db, self))
             }
         }
+    }
+
+    pub(super) fn has_divergent_type_impl(
+        &self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        visitor: &HasDivergentTypeVisitor<'db>,
+    ) -> bool {
+        self.overloads
+            .iter()
+            .any(|signature| signature.has_divergent_type_impl(db, div, visitor))
     }
 }
 
@@ -1060,6 +1072,17 @@ impl<'db> Signature<'db> {
     pub(crate) fn with_definition(self, definition: Option<Definition<'db>>) -> Self {
         Self { definition, ..self }
     }
+
+    fn has_divergent_type_impl(
+        &self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        visitor: &HasDivergentTypeVisitor<'db>,
+    ) -> bool {
+        self.return_ty
+            .is_some_and(|return_ty| return_ty.has_divergent_type_impl(db, div, visitor))
+            || self.parameters.has_divergent_type_impl(db, div, visitor)
+    }
 }
 
 impl<'db> VarianceInferable<'db> for &Signature<'db> {
@@ -1394,6 +1417,19 @@ impl<'db> Parameters<'db> {
         self.iter()
             .enumerate()
             .rfind(|(_, parameter)| parameter.is_keyword_variadic())
+    }
+
+    fn has_divergent_type_impl(
+        &self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        visitor: &HasDivergentTypeVisitor<'db>,
+    ) -> bool {
+        self.iter().any(|parameter| {
+            parameter
+                .annotated_type()
+                .is_some_and(|ty| ty.has_divergent_type_impl(db, div, visitor))
+        })
     }
 }
 
