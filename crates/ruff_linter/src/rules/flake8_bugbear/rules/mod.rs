@@ -37,6 +37,7 @@ pub(crate) use useless_comparison::*;
 pub(crate) use useless_contextlib_suppress::*;
 pub(crate) use useless_expression::*;
 pub(crate) use zip_without_explicit_strict::*;
+pub(crate) use map_without_explicit_strict::*;
 
 mod abstract_base_class;
 mod assert_false;
@@ -77,3 +78,4 @@ mod useless_comparison;
 mod useless_contextlib_suppress;
 mod useless_expression;
 mod zip_without_explicit_strict;
+mod map_without_explicit_strict;

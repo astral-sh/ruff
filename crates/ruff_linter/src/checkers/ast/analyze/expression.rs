@@ -741,6 +741,11 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     flake8_bugbear::rules::zip_without_explicit_strict(checker, call);
                 }
             }
+            if checker.is_rule_enabled(Rule::MapWithoutExplicitStrict) {
+                if checker.target_version() >= PythonVersion::PY314 {
+                    flake8_bugbear::rules::map_without_explicit_strict(checker, call);
+                }
+            }
             if checker.is_rule_enabled(Rule::NoExplicitStacklevel) {
                 flake8_bugbear::rules::no_explicit_stacklevel(checker, call);
             }
