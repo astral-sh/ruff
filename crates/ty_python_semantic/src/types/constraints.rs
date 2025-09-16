@@ -834,7 +834,7 @@ impl<'db> ConstrainedTypeVar<'db> {
             .map(|constraint| constraint.constrain(self.typevar))
     }
 
-    /// Returns the union of this individual constraint and another, if it can be simplified two a
+    /// Returns the union of this individual constraint and another, if it can be simplified to a
     /// union of two constraints or fewer. Returns `None` if the union cannot be simplified that
     /// much.
     fn simplified_union(&self, db: &'db dyn Db, other: &Self) -> Option<Simplifiable<Self>> {
