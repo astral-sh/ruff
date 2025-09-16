@@ -1016,6 +1016,9 @@ pub enum DiagnosticId {
 
     /// Use of a deprecated setting.
     DeprecatedSetting,
+
+    /// The code needs to be formatted.
+    Unformatted,
 }
 
 impl DiagnosticId {
@@ -1055,6 +1058,7 @@ impl DiagnosticId {
             DiagnosticId::UnnecessaryOverridesSection => "unnecessary-overrides-section",
             DiagnosticId::UselessOverridesSection => "useless-overrides-section",
             DiagnosticId::DeprecatedSetting => "deprecated-setting",
+            DiagnosticId::Unformatted => "unformatted",
         }
     }
 
