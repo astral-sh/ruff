@@ -7,7 +7,7 @@ use std::hash::BuildHasherDefault;
 use crate::lint::{LintRegistry, LintRegistryBuilder};
 use crate::suppression::{INVALID_IGNORE_COMMENT, UNKNOWN_RULE, UNUSED_IGNORE_COMMENT};
 pub use db::Db;
-pub use module_name::ModuleName;
+pub use module_name::{ModuleName, ModuleNameResolutionError};
 pub use module_resolver::{
     Module, SearchPath, SearchPathValidationError, SearchPaths, all_modules, list_modules,
     resolve_module, resolve_real_module, system_module_search_paths,
