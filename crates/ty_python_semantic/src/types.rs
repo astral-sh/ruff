@@ -1446,6 +1446,19 @@ impl<'db> Type<'db> {
         self.when_subtype_of(db, target).is_always_satisfied()
     }
 
+    /// Return the constraints under which this type is a [subtype of] type `target`. (See
+    /// [`is_subtype_of`][Self::is_subtype_of] for more details on how we calculate subtyping.)
+    ///
+    /// If neither type contains any bound typevars (inferable or not), the result will either be
+    /// [always][ConstraintSet::is_always_satisfied] or [never][ConstraintSet::is_never_satisfied].
+    /// Otherwise, the result will describe which types those typevars must be specialized to for
+    /// subtyping to hold. Note that the result will not enforce that the typevars can only be
+    /// specialized to _valid_ specializations (those that satisfy the typevar's upper bound or
+    /// constraints), nor will it ensure that subtyping holds for _all_ valid specializations. We
+    /// leave that up to the caller to check, so that you can use this method to obtain "partial"
+    /// results and build up a more complete constraint set over several subtyping checks.
+    ///
+    /// [subtype of]: https://typing.python.org/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
     fn when_subtype_of(self, db: &'db dyn Db, target: Type<'db>) -> ConstraintSet<'db> {
         self.has_relation_to(db, target, TypeRelation::Subtyping)
     }
@@ -1457,6 +1470,19 @@ impl<'db> Type<'db> {
         self.when_assignable_to(db, target).is_always_satisfied()
     }
 
+    /// Returns the constraints under which this type is [assignable to] type `target`.
+    ///
+    /// If neither type contains any bound typevars (inferable or not), the result will either be
+    /// [always][ConstraintSet::is_always_satisfied] or [never][ConstraintSet::is_never_satisfied].
+    /// Otherwise, the result will describe which types those typevars must be specialized to for
+    /// assignability to hold. Note that the result will not enforce that the typevars can only be
+    /// specialized to _valid_ specializations (those that satisfy the typevar's upper bound or
+    /// constraints), nor will it ensure that assignability holds for _all_ valid specializations.
+    /// We leave that up to the caller to check, so that you can use this method to obtain
+    /// "partial" results and build up a more complete constraint set over several assignability
+    /// checks.
+    ///
+    /// [assignable to]: https://typing.python.org/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation
     fn when_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> ConstraintSet<'db> {
         self.has_relation_to(db, target, TypeRelation::Assignability)
     }
@@ -3917,9 +3943,8 @@ impl<'db> Type<'db> {
                 Truthiness::Ambiguous
             }
 
-            Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked_set)) => {
-                let constraints = tracked_set.constraints(db);
-                Truthiness::from(constraints.is_always_satisfied())
+            Type::KnownInstance(KnownInstanceType::ConstraintSet(constraints)) => {
+                Truthiness::from(constraints.holds_for_all_valid_specializations(db))
             }
 
             Type::FunctionLiteral(_)
@@ -6850,19 +6875,39 @@ impl<'db> TypeMapping<'_, 'db> {
     }
 }
 
-/// A Salsa-tracked constraint set. This is only needed to have something appropriately small to
-/// put in a [`KnownInstance::ConstraintSet`]. We don't actually manipulate these as part of using
-/// constraint sets to check things like assignability; they're only used as a debugging aid in
-/// mdtests. That means there's no need for this to be interned; being tracked is sufficient.
+/// A constraint set, along with the valid specializations of a list of typevars.
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
-pub struct TrackedConstraintSet<'db> {
+pub struct ValidSpecializationsConstraintSet<'db> {
+    #[returns(as_ref)]
+    valid_specializations: Option<ConstraintSet<'db>>,
+
     #[returns(ref)]
     constraints: ConstraintSet<'db>,
 }
 
 // The Salsa heap is tracked separately.
-impl get_size2::GetSize for TrackedConstraintSet<'_> {}
+impl get_size2::GetSize for ValidSpecializationsConstraintSet<'_> {}
+
+impl<'db> ValidSpecializationsConstraintSet<'db> {
+    fn limit_to_valid_specializations(self, db: &'db dyn Db) -> ConstraintSet<'db> {
+        let constraints = self.constraints(db).clone();
+        let Some(valid_specializations) = self.valid_specializations(db) else {
+            return constraints;
+        };
+        constraints.and(db, || valid_specializations.clone())
+    }
+
+    fn holds_for_all_valid_specializations(self, db: &'db dyn Db) -> bool {
+        let constraints = self.constraints(db);
+        match self.valid_specializations(db) {
+            Some(valid_specializations) => (valid_specializations.clone())
+                .implies(db, || self.constraints(db).clone())
+                .is_always_satisfied(),
+            _ => constraints.is_always_satisfied(),
+        }
+    }
+}
 
 /// Singleton types that are heavily special-cased by ty. Despite its name,
 /// quite a different type to [`NominalInstanceType`].
@@ -6909,7 +6954,7 @@ pub enum KnownInstanceType<'db> {
 
     /// A constraint set, which is exposed in mdtests as an instance of
     /// `ty_extensions.ConstraintSet`.
-    ConstraintSet(TrackedConstraintSet<'db>),
+    ConstraintSet(ValidSpecializationsConstraintSet<'db>),
 }
 
 fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -7033,11 +7078,19 @@ impl<'db> KnownInstanceType<'db> {
                         f.write_str("]")
                     }
                     KnownInstanceType::ConstraintSet(tracked_set) => {
-                        let constraints = tracked_set.constraints(self.db);
+                        let constraints = tracked_set.limit_to_valid_specializations(self.db);
                         if constraints.is_always_satisfied() {
                             f.write_str("ty_extensions.ConstraintSet[always]")
                         } else if constraints.is_never_satisfied() {
                             f.write_str("ty_extensions.ConstraintSet[never]")
+                        } else if tracked_set.valid_specializations(self.db).is_some() {
+                            let is_valid = tracked_set.holds_for_all_valid_specializations(self.db);
+                            write!(
+                                f,
+                                "ty_extensions.ConstraintSet[{} valid specializations: {}]",
+                                if is_valid { "all" } else { "some" },
+                                constraints.display(self.db)
+                            )
                         } else {
                             write!(
                                 f,
