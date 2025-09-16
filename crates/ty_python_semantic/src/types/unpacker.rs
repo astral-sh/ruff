@@ -8,10 +8,13 @@ use ruff_python_ast::{self as ast, AnyNodeRef};
 use crate::Db;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::scope::ScopeId;
-use crate::types::infer::{InferExpression, infer_expression_types_impl};
+use crate::types::infer::{InferExpression, infer_expression_types_impl, infer_unpack_types};
 use crate::types::tuple::{ResizeTupleError, Tuple, TupleLength, TupleSpec, TupleUnpacker};
-use crate::types::{DivergentType, Type, TypeCheckDiagnostics, TypeContext};
-use crate::unpack::{UnpackKind, UnpackValue};
+use crate::types::{
+    DivergenceKind, DivergentType, NormalizedVisitor, Type, TypeCheckDiagnostics, TypeContext,
+    UnionType,
+};
+use crate::unpack::{Unpack, UnpackKind, UnpackValue};
 
 use super::context::InferContext;
 use super::diagnostic::INVALID_ASSIGNMENT;
@@ -43,23 +46,13 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
     }
 
     /// Unpack the value to the target expression.
-    pub(crate) fn unpack(
-        &mut self,
-        target: &ast::Expr,
-        value: UnpackValue<'db>,
-        cycle_recovery: DivergentType<'db>,
-    ) {
+    pub(crate) fn unpack(&mut self, target: &ast::Expr, value: UnpackValue<'db>) {
         debug_assert!(
             matches!(target, ast::Expr::List(_) | ast::Expr::Tuple(_)),
             "Unpacking target must be a list or tuple expression"
         );
 
-        let input = InferExpression::new(
-            self.db(),
-            value.expression(),
-            TypeContext::default(),
-            cycle_recovery,
-        );
+        let input = InferExpression::new(self.db(), value.expression(), TypeContext::default());
         let value_type = infer_expression_types_impl(self.db(), input)
             .expression_type(value.expression().node_ref(self.db(), self.module()));
 
@@ -184,8 +177,21 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
         }
     }
 
-    pub(crate) fn finish(mut self) -> UnpackResult<'db> {
+    pub(crate) fn finish(mut self, unpack: Unpack<'db>) -> UnpackResult<'db> {
+        let db = self.db();
         self.targets.shrink_to_fit();
+        let div = Type::divergent(DivergentType::new(
+            db,
+            DivergenceKind::InferUnpackTypes(unpack),
+        ));
+        let previous_cycle_value = infer_unpack_types(db, unpack);
+        let visitor = NormalizedVisitor::default().recursive(div);
+        for (expr, ty) in &mut self.targets {
+            let previous_ty = previous_cycle_value.expression_type(*expr);
+            *ty = UnionType::from_elements(db, [*ty, previous_ty])
+                .recursive_type_normalized(db, &visitor);
+        }
+
         UnpackResult {
             diagnostics: self.context.finish(),
             targets: self.targets,

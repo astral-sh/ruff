@@ -3,10 +3,8 @@ use crate::db::tests::{TestDb, setup_db};
 use crate::place::symbol;
 use crate::place::{ConsideredDefinitions, Place, global_symbol};
 use crate::semantic_index::definition::Definition;
-use crate::semantic_index::scope::{FileScopeId, ScopeKind};
-use crate::semantic_index::{
-    global_scope, implicit_attribute_table, place_table, semantic_index, use_def_map,
-};
+use crate::semantic_index::scope::FileScopeId;
+use crate::semantic_index::{global_scope, place_table, semantic_index, use_def_map};
 use crate::types::function::FunctionType;
 use crate::types::{BoundMethodType, KnownClass, KnownInstanceType, UnionType, check_types};
 use ruff_db::diagnostic::Diagnostic;
@@ -23,15 +21,26 @@ fn __() {
     let _ = &FunctionType::infer_return_type;
     let _ = &BoundMethodType::infer_return_type;
     let _ = &ClassLiteral::implicit_attribute_inner;
+    let _ = &infer_expression_type_impl;
+    let _ = &infer_expression_types_impl;
+    let _ = &infer_definition_types;
+    let _ = &infer_scope_types;
+    let _ = &infer_unpack_types;
 }
 /// These queries refer to a value ​​from the previous cycle to ensure convergence.
 /// Therefore, even when convergence is apparent, they will cycle at least once.
-const QUERIES_USE_PREVIOUS_CYCLE_VALUE: [&str; 5] = [
+/// TODO: Is it possible to use the salsa API to get the value from the previous cycle (without doing anything if called for the first time)?
+const QUERIES_USE_PREVIOUS_CYCLE_VALUE: [&str; 10] = [
     "Type < 'db >::member_lookup_with_policy_",
     "Type < 'db >::class_member_with_policy_",
     "FunctionType < 'db >::infer_return_type_",
     "BoundMethodType < 'db >::infer_return_type_",
     "ClassLiteral < 'db >::implicit_attribute_inner_",
+    "infer_expression_type_impl",
+    "infer_expression_types_impl",
+    "infer_definition_types",
+    "infer_scope_types",
+    "infer_unpack_types",
 ];
 
 #[track_caller]
@@ -57,24 +66,6 @@ fn get_symbol<'db>(
     }
 
     symbol(db, scope, symbol_name, ConsideredDefinitions::EndOfScope).place
-}
-
-#[track_caller]
-fn get_scope<'db>(
-    db: &'db TestDb,
-    file: File,
-    name: &str,
-    kind: ScopeKind,
-) -> Option<ScopeId<'db>> {
-    let module = parsed_module(db, file).load(db);
-    let index = semantic_index(db, file);
-    for (child_scope, _) in index.child_scopes(FileScopeId::global()) {
-        let scope = child_scope.to_scope_id(db, file);
-        if scope.name(db, &module) == name && scope.scope(db).kind() == kind {
-            return Some(scope);
-        }
-    }
-    None
 }
 
 #[track_caller]
@@ -487,15 +478,10 @@ fn dependency_implicit_instance_attribute() -> anyhow::Result<()> {
         assert_eq!(attr_ty.display(&db).to_string(), "Unknown | str | None");
         db.take_salsa_events()
     };
-    let file_mod = system_path_to_file(&db, "/src/mod.py").unwrap();
-    let class_body_scope = get_scope(&db, file_mod, "C", ScopeKind::Class).unwrap();
-    let implicit_attribute_table = implicit_attribute_table(&db, class_body_scope);
-    let attribute = implicit_attribute_table.symbol_id("attr").unwrap();
-    let cycle_recovery = DivergentType::implicit_attribute(&db, class_body_scope, attribute);
     assert_function_query_was_run(
         &db,
         infer_expression_types_impl,
-        InferExpression::bare(&db, x_rhs_expression(&db), cycle_recovery),
+        InferExpression::Bare(x_rhs_expression(&db)),
         &events,
     );
 
@@ -516,12 +502,10 @@ fn dependency_implicit_instance_attribute() -> anyhow::Result<()> {
         assert_eq!(attr_ty.display(&db).to_string(), "Unknown | str | None");
         db.take_salsa_events()
     };
-    let class_body_scope = get_scope(&db, file_mod, "C", ScopeKind::Class).unwrap();
-    let cycle_recovery = DivergentType::implicit_attribute(&db, class_body_scope, attribute);
     assert_function_query_was_not_run(
         &db,
         infer_expression_types_impl,
-        InferExpression::bare(&db, x_rhs_expression(&db), cycle_recovery),
+        InferExpression::Bare(x_rhs_expression(&db)),
         &events,
     );
 
@@ -585,11 +569,10 @@ fn dependency_own_instance_member() -> anyhow::Result<()> {
         assert_eq!(attr_ty.display(&db).to_string(), "Unknown | str | None");
         db.take_salsa_events()
     };
-    let cycle_recovery = DivergentType::should_not_diverge(&db, global_scope(&db, file_main));
     assert_function_query_was_run(
         &db,
         infer_expression_types_impl,
-        InferExpression::bare(&db, x_rhs_expression(&db), cycle_recovery),
+        InferExpression::Bare(x_rhs_expression(&db)),
         &events,
     );
 
@@ -612,11 +595,10 @@ fn dependency_own_instance_member() -> anyhow::Result<()> {
         assert_eq!(attr_ty.display(&db).to_string(), "Unknown | str | None");
         db.take_salsa_events()
     };
-    let cycle_recovery = DivergentType::should_not_diverge(&db, global_scope(&db, file_main));
     assert_function_query_was_not_run(
         &db,
         infer_expression_types_impl,
-        InferExpression::bare(&db, x_rhs_expression(&db), cycle_recovery),
+        InferExpression::Bare(x_rhs_expression(&db)),
         &events,
     );
 
@@ -683,15 +665,10 @@ fn dependency_implicit_class_member() -> anyhow::Result<()> {
         assert_eq!(attr_ty.display(&db).to_string(), "Unknown | str");
         db.take_salsa_events()
     };
-    let file_mod = system_path_to_file(&db, "/src/mod.py").unwrap();
-    let class_body_scope = get_scope(&db, file_mod, "C", ScopeKind::Class).unwrap();
-    let implicit_attribute_table = implicit_attribute_table(&db, class_body_scope);
-    let attribute = implicit_attribute_table.symbol_id("class_attr").unwrap();
-    let cycle_recovery = DivergentType::implicit_attribute(&db, class_body_scope, attribute);
     assert_function_query_was_run(
         &db,
         infer_expression_types_impl,
-        InferExpression::bare(&db, x_rhs_expression(&db), cycle_recovery),
+        InferExpression::Bare(x_rhs_expression(&db)),
         &events,
     );
 
@@ -716,12 +693,10 @@ fn dependency_implicit_class_member() -> anyhow::Result<()> {
         assert_eq!(attr_ty.display(&db).to_string(), "Unknown | str");
         db.take_salsa_events()
     };
-    let class_body_scope = get_scope(&db, file_mod, "C", ScopeKind::Class).unwrap();
-    let cycle_recovery = DivergentType::implicit_attribute(&db, class_body_scope, attribute);
     assert_function_query_was_not_run(
         &db,
         infer_expression_types_impl,
-        InferExpression::bare(&db, x_rhs_expression(&db), cycle_recovery),
+        InferExpression::Bare(x_rhs_expression(&db)),
         &events,
     );
 
@@ -763,13 +738,10 @@ fn call_type_doesnt_rerun_when_only_callee_changed() -> anyhow::Result<()> {
     let call = &*module.syntax().body[1].as_assign_stmt().unwrap().value;
     let foo_call = semantic_index(&db, bar).expression(call);
 
-    let foo = system_path_to_file(&db, "src/foo.py")?;
-    let function_scope = get_scope(&db, foo, "foo", ScopeKind::Function).unwrap();
-    let cycle_recovery = DivergentType::function_return_type(&db, function_scope);
     assert_function_query_was_run(
         &db,
         infer_expression_types_impl,
-        InferExpression::bare(&db, foo_call, cycle_recovery),
+        InferExpression::Bare(foo_call),
         &events,
     );
 
@@ -797,12 +769,10 @@ fn call_type_doesnt_rerun_when_only_callee_changed() -> anyhow::Result<()> {
     let call = &*module.syntax().body[1].as_assign_stmt().unwrap().value;
     let foo_call = semantic_index(&db, bar).expression(call);
 
-    let function_scope = get_scope(&db, foo, "foo", ScopeKind::Function).unwrap();
-    let cycle_recovery = DivergentType::function_return_type(&db, function_scope);
     assert_function_query_was_not_run(
         &db,
         infer_expression_types_impl,
-        InferExpression::bare(&db, foo_call, cycle_recovery),
+        InferExpression::Bare(foo_call),
         &events,
     );
 

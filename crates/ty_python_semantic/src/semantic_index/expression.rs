@@ -32,6 +32,7 @@ pub(crate) enum ExpressionKind {
 /// * a field of a type that is a return type of a cross-module query
 /// * an argument of a cross-module query
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
+#[derive(PartialOrd, Ord)]
 pub(crate) struct Expression<'db> {
     /// The file in which the expression occurs.
     pub(crate) file: File,

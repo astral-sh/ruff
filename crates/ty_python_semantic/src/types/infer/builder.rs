@@ -40,8 +40,7 @@ use crate::semantic_index::scope::{
 };
 use crate::semantic_index::symbol::{ScopedSymbolId, Symbol};
 use crate::semantic_index::{
-    ApplicableConstraints, EnclosingSnapshotResult, SemanticIndex, implicit_attribute_table,
-    place_table,
+    ApplicableConstraints, EnclosingSnapshotResult, SemanticIndex, place_table,
 };
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::class::{CodeGeneratorKind, FieldKind, MetaclassErrorKind, MethodDecorator};
@@ -75,6 +74,7 @@ use crate::types::function::{
 };
 use crate::types::generics::LegacyGenericBase;
 use crate::types::generics::{GenericContext, bind_typevar};
+use crate::types::infer::infer_expression_types_impl;
 use crate::types::instance::SliceLiteral;
 use crate::types::mro::MroErrorKind;
 use crate::types::signatures::Signature;
@@ -86,13 +86,13 @@ use crate::types::typed_dict::{
 };
 use crate::types::visitor::any_over_type;
 use crate::types::{
-    CallDunderError, CallableType, ClassLiteral, ClassType, DataclassParams, DivergentType,
-    DynamicType, IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType,
-    MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm,
-    Parameters, SpecialFormType, SubclassOfType, TrackedConstraintSet, Truthiness, Type,
-    TypeAliasType, TypeAndQualifiers, TypeCheckDiagnostics, TypeContext, TypeQualifiers,
-    TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation, TypeVarInstance, TypeVarKind,
-    UnionBuilder, UnionType, binding_type, todo_type,
+    CallDunderError, CallableType, ClassLiteral, ClassType, CycleRecoveryType, DataclassParams,
+    DivergenceKind, DivergentType, DynamicType, InferExpression, IntersectionBuilder,
+    IntersectionType, KnownClass, KnownInstanceType, MemberLookupPolicy, MetaclassCandidate,
+    NormalizedVisitor, PEP695TypeAliasType, Parameter, ParameterForm, Parameters, SpecialFormType,
+    SubclassOfType, TrackedConstraintSet, Truthiness, Type, TypeAliasType, TypeAndQualifiers,
+    TypeContext, TypeQualifiers, TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation,
+    TypeVarInstance, TypeVarKind, UnionBuilder, UnionType, binding_type, todo_type,
 };
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::{EvaluationMode, UnpackPosition};
@@ -255,22 +255,10 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     undecorated_type: Option<Type<'db>>,
 
     /// The fallback type for missing expressions/bindings/declarations or recursive type inference.
-    cycle_recovery: Option<DivergentType<'db>>,
+    cycle_recovery: Option<CycleRecoveryType<'db>>,
 
     /// `true` if all places in this expression are definitely bound
     all_definitely_bound: bool,
-}
-
-/// Normally, double checking is not allowed in a [`TypeInferenceBuilder`],
-/// but it is sometimes necessary for expression inference to detect divergence.
-/// Explicit double checking can be achieved by taking a snapshot of the state before the check
-/// and then reverting the state using the snapshot after the check.
-struct TypeInferenceSnapshot {
-    diagnostics: TypeCheckDiagnostics,
-    expression_keys: FxHashSet<ExpressionNodeKey>,
-    length_of_bindings: usize,
-    length_of_declarations: usize,
-    length_of_deferred: usize,
 }
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
@@ -309,99 +297,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn fallback_type(&self) -> Option<Type<'db>> {
-        self.cycle_recovery.map(Type::divergent)
+        self.cycle_recovery
     }
 
-    fn snapshot(&mut self) -> TypeInferenceSnapshot {
-        TypeInferenceSnapshot {
-            diagnostics: self.context.take_diagnostics(),
-            expression_keys: self.expressions.keys().copied().collect(),
-            length_of_bindings: self.bindings.len(),
-            length_of_declarations: self.declarations.len(),
-            length_of_deferred: self.deferred.len(),
-        }
-    }
-
-    fn restore(&mut self, snapshot: &TypeInferenceSnapshot) {
-        self.context.take_diagnostics();
-        self.context.extend(&snapshot.diagnostics);
-        self.expressions
-            .retain(|k, _| snapshot.expression_keys.contains(k));
-        self.bindings.truncate(snapshot.length_of_bindings);
-        self.declarations.truncate(snapshot.length_of_declarations);
-        self.deferred.truncate(snapshot.length_of_deferred);
-    }
-
-    /// If the inference in this expression diverges, what kind of divergence is possible?
-    fn expression_cycle_recovery(&mut self, expression: &ast::Expr) -> DivergentType<'db> {
-        let db = self.db();
-        match expression {
-            ast::Expr::Call(call) => {
-                let snapshot = self.snapshot();
-                let callable_ty =
-                    self.try_expression_type(call.func.as_ref())
-                        .unwrap_or_else(|| {
-                            self.infer_maybe_standalone_expression(
-                                &call.func,
-                                TypeContext::default(),
-                            )
-                        });
-                self.restore(&snapshot);
-                match callable_ty {
-                    Type::FunctionLiteral(func) => DivergentType::function_return_type(
-                        db,
-                        func.literal(db).last_definition(db).body_scope(db),
-                    ),
-                    Type::BoundMethod(method) => DivergentType::function_return_type(
-                        db,
-                        method
-                            .function(db)
-                            .literal(db)
-                            .last_definition(db)
-                            .body_scope(db),
-                    ),
-                    _ => DivergentType::should_not_diverge(db, self.scope()),
+    fn merge_cycle_recovery(&mut self, other: Option<CycleRecoveryType<'db>>) {
+        if let Some(other) = other {
+            match self.cycle_recovery {
+                Some(existing) => {
+                    self.cycle_recovery =
+                        Some(UnionType::from_elements(self.db(), [existing, other]));
                 }
-            }
-            ast::Expr::Attribute(attr) => {
-                let snapshot = self.snapshot();
-                let value_ty = self
-                    .try_expression_type(attr.value.as_ref())
-                    .unwrap_or_else(|| {
-                        self.infer_maybe_standalone_expression(&attr.value, TypeContext::default())
-                    });
-                self.restore(&snapshot);
-                let body_scope = match value_ty {
-                    Type::NominalInstance(instance) => instance.class_literal(db).body_scope(db),
-                    Type::ClassLiteral(class) => class.body_scope(db),
-                    Type::GenericAlias(generic) => generic.origin(db).body_scope(db),
-                    _ => {
-                        return DivergentType::should_not_diverge(db, self.scope());
-                    }
-                };
-                let implicit_attribute_table = implicit_attribute_table(db, body_scope);
-                if let Some(attribute) = implicit_attribute_table.symbol_id(&attr.attr) {
-                    DivergentType::implicit_attribute(db, body_scope, attribute)
-                } else {
-                    DivergentType::should_not_diverge(db, self.scope())
-                }
-            }
-            _ => DivergentType::should_not_diverge(db, self.scope()),
-        }
-    }
-
-    fn merge_cycle_recovery(&mut self, other: Option<DivergentType<'db>>) {
-        match (self.cycle_recovery, other) {
-            (None, _) | (Some(_), None) => {
-                self.cycle_recovery = self.cycle_recovery.or(other);
-            }
-            (Some(self_), Some(other)) => {
-                if self_ == other {
-                    // OK, do nothing
-                } else if self_.kind(self.db()).should_not_diverge() {
+                None => {
                     self.cycle_recovery = Some(other);
-                } else {
-                    panic!("Cannot merge divergent types");
                 }
             }
         }
@@ -3996,7 +3903,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ) => {
                 self.store_expression_type(target, assigned_ty.unwrap_or(Type::unknown()));
 
-                let object_ty = self.infer_expression(object, TypeContext::default());
+                let object_ty =
+                    self.infer_maybe_standalone_expression(object, TypeContext::default());
 
                 if let Some(assigned_ty) = assigned_ty {
                     self.validate_attribute_assignment(
@@ -5119,10 +5027,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         standalone_expression: Expression<'db>,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
-        let cycle_recovery = self
-            .cycle_recovery
-            .unwrap_or_else(|| self.expression_cycle_recovery(expression));
-        let types = infer_expression_types(self.db(), standalone_expression, tcx, cycle_recovery);
+        let types = infer_expression_types(self.db(), standalone_expression, tcx);
         self.extend_expression(types);
 
         // Instead of calling `self.expression_type(expr)` after extending here, we get
@@ -5565,19 +5470,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             //  but only if the target is a name. We should report a diagnostic here if the target isn't a name:
             //  `[... for a.x in not_iterable]
             if is_first {
-                // QUESTION: Could there be a case for divergence here?
-                let cycle_recovery =
-                    builder
-                        .cycle_recovery
-                        .unwrap_or(DivergentType::should_not_diverge(
-                            builder.db(),
-                            builder.scope(),
-                        ));
                 infer_same_file_expression_type(
                     builder.db(),
                     builder.index.expression(iter_expr),
                     TypeContext::default(),
-                    cycle_recovery,
                     builder.module(),
                 )
             } else {
@@ -5601,16 +5497,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let mut infer_iterable_type = || {
             let expression = self.index.expression(iterable);
-            // QUESTION: Could there be a case for divergence here?
-            let cycle_recovery = self
-                .cycle_recovery
-                .unwrap_or(DivergentType::should_not_diverge(self.db(), self.scope()));
-            let result = infer_expression_types(
-                self.db(),
-                expression,
-                TypeContext::default(),
-                cycle_recovery,
-            );
+            let result = infer_expression_types(self.db(), expression, TypeContext::default());
 
             // Two things are different if it's the first comprehension:
             // (1) We must lookup the `ScopedExpressionId` of the iterable expression in the outer scope,
@@ -6866,7 +6753,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         match ctx {
             ExprContext::Load => self.infer_attribute_load(attribute),
             ExprContext::Store => {
-                self.infer_expression(value, TypeContext::default());
+                self.infer_maybe_standalone_expression(value, TypeContext::default());
                 Type::Never
             }
             ExprContext::Del => {
@@ -6874,7 +6761,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Type::Never
             }
             ExprContext::Invalid => {
-                self.infer_expression(value, TypeContext::default());
+                self.infer_maybe_standalone_expression(value, TypeContext::default());
                 Type::unknown()
             }
         }
@@ -8988,14 +8875,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    pub(super) fn finish_expression(mut self) -> ExpressionInference<'db> {
+    pub(super) fn finish_expression(
+        mut self,
+        input: InferExpression<'db>,
+    ) -> ExpressionInference<'db> {
         self.infer_region();
 
+        let db = self.db();
         let Self {
             context,
             mut expressions,
             scope,
-            bindings,
+            mut bindings,
             declarations,
             deferred,
             cycle_recovery,
@@ -9025,6 +8916,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             "Expression region can't have deferred types"
         );
 
+        let div = Type::divergent(DivergentType::new(
+            db,
+            DivergenceKind::InferExpressionTypes(input),
+        ));
+        let visitor = NormalizedVisitor::default().recursive(div);
+        let previous_cycle_value = infer_expression_types_impl(db, input);
         let extra =
             (cycle_recovery.is_some() || !bindings.is_empty() || !diagnostics.is_empty() || !all_definitely_bound).then(|| {
                 if bindings.len() > 20 {
@@ -9033,6 +8930,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         self.region,
                         bindings.len()
                     );
+                }
+                for (binding, binding_ty) in bindings.iter_mut() {
+                    if let Some((_, previous_binding)) = previous_cycle_value.extra.as_deref()
+                    .and_then(|extra| extra.bindings.iter().find(|(previous_binding, _)| previous_binding == binding)) {
+                        *binding_ty = UnionType::from_elements(
+                            db,
+                            [*binding_ty, *previous_binding],
+                        ).recursive_type_normalized(db, &visitor);
+                    } else {
+                        *binding_ty = binding_ty.recursive_type_normalized(db, &visitor);
+                    }
                 }
 
                 Box::new(ExpressionInferenceExtra {
@@ -9044,6 +8952,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             });
 
         expressions.shrink_to_fit();
+        for (expr, ty) in &mut expressions {
+            let previous_ty = previous_cycle_value.expression_type(*expr);
+            *ty = UnionType::from_elements(db, [*ty, previous_ty])
+                .recursive_type_normalized(db, &visitor);
+        }
 
         ExpressionInference {
             expressions,
@@ -9055,25 +8968,32 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     pub(super) fn finish_definition(mut self) -> DefinitionInference<'db> {
         self.infer_region();
+        let db = self.db();
 
         let Self {
             context,
             mut expressions,
             scope,
-            bindings,
-            declarations,
+            mut bindings,
+            mut declarations,
             deferred,
             cycle_recovery,
             undecorated_type,
             all_definitely_bound: _,
             // builder only state
             typevar_binding_context: _,
-            deferred_state: _,
+            deferred_state,
             called_functions: _,
             index: _,
-            region: _,
+            region,
             returnees: _,
         } = self;
+
+        let (InferenceRegion::Definition(definition) | InferenceRegion::Deferred(definition)) =
+            region
+        else {
+            panic!("expected definition/deferred region");
+        };
 
         let _ = scope;
         let diagnostics = context.finish();
@@ -9108,6 +9028,32 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         expressions.shrink_to_fit();
+        if !matches!(region, InferenceRegion::Deferred(_)) && !deferred_state.is_deferred() {
+            let div = Type::divergent(DivergentType::new(
+                db,
+                DivergenceKind::InferDefinitionTypes(definition),
+            ));
+            let visitor = NormalizedVisitor::default().recursive(div);
+            let previous_cycle_value = infer_definition_types(db, definition);
+            for (expr, ty) in &mut expressions {
+                let previous_ty = previous_cycle_value.expression_type(*expr);
+                *ty = UnionType::from_elements(db, [*ty, previous_ty])
+                    .recursive_type_normalized(db, &visitor);
+            }
+
+            for (binding, binding_ty) in bindings.iter_mut() {
+                let previous_ty = previous_cycle_value.binding_type(*binding);
+                *binding_ty = UnionType::from_elements(db, [*binding_ty, previous_ty])
+                    .recursive_type_normalized(db, &visitor);
+            }
+            for (declaration, TypeAndQualifiers { inner, .. }) in declarations.iter_mut() {
+                let previous_ty = previous_cycle_value
+                    .declaration_type(*declaration)
+                    .inner_type();
+                *inner = UnionType::from_elements(db, [*inner, previous_ty])
+                    .recursive_type_normalized(db, &visitor);
+            }
+        }
 
         DefinitionInference {
             expressions,
@@ -9165,6 +9111,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         });
 
         expressions.shrink_to_fit();
+        if let NodeWithScopeKind::TypeAlias(_) = scope.node(db) {
+            // Don't perform recursive type normalization on type aliases
+        } else {
+            let div = Type::divergent(DivergentType::new(
+                db,
+                DivergenceKind::InferScopeTypes(scope),
+            ));
+            let visitor = NormalizedVisitor::default().recursive(div);
+            let previous_cycle_value = infer_scope_types(db, scope);
+
+            for (expr, ty) in &mut expressions {
+                let previous_ty = previous_cycle_value.expression_type(*expr);
+                *ty = UnionType::from_elements(db, [*ty, previous_ty])
+                    .recursive_type_normalized(db, &visitor);
+            }
+        }
 
         ScopeInference {
             expressions,
@@ -9430,6 +9392,10 @@ where
         self.0.iter().map(|(k, v)| (k, v))
     }
 
+    fn iter_mut(&mut self) -> impl ExactSizeIterator<Item = (&K, &mut V)> {
+        self.0.iter_mut().map(|(k, v)| (&*k, v))
+    }
+
     fn insert(&mut self, key: K, value: V) {
         debug_assert!(
             !self.0.iter().any(|(existing, _)| existing == &key),
@@ -9441,10 +9407,6 @@ where
 
     fn into_boxed_slice(self) -> Box<[(K, V)]> {
         self.0.into_boxed_slice()
-    }
-
-    fn truncate(&mut self, len: usize) {
-        self.0.truncate(len);
     }
 }
 
@@ -9488,14 +9450,6 @@ impl<V> VecSet<V> {
 
     fn into_boxed_slice(self) -> Box<[V]> {
         self.0.into_boxed_slice()
-    }
-
-    fn truncate(&mut self, len: usize) {
-        self.0.truncate(len);
-    }
-
-    fn len(&self) -> usize {
-        self.0.len()
     }
 }
 

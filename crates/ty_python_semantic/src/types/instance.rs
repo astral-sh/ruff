@@ -336,6 +336,22 @@ impl<'db> NominalInstanceType<'db> {
         }
     }
 
+    pub(super) fn recursive_type_normalized(
+        self,
+        db: &'db dyn Db,
+        visitor: &NormalizedVisitor<'db>,
+    ) -> Self {
+        match self.0 {
+            NominalInstanceInner::ExactTuple(tuple) => Self(NominalInstanceInner::ExactTuple(
+                tuple.recursive_type_normalized(db, visitor),
+            )),
+            NominalInstanceInner::NonTuple(class) => Self(NominalInstanceInner::NonTuple(
+                class.recursive_type_normalized(db, visitor),
+            )),
+            NominalInstanceInner::Object => Self(NominalInstanceInner::Object),
+        }
+    }
+
     pub(super) fn has_relation_to_impl(
         self,
         db: &'db dyn Db,
@@ -624,9 +640,6 @@ impl<'db> ProtocolInstanceType<'db> {
         db: &'db dyn Db,
         visitor: &NormalizedVisitor<'db>,
     ) -> Type<'db> {
-        if visitor.is_recursive() {
-            return Type::ProtocolInstance(self);
-        }
         if self.is_equivalent_to_object(db) {
             return Type::object();
         }
@@ -636,6 +649,14 @@ impl<'db> ProtocolInstanceType<'db> {
             )),
             Protocol::Synthesized(_) => Type::ProtocolInstance(self),
         }
+    }
+
+    pub(super) fn recursive_type_normalized(
+        self,
+        _db: &'db dyn Db,
+        _visitor: &NormalizedVisitor<'db>,
+    ) -> Self {
+        self
     }
 
     /// Return `true` if this protocol type is equivalent to the protocol `other`.

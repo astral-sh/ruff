@@ -399,6 +399,19 @@ impl<'db> GenericContext<'db> {
         Self::from_typevar_instances(db, variables)
     }
 
+    pub(super) fn recursive_type_normalized(
+        self,
+        db: &'db dyn Db,
+        visitor: &NormalizedVisitor<'db>,
+    ) -> Self {
+        let variables = self
+            .variables(db)
+            .iter()
+            .map(|bound_typevar| bound_typevar.recursive_type_normalized(db, visitor));
+
+        Self::from_typevar_instances(db, variables)
+    }
+
     fn heap_size((variables,): &(FxOrderSet<BoundTypeVarInstance<'db>>,)) -> usize {
         ruff_memory_usage::order_set_heap_size(variables)
     }
@@ -729,6 +742,31 @@ impl<'db> Specialization<'db> {
         )
     }
 
+    pub(super) fn recursive_type_normalized(
+        self,
+        db: &'db dyn Db,
+        visitor: &NormalizedVisitor<'db>,
+    ) -> Self {
+        let types: Box<[_]> = self
+            .types(db)
+            .iter()
+            .map(|ty| ty.recursive_type_normalized(db, visitor))
+            .collect();
+        let tuple_inner = self
+            .tuple_inner(db)
+            .map(|tuple| tuple.recursive_type_normalized(db, visitor));
+        let context = self
+            .generic_context(db)
+            .recursive_type_normalized(db, visitor);
+        Self::new(
+            db,
+            context,
+            types,
+            self.materialization_kind(db),
+            tuple_inner,
+        )
+    }
+
     pub(super) fn materialize_impl(
         self,
         db: &'db dyn Db,
@@ -981,6 +1019,24 @@ impl<'db> PartialSpecialization<'_, 'db> {
             .types
             .iter()
             .map(|ty| ty.normalized_impl(db, visitor))
+            .collect();
+
+        PartialSpecialization {
+            generic_context,
+            types,
+        }
+    }
+
+    pub(super) fn recursive_type_normalized(
+        &self,
+        db: &'db dyn Db,
+        visitor: &NormalizedVisitor<'db>,
+    ) -> PartialSpecialization<'db, 'db> {
+        let generic_context = self.generic_context.recursive_type_normalized(db, visitor);
+        let types: Cow<_> = self
+            .types
+            .iter()
+            .map(|ty| ty.recursive_type_normalized(db, visitor))
             .collect();
 
         PartialSpecialization {

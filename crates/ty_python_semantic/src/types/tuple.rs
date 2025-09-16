@@ -228,6 +228,14 @@ impl<'db> TupleType<'db> {
         TupleType::new(db, &self.tuple(db).normalized_impl(db, visitor))
     }
 
+    pub(super) fn recursive_type_normalized(
+        self,
+        db: &'db dyn Db,
+        visitor: &NormalizedVisitor<'db>,
+    ) -> Self {
+        Self::new_internal(db, self.tuple(db).recursive_type_normalized(db, visitor))
+    }
+
     pub(crate) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
@@ -384,6 +392,14 @@ impl<'db> FixedLengthTuple<Type<'db>> {
     #[must_use]
     fn normalized_impl(&self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         Self::from_elements(self.0.iter().map(|ty| ty.normalized_impl(db, visitor)))
+    }
+
+    fn recursive_type_normalized(&self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+        Self::from_elements(
+            self.0
+                .iter()
+                .map(|ty| ty.recursive_type_normalized(db, visitor)),
+        )
     }
 
     fn apply_type_mapping_impl<'a>(
@@ -697,6 +713,25 @@ impl<'db> VariableLengthTuple<Type<'db>> {
             variable,
             suffix,
         })
+    }
+
+    fn recursive_type_normalized(&self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+        let prefix = self
+            .prefix
+            .iter()
+            .map(|ty| ty.recursive_type_normalized(db, visitor))
+            .collect::<Box<_>>();
+        let suffix = self
+            .suffix
+            .iter()
+            .map(|ty| ty.recursive_type_normalized(db, visitor))
+            .collect::<Box<_>>();
+        let variable = self.variable.recursive_type_normalized(db, visitor);
+        Self {
+            prefix,
+            variable,
+            suffix,
+        }
     }
 
     fn apply_type_mapping_impl<'a>(
@@ -1037,6 +1072,17 @@ impl<'db> Tuple<Type<'db>> {
         match self {
             Tuple::Fixed(tuple) => Tuple::Fixed(tuple.normalized_impl(db, visitor)),
             Tuple::Variable(tuple) => tuple.normalized_impl(db, visitor),
+        }
+    }
+
+    pub(super) fn recursive_type_normalized(
+        &self,
+        db: &'db dyn Db,
+        visitor: &NormalizedVisitor<'db>,
+    ) -> Self {
+        match self {
+            Tuple::Fixed(tuple) => Tuple::Fixed(tuple.recursive_type_normalized(db, visitor)),
+            Tuple::Variable(tuple) => Tuple::Variable(tuple.recursive_type_normalized(db, visitor)),
         }
     }
 

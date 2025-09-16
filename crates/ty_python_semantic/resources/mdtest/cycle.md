@@ -28,6 +28,20 @@ class Point:
         self.x, self.y = other.x, other.y
 
 p = Point()
-reveal_type(p.x)  # revealed: Unknown | int
-reveal_type(p.y)  # revealed: Unknown | int
+# TODO: should be `Unknown | int`
+reveal_type(p.x)  # revealed: Unknown | int | Divergent
+# TODO: should be `Unknown | int`
+reveal_type(p.y)  # revealed: Unknown | int | Divergent
+```
+
+## Self-referential bare type alias
+
+```py
+A = list["A" | None]
+
+def f(x: A):
+    # TODO: should be `list[A | None]`?
+    reveal_type(x)  # revealed: list[Divergent]
+    # TODO: should be `A | None`?
+    reveal_type(x[0])  # revealed: Divergent
 ```

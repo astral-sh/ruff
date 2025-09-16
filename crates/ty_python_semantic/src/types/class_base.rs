@@ -37,8 +37,22 @@ impl<'db> ClassBase<'db> {
 
     pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         match self {
-            Self::Dynamic(dynamic) => Self::Dynamic(dynamic.normalized(visitor.is_recursive())),
+            Self::Dynamic(dynamic) => Self::Dynamic(dynamic.normalized_impl(visitor.kind)),
             Self::Class(class) => Self::Class(class.normalized_impl(db, visitor)),
+            Self::Protocol | Self::Generic | Self::TypedDict => self,
+        }
+    }
+
+    pub(super) fn recursive_type_normalized(
+        self,
+        db: &'db dyn Db,
+        visitor: &NormalizedVisitor<'db>,
+    ) -> Self {
+        match self {
+            Self::Dynamic(dynamic) => {
+                Self::Dynamic(dynamic.recursive_type_normalized(visitor.kind))
+            }
+            Self::Class(class) => Self::Class(class.recursive_type_normalized(db, visitor)),
             Self::Protocol | Self::Generic | Self::TypedDict => self,
         }
     }

@@ -181,6 +181,16 @@ impl<'db> SubclassOfType<'db> {
         }
     }
 
+    pub(super) fn recursive_type_normalized(
+        self,
+        db: &'db dyn Db,
+        visitor: &NormalizedVisitor<'db>,
+    ) -> Self {
+        Self {
+            subclass_of: self.subclass_of.recursive_type_normalized(db, visitor),
+        }
+    }
+
     pub(crate) fn to_instance(self, db: &'db dyn Db) -> Type<'db> {
         match self.subclass_of {
             SubclassOfInner::Class(class) => Type::instance(db, class),
@@ -250,7 +260,20 @@ impl<'db> SubclassOfInner<'db> {
     pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         match self {
             Self::Class(class) => Self::Class(class.normalized_impl(db, visitor)),
-            Self::Dynamic(dynamic) => Self::Dynamic(dynamic.normalized(visitor.is_recursive())),
+            Self::Dynamic(dynamic) => Self::Dynamic(dynamic.normalized_impl(visitor.kind)),
+        }
+    }
+
+    pub(super) fn recursive_type_normalized(
+        self,
+        db: &'db dyn Db,
+        visitor: &NormalizedVisitor<'db>,
+    ) -> Self {
+        match self {
+            Self::Class(class) => Self::Class(class.recursive_type_normalized(db, visitor)),
+            Self::Dynamic(dynamic) => {
+                Self::Dynamic(dynamic.recursive_type_normalized(visitor.kind))
+            }
         }
     }
 

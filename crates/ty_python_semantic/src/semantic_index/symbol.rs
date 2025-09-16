@@ -268,7 +268,3 @@ impl DerefMut for SymbolTableBuilder {
         &mut self.table
     }
 }
-
-pub(crate) type ScopedImplicitAttributeId = ScopedSymbolId;
-pub(crate) type ImplicitAttributeTable = SymbolTable;
-pub(super) type ImplicitAttributeTableBuilder = SymbolTableBuilder;
