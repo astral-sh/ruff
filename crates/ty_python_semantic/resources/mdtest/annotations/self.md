@@ -237,7 +237,7 @@ reveal_type(D().instance_method)
 reveal_type(D.class_method)
 ```
 
-In nested functions self bounds to the method. So in the following example the `self` in `C.b` is
+In nested functions `self` binds to the method. So in the following example the `self` in `C.b` is
 bound at `C.f`.
 
 ```py
