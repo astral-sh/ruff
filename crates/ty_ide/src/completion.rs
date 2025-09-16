@@ -5,12 +5,120 @@ use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast as ast;
 use ruff_python_parser::{Token, TokenAt, TokenKind};
 use ruff_text_size::{Ranged, TextRange, TextSize};
-use ty_python_semantic::{Completion, NameKind, SemanticModel};
+use ty_python_semantic::{
+    Completion as SemanticCompletion, ModuleName, NameKind, SemanticModel,
+    types::{CycleDetector, Type},
+};
 
 use crate::docstring::Docstring;
 use crate::find_node::covering_node;
 use crate::goto::DefinitionsOrTargets;
 use crate::{Db, all_symbols};
+
+impl<'db> Completion<'db> {
+    /// Returns the "kind" of this completion.
+    ///
+    /// This is meant to be a very general classification of this completion.
+    /// Typically, this is communicated from the LSP server to a client, and
+    /// the client uses this information to help improve the UX (perhaps by
+    /// assigning an icon of some kind to the completion).
+    pub fn kind(&self, db: &'db dyn Db) -> Option<CompletionKind> {
+        type CompletionKindVisitor<'db> =
+            CycleDetector<CompletionKind, Type<'db>, Option<CompletionKind>>;
+
+        fn imp<'db>(
+            db: &'db dyn Db,
+            ty: Type<'db>,
+            visitor: &CompletionKindVisitor<'db>,
+        ) -> Option<CompletionKind> {
+            Some(match ty {
+                Type::FunctionLiteral(_)
+                | Type::DataclassDecorator(_)
+                | Type::WrapperDescriptor(_)
+                | Type::DataclassTransformer(_)
+                | Type::Callable(_) => CompletionKind::Function,
+                Type::BoundMethod(_) | Type::KnownBoundMethod(_) => CompletionKind::Method,
+                Type::ModuleLiteral(_) => CompletionKind::Module,
+                Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => {
+                    CompletionKind::Class
+                }
+                // This is a little weird for "struct." I'm mostly interpreting
+                // "struct" here as a more general "object." ---AG
+                Type::NominalInstance(_)
+                | Type::PropertyInstance(_)
+                | Type::BoundSuper(_)
+                | Type::TypedDict(_) => CompletionKind::Struct,
+                Type::IntLiteral(_)
+                | Type::BooleanLiteral(_)
+                | Type::TypeIs(_)
+                | Type::StringLiteral(_)
+                | Type::LiteralString
+                | Type::BytesLiteral(_) => CompletionKind::Value,
+                Type::EnumLiteral(_) => CompletionKind::Enum,
+                Type::ProtocolInstance(_) => CompletionKind::Interface,
+                Type::NonInferableTypeVar(_) | Type::TypeVar(_) => CompletionKind::TypeParameter,
+                Type::Union(union) => union
+                    .elements(db)
+                    .iter()
+                    .find_map(|&ty| imp(db, ty, visitor))?,
+                Type::Intersection(intersection) => intersection
+                    .iter_positive(db)
+                    .find_map(|ty| imp(db, ty, visitor))?,
+                Type::Dynamic(_)
+                | Type::Never
+                | Type::SpecialForm(_)
+                | Type::KnownInstance(_)
+                | Type::AlwaysTruthy
+                | Type::AlwaysFalsy => return None,
+                Type::TypeAlias(alias) => {
+                    visitor.visit(ty, || imp(db, alias.value_type(db), visitor))?
+                }
+            })
+        }
+        self.kind.or_else(|| {
+            self.ty
+                .and_then(|ty| imp(db, ty, &CompletionKindVisitor::default()))
+        })
+    }
+}
+
+/// The "kind" of a completion.
+///
+/// This is taken directly from the LSP completion specification:
+/// <https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#completionItemKind>
+///
+/// The idea here is that [`Completion::kind`] defines the mapping to this from
+/// `Type` (and possibly other information), which might be interesting and
+/// contentious. Then the outer edges map this to the LSP types, which is
+/// expected to be mundane and boring.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CompletionKind {
+    Text,
+    Method,
+    Function,
+    Constructor,
+    Field,
+    Variable,
+    Class,
+    Interface,
+    Module,
+    Property,
+    Unit,
+    Value,
+    Enum,
+    Keyword,
+    Snippet,
+    Color,
+    File,
+    Reference,
+    Folder,
+    EnumMember,
+    Constant,
+    Struct,
+    Event,
+    Operator,
+    TypeParameter,
+}
 
 #[derive(Clone, Debug, Default)]
 pub struct CompletionSettings {

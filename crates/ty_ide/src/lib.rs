@@ -26,7 +26,7 @@ mod symbols;
 mod workspace_symbols;
 
 pub use all_symbols::{AllSymbolInfo, all_symbols};
-pub use completion::{CompletionSettings, completion};
+pub use completion::{Completion, CompletionKind, CompletionSettings, completion};
 pub use doc_highlights::document_highlights;
 pub use document_symbols::document_symbols;
 pub use goto::{goto_declaration, goto_definition, goto_type_definition};
