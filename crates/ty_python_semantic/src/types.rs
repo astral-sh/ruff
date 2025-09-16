@@ -65,6 +65,7 @@ use crate::types::signatures::{Parameter, ParameterForm, Parameters, walk_signat
 use crate::types::tuple::TupleSpec;
 pub(crate) use crate::types::typed_dict::{TypedDictParams, TypedDictType, walk_typed_dict_type};
 use crate::types::variance::{TypeVarVariance, VarianceInferable};
+use crate::types::visitor::any_over_type;
 use crate::unpack::EvaluationMode;
 pub use crate::util::diagnostics::add_inferred_python_version_hint_to_diagnostic;
 use crate::{Db, FxOrderSet, Module, Program};
@@ -220,10 +221,6 @@ pub(crate) struct TryBool;
 /// A [`TypeTransformer`] that is used in `normalized` methods.
 pub(crate) type NormalizedVisitor<'db> = TypeTransformer<'db, Normalized>;
 pub(crate) struct Normalized;
-
-/// A [`CycleDetector`] that is used in `has_divergent_type` methods.
-pub(crate) type HasDivergentTypeVisitor<'db> = CycleDetector<HasDivergentType, Type<'db>, bool>;
-pub(crate) struct HasDivergentType;
 
 /// How a generic type has been specialized.
 ///
@@ -590,19 +587,6 @@ impl<'db> PropertyInstanceType<'db> {
         };
 
         getter_equivalence.and(db, setter_equivalence)
-    }
-
-    fn has_divergent_type_impl(
-        self,
-        db: &'db dyn Db,
-        div: Type<'db>,
-        visitor: &HasDivergentTypeVisitor<'db>,
-    ) -> bool {
-        self.getter(db)
-            .is_some_and(|ty| ty.has_divergent_type_impl(db, div, visitor))
-            || self
-                .setter(db)
-                .is_some_and(|ty| ty.has_divergent_type_impl(db, div, visitor))
     }
 }
 
@@ -6512,77 +6496,7 @@ impl<'db> Type<'db> {
     }
 
     pub(super) fn has_divergent_type(self, db: &'db dyn Db, div: Type<'db>) -> bool {
-        self.has_divergent_type_impl(db, div, &HasDivergentTypeVisitor::new(false))
-    }
-
-    pub(super) fn has_divergent_type_impl(
-        self,
-        db: &'db dyn Db,
-        div: Type<'db>,
-        visitor: &HasDivergentTypeVisitor<'db>,
-    ) -> bool {
-        // We don't use `any_over_type` here because we don't need/want to descend into lazy
-        // parts of types (typevar bounds/constraints, type alias values, etc) here. If it's a lazy
-        // aspect of the type, it won't cause a query cycle in type inference, and we shouldn't
-        // trigger unnecessary inference of it. (TODO: bounds/constraints of legacy typevars aren't
-        // yet lazy, but they should be.)
-        match self {
-            Type::Dynamic(DynamicType::Divergent(_)) => self == div,
-            Type::Union(union) => union.has_divergent_type_impl(db, div, visitor),
-            Type::Intersection(intersection) => {
-                intersection.has_divergent_type_impl(db, div, visitor)
-            }
-            Type::GenericAlias(alias) => visitor.visit(self, || {
-                alias
-                    .specialization(db)
-                    .has_divergent_type_impl(db, div, visitor)
-            }),
-            Type::NominalInstance(instance) => visitor.visit(self, || {
-                instance.class(db).has_divergent_type_impl(db, div, visitor)
-            }),
-            Type::Callable(callable) => {
-                visitor.visit(self, || callable.has_divergent_type_impl(db, div, visitor))
-            }
-            Type::ProtocolInstance(protocol) => {
-                visitor.visit(self, || protocol.has_divergent_type_impl(db, div, visitor))
-            }
-            Type::PropertyInstance(property) => property.has_divergent_type_impl(db, div, visitor),
-            Type::TypeIs(type_is) => type_is
-                .return_type(db)
-                .has_divergent_type_impl(db, div, visitor),
-            Type::SubclassOf(subclass_of) => visitor.visit(self, || {
-                subclass_of.has_divergent_type_impl(db, div, visitor)
-            }),
-            Type::TypedDict(typed_dict) => visitor.visit(self, || {
-                typed_dict
-                    .defining_class()
-                    .has_divergent_type_impl(db, div, visitor)
-            }),
-            Type::Never
-            | Type::AlwaysTruthy
-            | Type::AlwaysFalsy
-            | Type::WrapperDescriptor(_)
-            | Type::DataclassDecorator(_)
-            | Type::DataclassTransformer(_)
-            | Type::ModuleLiteral(_)
-            | Type::ClassLiteral(_)
-            | Type::IntLiteral(_)
-            | Type::BooleanLiteral(_)
-            | Type::LiteralString
-            | Type::StringLiteral(_)
-            | Type::BytesLiteral(_)
-            | Type::EnumLiteral(_)
-            | Type::BoundSuper(_)
-            | Type::SpecialForm(_)
-            | Type::KnownInstance(_)
-            | Type::NonInferableTypeVar(_)
-            | Type::TypeVar(_)
-            | Type::FunctionLiteral(_)
-            | Type::KnownBoundMethod(_)
-            | Type::BoundMethod(_)
-            | Type::Dynamic(_)
-            | Type::TypeAlias(_) => false,
-        }
+        any_over_type(db, self, &|ty| ty == div, false)
     }
 }
 
@@ -7528,10 +7442,27 @@ fn walk_type_var_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     typevar: TypeVarInstance<'db>,
     visitor: &V,
 ) {
-    if let Some(bounds) = typevar.bound_or_constraints(db) {
-        walk_type_var_bounds(db, bounds, visitor);
+    if let Some(bound_or_constraints) = if visitor.should_visit_lazy_type_attributes() {
+        typevar.bound_or_constraints(db)
+    } else {
+        match typevar._bound_or_constraints(db) {
+            _ if visitor.should_visit_lazy_type_attributes() => typevar.bound_or_constraints(db),
+            Some(TypeVarBoundOrConstraintsEvaluation::Eager(bound_or_constraints)) => {
+                Some(bound_or_constraints)
+            }
+            _ => None,
+        }
+    } {
+        walk_type_var_bounds(db, bound_or_constraints, visitor);
     }
-    if let Some(default_type) = typevar.default_type(db) {
+    if let Some(default_type) = if visitor.should_visit_lazy_type_attributes() {
+        typevar.default_type(db)
+    } else {
+        match typevar._default(db) {
+            Some(TypeVarDefaultEvaluation::Eager(default_type)) => Some(default_type),
+            _ => None,
+        }
+    } {
         visitor.visit_type(db, default_type);
     }
 }
@@ -9314,16 +9245,6 @@ impl<'db> CallableType<'db> {
                 .is_equivalent_to_impl(db, other.signatures(db), visitor)
         })
     }
-
-    fn has_divergent_type_impl(
-        self,
-        db: &'db dyn Db,
-        div: Type<'db>,
-        visitor: &HasDivergentTypeVisitor<'db>,
-    ) -> bool {
-        self.signatures(db)
-            .has_divergent_type_impl(db, div, visitor)
-    }
 }
 
 /// Represents a specific instance of a bound method type for a builtin class.
@@ -9970,6 +9891,9 @@ fn walk_type_alias_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     type_alias: TypeAliasType<'db>,
     visitor: &V,
 ) {
+    if !visitor.should_visit_lazy_type_attributes() {
+        return;
+    }
     match type_alias {
         TypeAliasType::PEP695(type_alias) => {
             walk_pep_695_type_alias(db, type_alias, visitor);
@@ -10298,17 +10222,6 @@ impl<'db> UnionType<'db> {
 
         ConstraintSet::from(sorted_self == other.normalized(db))
     }
-
-    fn has_divergent_type_impl(
-        self,
-        db: &'db dyn Db,
-        div: Type<'db>,
-        visitor: &HasDivergentTypeVisitor<'db>,
-    ) -> bool {
-        self.elements(db)
-            .iter()
-            .any(|ty| ty.has_divergent_type_impl(db, div, visitor))
-    }
 }
 
 #[salsa::interned(debug, heap_size=IntersectionType::heap_size)]
@@ -10523,21 +10436,6 @@ impl<'db> IntersectionType<'db> {
     fn heap_size((positive, negative): &(FxOrderSet<Type<'db>>, FxOrderSet<Type<'db>>)) -> usize {
         ruff_memory_usage::order_set_heap_size(positive)
             + ruff_memory_usage::order_set_heap_size(negative)
-    }
-
-    fn has_divergent_type_impl(
-        self,
-        db: &'db dyn Db,
-        div: Type<'db>,
-        visitor: &HasDivergentTypeVisitor<'db>,
-    ) -> bool {
-        self.positive(db)
-            .iter()
-            .any(|ty| ty.has_divergent_type_impl(db, div, visitor))
-            || self
-                .negative(db)
-                .iter()
-                .any(|ty| ty.has_divergent_type_impl(db, div, visitor))
     }
 }
 

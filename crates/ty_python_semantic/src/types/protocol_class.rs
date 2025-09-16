@@ -14,7 +14,7 @@ use crate::{
     },
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral,
-        ClassType, FindLegacyTypeVarsVisitor, HasDivergentTypeVisitor, HasRelationToVisitor,
+        ClassType, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
         InstanceFallbackShadowsNonDataDescriptor, IsDisjointVisitor, KnownFunction,
         MemberLookupPolicy, NormalizedVisitor, PropertyInstanceType, Signature, Type, TypeMapping,
         TypeQualifiers, TypeRelation, TypeVarVariance, VarianceInferable,
@@ -515,15 +515,6 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         }
     }
 
-    pub(super) fn has_divergent_type_impl(
-        &self,
-        db: &'db dyn Db,
-        div: Type<'db>,
-        visitor: &HasDivergentTypeVisitor<'db>,
-    ) -> bool {
-        self.ty().has_divergent_type_impl(db, div, visitor)
-    }
-
     pub(super) fn has_disjoint_type_from(
         &self,
         db: &'db dyn Db,
@@ -582,9 +573,12 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
 
                 let proto_member_as_bound_method = method.bind_self(db);
 
-                if any_over_type(db, proto_member_as_bound_method, &|t| {
-                    matches!(t, Type::TypeVar(_))
-                }) {
+                if any_over_type(
+                    db,
+                    proto_member_as_bound_method,
+                    &|t| matches!(t, Type::TypeVar(_)),
+                    true,
+                ) {
                     // TODO: proper validation for generic methods on protocols
                     return ConstraintSet::from(true);
                 }

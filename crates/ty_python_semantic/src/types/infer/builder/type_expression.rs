@@ -1522,13 +1522,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     // `Callable[]`.
                     return None;
                 }
-                if any_over_type(self.db(), self.infer_name_load(name), &|ty| match ty {
-                    Type::Dynamic(DynamicType::TodoPEP695ParamSpec) => true,
-                    Type::NominalInstance(nominal) => {
-                        nominal.has_known_class(self.db(), KnownClass::ParamSpec)
-                    }
-                    _ => false,
-                }) {
+                if any_over_type(
+                    self.db(),
+                    self.infer_name_load(name),
+                    &|ty| match ty {
+                        Type::Dynamic(DynamicType::TodoPEP695ParamSpec) => true,
+                        Type::NominalInstance(nominal) => {
+                            nominal.has_known_class(self.db(), KnownClass::ParamSpec)
+                        }
+                        _ => false,
+                    },
+                    true,
+                ) {
                     return Some(Parameters::todo());
                 }
             }

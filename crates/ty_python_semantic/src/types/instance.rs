@@ -9,12 +9,13 @@ use crate::place::PlaceAndQualifiers;
 use crate::semantic_index::definition::Definition;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::enums::is_single_member_enum;
+use crate::types::generics::walk_specialization;
 use crate::types::protocol_class::walk_protocol_interface;
 use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
     ApplyTypeMappingVisitor, ClassBase, ClassLiteral, FindLegacyTypeVarsVisitor,
-    HasDivergentTypeVisitor, HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor,
-    NormalizedVisitor, TypeMapping, TypeRelation, VarianceInferable,
+    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, NormalizedVisitor, TypeMapping,
+    TypeRelation, VarianceInferable,
 };
 use crate::{Db, FxOrderSet};
 
@@ -528,7 +529,20 @@ pub(super) fn walk_protocol_instance_type<'db, V: super::visitor::TypeVisitor<'d
     protocol: ProtocolInstanceType<'db>,
     visitor: &V,
 ) {
-    walk_protocol_interface(db, protocol.inner.interface(db), visitor);
+    if visitor.should_visit_lazy_type_attributes() {
+        walk_protocol_interface(db, protocol.inner.interface(db), visitor);
+    } else {
+        match protocol.inner {
+            Protocol::FromClass(class) => {
+                if let Some(specialization) = class.class_literal(db).1 {
+                    walk_specialization(db, specialization, visitor);
+                }
+            }
+            Protocol::Synthesized(synthesized) => {
+                walk_protocol_interface(db, synthesized.interface(), visitor);
+            }
+        }
+    }
 }
 
 impl<'db> ProtocolInstanceType<'db> {
@@ -710,21 +724,6 @@ impl<'db> ProtocolInstanceType<'db> {
 
     pub(super) fn interface(self, db: &'db dyn Db) -> ProtocolInterface<'db> {
         self.inner.interface(db)
-    }
-
-    pub(super) fn has_divergent_type_impl(
-        self,
-        db: &'db dyn Db,
-        div: Type<'db>,
-        visitor: &HasDivergentTypeVisitor<'db>,
-    ) -> bool {
-        match self.inner {
-            Protocol::FromClass(class) => class.has_divergent_type_impl(db, div, visitor),
-            Protocol::Synthesized(synthesized) => synthesized
-                .interface()
-                .members(db)
-                .any(|member| member.has_divergent_type_impl(db, div, visitor)),
-        }
     }
 }
 

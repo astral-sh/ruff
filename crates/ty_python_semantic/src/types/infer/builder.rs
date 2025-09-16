@@ -8785,14 +8785,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         *typevar,
                     )
                     .ok_or(GenericContextError::InvalidArgument)
-                } else if any_over_type(self.db(), *typevar, &|ty| match ty {
-                    Type::Dynamic(DynamicType::TodoUnpack) => true,
-                    Type::NominalInstance(nominal) => matches!(
-                        nominal.known_class(self.db()),
-                        Some(KnownClass::TypeVarTuple | KnownClass::ParamSpec)
-                    ),
-                    _ => false,
-                }) {
+                } else if any_over_type(
+                    self.db(),
+                    *typevar,
+                    &|ty| match ty {
+                        Type::Dynamic(DynamicType::TodoUnpack) => true,
+                        Type::NominalInstance(nominal) => matches!(
+                            nominal.known_class(self.db()),
+                            Some(KnownClass::TypeVarTuple | KnownClass::ParamSpec)
+                        ),
+                        _ => false,
+                    },
+                    true,
+                ) {
                     Err(GenericContextError::NotYetSupported)
                 } else {
                     if let Some(builder) =
