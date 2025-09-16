@@ -30,35 +30,55 @@ use resolve_definition::{find_symbol_in_scope, resolve_definition};
 pub(crate) fn all_declarations_and_bindings<'db>(
     db: &'db dyn Db,
     scope_id: ScopeId<'db>,
-) -> impl Iterator<Item = Member<'db>> + 'db {
+) -> impl Iterator<Item = MemberWithDefinition<'db>> + 'db {
     let use_def_map = use_def_map(db, scope_id);
     let table = place_table(db, scope_id);
 
     use_def_map
         .all_end_of_scope_symbol_declarations()
         .filter_map(move |(symbol_id, declarations)| {
-            place_from_declarations(db, declarations)
+            let place_result = place_from_declarations(db, declarations);
+            let definition = place_result.single_declaration;
+            place_result
                 .ignore_conflicting_declarations()
                 .place
                 .ignore_possibly_unbound()
                 .map(|ty| {
                     let symbol = table.symbol(symbol_id);
-                    Member {
+                    let member = Member {
                         name: symbol.name().clone(),
                         ty,
-                    }
+                    };
+                    MemberWithDefinition { member, definition }
                 })
         })
         .chain(use_def_map.all_end_of_scope_symbol_bindings().filter_map(
             move |(symbol_id, bindings)| {
+                // It's not clear to AG how to using a bindings
+                // iterator here to get the correct definition for
+                // this binding. Below, we look through all bindings
+                // with a definition and only take one if there is
+                // exactly one. I don't think this can be wrong, but
+                // it's probably omitting definitions in some cases.
+                let mut definition = None;
+                for binding in bindings.clone() {
+                    if let Some(def) = binding.binding.definition() {
+                        if definition.is_some() {
+                            definition = None;
+                            break;
+                        }
+                        definition = Some(def);
+                    }
+                }
                 place_from_bindings(db, bindings)
                     .ignore_possibly_unbound()
                     .map(|ty| {
                         let symbol = table.symbol(symbol_id);
-                        Member {
+                        let member = Member {
                             name: symbol.name().clone(),
                             ty,
-                        }
+                        };
+                        MemberWithDefinition { member, definition }
                     })
             },
         ))
@@ -305,12 +325,15 @@ impl<'db> AllMembers<'db> {
             .map(|class| class.class_literal(db).0)
         {
             let parent_scope = parent.body_scope(db);
-            for Member { name, .. } in all_declarations_and_bindings(db, parent_scope) {
-                let result = ty.member(db, name.as_str());
+            for memberdef in all_declarations_and_bindings(db, parent_scope) {
+                let result = ty.member(db, memberdef.member.name.as_str());
                 let Some(ty) = result.place.ignore_possibly_unbound() else {
                     continue;
                 };
-                self.members.insert(Member { name, ty });
+                self.members.insert(Member {
+                    name: memberdef.member.name,
+                    ty,
+                });
             }
         }
     }
@@ -350,15 +373,25 @@ impl<'db> AllMembers<'db> {
             // class member. This gets us the right type for each
             // member, e.g., `SomeClass.__delattr__` is not a bound
             // method, but `instance_of_SomeClass.__delattr__` is.
-            for Member { name, .. } in all_declarations_and_bindings(db, class_body_scope) {
-                let result = ty.member(db, name.as_str());
+            for memberdef in all_declarations_and_bindings(db, class_body_scope) {
+                let result = ty.member(db, memberdef.member.name.as_str());
                 let Some(ty) = result.place.ignore_possibly_unbound() else {
                     continue;
                 };
-                self.members.insert(Member { name, ty });
+                self.members.insert(Member {
+                    name: memberdef.member.name,
+                    ty,
+                });
             }
         }
     }
+}
+
+/// A member of a type with an optional definition.
+#[derive(Clone, Debug)]
+pub struct MemberWithDefinition<'db> {
+    pub member: Member<'db>,
+    pub definition: Option<Definition<'db>>,
 }
 
 /// A member of a type.
