@@ -249,7 +249,7 @@ class C[T]():
             reveal_type(x)  # revealed: Self@f
 ```
 
-Even if the `Self` annotation appears first in the nested function. We have the same behavior.
+Even if the `Self` annotation appears first in the nested function, it is the method that binds `Self`.
 
 ```py
 from typing import Self
