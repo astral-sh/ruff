@@ -181,8 +181,11 @@ impl<'db> SemanticModel<'db> {
         let mut completions = vec![];
         for submodule in module.all_submodules(self.db) {
             let ty = Type::module_literal(self.db, self.file, *submodule);
+            let Some(base) = submodule.name(self.db).components().next_back() else {
+                continue;
+            };
             completions.push(Completion {
-                name: Name::new(submodule.name(self.db).as_str()),
+                name: Name::new(base),
                 ty: Some(ty),
                 kind: None,
                 builtin,

@@ -1912,7 +1912,7 @@ fn submodule_cache_invalidation_created() -> anyhow::Result<()> {
 
     insta::assert_snapshot!(
         case.sorted_submodule_names("bar").join("\n"),
-        @"foo",
+        @"bar.foo",
     );
 
     std::fs::write(case.project_path("bar/wazoo.py").as_std_path(), "")?;
@@ -1922,8 +1922,8 @@ fn submodule_cache_invalidation_created() -> anyhow::Result<()> {
     insta::assert_snapshot!(
         case.sorted_submodule_names("bar").join("\n"),
         @r"
-    foo
-    wazoo
+    bar.foo
+    bar.wazoo
     ",
     );
 
@@ -1944,8 +1944,8 @@ fn submodule_cache_invalidation_deleted() -> anyhow::Result<()> {
     insta::assert_snapshot!(
         case.sorted_submodule_names("bar").join("\n"),
         @r"
-    foo
-    wazoo
+    bar.foo
+    bar.wazoo
     ",
     );
 
@@ -1955,7 +1955,7 @@ fn submodule_cache_invalidation_deleted() -> anyhow::Result<()> {
 
     insta::assert_snapshot!(
         case.sorted_submodule_names("bar").join("\n"),
-        @"foo",
+        @"bar.foo",
     );
 
     Ok(())
@@ -1969,7 +1969,7 @@ fn submodule_cache_invalidation_created_then_deleted() -> anyhow::Result<()> {
 
     insta::assert_snapshot!(
         case.sorted_submodule_names("bar").join("\n"),
-        @"foo",
+        @"bar.foo",
     );
 
     std::fs::write(case.project_path("bar/wazoo.py").as_std_path(), "")?;
@@ -1982,7 +1982,7 @@ fn submodule_cache_invalidation_created_then_deleted() -> anyhow::Result<()> {
 
     insta::assert_snapshot!(
         case.sorted_submodule_names("bar").join("\n"),
-        @"foo",
+        @"bar.foo",
     );
 
     Ok(())
@@ -1997,7 +1997,7 @@ fn submodule_cache_invalidation_after_pyproject_created() -> anyhow::Result<()> 
 
     insta::assert_snapshot!(
         case.sorted_submodule_names("bar").join("\n"),
-        @"foo",
+        @"bar.foo",
     );
 
     case.update_options(Options::default())?;
@@ -2009,8 +2009,8 @@ fn submodule_cache_invalidation_after_pyproject_created() -> anyhow::Result<()> 
     insta::assert_snapshot!(
         case.sorted_submodule_names("bar").join("\n"),
         @r"
-    foo
-    wazoo
+    bar.foo
+    bar.wazoo
     ",
     );
 
