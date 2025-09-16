@@ -1,10 +1,10 @@
 name: CI
 
-permissions: { }
+permissions: {}
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
@@ -88,7 +88,6 @@ jobs:
             ':!crates/ruff_python_formatter/**' \
             ':!crates/ruff_formatter/**' \
             ':!crates/ruff_dev/**' \
-            ':!crates/ruff_db/**' \
             ':scripts/*' \
             ':python/**' \
             ':.github/workflows/ci.yaml' \
@@ -910,11 +909,14 @@ jobs:
   benchmarks-instrumented:
     runs-on: ubuntu-24.04
     needs: determine_changes
-    if: ${{ github.repository == 'astral-sh/ruff' && !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 20
     strategy:
       matrix:
-        benchmark: [ "formatter lexer linter parser", "ty" ]
+        include:
+          - name: ruff
+            benchmarks: "formatter lexer linter parser"
+          - name: ty
+            benchmarks: "ty"
     steps:
       - name: "Checkout Branch"
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -932,10 +934,31 @@ jobs:
         with:
           tool: cargo-codspeed
 
+      - name: "Determine if benchmarks should run"
+        id: should_run
+        env:
+          GITHUB_REF: ${{ github.ref }}
+          MATRIX_NAME: ${{ matrix.name }}
+          FORMATTER_CHANGED: ${{ needs.determine_changes.outputs.formatter }}
+          LINTER_CHANGED: ${{ needs.determine_changes.outputs.linter }}
+          TY_CHANGED: ${{ needs.determine_changes.outputs.ty }}
+        run: |
+          if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          elif [[ "${MATRIX_NAME}" == "ruff" && ("${FORMATTER_CHANGED}" == "true" || "${LINTER_CHANGED}" == "true") ]]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          elif [[ "${MATRIX_NAME}" == "ty" && "${TY_CHANGED}" == "true" ]]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: "Build benchmarks"
-        run: cargo codspeed build --features "codspeed,instrumented" --no-default-features -p ruff_benchmark ${{matrix.benchmark}}
+        if: ${{ steps.should_run.outputs.run == 'true' }}
+        run: cargo codspeed build --features "codspeed,instrumented" --no-default-features -p ruff_benchmark ${{matrix.benchmarks}}
 
       - name: "Run benchmarks"
+        if: ${{ steps.should_run.outputs.run == 'true' }}
         uses: CodSpeedHQ/action@653fdc30e6c40ffd9739e40c8a0576f4f4523ca1 # v4.0.1
         with:
           mode: instrumentation
