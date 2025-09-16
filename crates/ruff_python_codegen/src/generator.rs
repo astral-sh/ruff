@@ -105,7 +105,7 @@ impl<'a> Generator<'a> {
         }
     }
 
-    /// Force quote style for generated source code
+    /// Force quote style for generated source code.
     #[must_use]
     pub fn with_quote(mut self, quote: Quote) -> Self {
         self.quote = Some(quote);
