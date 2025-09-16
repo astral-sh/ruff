@@ -56,7 +56,6 @@ koda-validate
 kopf
 kornia
 manticore
-materialize
 meson
 mitmproxy
 mkdocs

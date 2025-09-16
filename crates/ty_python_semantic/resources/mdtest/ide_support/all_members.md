@@ -238,6 +238,58 @@ def _(t_person: type[Person]):
     static_assert(has_member(t_person, "keys"))
 ```
 
+### NamedTuples
+
+```py
+from ty_extensions import has_member, static_assert
+from typing import NamedTuple, Generic, TypeVar
+
+class Person(NamedTuple):
+    id: int
+    name: str
+
+static_assert(has_member(Person, "id"))
+static_assert(has_member(Person, "name"))
+
+static_assert(has_member(Person, "_make"))
+static_assert(has_member(Person, "_asdict"))
+static_assert(has_member(Person, "_replace"))
+
+def _(person: Person):
+    static_assert(has_member(person, "id"))
+    static_assert(has_member(person, "name"))
+
+    static_assert(has_member(person, "_make"))
+    static_assert(has_member(person, "_asdict"))
+    static_assert(has_member(person, "_replace"))
+
+def _(t_person: type[Person]):
+    static_assert(has_member(t_person, "id"))
+    static_assert(has_member(t_person, "name"))
+
+    static_assert(has_member(t_person, "_make"))
+    static_assert(has_member(t_person, "_asdict"))
+    static_assert(has_member(t_person, "_replace"))
+
+T = TypeVar("T")
+
+class Box(NamedTuple, Generic[T]):
+    item: T
+
+static_assert(has_member(Box, "item"))
+
+static_assert(has_member(Box, "_make"))
+static_assert(has_member(Box, "_asdict"))
+static_assert(has_member(Box, "_replace"))
+
+def _(box: Box[int]):
+    static_assert(has_member(box, "item"))
+
+    static_assert(has_member(box, "_make"))
+    static_assert(has_member(box, "_asdict"))
+    static_assert(has_member(box, "_replace"))
+```
+
 ### Unions
 
 For unions, `ide_support::all_members` only returns members that are available on all elements of

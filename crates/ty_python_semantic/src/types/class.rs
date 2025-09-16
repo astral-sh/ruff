@@ -31,7 +31,7 @@ use crate::types::{
     MaterializationKind, NormalizedVisitor, PropertyInstanceType, StringLiteralType, TypeAliasType,
     TypeContext, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance,
     TypeVarKind, TypedDictParams, UnionBuilder, VarianceInferable, declaration_type,
-    infer_definition_types,
+    determine_upper_bound, infer_definition_types,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet, Program,
@@ -1600,13 +1600,9 @@ impl<'db> ClassLiteral<'db> {
 
     /// Return `Some()` if this class is known to be a [`DisjointBase`], or `None` if it is not.
     pub(super) fn as_disjoint_base(self, db: &'db dyn Db) -> Option<DisjointBase<'db>> {
-        // TODO: Typeshed cannot add `@disjoint_base` to its `tuple` definition without breaking pyright.
-        // See <https://github.com/microsoft/pyright/issues/10836>.
-        // This should be fixed soon; we can remove this workaround then.
-        if self.is_known(db, KnownClass::Tuple)
-            || self
-                .known_function_decorators(db)
-                .contains(&KnownFunction::DisjointBase)
+        if self
+            .known_function_decorators(db)
+            .contains(&KnownFunction::DisjointBase)
         {
             Some(DisjointBase::due_to_decorator(self))
         } else if SlotsKind::from(db, self) == SlotsKind::NotEmpty {
@@ -2026,7 +2022,20 @@ impl<'db> ClassLiteral<'db> {
                     return KnownClass::TypedDictFallback
                         .to_class_literal(db)
                         .find_name_in_mro_with_policy(db, name, policy)
-                        .expect("Will return Some() when called on class literal");
+                        .expect("Will return Some() when called on class literal")
+                        .map_type(|ty| {
+                            ty.apply_type_mapping(
+                                db,
+                                &TypeMapping::ReplaceSelf {
+                                    new_upper_bound: determine_upper_bound(
+                                        db,
+                                        self,
+                                        None,
+                                        ClassBase::is_typed_dict,
+                                    ),
+                                },
+                            )
+                        });
                 }
             }
             if lookup_result.is_ok() {
@@ -2307,6 +2316,22 @@ impl<'db> ClassLiteral<'db> {
                     .own_class_member(db, self.generic_context(db), None, name)
                     .place
                     .ignore_possibly_unbound()
+                    .map(|ty| {
+                        ty.apply_type_mapping(
+                            db,
+                            &TypeMapping::ReplaceSelf {
+                                new_upper_bound: determine_upper_bound(
+                                    db,
+                                    self,
+                                    specialization,
+                                    |base| {
+                                        base.into_class()
+                                            .is_some_and(|c| c.is_known(db, KnownClass::Tuple))
+                                    },
+                                ),
+                            },
+                        )
+                    })
             }
             (CodeGeneratorKind::DataclassLike, "__replace__")
                 if Program::get(db).python_version(db) >= PythonVersion::PY313 =>
@@ -2629,6 +2654,12 @@ impl<'db> ClassLiteral<'db> {
                 .to_class_literal(db)
                 .find_name_in_mro_with_policy(db, name, policy)
                 .expect("`find_name_in_mro_with_policy` will return `Some()` when called on class literal")
+                .map_type(|ty|
+                    ty.apply_type_mapping(
+                        db,
+                        &TypeMapping::ReplaceSelf {new_upper_bound: determine_upper_bound(db, self, specialization, ClassBase::is_typed_dict) }
+                    )
+                )
         }
     }
 
@@ -2866,7 +2897,18 @@ impl<'db> ClassLiteral<'db> {
                 ClassBase::TypedDict => {
                     return KnownClass::TypedDictFallback
                         .to_instance(db)
-                        .instance_member(db, name);
+                        .instance_member(db, name)
+                        .map_type(|ty| {
+                            ty.apply_type_mapping(
+                                db,
+                                &TypeMapping::ReplaceSelf {
+                                    new_upper_bound: Type::instance(
+                                        db,
+                                        self.unknown_specialization(db),
+                                    ),
+                                },
+                            )
+                        });
                 }
             }
         }
