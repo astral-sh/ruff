@@ -1,7 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
-use ruff_python_ast::{self as ast, Arguments, Expr};
-use ruff_python_semantic::SemanticModel;
+use ruff_python_ast::{self as ast};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -10,6 +9,9 @@ use crate::{AlwaysFixableViolation, Applicability, Fix};
 
 /// ## What it does
 /// Checks for `map` calls without an explicit `strict` parameter when called with two or more iterables.
+///
+/// This rule applies to Python 3.14 and later, where `map` accepts a `strict` keyword
+/// argument. For details, see: [What’s New in Python 3.14](https://docs.python.org/dev/whatsnew/3.14.html).
 ///
 /// ## Why is this bad?
 /// By default, if the iterables passed to `map` are of different lengths, the
@@ -37,6 +39,7 @@ use crate::{AlwaysFixableViolation, Applicability, Fix};
 ///
 /// ## References
 /// - [Python documentation: `map`](https://docs.python.org/3/library/functions.html#map)
+/// - [What’s New in Python 3.14](https://docs.python.org/dev/whatsnew/3.14.html)
 #[derive(ViolationMetadata)]
 pub(crate) struct MapWithoutExplicitStrict;
 
@@ -58,12 +61,7 @@ pub(crate) fn map_without_explicit_strict(checker: &Checker, call: &ast::ExprCal
     if semantic.match_builtin_expr(&call.func, "map")
         && call.arguments.find_keyword("strict").is_none()
         && call.arguments.args.len() >= 3 // function + at least 2 iterables
-        && !call
-            .arguments
-            .args
-            .iter()
-            .skip(1) // Skip the function argument
-            .any(|arg| is_infinite_iterable_for_map(arg, semantic))
+        && !any_infinite_iterables(call.arguments.args.iter().skip(1), semantic)
     {
         checker
             .report_diagnostic(MapWithoutExplicitStrict, call.range())
@@ -89,46 +87,4 @@ pub(crate) fn map_without_explicit_strict(checker: &Checker, call: &ast::ExprCal
     }
 }
 
-/// Return `true` if the [`Expr`] appears to be an infinite iterator (e.g., a call to
-/// `itertools.cycle` or similar).
-pub(crate) fn is_infinite_iterable_for_map(arg: &Expr, semantic: &SemanticModel) -> bool {
-    let Expr::Call(ast::ExprCall {
-        func,
-        arguments: Arguments { args, keywords, .. },
-        ..
-    }) = &arg
-    else {
-        return false;
-    };
-
-    semantic
-        .resolve_qualified_name(func)
-        .is_some_and(|qualified_name| {
-            match qualified_name.segments() {
-                ["itertools", "cycle" | "count"] => true,
-                ["itertools", "repeat"] => {
-                    // Ex) `itertools.repeat(1)`
-                    if keywords.is_empty() && args.len() == 1 {
-                        return true;
-                    }
-
-                    // Ex) `itertools.repeat(1, None)`
-                    if args.len() == 2 && args[1].is_none_literal_expr() {
-                        return true;
-                    }
-
-                    // Ex) `iterools.repeat(1, times=None)`
-                    for keyword in keywords {
-                        if keyword.arg.as_ref().is_some_and(|name| name == "times") {
-                            if keyword.value.is_none_literal_expr() {
-                                return true;
-                            }
-                        }
-                    }
-
-                    false
-                }
-                _ => false,
-            }
-        })
-}
+use super::strict_utils::any_infinite_iterables;

@@ -1,7 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
-use ruff_python_ast::{self as ast, Arguments, Expr};
-use ruff_python_semantic::SemanticModel;
+use ruff_python_ast::{self as ast};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -57,11 +56,7 @@ pub(crate) fn zip_without_explicit_strict(checker: &Checker, call: &ast::ExprCal
 
     if semantic.match_builtin_expr(&call.func, "zip")
         && call.arguments.find_keyword("strict").is_none()
-        && !call
-            .arguments
-            .args
-            .iter()
-            .any(|arg| is_infinite_iterable(arg, semantic))
+        && !any_infinite_iterables(call.arguments.args.iter(), semantic)
     {
         checker
             .report_diagnostic(ZipWithoutExplicitStrict, call.range())
@@ -87,46 +82,4 @@ pub(crate) fn zip_without_explicit_strict(checker: &Checker, call: &ast::ExprCal
     }
 }
 
-/// Return `true` if the [`Expr`] appears to be an infinite iterator (e.g., a call to
-/// `itertools.cycle` or similar).
-pub(crate) fn is_infinite_iterable(arg: &Expr, semantic: &SemanticModel) -> bool {
-    let Expr::Call(ast::ExprCall {
-        func,
-        arguments: Arguments { args, keywords, .. },
-        ..
-    }) = &arg
-    else {
-        return false;
-    };
-
-    semantic
-        .resolve_qualified_name(func)
-        .is_some_and(|qualified_name| {
-            match qualified_name.segments() {
-                ["itertools", "cycle" | "count"] => true,
-                ["itertools", "repeat"] => {
-                    // Ex) `itertools.repeat(1)`
-                    if keywords.is_empty() && args.len() == 1 {
-                        return true;
-                    }
-
-                    // Ex) `itertools.repeat(1, None)`
-                    if args.len() == 2 && args[1].is_none_literal_expr() {
-                        return true;
-                    }
-
-                    // Ex) `iterools.repeat(1, times=None)`
-                    for keyword in keywords {
-                        if keyword.arg.as_ref().is_some_and(|name| name == "times") {
-                            if keyword.value.is_none_literal_expr() {
-                                return true;
-                            }
-                        }
-                    }
-
-                    false
-                }
-                _ => false,
-            }
-        })
-}
+use super::strict_utils::any_infinite_iterables;
