@@ -12,6 +12,19 @@ reveal_type({1, 2})  # revealed: set[Unknown | int]
 reveal_type({(1, 2), (3, 4)})  # revealed: set[Unknown | tuple[int, int]]
 ```
 
+## Set of functions
+
+```py
+def a(_: int) -> int:
+    return 0
+
+def b(_: int) -> int:
+    return 1
+
+x = {a, b}
+reveal_type(x)  # revealed: set[Unknown | ((_: int) -> int)]
+```
+
 ## Mixed set
 
 ```py

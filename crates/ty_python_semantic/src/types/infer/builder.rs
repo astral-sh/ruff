@@ -89,8 +89,9 @@ use crate::types::{
     IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, MemberLookupPolicy,
     MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm, Parameters, SpecialFormType,
     SubclassOfType, TrackedConstraintSet, Truthiness, Type, TypeAliasType, TypeAndQualifiers,
-    TypeContext, TypeQualifiers, TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation,
-    TypeVarInstance, TypeVarKind, UnionBuilder, UnionType, binding_type, todo_type,
+    TypeContext, TypeMapping, TypeQualifiers, TypeVarBoundOrConstraintsEvaluation,
+    TypeVarDefaultEvaluation, TypeVarInstance, TypeVarKind, UnionBuilder, UnionType, binding_type,
+    todo_type,
 };
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::{EvaluationMode, UnpackPosition};
@@ -5366,9 +5367,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // The inferred type of each element acts as an additional constraint on `T`.
         for inferred_elt_ty in inferred_elt_tys {
-            // Promote element literals to their fallback instance type to avoid excessively large unions
-            // for large nested list literals, which the constraint solver struggles with.
-            let inferred_elt_ty = inferred_elt_ty.promote_literals(self.db());
+            // Promote element literals to their type annotation form to avoid excessively large
+            // unions for large nested list literals, which the constraint solver struggles with.
+            let inferred_elt_ty =
+                inferred_elt_ty.apply_type_mapping(self.db(), &TypeMapping::LiteralToAnnotation);
             builder.infer(elts_ty, inferred_elt_ty).ok()?;
         }
 

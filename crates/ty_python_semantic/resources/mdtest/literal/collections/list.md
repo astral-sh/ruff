@@ -12,6 +12,19 @@ reveal_type([])  # revealed: list[Unknown]
 reveal_type([(1, 2), (3, 4)])  # revealed: list[Unknown | tuple[int, int]]
 ```
 
+## List of functions
+
+```py
+def a(_: int) -> int:
+    return 0
+
+def b(_: int) -> int:
+    return 1
+
+x = [a, b]
+reveal_type(x)  # revealed: list[Unknown | ((_: int) -> int)]
+```
+
 ## Mixed list
 
 ```py
