@@ -3172,6 +3172,7 @@ name = "ruff_python_importer"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "insta",
  "ruff_diagnostics",
  "ruff_python_ast",
  "ruff_python_codegen",
