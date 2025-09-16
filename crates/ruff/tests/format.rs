@@ -69,8 +69,8 @@ bar =     "needs formatting"
     success: false
     exit_code: 1
     ----- stdout -----
-    Would reformat: bar.py
-    Would reformat: foo.py
+    bar.py: error[unformatted] File would be reformatted
+    foo.py: error[unformatted] File would be reformatted
     2 files would be reformatted
 
     ----- stderr -----
@@ -491,8 +491,8 @@ OTHER = "OTHER"
     success: false
     exit_code: 1
     ----- stdout -----
-    Would reformat: main.py
-    Would reformat: test.py
+    main.py: error[unformatted] File would be reformatted
+    test.py: error[unformatted] File would be reformatted
     2 files would be reformatted
 
     ----- stderr -----
@@ -547,7 +547,7 @@ if __name__ == "__main__":
     success: false
     exit_code: 1
     ----- stdout -----
-    Would reformat: main.py
+    main.py: error[unformatted] File would be reformatted
     1 file would be reformatted
 
     ----- stderr -----
@@ -718,7 +718,7 @@ OTHER = "OTHER"
     success: false
     exit_code: 1
     ----- stdout -----
-    Would reformat: main.py
+    main.py: error[unformatted] File would be reformatted
     1 file would be reformatted
 
     ----- stderr -----

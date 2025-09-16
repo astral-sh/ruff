@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::fs::File;
 use std::io;
@@ -11,6 +12,10 @@ use itertools::Itertools;
 use log::{error, warn};
 use rayon::iter::Either::{Left, Right};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use ruff_db::diagnostic::{
+    Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig, Severity, Span,
+};
+use ruff_linter::message::EmitterContext;
 use ruff_python_parser::ParseError;
 use rustc_hash::FxHashSet;
 use thiserror::Error;
@@ -27,7 +32,7 @@ use ruff_linter::source_kind::{SourceError, SourceKind};
 use ruff_linter::warn_user_once;
 use ruff_python_ast::{PySourceType, SourceType};
 use ruff_python_formatter::{FormatModuleError, QuoteStyle, format_module_source, format_range};
-use ruff_source_file::LineIndex;
+use ruff_source_file::{LineIndex, SourceFileBuilder};
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use ruff_workspace::FormatterSettings;
 use ruff_workspace::resolver::{ResolvedFile, Resolver, match_exclusion, python_files_in_path};
@@ -548,19 +553,34 @@ impl<'a> FormatResults<'a> {
 
     /// Write a list of the files that would be changed to the given writer.
     fn write_changed(&self, f: &mut impl Write) -> io::Result<()> {
+        let notebook_index = HashMap::default();
+        let resolver = EmitterContext::new(&notebook_index);
+        let config = DisplayDiagnosticConfig::default().format(DiagnosticFormat::Concise);
         for path in self
             .results
             .iter()
             .filter_map(|result| {
                 if result.result.is_formatted() {
-                    Some(result.path.as_path())
+                    let mut diagnostic = Diagnostic::new(
+                        DiagnosticId::Unformatted,
+                        Severity::Error,
+                        "File would be reformatted",
+                    );
+                    let source_file =
+                        SourceFileBuilder::new(result.path.to_string_lossy(), "").finish();
+                    let span = Span::from(source_file);
+                    let mut annotation = Annotation::primary(span);
+                    annotation.set_file_level(true);
+                    diagnostic.annotate(annotation);
+
+                    Some(diagnostic)
                 } else {
                     None
                 }
             })
-            .sorted_unstable()
+            .sorted_unstable_by(Diagnostic::ruff_start_ordering)
         {
-            writeln!(f, "Would reformat: {}", fs::relativize_path(path).bold())?;
+            write!(f, "{}", path.display(&resolver, &config))?;
         }
 
         Ok(())
