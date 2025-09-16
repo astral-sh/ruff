@@ -10,8 +10,8 @@ use ruff_linter::linter::FixTable;
 use serde::Serialize;
 
 use ruff_db::diagnostic::{
-    Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, DisplayDiagnostics, GithubRenderer,
-    SecondaryCode,
+    Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, DisplayDiagnostics,
+    DisplayGithubDiagnostics, GithubRenderer, SecondaryCode,
 };
 use ruff_linter::fs::relativize_path;
 use ruff_linter::logging::LogLevel;
@@ -283,7 +283,8 @@ impl Printer {
                 self.write_summary_text(writer, diagnostics)?;
             }
             OutputFormat::Github => {
-                let value = GithubRenderer::new(&context, "Ruff", &diagnostics.inner);
+                let renderer = GithubRenderer::new(&context, "Ruff");
+                let value = DisplayGithubDiagnostics::new(&renderer, &diagnostics.inner);
                 write!(writer, "{value}")?;
             }
             OutputFormat::Gitlab => {

@@ -3,26 +3,19 @@ use crate::diagnostic::{Diagnostic, FileResolver, Severity};
 pub struct GithubRenderer<'a> {
     resolver: &'a dyn FileResolver,
     program: &'a str,
-    diagnostics: &'a [Diagnostic],
 }
 
 impl<'a> GithubRenderer<'a> {
-    pub fn new(
-        resolver: &'a dyn FileResolver,
-        program: &'a str,
-        diagnostics: &'a [Diagnostic],
-    ) -> Self {
-        Self {
-            resolver,
-            program,
-            diagnostics,
-        }
+    pub fn new(resolver: &'a dyn FileResolver, program: &'a str) -> Self {
+        Self { resolver, program }
     }
-}
 
-impl std::fmt::Display for GithubRenderer<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        for diagnostic in self.diagnostics {
+    pub(super) fn render(
+        &self,
+        f: &mut std::fmt::Formatter,
+        diagnostics: &[Diagnostic],
+    ) -> std::fmt::Result {
+        for diagnostic in diagnostics {
             let severity = match diagnostic.severity() {
                 Severity::Info => "notice",
                 Severity::Warning => "warning",
@@ -86,6 +79,26 @@ impl std::fmt::Display for GithubRenderer<'_> {
         }
 
         Ok(())
+    }
+}
+
+pub struct DisplayGithubDiagnostics<'a> {
+    renderer: &'a GithubRenderer<'a>,
+    diagnostics: &'a [Diagnostic],
+}
+
+impl<'a> DisplayGithubDiagnostics<'a> {
+    pub fn new(renderer: &'a GithubRenderer<'a>, diagnostics: &'a [Diagnostic]) -> Self {
+        Self {
+            renderer,
+            diagnostics,
+        }
+    }
+}
+
+impl std::fmt::Display for DisplayGithubDiagnostics<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.renderer.render(f, self.diagnostics)
     }
 }
 
