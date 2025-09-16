@@ -968,6 +968,8 @@ jobs:
 
       - name: "Run benchmarks"
         uses: CodSpeedHQ/action@653fdc30e6c40ffd9739e40c8a0576f4f4523ca1 # v4.0.1
+        env:
+          CODSPEED_PERF_ENABLED: false
         with:
           mode: walltime
           run: cargo codspeed run
