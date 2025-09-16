@@ -77,13 +77,13 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// It is also possible for the right-hand side to have values that implement
 /// `__format__` to not behave the same as `__str__` when `None` is passed:
-/// 
+///
 /// ```python
 /// class C:
 ///     def __format__(*args, **kwargs):
 ///         print("called my format!")
 ///         return ""
-/// 
+///
 /// "{}".format(C())  # prints "called my format!", returns ""
 /// "%s" % C()  # '<__main__.C object at 0x7fd0f5757250>'
 /// ```
@@ -471,7 +471,7 @@ pub(crate) fn printf_string_formatting(
                 // ```
                 // So we offer an unsafe fix:
                 Cow::Owned(format!("({})", checker.locator().slice(right)))
-            }
+            },
         ),
         Expr::Tuple(tuple) => (
             if is_literal_safe_fix_printf_string_formatting_enabled(checker.settings())
@@ -483,14 +483,24 @@ pub(crate) fn printf_string_formatting(
             },
             clean_params_tuple(right, checker.locator()),
         ),
-        Expr::Dict(_) => {
+        Expr::Dict(dict) => {
             let Some(params_string) =
                 clean_params_dictionary(right, checker.locator(), checker.stylist())
             else {
                 checker.report_diagnostic(PrintfStringFormatting, string_expr.range());
                 return;
             };
-            (Applicability::Unsafe, Cow::Owned(params_string))
+            let applicability =
+                if is_literal_safe_fix_printf_string_formatting_enabled(checker.settings())
+                    && dict.iter().all(|item| {
+                        item.key.as_ref().is_some_and(is_constant) && is_constant(&item.value)
+                    })
+                {
+                    Applicability::Safe
+                } else {
+                    Applicability::Unsafe
+                };
+            (applicability, Cow::Owned(params_string))
         }
         _ => return,
     };
