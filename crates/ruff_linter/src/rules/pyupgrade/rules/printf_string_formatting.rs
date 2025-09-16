@@ -4,7 +4,9 @@ use std::str::FromStr;
 
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, AnyStringFlags, Expr, StringFlags, whitespace::indentation};
+use ruff_python_ast::{
+    self as ast, AnyStringFlags, Expr, StringFlags, helpers::is_constant, whitespace::indentation,
+};
 use ruff_python_codegen::Stylist;
 use ruff_python_literal::cformat::{
     CConversionFlags, CFormatPart, CFormatPrecision, CFormatQuantity, CFormatString,
@@ -428,20 +430,17 @@ pub(crate) fn printf_string_formatting(
             Applicability::Safe,
             Cow::Owned(format!("({})", checker.locator().slice(right))),
         ),
-        Expr::Name(_) | Expr::Attribute(_) | Expr::Subscript(_) | Expr::Call(_) => {
+        Expr::Name(_) | Expr::Attribute(_) | Expr::Subscript(_) | Expr::Call(_) => (
+            // Values may implement __format__ to not have the same behavior as %s,
+            // so these fixes should stay unsafe.
+            Applicability::Unsafe,
             if num_keyword_arguments > 0 {
                 // If we have _any_ named fields, assume the right-hand side is a mapping.
-                (
-                    Applicability::Safe,
-                    Cow::Owned(format!("(**{})", checker.locator().slice(right))),
-                )
+                Cow::Owned(format!("(**{})", checker.locator().slice(right)))
             } else if num_positional_arguments > 1 {
                 // If we have multiple fields, but no named fields, assume the right-hand side is a
                 // tuple.
-                (
-                    Applicability::Safe,
-                    Cow::Owned(format!("(*{})", checker.locator().slice(right))),
-                )
+                Cow::Owned(format!("(*{})", checker.locator().slice(right)))
             } else {
                 // Otherwise, if we have a single field, we can't make any assumptions about the
                 // right-hand side. It _could_ be a tuple, but it could also be a single value,
@@ -453,14 +452,15 @@ pub(crate) fn printf_string_formatting(
                 // print("{}".format(x))
                 // ```
                 // So we offer an unsafe fix:
-                (
-                    Applicability::Unsafe,
-                    Cow::Owned(format!("({})", checker.locator().slice(right))),
-                )
+                Cow::Owned(format!("({})", checker.locator().slice(right)))
             }
-        }
-        Expr::Tuple(_) => (
-            Applicability::Safe,
+        ),
+        Expr::Tuple(tuple) => (
+            if tuple.iter().all(is_constant) {
+                Applicability::Safe
+            } else {
+                Applicability::Unsafe
+            },
             clean_params_tuple(right, checker.locator()),
         ),
         Expr::Dict(_) => {
@@ -470,7 +470,7 @@ pub(crate) fn printf_string_formatting(
                 checker.report_diagnostic(PrintfStringFormatting, string_expr.range());
                 return;
             };
-            (Applicability::Safe, Cow::Owned(params_string))
+            (Applicability::Unsafe, Cow::Owned(params_string))
         }
         _ => return,
     };
