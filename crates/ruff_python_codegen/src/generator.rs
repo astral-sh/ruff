@@ -3,6 +3,7 @@
 use std::fmt::Write;
 use std::ops::Deref;
 
+use ruff_python_ast::str::Quote;
 use ruff_python_ast::{
     self as ast, Alias, AnyStringFlags, ArgOrKeyword, BoolOp, BytesLiteralFlags, CmpOp,
     Comprehension, ConversionFlag, DebugText, ExceptHandler, Expr, Identifier, MatchCase, Operator,
@@ -67,6 +68,8 @@ pub struct Generator<'a> {
     indent: &'a Indentation,
     /// The line ending to use.
     line_ending: LineEnding,
+    /// Quote style to use.
+    quote: Quote,
     buffer: String,
     indent_depth: usize,
     num_newlines: usize,
@@ -78,6 +81,7 @@ impl<'a> From<&'a Stylist<'a>> for Generator<'a> {
         Self {
             indent: stylist.indentation(),
             line_ending: stylist.line_ending(),
+            quote: stylist.quote(),
             buffer: String::new(),
             indent_depth: 0,
             num_newlines: 0,
@@ -87,11 +91,12 @@ impl<'a> From<&'a Stylist<'a>> for Generator<'a> {
 }
 
 impl<'a> Generator<'a> {
-    pub const fn new(indent: &'a Indentation, line_ending: LineEnding) -> Self {
+    pub const fn new(indent: &'a Indentation, line_ending: LineEnding, quote: Quote) -> Self {
         Self {
             // Style preferences.
             indent,
             line_ending,
+            quote,
             // Internal state.
             buffer: String::new(),
             indent_depth: 0,
@@ -1437,7 +1442,7 @@ impl<'a> Generator<'a> {
         spec: Option<&ast::InterpolatedStringFormatSpec>,
         flags: AnyStringFlags,
     ) {
-        let mut generator = Generator::new(self.indent, self.line_ending);
+        let mut generator = Generator::new(self.indent, self.line_ending, self.quote);
         generator.unparse_expr(val, precedence::FORMATTED_VALUE);
         let brace = if generator.buffer.starts_with('{') {
             // put a space to avoid escaping the bracket
@@ -1563,6 +1568,7 @@ impl<'a> Generator<'a> {
 
 #[cfg(test)]
 mod tests {
+    use ruff_python_ast::str::Quote;
     use ruff_python_ast::{Mod, ModModule};
     use ruff_python_parser::{self, Mode, ParseOptions, parse_module};
     use ruff_source_file::LineEnding;
@@ -1575,7 +1581,7 @@ mod tests {
         let indentation = Indentation::default();
         let line_ending = LineEnding::default();
         let module = parse_module(contents).unwrap();
-        let mut generator = Generator::new(&indentation, line_ending);
+        let mut generator = Generator::new(&indentation, line_ending, Quote::default());
         generator.unparse_suite(module.suite());
         generator.generate()
     }
@@ -1585,10 +1591,11 @@ mod tests {
     fn round_trip_with(
         indentation: &Indentation,
         line_ending: LineEnding,
+        quote: Quote,
         contents: &str,
     ) -> String {
         let module = parse_module(contents).unwrap();
-        let mut generator = Generator::new(indentation, line_ending);
+        let mut generator = Generator::new(indentation, line_ending, quote);
         generator.unparse_suite(module.suite());
         generator.generate()
     }
@@ -1604,7 +1611,7 @@ mod tests {
         let [stmt] = body.as_slice() else {
             panic!("Expected only one statement in source code")
         };
-        let mut generator = Generator::new(&indentation, line_ending);
+        let mut generator = Generator::new(&indentation, line_ending, Quote::default());
         generator.unparse_stmt(stmt);
         generator.generate()
     }
@@ -1974,6 +1981,7 @@ if True:
             round_trip_with(
                 &Indentation::new("    ".to_string()),
                 LineEnding::default(),
+                Quote::default(),
                 r"
 if True:
   pass
@@ -1991,6 +1999,7 @@ if True:
             round_trip_with(
                 &Indentation::new("  ".to_string()),
                 LineEnding::default(),
+                Quote::default(),
                 r"
 if True:
   pass
@@ -2008,6 +2017,7 @@ if True:
             round_trip_with(
                 &Indentation::new("\t".to_string()),
                 LineEnding::default(),
+                Quote::default(),
                 r"
 if True:
   pass
@@ -2029,6 +2039,7 @@ if True:
             round_trip_with(
                 &Indentation::default(),
                 LineEnding::Lf,
+                Quote::default(),
                 "if True:\n    print(42)",
             ),
             "if True:\n    print(42)",
@@ -2038,6 +2049,7 @@ if True:
             round_trip_with(
                 &Indentation::default(),
                 LineEnding::CrLf,
+                Quote::default(),
                 "if True:\n    print(42)",
             ),
             "if True:\r\n    print(42)",
@@ -2047,6 +2059,7 @@ if True:
             round_trip_with(
                 &Indentation::default(),
                 LineEnding::Cr,
+                Quote::default(),
                 "if True:\n    print(42)",
             ),
             "if True:\r    print(42)",
