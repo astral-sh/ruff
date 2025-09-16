@@ -205,3 +205,31 @@ pub(crate) fn has_unknown_keywords_or_starred_expr(
         None => true,
     })
 }
+
+/// Return true if there are extra positional arguments beyond the last accepted position index.
+pub(crate) fn has_extra_positional_args(
+    arguments: &ast::Arguments,
+    last_positional_index: usize,
+) -> bool {
+    let mut seen_positional = 0usize;
+    let allowed = last_positional_index.saturating_add(1);
+    for expr in &arguments.args {
+        if expr.is_starred_expr() {
+            return true;
+        }
+        seen_positional = seen_positional.saturating_add(1);
+        if seen_positional > allowed {
+            return true;
+        }
+    }
+    false
+}
+
+/// For chmod, collect an optional `follow_symlinks` keyword if present and non-default.
+pub(crate) fn collect_follow_symlinks(arguments: &ast::Arguments) -> Option<&Expr> {
+    let kw = arguments.find_keyword("follow_symlinks")?;
+    match &kw.value {
+        Expr::BooleanLiteral(ast::ExprBooleanLiteral { value: true, .. }) => None,
+        _ => Some(&kw.value),
+    }
+}
