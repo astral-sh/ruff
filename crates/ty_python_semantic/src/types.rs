@@ -240,30 +240,24 @@ pub(crate) type TryBoolVisitor<'db> =
     CycleDetector<TryBool, Type<'db>, Result<Truthiness, BoolError<'db>>>;
 pub(crate) struct TryBool;
 
-#[derive(Default, Copy, Clone, Debug)]
-pub(crate) enum NormalizationKind<'db> {
-    #[default]
-    Normal,
-    Recursive(Type<'db>),
-}
-
-/// A [`TypeTransformer`] that is used in `normalized` methods.
-#[derive(Default)]
-pub(crate) struct NormalizedVisitor<'db> {
-    transformer: TypeTransformer<'db, Normalized>,
-    /// If this is [`NormalizationKind::Recursive`], calling [`Type::normalized_impl`] will normalize the recursive type.
-    /// A recursive type here means a type that contains a `Divergent` type.
-    /// Normalizing recursive types allows recursive type inference for divergent functions to converge.
-    kind: NormalizationKind<'db>,
-}
+pub(crate) type NormalizedVisitor<'db> = TypeTransformer<'db, Normalized>;
 pub(crate) struct Normalized;
 
-impl<'db> NormalizedVisitor<'db> {
-    fn recursive(self, div: Type<'db>) -> Self {
+/// A [`TypeTransformer`] that is used in `recursive_type_normalized` methods.
+/// Calling [`Type::recursive_type_normalized`] will normalize the recursive type.
+/// A recursive type here means a type that contains a `Divergent` type.
+/// Normalizing recursive types allows recursive type inference for divergent functions to converge.
+pub(crate) struct RecursiveTypeNormalizedVisitor<'db> {
+    transformer: TypeTransformer<'db, Normalized>,
+    div: Type<'db>,
+}
+
+impl<'db> RecursiveTypeNormalizedVisitor<'db> {
+    fn new(div: Type<'db>) -> Self {
         debug_assert!(matches!(div, Type::Dynamic(DynamicType::Divergent(_))));
         Self {
-            transformer: self.transformer,
-            kind: NormalizationKind::Recursive(div),
+            transformer: NormalizedVisitor::default(),
+            div,
         }
     }
 
@@ -617,7 +611,11 @@ impl<'db> PropertyInstanceType<'db> {
         )
     }
 
-    fn recursive_type_normalized(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    fn recursive_type_normalized(
+        self,
+        db: &'db dyn Db,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
         Self::new(
             db,
             self.getter(db)
@@ -1302,7 +1300,7 @@ impl<'db> Type<'db> {
             Type::TypeIs(type_is) => visitor.visit(self, || {
                 type_is.with_type(db, type_is.return_type(db).normalized_impl(db, visitor))
             }),
-            Type::Dynamic(dynamic) => Type::Dynamic(dynamic.normalized_impl(visitor.kind)),
+            Type::Dynamic(dynamic) => Type::Dynamic(dynamic.normalized_impl()),
             Type::EnumLiteral(enum_literal)
                 if is_single_member_enum(db, enum_literal.enum_class(db)) =>
             {
@@ -1336,16 +1334,14 @@ impl<'db> Type<'db> {
     pub(crate) fn recursive_type_normalized(
         self,
         db: &'db dyn Db,
-        visitor: &NormalizedVisitor<'db>,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
     ) -> Self {
-        if let NormalizationKind::Recursive(div) = visitor.kind {
-            if visitor.level() == 0 && self == div {
-                // int | Divergent = int | (int | (int | ...)) = int
-                return Type::Never;
-            } else if visitor.level() >= 1 && self.has_divergent_type(db, div) {
-                // G[G[Divergent]] = G[Divergent]
-                return div;
-            }
+        if visitor.level() == 0 && self == visitor.div {
+            // int | Divergent = int | (int | (int | ...)) = int
+            return Type::Never;
+        } else if visitor.level() >= 1 && self.has_divergent_type(db, visitor.div) {
+            // G[G[Divergent]] = G[Divergent]
+            return visitor.div;
         }
         match self {
             Type::Union(union) => {
@@ -1403,9 +1399,7 @@ impl<'db> Type<'db> {
                         .recursive_type_normalized(db, visitor),
                 )
             }),
-            Type::Dynamic(dynamic) => {
-                Type::Dynamic(dynamic.recursive_type_normalized(visitor.kind))
-            }
+            Type::Dynamic(dynamic) => Type::Dynamic(dynamic.recursive_type_normalized()),
             Type::TypedDict(_) => {
                 // TODO: Normalize TypedDicts
                 self
@@ -3135,14 +3129,16 @@ impl<'db> Type<'db> {
                 ty
             };
 
-            if let Place::Type(div @ Type::Dynamic(DynamicType::Divergent(_)), _) =
-                class_lookup_cycle_initial(db, self, name, policy).place
-            {
-                let visitor = NormalizedVisitor::default().recursive(div);
-                ty.recursive_type_normalized(db, &visitor)
-            } else {
-                ty
-            }
+            let div = Type::divergent(DivergentType::new(
+                db,
+                DivergenceKind::ClassLookupWithPolicy {
+                    self_type: self,
+                    name,
+                    policy,
+                },
+            ));
+            let visitor = RecursiveTypeNormalizedVisitor::new(div);
+            ty.recursive_type_normalized(db, &visitor)
         })
     }
 
@@ -3926,14 +3922,16 @@ impl<'db> Type<'db> {
                 ty
             };
 
-            if let Place::Type(div @ Type::Dynamic(DynamicType::Divergent(_)), _) =
-                member_lookup_cycle_initial(db, self, name, policy).place
-            {
-                let visotor = NormalizedVisitor::default().recursive(div);
-                ty.recursive_type_normalized(db, &visotor)
-            } else {
-                ty
-            }
+            let div = Type::divergent(DivergentType::new(
+                db,
+                DivergenceKind::MemberLookupWithPolicy {
+                    self_type: self,
+                    name,
+                    policy,
+                },
+            ));
+            let visotor = RecursiveTypeNormalizedVisitor::new(div);
+            ty.recursive_type_normalized(db, &visotor)
         })
     }
 
@@ -7090,7 +7088,11 @@ impl<'db> TypeMapping<'_, 'db> {
         }
     }
 
-    fn recursive_type_normalized(&self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    fn recursive_type_normalized(
+        &self,
+        db: &'db dyn Db,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
         match self {
             TypeMapping::Specialization(specialization) => {
                 TypeMapping::Specialization(specialization.recursive_type_normalized(db, visitor))
@@ -7268,7 +7270,11 @@ impl<'db> KnownInstanceType<'db> {
         }
     }
 
-    fn recursive_type_normalized(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    fn recursive_type_normalized(
+        self,
+        db: &'db dyn Db,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
         match self {
             Self::SubscriptedProtocol(context) => {
                 Self::SubscriptedProtocol(context.recursive_type_normalized(db, visitor))
@@ -7467,21 +7473,16 @@ pub enum DynamicType<'db> {
     Divergent(DivergentType<'db>),
 }
 
-impl<'db> DynamicType<'db> {
-    fn normalized_impl(self, kind: NormalizationKind<'db>) -> Self {
-        match kind {
-            NormalizationKind::Recursive(_) => self,
-            NormalizationKind::Normal => {
-                if matches!(self, Self::Divergent(_)) {
-                    self
-                } else {
-                    Self::Any
-                }
-            }
+impl DynamicType<'_> {
+    fn normalized_impl(self) -> Self {
+        if matches!(self, Self::Divergent(_)) {
+            self
+        } else {
+            Self::Any
         }
     }
 
-    fn recursive_type_normalized(self, _kind: NormalizationKind<'db>) -> Self {
+    fn recursive_type_normalized(self) -> Self {
         self
     }
 }
@@ -7819,7 +7820,11 @@ impl<'db> FieldInstance<'db> {
         )
     }
 
-    fn recursive_type_normalized(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    fn recursive_type_normalized(
+        self,
+        db: &'db dyn Db,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
         FieldInstance::new(
             db,
             self.default_type(db).recursive_type_normalized(db, visitor),
@@ -7999,7 +8004,7 @@ impl<'db> TypeVarInstance<'db> {
     fn recursive_type_normalized(
         self,
         _db: &'db dyn Db,
-        _visitor: &NormalizedVisitor<'db>,
+        _visitor: &RecursiveTypeNormalizedVisitor<'db>,
     ) -> Self {
         self
     }
@@ -8299,7 +8304,11 @@ impl<'db> BoundTypeVarInstance<'db> {
         )
     }
 
-    fn recursive_type_normalized(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    fn recursive_type_normalized(
+        self,
+        db: &'db dyn Db,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
         Self::new(
             db,
             self.typevar(db).recursive_type_normalized(db, visitor),
@@ -9630,7 +9639,11 @@ impl<'db> BoundMethodType<'db> {
         )
     }
 
-    fn recursive_type_normalized(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    fn recursive_type_normalized(
+        self,
+        db: &'db dyn Db,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
         Self::new(
             db,
             self.function(db).recursive_type_normalized(db, visitor),
@@ -9766,7 +9779,11 @@ impl<'db> CallableType<'db> {
         )
     }
 
-    fn recursive_type_normalized(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    fn recursive_type_normalized(
+        self,
+        db: &'db dyn Db,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
         CallableType::new(
             db,
             self.signatures(db).recursive_type_normalized(db, visitor),
@@ -10004,7 +10021,11 @@ impl<'db> KnownBoundMethodType<'db> {
         }
     }
 
-    fn recursive_type_normalized(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    fn recursive_type_normalized(
+        self,
+        db: &'db dyn Db,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
         match self {
             KnownBoundMethodType::FunctionTypeDunderGet(function) => {
                 KnownBoundMethodType::FunctionTypeDunderGet(
@@ -10437,7 +10458,7 @@ impl<'db> PEP695TypeAliasType<'db> {
     fn recursive_type_normalized(
         self,
         _db: &'db dyn Db,
-        _visitor: &NormalizedVisitor<'db>,
+        _visitor: &RecursiveTypeNormalizedVisitor<'db>,
     ) -> Self {
         self
     }
@@ -10508,7 +10529,11 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
         )
     }
 
-    fn recursive_type_normalized(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    fn recursive_type_normalized(
+        self,
+        db: &'db dyn Db,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
         Self::new(
             db,
             self.name(db),
@@ -10555,7 +10580,11 @@ impl<'db> TypeAliasType<'db> {
         }
     }
 
-    fn recursive_type_normalized(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    fn recursive_type_normalized(
+        self,
+        db: &'db dyn Db,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
         match self {
             TypeAliasType::PEP695(type_alias) => {
                 TypeAliasType::PEP695(type_alias.recursive_type_normalized(db, visitor))
@@ -10850,7 +10879,7 @@ impl<'db> UnionType<'db> {
     fn recursive_type_normalized(
         self,
         db: &'db dyn Db,
-        visitor: &NormalizedVisitor<'db>,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
     ) -> Type<'db> {
         self.elements(db)
             .iter()
@@ -10978,12 +11007,12 @@ impl<'db> IntersectionType<'db> {
     pub(crate) fn recursive_type_normalized(
         self,
         db: &'db dyn Db,
-        visitor: &NormalizedVisitor<'db>,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
     ) -> Self {
         fn normalized_set<'db>(
             db: &'db dyn Db,
             elements: &FxOrderSet<Type<'db>>,
-            visitor: &NormalizedVisitor<'db>,
+            visitor: &RecursiveTypeNormalizedVisitor<'db>,
         ) -> FxOrderSet<Type<'db>> {
             elements
                 .iter()
@@ -11278,9 +11307,7 @@ pub enum SuperOwnerKind<'db> {
 impl<'db> SuperOwnerKind<'db> {
     fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         match self {
-            SuperOwnerKind::Dynamic(dynamic) => {
-                SuperOwnerKind::Dynamic(dynamic.normalized_impl(visitor.kind))
-            }
+            SuperOwnerKind::Dynamic(dynamic) => SuperOwnerKind::Dynamic(dynamic.normalized_impl()),
             SuperOwnerKind::Class(class) => {
                 SuperOwnerKind::Class(class.normalized_impl(db, visitor))
             }
@@ -11292,10 +11319,14 @@ impl<'db> SuperOwnerKind<'db> {
         }
     }
 
-    fn recursive_type_normalized(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    fn recursive_type_normalized(
+        self,
+        db: &'db dyn Db,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
         match self {
             SuperOwnerKind::Dynamic(dynamic) => {
-                SuperOwnerKind::Dynamic(dynamic.recursive_type_normalized(visitor.kind))
+                SuperOwnerKind::Dynamic(dynamic.recursive_type_normalized())
             }
             SuperOwnerKind::Class(class) => {
                 SuperOwnerKind::Class(class.recursive_type_normalized(db, visitor))
@@ -11581,7 +11612,11 @@ impl<'db> BoundSuperType<'db> {
         )
     }
 
-    fn recursive_type_normalized(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    fn recursive_type_normalized(
+        self,
+        db: &'db dyn Db,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
         Self::new(
             db,
             self.pivot_class(db).recursive_type_normalized(db, visitor),
@@ -11802,7 +11837,7 @@ pub(crate) mod tests {
         let union = UnionType::from_elements(&db, [KnownClass::Object.to_instance(&db), div]);
         assert_eq!(union.display(&db).to_string(), "object");
 
-        let visitor = NormalizedVisitor::default().recursive(div);
+        let visitor = RecursiveTypeNormalizedVisitor::new(div);
         let recursice = UnionType::from_elements(
             &db,
             [

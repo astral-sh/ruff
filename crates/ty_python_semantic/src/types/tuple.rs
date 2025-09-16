@@ -26,8 +26,8 @@ use crate::types::class::{ClassType, KnownClass};
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
-    IsDisjointVisitor, IsEquivalentVisitor, NormalizedVisitor, Type, TypeMapping, TypeRelation,
-    UnionBuilder, UnionType,
+    IsDisjointVisitor, IsEquivalentVisitor, NormalizedVisitor, RecursiveTypeNormalizedVisitor,
+    Type, TypeMapping, TypeRelation, UnionBuilder, UnionType,
 };
 use crate::types::{HasDivergentTypeVisitor, Truthiness};
 use crate::util::subscript::{Nth, OutOfBoundsError, PyIndex, PySlice, StepSizeZeroError};
@@ -231,7 +231,7 @@ impl<'db> TupleType<'db> {
     pub(super) fn recursive_type_normalized(
         self,
         db: &'db dyn Db,
-        visitor: &NormalizedVisitor<'db>,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
     ) -> Self {
         Self::new_internal(db, self.tuple(db).recursive_type_normalized(db, visitor))
     }
@@ -405,7 +405,11 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         Self::from_elements(self.0.iter().map(|ty| ty.normalized_impl(db, visitor)))
     }
 
-    fn recursive_type_normalized(&self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    fn recursive_type_normalized(
+        &self,
+        db: &'db dyn Db,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
         Self::from_elements(
             self.0
                 .iter()
@@ -726,7 +730,11 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         })
     }
 
-    fn recursive_type_normalized(&self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    fn recursive_type_normalized(
+        &self,
+        db: &'db dyn Db,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
         let prefix = self
             .prefix
             .iter()
@@ -1089,7 +1097,7 @@ impl<'db> Tuple<Type<'db>> {
     pub(super) fn recursive_type_normalized(
         &self,
         db: &'db dyn Db,
-        visitor: &NormalizedVisitor<'db>,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
     ) -> Self {
         match self {
             Tuple::Fixed(tuple) => Tuple::Fixed(tuple.recursive_type_normalized(db, visitor)),

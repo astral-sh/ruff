@@ -11,8 +11,8 @@ use crate::semantic_index::scope::ScopeId;
 use crate::types::infer::{InferExpression, infer_expression_types_impl, infer_unpack_types};
 use crate::types::tuple::{ResizeTupleError, Tuple, TupleLength, TupleSpec, TupleUnpacker};
 use crate::types::{
-    DivergenceKind, DivergentType, NormalizedVisitor, Type, TypeCheckDiagnostics, TypeContext,
-    UnionType,
+    DivergenceKind, DivergentType, RecursiveTypeNormalizedVisitor, Type, TypeCheckDiagnostics,
+    TypeContext, UnionType,
 };
 use crate::unpack::{Unpack, UnpackKind, UnpackValue};
 
@@ -185,7 +185,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
             DivergenceKind::InferUnpackTypes(unpack),
         ));
         let previous_cycle_value = infer_unpack_types(db, unpack);
-        let visitor = NormalizedVisitor::default().recursive(div);
+        let visitor = RecursiveTypeNormalizedVisitor::new(div);
         for (expr, ty) in &mut self.targets {
             let previous_ty = previous_cycle_value.expression_type(*expr);
             *ty = UnionType::from_elements(db, [*ty, previous_ty])

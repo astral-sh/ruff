@@ -22,8 +22,8 @@ use crate::types::generics::{GenericContext, walk_generic_context};
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, FindLegacyTypeVarsVisitor,
     HasDivergentTypeVisitor, HasRelationToVisitor, IsEquivalentVisitor, KnownClass,
-    MaterializationKind, NormalizedVisitor, TypeMapping, TypeRelation, VarianceInferable,
-    todo_type,
+    MaterializationKind, NormalizedVisitor, RecursiveTypeNormalizedVisitor, TypeMapping,
+    TypeRelation, VarianceInferable, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -78,7 +78,7 @@ impl<'db> CallableSignature<'db> {
     pub(super) fn recursive_type_normalized(
         &self,
         db: &'db dyn Db,
-        visitor: &NormalizedVisitor<'db>,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
     ) -> Self {
         Self::from_overloads(
             self.overloads
@@ -476,7 +476,7 @@ impl<'db> Signature<'db> {
     pub(super) fn recursive_type_normalized(
         &self,
         db: &'db dyn Db,
-        visitor: &NormalizedVisitor<'db>,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
     ) -> Self {
         Self {
             generic_context: self
@@ -1614,7 +1614,7 @@ impl<'db> Parameter<'db> {
     pub(super) fn recursive_type_normalized(
         &self,
         db: &'db dyn Db,
-        visitor: &NormalizedVisitor<'db>,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
     ) -> Self {
         let Parameter {
             annotated_type,

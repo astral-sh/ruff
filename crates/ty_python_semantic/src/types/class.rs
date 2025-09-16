@@ -29,9 +29,10 @@ use crate::types::{
     DataclassParams, DeprecatedInstance, DivergenceKind, DivergentType, FindLegacyTypeVarsVisitor,
     HasDivergentTypeVisitor, HasRelationToVisitor, IsEquivalentVisitor, KnownInstanceType,
     ManualPEP695TypeAliasType, MaterializationKind, NormalizedVisitor, PropertyInstanceType,
-    StringLiteralType, TypeAliasType, TypeContext, TypeMapping, TypeRelation,
-    TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, TypedDictParams, UnionBuilder,
-    VarianceInferable, declaration_type, determine_upper_bound, infer_definition_types,
+    RecursiveTypeNormalizedVisitor, StringLiteralType, TypeAliasType, TypeContext, TypeMapping,
+    TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, TypedDictParams,
+    UnionBuilder, VarianceInferable, declaration_type, determine_upper_bound,
+    infer_definition_types,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet, Program,
@@ -294,7 +295,7 @@ impl<'db> GenericAlias<'db> {
     pub(super) fn recursive_type_normalized(
         self,
         db: &'db dyn Db,
-        visitor: &NormalizedVisitor<'db>,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
     ) -> Self {
         Self::new(
             db,
@@ -432,7 +433,7 @@ impl<'db> ClassType<'db> {
     pub(super) fn recursive_type_normalized(
         self,
         db: &'db dyn Db,
-        visitor: &NormalizedVisitor<'db>,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
     ) -> Self {
         match self {
             Self::NonGeneric(_) => self,
@@ -2988,7 +2989,7 @@ impl<'db> ClassLiteral<'db> {
                 target_method_decorator,
             },
         );
-        let visitor = NormalizedVisitor::default().recursive(Type::divergent(div));
+        let visitor = RecursiveTypeNormalizedVisitor::new(Type::divergent(div));
 
         let is_valid_scope = |method_scope: ScopeId<'db>| {
             if let Some(method_def) = method_scope.node(db).as_function() {

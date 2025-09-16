@@ -89,10 +89,11 @@ use crate::types::{
     CallDunderError, CallableType, ClassLiteral, ClassType, CycleRecoveryType, DataclassParams,
     DivergenceKind, DivergentType, DynamicType, InferExpression, IntersectionBuilder,
     IntersectionType, KnownClass, KnownInstanceType, MemberLookupPolicy, MetaclassCandidate,
-    NormalizedVisitor, PEP695TypeAliasType, Parameter, ParameterForm, Parameters, SpecialFormType,
-    SubclassOfType, TrackedConstraintSet, Truthiness, Type, TypeAliasType, TypeAndQualifiers,
-    TypeContext, TypeQualifiers, TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation,
-    TypeVarInstance, TypeVarKind, UnionBuilder, UnionType, binding_type, todo_type,
+    PEP695TypeAliasType, Parameter, ParameterForm, Parameters, RecursiveTypeNormalizedVisitor,
+    SpecialFormType, SubclassOfType, TrackedConstraintSet, Truthiness, Type, TypeAliasType,
+    TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraintsEvaluation,
+    TypeVarDefaultEvaluation, TypeVarInstance, TypeVarKind, UnionBuilder, UnionType, binding_type,
+    todo_type,
 };
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::{EvaluationMode, UnpackPosition};
@@ -8920,7 +8921,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             db,
             DivergenceKind::InferExpressionTypes(input),
         ));
-        let visitor = NormalizedVisitor::default().recursive(div);
+        let visitor = RecursiveTypeNormalizedVisitor::new(div);
         let previous_cycle_value = infer_expression_types_impl(db, input);
         let extra =
             (cycle_recovery.is_some() || !bindings.is_empty() || !diagnostics.is_empty() || !all_definitely_bound).then(|| {
@@ -9033,7 +9034,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 db,
                 DivergenceKind::InferDefinitionTypes(definition),
             ));
-            let visitor = NormalizedVisitor::default().recursive(div);
+            let visitor = RecursiveTypeNormalizedVisitor::new(div);
             let previous_cycle_value = infer_definition_types(db, definition);
             for (expr, ty) in &mut expressions {
                 let previous_ty = previous_cycle_value.expression_type(*expr);
@@ -9118,7 +9119,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 db,
                 DivergenceKind::InferScopeTypes(scope),
             ));
-            let visitor = NormalizedVisitor::default().recursive(div);
+            let visitor = RecursiveTypeNormalizedVisitor::new(div);
             let previous_cycle_value = infer_scope_types(db, scope);
 
             for (expr, ty) in &mut expressions {

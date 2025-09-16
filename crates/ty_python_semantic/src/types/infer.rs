@@ -51,8 +51,8 @@ use crate::semantic_index::{SemanticIndex, semantic_index, use_def_map};
 use crate::types::diagnostic::TypeCheckDiagnostics;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    ClassLiteral, CycleRecoveryType, DivergenceKind, DivergentType, NormalizedVisitor, Truthiness,
-    Type, TypeAndQualifiers, UnionBuilder, UnionType,
+    ClassLiteral, CycleRecoveryType, DivergenceKind, DivergentType, RecursiveTypeNormalizedVisitor,
+    Truthiness, Type, TypeAndQualifiers, UnionBuilder, UnionType,
 };
 use crate::unpack::Unpack;
 use builder::TypeInferenceBuilder;
@@ -285,7 +285,7 @@ fn infer_expression_type_impl<'db>(db: &'db dyn Db, input: InferExpression<'db>)
         DivergenceKind::InferExpression(input),
     ));
     let previous_cycle_value = infer_expression_type_impl(db, input);
-    let visitor = NormalizedVisitor::default().recursive(div);
+    let visitor = RecursiveTypeNormalizedVisitor::new(div);
     let result_ty = inference.expression_type(input.expression(db).node_ref(db, &module));
     UnionType::from_elements(db, [result_ty, previous_cycle_value])
         .recursive_type_normalized(db, &visitor)
@@ -595,7 +595,7 @@ impl<'db> ScopeInference<'db> {
         if let Some(fall_back) = self.fallback_type() {
             union = union.add(fall_back);
         }
-        let visitor = NormalizedVisitor::default().recursive(div);
+        let visitor = RecursiveTypeNormalizedVisitor::new(div);
         // Here, we use the dynamic type `Divergent` to detect divergent type inference and ensure that we obtain finite results.
         // For example, consider the following recursive function:
         // ```py

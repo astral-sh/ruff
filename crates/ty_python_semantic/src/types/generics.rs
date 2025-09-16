@@ -18,9 +18,9 @@ use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, FindLegacyTypeVarsVisitor,
     HasDivergentTypeVisitor, HasRelationToVisitor, IsEquivalentVisitor, KnownClass,
-    KnownInstanceType, MaterializationKind, NormalizedVisitor, Type, TypeMapping, TypeRelation,
-    TypeVarBoundOrConstraints, TypeVarInstance, TypeVarVariance, UnionType, binding_type,
-    declaration_type,
+    KnownInstanceType, MaterializationKind, NormalizedVisitor, RecursiveTypeNormalizedVisitor,
+    Type, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarVariance,
+    UnionType, binding_type, declaration_type,
 };
 use crate::{Db, FxOrderSet};
 
@@ -403,7 +403,7 @@ impl<'db> GenericContext<'db> {
     pub(super) fn recursive_type_normalized(
         self,
         db: &'db dyn Db,
-        visitor: &NormalizedVisitor<'db>,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
     ) -> Self {
         let variables = self
             .variables(db)
@@ -746,7 +746,7 @@ impl<'db> Specialization<'db> {
     pub(super) fn recursive_type_normalized(
         self,
         db: &'db dyn Db,
-        visitor: &NormalizedVisitor<'db>,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
     ) -> Self {
         let types: Box<[_]> = self
             .types(db)
@@ -1045,7 +1045,7 @@ impl<'db> PartialSpecialization<'_, 'db> {
     pub(super) fn recursive_type_normalized(
         &self,
         db: &'db dyn Db,
-        visitor: &NormalizedVisitor<'db>,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
     ) -> PartialSpecialization<'db, 'db> {
         let generic_context = self.generic_context.recursive_type_normalized(db, visitor);
         let types: Cow<_> = self

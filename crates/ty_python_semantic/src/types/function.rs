@@ -81,8 +81,9 @@ use crate::types::{
     BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, ClassType,
     DeprecatedInstance, DivergenceKind, DivergentType, DynamicType, FindLegacyTypeVarsVisitor,
     HasRelationToVisitor, IsEquivalentVisitor, KnownClass, KnownInstanceType, NormalizedVisitor,
-    SpecialFormType, TrackedConstraintSet, Truthiness, Type, TypeMapping, TypeRelation,
-    UnionBuilder, all_members, binding_type, todo_type, walk_generic_context, walk_type_mapping,
+    RecursiveTypeNormalizedVisitor, SpecialFormType, TrackedConstraintSet, Truthiness, Type,
+    TypeMapping, TypeRelation, UnionBuilder, all_members, binding_type, todo_type,
+    walk_generic_context, walk_type_mapping,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -700,7 +701,11 @@ impl<'db> FunctionLiteral<'db> {
         Self::new(db, self.last_definition(db), context)
     }
 
-    fn recursive_type_normalized(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    fn recursive_type_normalized(
+        self,
+        db: &'db dyn Db,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
         let context = self
             .inherited_generic_context(db)
             .map(|ctx| ctx.recursive_type_normalized(db, visitor));
@@ -1052,7 +1057,7 @@ impl<'db> FunctionType<'db> {
     pub(super) fn recursive_type_normalized(
         self,
         db: &'db dyn Db,
-        visitor: &NormalizedVisitor<'db>,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
     ) -> Self {
         let mappings: Box<_> = self
             .type_mappings(db)

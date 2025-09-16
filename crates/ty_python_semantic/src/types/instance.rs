@@ -14,7 +14,8 @@ use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
     ApplyTypeMappingVisitor, ClassBase, ClassLiteral, FindLegacyTypeVarsVisitor,
     HasDivergentTypeVisitor, HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor,
-    NormalizedVisitor, TypeMapping, TypeRelation, VarianceInferable,
+    NormalizedVisitor, RecursiveTypeNormalizedVisitor, TypeMapping, TypeRelation,
+    VarianceInferable,
 };
 use crate::{Db, FxOrderSet};
 
@@ -339,7 +340,7 @@ impl<'db> NominalInstanceType<'db> {
     pub(super) fn recursive_type_normalized(
         self,
         db: &'db dyn Db,
-        visitor: &NormalizedVisitor<'db>,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
     ) -> Self {
         match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => Self(NominalInstanceInner::ExactTuple(
@@ -654,7 +655,7 @@ impl<'db> ProtocolInstanceType<'db> {
     pub(super) fn recursive_type_normalized(
         self,
         _db: &'db dyn Db,
-        _visitor: &NormalizedVisitor<'db>,
+        _visitor: &RecursiveTypeNormalizedVisitor<'db>,
     ) -> Self {
         self
     }
