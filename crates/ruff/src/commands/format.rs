@@ -16,6 +16,7 @@ use ruff_db::diagnostic::{
     Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig, Severity, Span,
 };
 use ruff_linter::message::EmitterContext;
+use ruff_linter::settings::types::OutputFormat;
 use ruff_python_parser::ParseError;
 use rustc_hash::FxHashSet;
 use thiserror::Error;
@@ -73,6 +74,8 @@ pub(crate) fn format(
     let mode = FormatMode::from_cli(&cli);
     let files = resolve_default_files(cli.files, false);
     let (paths, resolver) = python_files_in_path(&files, &pyproject_config, config_arguments)?;
+
+    let output_format = pyproject_config.settings.output_format;
 
     if paths.is_empty() {
         warn_user_once!("No Python files found under the given path(s)");
@@ -199,7 +202,7 @@ pub(crate) fn format(
     match mode {
         FormatMode::Write => {}
         FormatMode::Check => {
-            results.write_changed(&mut stdout().lock())?;
+            results.write_changed(&mut stdout().lock(), output_format)?;
         }
         FormatMode::Diff => {
             results.write_diff(&mut stdout().lock())?;
@@ -552,10 +555,24 @@ impl<'a> FormatResults<'a> {
     }
 
     /// Write a list of the files that would be changed to the given writer.
-    fn write_changed(&self, f: &mut impl Write) -> io::Result<()> {
+    fn write_changed(&self, f: &mut impl Write, output_format: OutputFormat) -> io::Result<()> {
         let notebook_index = HashMap::default();
         let resolver = EmitterContext::new(&notebook_index);
-        let config = DisplayDiagnosticConfig::default().format(DiagnosticFormat::Concise);
+        let format = match output_format {
+            OutputFormat::Concise => DiagnosticFormat::Concise,
+            OutputFormat::Full => DiagnosticFormat::Full,
+            OutputFormat::Json => DiagnosticFormat::Json,
+            OutputFormat::JsonLines => DiagnosticFormat::JsonLines,
+            OutputFormat::Junit => DiagnosticFormat::Junit,
+            OutputFormat::Grouped => todo!(),
+            OutputFormat::Github => DiagnosticFormat::Github,
+            OutputFormat::Gitlab => DiagnosticFormat::Gitlab,
+            OutputFormat::Pylint => DiagnosticFormat::Pylint,
+            OutputFormat::Rdjson => DiagnosticFormat::Rdjson,
+            OutputFormat::Azure => DiagnosticFormat::Azure,
+            OutputFormat::Sarif => todo!(),
+        };
+        let config = DisplayDiagnosticConfig::default().format(format);
         for path in self
             .results
             .iter()

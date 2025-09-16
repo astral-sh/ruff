@@ -65,7 +65,8 @@ bar =     "needs formatting"
     )?;
 
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--isolated", "--no-cache", "--check"]).current_dir(tempdir.path()), @r"
+        .args(["format", "--isolated", "--no-cache", "--check", "--output-format=concise"])
+        .current_dir(tempdir.path()), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -482,7 +483,7 @@ OTHER = "OTHER"
 
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .current_dir(tempdir.path())
-        .args(["format", "--no-cache", "--check", "--config"])
+        .args(["format", "--no-cache", "--check", "--output-format=concise", "--config"])
         .arg(ruff_toml.file_name().unwrap())
         // Explicitly pass test.py, should be formatted regardless of it being excluded by format.exclude
         .arg(test_path.file_name().unwrap())
@@ -542,7 +543,7 @@ if __name__ == "__main__":
 
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .current_dir(tempdir.path())
-        .args(["format", "--no-cache", "--isolated", "--check"])
+        .args(["format", "--no-cache", "--isolated", "--check", "--output-format=concise"])
         .arg("main.py"), @r"
     success: false
     exit_code: 1
@@ -709,7 +710,7 @@ OTHER = "OTHER"
 
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .current_dir(tempdir.path())
-        .args(["format", "--no-cache", "--force-exclude", "--check", "--config"])
+        .args(["format", "--no-cache", "--force-exclude", "--check", "--output-format=concise", "--config"])
         .arg(ruff_toml.file_name().unwrap())
         // Explicitly pass test.py, should be respect the `format.exclude` when `--force-exclude` is present
         .arg(test_path.file_name().unwrap())
