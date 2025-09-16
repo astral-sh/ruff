@@ -249,7 +249,8 @@ class C[T]():
             reveal_type(x)  # revealed: Self@f
 ```
 
-Even if the `Self` annotation appears first in the nested function, it is the method that binds `Self`.
+Even if the `Self` annotation appears first in the nested function, it is the method that binds
+`Self`.
 
 ```py
 from typing import Self
@@ -260,12 +261,21 @@ class C:
             reveal_type(x)  # revealed: Self@f
 ```
 
-Methods that have self argument will not get a generic context only because of self:
+Methods that have self argument can be or not be generic based on the situation:
 
 ```py
 from ty_extensions import generic_context
 
-reveal_type(generic_context(C.f))  # revealed: None
+class A:
+    # Method will not be generic
+    def f(self: "A"): ...
+
+class B:
+    # Annotating the method with Self will make it generic
+    def f(self: Self): ...
+
+reveal_type(generic_context(A.f))  # revealed: None
+reveal_type(generic_context(B.f))  # revealed: tuple[Self@f]
 ```
 
 [self attribute]: https://typing.python.org/en/latest/spec/generics.html#use-in-attribute-annotations
