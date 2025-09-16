@@ -482,13 +482,13 @@ impl<'db> ConstraintClause<'db> {
         for existing in existing_constraints.by_ref() {
             // Try to simplify the new constraint against an existing constraint.
             match existing.intersect(db, &constraint) {
-                Simplifiable::NeverSatisfiable => {
+                Some(Satisfiable::Never) => {
                     // If two constraints cancel out to 0, that makes the entire clause 0, and all
                     // existing constraints are simplified away.
                     return Satisfiable::Never;
                 }
 
-                Simplifiable::AlwaysSatisfiable => {
+                Some(Satisfiable::Always) => {
                     // If two constraints cancel out to 1, that does NOT cause the entire clause to
                     // become 1. We need to keep whatever constraints have already been added to
                     // the result, and also need to copy over any later constraints that we hadn't
@@ -497,19 +497,18 @@ impl<'db> ConstraintClause<'db> {
                     return self.is_satisfiable();
                 }
 
-                Simplifiable::NotSimplified(existing, c) => {
+                None => {
                     // We couldn't simplify the new constraint relative to this existing
                     // constraint, so add the existing constraint to the result. Continue trying to
                     // simplify the new constraint against the later existing constraints.
-                    self.constraints.push(existing);
-                    constraint = c;
+                    self.constraints.push(existing.clone());
                 }
 
-                Simplifiable::Simplified(c) => {
+                Some(Satisfiable::Constrained(simplified)) => {
                     // We were able to simplify the new constraint relative to this existing
                     // constraint. Don't add it to the result yet; instead, try to simplify the
                     // result further against later existing constraints.
-                    constraint = c;
+                    constraint = simplified;
                 }
             }
         }
@@ -824,14 +823,18 @@ impl<'db> ConstrainedTypeVar<'db> {
         self.constraint.clause_count()
     }
 
-    /// Returns the intersection of this individual constraint and another.
-    /// XXX Satisfiable
-    fn intersect(&self, db: &'db dyn Db, other: &Self) -> Simplifiable<Self> {
+    /// Returns the intersection of this individual constraint and another, or `None` if the two
+    /// constraints do not refer to the same typevar (and therefore cannot be simplified to a
+    /// single constraint).
+    fn intersect(&self, db: &'db dyn Db, other: &Self) -> Option<Satisfiable<Self>> {
         if self.typevar != other.typevar {
-            return Simplifiable::NotSimplified(self.clone(), other.clone());
+            return None;
         }
-        Simplifiable::from_one(self.constraint.intersect(db, &other.constraint))
-            .map(|constraint| constraint.constrain(self.typevar))
+        Some(
+            self.constraint
+                .intersect(db, &other.constraint)
+                .map(|constraint| constraint.constrain(self.typevar)),
+        )
     }
 
     /// Returns the union of this individual constraint and another, if it can be simplified to a
@@ -856,7 +859,7 @@ impl<'db> ConstrainedTypeVar<'db> {
     fn subsumes(&self, db: &'db dyn Db, other: &Self) -> bool {
         debug_assert_eq!(self.typevar, other.typevar);
         match self.intersect(db, other) {
-            Simplifiable::Simplified(intersection) => intersection == *self,
+            Some(Satisfiable::Constrained(intersection)) => intersection == *self,
             _ => false,
         }
     }
