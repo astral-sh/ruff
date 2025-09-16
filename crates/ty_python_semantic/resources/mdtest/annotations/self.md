@@ -242,11 +242,13 @@ bound at `C.f`.
 
 ```py
 from typing import Self
+from ty_extensions import generic_context
 
 class C[T]():
     def f(self: Self):
         def b(x: Self):
             reveal_type(x)  # revealed: Self@f
+        reveal_type(generic_context(b))  # revealed: None
 ```
 
 Even if the `Self` annotation appears first in the nested function, it is the method that binds
@@ -254,29 +256,13 @@ Even if the `Self` annotation appears first in the nested function, it is the me
 
 ```py
 from typing import Self
+from ty_extensions import generic_context
 
 class C:
     def f(self: "C"):
         def b(x: Self):
             reveal_type(x)  # revealed: Self@f
-```
-
-Methods that have self argument can be or not be generic based on the situation:
-
-```py
-from ty_extensions import generic_context
-
-class A:
-    # Method will not be generic
-    def f(self: "A"): ...
-
-class B:
-    # Annotating the method with Self will make it generic
-    def f(self: Self): ...
-
-reveal_type(generic_context(A.f))  # revealed: None
-reveal_type(generic_context(B.f))  # revealed: tuple[Self@f]
-# TODO: Also add a case with implicit self to explain what is the generic context of method with implicit self
+        reveal_type(generic_context(b))  # revealed: None
 ```
 
 [self attribute]: https://typing.python.org/en/latest/spec/generics.html#use-in-attribute-annotations
