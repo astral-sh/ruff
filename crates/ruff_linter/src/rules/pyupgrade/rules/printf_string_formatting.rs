@@ -18,6 +18,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::preview::is_literal_safe_fix_printf_string_formatting_enabled;
 use crate::rules::pyupgrade::helpers::curly_escape;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -427,7 +428,11 @@ pub(crate) fn printf_string_formatting(
         | Expr::NoneLiteral(_)
         | Expr::EllipsisLiteral(_)
         | Expr::FString(_) => (
-            Applicability::Safe,
+            if is_literal_safe_fix_printf_string_formatting_enabled(checker.settings()) {
+                Applicability::Safe
+            } else {
+                Applicability::Unsafe
+            },
             Cow::Owned(format!("({})", checker.locator().slice(right))),
         ),
         Expr::Name(_) | Expr::Attribute(_) | Expr::Subscript(_) | Expr::Call(_) => (
@@ -456,7 +461,9 @@ pub(crate) fn printf_string_formatting(
             }
         ),
         Expr::Tuple(tuple) => (
-            if tuple.iter().all(is_constant) {
+            if is_literal_safe_fix_printf_string_formatting_enabled(checker.settings())
+                && tuple.iter().all(is_constant)
+            {
                 Applicability::Safe
             } else {
                 Applicability::Unsafe
