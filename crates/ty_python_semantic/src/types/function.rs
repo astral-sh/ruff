@@ -1499,8 +1499,8 @@ impl KnownFunction {
                 let contains_unknown_or_todo =
                     |ty| matches!(ty, Type::Dynamic(dynamic) if dynamic != DynamicType::Any);
                 if source_type.is_equivalent_to(db, *casted_type)
-                    && !any_over_type(db, *source_type, &contains_unknown_or_todo)
-                    && !any_over_type(db, *casted_type, &contains_unknown_or_todo)
+                    && !any_over_type(db, *source_type, &contains_unknown_or_todo, true)
+                    && !any_over_type(db, *casted_type, &contains_unknown_or_todo, true)
                 {
                     if let Some(builder) = context.report_lint(&REDUNDANT_CAST, call_expression) {
                         builder.into_diagnostic(format_args!(

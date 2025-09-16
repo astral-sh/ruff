@@ -58,6 +58,9 @@ mod builder;
 #[cfg(test)]
 mod tests;
 
+/// How many fixpoint iterations to allow before falling back to Divergent type.
+const ITERATIONS_BEFORE_FALLBACK: u32 = 10;
+
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
 /// scope.
@@ -111,12 +114,18 @@ pub(crate) fn infer_definition_types<'db>(
 }
 
 fn definition_cycle_recover<'db>(
-    _db: &'db dyn Db,
+    db: &'db dyn Db,
     _value: &DefinitionInference<'db>,
-    _count: u32,
-    _definition: Definition<'db>,
+    count: u32,
+    definition: Definition<'db>,
 ) -> salsa::CycleRecoveryAction<DefinitionInference<'db>> {
-    salsa::CycleRecoveryAction::Iterate
+    if count == ITERATIONS_BEFORE_FALLBACK {
+        salsa::CycleRecoveryAction::Fallback(DefinitionInference::cycle_fallback(
+            definition.scope(db),
+        ))
+    } else {
+        salsa::CycleRecoveryAction::Iterate
+    }
 }
 
 fn definition_cycle_initial<'db>(
@@ -206,9 +215,6 @@ fn infer_expression_types_impl<'db>(
     )
     .finish_expression()
 }
-
-/// How many fixpoint iterations to allow before falling back to Divergent type.
-const ITERATIONS_BEFORE_FALLBACK: u32 = 10;
 
 fn expression_cycle_recover<'db>(
     db: &'db dyn Db,
@@ -618,6 +624,22 @@ impl<'db> DefinitionInference<'db> {
             scope,
             extra: Some(Box::new(DefinitionInferenceExtra {
                 cycle_recovery: Some(CycleRecovery::Initial),
+                ..DefinitionInferenceExtra::default()
+            })),
+        }
+    }
+
+    fn cycle_fallback(scope: ScopeId<'db>) -> Self {
+        let _ = scope;
+
+        Self {
+            expressions: FxHashMap::default(),
+            bindings: Box::default(),
+            declarations: Box::default(),
+            #[cfg(debug_assertions)]
+            scope,
+            extra: Some(Box::new(DefinitionInferenceExtra {
+                cycle_recovery: Some(CycleRecovery::Divergent(scope)),
                 ..DefinitionInferenceExtra::default()
             })),
         }

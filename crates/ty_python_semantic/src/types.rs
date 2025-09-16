@@ -6496,10 +6496,7 @@ impl<'db> Type<'db> {
     }
 
     pub(super) fn has_divergent_type(self, db: &'db dyn Db, div: Type<'db>) -> bool {
-        any_over_type(db, self, &|ty| match ty {
-            Type::Dynamic(DynamicType::Divergent(_)) => ty == div,
-            _ => false,
-        })
+        any_over_type(db, self, &|ty| ty == div, false)
     }
 }
 
@@ -7445,10 +7442,27 @@ fn walk_type_var_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     typevar: TypeVarInstance<'db>,
     visitor: &V,
 ) {
-    if let Some(bounds) = typevar.bound_or_constraints(db) {
-        walk_type_var_bounds(db, bounds, visitor);
+    if let Some(bound_or_constraints) = if visitor.should_visit_lazy_type_attributes() {
+        typevar.bound_or_constraints(db)
+    } else {
+        match typevar._bound_or_constraints(db) {
+            _ if visitor.should_visit_lazy_type_attributes() => typevar.bound_or_constraints(db),
+            Some(TypeVarBoundOrConstraintsEvaluation::Eager(bound_or_constraints)) => {
+                Some(bound_or_constraints)
+            }
+            _ => None,
+        }
+    } {
+        walk_type_var_bounds(db, bound_or_constraints, visitor);
     }
-    if let Some(default_type) = typevar.default_type(db) {
+    if let Some(default_type) = if visitor.should_visit_lazy_type_attributes() {
+        typevar.default_type(db)
+    } else {
+        match typevar._default(db) {
+            Some(TypeVarDefaultEvaluation::Eager(default_type)) => Some(default_type),
+            _ => None,
+        }
+    } {
         visitor.visit_type(db, default_type);
     }
 }
@@ -9877,6 +9891,9 @@ fn walk_type_alias_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     type_alias: TypeAliasType<'db>,
     visitor: &V,
 ) {
+    if !visitor.should_visit_lazy_type_attributes() {
+        return;
+    }
     match type_alias {
         TypeAliasType::PEP695(type_alias) => {
             walk_pep_695_type_alias(db, type_alias, visitor);
