@@ -3,15 +3,16 @@ use std::time::Instant;
 
 use lsp_types::request::Completion;
 use lsp_types::{
-    CompletionItem, CompletionItemKind, CompletionParams, CompletionResponse, Documentation, Url,
+    CompletionItem, CompletionItemKind, CompletionItemLabelDetails, CompletionParams,
+    CompletionResponse, Documentation, TextEdit, Url,
 };
 use ruff_db::source::{line_index, source_text};
 use ruff_source_file::OneIndexed;
-use ty_ide::{CompletionSettings, completion};
+use ruff_text_size::Ranged;
+use ty_ide::{CompletionKind, CompletionSettings, completion};
 use ty_project::ProjectDatabase;
-use ty_python_semantic::CompletionKind;
 
-use crate::document::PositionExt;
+use crate::document::{PositionExt, ToRangeExt};
 use crate::server::api::traits::{
     BackgroundDocumentRequestHandler, RequestHandler, RetriableRequestHandler,
 };
@@ -70,11 +71,27 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
             .enumerate()
             .map(|(i, comp)| {
                 let kind = comp.kind(db).map(ty_kind_to_lsp_kind);
+                let type_display = comp.ty.map(|ty| ty.display(db).to_string());
+                let import_edit = comp.import.as_ref().map(|edit| {
+                    let range =
+                        edit.range()
+                            .to_lsp_range(&source, &line_index, snapshot.encoding());
+                    TextEdit {
+                        range,
+                        new_text: edit.content().map(ToString::to_string).unwrap_or_default(),
+                    }
+                });
                 CompletionItem {
-                    label: comp.inner.name.into(),
+                    label: comp.name.into(),
                     kind,
                     sort_text: Some(format!("{i:-max_index_len$}")),
-                    detail: comp.inner.ty.map(|ty| ty.display(db).to_string()),
+                    detail: type_display.clone(),
+                    label_details: Some(CompletionItemLabelDetails {
+                        detail: type_display,
+                        description: comp.module_name.map(ToString::to_string),
+                    }),
+                    insert_text: comp.insert.map(String::from),
+                    additional_text_edits: import_edit.map(|edit| vec![edit]),
                     documentation: comp
                         .documentation
                         .map(|docstring| Documentation::String(docstring.render_plaintext())),
