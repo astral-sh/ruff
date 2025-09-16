@@ -618,6 +618,72 @@ if __name__ == "__main__":
 }
 
 #[test]
+fn messages_json() -> Result<()> {
+    let tempdir = TempDir::new()?;
+
+    fs::write(
+        tempdir.path().join("main.py"),
+        r#"
+from test import say_hy
+
+if __name__ == "__main__":
+    say_hy("dear Ruff contributor")
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .current_dir(tempdir.path())
+            .args(["format", "--no-cache", "--isolated", "--check", "--output-format=json"])
+            .arg("main.py"), @r#"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        [
+          {
+            "cell": null,
+            "code": "unformatted",
+            "end_location": {
+              "column": 1,
+              "row": 1
+            },
+            "filename": "[TMP]/main.py",
+            "fix": {
+              "applicability": "safe",
+              "edits": [
+                {
+                  "content": "from test import say_hy\n\nif __name__ == \"__main__\":\n    say_hy(\"dear Ruff contributor\")\n",
+                  "end_location": {
+                    "column": 1,
+                    "row": 6
+                  },
+                  "location": {
+                    "column": 1,
+                    "row": 1
+                  }
+                }
+              ],
+              "message": null
+            },
+            "location": {
+              "column": 1,
+              "row": 1
+            },
+            "message": "File would be reformatted",
+            "noqa_row": null,
+            "url": "https://docs.astral.sh/ruff/rules/unformatted"
+          }
+        ]
+        ----- stderr -----
+        "#);
+    });
+
+    Ok(())
+}
+
+#[test]
 fn exit_non_zero_on_format() -> Result<()> {
     let tempdir = TempDir::new()?;
 

@@ -214,7 +214,7 @@ pub(crate) fn format(
         if mode.is_diff() {
             // Allow piping the diff to e.g. a file by writing the summary to stderr
             results.write_summary(&mut stderr().lock())?;
-        } else {
+        } else if output_format.is_human_readable() {
             results.write_summary(&mut stdout().lock())?;
         }
     }
