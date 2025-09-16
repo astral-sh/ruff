@@ -104,6 +104,9 @@ impl SemanticSyntaxChecker {
                         *range,
                     );
                 }
+                for target in targets {
+                    Self::multiple_star_expression(target, ctx);
+                }
 
                 // test_ok assign_stmt_starred_expr_value
                 // _ = 4
@@ -356,6 +359,38 @@ impl SemanticSyntaxChecker {
                 SemanticSyntaxErrorKind::InvalidStarExpression,
                 expr.range(),
             );
+        }
+    }
+    fn multiple_star_expression<Ctx: SemanticSyntaxContext>(expr: &Expr, ctx: &Ctx) {
+        match expr {
+            Expr::Tuple(ast::ExprTuple { elts, range, .. })
+            | Expr::List(ast::ExprList { elts, range, .. }) => {
+                let mut count = 0;
+                for elt in elts {
+                    if matches!(elt, Expr::Starred(_)) {
+                        count += 1;
+                    }
+                    Self::multiple_star_expression(elt, ctx);
+                }
+                if count > 1 {
+                    // test_err multiple_starred_assignment_target
+                    // (*a, *b) = (1, 2)
+                    // [*a, *b] = (1, 2)
+                    // (*a, *b, c) = (1, 2, 3)
+                    // [*a, *b, c] = (1, 2, 3)
+
+                    // test_ok multiple_starred_assignment_target
+                    // (*a, b) = (1, 2)
+                    // (*_, normed), *_ = [(1,), 2]
+
+                    Self::add_error(
+                        ctx,
+                        SemanticSyntaxErrorKind::MultipleStarredExpressions,
+                        *range,
+                    );
+                }
+            }
+            _ => {}
         }
     }
 
@@ -1002,6 +1037,9 @@ impl Display for SemanticSyntaxError {
             SemanticSyntaxErrorKind::YieldFromInAsyncFunction => {
                 f.write_str("`yield from` statement in async function; use `async for` instead")
             }
+            SemanticSyntaxErrorKind::MultipleStarredExpressions => {
+                write!(f, "Two starred expressions in assignment")
+            }
         }
     }
 }
@@ -1362,6 +1400,13 @@ pub enum SemanticSyntaxErrorKind {
 
     /// Represents the use of `yield from` inside an asynchronous function.
     YieldFromInAsyncFunction,
+
+    /// Represents the use of more than one starred expression in an assignment.
+    ///
+    /// Python only allows a single starred target when unpacking values on the
+    /// left-hand side of an assignment. Using multiple starred expressions makes
+    /// the statement invalid and results in a `SyntaxError`.
+    MultipleStarredExpressions,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
