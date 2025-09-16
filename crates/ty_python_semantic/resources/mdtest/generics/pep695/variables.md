@@ -171,8 +171,10 @@ from typing import Any
 from typing_extensions import final
 
 def bounded[T: Super](t: T) -> None:
-    reveal_type(is_assignable_to(T, Any))  # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_assignable_to(Any, T))  # revealed: ty_extensions.ConstraintSet[always]
+    # revealed: ty_extensions.ConstraintSet[all valid specializations: (T@bounded ≤ Super)]
+    reveal_type(is_assignable_to(T, Any))
+    # revealed: ty_extensions.ConstraintSet[all valid specializations: (T@bounded ≤ Super)]
+    reveal_type(is_assignable_to(Any, T))
     # revealed: ty_extensions.ConstraintSet[all valid specializations: (T@bounded ≤ Super)]
     reveal_type(is_assignable_to(T, Super))
     reveal_type(is_assignable_to(T, Sub))  # revealed: ty_extensions.ConstraintSet[never]
@@ -206,8 +208,10 @@ def bounded_by_gradual[T: Any](t: T) -> None:
 class FinalClass: ...
 
 def bounded_final[T: FinalClass](t: T) -> None:
-    reveal_type(is_assignable_to(T, Any))  # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_assignable_to(Any, T))  # revealed: ty_extensions.ConstraintSet[always]
+    # revealed: ty_extensions.ConstraintSet[all valid specializations: (T@bounded_final ≤ FinalClass)]
+    reveal_type(is_assignable_to(T, Any))
+    # revealed: ty_extensions.ConstraintSet[all valid specializations: (T@bounded_final ≤ FinalClass)]
+    reveal_type(is_assignable_to(Any, T))
     # revealed: ty_extensions.ConstraintSet[all valid specializations: (T@bounded_final ≤ FinalClass)]
     reveal_type(is_assignable_to(T, FinalClass))
     reveal_type(is_assignable_to(FinalClass, T))  # revealed: ty_extensions.ConstraintSet[never]
@@ -255,14 +259,16 @@ def constrained[T: (Base, Unrelated)](t: T) -> None:
     reveal_type(is_assignable_to(T, Sub))  # revealed: ty_extensions.ConstraintSet[never]
     # revealed: ty_extensions.ConstraintSet[some valid specializations: (T@constrained = Unrelated)]
     reveal_type(is_assignable_to(T, Unrelated))
-    reveal_type(is_assignable_to(T, Any))  # revealed: ty_extensions.ConstraintSet[always]
+    # revealed: ty_extensions.ConstraintSet[all valid specializations: (T@constrained = Base) ∨ (T@constrained = Unrelated)]
+    reveal_type(is_assignable_to(T, Any))
     # revealed: ty_extensions.ConstraintSet[all valid specializations: (T@constrained = Base) ∨ (T@constrained = Unrelated)]
     reveal_type(is_assignable_to(T, Super | Unrelated))
     # revealed: ty_extensions.ConstraintSet[all valid specializations: (T@constrained = Base) ∨ (T@constrained = Unrelated)]
     reveal_type(is_assignable_to(T, Base | Unrelated))
     # revealed: ty_extensions.ConstraintSet[some valid specializations: (T@constrained = Unrelated)]
     reveal_type(is_assignable_to(T, Sub | Unrelated))
-    reveal_type(is_assignable_to(Any, T))  # revealed: ty_extensions.ConstraintSet[always]
+    # revealed: ty_extensions.ConstraintSet[all valid specializations: (T@constrained = Base) ∨ (T@constrained = Unrelated)]
+    reveal_type(is_assignable_to(Any, T))
     reveal_type(is_assignable_to(Super, T))  # revealed: ty_extensions.ConstraintSet[never]
     # revealed: ty_extensions.ConstraintSet[some valid specializations: (T@constrained = Unrelated)]
     reveal_type(is_assignable_to(Unrelated, T))
