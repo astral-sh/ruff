@@ -714,7 +714,7 @@ impl Drop for PythonFilesVisitor<'_, '_> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Ord, PartialOrd)]
 pub enum ResolvedFile {
     /// File explicitly passed to the CLI
     Root(PathBuf),
@@ -744,25 +744,6 @@ impl ResolvedFile {
 
     pub fn is_root(&self) -> bool {
         matches!(self, ResolvedFile::Root(_))
-    }
-}
-
-impl PartialOrd for ResolvedFile {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for ResolvedFile {
-    fn cmp(&self, other: &Self) -> Ordering {
-        match self.path().cmp(other.path()) {
-            Ordering::Equal => match (self.is_root(), other.is_root()) {
-                (true, false) => Ordering::Less,
-                (false, true) => Ordering::Greater,
-                _ => Ordering::Equal,
-            },
-            ord => ord,
-        }
     }
 }
 
