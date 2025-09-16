@@ -1,6 +1,6 @@
 use ruff_db::files::File;
 use ty_project::Db;
-use ty_python_semantic::all_modules;
+use ty_python_semantic::{Module, all_modules};
 
 use crate::symbols::{QueryPattern, SymbolInfo, symbols_for_file_global_only};
 
@@ -8,7 +8,7 @@ use crate::symbols::{QueryPattern, SymbolInfo, symbols_for_file_global_only};
 ///
 /// Returns symbols from all files in the workspace and dependencies, filtered
 /// by the query.
-pub fn all_symbols(db: &dyn Db, query: &str) -> Vec<AllSymbolInfo> {
+pub fn all_symbols<'db>(db: &'db dyn Db, query: &str) -> Vec<AllSymbolInfo<'db>> {
     // If the query is empty, return immediately to avoid expensive file scanning
     if query.is_empty() {
         return Vec::new();
@@ -36,6 +36,7 @@ pub fn all_symbols(db: &dyn Db, query: &str) -> Vec<AllSymbolInfo> {
                         // but this works pretty well as it is.
                         results.lock().unwrap().push(AllSymbolInfo {
                             symbol: symbol.to_owned(),
+                            module,
                             file,
                         });
                     }
@@ -56,10 +57,15 @@ pub fn all_symbols(db: &dyn Db, query: &str) -> Vec<AllSymbolInfo> {
 /// A symbol found in the workspace and dependencies, including the
 /// file it was found in.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct AllSymbolInfo {
-    /// The symbol information
+pub struct AllSymbolInfo<'db> {
+    /// The symbol information.
     pub symbol: SymbolInfo<'static>,
-    /// The file containing the symbol
+    /// The module containing the symbol.
+    pub module: Module<'db>,
+    /// The file containing the symbol.
+    ///
+    /// This `File` is guaranteed to be the same
+    /// as the `File` underlying `module`.
     pub file: File,
 }
 
@@ -148,17 +154,17 @@ ABCDEFGHIJKLMNOP = 'https://api.example.com'
         }
     }
 
-    struct AllSymbolDiagnostic {
-        symbol_info: AllSymbolInfo,
+    struct AllSymbolDiagnostic<'db> {
+        symbol_info: AllSymbolInfo<'db>,
     }
 
-    impl AllSymbolDiagnostic {
-        fn new(symbol_info: AllSymbolInfo) -> Self {
+    impl<'db> AllSymbolDiagnostic<'db> {
+        fn new(symbol_info: AllSymbolInfo<'db>) -> Self {
             Self { symbol_info }
         }
     }
 
-    impl IntoDiagnostic for AllSymbolDiagnostic {
+    impl IntoDiagnostic for AllSymbolDiagnostic<'_> {
         fn into_diagnostic(self) -> Diagnostic {
             let symbol_kind_str = self.symbol_info.symbol.kind.to_string();
 
