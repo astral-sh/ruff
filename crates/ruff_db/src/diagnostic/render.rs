@@ -25,11 +25,13 @@ use super::{
 
 use azure::AzureRenderer;
 use concise::ConciseRenderer;
+use github::GithubRenderer;
 use pylint::PylintRenderer;
 
 mod azure;
 mod concise;
 mod full;
+pub mod github;
 #[cfg(feature = "serde")]
 mod gitlab;
 #[cfg(feature = "serde")]
@@ -141,6 +143,9 @@ impl std::fmt::Display for DisplayDiagnostics<'_> {
             #[cfg(feature = "serde")]
             DiagnosticFormat::Gitlab => {
                 gitlab::GitlabRenderer::new(self.resolver).render(f, self.diagnostics)?;
+            }
+            DiagnosticFormat::Github => {
+                GithubRenderer::new(self.resolver, "ty").render(f, self.diagnostics)?;
             }
         }
 
@@ -254,9 +259,7 @@ impl<'a> ResolvedDiagnostic<'a> {
             id,
             message: diag.inner.message.as_str().to_string(),
             annotations,
-            is_fixable: diag
-                .fix()
-                .is_some_and(|fix| fix.applies(config.fix_applicability)),
+            is_fixable: diag.has_applicable_fix(config),
         }
     }
 

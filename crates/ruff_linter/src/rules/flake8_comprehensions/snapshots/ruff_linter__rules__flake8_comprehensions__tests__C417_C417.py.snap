@@ -342,6 +342,7 @@ help: Replace `map()` with a set comprehension
 75 + _ = t"{ {x % 2 == 0 for x in nums} }"
 76 | _ = t"{dict(map(lambda v: (v, v**2), nums))}"
 77 | 
+78 | 
 note: This is an unsafe fix and may change runtime behavior
 
 C417 [*] Unnecessary `map()` usage (rewrite using a dict comprehension)
@@ -359,4 +360,6 @@ help: Replace `map()` with a dict comprehension
    - _ = t"{dict(map(lambda v: (v, v**2), nums))}"
 76 + _ = t"{ {v: v**2 for v in nums} }"
 77 | 
+78 | 
+79 | # See https://github.com/astral-sh/ruff/issues/20198
 note: This is an unsafe fix and may change runtime behavior

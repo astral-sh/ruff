@@ -39,3 +39,16 @@ hasattr(
     "__call__",  # comment 4
     # comment 5
 )
+
+import operator
+
+assert hasattr(operator, "__call__")
+assert callable(operator) is False
+
+
+class A:
+    def __init__(self): self.__call__ = None
+
+
+assert hasattr(A(), "__call__")
+assert callable(A()) is False

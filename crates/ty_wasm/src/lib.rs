@@ -415,7 +415,11 @@ impl Workspace {
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
 
-        let completions = ty_ide::completion(&self.db, file_id.file, offset);
+        // NOTE: At time of writing, 2025-08-29, auto-import isn't
+        // ready to be enabled by default yet. Once it is, we should
+        // either just enable it or provide a way to configure it.
+        let settings = ty_ide::CompletionSettings { auto_import: false };
+        let completions = ty_ide::completion(&self.db, &settings, file_id.file, offset);
 
         Ok(completions
             .into_iter()
@@ -425,7 +429,10 @@ impl Workspace {
                 documentation: completion
                     .documentation
                     .map(|documentation| documentation.render_plaintext()),
-                detail: completion.inner.ty.display(&self.db).to_string().into(),
+                detail: completion
+                    .inner
+                    .ty
+                    .map(|ty| ty.display(&self.db).to_string()),
             })
             .collect())
     }

@@ -398,7 +398,7 @@ the expression `str`:
 from ty_extensions import TypeOf, is_subtype_of, static_assert
 
 # This is incorrect and therefore fails with ...
-# error: "Static assertion error: argument evaluates to `False`"
+# error: "Static assertion error: argument of type `ty_extensions.ConstraintSet[never]` is statically known to be falsy"
 static_assert(is_subtype_of(str, type[str]))
 
 # Correct, returns True:
@@ -469,6 +469,8 @@ c4: CallableTypeOf[()]
 Using it in annotation to reveal the signature of the callable object:
 
 ```py
+from typing_extensions import Self
+
 class Foo:
     def __init__(self, x: int) -> None:
         pass
@@ -476,12 +478,21 @@ class Foo:
     def __call__(self, x: int) -> str:
         return "foo"
 
+    def returns_self(self, x: int) -> Self:
+        return self
+
+    @classmethod
+    def class_method(cls, x: int) -> Self:
+        return cls(x)
+
 def _(
     c1: CallableTypeOf[f1],
     c2: CallableTypeOf[f2],
     c3: CallableTypeOf[f3],
     c4: CallableTypeOf[Foo],
     c5: CallableTypeOf[Foo(42).__call__],
+    c6: CallableTypeOf[Foo(42).returns_self],
+    c7: CallableTypeOf[Foo.class_method],
 ) -> None:
     reveal_type(c1)  # revealed: () -> Unknown
     reveal_type(c2)  # revealed: () -> int
@@ -491,4 +502,7 @@ def _(
     reveal_type(c4)  # revealed: (...) -> Foo
 
     reveal_type(c5)  #  revealed: (x: int) -> str
+
+    reveal_type(c6)  # revealed: (x: int) -> Foo
+    reveal_type(c7)  # revealed: (x: int) -> Foo
 ```

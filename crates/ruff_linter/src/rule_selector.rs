@@ -214,10 +214,8 @@ impl RuleSelector {
                 RuleGroup::Preview => {
                     preview_enabled && (self.is_exact() || !preview_require_explicit)
                 }
-                // Deprecated rules are excluded in preview mode and with 'All' option unless explicitly selected
-                RuleGroup::Deprecated => {
-                    (!preview_enabled || self.is_exact()) && !matches!(self, RuleSelector::All)
-                }
+                // Deprecated rules are excluded by default unless explicitly selected
+                RuleGroup::Deprecated => !preview_enabled && self.is_exact(),
                 // Removed rules are included if explicitly selected but will error downstream
                 RuleGroup::Removed => self.is_exact(),
             }

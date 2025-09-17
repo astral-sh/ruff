@@ -27,7 +27,8 @@ use crate::rules::flake8_pytest_style::rules::is_pytest_raises;
 ///     do_thing_that_raises()
 /// ```
 ///
-/// Use instead:
+/// If the pattern is intended to be a regular expression, use a raw string to signal this
+/// intention:
 ///
 /// ```python
 /// import pytest
@@ -37,7 +38,7 @@ use crate::rules::flake8_pytest_style::rules::is_pytest_raises;
 ///     do_thing_that_raises()
 /// ```
 ///
-/// Alternatively:
+/// Alternatively, escape any regex metacharacters with `re.escape`:
 ///
 /// ```python
 /// import pytest
@@ -48,7 +49,7 @@ use crate::rules::flake8_pytest_style::rules::is_pytest_raises;
 ///     do_thing_that_raises()
 /// ```
 ///
-/// or:
+/// or directly with backslashes:
 ///
 /// ```python
 /// import pytest

@@ -78,10 +78,7 @@ reveal_type(Person.id)  # revealed: property
 reveal_type(Person.name)  # revealed: property
 reveal_type(Person.age)  # revealed: property
 
-# TODO... the error is correct, but this is not the friendliest error message
-# for assigning to a read-only property :-)
-#
-# error: [invalid-assignment] "Invalid assignment to data descriptor attribute `id` on type `Person` with custom `__set__` method"
+# error: [invalid-assignment] "Cannot assign to read-only property `id` on object of type `Person`"
 alice.id = 42
 # error: [invalid-assignment]
 bob.age = None
@@ -221,10 +218,7 @@ james = SuperUser(0, "James", 42, "Jimmy")
 # on the subclass
 james.name = "Robert"
 
-# TODO: the error is correct (can't assign to the read-only property inherited from the superclass)
-# but the error message could be friendlier :-)
-#
-# error: [invalid-assignment] "Invalid assignment to data descriptor attribute `nickname` on type `SuperUser` with custom `__set__` method"
+# error: [invalid-assignment] "Cannot assign to read-only property `nickname` on object of type `SuperUser`"
 james.nickname = "Bob"
 ```
 
@@ -278,14 +272,32 @@ reveal_type(Person._make)  # revealed: bound method <class 'Person'>._make(itera
 reveal_type(Person._asdict)  # revealed: def _asdict(self) -> dict[str, Any]
 reveal_type(Person._replace)  # revealed: def _replace(self, **kwargs: Any) -> Self@_replace
 
-# TODO: should be `Person` once we support `Self`
+# TODO: should be `Person` once we support implicit type of `self`
 reveal_type(Person._make(("Alice", 42)))  # revealed: Unknown
 
 person = Person("Alice", 42)
 
 reveal_type(person._asdict())  # revealed: dict[str, Any]
-# TODO: should be `Person` once we support `Self`
+# TODO: should be `Person` once we support implicit type of `self`
 reveal_type(person._replace(name="Bob"))  # revealed: Unknown
+```
+
+When accessing them on child classes of generic `NamedTuple`s, the return type is specialized
+accordingly:
+
+```py
+from typing import NamedTuple, Generic, TypeVar
+
+T = TypeVar("T")
+
+class Box(NamedTuple, Generic[T]):
+    content: T
+
+class IntBox(Box[int]):
+    pass
+
+# TODO: should be `IntBox` once we support the implicit type of `self`
+reveal_type(IntBox(1)._replace(content=42))  # revealed: Unknown
 ```
 
 ## `collections.namedtuple`

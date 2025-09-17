@@ -1,6 +1,8 @@
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::visitor::{Visitor, walk_expr, walk_stmt};
 use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
@@ -94,13 +96,21 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
     };
 
     // Find the enclosing function definition (if any).
-    let Some(Stmt::FunctionDef(ast::StmtFunctionDef {
-        parameters: parent_parameters,
-        ..
-    })) = parents.find(|stmt| stmt.is_function_def_stmt())
+    let Some(
+        func_stmt @ Stmt::FunctionDef(ast::StmtFunctionDef {
+            parameters: parent_parameters,
+            ..
+        }),
+    ) = parents.find(|stmt| stmt.is_function_def_stmt())
     else {
         return;
     };
+
+    if is_builtins_super(checker.semantic(), call)
+        && !has_local_dunder_class_var_ref(checker.semantic(), func_stmt)
+    {
+        return;
+    }
 
     // Extract the name of the first argument to the enclosing function.
     let Some(parent_arg) = parent_parameters.args.first() else {
@@ -192,4 +202,68 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
 /// Returns `true` if a call is an argumented `super` invocation.
 fn is_super_call_with_arguments(call: &ast::ExprCall, checker: &Checker) -> bool {
     checker.semantic().match_builtin_expr(&call.func, "super") && !call.arguments.is_empty()
+}
+
+/// Returns `true` if the function contains load references to `__class__` or `super` without
+/// local binding.
+///
+/// This indicates that the function relies on the implicit `__class__` cell variable created by
+/// Python when `super()` is called without arguments, making it unsafe to remove `super()` parameters.
+fn has_local_dunder_class_var_ref(semantic: &SemanticModel, func_stmt: &Stmt) -> bool {
+    if semantic.current_scope().has("__class__") {
+        return false;
+    }
+
+    let mut finder = ClassCellReferenceFinder::new();
+    finder.visit_stmt(func_stmt);
+
+    finder.found()
+}
+
+/// Returns `true` if the call is to the built-in `builtins.super` function.
+fn is_builtins_super(semantic: &SemanticModel, call: &ast::ExprCall) -> bool {
+    semantic
+        .resolve_qualified_name(&call.func)
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["builtins", "super"]))
+}
+
+/// A [`Visitor`] that searches for implicit reference to `__class__` cell,
+/// excluding nested class definitions.
+#[derive(Debug)]
+struct ClassCellReferenceFinder {
+    has_class_cell: bool,
+}
+
+impl ClassCellReferenceFinder {
+    pub(crate) fn new() -> Self {
+        ClassCellReferenceFinder {
+            has_class_cell: false,
+        }
+    }
+    pub(crate) fn found(&self) -> bool {
+        self.has_class_cell
+    }
+}
+
+impl<'a> Visitor<'a> for ClassCellReferenceFinder {
+    fn visit_stmt(&mut self, stmt: &'a Stmt) {
+        match stmt {
+            Stmt::ClassDef(_) => {}
+            _ => {
+                if !self.has_class_cell {
+                    walk_stmt(self, stmt);
+                }
+            }
+        }
+    }
+
+    fn visit_expr(&mut self, expr: &'a Expr) {
+        if expr.as_name_expr().is_some_and(|name| {
+            matches!(name.id.as_str(), "super" | "__class__") && name.ctx.is_load()
+        }) {
+            self.has_class_cell = true;
+            return;
+        }
+        walk_expr(self, expr);
+    }
 }

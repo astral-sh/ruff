@@ -158,8 +158,8 @@ struct SarifResult<'a> {
 impl<'a> SarifResult<'a> {
     #[cfg(not(target_arch = "wasm32"))]
     fn from_message(message: &'a Diagnostic) -> Result<Self> {
-        let start_location = message.expect_ruff_start_location();
-        let end_location = message.expect_ruff_end_location();
+        let start_location = message.ruff_start_location().unwrap_or_default();
+        let end_location = message.ruff_end_location().unwrap_or_default();
         let path = normalize_path(&*message.expect_ruff_filename());
         Ok(Self {
             code: RuleCode::from(message),
@@ -178,8 +178,8 @@ impl<'a> SarifResult<'a> {
     #[cfg(target_arch = "wasm32")]
     #[expect(clippy::unnecessary_wraps)]
     fn from_message(message: &'a Diagnostic) -> Result<Self> {
-        let start_location = message.expect_ruff_start_location();
-        let end_location = message.expect_ruff_end_location();
+        let start_location = message.ruff_start_location().unwrap_or_default();
+        let end_location = message.ruff_end_location().unwrap_or_default();
         let path = normalize_path(&*message.expect_ruff_filename());
         Ok(Self {
             code: RuleCode::from(message),

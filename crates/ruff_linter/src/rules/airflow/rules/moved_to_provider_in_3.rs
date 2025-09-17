@@ -13,13 +13,13 @@ use ruff_text_size::TextRange;
 use crate::{FixAvailability, Violation};
 
 /// ## What it does
-/// Checks for uses of Airflow functions and values that have been moved to it providers.
-/// (e.g., apache-airflow-providers-fab)
+/// Checks for uses of Airflow functions and values that have been moved to its providers
+/// (e.g., `apache-airflow-providers-fab`).
 ///
 /// ## Why is this bad?
 /// Airflow 3.0 moved various deprecated functions, members, and other
 /// values to its providers. The user needs to install the corresponding provider and replace
-/// the original usage with the one in the provider
+/// the original usage with the one in the provider.
 ///
 /// ## Example
 /// ```python
@@ -50,9 +50,6 @@ impl Violation for Airflow3MovedToProvider<'_> {
             replacement,
         } = self;
         match replacement {
-            ProviderReplacement::None => {
-                format!("`{deprecated}` is removed in Airflow 3.0")
-            }
             ProviderReplacement::AutoImport {
                 name: _,
                 module: _,
@@ -85,7 +82,6 @@ impl Violation for Airflow3MovedToProvider<'_> {
                 provider,
                 version,
             } => Some((module, name.as_str(), provider, version)),
-            ProviderReplacement::None => None,
         } {
             Some(format!(
                 "Install `apache-airflow-providers-{provider}>={version}` and use `{name}` from `{module}` instead."
@@ -1020,7 +1016,6 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             provider: "postgres",
             version: "1.0.0",
         },
-        ["airflow", "operators", "postgres_operator", "Mapping"] => ProviderReplacement::None,
 
         // apache-airflow-providers-presto
         ["airflow", "hooks", "presto_hook", "PrestoHook"] => ProviderReplacement::AutoImport {
@@ -1208,16 +1203,6 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         ProviderReplacement::AutoImport { module, name, .. } => (module, *name),
         ProviderReplacement::SourceModuleMovedToProvider { module, name, .. } => {
             (module, name.as_str())
-        }
-        ProviderReplacement::None => {
-            checker.report_diagnostic(
-                Airflow3MovedToProvider {
-                    deprecated: qualified_name,
-                    replacement,
-                },
-                ranged,
-            );
-            return;
         }
     };
 

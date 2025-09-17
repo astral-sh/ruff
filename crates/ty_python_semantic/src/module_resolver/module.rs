@@ -1,9 +1,9 @@
 use std::fmt::Formatter;
 use std::str::FromStr;
 
-use ruff_db::files::File;
-use ruff_python_ast::name::Name;
-use ruff_python_stdlib::identifiers::is_identifier;
+use ruff_db::files::{File, system_path_to_file, vendored_path_to_file};
+use ruff_db::system::SystemPath;
+use ruff_db::vendored::VendoredPath;
 use salsa::Database;
 use salsa::plumbing::AsId;
 
@@ -97,23 +97,10 @@ impl<'db> Module<'db> {
     ///
     /// The names returned correspond to the "base" name of the module.
     /// That is, `{self.name}.{basename}` should give the full module name.
-    pub fn all_submodules(self, db: &'db dyn Db) -> &'db [Name] {
-        self.all_submodules_inner(db).unwrap_or_default()
-    }
-
-    fn all_submodules_inner(self, db: &'db dyn Db) -> Option<&'db [Name]> {
-        // It would be complex and expensive to compute all submodules for
-        // namespace packages, since a namespace package doesn't correspond
-        // to a single file; it can span multiple directories across multiple
-        // search paths. For now, we only compute submodules for traditional
-        // packages that exist in a single directory on a single search path.
-        let Module::File(module) = self else {
-            return None;
-        };
-        if !matches!(module.kind(db), ModuleKind::Package) {
-            return None;
-        }
-        all_submodule_names_for_package(db, module.file(db)).as_deref()
+    pub fn all_submodules(self, db: &'db dyn Db) -> &'db [Module<'db>] {
+        all_submodule_names_for_package(db, self)
+            .as_deref()
+            .unwrap_or_default()
     }
 }
 
@@ -134,7 +121,10 @@ impl std::fmt::Debug for Module<'_> {
 
 #[allow(clippy::ref_option)]
 #[salsa::tracked(returns(ref))]
-fn all_submodule_names_for_package(db: &dyn Db, file: File) -> Option<Vec<Name>> {
+fn all_submodule_names_for_package<'db>(
+    db: &'db dyn Db,
+    module: Module<'db>,
+) -> Option<Vec<Module<'db>>> {
     fn is_submodule(
         is_dir: bool,
         is_file: bool,
@@ -147,7 +137,31 @@ fn all_submodule_names_for_package(db: &dyn Db, file: File) -> Option<Vec<Name>>
                 && !matches!(basename, Some("__init__.py" | "__init__.pyi")))
     }
 
-    let path = SystemOrVendoredPathRef::try_from_file(db, file)?;
+    fn find_package_init_system(db: &dyn Db, dir: &SystemPath) -> Option<File> {
+        system_path_to_file(db, dir.join("__init__.pyi"))
+            .or_else(|_| system_path_to_file(db, dir.join("__init__.py")))
+            .ok()
+    }
+
+    fn find_package_init_vendored(db: &dyn Db, dir: &VendoredPath) -> Option<File> {
+        vendored_path_to_file(db, dir.join("__init__.pyi"))
+            .or_else(|_| vendored_path_to_file(db, dir.join("__init__.py")))
+            .ok()
+    }
+
+    // It would be complex and expensive to compute all submodules for
+    // namespace packages, since a namespace package doesn't correspond
+    // to a single file; it can span multiple directories across multiple
+    // search paths. For now, we only compute submodules for traditional
+    // packages that exist in a single directory on a single search path.
+    let Module::File(module) = module else {
+        return None;
+    };
+    if !matches!(module.kind(db), ModuleKind::Package) {
+        return None;
+    }
+
+    let path = SystemOrVendoredPathRef::try_from_file(db, module.file(db))?;
     debug_assert!(
         matches!(path.file_name(), Some("__init__.py" | "__init__.pyi")),
         "expected package file `{:?}` to be `__init__.py` or `__init__.pyi`",
@@ -161,9 +175,11 @@ fn all_submodule_names_for_package(db: &dyn Db, file: File) -> Option<Vec<Name>>
             // tree. When the revision gets bumped, the cache
             // that Salsa creates does for this routine will be
             // invalidated.
-            if let Some(root) = db.files().root(db, parent_directory) {
-                let _ = root.revision(db);
-            }
+            let root = db
+                .files()
+                .root(db, parent_directory)
+                .expect("System search path should have a registered root");
+            let _ = root.revision(db);
 
             db.system()
                 .read_directory(parent_directory)
@@ -187,7 +203,23 @@ fn all_submodule_names_for_package(db: &dyn Db, file: File) -> Option<Vec<Name>>
                 })
                 .filter_map(|entry| {
                     let stem = entry.path().file_stem()?;
-                    is_identifier(stem).then(|| Name::from(stem))
+                    let name = ModuleName::new(stem)?;
+                    let (kind, file) = if entry.file_type().is_directory() {
+                        (
+                            ModuleKind::Package,
+                            find_package_init_system(db, entry.path())?,
+                        )
+                    } else {
+                        let file = system_path_to_file(db, entry.path()).ok()?;
+                        (ModuleKind::Module, file)
+                    };
+                    Some(Module::file_module(
+                        db,
+                        name,
+                        kind,
+                        module.search_path(db).clone(),
+                        file,
+                    ))
                 })
                 .collect()
         }
@@ -207,7 +239,23 @@ fn all_submodule_names_for_package(db: &dyn Db, file: File) -> Option<Vec<Name>>
             })
             .filter_map(|entry| {
                 let stem = entry.path().file_stem()?;
-                is_identifier(stem).then(|| Name::from(stem))
+                let name = ModuleName::new(stem)?;
+                let (kind, file) = if entry.file_type().is_directory() {
+                    (
+                        ModuleKind::Package,
+                        find_package_init_vendored(db, entry.path())?,
+                    )
+                } else {
+                    let file = vendored_path_to_file(db, entry.path()).ok()?;
+                    (ModuleKind::Module, file)
+                };
+                Some(Module::file_module(
+                    db,
+                    name,
+                    kind,
+                    module.search_path(db).clone(),
+                    file,
+                ))
             })
             .collect(),
     })

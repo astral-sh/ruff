@@ -537,8 +537,6 @@ pub struct LintOptions {
     /// For example, `TC001`, `TC002`, and `TC003` can move more imports into `TYPE_CHECKING` blocks
     /// if `__future__` annotations are enabled.
     ///
-    /// This setting is currently in [preview](https://docs.astral.sh/ruff/preview/) and requires
-    /// preview mode to be enabled to have any effect.
     #[option(
         default = "false",
         value_type = "bool",
@@ -3862,6 +3860,13 @@ pub struct AnalyzeOptions {
     /// This setting is only relevant when [`detect-string-imports`](#detect-string-imports) is enabled.
     /// For example, if this is set to `2`, then only strings with at least two dots (e.g., `"path.to.module"`)
     /// would be considered valid imports.
+    #[option(
+        default = "2",
+        value_type = "usize",
+        example = r#"
+            string-imports-min-dots = 2
+        "#
+    )]
     pub string_imports_min_dots: Option<usize>,
     /// A map from file path to the list of Python or non-Python file paths or globs that should be
     /// considered dependencies of that file, regardless of whether relevant imports are detected.

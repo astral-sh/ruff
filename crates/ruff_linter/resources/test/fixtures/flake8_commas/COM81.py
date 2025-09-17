@@ -664,3 +664,14 @@ class C[
 type X[T,] = T
 def f[T,](): pass
 class C[T,]: pass
+
+# t-string examples
+kwargs.pop("remove", t"this {trailing_comma}",)
+kwargs.pop("remove", t"this {f"{trailing_comma}"}",)
+
+t"""This is a test. {
+    "Another sentence."
+    if True else
+    "Don't add a trailing comma here ->"
+}"""
+

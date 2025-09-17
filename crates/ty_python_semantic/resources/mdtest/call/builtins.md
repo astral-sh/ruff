@@ -162,3 +162,22 @@ def _(x: A | B, y: list[int]):
         reveal_type(x)  # revealed: B & ~A
         reveal_type(isinstance(x, B))  # revealed: Literal[True]
 ```
+
+## Calls to `open()`
+
+We do not fully understand typeshed's overloads for `open()` yet, due to missing support for PEP-613
+type aliases. However, we also do not emit false-positive diagnostics on common calls to `open()`:
+
+```py
+import pickle
+
+reveal_type(open(""))  # revealed: TextIOWrapper[_WrappedBuffer]
+reveal_type(open("", "r"))  # revealed: TextIOWrapper[_WrappedBuffer]
+reveal_type(open("", "rb"))  # revealed: @Todo(`builtins.open` return type)
+
+with open("foo.pickle", "rb") as f:
+    x = pickle.load(f)  # fine
+
+def _(mode: str):
+    reveal_type(open("", mode))  # revealed: @Todo(`builtins.open` return type)
+```

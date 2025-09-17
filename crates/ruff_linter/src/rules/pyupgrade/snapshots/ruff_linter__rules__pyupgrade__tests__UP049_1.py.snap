@@ -262,7 +262,7 @@ UP049 Generic class uses private type parameters
    |
 help: Rename type parameter to remove leading underscores
 
-UP049 Generic class uses private type parameters
+UP049 [*] Generic class uses private type parameters
   --> UP049_1.py:71:9
    |
 71 | class C[_T]:
@@ -295,7 +295,7 @@ help: Rename type parameter to remove leading underscores
 82 | class C[_T]:
 note: This is a display-only fix and is likely to be incorrect
 
-UP049 Generic class uses private type parameters
+UP049 [*] Generic class uses private type parameters
   --> UP049_1.py:82:9
    |
 82 | class C[_T]:

@@ -466,6 +466,7 @@ help: Replace with `Path(...).name`
 30 | foo_p.dirname(p)
 31 | foo_p.samefile(p)
 32 | foo_p.splitext(p)
+note: This is an unsafe fix and may change runtime behavior
 
 PTH120 [*] `os.path.dirname()` should be replaced by `Path.parent`
   --> import_as.py:29:1
@@ -492,6 +493,7 @@ help: Replace with `Path(...).parent`
 30 + pathlib.Path(p).parent
 31 | foo_p.samefile(p)
 32 | foo_p.splitext(p)
+note: This is an unsafe fix and may change runtime behavior
 
 PTH121 `os.path.samefile()` should be replaced by `Path.samefile()`
   --> import_as.py:30:1
