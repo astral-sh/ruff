@@ -177,32 +177,32 @@ where
 ///
 /// [POPL2015]: https://doi.org/10.1145/2676726.2676991
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
-pub struct ConstraintSet<'db> {
+pub enum ConstraintSet<'db> {
+    Never,
+    Always,
     // NOTE: We use 2 here because there are a couple of places where we create unions of 2 clauses
     // as temporary values — in particular when negating a constraint — and this lets us avoid
     // spilling the temporary value to the heap.
-    clauses: SmallVec<[ConstraintClause<'db>; 2]>,
+    Clauses(SmallVec<[ConstraintClause<'db>; 2]>),
 }
 
 impl<'db> ConstraintSet<'db> {
     fn never() -> Self {
-        Self {
-            clauses: smallvec![],
-        }
+        Self::Never
     }
 
     fn always() -> Self {
-        Self::singleton(ConstraintClause::always())
+        Self::Always
     }
 
     /// Returns whether this constraint set never holds
     pub(crate) fn is_never_satisfied(&self) -> bool {
-        self.clauses.is_empty()
+        matches!(self, Self::Never)
     }
 
     /// Returns whether this constraint set always holds
     pub(crate) fn is_always_satisfied(&self) -> bool {
-        self.clauses.len() == 1 && self.clauses[0].is_always()
+        matches!(self, Self::Always)
     }
 
     /// Updates this constraint set to hold the union of itself and another constraint set.
@@ -219,8 +219,13 @@ impl<'db> ConstraintSet<'db> {
 
     /// Returns the negation of this constraint set.
     pub(crate) fn negate(&self, db: &'db dyn Db) -> Self {
+        let clauses = match self {
+            Self::Never => return Self::Always,
+            Self::Always => return Self::Never,
+            Self::Clauses(clauses) => clauses,
+        };
         let mut result = Self::always();
-        for clause in &self.clauses {
+        for clause in clauses {
             result.intersect_set(db, &clause.negate(db));
         }
         result
@@ -244,13 +249,6 @@ impl<'db> ConstraintSet<'db> {
             self.union(db, other());
         }
         self
-    }
-
-    /// Returns a constraint set that contains a single clause.
-    fn singleton(clause: ConstraintClause<'db>) -> Self {
-        Self {
-            clauses: smallvec![clause],
-        }
     }
 
     pub(crate) fn range(
@@ -297,8 +295,7 @@ impl<'db> ConstraintSet<'db> {
             // If the new constraint can always be satisfied, that causes this whole set to be
             // always satisfied too.
             Satisfiable::Always => {
-                self.clauses.clear();
-                self.clauses.push(ConstraintClause::always());
+                *self = Self::Always;
                 return;
             }
 
@@ -308,29 +305,48 @@ impl<'db> ConstraintSet<'db> {
             Satisfiable::Constrained(clause) => clause,
         };
 
+        let clauses = match self {
+            // If the set is already always satisfied, unioning in anything else doesn't change
+            // that.
+            Self::Always => return,
+
+            // If the set was previously empty, we can just add the new clause without having to
+            // simplify it against anything.
+            Self::Never => {
+                *self = Self::Clauses(smallvec![clause]);
+                return;
+            }
+
+            // Otherwise, we have to simplify the new clause against any existing clauses.
+            Self::Clauses(clauses) => clauses,
+        };
+
         // Naively, we would just append the new clause to the set's list of clauses. But that
         // doesn't ensure that the clauses are simplified with respect to each other. So instead,
         // we iterate through the list of existing clauses, and try to simplify the new clause
         // against each one in turn. (We can assume that the existing clauses are already
         // simplified with respect to each other, since we can assume that the invariant holds upon
         // entry to this method.)
-        let mut existing_clauses = std::mem::take(&mut self.clauses).into_iter();
+        let mut existing_clauses = std::mem::take(clauses).into_iter();
         for existing in existing_clauses.by_ref() {
             // Try to simplify the new clause against an existing clause.
             match existing.simplify_clauses(db, clause) {
                 Simplifiable::NeverSatisfiable => {
-                    // If two clauses cancel out to 0, that does NOT cause the entire set to become
-                    // 0.  We need to keep whatever clauses have already been added to the result,
-                    // and also need to copy over any later clauses that we hadn't processed yet.
-                    self.clauses.extend(existing_clauses);
+                    // If two clauses cancel out to 0, that does not necessarily cause the entire
+                    // set to become 0. We need to keep whatever clauses have already been added to
+                    // the result, and also need to copy over any later clauses that we hadn't
+                    // processed yet.
+                    clauses.extend(existing_clauses);
+                    if clauses.is_empty() {
+                        *self = Self::Never;
+                    }
                     return;
                 }
 
                 Simplifiable::AlwaysSatisfiable => {
                     // If two clauses cancel out to 1, that makes the entire set 1, and all
                     // existing clauses are simplified away.
-                    self.clauses.clear();
-                    self.clauses.push(ConstraintClause::always());
+                    *self = Self::Always;
                     return;
                 }
 
@@ -338,7 +354,7 @@ impl<'db> ConstraintSet<'db> {
                     // We couldn't simplify the new clause relative to this existing clause, so add
                     // the existing clause to the result. Continue trying to simplify the new
                     // clause against the later existing clauses.
-                    self.clauses.push(existing);
+                    clauses.push(existing);
                     clause = c;
                 }
 
@@ -353,24 +369,64 @@ impl<'db> ConstraintSet<'db> {
 
         // If we fall through then we need to add the new clause to the clause list (either because
         // we couldn't simplify it with anything, or because we did without it canceling out).
-        self.clauses.push(clause);
+        clauses.push(clause);
     }
 
     /// Updates this set to be the union of itself and another set.
     fn union_set(&mut self, db: &'db dyn Db, other: Self) {
-        for clause in other.clauses {
-            self.union_clause(db, Satisfiable::Constrained(clause));
+        match other {
+            // If the new set can never satisfied, then the current set does not change.
+            Self::Never => {}
+
+            // If the new set can always be satisfied, that causes this whole set to be always
+            // satisfied too.
+            Self::Always => {
+                *self = Self::Always;
+            }
+
+            // Otherwise we have to add the new set's clauses to the current set.
+            Self::Clauses(clauses) => {
+                for clause in clauses {
+                    self.union_clause(db, Satisfiable::Constrained(clause));
+                }
+            }
         }
     }
 
     /// Updates this set to be the intersection of itself and another set.
     fn intersect_set(&mut self, db: &'db dyn Db, other: &Self) {
+        // If either set can never be satisfied, the result cannot either. If either set can always
+        // be satisfied, the result is the other set. Otherwise we have to add the new set's
+        // clauses to the current set.
+        let self_clauses = match self {
+            Self::Never => return,
+            Self::Always => {
+                *self = other.clone();
+                return;
+            }
+            Self::Clauses(clauses) => clauses,
+        };
+
+        let other_clauses = match other {
+            Self::Never => {
+                *self = Self::Never;
+                return;
+            }
+            Self::Always => return,
+            Self::Clauses(clauses) => clauses,
+        };
+
         // This is the distributive law:
         // (A ∪ B) ∩ (C ∪ D ∪ E) = (A ∩ C) ∪ (A ∩ D) ∪ (A ∩ E) ∪ (B ∩ C) ∪ (B ∩ D) ∪ (B ∩ E)
-        let self_clauses = std::mem::take(&mut self.clauses);
+        let self_clauses = std::mem::take(self_clauses);
         for self_clause in &self_clauses {
-            for other_clause in &other.clauses {
+            for other_clause in other_clauses {
                 self.union_clause(db, self_clause.intersect_clause(db, other_clause));
+            }
+        }
+        if let Self::Clauses(clauses) = self {
+            if clauses.is_empty() {
+                *self = Self::Never;
             }
         }
     }
@@ -383,10 +439,13 @@ impl<'db> ConstraintSet<'db> {
 
         impl Display for DisplayConstraintSet<'_, '_> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                if self.set.clauses.is_empty() {
-                    return f.write_str("0");
-                }
-                for (i, clause) in self.set.clauses.iter().enumerate() {
+                let clauses = match self.set {
+                    ConstraintSet::Never => return f.write_str("0"),
+                    ConstraintSet::Always => return f.write_str("1"),
+                    ConstraintSet::Clauses(clauses) => clauses,
+                };
+                assert!(!clauses.is_empty());
+                for (i, clause) in clauses.iter().enumerate() {
                     if i > 0 {
                         f.write_str(" ∨ ")?;
                     }
@@ -412,7 +471,7 @@ impl From<bool> for ConstraintSet<'_> {
 ///
 /// [POPL2015]: https://doi.org/10.1145/2676726.2676991
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
-pub(crate) struct ConstraintClause<'db> {
+pub struct ConstraintClause<'db> {
     // NOTE: We use 1 here because most clauses only mention a single typevar.
     constraints: SmallVec<[ConstrainedTypeVar<'db>; 1]>,
 }
