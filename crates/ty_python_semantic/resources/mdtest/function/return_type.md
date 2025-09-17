@@ -383,6 +383,15 @@ def divergent2(value):
 
 reveal_type(divergent2((1,)))  # revealed: tuple[Divergent] | list[Divergent] | None
 
+def list_int(x: int):
+    if x > 0:
+        return list1(list_int(x - 1))
+    else:
+        return list1(x)
+
+# TODO: should be `list[int]`
+reveal_type(list_int(1))  # revealed: list[Divergent] | list[int]
+
 def tuple_obj(cond: bool):
     if cond:
         x = object()
@@ -421,6 +430,7 @@ class C:
         return D()
 
 class D(C):
+    # TODO invalid override error
     def flip(self) -> "C":
         return C()
 
