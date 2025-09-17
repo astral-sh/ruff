@@ -267,10 +267,6 @@ impl<'db> SemanticModel<'db> {
     fn scope(&self, node: ast::AnyNodeRef<'_>) -> Option<FileScopeId> {
         let index = semantic_index(self.db, self.file);
 
-        // TODO: We currently use `try_expression_scope_id` here as a hotfix for [1].
-        // Revert this to use `expression_scope_id` once a proper fix is in place.
-        //
-        // [1] https://github.com/astral-sh/ty/issues/572
         match node {
             ast::AnyNodeRef::Identifier(identifier) => index.try_expression_scope_id(identifier),
             node => match node.as_expr_ref() {
