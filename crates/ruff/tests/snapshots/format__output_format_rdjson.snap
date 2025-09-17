@@ -17,7 +17,6 @@ exit_code: 1
   "diagnostics": [
     {
       "code": {
-        "url": "https://docs.astral.sh/ruff/rules/unformatted",
         "value": "unformatted"
       },
       "location": {

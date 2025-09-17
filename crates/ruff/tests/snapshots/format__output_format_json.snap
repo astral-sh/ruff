@@ -45,7 +45,7 @@ exit_code: 1
     },
     "message": "File would be reformatted",
     "noqa_row": null,
-    "url": "https://docs.astral.sh/ruff/rules/unformatted"
+    "url": null
   }
 ]
 ----- stderr -----
