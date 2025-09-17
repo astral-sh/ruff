@@ -43,3 +43,16 @@ def f(x: A):
     # TODO: should be `A | None`?
     reveal_type(x[0])  # revealed: Divergent
 ```
+
+## Self-referential type variables
+
+```py
+from typing import Generic, TypeVar
+
+B = TypeVar("B", bound="Base")
+
+# TODO: no error
+# error: [invalid-argument-type] "`typing.TypeVar | typing.TypeVar` is not a valid argument to `Generic`"
+class Base(Generic[B]):
+    pass
+```
