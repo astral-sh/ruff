@@ -7721,6 +7721,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ))
             }
 
+            (Type::TypeAlias(alias), right) => Some(self.infer_binary_type_comparison(
+                alias.value_type(self.db()),
+                op,
+                right,
+                range,
+            )),
+
+            (left, Type::TypeAlias(alias)) => Some(self.infer_binary_type_comparison(
+                left,
+                op,
+                alias.value_type(self.db()),
+                range,
+            )),
+
             (Type::IntLiteral(n), Type::IntLiteral(m)) => Some(match op {
                 ast::CmpOp::Eq => Ok(Type::BooleanLiteral(n == m)),
                 ast::CmpOp::NotEq => Ok(Type::BooleanLiteral(n != m)),
