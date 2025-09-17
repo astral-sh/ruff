@@ -1300,7 +1300,7 @@ impl<'db> Type<'db> {
             Type::TypeIs(type_is) => visitor.visit(self, || {
                 type_is.with_type(db, type_is.return_type(db).normalized_impl(db, visitor))
             }),
-            Type::Dynamic(dynamic) => Type::Dynamic(dynamic.normalized_impl()),
+            Type::Dynamic(dynamic) => Type::Dynamic(dynamic.normalized()),
             Type::EnumLiteral(enum_literal)
                 if is_single_member_enum(db, enum_literal.enum_class(db)) =>
             {
@@ -7474,7 +7474,7 @@ pub enum DynamicType<'db> {
 }
 
 impl DynamicType<'_> {
-    fn normalized_impl(self) -> Self {
+    fn normalized(self) -> Self {
         if matches!(self, Self::Divergent(_)) {
             self
         } else {
@@ -11307,7 +11307,7 @@ pub enum SuperOwnerKind<'db> {
 impl<'db> SuperOwnerKind<'db> {
     fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         match self {
-            SuperOwnerKind::Dynamic(dynamic) => SuperOwnerKind::Dynamic(dynamic.normalized_impl()),
+            SuperOwnerKind::Dynamic(dynamic) => SuperOwnerKind::Dynamic(dynamic.normalized()),
             SuperOwnerKind::Class(class) => {
                 SuperOwnerKind::Class(class.normalized_impl(db, visitor))
             }

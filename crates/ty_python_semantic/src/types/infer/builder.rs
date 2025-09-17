@@ -301,7 +301,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.cycle_recovery
     }
 
-    fn merge_cycle_recovery(&mut self, other: Option<CycleRecoveryType<'db>>) {
+    fn extend_cycle_recovery(&mut self, other: Option<CycleRecoveryType<'db>>) {
         if let Some(other) = other {
             match self.cycle_recovery {
                 Some(existing) => {
@@ -327,7 +327,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         if let Some(extra) = &inference.extra {
-            self.merge_cycle_recovery(extra.cycle_recovery);
+            self.extend_cycle_recovery(extra.cycle_recovery);
             self.context.extend(&extra.diagnostics);
             self.deferred.extend(extra.deferred.iter().copied());
         }
@@ -345,7 +345,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if let Some(extra) = &inference.extra {
             self.context.extend(&extra.diagnostics);
-            self.merge_cycle_recovery(extra.cycle_recovery);
+            self.extend_cycle_recovery(extra.cycle_recovery);
 
             if !matches!(self.region, InferenceRegion::Scope(..)) {
                 self.bindings.extend(extra.bindings.iter().copied());

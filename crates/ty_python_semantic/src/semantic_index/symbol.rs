@@ -149,7 +149,7 @@ impl Symbol {
 ///
 /// Allows lookup by name and a symbol's ID.
 #[derive(Default, get_size2::GetSize)]
-pub(crate) struct SymbolTable {
+pub(super) struct SymbolTable {
     symbols: IndexVec<ScopedSymbolId, Symbol>,
 
     /// Map from symbol name to its ID.

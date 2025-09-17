@@ -273,7 +273,7 @@ impl<'db> SubclassOfInner<'db> {
     pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         match self {
             Self::Class(class) => Self::Class(class.normalized_impl(db, visitor)),
-            Self::Dynamic(dynamic) => Self::Dynamic(dynamic.normalized_impl()),
+            Self::Dynamic(dynamic) => Self::Dynamic(dynamic.normalized()),
         }
     }
 
