@@ -850,7 +850,7 @@ help: Replace with `Path(...).chmod(...)`
 129 | 
 130 | # https://github.com/astral-sh/ruff/issues/20134
     - os.chmod("pth1_link", mode=0o600, follow_symlinks=      False    )
-131 + pathlib.Path("pth1_link").chmod(mode=0o600, follow_symlinks=False)
+131 + pathlib.Path("pth1_link").chmod(mode=0o600, follow_symlinks=      False)
 132 | os.chmod("pth1_link", mode=0o600, follow_symlinks=True)
 133 | 
 134 | # Only diagnostic
