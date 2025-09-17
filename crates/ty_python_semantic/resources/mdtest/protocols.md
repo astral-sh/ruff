@@ -2370,9 +2370,8 @@ class RecursiveNonFullyStatic(Protocol):
     parent: RecursiveNonFullyStatic
     x: Any
 
-# TODO: these should pass, once we take into account types of members
-static_assert(not is_subtype_of(RecursiveFullyStatic, RecursiveNonFullyStatic))  # error: [static-assert-error]
-static_assert(not is_subtype_of(RecursiveNonFullyStatic, RecursiveFullyStatic))  # error: [static-assert-error]
+static_assert(not is_subtype_of(RecursiveFullyStatic, RecursiveNonFullyStatic))
+static_assert(not is_subtype_of(RecursiveNonFullyStatic, RecursiveFullyStatic))
 
 static_assert(is_assignable_to(RecursiveNonFullyStatic, RecursiveNonFullyStatic))
 static_assert(is_assignable_to(RecursiveFullyStatic, RecursiveNonFullyStatic))
@@ -2389,7 +2388,8 @@ class RecursiveOptionalParent(Protocol):
 
 static_assert(is_assignable_to(RecursiveOptionalParent, RecursiveOptionalParent))
 
-static_assert(is_assignable_to(RecursiveNonFullyStatic, RecursiveOptionalParent))
+# Due to invariance of mutable attribute members, neither is assignable to the other
+static_assert(not is_assignable_to(RecursiveNonFullyStatic, RecursiveOptionalParent))
 static_assert(not is_assignable_to(RecursiveOptionalParent, RecursiveNonFullyStatic))
 
 class Other(Protocol):
