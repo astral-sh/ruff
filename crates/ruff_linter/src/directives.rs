@@ -300,7 +300,7 @@ impl<'a> TodoDirective<'a> {
             relative_offset += offset;
 
             // Find the first word. Don't use split by whitespace because that would include the `:` character
-            // in `TODO:`
+
             let first_word = trimmed.split(|c: char| !c.is_alphanumeric()).next()?;
 
             // If we detect a TodoDirectiveKind variant substring in the comment, construct and
