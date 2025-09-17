@@ -111,21 +111,24 @@ g: typing.Set[int] = {1, 2, 3}
 reveal_type(g)  # revealed: set[int]
 
 h: list[list[int]] = [[], [42]]
-# TODO: revealed: list[list[int]]
-reveal_type(h)  # revealed: list[list[int] | list[Unknown] | list[Unknown | int]]
+reveal_type(h)  # revealed: list[list[int]]
 
-i: list[tuple[str | int, ...]] = [(1, 2), ("foo", "bar"), ()]
-reveal_type(i)  # revealed: list[tuple[str | int, ...]]
+i: list[typing.Any] = [1, 2, "3", ([4],)]
+reveal_type(i)  # revealed: list[Any | int | str | tuple[list[Unknown | int]]]
 
-j: list[tuple[list[typing.Any], ...]] = [([],), ([1, 2], [3, 4]), (["foo"], ["bar"])]
-# TODO: revealed: list[tuple[list[typing.Any], ...]]
-# revealed: list[tuple[list[Any], ...] | tuple[list[Unknown]] | tuple[list[Unknown | int], list[Unknown | int]] | tuple[list[Unknown | str], list[Unknown | str]]]
-reveal_type(j)
+j: list[tuple[str | int, ...]] = [(1, 2), ("foo", "bar"), ()]
+reveal_type(j)  # revealed: list[tuple[str | int, ...]]
+
+k: list[tuple[list[int], ...]] = [([],), ([1, 2], [3, 4]), ([5], [6], [7])]
+reveal_type(k)  # revealed: list[tuple[list[int], ...]]
+
+l: tuple[list[int], *tuple[list[typing.Any], ...], list[str]] = ([1, 2, 3], [4, 5, 6], [7, 8, 9], ["10", "11", "12"])
+reveal_type(l)  # revealed: tuple[list[int], list[Any | int], list[Any | int], list[str]]
 
 type IntList = list[int]
 
-k: IntList = [1, 2, 3]
-reveal_type(a)  # revealed: list[int]
+m: IntList = [1, 2, 3]
+reveal_type(m)  # revealed: list[int]
 ```
 
 ## Incorrect collection literal assignments are complained aobut

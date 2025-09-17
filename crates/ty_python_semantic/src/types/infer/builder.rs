@@ -1,4 +1,4 @@
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity};
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
@@ -4001,7 +4001,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if let Some(value) = value {
                 self.infer_maybe_standalone_expression(
                     value,
-                    TypeContext::new(annotated.inner_type()),
+                    TypeContext::new(Some(annotated.inner_type())),
                 );
             }
 
@@ -4094,8 +4094,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         debug_assert!(PlaceExpr::try_from_expr(target).is_some());
 
         if let Some(value) = value {
-            let inferred_ty = self
-                .infer_maybe_standalone_expression(value, TypeContext::new(declared.inner_type()));
+            let inferred_ty = self.infer_maybe_standalone_expression(
+                value,
+                TypeContext::new(Some(declared.inner_type())),
+            );
             let mut inferred_ty = if target
                 .as_name_expr()
                 .is_some_and(|name| &name.id == "TYPE_CHECKING")
@@ -5229,7 +5231,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_tuple_expression(
         &mut self,
         tuple: &ast::ExprTuple,
-        _tcx: TypeContext<'db>,
+        tcx: TypeContext<'db>,
     ) -> Type<'db> {
         let ast::ExprTuple {
             range: _,
@@ -5239,11 +5241,39 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             parenthesized: _,
         } = tuple;
 
+        let mut annotated_elt_tys =
+            tcx.known_specialization(KnownClass::Tuple, self.db())
+                .map(|specialization| {
+                    match specialization
+                        .tuple(self.db())
+                        .expect("the specialization of `KnownClass::Tuple` must have a tuple spec")
+                    {
+                        Tuple::Fixed(tuple) => Either::Right(tuple.all_elements()),
+
+                        Tuple::Variable(tuple) => {
+                            // Extend variadic tuple annotations to match the length of the RHS.
+                            let variable_elements = elts
+                                .len()
+                                .saturating_sub(tuple.prefix.len())
+                                .saturating_sub(tuple.suffix.len());
+
+                            let elements = tuple
+                                .prefix_elements()
+                                .chain(std::iter::repeat_n(&tuple.variable, variable_elements))
+                                .chain(tuple.suffix_elements());
+
+                            Either::Left(elements)
+                        }
+                    }
+                    .into_iter()
+                });
+
         let db = self.db();
         let divergent = Type::divergent(self.scope());
         let element_types = elts.iter().map(|element| {
-            // TODO: Use the type context for more precise inference.
-            let element_type = self.infer_expression(element, TypeContext::default());
+            let annotated_elt_ty = annotated_elt_tys.as_mut().and_then(Iterator::next).copied();
+            let element_type = self.infer_expression(element, TypeContext::new(annotated_elt_ty));
+
             if element_type.has_divergent_type(self.db(), divergent) {
                 divergent
             } else {
@@ -5288,30 +5318,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         tcx: TypeContext<'db>,
         collection_class: KnownClass,
     ) -> Option<Type<'db>> {
-        // Extract `T` from a type annotation of the form `list[T]`.
-        fn annotated_elts_ty<'db>(
-            tcx: TypeContext<'db>,
-            collection_class: KnownClass,
-            db: &'db dyn Db,
-        ) -> Option<Type<'db>> {
-            let class_type = match tcx.annotation? {
-                Type::NominalInstance(instance) => instance,
-                Type::TypeAlias(alias) => alias.value_type(db).into_nominal_instance()?,
-                _ => return None,
-            }
-            .class(db);
-
-            if !class_type.is_known(db, collection_class) {
-                return None;
-            }
-            let specialization = class_type.into_generic_alias()?.specialization(db);
-            let [annotated_elts_ty] = specialization.types(db) else {
-                return None;
-            };
-
-            Some(*annotated_elts_ty)
-        }
-
         // Extract the type variable `T` from `list[T]` in typeshed.
         fn elts_ty(
             collection_class: KnownClass,
@@ -5324,7 +5330,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Some((class_literal, Type::TypeVar(*elts_ty)))
         }
 
-        let annotated_elts_ty = annotated_elts_ty(tcx, collection_class, self.db());
+        let annotated_elts_ty = tcx
+            .known_specialization(collection_class, self.db())
+            .and_then(|specialization| specialization.types(self.db()).iter().exactly_one().ok())
+            .copied();
+
         let (class_literal, elts_ty) = elts_ty(collection_class, self.db()).unwrap_or_else(|| {
             let name = collection_class.name(self.db());
             panic!("Typeshed should always have a `{name}` class in `builtins.pyi` with a single type variable")
@@ -5335,7 +5345,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Infer the type of each element in the collection literal.
         for elt in elts {
-            let inferred_elt_ty = self.infer_expression(elt, TypeContext::default());
+            let inferred_elt_ty = self.infer_expression(elt, TypeContext::new(annotated_elts_ty));
             inferred_elt_tys.push(inferred_elt_ty);
 
             if let Some(annotated_elts_ty) = annotated_elts_ty {

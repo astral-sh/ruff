@@ -545,11 +545,15 @@ impl<T> VariableLengthTuple<T> {
         })
     }
 
-    fn prefix_elements(&self) -> impl DoubleEndedIterator<Item = &T> + ExactSizeIterator + '_ {
+    pub(crate) fn prefix_elements(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = &T> + ExactSizeIterator + '_ {
         self.prefix.iter()
     }
 
-    fn suffix_elements(&self) -> impl DoubleEndedIterator<Item = &T> + ExactSizeIterator + '_ {
+    pub(crate) fn suffix_elements(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = &T> + ExactSizeIterator + '_ {
         self.suffix.iter()
     }
 
