@@ -1,6 +1,9 @@
 use std::ops::Range;
 
-use ruff_db::{files::File, parsed::ParsedModuleRef};
+use ruff_db::{
+    files::File,
+    parsed::{ParsedModuleRef, parsed_module},
+};
 use ruff_index::newtype_index;
 use ruff_python_ast as ast;
 
@@ -28,6 +31,10 @@ impl get_size2::GetSize for ScopeId<'_> {}
 impl<'db> ScopeId<'db> {
     pub(crate) fn is_function_like(self, db: &'db dyn Db) -> bool {
         self.node(db).scope_kind().is_function_like()
+    }
+
+    pub(crate) fn is_non_lambda_function(self, db: &'db dyn Db) -> bool {
+        self.node(db).scope_kind().is_non_lambda_function()
     }
 
     pub(crate) fn is_annotation(self, db: &'db dyn Db) -> bool {
@@ -66,6 +73,18 @@ impl<'db> ScopeId<'db> {
             NodeWithScopeKind::DictComprehension(_) => "<dictcomp>",
             NodeWithScopeKind::GeneratorExpression(_) => "<generator>",
         }
+    }
+
+    pub(crate) fn is_coroutine_function(self, db: &'db dyn Db) -> bool {
+        let module = parsed_module(db, self.file(db)).load(db);
+        self.node(db)
+            .as_function()
+            .is_some_and(|func| func.node(&module).is_async && !self.is_generator_function(db))
+    }
+
+    pub(crate) fn is_generator_function(self, db: &'db dyn Db) -> bool {
+        let index = semantic_index(db, self.file(db));
+        self.file_scope_id(db).is_generator_function(index)
     }
 }
 

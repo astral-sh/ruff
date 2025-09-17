@@ -2511,7 +2511,12 @@ impl<'db> Binding<'db> {
                 }
             }
         }
-        self.return_ty = self.signature.return_ty.unwrap_or(Type::unknown());
+
+        self.return_ty = self.signature.return_ty.unwrap_or_else(|| {
+            self.callable_type
+                .infer_return_type(db)
+                .unwrap_or(Type::unknown())
+        });
         self.parameter_tys = vec![None; parameters.len()].into_boxed_slice();
         self.argument_matches = matcher.finish();
     }

@@ -27,6 +27,7 @@ use crate::semantic_index::scope::{FileScopeId, ScopeId};
 /// * a field of a type that is a return type of a cross-module query
 /// * an argument of a cross-module query
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
+#[derive(PartialOrd, Ord)]
 pub(crate) struct Unpack<'db> {
     pub(crate) file: File,
 

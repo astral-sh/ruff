@@ -72,18 +72,36 @@ use crate::types::diagnostic::{
     report_bad_argument_to_get_protocol_members, report_bad_argument_to_protocol_interface,
     report_runtime_check_against_non_runtime_checkable_protocol,
 };
-use crate::types::generics::{GenericContext, walk_generic_context};
+use crate::types::generics::GenericContext;
+use crate::types::infer::infer_scope_types;
 use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::any_over_type;
 use crate::types::{
     BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, ClassType,
-    DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
-    IsEquivalentVisitor, KnownClass, KnownInstanceType, NormalizedVisitor, SpecialFormType,
-    TrackedConstraintSet, Truthiness, Type, TypeMapping, TypeRelation, UnionBuilder, all_members,
-    binding_type, todo_type, walk_type_mapping,
+    DeprecatedInstance, DivergenceKind, DivergentType, DynamicType, FindLegacyTypeVarsVisitor,
+    HasRelationToVisitor, IsEquivalentVisitor, KnownClass, KnownInstanceType, NormalizedVisitor,
+    RecursiveTypeNormalizedVisitor, SpecialFormType, TrackedConstraintSet, Truthiness, Type,
+    TypeMapping, TypeRelation, UnionBuilder, all_members, binding_type, todo_type,
+    walk_generic_context, walk_type_mapping,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
+
+fn return_type_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &Type<'db>,
+    _count: u32,
+    _self: FunctionType<'db>,
+) -> salsa::CycleRecoveryAction<Type<'db>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn return_type_cycle_initial<'db>(db: &'db dyn Db, function: FunctionType<'db>) -> Type<'db> {
+    Type::Dynamic(DynamicType::Divergent(DivergentType::new(
+        db,
+        DivergenceKind::InferReturnType(function.literal(db).last_definition(db).body_scope(db)),
+    )))
+}
 
 /// A collection of useful spans for annotating functions.
 ///
@@ -576,7 +594,7 @@ impl<'db> FunctionLiteral<'db> {
         self.last_definition(db).spans(db)
     }
 
-    #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(ref), cycle_fn=overloads_and_implementation_cycle_recover, cycle_initial=overloads_and_implementation_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     fn overloads_and_implementation(
         self,
         db: &'db dyn Db,
@@ -682,6 +700,33 @@ impl<'db> FunctionLiteral<'db> {
             .map(|ctx| ctx.normalized_impl(db, visitor));
         Self::new(db, self.last_definition(db), context)
     }
+
+    fn recursive_type_normalized(
+        self,
+        db: &'db dyn Db,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
+        let context = self
+            .inherited_generic_context(db)
+            .map(|ctx| ctx.recursive_type_normalized(db, visitor));
+        Self::new(db, self.last_definition(db), context)
+    }
+}
+
+fn overloads_and_implementation_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &(Box<[OverloadLiteral<'db>]>, Option<OverloadLiteral<'db>>),
+    _count: u32,
+    _function: FunctionLiteral<'db>,
+) -> salsa::CycleRecoveryAction<(Box<[OverloadLiteral<'db>]>, Option<OverloadLiteral<'db>>)> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn overloads_and_implementation_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _function: FunctionLiteral<'db>,
+) -> (Box<[OverloadLiteral<'db>]>, Option<OverloadLiteral<'db>>) {
+    (Box::new([]), None)
 }
 
 /// Represents a function type, which might be a non-generic function, or a specialization of a
@@ -1023,6 +1068,31 @@ impl<'db> FunctionType<'db> {
             .map(|mapping| mapping.normalized_impl(db, visitor))
             .collect();
         Self::new(db, self.literal(db).normalized_impl(db, visitor), mappings)
+    }
+
+    pub(super) fn recursive_type_normalized(
+        self,
+        db: &'db dyn Db,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
+        let mappings: Box<_> = self
+            .type_mappings(db)
+            .iter()
+            .map(|mapping| mapping.recursive_type_normalized(db, visitor))
+            .collect();
+        Self::new(
+            db,
+            self.literal(db).recursive_type_normalized(db, visitor),
+            mappings,
+        )
+    }
+
+    /// Infers this function scope's types and returns the inferred return type.
+    #[salsa::tracked(cycle_fn=return_type_cycle_recover, cycle_initial=return_type_cycle_initial, heap_size=get_size2::heap_size)]
+    pub(crate) fn infer_return_type(self, db: &'db dyn Db) -> Type<'db> {
+        let scope = self.literal(db).last_definition(db).body_scope(db);
+        let inference = infer_scope_types(db, scope);
+        inference.infer_return_type(db, Type::FunctionLiteral(self))
     }
 }
 

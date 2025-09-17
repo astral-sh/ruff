@@ -21,11 +21,7 @@ use crate::types::{
 impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Infer the type of a type expression.
     pub(super) fn infer_type_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
-        let mut ty = self.infer_type_expression_no_store(expression);
-        let divergent = Type::divergent(self.scope());
-        if ty.has_divergent_type(self.db(), divergent) {
-            ty = divergent;
-        }
+        let ty = self.infer_type_expression_no_store(expression);
         self.store_expression_type(expression, ty);
         ty
     }
@@ -550,7 +546,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         // we do not store types for sub-expressions. Re-infer the type here.
                         builder.infer_expression(value, TypeContext::default())
                     } else {
-                        builder.expression_type(value)
+                        builder.expression_type(value.as_ref())
                     };
 
                     value_ty == Type::SpecialForm(SpecialFormType::Unpack)

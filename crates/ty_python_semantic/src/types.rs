@@ -1,6 +1,5 @@
 use infer::nearest_enclosing_class;
 use itertools::{Either, Itertools};
-use ruff_db::parsed::parsed_module;
 
 use std::borrow::Cow;
 
@@ -13,6 +12,7 @@ use diagnostic::{
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_db::files::File;
+use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange};
@@ -23,9 +23,10 @@ pub(crate) use self::cyclic::{CycleDetector, PairVisitor, TypeTransformer};
 pub use self::diagnostic::TypeCheckDiagnostics;
 pub(crate) use self::diagnostic::register_lints;
 pub(crate) use self::infer::{
-    TypeContext, infer_deferred_types, infer_definition_types, infer_expression_type,
-    infer_expression_types, infer_scope_types, static_expression_truthiness,
+    TypeContext, infer_deferred_types, infer_expression_type, infer_scope_expression_type,
+    static_expression_truthiness,
 };
+use self::infer::{infer_definition_types, infer_expression_types, infer_scope_types};
 pub(crate) use self::signatures::{CallableSignature, Signature};
 pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
 use crate::module_name::ModuleName;
@@ -37,6 +38,7 @@ use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{imported_modules, place_table, semantic_index};
 use crate::suppression::check_suppressions;
 use crate::types::call::{Binding, Bindings, CallArguments, CallableBinding};
+use crate::types::class::MethodDecorator;
 pub(crate) use crate::types::class_base::ClassBase;
 use crate::types::constraints::{
     ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension,
@@ -47,7 +49,7 @@ pub use crate::types::display::DisplaySettings;
 use crate::types::display::TupleSpecialization;
 use crate::types::enums::{enum_metadata, is_single_member_enum};
 use crate::types::function::{
-    DataclassTransformerParams, FunctionSpans, FunctionType, KnownFunction,
+    DataclassTransformerParams, FunctionDecorators, FunctionSpans, FunctionType, KnownFunction,
 };
 use crate::types::generics::{
     GenericContext, PartialSpecialization, Specialization, bind_typevar, walk_generic_context,
@@ -58,15 +60,14 @@ pub use crate::types::ide_support::{
     definitions_for_attribute, definitions_for_imported_symbol, definitions_for_keyword_argument,
     definitions_for_name, find_active_signature_from_details, inlay_hint_function_argument_details,
 };
-use crate::types::infer::infer_unpack_types;
+use crate::types::infer::InferExpression;
 use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
 use crate::types::signatures::{Parameter, ParameterForm, Parameters, walk_signature};
 use crate::types::tuple::TupleSpec;
 pub(crate) use crate::types::typed_dict::{TypedDictParams, TypedDictType, walk_typed_dict_type};
 use crate::types::variance::{TypeVarVariance, VarianceInferable};
-use crate::types::visitor::any_over_type;
-use crate::unpack::EvaluationMode;
+use crate::unpack::{EvaluationMode, Unpack};
 pub use crate::util::diagnostics::add_inferred_python_version_hint_to_diagnostic;
 use crate::{Db, FxOrderSet, Module, Program};
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, KnownClass};
@@ -107,6 +108,28 @@ mod definition;
 #[cfg(test)]
 mod property_tests;
 
+fn return_type_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &Type<'db>,
+    _count: u32,
+    _self: BoundMethodType<'db>,
+) -> salsa::CycleRecoveryAction<Type<'db>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn return_type_cycle_initial<'db>(db: &'db dyn Db, method: BoundMethodType<'db>) -> Type<'db> {
+    Type::divergent(DivergentType::new(
+        db,
+        DivergenceKind::InferReturnType(
+            method
+                .function(db)
+                .literal(db)
+                .last_definition(db)
+                .body_scope(db),
+        ),
+    ))
+}
+
 pub fn check_types(db: &dyn Db, file: File) -> Vec<Diagnostic> {
     let _span = tracing::trace_span!("check_types", ?file).entered();
 
@@ -138,7 +161,11 @@ pub fn check_types(db: &dyn Db, file: File) -> Vec<Diagnostic> {
 /// Infer the type of a binding.
 pub(crate) fn binding_type<'db>(db: &'db dyn Db, definition: Definition<'db>) -> Type<'db> {
     let inference = infer_definition_types(db, definition);
-    inference.binding_type(definition)
+    if let Some(cycle_recovery) = inference.cycle_recovery() {
+        UnionType::from_elements(db, [inference.binding_type(definition), cycle_recovery])
+    } else {
+        inference.binding_type(definition)
+    }
 }
 
 /// Infer the type of a declaration.
@@ -147,7 +174,28 @@ pub(crate) fn declaration_type<'db>(
     definition: Definition<'db>,
 ) -> TypeAndQualifiers<'db> {
     let inference = infer_definition_types(db, definition);
-    inference.declaration_type(definition)
+    if let Some(cycle_recovery) = inference.cycle_recovery() {
+        let decl_ty = inference.declaration_type(definition);
+        let union = UnionType::from_elements(db, [decl_ty.inner_type(), cycle_recovery]);
+        TypeAndQualifiers::new(union, decl_ty.qualifiers())
+    } else {
+        inference.declaration_type(definition)
+    }
+}
+
+pub(crate) fn undecorated_type<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> Option<Type<'db>> {
+    let inference = infer_definition_types(db, definition);
+    if let Some(cycle_recovery) = inference.cycle_recovery() {
+        Some(UnionType::from_elements(
+            db,
+            [inference.undecorated_type()?, cycle_recovery],
+        ))
+    } else {
+        inference.undecorated_type()
+    }
 }
 
 /// Infer the type of a (possibly deferred) sub-expression of a [`Definition`].
@@ -169,13 +217,17 @@ fn definition_expression_type<'db>(
         // expression is in the definition scope
         let inference = infer_definition_types(db, definition);
         if let Some(ty) = inference.try_expression_type(expression) {
-            ty
+            if let Some(cycle_recovery) = inference.cycle_recovery() {
+                UnionType::from_elements(db, [ty, cycle_recovery])
+            } else {
+                ty
+            }
         } else {
             infer_deferred_types(db, definition).expression_type(expression)
         }
     } else {
         // expression is in a type-params sub-scope
-        infer_scope_types(db, scope).expression_type(expression)
+        infer_scope_expression_type(db, scope, expression)
     }
 }
 
@@ -218,9 +270,43 @@ pub(crate) type TryBoolVisitor<'db> =
     CycleDetector<TryBool, Type<'db>, Result<Truthiness, BoolError<'db>>>;
 pub(crate) struct TryBool;
 
-/// A [`TypeTransformer`] that is used in `normalized` methods.
 pub(crate) type NormalizedVisitor<'db> = TypeTransformer<'db, Normalized>;
 pub(crate) struct Normalized;
+
+/// A [`TypeTransformer`] that is used in `recursive_type_normalized` methods.
+/// Calling [`Type::recursive_type_normalized`] will normalize the recursive type.
+/// A recursive type here means a type that contains a `Divergent` type.
+/// Normalizing recursive types allows recursive type inference for divergent functions to converge.
+pub(crate) struct RecursiveTypeNormalizedVisitor<'db> {
+    transformer: TypeTransformer<'db, Normalized>,
+    div: Type<'db>,
+}
+
+impl<'db> RecursiveTypeNormalizedVisitor<'db> {
+    fn new(div: Type<'db>) -> Self {
+        debug_assert!(matches!(div, Type::Dynamic(DynamicType::Divergent(_))));
+        Self {
+            transformer: NormalizedVisitor::default(),
+            div,
+        }
+    }
+
+    fn visit(&self, item: Type<'db>, func: impl FnOnce() -> Type<'db>) -> Type<'db> {
+        self.transformer.visit(item, func)
+    }
+
+    fn visit_no_shift(&self, item: Type<'db>, func: impl FnOnce() -> Type<'db>) -> Type<'db> {
+        self.transformer.visit_no_shift(item, func)
+    }
+
+    fn level(&self) -> usize {
+        self.transformer.level()
+    }
+}
+
+/// A [`CycleDetector`] that is used in `has_divergent_type` methods.
+pub(crate) type HasDivergentTypeVisitor<'db> = CycleDetector<HasDivergentType, Type<'db>, bool>;
+pub(crate) struct HasDivergentType;
 
 /// How a generic type has been specialized.
 ///
@@ -281,7 +367,7 @@ enum InstanceFallbackShadowsNonDataDescriptor {
 }
 
 bitflags! {
-    #[derive(Clone, Debug, Copy, PartialEq, Eq, Hash)]
+    #[derive(Clone, Debug, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
     pub(crate) struct MemberLookupPolicy: u8 {
         /// Dunder methods are looked up on the meta-type of a type without potentially falling
         /// back on attributes on the type itself. For example, when implicitly invoked on an
@@ -344,6 +430,8 @@ impl Default for MemberLookupPolicy {
     }
 }
 
+impl get_size2::GetSize for MemberLookupPolicy {}
+
 fn member_lookup_cycle_recover<'db>(
     _db: &'db dyn Db,
     _value: &PlaceAndQualifiers<'db>,
@@ -355,13 +443,22 @@ fn member_lookup_cycle_recover<'db>(
     salsa::CycleRecoveryAction::Iterate
 }
 
+#[allow(clippy::needless_pass_by_value)]
 fn member_lookup_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _self: Type<'db>,
-    _name: Name,
-    _policy: MemberLookupPolicy,
+    db: &'db dyn Db,
+    self_type: Type<'db>,
+    name: Name,
+    policy: MemberLookupPolicy,
 ) -> PlaceAndQualifiers<'db> {
-    Place::bound(Type::Never).into()
+    Place::bound(Type::divergent(DivergentType::new(
+        db,
+        DivergenceKind::MemberLookupWithPolicy {
+            self_type,
+            name,
+            policy,
+        },
+    )))
+    .into()
 }
 
 fn class_lookup_cycle_recover<'db>(
@@ -375,13 +472,22 @@ fn class_lookup_cycle_recover<'db>(
     salsa::CycleRecoveryAction::Iterate
 }
 
+#[allow(clippy::needless_pass_by_value)]
 fn class_lookup_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _self: Type<'db>,
-    _name: Name,
-    _policy: MemberLookupPolicy,
+    db: &'db dyn Db,
+    self_type: Type<'db>,
+    name: Name,
+    policy: MemberLookupPolicy,
 ) -> PlaceAndQualifiers<'db> {
-    Place::bound(Type::Never).into()
+    Place::bound(Type::divergent(DivergentType::new(
+        db,
+        DivergenceKind::ClassLookupWithPolicy {
+            self_type,
+            name,
+            policy,
+        },
+    )))
+    .into()
 }
 
 #[allow(clippy::trivially_copy_pass_by_ref)]
@@ -535,6 +641,20 @@ impl<'db> PropertyInstanceType<'db> {
         )
     }
 
+    fn recursive_type_normalized(
+        self,
+        db: &'db dyn Db,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
+        Self::new(
+            db,
+            self.getter(db)
+                .map(|ty| ty.recursive_type_normalized(db, visitor)),
+            self.setter(db)
+                .map(|ty| ty.recursive_type_normalized(db, visitor)),
+        )
+    }
+
     fn find_legacy_typevars_impl(
         self,
         db: &'db dyn Db,
@@ -587,6 +707,19 @@ impl<'db> PropertyInstanceType<'db> {
         };
 
         getter_equivalence.and(db, setter_equivalence)
+    }
+
+    fn has_divergent_type_impl(
+        self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        visitor: &HasDivergentTypeVisitor<'db>,
+    ) -> bool {
+        self.setter(db)
+            .is_some_and(|setter| setter.has_divergent_type_impl(db, div, visitor))
+            || self
+                .getter(db)
+                .is_some_and(|getter| getter.has_divergent_type_impl(db, div, visitor))
     }
 }
 
@@ -773,8 +906,8 @@ impl<'db> Type<'db> {
         Self::Dynamic(DynamicType::Unknown)
     }
 
-    pub(crate) fn divergent(scope: ScopeId<'db>) -> Self {
-        Self::Dynamic(DynamicType::Divergent(DivergentType { scope }))
+    pub(crate) fn divergent(divergent: DivergentType<'db>) -> Self {
+        Self::Dynamic(DynamicType::Divergent(divergent))
     }
 
     pub const fn is_unknown(&self) -> bool {
@@ -1209,6 +1342,99 @@ impl<'db> Type<'db> {
                 self
             }
             Type::TypeAlias(alias) => alias.value_type(db).normalized_impl(db, visitor),
+            Type::LiteralString
+            | Type::AlwaysFalsy
+            | Type::AlwaysTruthy
+            | Type::BooleanLiteral(_)
+            | Type::BytesLiteral(_)
+            | Type::EnumLiteral(_)
+            | Type::StringLiteral(_)
+            | Type::Never
+            | Type::WrapperDescriptor(_)
+            | Type::DataclassDecorator(_)
+            | Type::DataclassTransformer(_)
+            | Type::ModuleLiteral(_)
+            | Type::ClassLiteral(_)
+            | Type::SpecialForm(_)
+            | Type::IntLiteral(_) => self,
+        }
+    }
+
+    #[must_use]
+    pub(crate) fn recursive_type_normalized(
+        self,
+        db: &'db dyn Db,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
+        if visitor.level() == 0 && self == visitor.div {
+            // int | Divergent = int | (int | (int | ...)) = int
+            return Type::Never;
+        } else if visitor.level() >= 1 && self.has_divergent_type(db, visitor.div) {
+            // G[G[Divergent]] = G[Divergent]
+            return visitor.div;
+        }
+        match self {
+            Type::Union(union) => {
+                // As explained above, `Divergent` in a union type does not mean true divergence,
+                // so we normalize the type while keeping the nesting level the same.
+                visitor.visit_no_shift(self, || union.recursive_type_normalized(db, visitor))
+            }
+            Type::Intersection(intersection) => visitor.visit(self, || {
+                Type::Intersection(intersection.recursive_type_normalized(db, visitor))
+            }),
+            Type::Callable(callable) => visitor.visit(self, || {
+                Type::Callable(callable.recursive_type_normalized(db, visitor))
+            }),
+            Type::ProtocolInstance(protocol) => visitor.visit(self, || {
+                Type::ProtocolInstance(protocol.recursive_type_normalized(db, visitor))
+            }),
+            Type::NominalInstance(instance) => visitor.visit(self, || {
+                Type::NominalInstance(instance.recursive_type_normalized(db, visitor))
+            }),
+            Type::FunctionLiteral(function) => visitor.visit(self, || {
+                Type::FunctionLiteral(function.recursive_type_normalized(db, visitor))
+            }),
+            Type::PropertyInstance(property) => visitor.visit(self, || {
+                Type::PropertyInstance(property.recursive_type_normalized(db, visitor))
+            }),
+            Type::KnownBoundMethod(method_kind) => visitor.visit(self, || {
+                Type::KnownBoundMethod(method_kind.recursive_type_normalized(db, visitor))
+            }),
+            Type::BoundMethod(method) => visitor.visit(self, || {
+                Type::BoundMethod(method.recursive_type_normalized(db, visitor))
+            }),
+            Type::BoundSuper(bound_super) => visitor.visit(self, || {
+                Type::BoundSuper(bound_super.recursive_type_normalized(db, visitor))
+            }),
+            Type::GenericAlias(generic) => visitor.visit(self, || {
+                Type::GenericAlias(generic.recursive_type_normalized(db, visitor))
+            }),
+            Type::SubclassOf(subclass_of) => visitor.visit(self, || {
+                Type::SubclassOf(subclass_of.recursive_type_normalized(db, visitor))
+            }),
+            Type::TypeVar(bound_typevar) => visitor.visit(self, || {
+                Type::TypeVar(bound_typevar.recursive_type_normalized(db, visitor))
+            }),
+            Type::NonInferableTypeVar(bound_typevar) => visitor.visit(self, || {
+                Type::NonInferableTypeVar(bound_typevar.recursive_type_normalized(db, visitor))
+            }),
+            Type::KnownInstance(known_instance) => visitor.visit(self, || {
+                Type::KnownInstance(known_instance.recursive_type_normalized(db, visitor))
+            }),
+            Type::TypeIs(type_is) => visitor.visit(self, || {
+                type_is.with_type(
+                    db,
+                    type_is
+                        .return_type(db)
+                        .recursive_type_normalized(db, visitor),
+                )
+            }),
+            Type::Dynamic(dynamic) => Type::Dynamic(dynamic.recursive_type_normalized()),
+            Type::TypedDict(_) => {
+                // TODO: Normalize TypedDicts
+                self
+            }
+            Type::TypeAlias(_) => self,
             Type::LiteralString
             | Type::AlwaysFalsy
             | Type::AlwaysTruthy
@@ -2902,7 +3128,7 @@ impl<'db> Type<'db> {
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
         tracing::trace!("class_member: {}.{}", self.display(db), name);
-        match self {
+        let result = match self {
             Type::Union(union) => union.map_with_boundness_and_qualifiers(db, |elem| {
                 elem.class_member_with_policy(db, name.clone(), policy)
             }),
@@ -2920,7 +3146,30 @@ impl<'db> Type<'db> {
                 .expect(
                     "`Type::find_name_in_mro()` should return `Some()` when called on a meta-type",
                 ),
-        }
+        };
+        result.map_type(|ty| {
+            // In fixed-point iteration of type inference, the member type must be monotonically widened and not "oscillate".
+            // Here, monotonicity is guaranteed by pre-unioning the type of the previous iteration into the current result.
+            let previous_cycle_value = self.class_member_with_policy(db, name.clone(), policy);
+
+            let ty = if let Some(previous_ty) = previous_cycle_value.place.ignore_possibly_unbound()
+            {
+                UnionType::from_elements(db, [ty, previous_ty])
+            } else {
+                ty
+            };
+
+            let div = Type::divergent(DivergentType::new(
+                db,
+                DivergenceKind::ClassLookupWithPolicy {
+                    self_type: self,
+                    name,
+                    policy,
+                },
+            ));
+            let visitor = RecursiveTypeNormalizedVisitor::new(div);
+            ty.recursive_type_normalized(db, &visitor)
+        })
     }
 
     /// This function roughly corresponds to looking up an attribute in the `__dict__` of an object.
@@ -3374,7 +3623,7 @@ impl<'db> Type<'db> {
 
         let name_str = name.as_str();
 
-        match self {
+        let result = match self {
             Type::Union(union) => union.map_with_boundness_and_qualifiers(db, |elem| {
                 elem.member_lookup_with_policy(db, name_str.into(), policy)
             }),
@@ -3442,20 +3691,20 @@ impl<'db> Type<'db> {
                             // If an attribute is not available on the bound method object,
                             // it will be looked up on the underlying function object:
                             Type::FunctionLiteral(bound_method.function(db))
-                                .member_lookup_with_policy(db, name, policy)
+                                .member_lookup_with_policy(db, name.clone(), policy)
                         })
                 }
             },
             Type::KnownBoundMethod(method) => method
                 .class()
                 .to_instance(db)
-                .member_lookup_with_policy(db, name, policy),
+                .member_lookup_with_policy(db, name.clone(), policy),
             Type::WrapperDescriptor(_) => KnownClass::WrapperDescriptorType
                 .to_instance(db)
-                .member_lookup_with_policy(db, name, policy),
+                .member_lookup_with_policy(db, name.clone(), policy),
             Type::DataclassDecorator(_) => KnownClass::FunctionType
                 .to_instance(db)
-                .member_lookup_with_policy(db, name, policy),
+                .member_lookup_with_policy(db, name.clone(), policy),
 
             Type::Callable(_) | Type::DataclassTransformer(_) if name_str == "__call__" => {
                 Place::bound(self).into()
@@ -3463,10 +3712,10 @@ impl<'db> Type<'db> {
 
             Type::Callable(callable) if callable.is_function_like(db) => KnownClass::FunctionType
                 .to_instance(db)
-                .member_lookup_with_policy(db, name, policy),
+                .member_lookup_with_policy(db, name.clone(), policy),
 
             Type::Callable(_) | Type::DataclassTransformer(_) => {
-                Type::object().member_lookup_with_policy(db, name, policy)
+                Type::object().member_lookup_with_policy(db, name.clone(), policy)
             }
 
             Type::NominalInstance(instance)
@@ -3524,9 +3773,11 @@ impl<'db> Type<'db> {
                 policy,
             ),
 
-            Type::TypeAlias(alias) => alias
-                .value_type(db)
-                .member_lookup_with_policy(db, name, policy),
+            Type::TypeAlias(alias) => {
+                alias
+                    .value_type(db)
+                    .member_lookup_with_policy(db, name.clone(), policy)
+            }
 
             Type::EnumLiteral(enum_literal)
                 if matches!(name_str, "name" | "_name_")
@@ -3711,7 +3962,30 @@ impl<'db> Type<'db> {
                     .try_call_dunder_get_on_attribute(db, owner_attr.clone())
                     .unwrap_or(owner_attr)
             }
-        }
+        };
+        result.map_type(|ty| {
+            // In fixed-point iteration of type inference, the member type must be monotonically widened and not "oscillate".
+            // Here, monotonicity is guaranteed by pre-unioning the type of the previous iteration into the current result.
+            let previous_cycle_value = self.member_lookup_with_policy(db, name.clone(), policy);
+
+            let ty = if let Some(previous_ty) = previous_cycle_value.place.ignore_possibly_unbound()
+            {
+                UnionType::from_elements(db, [ty, previous_ty])
+            } else {
+                ty
+            };
+
+            let div = Type::divergent(DivergentType::new(
+                db,
+                DivergenceKind::MemberLookupWithPolicy {
+                    self_type: self,
+                    name,
+                    policy,
+                },
+            ));
+            let visotor = RecursiveTypeNormalizedVisitor::new(div);
+            ty.recursive_type_normalized(db, &visotor)
+        })
     }
 
     /// Resolves the boolean value of the type and falls back to [`Truthiness::Ambiguous`] if the type doesn't implement `__bool__` correctly.
@@ -4776,6 +5050,19 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Returns the inferred return type of `self` if it is a function literal / bound method.
+    fn infer_return_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        match self {
+            Type::FunctionLiteral(function_type) if !function_type.file(db).is_stub(db) => {
+                Some(function_type.infer_return_type(db))
+            }
+            Type::BoundMethod(method_type) if !method_type.function(db).file(db).is_stub(db) => {
+                Some(method_type.infer_return_type(db))
+            }
+            _ => None,
+        }
+    }
+
     /// Calls `self`. Returns a [`CallError`] if `self` is (always or possibly) not callable, or if
     /// the arguments are not compatible with the formal parameters.
     ///
@@ -4938,9 +5225,7 @@ impl<'db> Type<'db> {
         let special_case = match self {
             Type::NominalInstance(nominal) => nominal.tuple_spec(db),
             Type::GenericAlias(alias) if alias.origin(db).is_tuple(db) => {
-                Some(Cow::Owned(TupleSpec::homogeneous(todo_type!(
-                    "*tuple[] annotations"
-                ))))
+                Some(Cow::Owned(TupleSpec::homogeneous(todo_type!("*tuple[] annotations"))))
             }
             Type::StringLiteral(string_literal_ty) => {
                 let string_literal = string_literal_ty.value(db);
@@ -5861,7 +6146,6 @@ impl<'db> Type<'db> {
                         .unwrap_or(SubclassOfInner::unknown()),
                 ),
             },
-
             Type::StringLiteral(_) | Type::LiteralString => KnownClass::Str.to_class_literal(db),
             Type::Dynamic(dynamic) => SubclassOfType::from(db, SubclassOfInner::Dynamic(dynamic)),
             // TODO intersections
@@ -6519,7 +6803,79 @@ impl<'db> Type<'db> {
     }
 
     pub(super) fn has_divergent_type(self, db: &'db dyn Db, div: Type<'db>) -> bool {
-        any_over_type(db, self, &|ty| ty == div, false)
+        let visitor = HasDivergentTypeVisitor::new(false);
+        self.has_divergent_type_impl(db, div, &visitor)
+    }
+
+    fn has_divergent_type_impl(
+        self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        visitor: &HasDivergentTypeVisitor<'db>,
+    ) -> bool {
+        match self {
+            Type::Dynamic(DynamicType::Divergent(_)) => self == div,
+            Type::Union(union) => {
+                visitor.visit(self, || union.has_divergent_type_impl(db, div, visitor))
+            }
+            Type::Intersection(intersection) => visitor.visit(self, || {
+                intersection.has_divergent_type_impl(db, div, visitor)
+            }),
+            Type::GenericAlias(alias) => visitor.visit(self, || {
+                alias
+                    .specialization(db)
+                    .has_divergent_type_impl(db, div, visitor)
+            }),
+            Type::NominalInstance(instance) => visitor.visit(self, || {
+                instance.class(db).has_divergent_type_impl(db, div, visitor)
+            }),
+            Type::Callable(callable) => {
+                visitor.visit(self, || callable.has_divergent_type_impl(db, div, visitor))
+            }
+            Type::ProtocolInstance(protocol) => {
+                visitor.visit(self, || protocol.has_divergent_type_impl(db, div, visitor))
+            }
+            Type::PropertyInstance(property) => {
+                visitor.visit(self, || property.has_divergent_type_impl(db, div, visitor))
+            }
+            Type::TypeIs(type_is) => visitor.visit(self, || {
+                type_is
+                    .return_type(db)
+                    .has_divergent_type_impl(db, div, visitor)
+            }),
+            Type::SubclassOf(subclass_of) => visitor.visit(self, || {
+                subclass_of.has_divergent_type_impl(db, div, visitor)
+            }),
+            Type::TypedDict(typed_dict) => visitor.visit(self, || {
+                typed_dict
+                    .defining_class()
+                    .has_divergent_type_impl(db, div, visitor)
+            }),
+            Type::Never
+            | Type::AlwaysTruthy
+            | Type::AlwaysFalsy
+            | Type::WrapperDescriptor(_)
+            | Type::DataclassDecorator(_)
+            | Type::DataclassTransformer(_)
+            | Type::ModuleLiteral(_)
+            | Type::ClassLiteral(_)
+            | Type::IntLiteral(_)
+            | Type::BooleanLiteral(_)
+            | Type::LiteralString
+            | Type::StringLiteral(_)
+            | Type::BytesLiteral(_)
+            | Type::EnumLiteral(_)
+            | Type::BoundSuper(_)
+            | Type::SpecialForm(_)
+            | Type::KnownInstance(_)
+            | Type::NonInferableTypeVar(_)
+            | Type::TypeVar(_)
+            | Type::FunctionLiteral(_)
+            | Type::KnownBoundMethod(_)
+            | Type::BoundMethod(_)
+            | Type::Dynamic(_)
+            | Type::TypeAlias(_) => false,
+        }
     }
 }
 
@@ -6755,6 +7111,37 @@ impl<'db> TypeMapping<'_, 'db> {
         }
     }
 
+    fn recursive_type_normalized(
+        &self,
+        db: &'db dyn Db,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
+        match self {
+            TypeMapping::Specialization(specialization) => {
+                TypeMapping::Specialization(specialization.recursive_type_normalized(db, visitor))
+            }
+            TypeMapping::PartialSpecialization(partial) => {
+                TypeMapping::PartialSpecialization(partial.recursive_type_normalized(db, visitor))
+            }
+            TypeMapping::PromoteLiterals => TypeMapping::PromoteLiterals,
+            TypeMapping::BindLegacyTypevars(binding_context) => {
+                TypeMapping::BindLegacyTypevars(*binding_context)
+            }
+            TypeMapping::BindSelf(self_type) => {
+                TypeMapping::BindSelf(self_type.recursive_type_normalized(db, visitor))
+            }
+            TypeMapping::ReplaceSelf { new_upper_bound } => TypeMapping::ReplaceSelf {
+                new_upper_bound: new_upper_bound.recursive_type_normalized(db, visitor),
+            },
+            TypeMapping::MarkTypeVarsInferable(binding_context) => {
+                TypeMapping::MarkTypeVarsInferable(*binding_context)
+            }
+            TypeMapping::Materialize(materialization_kind) => {
+                TypeMapping::Materialize(*materialization_kind)
+            }
+        }
+    }
+
     /// Update the generic context of a [`Signature`] according to the current type mapping
     pub(crate) fn update_signature_generic_context(
         &self,
@@ -6906,6 +7293,34 @@ impl<'db> KnownInstanceType<'db> {
         }
     }
 
+    fn recursive_type_normalized(
+        self,
+        db: &'db dyn Db,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
+        match self {
+            Self::SubscriptedProtocol(context) => {
+                Self::SubscriptedProtocol(context.recursive_type_normalized(db, visitor))
+            }
+            Self::SubscriptedGeneric(context) => {
+                Self::SubscriptedGeneric(context.recursive_type_normalized(db, visitor))
+            }
+            Self::TypeVar(typevar) => Self::TypeVar(typevar.recursive_type_normalized(db, visitor)),
+            Self::TypeAliasType(type_alias) => {
+                Self::TypeAliasType(type_alias.recursive_type_normalized(db, visitor))
+            }
+            Self::Deprecated(deprecated) => {
+                // Nothing to normalize
+                Self::Deprecated(deprecated)
+            }
+            Self::Field(field) => Self::Field(field.recursive_type_normalized(db, visitor)),
+            Self::ConstraintSet(set) => {
+                // Nothing to normalize
+                Self::ConstraintSet(set)
+            }
+        }
+    }
+
     fn class(self, db: &'db dyn Db) -> KnownClass {
         match self {
             Self::SubscriptedProtocol(_) | Self::SubscriptedGeneric(_) => KnownClass::SpecialForm,
@@ -7001,16 +7416,58 @@ impl<'db> KnownInstanceType<'db> {
     }
 }
 
+#[allow(private_interfaces)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+pub enum DivergenceKind<'db> {
+    /// Divergence from `{FunctionLiteral, BoundMethodType}::infer_return_type`.
+    InferReturnType(ScopeId<'db>),
+    /// Divergence from `ClassLiteral::implicit_attribute_inner`.
+    ImplicitAttribute {
+        class_body_scope: ScopeId<'db>,
+        name: String,
+        target_method_decorator: MethodDecorator,
+    },
+    /// Divergence from `Type::member_lookup_with_policy`.
+    MemberLookupWithPolicy {
+        self_type: Type<'db>,
+        name: Name,
+        policy: MemberLookupPolicy,
+    },
+    /// Divergence from `Type::class_lookup_with_policy`.
+    ClassLookupWithPolicy {
+        self_type: Type<'db>,
+        name: Name,
+        policy: MemberLookupPolicy,
+    },
+    /// Divergence from `infer_expression_type_impl`.
+    InferExpression(InferExpression<'db>),
+    /// Divergence from `infer_expression_types_impl`.
+    InferExpressionTypes(InferExpression<'db>),
+    /// Divergence from `infer_definition_types`.
+    InferDefinitionTypes(Definition<'db>),
+    /// Divergence from `infer_scope_types`.
+    InferScopeTypes(ScopeId<'db>),
+    /// Divergence from `infer_unpack_types`.
+    InferUnpackTypes(Unpack<'db>),
+}
+
+pub(crate) type CycleRecoveryType<'db> = Type<'db>;
+
 /// A type that is determined to be divergent during recursive type inference.
 /// This type must never be eliminated by dynamic type reduction
 /// (e.g. `Divergent` is assignable to `@Todo`, but `@Todo | Divergent` must not be reducted to `@Todo`).
 /// Otherwise, type inference cannot converge properly.
 /// For detailed properties of this type, see the unit test at the end of the file.
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[derive(PartialOrd, Ord)]
 pub struct DivergentType<'db> {
-    /// The scope where this divergence was detected.
-    scope: ScopeId<'db>,
+    /// The kind of divergence.
+    #[returns(ref)]
+    kind: DivergenceKind<'db>,
 }
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for DivergentType<'_> {}
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
 pub enum DynamicType<'db> {
@@ -7047,6 +7504,10 @@ impl DynamicType<'_> {
         } else {
             Self::Any
         }
+    }
+
+    fn recursive_type_normalized(self) -> Self {
+        self
     }
 }
 
@@ -7382,6 +7843,19 @@ impl<'db> FieldInstance<'db> {
             self.kw_only(db),
         )
     }
+
+    fn recursive_type_normalized(
+        self,
+        db: &'db dyn Db,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
+        FieldInstance::new(
+            db,
+            self.default_type(db).recursive_type_normalized(db, visitor),
+            self.init(db),
+            self.kw_only(db),
+        )
+    }
 }
 
 /// Whether this typevar was created via the legacy `TypeVar` constructor, using PEP 695 syntax,
@@ -7568,6 +8042,14 @@ impl<'db> TypeVarInstance<'db> {
         )
     }
 
+    fn recursive_type_normalized(
+        self,
+        _db: &'db dyn Db,
+        _visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
+        self
+    }
+
     fn materialize_impl(
         self,
         db: &'db dyn Db,
@@ -7642,7 +8124,7 @@ impl<'db> TypeVarInstance<'db> {
         Some(TypeVarBoundOrConstraints::UpperBound(ty))
     }
 
-    #[salsa::tracked]
+    #[salsa::tracked(cycle_fn=lazy_constraint_cycle_recover, cycle_initial=lazy_constraint_cycle_initial)]
     fn lazy_constraints(self, db: &'db dyn Db) -> Option<TypeVarBoundOrConstraints<'db>> {
         let definition = self.definition(db)?;
         let module = parsed_module(db, definition.file(db)).load(db);
@@ -7652,7 +8134,7 @@ impl<'db> TypeVarInstance<'db> {
         Some(TypeVarBoundOrConstraints::Constraints(ty))
     }
 
-    #[salsa::tracked]
+    #[salsa::tracked(cycle_fn=lazy_default_cycle_recover, cycle_initial=lazy_default_cycle_initial)]
     fn lazy_default(self, db: &'db dyn Db) -> Option<Type<'db>> {
         let definition = self.definition(db)?;
         let module = parsed_module(db, definition.file(db)).load(db);
@@ -7679,6 +8161,40 @@ fn lazy_bound_cycle_initial<'db>(
     _db: &'db dyn Db,
     _self: TypeVarInstance<'db>,
 ) -> Option<TypeVarBoundOrConstraints<'db>> {
+    None
+}
+
+#[allow(clippy::ref_option)]
+fn lazy_constraint_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &Option<TypeVarBoundOrConstraints<'db>>,
+    _count: u32,
+    _self: TypeVarInstance<'db>,
+) -> salsa::CycleRecoveryAction<Option<TypeVarBoundOrConstraints<'db>>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn lazy_constraint_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _self: TypeVarInstance<'db>,
+) -> Option<TypeVarBoundOrConstraints<'db>> {
+    None
+}
+
+#[allow(clippy::ref_option)]
+fn lazy_default_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &Option<Type<'db>>,
+    _count: u32,
+    _self: TypeVarInstance<'db>,
+) -> salsa::CycleRecoveryAction<Option<Type<'db>>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn lazy_default_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _self: TypeVarInstance<'db>,
+) -> Option<Type<'db>> {
     None
 }
 
@@ -7766,13 +8282,9 @@ impl<'db> BoundTypeVarInstance<'db> {
         match self.typevar(db).explicit_variance(db) {
             Some(explicit_variance) => explicit_variance.compose(polarity),
             None => match self.binding_context(db) {
-                BindingContext::Definition(definition) => {
-                    let type_inference = infer_definition_types(db, definition);
-                    type_inference
-                        .binding_type(definition)
-                        .with_polarity(polarity)
-                        .variance_of(db, self)
-                }
+                BindingContext::Definition(definition) => binding_type(db, definition)
+                    .with_polarity(polarity)
+                    .variance_of(db, self),
                 BindingContext::Synthetic => TypeVarVariance::Invariant,
             },
         }
@@ -7825,6 +8337,18 @@ impl<'db> BoundTypeVarInstance<'db> {
         Self::new(
             db,
             self.typevar(db).normalized_impl(db, visitor),
+            self.binding_context(db),
+        )
+    }
+
+    fn recursive_type_normalized(
+        self,
+        db: &'db dyn Db,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
+        Self::new(
+            db,
+            self.typevar(db).recursive_type_normalized(db, visitor),
             self.binding_context(db),
         )
     }
@@ -9073,11 +9597,95 @@ impl<'db> BoundMethodType<'db> {
         )
     }
 
+    /// Infers this method scope's types and returns the inferred return type.
+    #[salsa::tracked(cycle_fn=return_type_cycle_recover, cycle_initial=return_type_cycle_initial, heap_size=get_size2::heap_size)]
+    pub(crate) fn infer_return_type(self, db: &'db dyn Db) -> Type<'db> {
+        let scope = self
+            .function(db)
+            .literal(db)
+            .last_definition(db)
+            .body_scope(db);
+        let inference = infer_scope_types(db, scope);
+        inference.infer_return_type(db, Type::BoundMethod(self))
+    }
+
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    fn class_definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
+        let definition_scope = self.function(db).definition(db).scope(db);
+        let index = semantic_index(db, definition_scope.file(db));
+        Some(index.expect_single_definition(definition_scope.node(db).as_class()?))
+    }
+
+    pub(crate) fn is_final(self, db: &'db dyn Db) -> bool {
+        if self
+            .function(db)
+            .has_known_decorator(db, FunctionDecorators::FINAL)
+        {
+            return true;
+        }
+        let Some(class_ty) = self
+            .class_definition(db)
+            .and_then(|class| binding_type(db, class).into_class_literal())
+        else {
+            return false;
+        };
+        class_ty
+            .known_function_decorators(db)
+            .any(|deco| deco == KnownFunction::Final)
+    }
+
+    pub(super) fn base_return_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        let class = binding_type(db, self.class_definition(db)?).to_class_type(db)?;
+        let name = self.function(db).name(db);
+
+        let base = class
+            .iter_mro(db)
+            .nth(1)
+            .and_then(class_base::ClassBase::into_class)?;
+        let base_member = base.class_member(db, name, MemberLookupPolicy::default());
+        if let Place::Type(Type::FunctionLiteral(base_func), _) = base_member.place {
+            if let [signature] = base_func.signature(db).overloads.as_slice() {
+                let unspecialized_return_ty = signature.return_ty.unwrap_or_else(|| {
+                    let base_method_ty =
+                        base_func.into_bound_method_type(db, Type::instance(db, class));
+                    base_method_ty.infer_return_type(db)
+                });
+                if let Some(generic_context) = signature.generic_context.as_ref() {
+                    // If the return type of the base method contains a type variable, replace it with `Unknown` to avoid dangling type variables.
+                    Some(
+                        unspecialized_return_ty
+                            .apply_specialization(db, generic_context.unknown_specialization(db)),
+                    )
+                } else {
+                    Some(unspecialized_return_ty)
+                }
+            } else {
+                // TODO: Handle overloaded base methods.
+                None
+            }
+        } else {
+            None
+        }
+    }
+
     fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         Self::new(
             db,
             self.function(db).normalized_impl(db, visitor),
             self.self_instance(db).normalized_impl(db, visitor),
+        )
+    }
+
+    fn recursive_type_normalized(
+        self,
+        db: &'db dyn Db,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
+        Self::new(
+            db,
+            self.function(db).recursive_type_normalized(db, visitor),
+            self.self_instance(db)
+                .recursive_type_normalized(db, visitor),
         )
     }
 
@@ -9208,6 +9816,18 @@ impl<'db> CallableType<'db> {
         )
     }
 
+    fn recursive_type_normalized(
+        self,
+        db: &'db dyn Db,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
+        CallableType::new(
+            db,
+            self.signatures(db).recursive_type_normalized(db, visitor),
+            self.is_function_like(db),
+        )
+    }
+
     fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
@@ -9267,6 +9887,16 @@ impl<'db> CallableType<'db> {
             self.signatures(db)
                 .is_equivalent_to_impl(db, other.signatures(db), visitor)
         })
+    }
+
+    fn has_divergent_type_impl(
+        self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        visitor: &HasDivergentTypeVisitor<'db>,
+    ) -> bool {
+        self.signatures(db)
+            .has_divergent_type_impl(db, div, visitor)
     }
 }
 
@@ -9423,6 +10053,36 @@ impl<'db> KnownBoundMethodType<'db> {
             }
             KnownBoundMethodType::PropertyDunderSet(property) => {
                 KnownBoundMethodType::PropertyDunderSet(property.normalized_impl(db, visitor))
+            }
+            KnownBoundMethodType::StrStartswith(_) => self,
+        }
+    }
+
+    fn recursive_type_normalized(
+        self,
+        db: &'db dyn Db,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
+        match self {
+            KnownBoundMethodType::FunctionTypeDunderGet(function) => {
+                KnownBoundMethodType::FunctionTypeDunderGet(
+                    function.recursive_type_normalized(db, visitor),
+                )
+            }
+            KnownBoundMethodType::FunctionTypeDunderCall(function) => {
+                KnownBoundMethodType::FunctionTypeDunderCall(
+                    function.recursive_type_normalized(db, visitor),
+                )
+            }
+            KnownBoundMethodType::PropertyDunderGet(property) => {
+                KnownBoundMethodType::PropertyDunderGet(
+                    property.recursive_type_normalized(db, visitor),
+                )
+            }
+            KnownBoundMethodType::PropertyDunderSet(property) => {
+                KnownBoundMethodType::PropertyDunderSet(
+                    property.recursive_type_normalized(db, visitor),
+                )
             }
             KnownBoundMethodType::StrStartswith(_) => self,
         }
@@ -9831,6 +10491,14 @@ impl<'db> PEP695TypeAliasType<'db> {
     fn normalized_impl(self, _db: &'db dyn Db, _visitor: &NormalizedVisitor<'db>) -> Self {
         self
     }
+
+    fn recursive_type_normalized(
+        self,
+        _db: &'db dyn Db,
+        _visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
+        self
+    }
 }
 
 #[allow(clippy::ref_option, clippy::trivially_copy_pass_by_ref)]
@@ -9897,6 +10565,19 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
             self.value(db).normalized_impl(db, visitor),
         )
     }
+
+    fn recursive_type_normalized(
+        self,
+        db: &'db dyn Db,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
+        Self::new(
+            db,
+            self.name(db),
+            self.definition(db),
+            self.value(db).recursive_type_normalized(db, visitor),
+        )
+    }
 }
 
 #[derive(
@@ -9935,6 +10616,21 @@ impl<'db> TypeAliasType<'db> {
             }
             TypeAliasType::ManualPEP695(type_alias) => {
                 TypeAliasType::ManualPEP695(type_alias.normalized_impl(db, visitor))
+            }
+        }
+    }
+
+    fn recursive_type_normalized(
+        self,
+        db: &'db dyn Db,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
+        match self {
+            TypeAliasType::PEP695(type_alias) => {
+                TypeAliasType::PEP695(type_alias.recursive_type_normalized(db, visitor))
+            }
+            TypeAliasType::ManualPEP695(type_alias) => {
+                TypeAliasType::ManualPEP695(type_alias.recursive_type_normalized(db, visitor))
             }
         }
     }
@@ -10220,6 +10916,23 @@ impl<'db> UnionType<'db> {
             .build()
     }
 
+    fn recursive_type_normalized(
+        self,
+        db: &'db dyn Db,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Type<'db> {
+        self.elements(db)
+            .iter()
+            .map(|ty| ty.recursive_type_normalized(db, visitor))
+            .fold(
+                UnionBuilder::new(db)
+                    .order_elements(false)
+                    .unpack_aliases(false),
+                UnionBuilder::add,
+            )
+            .build()
+    }
+
     pub(crate) fn is_equivalent_to_impl(
         self,
         db: &'db dyn Db,
@@ -10244,6 +10957,17 @@ impl<'db> UnionType<'db> {
         }
 
         ConstraintSet::from(sorted_self == other.normalized(db))
+    }
+
+    fn has_divergent_type_impl(
+        self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        visitor: &HasDivergentTypeVisitor<'db>,
+    ) -> bool {
+        self.elements(db)
+            .iter()
+            .any(|ty| ty.has_divergent_type_impl(db, div, visitor))
     }
 }
 
@@ -10311,6 +11035,29 @@ impl<'db> IntersectionType<'db> {
 
             elements.sort_unstable_by(|l, r| union_or_intersection_elements_ordering(db, l, r));
             elements
+        }
+
+        IntersectionType::new(
+            db,
+            normalized_set(db, self.positive(db), visitor),
+            normalized_set(db, self.negative(db), visitor),
+        )
+    }
+
+    pub(crate) fn recursive_type_normalized(
+        self,
+        db: &'db dyn Db,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
+        fn normalized_set<'db>(
+            db: &'db dyn Db,
+            elements: &FxOrderSet<Type<'db>>,
+            visitor: &RecursiveTypeNormalizedVisitor<'db>,
+        ) -> FxOrderSet<Type<'db>> {
+            elements
+                .iter()
+                .map(|ty| ty.recursive_type_normalized(db, visitor))
+                .collect()
         }
 
         IntersectionType::new(
@@ -10460,6 +11207,21 @@ impl<'db> IntersectionType<'db> {
         ruff_memory_usage::order_set_heap_size(positive)
             + ruff_memory_usage::order_set_heap_size(negative)
     }
+
+    fn has_divergent_type_impl(
+        self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        visitor: &HasDivergentTypeVisitor<'db>,
+    ) -> bool {
+        self.positive(db)
+            .iter()
+            .any(|ty| ty.has_divergent_type_impl(db, div, visitor))
+            || self
+                .negative(db)
+                .iter()
+                .any(|ty| ty.has_divergent_type_impl(db, div, visitor))
+    }
 }
 
 /// # Ordering
@@ -10594,6 +11356,24 @@ impl<'db> SuperOwnerKind<'db> {
                 .into_nominal_instance()
                 .map(Self::Instance)
                 .unwrap_or(Self::Dynamic(DynamicType::Any)),
+        }
+    }
+
+    fn recursive_type_normalized(
+        self,
+        db: &'db dyn Db,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
+        match self {
+            SuperOwnerKind::Dynamic(dynamic) => {
+                SuperOwnerKind::Dynamic(dynamic.recursive_type_normalized())
+            }
+            SuperOwnerKind::Class(class) => {
+                SuperOwnerKind::Class(class.recursive_type_normalized(db, visitor))
+            }
+            SuperOwnerKind::Instance(instance) => {
+                SuperOwnerKind::Instance(instance.recursive_type_normalized(db, visitor))
+            }
         }
     }
 
@@ -10871,6 +11651,18 @@ impl<'db> BoundSuperType<'db> {
             self.owner(db).normalized_impl(db, visitor),
         )
     }
+
+    fn recursive_type_normalized(
+        self,
+        db: &'db dyn Db,
+        visitor: &RecursiveTypeNormalizedVisitor<'db>,
+    ) -> Self {
+        Self::new(
+            db,
+            self.pivot_class(db).recursive_type_normalized(db, visitor),
+            self.owner(db).recursive_type_normalized(db, visitor),
+        )
+    }
 }
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
@@ -11056,7 +11848,10 @@ pub(crate) mod tests {
         let file_scope_id = FileScopeId::global();
         let scope = file_scope_id.to_scope_id(&db, file);
 
-        let div = Type::Dynamic(DynamicType::Divergent(DivergentType { scope }));
+        let div = Type::divergent(DivergentType::new(
+            &db,
+            DivergenceKind::InferReturnType(scope),
+        ));
 
         // The `Divergent` type must not be eliminated in union with other dynamic types,
         // as this would prevent detection of divergent type inference using `Divergent`.
@@ -11081,6 +11876,27 @@ pub(crate) mod tests {
 
         let union = UnionType::from_elements(&db, [KnownClass::Object.to_instance(&db), div]);
         assert_eq!(union.display(&db).to_string(), "object");
+
+        let visitor = RecursiveTypeNormalizedVisitor::new(div);
+        let recursice = UnionType::from_elements(
+            &db,
+            [
+                KnownClass::List.to_specialized_instance(&db, [div]),
+                Type::none(&db),
+            ],
+        );
+        let nested_rec = KnownClass::List.to_specialized_instance(&db, [recursice]);
+        assert_eq!(
+            nested_rec.display(&db).to_string(),
+            "list[list[Divergent] | None]"
+        );
+        let normalized = nested_rec.recursive_type_normalized(&db, &visitor);
+        assert_eq!(normalized.display(&db).to_string(), "list[Divergent]");
+
+        let union = UnionType::from_elements(&db, [div, KnownClass::Int.to_instance(&db)]);
+        assert_eq!(union.display(&db).to_string(), "Divergent | int");
+        let normalized = union.recursive_type_normalized(&db, &visitor);
+        assert_eq!(normalized.display(&db).to_string(), "int");
 
         // The same can be said about intersections for the `Never` type.
         let intersection = IntersectionBuilder::new(&db)

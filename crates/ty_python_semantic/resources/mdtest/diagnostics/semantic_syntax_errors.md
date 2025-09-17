@@ -125,7 +125,8 @@ match obj:
 
 ```py
 class C:
-    def __await__(self): ...
+    def __await__(self):
+        yield
 
 # error: [invalid-syntax] "`return` statement outside of a function"
 return

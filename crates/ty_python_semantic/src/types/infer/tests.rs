@@ -5,13 +5,43 @@ use crate::place::{ConsideredDefinitions, Place, global_symbol};
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::FileScopeId;
 use crate::semantic_index::{global_scope, place_table, semantic_index, use_def_map};
-use crate::types::{KnownClass, KnownInstanceType, UnionType, check_types};
+use crate::types::function::FunctionType;
+use crate::types::{BoundMethodType, KnownClass, KnownInstanceType, UnionType, check_types};
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::DbWithWritableSystem as _;
 use ruff_db::testing::{assert_function_query_was_not_run, assert_function_query_was_run};
+use salsa::Database;
 
 use super::*;
+
+fn __() {
+    let _ = &Type::member_lookup_with_policy;
+    let _ = &Type::class_member_with_policy;
+    let _ = &FunctionType::infer_return_type;
+    let _ = &BoundMethodType::infer_return_type;
+    let _ = &ClassLiteral::implicit_attribute_inner;
+    let _ = &infer_expression_type_impl;
+    let _ = &infer_expression_types_impl;
+    let _ = &infer_definition_types;
+    let _ = &infer_scope_types;
+    let _ = &infer_unpack_types;
+}
+/// These queries refer to a value ​​from the previous cycle to ensure convergence.
+/// Therefore, even when convergence is apparent, they will cycle at least once.
+/// TODO: Is it possible to use the salsa API to get the value from the previous cycle (without doing anything if called for the first time)?
+const QUERIES_USE_PREVIOUS_CYCLE_VALUE: [&str; 10] = [
+    "Type < 'db >::member_lookup_with_policy_",
+    "Type < 'db >::class_member_with_policy_",
+    "FunctionType < 'db >::infer_return_type_",
+    "BoundMethodType < 'db >::infer_return_type_",
+    "ClassLiteral < 'db >::implicit_attribute_inner_",
+    "infer_expression_type_impl",
+    "infer_expression_types_impl",
+    "infer_definition_types",
+    "infer_scope_types",
+    "infer_unpack_types",
+];
 
 #[track_caller]
 fn get_symbol<'db>(
@@ -273,6 +303,12 @@ fn unbound_symbol_no_reachability_constraint_check() {
             .iter()
             .filter_map(|event| {
                 if let salsa::EventKind::WillIterateCycle { database_key, .. } = event.kind {
+                    if QUERIES_USE_PREVIOUS_CYCLE_VALUE.contains(
+                        &db.ingredient_debug_name(database_key.ingredient_index())
+                            .as_ref(),
+                    ) {
+                        return None;
+                    }
                     Some(format!("{database_key:?}"))
                 } else {
                     None
@@ -466,7 +502,6 @@ fn dependency_implicit_instance_attribute() -> anyhow::Result<()> {
         assert_eq!(attr_ty.display(&db).to_string(), "Unknown | str | None");
         db.take_salsa_events()
     };
-
     assert_function_query_was_not_run(
         &db,
         infer_expression_types_impl,
@@ -560,7 +595,6 @@ fn dependency_own_instance_member() -> anyhow::Result<()> {
         assert_eq!(attr_ty.display(&db).to_string(), "Unknown | str | None");
         db.take_salsa_events()
     };
-
     assert_function_query_was_not_run(
         &db,
         infer_expression_types_impl,
@@ -659,7 +693,6 @@ fn dependency_implicit_class_member() -> anyhow::Result<()> {
         assert_eq!(attr_ty.display(&db).to_string(), "Unknown | str");
         db.take_salsa_events()
     };
-
     assert_function_query_was_not_run(
         &db,
         infer_expression_types_impl,
