@@ -11,7 +11,6 @@ use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::{FileScopeId, NodeWithScopeKind};
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
-use crate::types::infer::infer_definition_types;
 use crate::types::instance::{Protocol, ProtocolInstanceType};
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
@@ -20,7 +19,7 @@ use crate::types::{
     HasDivergentTypeVisitor, HasRelationToVisitor, IsEquivalentVisitor, KnownClass,
     KnownInstanceType, MaterializationKind, NormalizedVisitor, RecursiveTypeNormalizedVisitor,
     Type, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarVariance,
-    UnionType, binding_type, declaration_type,
+    UnionType, binding_type, declaration_type, undecorated_type,
 };
 use crate::{Db, FxOrderSet};
 
@@ -43,8 +42,7 @@ fn enclosing_generic_contexts<'db>(
             }
             NodeWithScopeKind::Function(function) => {
                 let definition = index.expect_single_definition(function.node(module));
-                infer_definition_types(db, definition)
-                    .undecorated_type()
+                undecorated_type(db, definition)
                     .expect("function should have undecorated type")
                     .into_function_literal()?
                     .last_definition_signature(db)

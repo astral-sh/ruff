@@ -23,9 +23,10 @@ pub(crate) use self::cyclic::{CycleDetector, PairVisitor, TypeTransformer};
 pub use self::diagnostic::TypeCheckDiagnostics;
 pub(crate) use self::diagnostic::register_lints;
 pub(crate) use self::infer::{
-    TypeContext, infer_deferred_types, infer_definition_types, infer_expression_type,
-    infer_expression_types, infer_scope_types, static_expression_truthiness,
+    TypeContext, infer_deferred_types, infer_expression_type, infer_scope_expression_type,
+    static_expression_truthiness,
 };
+use self::infer::{infer_definition_types, infer_expression_types, infer_scope_types};
 pub(crate) use self::signatures::{CallableSignature, Signature};
 pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
 use crate::module_name::ModuleName;
@@ -160,7 +161,11 @@ pub fn check_types(db: &dyn Db, file: File) -> Vec<Diagnostic> {
 /// Infer the type of a binding.
 pub(crate) fn binding_type<'db>(db: &'db dyn Db, definition: Definition<'db>) -> Type<'db> {
     let inference = infer_definition_types(db, definition);
-    inference.binding_type(definition)
+    if let Some(cycle_recovery) = inference.cycle_recovery() {
+        UnionType::from_elements(db, [inference.binding_type(definition), cycle_recovery])
+    } else {
+        inference.binding_type(definition)
+    }
 }
 
 /// Infer the type of a declaration.
@@ -169,7 +174,28 @@ pub(crate) fn declaration_type<'db>(
     definition: Definition<'db>,
 ) -> TypeAndQualifiers<'db> {
     let inference = infer_definition_types(db, definition);
-    inference.declaration_type(definition)
+    if let Some(cycle_recovery) = inference.cycle_recovery() {
+        let decl_ty = inference.declaration_type(definition);
+        let union = UnionType::from_elements(db, [decl_ty.inner_type(), cycle_recovery]);
+        TypeAndQualifiers::new(union, decl_ty.qualifiers())
+    } else {
+        inference.declaration_type(definition)
+    }
+}
+
+pub(crate) fn undecorated_type<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> Option<Type<'db>> {
+    let inference = infer_definition_types(db, definition);
+    if let Some(cycle_recovery) = inference.cycle_recovery() {
+        Some(UnionType::from_elements(
+            db,
+            [inference.undecorated_type()?, cycle_recovery],
+        ))
+    } else {
+        inference.undecorated_type()
+    }
 }
 
 /// Infer the type of a (possibly deferred) sub-expression of a [`Definition`].
@@ -191,13 +217,17 @@ fn definition_expression_type<'db>(
         // expression is in the definition scope
         let inference = infer_definition_types(db, definition);
         if let Some(ty) = inference.try_expression_type(expression) {
-            ty
+            if let Some(cycle_recovery) = inference.cycle_recovery() {
+                UnionType::from_elements(db, [ty, cycle_recovery])
+            } else {
+                ty
+            }
         } else {
             infer_deferred_types(db, definition).expression_type(expression)
         }
     } else {
         // expression is in a type-params sub-scope
-        infer_scope_types(db, scope).expression_type(expression)
+        infer_scope_expression_type(db, scope, expression)
     }
 }
 
@@ -8242,13 +8272,9 @@ impl<'db> BoundTypeVarInstance<'db> {
         match self.typevar(db).explicit_variance(db) {
             Some(explicit_variance) => explicit_variance.compose(polarity),
             None => match self.binding_context(db) {
-                BindingContext::Definition(definition) => {
-                    let type_inference = infer_definition_types(db, definition);
-                    type_inference
-                        .binding_type(definition)
-                        .with_polarity(polarity)
-                        .variance_of(db, self)
-                }
+                BindingContext::Definition(definition) => binding_type(db, definition)
+                    .with_polarity(polarity)
+                    .variance_of(db, self),
                 BindingContext::Synthetic => TypeVarVariance::Invariant,
             },
         }

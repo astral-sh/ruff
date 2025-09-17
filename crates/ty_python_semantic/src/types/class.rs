@@ -31,8 +31,7 @@ use crate::types::{
     ManualPEP695TypeAliasType, MaterializationKind, NormalizedVisitor, PropertyInstanceType,
     RecursiveTypeNormalizedVisitor, StringLiteralType, TypeAliasType, TypeContext, TypeMapping,
     TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, TypedDictParams,
-    UnionBuilder, VarianceInferable, declaration_type, determine_upper_bound,
-    infer_definition_types,
+    UnionBuilder, VarianceInferable, binding_type, declaration_type, determine_upper_bound,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet, Program,
@@ -4994,8 +4993,7 @@ impl KnownClass {
                         };
 
                         let definition = index.expect_single_definition(first_param);
-                        let first_param =
-                            infer_definition_types(db, definition).binding_type(definition);
+                        let first_param = binding_type(db, definition);
 
                         let bound_super = BoundSuperType::build(
                             db,

@@ -74,7 +74,7 @@ use crate::types::function::{
 };
 use crate::types::generics::LegacyGenericBase;
 use crate::types::generics::{GenericContext, bind_typevar};
-use crate::types::infer::infer_expression_types_impl;
+use crate::types::infer::{infer_expression_types_impl, infer_scope_expression_type};
 use crate::types::instance::SliceLiteral;
 use crate::types::mro::MroErrorKind;
 use crate::types::signatures::Signature;
@@ -93,7 +93,7 @@ use crate::types::{
     SpecialFormType, SubclassOfType, TrackedConstraintSet, Truthiness, Type, TypeAliasType,
     TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraintsEvaluation,
     TypeVarDefaultEvaluation, TypeVarInstance, TypeVarKind, UnionBuilder, UnionType, binding_type,
-    todo_type,
+    infer_expression_type, todo_type,
 };
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::{EvaluationMode, UnpackPosition};
@@ -441,7 +441,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             InferenceRegion::Scope(scope) if scope == expr_scope => {
                 self.expression_type(expression)
             }
-            _ => infer_scope_types(self.db(), expr_scope).expression_type(expression),
+            _ => infer_scope_expression_type(self.db(), expr_scope, expression),
         }
     }
 
@@ -1822,10 +1822,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let definition_types = infer_definition_types(self.db(), definition);
 
-        function
-            .decorator_list
-            .iter()
-            .map(move |decorator| definition_types.expression_type(&decorator.expression))
+        function.decorator_list.iter().map(move |decorator| {
+            let decorator_ty = definition_types.expression_type(&decorator.expression);
+            if let Some(cycle_recovery) = definition_types.cycle_recovery() {
+                UnionType::from_elements(self.db(), [decorator_ty, cycle_recovery])
+            } else {
+                decorator_ty
+            }
+        })
     }
 
     /// Returns `true` if the current scope is the function body scope of a function overload (that
@@ -4516,7 +4520,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // Check non-star imports for deprecations
                 if definition.kind(self.db()).as_star_import().is_none() {
                     for ty in inferred.declaration_types() {
-                        self.check_deprecated(alias, ty.inner);
+                        let ty = if let Some(cycle_recovery) = inferred.cycle_recovery() {
+                            UnionType::from_elements(self.db(), [ty.inner, cycle_recovery])
+                        } else {
+                            ty.inner
+                        };
+                        self.check_deprecated(alias, ty);
                     }
                 }
                 self.extend_definition(inferred);
@@ -5499,6 +5508,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut infer_iterable_type = || {
             let expression = self.index.expression(iterable);
             let result = infer_expression_types(self.db(), expression, TypeContext::default());
+            let iterable = infer_expression_type(self.db(), expression, TypeContext::default());
 
             // Two things are different if it's the first comprehension:
             // (1) We must lookup the `ScopedExpressionId` of the iterable expression in the outer scope,
@@ -5507,10 +5517,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             //     because `ScopedExpressionId`s are only meaningful within their own scope, so
             //     we'd add types for random wrong expressions in the current scope
             if comprehension.is_first() && target.is_name_expr() {
-                result.expression_type(iterable)
+                iterable
             } else {
                 self.extend_expression_unchecked(result);
-                result.expression_type(iterable)
+                iterable
             }
         };
 
@@ -5549,7 +5559,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let definition = self.index.expect_single_definition(named);
             let result = infer_definition_types(self.db(), definition);
             self.extend_definition(result);
-            result.binding_type(definition)
+            binding_type(self.db(), definition)
         } else {
             // For syntactically invalid targets, we still need to run type inference:
             self.infer_expression(&named.target, TypeContext::default());
