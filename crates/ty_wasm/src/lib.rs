@@ -423,13 +423,32 @@ impl Workspace {
 
         Ok(completions
             .into_iter()
-            .map(|completion| Completion {
-                kind: completion.kind(&self.db).map(CompletionKind::from),
-                name: completion.name.into(),
-                documentation: completion
-                    .documentation
-                    .map(|documentation| documentation.render_plaintext()),
-                detail: completion.ty.map(|ty| ty.display(&self.db).to_string()),
+            .map(|comp| {
+                let kind = comp.kind(&self.db).map(CompletionKind::from);
+                let type_display = comp.ty.map(|ty| ty.display(&self.db).to_string());
+                let import_edit = comp.import.as_ref().map(|edit| {
+                    let range = Range::from_text_range(
+                        edit.range(),
+                        &index,
+                        &source,
+                        self.position_encoding,
+                    );
+                    TextEdit {
+                        range,
+                        new_text: edit.content().map(ToString::to_string).unwrap_or_default(),
+                    }
+                });
+                Completion {
+                    name: comp.name.into(),
+                    kind,
+                    detail: type_display,
+                    description: comp.module_name.map(ToString::to_string),
+                    insert_text: comp.insert.map(String::from),
+                    additional_text_edits: import_edit.map(|edit| vec![edit]),
+                    documentation: comp
+                        .documentation
+                        .map(|docstring| docstring.render_plaintext()),
+                }
             })
             .collect())
     }
@@ -918,9 +937,15 @@ pub struct Completion {
     pub name: String,
     pub kind: Option<CompletionKind>,
     #[wasm_bindgen(getter_with_clone)]
+    pub insert_text: Option<String>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub additional_text_edits: Option<Vec<TextEdit>>,
+    #[wasm_bindgen(getter_with_clone)]
     pub documentation: Option<String>,
     #[wasm_bindgen(getter_with_clone)]
     pub detail: Option<String>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub description: Option<String>,
 }
 
 #[wasm_bindgen]
@@ -983,6 +1008,14 @@ impl From<ty_ide::CompletionKind> for CompletionKind {
             ty_ide::CompletionKind::TypeParameter => Self::TypeParameter,
         }
     }
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TextEdit {
+    range: Range,
+    #[wasm_bindgen(getter_with_clone)]
+    new_text: String,
 }
 
 #[wasm_bindgen]
