@@ -8,7 +8,7 @@ use crate::importer::ImportRequest;
 use crate::preview::is_fix_os_symlink_enabled;
 use crate::rules::flake8_use_pathlib::helpers::{
     has_unknown_keywords_or_starred_expr, is_keyword_only_argument_non_default,
-    is_optional_bool_literal, is_pathlib_path_call,
+    is_pathlib_path_call,
 };
 use crate::{FixAvailability, Violation};
 
