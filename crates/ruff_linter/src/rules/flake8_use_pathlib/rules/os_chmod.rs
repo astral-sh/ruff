@@ -120,17 +120,15 @@ pub(crate) fn os_chmod(checker: &Checker, call: &ExprCall, segments: &[&str]) {
         let path_code = locator.slice(path_arg.range());
 
         let args = |arg: ArgOrKeyword| match arg {
-            ArgOrKeyword::Arg(expr) => {
-                if expr.range() == path_arg.range() {
-                    None
-                } else {
-                    Some(locator.slice(expr.range()).to_string())
-                }
+            ArgOrKeyword::Arg(expr) if expr.range() != path_arg.range() => {
+                Some(locator.slice(expr.range()))
             }
-            ArgOrKeyword::Keyword(kw) => match kw.arg.as_deref() {
-                Some("mode" | "follow_symlinks") => Some(locator.slice(kw).to_string()),
-                _ => None,
-            },
+            ArgOrKeyword::Keyword(kw)
+                if matches!(kw.arg.as_deref(), Some("mode" | "follow_symlinks")) =>
+            {
+                Some(locator.slice(kw.range()))
+            }
+            _ => None,
         };
 
         let chmod_args = itertools::join(
