@@ -906,21 +906,14 @@ jobs:
         run: npm run fmt:check
         working-directory: playground
 
-  benchmarks-instrumented:
+  benchmarks-instrumented-ruff:
+    name: "benchmarks instrumented (ruff)"
     runs-on: ubuntu-24.04
     needs: determine_changes
     if: |
       github.ref == 'refs/heads/main' || 
-      (matrix.name == 'ruff' && (needs.determine_changes.outputs.formatter == 'true' || needs.determine_changes.outputs.linter == 'true')) ||
-      (matrix.name == 'ty' && needs.determine_changes.outputs.ty == 'true')
+      (needs.determine_changes.outputs.formatter == 'true' || needs.determine_changes.outputs.linter == 'true')
     timeout-minutes: 20
-    strategy:
-      matrix:
-        include:
-          - name: ruff
-            benchmarks: "formatter lexer linter parser"
-          - name: ty
-            benchmarks: "ty"
     steps:
       - name: "Checkout Branch"
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -939,7 +932,42 @@ jobs:
           tool: cargo-codspeed
 
       - name: "Build benchmarks"
-        run: cargo codspeed build --features "codspeed,instrumented" --no-default-features -p ruff_benchmark ${{matrix.benchmarks}}
+        run: cargo codspeed build --features "codspeed,instrumented" --no-default-features -p ruff_benchmark formatter lexer linter parser
+
+      - name: "Run benchmarks"
+        uses: CodSpeedHQ/action@653fdc30e6c40ffd9739e40c8a0576f4f4523ca1 # v4.0.1
+        with:
+          mode: instrumentation
+          run: cargo codspeed run
+          token: ${{ secrets.CODSPEED_TOKEN }}
+
+  benchmarks-instrumented-ty:
+    name: "benchmarks instrumented (ty)"
+    runs-on: ubuntu-24.04
+    needs: determine_changes
+    if: |
+      github.ref == 'refs/heads/main' || 
+      needs.determine_changes.outputs.ty == 'true'
+    timeout-minutes: 20
+    steps:
+      - name: "Checkout Branch"
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+
+      - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
+      - uses: astral-sh/setup-uv@b75a909f75acd358c2196fb9a5f1299a9a8868a4 # v6.7.0
+
+      - name: "Install Rust toolchain"
+        run: rustup show
+
+      - name: "Install codspeed"
+        uses: taiki-e/install-action@67cc679904bee382389bf22082124fa963c6f6bd # v2.61.3
+        with:
+          tool: cargo-codspeed
+
+      - name: "Build benchmarks"
+        run: cargo codspeed build --features "codspeed,instrumented" --no-default-features -p ruff_benchmark ty
 
       - name: "Run benchmarks"
         uses: CodSpeedHQ/action@653fdc30e6c40ffd9739e40c8a0576f4f4523ca1 # v4.0.1
