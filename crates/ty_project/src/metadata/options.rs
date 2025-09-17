@@ -286,7 +286,7 @@ impl Options {
             {
                 // If the `tests` directory exists and is not a package, include it as a source root.
                 tracing::debug!(
-                    "Including `./tests` in `environment.root` because a `./tests` directory exists"
+                    "Including `./tests` in `environment.root` because a `./tests` directory exists."
                 );
 
                 roots.push(tests_dir);
