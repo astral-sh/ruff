@@ -1443,7 +1443,11 @@ impl<'db> Type<'db> {
     /// intersection simplification dependent on the order in which elements are added), so we do
     /// not use this more general definition of subtyping.
     pub(crate) fn is_subtype_of(self, db: &'db dyn Db, target: Type<'db>) -> bool {
-        self.when_subtype_of(db, target).is_always_satisfied()
+        let valid_specializations =
+            (self.valid_specializations(db)).and(db, || target.valid_specializations(db));
+        valid_specializations
+            .implies(db, || self.when_subtype_of(db, target))
+            .is_always_satisfied()
     }
 
     /// Return the constraints under which this type is a [subtype of] type `target`. (See
@@ -1467,7 +1471,11 @@ impl<'db> Type<'db> {
     ///
     /// [assignable to]: https://typing.python.org/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation
     pub(crate) fn is_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
-        self.when_assignable_to(db, target).is_always_satisfied()
+        let valid_specializations =
+            (self.valid_specializations(db)).and(db, || target.valid_specializations(db));
+        valid_specializations
+            .implies(db, || self.when_assignable_to(db, target))
+            .is_always_satisfied()
     }
 
     /// Returns the constraints under which this type is [assignable to] type `target`.
