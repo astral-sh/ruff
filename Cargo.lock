@@ -3016,6 +3016,7 @@ dependencies = [
  "ruff_notebook",
  "ruff_python_ast",
  "ruff_python_codegen",
+ "ruff_python_importer",
  "ruff_python_index",
  "ruff_python_literal",
  "ruff_python_parser",
@@ -3164,6 +3165,21 @@ dependencies = [
  "static_assertions",
  "thiserror 2.0.16",
  "tracing",
+]
+
+[[package]]
+name = "ruff_python_importer"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "insta",
+ "ruff_diagnostics",
+ "ruff_python_ast",
+ "ruff_python_codegen",
+ "ruff_python_parser",
+ "ruff_python_trivia",
+ "ruff_source_file",
+ "ruff_text_size",
 ]
 
 [[package]]
@@ -4218,9 +4234,12 @@ dependencies = [
  "rayon",
  "regex",
  "ruff_db",
+ "ruff_diagnostics",
  "ruff_index",
  "ruff_memory_usage",
  "ruff_python_ast",
+ "ruff_python_codegen",
+ "ruff_python_importer",
  "ruff_python_parser",
  "ruff_python_trivia",
  "ruff_source_file",

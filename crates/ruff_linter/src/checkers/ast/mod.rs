@@ -277,7 +277,7 @@ impl<'a> Checker<'a> {
             locator,
             stylist,
             indexer,
-            importer: Importer::new(parsed, locator, stylist),
+            importer: Importer::new(parsed, locator.contents(), stylist),
             semantic,
             visit: deferred::Visit::default(),
             analyze: deferred::Analyze::default(),

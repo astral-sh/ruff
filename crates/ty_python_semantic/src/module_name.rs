@@ -273,7 +273,14 @@ impl ModuleName {
         std::iter::successors(Some(self.clone()), Self::parent)
     }
 
-    pub(crate) fn from_import_statement<'db>(
+    /// Extracts a module name from the AST of a `from <module> import ...`
+    /// statement.
+    ///
+    /// `importing_file` must be the [`File`] that contains the import
+    /// statement.
+    ///
+    /// This handles relative import statements.
+    pub fn from_import_statement<'db>(
         db: &'db dyn Db,
         importing_file: File,
         node: &'db ast::StmtImportFrom,
@@ -372,7 +379,7 @@ fn relative_module_name(
 /// Various ways in which resolving a [`ModuleName`]
 /// from an [`ast::StmtImport`] or [`ast::StmtImportFrom`] node might fail
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub(crate) enum ModuleNameResolutionError {
+pub enum ModuleNameResolutionError {
     /// The import statement has invalid syntax
     InvalidSyntax,
 

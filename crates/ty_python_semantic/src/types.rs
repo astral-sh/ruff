@@ -19,7 +19,8 @@ use ruff_text_size::{Ranged, TextRange};
 use type_ordering::union_or_intersection_elements_ordering;
 
 pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
-pub(crate) use self::cyclic::{CycleDetector, PairVisitor, TypeTransformer};
+pub use self::cyclic::CycleDetector;
+pub(crate) use self::cyclic::{PairVisitor, TypeTransformer};
 pub use self::diagnostic::TypeCheckDiagnostics;
 pub(crate) use self::diagnostic::register_lints;
 pub(crate) use self::infer::{
@@ -54,9 +55,10 @@ use crate::types::generics::{
     walk_partial_specialization, walk_specialization,
 };
 pub use crate::types::ide_support::{
-    CallSignatureDetails, Member, all_members, call_signature_details, definition_kind_for_name,
-    definitions_for_attribute, definitions_for_imported_symbol, definitions_for_keyword_argument,
-    definitions_for_name, find_active_signature_from_details, inlay_hint_function_argument_details,
+    CallSignatureDetails, Member, MemberWithDefinition, all_members, call_signature_details,
+    definition_kind_for_name, definitions_for_attribute, definitions_for_imported_symbol,
+    definitions_for_keyword_argument, definitions_for_name, find_active_signature_from_details,
+    inlay_hint_function_argument_details,
 };
 use crate::types::infer::infer_unpack_types;
 use crate::types::mro::{Mro, MroError, MroIterator};
@@ -9953,7 +9955,7 @@ impl<'db> TypeAliasType<'db> {
         }
     }
 
-    pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
+    pub fn value_type(self, db: &'db dyn Db) -> Type<'db> {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.value_type(db),
             TypeAliasType::ManualPEP695(type_alias) => type_alias.value(db),
