@@ -909,6 +909,10 @@ jobs:
   benchmarks-instrumented:
     runs-on: ubuntu-24.04
     needs: determine_changes
+    if: |
+      github.ref == 'refs/heads/main' || 
+      (matrix.name == 'ruff' && (needs.determine_changes.outputs.formatter == 'true' || needs.determine_changes.outputs.linter == 'true')) ||
+      (matrix.name == 'ty' && needs.determine_changes.outputs.ty == 'true')
     timeout-minutes: 20
     strategy:
       matrix:
@@ -934,31 +938,10 @@ jobs:
         with:
           tool: cargo-codspeed
 
-      - name: "Determine if benchmarks should run"
-        id: should_run
-        env:
-          GITHUB_REF: ${{ github.ref }}
-          MATRIX_NAME: ${{ matrix.name }}
-          FORMATTER_CHANGED: ${{ needs.determine_changes.outputs.formatter }}
-          LINTER_CHANGED: ${{ needs.determine_changes.outputs.linter }}
-          TY_CHANGED: ${{ needs.determine_changes.outputs.ty }}
-        run: |
-          if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-          elif [[ "${MATRIX_NAME}" == "ruff" && ("${FORMATTER_CHANGED}" == "true" || "${LINTER_CHANGED}" == "true") ]]; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-          elif [[ "${MATRIX_NAME}" == "ty" && "${TY_CHANGED}" == "true" ]]; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "run=false" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: "Build benchmarks"
-        if: ${{ steps.should_run.outputs.run == 'true' }}
         run: cargo codspeed build --features "codspeed,instrumented" --no-default-features -p ruff_benchmark ${{matrix.benchmarks}}
 
       - name: "Run benchmarks"
-        if: ${{ steps.should_run.outputs.run == 'true' }}
         uses: CodSpeedHQ/action@653fdc30e6c40ffd9739e40c8a0576f4f4523ca1 # v4.0.1
         with:
           mode: instrumentation
