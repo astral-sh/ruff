@@ -149,12 +149,12 @@ pub(crate) fn builtin_open(checker: &Checker, call: &ExprCall, segments: &[&str]
                 if expr.range() == file.range() || i == 6 || i == 7 {
                     None
                 } else {
-                    Some(locator.slice(expr.range()).to_string())
+                    Some(locator.slice(expr.range()))
                 }
             }
             ArgOrKeyword::Keyword(kw) => match kw.arg.as_deref() {
                 Some("mode" | "buffering" | "encoding" | "errors" | "newline") => {
-                    Some(locator.slice(kw).to_string())
+                    Some(locator.slice(kw))
                 }
                 _ => None,
             },
