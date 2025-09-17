@@ -2287,6 +2287,7 @@ class Base:
         return Sub()
 
 class Sub(Base):
+    # TODO invalid override error
     def flip(self) -> "Base":
         return Base()
 
