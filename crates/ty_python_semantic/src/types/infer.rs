@@ -628,10 +628,11 @@ impl<'db> ScopeInference<'db> {
         // 0th: Divergent
         // 1st: tuple[Divergent] | None
         // 2nd: tuple[tuple[Divergent] | None] | None => tuple[Divergent] | None
-        let previous_cycle_value = callee_ty.infer_return_type(db).unwrap();
-        // In fixed-point iteration of return type inference, the return type must be monotonically widened and not "oscillate".
-        // Here, monotonicity is guaranteed by pre-unioning the type of the previous iteration into the current result.
-        union = union.add(previous_cycle_value.recursive_type_normalized(db, &visitor));
+        if let Some(previous_cycle_value) = callee_ty.infer_return_type(db) {
+            // In fixed-point iteration of return type inference, the return type must be monotonically widened and not "oscillate".
+            // Here, monotonicity is guaranteed by pre-unioning the type of the previous iteration into the current result.
+            union = union.add(previous_cycle_value.recursive_type_normalized(db, &visitor));
+        }
 
         let Some(extra) = &self.extra else {
             unreachable!(
