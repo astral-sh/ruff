@@ -203,7 +203,13 @@ pub(crate) fn has_unknown_keywords_or_starred_expr(
     })
 }
 
-pub(crate) fn is_optional_bool_literal(args: &Arguments, name: &str, pos: usize) -> bool {
-    args.find_argument_value(name, pos)
-        .is_none_or(Expr::is_boolean_literal_expr)
+/// Returns `true` if argument `name` is set to a non-default `None` value.
+pub(crate) fn is_argument_non_default(
+    arguments: &Arguments,
+    name: &str,
+    position: usize,
+) -> bool {
+    arguments
+        .find_argument_value(name, position)
+        .is_some_and(|expr| !expr.is_none_literal_expr())
 }
