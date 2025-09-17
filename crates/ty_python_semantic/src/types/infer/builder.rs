@@ -73,13 +73,13 @@ use crate::types::diagnostic::{
 use crate::types::function::{
     FunctionDecorators, FunctionLiteral, FunctionType, KnownFunction, OverloadLiteral,
 };
-use crate::types::generics::LegacyGenericBase;
 use crate::types::generics::{GenericContext, bind_typevar};
+use crate::types::generics::{LegacyGenericBase, SpecializationBuilder};
 use crate::types::instance::SliceLiteral;
 use crate::types::mro::MroErrorKind;
 use crate::types::signatures::Signature;
 use crate::types::subclass_of::SubclassOfInner;
-use crate::types::tuple::{Tuple, TupleSpec, TupleType};
+use crate::types::tuple::{Tuple, TupleLength, TupleSpec, TupleType};
 use crate::types::typed_dict::{
     TypedDictAssignmentKind, validate_typed_dict_constructor, validate_typed_dict_dict_literal,
     validate_typed_dict_key_assignment,
@@ -90,8 +90,9 @@ use crate::types::{
     IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, MemberLookupPolicy,
     MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm, Parameters, SpecialFormType,
     SubclassOfType, TrackedConstraintSet, Truthiness, Type, TypeAliasType, TypeAndQualifiers,
-    TypeContext, TypeQualifiers, TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation,
-    TypeVarInstance, TypeVarKind, UnionBuilder, UnionType, binding_type, todo_type,
+    TypeContext, TypeMapping, TypeQualifiers, TypeVarBoundOrConstraintsEvaluation,
+    TypeVarDefaultEvaluation, TypeVarInstance, TypeVarKind, UnionBuilder, UnionType, binding_type,
+    todo_type,
 };
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::{EvaluationMode, UnpackPosition};
@@ -4008,7 +4009,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if let Some(value) = value {
                 self.infer_maybe_standalone_expression(
                     value,
-                    TypeContext::new(annotated.inner_type()),
+                    TypeContext::new(Some(annotated.inner_type())),
                 );
             }
 
@@ -4101,8 +4102,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         debug_assert!(PlaceExpr::try_from_expr(target).is_some());
 
         if let Some(value) = value {
-            let inferred_ty = self
-                .infer_maybe_standalone_expression(value, TypeContext::new(declared.inner_type()));
+            let inferred_ty = self.infer_maybe_standalone_expression(
+                value,
+                TypeContext::new(Some(declared.inner_type())),
+            );
             let mut inferred_ty = if target
                 .as_name_expr()
                 .is_some_and(|name| &name.id == "TYPE_CHECKING")
@@ -5236,7 +5239,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_tuple_expression(
         &mut self,
         tuple: &ast::ExprTuple,
-        _tcx: TypeContext<'db>,
+        tcx: TypeContext<'db>,
     ) -> Type<'db> {
         let ast::ExprTuple {
             range: _,
@@ -5246,11 +5249,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             parenthesized: _,
         } = tuple;
 
+        let annotated_tuple = tcx
+            .known_specialization(KnownClass::Tuple, self.db())
+            .and_then(|specialization| {
+                specialization
+                    .tuple(self.db())
+                    .expect("the specialization of `KnownClass::Tuple` must have a tuple spec")
+                    .resize(self.db(), TupleLength::Fixed(elts.len()))
+                    .ok()
+            });
+
+        let mut annotated_elt_tys = annotated_tuple.as_ref().map(Tuple::all_elements);
+
         let db = self.db();
         let divergent = Type::divergent(self.scope());
         let element_types = elts.iter().map(|element| {
-            // TODO: Use the type context for more precise inference.
-            let element_type = self.infer_expression(element, TypeContext::default());
+            let annotated_elt_ty = annotated_elt_tys.as_mut().and_then(Iterator::next).copied();
+            let element_type = self.infer_expression(element, TypeContext::new(annotated_elt_ty));
+
             if element_type.has_divergent_type(self.db(), divergent) {
                 divergent
             } else {
@@ -5261,7 +5277,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         Type::heterogeneous_tuple(db, element_types)
     }
 
-    fn infer_list_expression(&mut self, list: &ast::ExprList, _tcx: TypeContext<'db>) -> Type<'db> {
+    fn infer_list_expression(&mut self, list: &ast::ExprList, tcx: TypeContext<'db>) -> Type<'db> {
         let ast::ExprList {
             range: _,
             node_index: _,
@@ -5269,28 +5285,102 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ctx: _,
         } = list;
 
-        // TODO: Use the type context for more precise inference.
-        for elt in elts {
-            self.infer_expression(elt, TypeContext::default());
-        }
-
-        KnownClass::List
-            .to_specialized_instance(self.db(), [todo_type!("list literal element type")])
+        self.infer_collection_literal(elts, tcx, KnownClass::List)
+            .unwrap_or_else(|| {
+                KnownClass::List.to_specialized_instance(self.db(), [Type::unknown()])
+            })
     }
 
-    fn infer_set_expression(&mut self, set: &ast::ExprSet, _tcx: TypeContext<'db>) -> Type<'db> {
+    fn infer_set_expression(&mut self, set: &ast::ExprSet, tcx: TypeContext<'db>) -> Type<'db> {
         let ast::ExprSet {
             range: _,
             node_index: _,
             elts,
         } = set;
 
-        // TODO: Use the type context for more precise inference.
-        for elt in elts {
-            self.infer_expression(elt, TypeContext::default());
+        self.infer_collection_literal(elts, tcx, KnownClass::Set)
+            .unwrap_or_else(|| {
+                KnownClass::Set.to_specialized_instance(self.db(), [Type::unknown()])
+            })
+    }
+
+    // Infer the type of a collection literal expression.
+    fn infer_collection_literal(
+        &mut self,
+        elts: &[ast::Expr],
+        tcx: TypeContext<'db>,
+        collection_class: KnownClass,
+    ) -> Option<Type<'db>> {
+        // Extract the type variable `T` from `list[T]` in typeshed.
+        fn elts_ty(
+            collection_class: KnownClass,
+            db: &dyn Db,
+        ) -> Option<(ClassLiteral<'_>, Type<'_>)> {
+            let class_literal = collection_class.try_to_class_literal(db)?;
+            let generic_context = class_literal.generic_context(db)?;
+            let variables = generic_context.variables(db);
+            let elts_ty = variables.iter().exactly_one().ok()?;
+            Some((class_literal, Type::TypeVar(*elts_ty)))
         }
 
-        KnownClass::Set.to_specialized_instance(self.db(), [todo_type!("set literal element type")])
+        let annotated_elts_ty = tcx
+            .known_specialization(collection_class, self.db())
+            .and_then(|specialization| specialization.types(self.db()).iter().exactly_one().ok())
+            .copied();
+
+        let (class_literal, elts_ty) = elts_ty(collection_class, self.db()).unwrap_or_else(|| {
+            let name = collection_class.name(self.db());
+            panic!("Typeshed should always have a `{name}` class in `builtins.pyi` with a single type variable")
+        });
+
+        let mut elements_are_assignable = true;
+        let mut inferred_elt_tys = Vec::with_capacity(elts.len());
+
+        // Infer the type of each element in the collection literal.
+        for elt in elts {
+            let inferred_elt_ty = self.infer_expression(elt, TypeContext::new(annotated_elts_ty));
+            inferred_elt_tys.push(inferred_elt_ty);
+
+            if let Some(annotated_elts_ty) = annotated_elts_ty {
+                elements_are_assignable &=
+                    inferred_elt_ty.is_assignable_to(self.db(), annotated_elts_ty);
+            }
+        }
+
+        // Create a set of constraints to infer a precise type for `T`.
+        let mut builder = SpecializationBuilder::new(self.db());
+
+        match annotated_elts_ty {
+            // If the inferred type of any element is not assignable to the type annotation, we
+            // ignore it, as to provide a more precise error message.
+            Some(_) if !elements_are_assignable => {}
+
+            // Otherwise, the annotated type acts as a constraint for `T`.
+            //
+            // Note that we infer the annotated type _before_ the elements, to closer match the order
+            // of any unions written in the type annotation.
+            Some(annotated_elts_ty) => {
+                builder.infer(elts_ty, annotated_elts_ty).ok()?;
+            }
+
+            // If a valid type annotation was not provided, avoid restricting the type of the collection
+            // by unioning the inferred type with `Unknown`.
+            None => builder.infer(elts_ty, Type::unknown()).ok()?,
+        }
+
+        // The inferred type of each element acts as an additional constraint on `T`.
+        for inferred_elt_ty in inferred_elt_tys {
+            // Convert any element literals to their promoted type form to avoid excessively large
+            // unions for large nested list literals, which the constraint solver struggles with.
+            let inferred_elt_ty =
+                inferred_elt_ty.apply_type_mapping(self.db(), &TypeMapping::PromoteLiterals);
+            builder.infer(elts_ty, inferred_elt_ty).ok()?;
+        }
+
+        let class_type = class_literal
+            .apply_specialization(self.db(), |generic_context| builder.build(generic_context));
+
+        Type::from(class_type).to_instance(self.db())
     }
 
     fn infer_dict_expression(&mut self, dict: &ast::ExprDict, _tcx: TypeContext<'db>) -> Type<'db> {
@@ -5314,6 +5404,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ],
         )
     }
+
     /// Infer the type of the `iter` expression of the first comprehension.
     fn infer_first_comprehension_iter(&mut self, comprehensions: &[ast::Comprehension]) {
         let mut comprehensions_iter = comprehensions.iter();

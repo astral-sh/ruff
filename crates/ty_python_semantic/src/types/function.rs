@@ -1081,15 +1081,12 @@ fn is_instance_truthiness<'db>(
         | Type::StringLiteral(..)
         | Type::LiteralString
         | Type::ModuleLiteral(..)
-        | Type::EnumLiteral(..) => always_true_if(
+        | Type::EnumLiteral(..)
+        | Type::FunctionLiteral(..) => always_true_if(
             ty.literal_fallback_instance(db)
                 .as_ref()
                 .is_some_and(is_instance),
         ),
-
-        Type::FunctionLiteral(..) => {
-            always_true_if(is_instance(&KnownClass::FunctionType.to_instance(db)))
-        }
 
         Type::ClassLiteral(..) => always_true_if(is_instance(&KnownClass::Type.to_instance(db))),
 

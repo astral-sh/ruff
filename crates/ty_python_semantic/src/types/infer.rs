@@ -49,8 +49,9 @@ use crate::semantic_index::expression::Expression;
 use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{SemanticIndex, semantic_index};
 use crate::types::diagnostic::TypeCheckDiagnostics;
+use crate::types::generics::Specialization;
 use crate::types::unpacker::{UnpackResult, Unpacker};
-use crate::types::{ClassLiteral, Truthiness, Type, TypeAndQualifiers};
+use crate::types::{ClassLiteral, KnownClass, Truthiness, Type, TypeAndQualifiers};
 use crate::unpack::Unpack;
 use builder::TypeInferenceBuilder;
 
@@ -355,10 +356,31 @@ pub(crate) struct TypeContext<'db> {
 }
 
 impl<'db> TypeContext<'db> {
-    pub(crate) fn new(annotation: Type<'db>) -> Self {
-        Self {
-            annotation: Some(annotation),
+    pub(crate) fn new(annotation: Option<Type<'db>>) -> Self {
+        Self { annotation }
+    }
+
+    // If the type annotation is a specialized instance of the given `KnownClass`, returns the
+    // specialization.
+    fn known_specialization(
+        &self,
+        known_class: KnownClass,
+        db: &'db dyn Db,
+    ) -> Option<Specialization<'db>> {
+        let class_type = match self.annotation? {
+            Type::NominalInstance(instance) => instance,
+            Type::TypeAlias(alias) => alias.value_type(db).into_nominal_instance()?,
+            _ => return None,
         }
+        .class(db);
+
+        if !class_type.is_known(db, known_class) {
+            return None;
+        }
+
+        class_type
+            .into_generic_alias()
+            .map(|generic_alias| generic_alias.specialization(db))
     }
 }
 
