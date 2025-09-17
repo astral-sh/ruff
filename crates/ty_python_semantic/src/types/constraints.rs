@@ -261,7 +261,7 @@ impl<'db> ConstraintSet<'db> {
     ) -> Self {
         let lower = lower.bottom_materialization(db);
         let upper = upper.top_materialization(db);
-        let constraint = Constraint::range(db, lower, upper).constrain(typevar);
+        let constraint = Constraint::range(db, lower, upper).constrain(db, typevar);
         let mut result = Self::never();
         result.union_constraint(db, constraint);
         result
@@ -275,7 +275,7 @@ impl<'db> ConstraintSet<'db> {
     ) -> Self {
         let lower = lower.bottom_materialization(db);
         let upper = upper.top_materialization(db);
-        let constraint = Constraint::negated_range(db, lower, upper).constrain(typevar);
+        let constraint = Constraint::negated_range(db, lower, upper).constrain(db, typevar);
         let mut result = Self::never();
         result.union_constraint(db, constraint);
         result
@@ -481,7 +481,7 @@ impl<'db> ConstraintClause<'db> {
         let mut existing_constraints = std::mem::take(&mut self.constraints).into_iter();
         for existing in existing_constraints.by_ref() {
             // Try to simplify the new constraint against an existing constraint.
-            match existing.intersect(db, &constraint) {
+            match existing.intersect(db, constraint) {
                 Some(Satisfiable::Never) => {
                     // If two constraints cancel out to 0, that makes the entire clause 0, and all
                     // existing constraints are simplified away.
@@ -501,7 +501,7 @@ impl<'db> ConstraintClause<'db> {
                     // We couldn't simplify the new constraint relative to this existing
                     // constraint, so add the existing constraint to the result. Continue trying to
                     // simplify the new constraint against the later existing constraints.
-                    self.constraints.push(existing.clone());
+                    self.constraints.push(existing);
                 }
 
                 Some(Satisfiable::Constrained(simplified)) => {
@@ -525,7 +525,7 @@ impl<'db> ConstraintClause<'db> {
         // Add each `other` constraint in turn. Short-circuit if the result ever becomes 0.
         let mut result = self.clone();
         for constraint in &other.constraints {
-            match result.intersect_constraint(db, Satisfiable::Constrained(constraint.clone())) {
+            match result.intersect_constraint(db, Satisfiable::Constrained(*constraint)) {
                 Satisfiable::Never => return Satisfiable::Never,
                 Satisfiable::Always | Satisfiable::Constrained(()) => {}
             }
@@ -647,7 +647,7 @@ impl<'db> ConstraintClause<'db> {
         }
 
         let pairwise = (self.constraints.iter())
-            .merge_join_by(&other.constraints, |a, b| a.typevar.cmp(&b.typevar));
+            .merge_join_by(&other.constraints, |a, b| a.typevar(db).cmp(&b.typevar(db)));
         for pair in pairwise {
             match pair {
                 // `other` contains a constraint whose typevar doesn't appear in `self`, so `self`
@@ -661,7 +661,7 @@ impl<'db> ConstraintClause<'db> {
                 // Both clauses contain a constraint with this typevar; verify that the constraint
                 // in `self` is smaller.
                 EitherOrBoth::Both(self_constraint, other_constraint) => {
-                    if !self_constraint.subsumes(db, other_constraint) {
+                    if !self_constraint.subsumes(db, *other_constraint) {
                         return false;
                     }
                 }
@@ -705,7 +705,7 @@ impl<'db> ConstraintClause<'db> {
         // simplify.
         let mut simplified_index = None;
         let pairwise = (self.constraints.iter())
-            .merge_join_by(&other.constraints, |a, b| a.typevar.cmp(&b.typevar));
+            .merge_join_by(&other.constraints, |a, b| a.typevar(db).cmp(&b.typevar(db)));
         for (index, pair) in pairwise.enumerate() {
             match pair {
                 // If either clause contains a constraint whose typevar doesn't appear in the
@@ -717,7 +717,7 @@ impl<'db> ConstraintClause<'db> {
                         continue;
                     }
                     let Some(union_constraint) =
-                        self_constraint.simplified_union(db, other_constraint)
+                        self_constraint.simplified_union(db, *other_constraint)
                     else {
                         // The constraints for this typevar are not identical, nor do they
                         // simplify.
@@ -790,7 +790,7 @@ impl<'db> ConstraintClause<'db> {
                 }
 
                 let clause_count: usize = (self.clause.constraints.iter())
-                    .map(ConstrainedTypeVar::clause_count)
+                    .map(|constraint| constraint.clause_count(self.db))
                     .sum();
                 if clause_count > 1 {
                     f.write_str("(")?;
@@ -812,60 +812,70 @@ impl<'db> ConstraintClause<'db> {
     }
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub(crate) struct ConstrainedTypeVar<'db> {
     typevar: BoundTypeVarInstance<'db>,
+    #[returns(ref)]
     constraint: Constraint<'db>,
 }
 
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for ConstrainedTypeVar<'_> {}
+
+#[salsa::tracked]
 impl<'db> ConstrainedTypeVar<'db> {
-    fn clause_count(&self) -> usize {
-        self.constraint.clause_count()
+    fn clause_count(self, db: &'db dyn Db) -> usize {
+        self.constraint(db).clause_count()
     }
 
     /// Returns the intersection of this individual constraint and another, or `None` if the two
     /// constraints do not refer to the same typevar (and therefore cannot be simplified to a
     /// single constraint).
-    fn intersect(&self, db: &'db dyn Db, other: &Self) -> Option<Satisfiable<Self>> {
-        if self.typevar != other.typevar {
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    fn intersect(self, db: &'db dyn Db, other: Self) -> Option<Satisfiable<Self>> {
+        if self.typevar(db) != other.typevar(db) {
             return None;
         }
         Some(
-            self.constraint
-                .intersect(db, &other.constraint)
-                .map(|constraint| constraint.constrain(self.typevar)),
+            self.constraint(db)
+                .intersect(db, other.constraint(db))
+                .map(|constraint| constraint.constrain(db, self.typevar(db))),
         )
     }
 
     /// Returns the union of this individual constraint and another, if it can be simplified to a
     /// union of two constraints or fewer. Returns `None` if the union cannot be simplified that
     /// much.
-    fn simplified_union(&self, db: &'db dyn Db, other: &Self) -> Option<Simplifiable<Self>> {
-        if self.typevar != other.typevar {
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    fn simplified_union(self, db: &'db dyn Db, other: Self) -> Option<Simplifiable<Self>> {
+        if self.typevar(db) != other.typevar(db) {
             return None;
         }
-        self.constraint
-            .simplified_union(db, &other.constraint)
-            .map(|constraint| constraint.map(|constraint| constraint.constrain(self.typevar)))
+        self.constraint(db)
+            .simplified_union(db, other.constraint(db))
+            .map(|constraint| {
+                constraint.map(|constraint| constraint.constrain(db, self.typevar(db)))
+            })
     }
 
     /// Adds the negation of this individual constraint to a constraint set.
-    fn negate_into(&self, db: &'db dyn Db, set: &mut ConstraintSet<'db>) {
-        self.constraint.negate_into(db, self.typevar, set);
+    fn negate_into(self, db: &'db dyn Db, set: &mut ConstraintSet<'db>) {
+        self.constraint(db).negate_into(db, self.typevar(db), set);
     }
 
     /// Returns whether `self` has tighter bounds than `other` — that is, if the intersection of
     /// `self` and `other` is `self`.
-    fn subsumes(&self, db: &'db dyn Db, other: &Self) -> bool {
-        debug_assert_eq!(self.typevar, other.typevar);
+    fn subsumes(self, db: &'db dyn Db, other: Self) -> bool {
+        debug_assert_eq!(self.typevar(db), other.typevar(db));
         match self.intersect(db, other) {
-            Some(Satisfiable::Constrained(intersection)) => intersection == *self,
+            Some(Satisfiable::Constrained(intersection)) => intersection == self,
             _ => false,
         }
     }
 
-    fn display(&self, db: &'db dyn Db) -> impl Display {
-        self.constraint.display(db, self.typevar.display(db))
+    fn display(self, db: &'db dyn Db) -> impl Display {
+        self.constraint(db)
+            .display(db, self.typevar(db).display(db))
     }
 }
 
@@ -876,11 +886,12 @@ pub(crate) struct Constraint<'db> {
 }
 
 impl<'db> Constraint<'db> {
-    fn constrain(self, typevar: BoundTypeVarInstance<'db>) -> ConstrainedTypeVar<'db> {
-        ConstrainedTypeVar {
-            typevar,
-            constraint: self,
-        }
+    fn constrain(
+        self,
+        db: &'db dyn Db,
+        typevar: BoundTypeVarInstance<'db>,
+    ) -> ConstrainedTypeVar<'db> {
+        ConstrainedTypeVar::new(db, typevar, self)
     }
 
     fn clause_count(&self) -> usize {
@@ -1116,13 +1127,14 @@ impl<'db> Constraint<'db> {
         for negative in &self.negative {
             set.union_constraint(
                 db,
-                Constraint::range(db, negative.hole.lower, negative.hole.upper).constrain(typevar),
+                Constraint::range(db, negative.hole.lower, negative.hole.upper)
+                    .constrain(db, typevar),
             );
         }
         set.union_constraint(
             db,
             Constraint::negated_range(db, self.positive.lower, self.positive.upper)
-                .constrain(typevar),
+                .constrain(db, typevar),
         );
     }
 
@@ -1163,8 +1175,12 @@ impl<'db> Constraint<'db> {
 }
 
 impl<'db> Satisfiable<Constraint<'db>> {
-    fn constrain(self, typevar: BoundTypeVarInstance<'db>) -> Satisfiable<ConstrainedTypeVar<'db>> {
-        self.map(|constraint| constraint.constrain(typevar))
+    fn constrain(
+        self,
+        db: &'db dyn Db,
+        typevar: BoundTypeVarInstance<'db>,
+    ) -> Satisfiable<ConstrainedTypeVar<'db>> {
+        self.map(|constraint| constraint.constrain(db, typevar))
     }
 }
 
@@ -1430,15 +1446,15 @@ impl<'db> NegatedRangeConstraint<'db> {
 
 /// Wraps a constraint (or clause, or set), while using distinct variants to represent when the
 /// constraint is never satisfiable or always satisfiable.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum Satisfiable<T> {
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
+enum Satisfiable<T: salsa::Update> {
     Never,
     Always,
     Constrained(T),
 }
 
-impl<T> Satisfiable<T> {
-    fn map<U>(self, f: impl FnOnce(T) -> U) -> Satisfiable<U> {
+impl<T: salsa::Update> Satisfiable<T> {
+    fn map<U: salsa::Update>(self, f: impl FnOnce(T) -> U) -> Satisfiable<U> {
         match self {
             Satisfiable::Never => Satisfiable::Never,
             Satisfiable::Always => Satisfiable::Always,
@@ -1450,15 +1466,15 @@ impl<T> Satisfiable<T> {
 /// The result of trying to simplify two constraints (or clauses, or sets). Like [`Satisfiable`],
 /// we use distinct variants to represent when the simplification is never satisfiable or always
 /// satisfiable.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum Simplifiable<T> {
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
+pub(crate) enum Simplifiable<T: salsa::Update> {
     NeverSatisfiable,
     AlwaysSatisfiable,
     Simplified(T),
     NotSimplified(T, T),
 }
 
-impl<T> Simplifiable<T> {
+impl<T: salsa::Update> Simplifiable<T> {
     fn from_one(constraint: Satisfiable<T>) -> Self {
         match constraint {
             Satisfiable::Never => Simplifiable::NeverSatisfiable,
@@ -1466,9 +1482,7 @@ impl<T> Simplifiable<T> {
             Satisfiable::Constrained(constraint) => Simplifiable::Simplified(constraint),
         }
     }
-}
 
-impl<T> Simplifiable<T> {
     fn from_union(first: Satisfiable<T>, second: Satisfiable<T>) -> Self {
         match (first, second) {
             (Satisfiable::Always, _) | (_, Satisfiable::Always) => Simplifiable::AlwaysSatisfiable,
@@ -1483,7 +1497,7 @@ impl<T> Simplifiable<T> {
         }
     }
 
-    fn map<U>(self, mut f: impl FnMut(T) -> U) -> Simplifiable<U> {
+    fn map<U: salsa::Update>(self, mut f: impl FnMut(T) -> U) -> Simplifiable<U> {
         match self {
             Simplifiable::NeverSatisfiable => Simplifiable::NeverSatisfiable,
             Simplifiable::AlwaysSatisfiable => Simplifiable::AlwaysSatisfiable,
