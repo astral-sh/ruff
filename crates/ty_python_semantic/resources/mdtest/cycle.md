@@ -28,10 +28,8 @@ class Point:
         self.x, self.y = other.x, other.y
 
 p = Point()
-# TODO: should be `Unknown | int`
-reveal_type(p.x)  # revealed: Unknown | int | Divergent
-# TODO: should be `Unknown | int`
-reveal_type(p.y)  # revealed: Unknown | int | Divergent
+reveal_type(p.x)  # revealed: Unknown | int
+reveal_type(p.y)  # revealed: Unknown | int
 ```
 
 ## Self-referential bare type alias

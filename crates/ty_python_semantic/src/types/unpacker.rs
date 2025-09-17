@@ -53,8 +53,15 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
         );
 
         let input = InferExpression::new(self.db(), value.expression(), TypeContext::default());
-        let value_type = infer_expression_types_impl(self.db(), input)
-            .expression_type(value.expression().node_ref(self.db(), self.module()));
+        let inference = infer_expression_types_impl(self.db(), input);
+        let value_type = if let Some(cycle_recovery) = inference.fallback_type() {
+            let visitor = RecursiveTypeNormalizedVisitor::new(cycle_recovery);
+            inference
+                .expression_type(value.expression().node_ref(self.db(), self.module()))
+                .recursive_type_normalized(self.db(), &visitor)
+        } else {
+            inference.expression_type(value.expression().node_ref(self.db(), self.module()))
+        };
 
         let value_type = match value.kind() {
             UnpackKind::Assign => {
