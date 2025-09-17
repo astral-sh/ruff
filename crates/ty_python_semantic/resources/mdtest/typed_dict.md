@@ -629,15 +629,13 @@ alice: Employee = {"name": "Alice", "employee_id": 1}
 eve: Employee = {"name": "Eve"}
 
 def combine(p: Person, e: Employee):
-    # TODO: Should be `Person` once we support the implicit type of self
-    reveal_type(p.copy())  # revealed: Unknown
-    # TODO: Should be `Employee` once we support the implicit type of self
-    reveal_type(e.copy())  # revealed: Unknown
+    reveal_type(p.copy())  # revealed: Person
+    reveal_type(e.copy())  # revealed: Employee
 
     reveal_type(p | p)  # revealed: Person
     reveal_type(e | e)  # revealed: Employee
 
-    # TODO: Should be `Person` once we support the implicit type of self and subtyping for TypedDicts
+    # TODO: Should be `Person` once we support subtyping for TypedDicts
     reveal_type(p | e)  # revealed: Employee
 ```
 

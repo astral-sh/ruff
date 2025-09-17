@@ -513,6 +513,5 @@ class C:
 def _(x: int):
     reveal_type(C().explicit_self(x))  # revealed: tuple[C, int]
 
-    # TODO: this should be `tuple[C, int]` as well, once we support implicit `self`
-    reveal_type(C().implicit_self(x))  # revealed: tuple[Unknown, int]
+    reveal_type(C().implicit_self(x))  # revealed: tuple[C, int]
 ```
