@@ -594,7 +594,7 @@ impl<'db> FunctionLiteral<'db> {
         self.last_definition(db).spans(db)
     }
 
-    #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(ref), cycle_fn=overloads_and_implementation_cycle_recover, cycle_initial=overloads_and_implementation_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     fn overloads_and_implementation(
         self,
         db: &'db dyn Db,
@@ -711,6 +711,22 @@ impl<'db> FunctionLiteral<'db> {
             .map(|ctx| ctx.recursive_type_normalized(db, visitor));
         Self::new(db, self.last_definition(db), context)
     }
+}
+
+fn overloads_and_implementation_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &(Box<[OverloadLiteral<'db>]>, Option<OverloadLiteral<'db>>),
+    _count: u32,
+    _function: FunctionLiteral<'db>,
+) -> salsa::CycleRecoveryAction<(Box<[OverloadLiteral<'db>]>, Option<OverloadLiteral<'db>>)> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn overloads_and_implementation_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _function: FunctionLiteral<'db>,
+) -> (Box<[OverloadLiteral<'db>]>, Option<OverloadLiteral<'db>>) {
+    (Box::new([]), None)
 }
 
 /// Represents a function type, which might be a non-generic function, or a specialization of a
