@@ -351,3 +351,12 @@ def f(x: A):
     for item in x:
         reveal_type(item)  # revealed: list[A | str | None] | str | None
 ```
+
+### Tuple comparison
+
+```py
+type X = tuple[X, int]
+
+def _(x: X):
+    reveal_type(x is x)  # revealed: bool
+```
