@@ -128,10 +128,7 @@ pub(crate) fn os_chmod(checker: &Checker, call: &ExprCall, segments: &[&str]) {
                 }
             }
             ArgOrKeyword::Keyword(kw) => match kw.arg.as_deref() {
-                Some("mode") => Some(format!("mode={}", locator.slice(&kw.value))),
-                Some("follow_symlinks") => {
-                    Some(format!("follow_symlinks={}", locator.slice(&kw.value)))
-                }
+                Some("mode" | "follow_symlinks") => locator.slice(kw),
                 _ => None,
             },
         };
