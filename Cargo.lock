@@ -4234,6 +4234,7 @@ dependencies = [
  "rayon",
  "regex",
  "ruff_db",
+ "ruff_diagnostics",
  "ruff_index",
  "ruff_memory_usage",
  "ruff_python_ast",

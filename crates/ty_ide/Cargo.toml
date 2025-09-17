@@ -13,6 +13,7 @@ license = { workspace = true }
 [dependencies]
 bitflags = { workspace = true }
 ruff_db = { workspace = true }
+ruff_diagnostics = { workspace = true }
 ruff_index = { workspace = true }
 ruff_memory_usage = { workspace = true }
 ruff_python_ast = { workspace = true }
