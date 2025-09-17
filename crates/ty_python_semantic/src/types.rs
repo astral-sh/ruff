@@ -1137,7 +1137,7 @@ impl<'db> Type<'db> {
     /// If this type is a literal, promote it to a type that this literal is an instance of.
     ///
     /// Note that this function tries to promote literals to a more user-friendly form than their
-    /// fallback instance type. For example, `def _() -> int` is promoted to a `Callable[[], int]`
+    /// fallback instance type. For example, `def _() -> int` is promoted to `Callable[[], int]`,
     /// as opposed to `FunctionType`.
     pub(crate) fn literal_promotion_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {

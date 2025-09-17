@@ -129,6 +129,16 @@ type IntList = list[int]
 
 m: IntList = [1, 2, 3]
 reveal_type(m)  # revealed: list[int]
+
+# TODO: this should type-check and avoid literal promotion
+# error: [invalid-assignment] "Object of type `list[int]` is not assignable to `list[Literal[1, 2, 3]]`"
+n: list[typing.Literal[1, 2, 3]] = [1, 2, 3]
+reveal_type(n)  # revealed: list[Literal[1, 2, 3]]
+
+# TODO: this should type-check and avoid literal promotion
+# error: [invalid-assignment] "Object of type `list[str]` is not assignable to `list[LiteralString]`"
+o: list[typing.LiteralString] = ["a", "b", "c"]
+reveal_type(o)  # revealed: list[LiteralString]
 ```
 
 ## Incorrect collection literal assignments are complained aobut
