@@ -249,6 +249,8 @@ class C[T]():
         def b(x: Self):
             reveal_type(x)  # revealed: Self@f
         reveal_type(generic_context(b))  # revealed: None
+
+reveal_type(generic_context(C.f))  # revealed: tuple[Self@f]
 ```
 
 Even if the `Self` annotation appears first in the nested function, it is the method that binds
@@ -263,6 +265,8 @@ class C:
         def b(x: Self):
             reveal_type(x)  # revealed: Self@f
         reveal_type(generic_context(b))  # revealed: None
+
+reveal_type(generic_context(C.f))  # revealed: None
 ```
 
 [self attribute]: https://typing.python.org/en/latest/spec/generics.html#use-in-attribute-annotations
