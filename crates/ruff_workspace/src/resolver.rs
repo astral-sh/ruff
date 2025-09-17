@@ -427,7 +427,7 @@ impl From<ConfigurationOrigin> for Relativity {
     }
 }
 
-/// Find all Python (`.py`, `.pyi` and `.ipynb` files) in a set of paths.
+/// Find all Python (`.py`, `.pyi`, `.pyw`, and `.ipynb` files) in a set of paths.
 pub fn python_files_in_path<'a>(
     paths: &[PathBuf],
     pyproject_config: &'a PyprojectConfig,
