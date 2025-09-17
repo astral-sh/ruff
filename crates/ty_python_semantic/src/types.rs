@@ -3779,6 +3779,29 @@ impl<'db> Type<'db> {
                     .member_lookup_with_policy(db, name.clone(), policy)
             }
 
+            Type::EnumLiteral(enum_literal)
+                if matches!(name_str, "name" | "_name_")
+                    && Type::ClassLiteral(enum_literal.enum_class(db))
+                        .is_subtype_of(db, KnownClass::Enum.to_subclass_of(db)) =>
+            {
+                Place::bound(Type::StringLiteral(StringLiteralType::new(
+                    db,
+                    enum_literal.name(db).as_str(),
+                )))
+                .into()
+            }
+
+            Type::EnumLiteral(enum_literal)
+                if matches!(name_str, "value" | "_value_")
+                    && Type::ClassLiteral(enum_literal.enum_class(db))
+                        .is_subtype_of(db, KnownClass::Enum.to_subclass_of(db)) =>
+            {
+                enum_metadata(db, enum_literal.enum_class(db))
+                    .and_then(|metadata| metadata.members.get(enum_literal.name(db)))
+                    .map_or_else(|| Place::Unbound, Place::bound)
+                    .into()
+            }
+
             Type::NominalInstance(..)
             | Type::ProtocolInstance(..)
             | Type::BooleanLiteral(..)
@@ -4332,56 +4355,26 @@ impl<'db> Type<'db> {
                 )
                 .into(),
 
-                Some(KnownFunction::RangeConstraint) => Binding::single(
-                    self,
-                    Signature::new(
-                        Parameters::new([
-                            Parameter::positional_only(Some(Name::new_static("lower_bound")))
-                                .type_form()
-                                .with_annotated_type(Type::any()),
-                            Parameter::positional_only(Some(Name::new_static("typevar")))
-                                .type_form()
-                                .with_annotated_type(Type::any()),
-                            Parameter::positional_only(Some(Name::new_static("upper_bound")))
-                                .type_form()
-                                .with_annotated_type(Type::any()),
-                        ]),
-                        Some(KnownClass::ConstraintSet.to_instance(db)),
-                    ),
-                )
-                .into(),
-
-                Some(KnownFunction::NotEquivalentConstraint) => Binding::single(
-                    self,
-                    Signature::new(
-                        Parameters::new([
-                            Parameter::positional_only(Some(Name::new_static("typevar")))
-                                .type_form()
-                                .with_annotated_type(Type::any()),
-                            Parameter::positional_only(Some(Name::new_static("hole")))
-                                .type_form()
-                                .with_annotated_type(Type::any()),
-                        ]),
-                        Some(KnownClass::ConstraintSet.to_instance(db)),
-                    ),
-                )
-                .into(),
-
-                Some(KnownFunction::IncomparableConstraint) => Binding::single(
-                    self,
-                    Signature::new(
-                        Parameters::new([
-                            Parameter::positional_only(Some(Name::new_static("typevar")))
-                                .type_form()
-                                .with_annotated_type(Type::any()),
-                            Parameter::positional_only(Some(Name::new_static("pivot")))
-                                .type_form()
-                                .with_annotated_type(Type::any()),
-                        ]),
-                        Some(KnownClass::ConstraintSet.to_instance(db)),
-                    ),
-                )
-                .into(),
+                Some(KnownFunction::RangeConstraint | KnownFunction::NegatedRangeConstraint) => {
+                    Binding::single(
+                        self,
+                        Signature::new(
+                            Parameters::new([
+                                Parameter::positional_only(Some(Name::new_static("lower_bound")))
+                                    .type_form()
+                                    .with_annotated_type(Type::any()),
+                                Parameter::positional_only(Some(Name::new_static("typevar")))
+                                    .type_form()
+                                    .with_annotated_type(Type::any()),
+                                Parameter::positional_only(Some(Name::new_static("upper_bound")))
+                                    .type_form()
+                                    .with_annotated_type(Type::any()),
+                            ]),
+                            Some(KnownClass::ConstraintSet.to_instance(db)),
+                        ),
+                    )
+                    .into()
+                }
 
                 Some(KnownFunction::IsSingleton | KnownFunction::IsSingleValued) => {
                     Binding::single(
@@ -7946,10 +7939,27 @@ fn walk_type_var_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     typevar: TypeVarInstance<'db>,
     visitor: &V,
 ) {
-    if let Some(bounds) = typevar.bound_or_constraints(db) {
-        walk_type_var_bounds(db, bounds, visitor);
+    if let Some(bound_or_constraints) = if visitor.should_visit_lazy_type_attributes() {
+        typevar.bound_or_constraints(db)
+    } else {
+        match typevar._bound_or_constraints(db) {
+            _ if visitor.should_visit_lazy_type_attributes() => typevar.bound_or_constraints(db),
+            Some(TypeVarBoundOrConstraintsEvaluation::Eager(bound_or_constraints)) => {
+                Some(bound_or_constraints)
+            }
+            _ => None,
+        }
+    } {
+        walk_type_var_bounds(db, bound_or_constraints, visitor);
     }
-    if let Some(default_type) = typevar.default_type(db) {
+    if let Some(default_type) = if visitor.should_visit_lazy_type_attributes() {
+        typevar.default_type(db)
+    } else {
+        match typevar._default(db) {
+            Some(TypeVarDefaultEvaluation::Eager(default_type)) => Some(default_type),
+            _ => None,
+        }
+    } {
         visitor.visit_type(db, default_type);
     }
 }
@@ -10585,6 +10595,9 @@ fn walk_type_alias_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     type_alias: TypeAliasType<'db>,
     visitor: &V,
 ) {
+    if !visitor.should_visit_lazy_type_attributes() {
+        return;
+    }
     match type_alias {
         TypeAliasType::PEP695(type_alias) => {
             walk_pep_695_type_alias(db, type_alias, visitor);

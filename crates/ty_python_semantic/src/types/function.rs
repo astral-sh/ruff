@@ -1313,10 +1313,8 @@ pub enum KnownFunction {
     RevealProtocolInterface,
     /// `ty_extensions.range_constraint`
     RangeConstraint,
-    /// `ty_extensions.not_equivalent_constraint`
-    NotEquivalentConstraint,
-    /// `ty_extensions.incomparable_constraint`
-    IncomparableConstraint,
+    /// `ty_extensions.negated_range_constraint`
+    NegatedRangeConstraint,
 }
 
 impl KnownFunction {
@@ -1384,8 +1382,7 @@ impl KnownFunction {
             | Self::HasMember
             | Self::RevealProtocolInterface
             | Self::RangeConstraint
-            | Self::NotEquivalentConstraint
-            | Self::IncomparableConstraint
+            | Self::NegatedRangeConstraint
             | Self::AllMembers => module.is_ty_extensions(),
             Self::ImportModule => module.is_importlib(),
         }
@@ -1556,8 +1553,8 @@ impl KnownFunction {
                 let contains_unknown_or_todo =
                     |ty| matches!(ty, Type::Dynamic(dynamic) if dynamic != DynamicType::Any);
                 if source_type.is_equivalent_to(db, *casted_type)
-                    && !any_over_type(db, *source_type, &contains_unknown_or_todo)
-                    && !any_over_type(db, *casted_type, &contains_unknown_or_todo)
+                    && !any_over_type(db, *source_type, &contains_unknown_or_todo, true)
+                    && !any_over_type(db, *casted_type, &contains_unknown_or_todo, true)
                 {
                     if let Some(builder) = context.report_lint(&REDUNDANT_CAST, call_expression) {
                         builder.into_diagnostic(format_args!(
@@ -1698,61 +1695,17 @@ impl KnownFunction {
                 )));
             }
 
-            KnownFunction::NotEquivalentConstraint => {
-                let [Some(Type::NonInferableTypeVar(typevar)), Some(hole)] = parameter_types else {
-                    return;
-                };
-
-                if !hole.is_equivalent_to(db, hole.top_materialization(db)) {
-                    if let Some(builder) =
-                        context.report_lint(&INVALID_ARGUMENT_TYPE, call_expression)
-                    {
-                        let mut diagnostic = builder.into_diagnostic(format_args!(
-                            "Not-equivalent constraint must have a fully static type"
-                        ));
-                        diagnostic.annotate(
-                            Annotation::secondary(context.span(&call_expression.arguments.args[1]))
-                                .message(format_args!(
-                                    "Type `{}` is not fully static",
-                                    hole.display(db)
-                                )),
-                        );
-                    }
-                    return;
-                }
-
-                let constraints = ConstraintSet::not_equivalent(db, *typevar, *hole);
-                let tracked = TrackedConstraintSet::new(db, constraints);
-                overload.set_return_type(Type::KnownInstance(KnownInstanceType::ConstraintSet(
-                    tracked,
-                )));
-            }
-
-            KnownFunction::IncomparableConstraint => {
-                let [Some(Type::NonInferableTypeVar(typevar)), Some(pivot)] = parameter_types
+            KnownFunction::NegatedRangeConstraint => {
+                let [
+                    Some(lower),
+                    Some(Type::NonInferableTypeVar(typevar)),
+                    Some(upper),
+                ] = parameter_types
                 else {
                     return;
                 };
 
-                if !pivot.is_equivalent_to(db, pivot.top_materialization(db)) {
-                    if let Some(builder) =
-                        context.report_lint(&INVALID_ARGUMENT_TYPE, call_expression)
-                    {
-                        let mut diagnostic = builder.into_diagnostic(format_args!(
-                            "Incomparable constraint must have a fully static type"
-                        ));
-                        diagnostic.annotate(
-                            Annotation::secondary(context.span(&call_expression.arguments.args[1]))
-                                .message(format_args!(
-                                    "Type `{}` is not fully static",
-                                    pivot.display(db)
-                                )),
-                        );
-                    }
-                    return;
-                }
-
-                let constraints = ConstraintSet::incomparable(db, *typevar, *pivot);
+                let constraints = ConstraintSet::negated_range(db, *lower, *typevar, *upper);
                 let tracked = TrackedConstraintSet::new(db, constraints);
                 overload.set_return_type(Type::KnownInstance(KnownInstanceType::ConstraintSet(
                     tracked,
@@ -1891,8 +1844,7 @@ pub(crate) mod tests {
                 | KnownFunction::HasMember
                 | KnownFunction::RevealProtocolInterface
                 | KnownFunction::RangeConstraint
-                | KnownFunction::NotEquivalentConstraint
-                | KnownFunction::IncomparableConstraint
+                | KnownFunction::NegatedRangeConstraint
                 | KnownFunction::AllMembers => KnownModule::TyExtensions,
 
                 KnownFunction::ImportModule => KnownModule::ImportLib,

@@ -724,7 +724,7 @@ impl<'db> Bindings<'db> {
                                                 db,
                                                 metadata
                                                     .members
-                                                    .iter()
+                                                    .keys()
                                                     .map(|member| Type::string_literal(db, member)),
                                             )
                                         } else {

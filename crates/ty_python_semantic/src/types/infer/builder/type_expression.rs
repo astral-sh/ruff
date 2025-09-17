@@ -713,7 +713,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 // `infer_expression` (instead of `infer_type_expression`) here to avoid
                 // false-positive `invalid-type-form` diagnostics (`1` is not a valid type
                 // expression).
-                self.infer_expression(&subscript.slice, TypeContext::default());
+                self.infer_expression(slice, TypeContext::default());
                 Type::unknown()
             }
             Type::SpecialForm(special_form) => {
@@ -721,7 +721,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
             Type::KnownInstance(known_instance) => match known_instance {
                 KnownInstanceType::SubscriptedProtocol(_) => {
-                    self.infer_type_expression(&subscript.slice);
+                    self.infer_type_expression(slice);
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         builder.into_diagnostic(format_args!(
                             "`typing.Protocol` is not allowed in type expressions",
@@ -730,7 +730,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     Type::unknown()
                 }
                 KnownInstanceType::SubscriptedGeneric(_) => {
-                    self.infer_type_expression(&subscript.slice);
+                    self.infer_type_expression(slice);
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         builder.into_diagnostic(format_args!(
                             "`typing.Generic` is not allowed in type expressions",
@@ -739,7 +739,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     Type::unknown()
                 }
                 KnownInstanceType::Deprecated(_) => {
-                    self.infer_type_expression(&subscript.slice);
+                    self.infer_type_expression(slice);
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         builder.into_diagnostic(format_args!(
                             "`warnings.deprecated` is not allowed in type expressions",
@@ -748,7 +748,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     Type::unknown()
                 }
                 KnownInstanceType::Field(_) => {
-                    self.infer_type_expression(&subscript.slice);
+                    self.infer_type_expression(slice);
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         builder.into_diagnostic(format_args!(
                             "`dataclasses.Field` is not allowed in type expressions",
@@ -757,7 +757,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     Type::unknown()
                 }
                 KnownInstanceType::ConstraintSet(_) => {
-                    self.infer_type_expression(&subscript.slice);
+                    self.infer_type_expression(slice);
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         builder.into_diagnostic(format_args!(
                             "`ty_extensions.ConstraintSet` is not allowed in type expressions",
@@ -766,7 +766,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     Type::unknown()
                 }
                 KnownInstanceType::TypeVar(_) => {
-                    self.infer_type_expression(&subscript.slice);
+                    self.infer_type_expression(slice);
                     todo_type!("TypeVar annotations")
                 }
                 KnownInstanceType::TypeAliasType(type_alias @ TypeAliasType::PEP695(_)) => {
@@ -831,8 +831,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             .unwrap_or(Type::unknown())
                     }
                     None => {
-                        // TODO: Once we know that e.g. `list` is generic, emit a diagnostic if you try to
-                        // specialize a non-generic class.
+                        // TODO: emit a diagnostic if you try to specialize a non-generic class.
                         self.infer_type_expression(slice);
                         todo_type!("specialized non-generic class")
                     }
@@ -1519,13 +1518,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     // `Callable[]`.
                     return None;
                 }
-                if any_over_type(self.db(), self.infer_name_load(name), &|ty| match ty {
-                    Type::Dynamic(DynamicType::TodoPEP695ParamSpec) => true,
-                    Type::NominalInstance(nominal) => {
-                        nominal.has_known_class(self.db(), KnownClass::ParamSpec)
-                    }
-                    _ => false,
-                }) {
+                if any_over_type(
+                    self.db(),
+                    self.infer_name_load(name),
+                    &|ty| match ty {
+                        Type::Dynamic(DynamicType::TodoPEP695ParamSpec) => true,
+                        Type::NominalInstance(nominal) => {
+                            nominal.has_known_class(self.db(), KnownClass::ParamSpec)
+                        }
+                        _ => false,
+                    },
+                    true,
+                ) {
                     return Some(Parameters::todo());
                 }
             }

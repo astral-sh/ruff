@@ -9,6 +9,7 @@ use crate::place::PlaceAndQualifiers;
 use crate::semantic_index::definition::Definition;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::enums::is_single_member_enum;
+use crate::types::generics::walk_specialization;
 use crate::types::protocol_class::walk_protocol_interface;
 use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
@@ -545,7 +546,20 @@ pub(super) fn walk_protocol_instance_type<'db, V: super::visitor::TypeVisitor<'d
     protocol: ProtocolInstanceType<'db>,
     visitor: &V,
 ) {
-    walk_protocol_interface(db, protocol.inner.interface(db), visitor);
+    if visitor.should_visit_lazy_type_attributes() {
+        walk_protocol_interface(db, protocol.inner.interface(db), visitor);
+    } else {
+        match protocol.inner {
+            Protocol::FromClass(class) => {
+                if let Some(specialization) = class.class_literal(db).1 {
+                    walk_specialization(db, specialization, visitor);
+                }
+            }
+            Protocol::Synthesized(synthesized) => {
+                walk_protocol_interface(db, synthesized.interface(), visitor);
+            }
+        }
+    }
 }
 
 impl<'db> ProtocolInstanceType<'db> {

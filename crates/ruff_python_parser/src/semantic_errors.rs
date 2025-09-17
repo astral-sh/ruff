@@ -3,16 +3,16 @@
 //! This checker is not responsible for traversing the AST itself. Instead, its
 //! [`SemanticSyntaxChecker::visit_stmt`] and [`SemanticSyntaxChecker::visit_expr`] methods should
 //! be called in a parent `Visitor`'s `visit_stmt` and `visit_expr` methods, respectively.
-use std::fmt::Display;
-
 use ruff_python_ast::{
     self as ast, Expr, ExprContext, IrrefutablePatternKind, Pattern, PythonVersion, Stmt, StmtExpr,
     StmtImportFrom,
     comparable::ComparableExpr,
+    helpers,
     visitor::{Visitor, walk_expr},
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::{FxBuildHasher, FxHashSet};
+use std::fmt::Display;
 
 #[derive(Debug, Default)]
 pub struct SemanticSyntaxChecker {
@@ -58,9 +58,39 @@ impl SemanticSyntaxChecker {
 
     fn check_stmt<Ctx: SemanticSyntaxContext>(&mut self, stmt: &ast::Stmt, ctx: &Ctx) {
         match stmt {
-            Stmt::ImportFrom(StmtImportFrom { range, module, .. }) => {
+            Stmt::ImportFrom(StmtImportFrom {
+                range,
+                module,
+                level,
+                names,
+                ..
+            }) => {
                 if self.seen_futures_boundary && matches!(module.as_deref(), Some("__future__")) {
                     Self::add_error(ctx, SemanticSyntaxErrorKind::LateFutureImport, *range);
+                }
+                for alias in names {
+                    if alias.name.as_str() == "*" && !ctx.in_module_scope() {
+                        // test_err import_from_star
+                        // def f1():
+                        //     from module import *
+                        // class C:
+                        //     from module import *
+                        // def f2():
+                        //     from ..module import *
+                        // def f3():
+                        //     from module import *, *
+
+                        // test_ok import_from_star
+                        // from module import *
+                        Self::add_error(
+                            ctx,
+                            SemanticSyntaxErrorKind::NonModuleImportStar(
+                                helpers::format_import_from(*level, module.as_deref()).to_string(),
+                            ),
+                            *range,
+                        );
+                        break;
+                    }
                 }
             }
             Stmt::Match(match_stmt) => {
@@ -1002,6 +1032,9 @@ impl Display for SemanticSyntaxError {
             SemanticSyntaxErrorKind::YieldFromInAsyncFunction => {
                 f.write_str("`yield from` statement in async function; use `async for` instead")
             }
+            SemanticSyntaxErrorKind::NonModuleImportStar(name) => {
+                write!(f, "`from {name} import *` only allowed at module level")
+            }
         }
     }
 }
@@ -1362,6 +1395,9 @@ pub enum SemanticSyntaxErrorKind {
 
     /// Represents the use of `yield from` inside an asynchronous function.
     YieldFromInAsyncFunction,
+
+    /// Represents the use of `from <module> import *` outside module scope.
+    NonModuleImportStar(String),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]

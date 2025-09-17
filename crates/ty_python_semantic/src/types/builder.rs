@@ -428,9 +428,8 @@ impl<'db> UnionBuilder<'db> {
 
                 let all_members_are_in_union = metadata
                     .members
-                    .difference(&enum_members_in_union)
-                    .next()
-                    .is_none();
+                    .keys()
+                    .all(|name| enum_members_in_union.contains(name));
 
                 if all_members_are_in_union {
                     self.add_in_place_impl(
