@@ -5377,10 +5377,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // The inferred type of each element acts as an additional constraint on `T`.
         for inferred_elt_ty in inferred_elt_tys {
-            // Promote element literals to their type annotation form to avoid excessively large
+            // Convert any element literals to their promoted type form to avoid excessively large
             // unions for large nested list literals, which the constraint solver struggles with.
             let inferred_elt_ty =
-                inferred_elt_ty.apply_type_mapping(self.db(), &TypeMapping::LiteralToAnnotation);
+                inferred_elt_ty.apply_type_mapping(self.db(), &TypeMapping::PromoteLiterals);
             builder.infer(elts_ty, inferred_elt_ty).ok()?;
         }
 

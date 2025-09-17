@@ -1128,17 +1128,18 @@ impl<'db> Type<'db> {
             Type::IntLiteral(_) => Some(KnownClass::Int.to_instance(db)),
             Type::BytesLiteral(_) => Some(KnownClass::Bytes.to_instance(db)),
             Type::ModuleLiteral(_) => Some(KnownClass::ModuleType.to_instance(db)),
+            Type::FunctionLiteral(_) => Some(KnownClass::FunctionType.to_instance(db)),
             Type::EnumLiteral(literal) => Some(literal.enum_class_instance(db)),
             _ => None,
         }
     }
 
-    /// If this type is a literal, returns a type that would be appropriate as a type annotation for
-    /// an instance of the literal.
+    /// If this type is a literal, promote it to a type that this literal is an instance of.
     ///
-    /// Notably, this converts `def _() -> int` to `Callable[[], int]`, which `literal_fallback_instance`
-    /// does not.
-    pub(crate) fn literal_annotation_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+    /// Note that this function tries to promote literals to a more user-friendly form than their
+    /// fallback instance type. For example, `def _() -> int` is promoted to a `Callable[[], int]`
+    /// as opposed to `FunctionType`.
+    pub(crate) fn literal_promotion_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
             Type::StringLiteral(_) | Type::LiteralString => Some(KnownClass::Str.to_instance(db)),
             Type::BooleanLiteral(_) => Some(KnownClass::Bool.to_instance(db)),
@@ -1720,17 +1721,12 @@ impl<'db> Type<'db> {
                 | Type::IntLiteral(_)
                 | Type::BytesLiteral(_)
                 | Type::ModuleLiteral(_)
-                | Type::EnumLiteral(_),
+                | Type::EnumLiteral(_)
+                | Type::FunctionLiteral(_),
                 _,
             ) => (self.literal_fallback_instance(db)).when_some_and(|instance| {
                 instance.has_relation_to_impl(db, target, relation, visitor)
             }),
-
-            // A `FunctionLiteral` type is a single-valued type like the other literals handled above,
-            // so it also, for now, just delegates to its instance fallback.
-            (Type::FunctionLiteral(_), _) => KnownClass::FunctionType
-                .to_instance(db)
-                .has_relation_to_impl(db, target, relation, visitor),
 
             // The same reasoning applies for these special callable types:
             (Type::BoundMethod(_), _) => KnownClass::MethodType
@@ -6002,8 +5998,7 @@ impl<'db> Type<'db> {
                         self
                     }
                 }
-                TypeMapping::LiteralToInstance
-                    | TypeMapping::LiteralToAnnotation
+                TypeMapping::PromoteLiterals
                     | TypeMapping::BindLegacyTypevars(_)
                     | TypeMapping::MarkTypeVarsInferable(_) => self,
                 TypeMapping::Materialize(materialization_kind)  => {
@@ -6025,8 +6020,7 @@ impl<'db> Type<'db> {
                         self
                     }
                 }
-                TypeMapping::LiteralToInstance
-                    | TypeMapping::LiteralToAnnotation
+                TypeMapping::PromoteLiterals
                     | TypeMapping::BindLegacyTypevars(_)
                     | TypeMapping::BindSelf(_)
                     | TypeMapping::ReplaceSelf { .. }
@@ -6041,8 +6035,7 @@ impl<'db> Type<'db> {
                 }
                 TypeMapping::Specialization(_) |
                 TypeMapping::PartialSpecialization(_) |
-                TypeMapping::LiteralToInstance |
-                TypeMapping::LiteralToAnnotation |
+                TypeMapping::PromoteLiterals |
                 TypeMapping::BindSelf(_) |
                 TypeMapping::ReplaceSelf { .. } |
                 TypeMapping::MarkTypeVarsInferable(_) |
@@ -6053,8 +6046,8 @@ impl<'db> Type<'db> {
                 let function = Type::FunctionLiteral(function.with_type_mapping(db, type_mapping));
 
                 match type_mapping {
-                    TypeMapping::LiteralToAnnotation => function.literal_annotation_type(db)
-                        .expect("function literal should have an annotation type"),
+                    TypeMapping::PromoteLiterals => function.literal_promotion_type(db)
+                        .expect("function literal should have a promotion type"),
                     _ => function
                 }
             }
@@ -6162,10 +6155,8 @@ impl<'db> Type<'db> {
                 TypeMapping::ReplaceSelf { .. } |
                 TypeMapping::MarkTypeVarsInferable(_) |
                 TypeMapping::Materialize(_) => self,
-                TypeMapping::LiteralToInstance => self.literal_fallback_instance(db)
-                    .expect("literal type should have fallback instance type"),
-                TypeMapping::LiteralToAnnotation => self.literal_annotation_type(db)
-                    .expect("literal type should have an annotation type"),
+                TypeMapping::PromoteLiterals => self.literal_promotion_type(db)
+                    .expect("literal type should have a promotion type"),
             }
 
             Type::Dynamic(_) => match type_mapping {
@@ -6175,8 +6166,7 @@ impl<'db> Type<'db> {
                 TypeMapping::BindSelf(_) |
                 TypeMapping::ReplaceSelf { .. } |
                 TypeMapping::MarkTypeVarsInferable(_) |
-                TypeMapping::LiteralToInstance => self,
-                TypeMapping::LiteralToAnnotation => self,
+                TypeMapping::PromoteLiterals => self,
                 TypeMapping::Materialize(materialization_kind) => match materialization_kind {
                     MaterializationKind::Top => Type::object(),
                     MaterializationKind::Bottom => Type::Never,
@@ -6702,12 +6692,9 @@ pub enum TypeMapping<'a, 'db> {
     Specialization(Specialization<'db>),
     /// Applies a partial specialization to the type
     PartialSpecialization(PartialSpecialization<'a, 'db>),
-    /// Promotes any literal types to their corresponding instance types (e.g. `Literal["string"]`
-    /// to `str`)
-    LiteralToInstance,
-    /// Promotes any literal types to their corresponding type annotation form (e.g. `Literal["string"]`
+    /// Replaces any literal types with their corresponding promoted type form (e.g. `Literal["string"]`
     /// to `str`, or `def _() -> int` to `Callable[[], int]`).
-    LiteralToAnnotation,
+    PromoteLiterals,
     /// Binds a legacy typevar with the generic context (class, function, type alias) that it is
     /// being used in.
     BindLegacyTypevars(BindingContext<'db>),
@@ -6739,8 +6726,7 @@ fn walk_type_mapping<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
         TypeMapping::ReplaceSelf { new_upper_bound } => {
             visitor.visit_type(db, *new_upper_bound);
         }
-        TypeMapping::LiteralToInstance
-        | TypeMapping::LiteralToAnnotation
+        TypeMapping::PromoteLiterals
         | TypeMapping::BindLegacyTypevars(_)
         | TypeMapping::MarkTypeVarsInferable(_)
         | TypeMapping::Materialize(_) => {}
@@ -6756,8 +6742,7 @@ impl<'db> TypeMapping<'_, 'db> {
             TypeMapping::PartialSpecialization(partial) => {
                 TypeMapping::PartialSpecialization(partial.to_owned())
             }
-            TypeMapping::LiteralToInstance => TypeMapping::LiteralToInstance,
-            TypeMapping::LiteralToAnnotation => TypeMapping::LiteralToAnnotation,
+            TypeMapping::PromoteLiterals => TypeMapping::PromoteLiterals,
             TypeMapping::BindLegacyTypevars(binding_context) => {
                 TypeMapping::BindLegacyTypevars(*binding_context)
             }
@@ -6782,8 +6767,7 @@ impl<'db> TypeMapping<'_, 'db> {
             TypeMapping::PartialSpecialization(partial) => {
                 TypeMapping::PartialSpecialization(partial.normalized_impl(db, visitor))
             }
-            TypeMapping::LiteralToInstance => TypeMapping::LiteralToInstance,
-            TypeMapping::LiteralToAnnotation => TypeMapping::LiteralToAnnotation,
+            TypeMapping::PromoteLiterals => TypeMapping::PromoteLiterals,
             TypeMapping::BindLegacyTypevars(binding_context) => {
                 TypeMapping::BindLegacyTypevars(*binding_context)
             }
@@ -6811,8 +6795,7 @@ impl<'db> TypeMapping<'_, 'db> {
         match self {
             TypeMapping::Specialization(_)
             | TypeMapping::PartialSpecialization(_)
-            | TypeMapping::LiteralToInstance
-            | TypeMapping::LiteralToAnnotation
+            | TypeMapping::PromoteLiterals
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::MarkTypeVarsInferable(_)
             | TypeMapping::Materialize(_) => context,

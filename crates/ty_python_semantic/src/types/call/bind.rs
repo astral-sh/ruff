@@ -2277,7 +2277,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             // inferred as a literal to the corresponding instance type.
             builder
                 .build(gc)
-                .apply_type_mapping(self.db, &TypeMapping::LiteralToInstance)
+                .apply_type_mapping(self.db, &TypeMapping::PromoteLiterals)
         });
     }
 
