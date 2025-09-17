@@ -178,10 +178,10 @@ impl<'src, 'loc> UselessSuppressionComments<'src, 'loc> {
                     // The comment is before a class definition
                     if comment.line_position.is_own_line() {
                         // Check if the comment is after any decorators
-                        if let Some(last_decorator) = decorator_list.last()
-                            && comment.range.start() > last_decorator.end()
-                        {
-                            return Err(IgnoredReason::AroundClassSignature);
+                        if let Some(last_decorator) = decorator_list.last() {
+                            if comment.range.start() > last_decorator.end() {
+                                return Err(IgnoredReason::AroundClassSignature);
+                            }
                         }
                         // No decorators, so any comment before the class is invalid
                         return Err(IgnoredReason::AroundClassSignature);
