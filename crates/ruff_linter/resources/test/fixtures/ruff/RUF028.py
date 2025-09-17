@@ -101,3 +101,24 @@ import pytest
 )  # fmt: skip
 def test_eval(test_input, expected):
     assert eval(test_input) == expected
+
+
+# Test cases for fmt: off/on around class signatures (RUF028)
+# fmt: off
+class TestClassSignature1:
+    pass
+# fmt: on
+
+class TestClassSignature2:
+    pass
+# fmt: off
+
+# fmt: off
+@decorator
+class TestClassSignature3:
+    pass
+# fmt: on
+
+class TestClassSignature4:
+    pass
+# fmt: on

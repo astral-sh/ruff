@@ -215,3 +215,102 @@ help: Remove this comment
 65 | 
 66 | # all of these should be fine
 note: This is an unsafe fix and may change runtime behavior
+
+RUF028 [*] This suppression comment is invalid because it cannot be around a class signature
+   --> RUF028.py:107:1
+    |
+106 | # Test cases for fmt: off/on around class signatures (RUF028)
+107 | # fmt: off
+    | ^^^^^^^^^^
+108 | class TestClassSignature1:
+109 |     pass
+    |
+help: Remove this comment
+104 | 
+105 | 
+106 | # Test cases for fmt: off/on around class signatures (RUF028)
+    - # fmt: off
+107 | class TestClassSignature1:
+108 |     pass
+109 | # fmt: on
+note: This is an unsafe fix and may change runtime behavior
+
+RUF028 [*] This suppression comment is invalid because it cannot be around a class signature
+   --> RUF028.py:110:1
+    |
+108 | class TestClassSignature1:
+109 |     pass
+110 | # fmt: on
+    | ^^^^^^^^^
+111 |
+112 | class TestClassSignature2:
+    |
+help: Remove this comment
+107 | # fmt: off
+108 | class TestClassSignature1:
+109 |     pass
+    - # fmt: on
+110 | 
+111 | class TestClassSignature2:
+112 |     pass
+note: This is an unsafe fix and may change runtime behavior
+
+RUF028 [*] This suppression comment is invalid because it cannot be around a class signature
+   --> RUF028.py:114:1
+    |
+112 | class TestClassSignature2:
+113 |     pass
+114 | # fmt: off
+    | ^^^^^^^^^^
+115 |
+116 | # fmt: off
+    |
+help: Remove this comment
+111 | 
+112 | class TestClassSignature2:
+113 |     pass
+    - # fmt: off
+114 | 
+115 | # fmt: off
+116 | @decorator
+note: This is an unsafe fix and may change runtime behavior
+
+RUF028 [*] This suppression comment is invalid because it cannot be around a class signature
+   --> RUF028.py:116:1
+    |
+114 | # fmt: off
+115 |
+116 | # fmt: off
+    | ^^^^^^^^^^
+117 | @decorator
+118 | class TestClassSignature3:
+    |
+help: Remove this comment
+113 |     pass
+114 | # fmt: off
+115 | 
+    - # fmt: off
+116 | @decorator
+117 | class TestClassSignature3:
+118 |     pass
+note: This is an unsafe fix and may change runtime behavior
+
+RUF028 [*] This suppression comment is invalid because it cannot be around a class signature
+   --> RUF028.py:120:1
+    |
+118 | class TestClassSignature3:
+119 |     pass
+120 | # fmt: on
+    | ^^^^^^^^^
+121 |
+122 | class TestClassSignature4:
+    |
+help: Remove this comment
+117 | @decorator
+118 | class TestClassSignature3:
+119 |     pass
+    - # fmt: on
+120 | 
+121 | class TestClassSignature4:
+122 |     pass
+note: This is an unsafe fix and may change runtime behavior
