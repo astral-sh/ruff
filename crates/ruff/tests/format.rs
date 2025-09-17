@@ -12,8 +12,8 @@ use tempfile::TempDir;
 
 const BIN_NAME: &str = "ruff";
 
-fn tempdir_filter(tempdir: &TempDir) -> String {
-    format!(r"{}\\?/?", escape(tempdir.path().to_str().unwrap()))
+fn tempdir_filter(path: impl AsRef<Path>) -> String {
+    format!(r"{}\\?/?", escape(path.as_ref().to_str().unwrap()))
 }
 
 #[test]
@@ -581,103 +581,55 @@ if __name__ == "__main__":
     Ok(())
 }
 
-#[test]
-fn messages_full() -> Result<()> {
-    let tempdir = TempDir::new()?;
-
-    fs::write(
-        tempdir.path().join("main.py"),
-        r#"
+#[test_case::test_case("concise")]
+#[test_case::test_case("full")]
+#[test_case::test_case("json")]
+#[test_case::test_case("json-lines")]
+#[test_case::test_case("junit")]
+// #[test_case::test_case("grouped")]
+#[test_case::test_case("github")]
+#[test_case::test_case("gitlab")]
+#[test_case::test_case("pylint")]
+#[test_case::test_case("rdjson")]
+#[test_case::test_case("azure")]
+// #[test_case::test_case("sarif")]
+fn output_format(output_format: &str) -> Result<()> {
+    const CONTENT: &str = r#"\
 from test import say_hy
 
 if __name__ == "__main__":
     say_hy("dear Ruff contributor")
-"#,
-    )?;
+"#;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .current_dir(tempdir.path())
-        .args(["format", "--no-cache", "--isolated", "--check", "--output-format=full"])
-        .arg("main.py"), @r#"
-    success: false
-    exit_code: 1
-    ----- stdout -----
-    error[unformatted][*]: File would be reformatted
-    --> main.py:1:1
-      - 
-    1 | from test import say_hy
-    2 | 
-    3 | if __name__ == "__main__":
-
-    1 file would be reformatted
-
-    ----- stderr -----
-    "#);
-
-    Ok(())
-}
-
-#[test]
-fn messages_json() -> Result<()> {
     let tempdir = TempDir::new()?;
+    let input = tempdir.path().join("input.py");
+    fs::write(&input, CONTENT)?;
 
-    fs::write(
-        tempdir.path().join("main.py"),
-        r#"
-from test import say_hy
+    let snapshot = format!("output_format_{output_format}");
 
-if __name__ == "__main__":
-    say_hy("dear Ruff contributor")
-"#,
-    )?;
+    let project_dir = dunce::canonicalize(tempdir.path())?;
 
     insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
-    }, {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-            .current_dir(tempdir.path())
-            .args(["format", "--no-cache", "--isolated", "--check", "--output-format=json"])
-            .arg("main.py"), @r#"
-        success: false
-        exit_code: 1
-        ----- stdout -----
-        [
-          {
-            "cell": null,
-            "code": "unformatted",
-            "end_location": {
-              "column": 1,
-              "row": 1
-            },
-            "filename": "[TMP]/main.py",
-            "fix": {
-              "applicability": "safe",
-              "edits": [
-                {
-                  "content": "from test import say_hy\n\nif __name__ == \"__main__\":\n    say_hy(\"dear Ruff contributor\")\n",
-                  "end_location": {
-                    "column": 1,
-                    "row": 6
-                  },
-                  "location": {
-                    "column": 1,
-                    "row": 1
-                  }
-                }
-              ],
-              "message": null
-            },
-            "location": {
-              "column": 1,
-              "row": 1
-            },
-            "message": "File would be reformatted",
-            "noqa_row": null,
-            "url": "https://docs.astral.sh/ruff/rules/unformatted"
-          }
+        filters => vec![
+            (tempdir_filter(&project_dir).as_str(), "[TMP]/"),
+            (tempdir_filter(&tempdir).as_str(), "[TMP]/"),
+            (r#""[^"]+\\?/?input.py"#, r#""[TMP]/input.py"#),
+            (ruff_linter::VERSION, "[VERSION]"),
         ]
-        ----- stderr -----
-        "#);
+    }, {
+        assert_cmd_snapshot!(
+            snapshot,
+            Command::new(get_cargo_bin(BIN_NAME))
+                .args([
+                    "format",
+                    "--no-cache",
+                    "--output-format",
+                    output_format,
+                    "--check",
+                    "input.py",
+                ])
+                .current_dir(&tempdir),
+        );
     });
 
     Ok(())
