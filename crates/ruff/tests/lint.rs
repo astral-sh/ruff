@@ -2556,6 +2556,7 @@ requires-python = ">= 3.11"
         file_resolver.include = [
         	"*.py",
         	"*.pyi",
+        	"*.pyw",
         	"*.ipynb",
         	"**/pyproject.toml",
         ]
@@ -6545,8 +6546,9 @@ fn supported_file_extensions_preview_enabled() -> Result<()> {
     [TMP]/src/thing.ipynb:cell 1:1:8: F401 [*] `os` imported but unused
     [TMP]/src/thing.py:1:8: F401 [*] `os` imported but unused
     [TMP]/src/thing.pyi:1:8: F401 [*] `os` imported but unused
-    Found 3 errors.
-    [*] 3 fixable with the `--fix` option.
+    [TMP]/src/thing.pyw:1:8: F401 [*] `os` imported but unused
+    Found 4 errors.
+    [*] 4 fixable with the `--fix` option.
 
     ----- stderr -----
     ");
