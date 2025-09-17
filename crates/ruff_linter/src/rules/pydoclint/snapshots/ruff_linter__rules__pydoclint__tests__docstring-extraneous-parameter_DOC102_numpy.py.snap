@@ -144,3 +144,15 @@ DOC102 Documented parameter `number` is not in the function's signature
 249 |         number : any
     |
 help: Remove the extraneous parameter from the docstring
+
+DOC102 Documented parameter `a` is not in the function's signature
+   --> DOC102_numpy.py:298:5
+    |
+296 |     Adds two numbers and returns the result.
+297 |
+298 |     Parameters
+    |     ^^^^^^^^^^
+299 |     ----------
+300 |     a
+    |
+help: Remove the extraneous parameter from the docstring

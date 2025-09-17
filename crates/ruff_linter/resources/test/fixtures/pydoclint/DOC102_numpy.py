@@ -272,3 +272,39 @@ def function_with_kwargs(param1, param2, **kwargs):
         Another extra parameter.
     """
     ...
+
+# OK
+def add_numbers(b):
+    """
+    Adds two numbers and returns the result.
+
+    Parameters
+    ----------
+    b
+        The second number to add.
+
+    Returns
+    -------
+    int
+        The sum of the two numbers.
+    """
+    return a + b
+
+# DOC102
+def add_numbers(b):
+    """
+    Adds two numbers and returns the result.
+
+    Parameters
+    ----------
+    a
+        The first number to add.
+    b
+        The second number to add.
+
+    Returns
+    -------
+    int
+        The sum of the two numbers.
+    """
+    return a + b

@@ -140,3 +140,15 @@ DOC102 Documented parameter `number` is not in the function's signature
 190 |             number (any): The value to check.
     |
 help: Remove the extraneous parameter from the docstring
+
+DOC102 Documented parameter `a` is not in the function's signature
+   --> DOC102_google.py:257:5
+    |
+255 |     Adds two numbers and returns the result.
+256 |
+257 |     Args:
+    |     ^^^^
+258 |         a: The first number to add.
+259 |         b: The second number to add.
+    |
+help: Remove the extraneous parameter from the docstring
