@@ -48,6 +48,7 @@ flake8
 flake8-pyi
 freqtrade
 git-revise
+graphql-core
 httpx-caching
 hydpy
 hydra-zen
