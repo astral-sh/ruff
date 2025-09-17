@@ -104,10 +104,6 @@ pub(crate) fn os_symlink(checker: &Checker, call: &ExprCall, segments: &[&str]) 
         return;
     };
 
-    if !is_optional_bool_literal(&call.arguments, "target_is_directory", 2) {
-        return;
-    }
-
     diagnostic.try_set_fix(|| {
         let (import_edit, binding) = checker.importer().get_or_import_symbol(
             &ImportRequest::import("pathlib", "Path"),
