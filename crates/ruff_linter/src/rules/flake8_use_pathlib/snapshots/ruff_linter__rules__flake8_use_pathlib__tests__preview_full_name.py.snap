@@ -520,7 +520,7 @@ PTH122 `os.path.splitext()` should be replaced by `Path.suffix`, `Path.stem`, an
 33 |     fp.read()
    |
 
-PTH123 `open()` should be replaced by `Path.open()`
+PTH123 [*] `open()` should be replaced by `Path.open()`
   --> full_name.py:32:6
    |
 30 | os.path.samefile(p)
@@ -530,8 +530,24 @@ PTH123 `open()` should be replaced by `Path.open()`
 33 |     fp.read()
 34 | open(p).close()
    |
+help: Replace with `Path.open()`
+1  | import os
+2  | import os.path
+3  + import pathlib
+4  | 
+5  | p = "/foo"
+6  | q = "bar"
+--------------------------------------------------------------------------------
+30 | os.path.dirname(p)
+31 | os.path.samefile(p)
+32 | os.path.splitext(p)
+   - with open(p) as fp:
+33 + with pathlib.Path(p).open() as fp:
+34 |     fp.read()
+35 | open(p).close()
+36 | os.getcwdb(p)
 
-PTH123 `open()` should be replaced by `Path.open()`
+PTH123 [*] `open()` should be replaced by `Path.open()`
   --> full_name.py:34:1
    |
 32 | with open(p) as fp:
@@ -541,6 +557,22 @@ PTH123 `open()` should be replaced by `Path.open()`
 35 | os.getcwdb(p)
 36 | os.path.join(p, *q)
    |
+help: Replace with `Path.open()`
+1  | import os
+2  | import os.path
+3  + import pathlib
+4  | 
+5  | p = "/foo"
+6  | q = "bar"
+--------------------------------------------------------------------------------
+32 | os.path.splitext(p)
+33 | with open(p) as fp:
+34 |     fp.read()
+   - open(p).close()
+35 + pathlib.Path(p).open().close()
+36 | os.getcwdb(p)
+37 | os.path.join(p, *q)
+38 | os.sep.join(p, *q)
 
 PTH109 `os.getcwd()` should be replaced by `Path.cwd()`
   --> full_name.py:35:1
@@ -575,7 +607,7 @@ PTH118 `os.sep.join()` should be replaced by `Path.joinpath()`
 39 | # https://github.com/astral-sh/ruff/issues/7620
    |
 
-PTH123 `open()` should be replaced by `Path.open()`
+PTH123 [*] `open()` should be replaced by `Path.open()`
   --> full_name.py:46:1
    |
 44 | open(p, closefd=False)
@@ -585,8 +617,24 @@ PTH123 `open()` should be replaced by `Path.open()`
 47 | open(p, 'r', - 1, None, None, None, True, None)
 48 | open(p, 'r', - 1, None, None, None, False, opener)
    |
+help: Replace with `Path.open()`
+1  | import os
+2  | import os.path
+3  + import pathlib
+4  | 
+5  | p = "/foo"
+6  | q = "bar"
+--------------------------------------------------------------------------------
+44 | 
+45 | open(p, closefd=False)
+46 | open(p, opener=opener)
+   - open(p, mode='r', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+47 + pathlib.Path(p).open(mode='r', buffering=-1, encoding=None, errors=None, newline=None)
+48 | open(p, 'r', - 1, None, None, None, True, None)
+49 | open(p, 'r', - 1, None, None, None, False, opener)
+50 | 
 
-PTH123 `open()` should be replaced by `Path.open()`
+PTH123 [*] `open()` should be replaced by `Path.open()`
   --> full_name.py:47:1
    |
 45 | open(p, opener=opener)
@@ -595,8 +643,24 @@ PTH123 `open()` should be replaced by `Path.open()`
    | ^^^^
 48 | open(p, 'r', - 1, None, None, None, False, opener)
    |
+help: Replace with `Path.open()`
+1  | import os
+2  | import os.path
+3  + import pathlib
+4  | 
+5  | p = "/foo"
+6  | q = "bar"
+--------------------------------------------------------------------------------
+45 | open(p, closefd=False)
+46 | open(p, opener=opener)
+47 | open(p, mode='r', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+   - open(p, 'r', - 1, None, None, None, True, None)
+48 + pathlib.Path(p).open('r', - 1, None, None, None)
+49 | open(p, 'r', - 1, None, None, None, False, opener)
+50 | 
+51 | # Cannot be upgraded `pathlib.Open` does not support fds
 
-PTH123 `open()` should be replaced by `Path.open()`
+PTH123 [*] `open()` should be replaced by `Path.open()`
   --> full_name.py:65:1
    |
 63 | open(f())
@@ -606,8 +670,24 @@ PTH123 `open()` should be replaced by `Path.open()`
 66 | byte_str = b"bar"
 67 | open(byte_str)
    |
+help: Replace with `Path.open()`
+1  | import os
+2  | import os.path
+3  + import pathlib
+4  | 
+5  | p = "/foo"
+6  | q = "bar"
+--------------------------------------------------------------------------------
+63 |     return 1
+64 | open(f())
+65 | 
+   - open(b"foo")
+66 + pathlib.Path(b"foo").open()
+67 | byte_str = b"bar"
+68 | open(byte_str)
+69 | 
 
-PTH123 `open()` should be replaced by `Path.open()`
+PTH123 [*] `open()` should be replaced by `Path.open()`
   --> full_name.py:67:1
    |
 65 | open(b"foo")
@@ -617,8 +697,24 @@ PTH123 `open()` should be replaced by `Path.open()`
 68 |
 69 | def bytes_str_func() -> bytes:
    |
+help: Replace with `Path.open()`
+1  | import os
+2  | import os.path
+3  + import pathlib
+4  | 
+5  | p = "/foo"
+6  | q = "bar"
+--------------------------------------------------------------------------------
+65 | 
+66 | open(b"foo")
+67 | byte_str = b"bar"
+   - open(byte_str)
+68 + pathlib.Path(byte_str).open()
+69 | 
+70 | def bytes_str_func() -> bytes:
+71 |     return b"foo"
 
-PTH123 `open()` should be replaced by `Path.open()`
+PTH123 [*] `open()` should be replaced by `Path.open()`
   --> full_name.py:71:1
    |
 69 | def bytes_str_func() -> bytes:
@@ -628,6 +724,22 @@ PTH123 `open()` should be replaced by `Path.open()`
 72 |
 73 | # https://github.com/astral-sh/ruff/issues/17693
    |
+help: Replace with `Path.open()`
+1  | import os
+2  | import os.path
+3  + import pathlib
+4  | 
+5  | p = "/foo"
+6  | q = "bar"
+--------------------------------------------------------------------------------
+69 | 
+70 | def bytes_str_func() -> bytes:
+71 |     return b"foo"
+   - open(bytes_str_func())
+72 + pathlib.Path(bytes_str_func()).open()
+73 | 
+74 | # https://github.com/astral-sh/ruff/issues/17693
+75 | os.stat(1)
 
 PTH109 [*] `os.getcwd()` should be replaced by `Path.cwd()`
    --> full_name.py:108:1
