@@ -1,4 +1,4 @@
-use itertools::{Either, Itertools};
+use itertools::Itertools;
 use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity};
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
@@ -78,7 +78,7 @@ use crate::types::instance::SliceLiteral;
 use crate::types::mro::MroErrorKind;
 use crate::types::signatures::Signature;
 use crate::types::subclass_of::SubclassOfInner;
-use crate::types::tuple::{Tuple, TupleSpec, TupleType};
+use crate::types::tuple::{Tuple, TupleLength, TupleSpec, TupleType};
 use crate::types::typed_dict::{
     TypedDictAssignmentKind, validate_typed_dict_constructor, validate_typed_dict_dict_literal,
     validate_typed_dict_key_assignment,
@@ -5241,32 +5241,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             parenthesized: _,
         } = tuple;
 
-        let mut annotated_elt_tys =
-            tcx.known_specialization(KnownClass::Tuple, self.db())
-                .map(|specialization| {
-                    match specialization
-                        .tuple(self.db())
-                        .expect("the specialization of `KnownClass::Tuple` must have a tuple spec")
-                    {
-                        Tuple::Fixed(tuple) => Either::Right(tuple.all_elements()),
+        let annotated_tuple = tcx
+            .known_specialization(KnownClass::Tuple, self.db())
+            .and_then(|specialization| {
+                specialization
+                    .tuple(self.db())
+                    .expect("the specialization of `KnownClass::Tuple` must have a tuple spec")
+                    .resize(self.db(), TupleLength::Fixed(elts.len()))
+                    .ok()
+            });
 
-                        Tuple::Variable(tuple) => {
-                            // Extend variadic tuple annotations to match the length of the RHS.
-                            let variable_elements = elts
-                                .len()
-                                .saturating_sub(tuple.prefix.len())
-                                .saturating_sub(tuple.suffix.len());
-
-                            let elements = tuple
-                                .prefix_elements()
-                                .chain(std::iter::repeat_n(&tuple.variable, variable_elements))
-                                .chain(tuple.suffix_elements());
-
-                            Either::Left(elements)
-                        }
-                    }
-                    .into_iter()
-                });
+        let mut annotated_elt_tys = annotated_tuple.as_ref().map(Tuple::all_elements);
 
         let db = self.db();
         let divergent = Type::divergent(self.scope());
