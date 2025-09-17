@@ -1,12 +1,13 @@
-use crate::diagnostic::{Diagnostic, FileResolver};
+use crate::diagnostic::{Diagnostic, FileResolver, Severity};
 
-pub(super) struct GithubRenderer<'a> {
+pub struct GithubRenderer<'a> {
     resolver: &'a dyn FileResolver,
+    program: &'a str,
 }
 
 impl<'a> GithubRenderer<'a> {
-    pub(super) fn new(resolver: &'a dyn FileResolver) -> Self {
-        Self { resolver }
+    pub fn new(resolver: &'a dyn FileResolver, program: &'a str) -> Self {
+        Self { resolver, program }
     }
 
     pub(super) fn render(
@@ -15,9 +16,15 @@ impl<'a> GithubRenderer<'a> {
         diagnostics: &[Diagnostic],
     ) -> std::fmt::Result {
         for diagnostic in diagnostics {
+            let severity = match diagnostic.severity() {
+                Severity::Info => "notice",
+                Severity::Warning => "warning",
+                Severity::Error | Severity::Fatal => "error",
+            };
             write!(
                 f,
-                "::error title=Ruff ({code})",
+                "::{severity} title={program} ({code})",
+                program = self.program,
                 code = diagnostic.secondary_code_or_id()
             )?;
 
@@ -75,6 +82,26 @@ impl<'a> GithubRenderer<'a> {
     }
 }
 
+pub struct DisplayGithubDiagnostics<'a> {
+    renderer: &'a GithubRenderer<'a>,
+    diagnostics: &'a [Diagnostic],
+}
+
+impl<'a> DisplayGithubDiagnostics<'a> {
+    pub fn new(renderer: &'a GithubRenderer<'a>, diagnostics: &'a [Diagnostic]) -> Self {
+        Self {
+            renderer,
+            diagnostics,
+        }
+    }
+}
+
+impl std::fmt::Display for DisplayGithubDiagnostics<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.renderer.render(f, self.diagnostics)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::diagnostic::{
@@ -103,7 +130,7 @@ mod tests {
 
         insta::assert_snapshot!(
             env.render(&diag),
-            @"::error title=Ruff (test-diagnostic)::test-diagnostic: main diagnostic message",
+            @"::error title=ty (test-diagnostic)::test-diagnostic: main diagnostic message",
         );
     }
 }
