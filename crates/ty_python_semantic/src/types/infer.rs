@@ -312,17 +312,7 @@ fn single_expression_cycle_initial<'db>(db: &'db dyn Db, input: InferExpression<
 /// This is a Salsa supertype used as the input to `infer_expression_types` to avoid
 /// interning an `ExpressionWithContext` unnecessarily when no type context is provided.
 #[derive(
-    Debug,
-    Clone,
-    Copy,
-    Eq,
-    Hash,
-    PartialEq,
-    PartialOrd,
-    Ord,
-    salsa::Supertype,
-    salsa::Update,
-    get_size2::GetSize,
+    Debug, Clone, Copy, Eq, Hash, PartialEq, salsa::Supertype, salsa::Update, get_size2::GetSize,
 )]
 pub(super) enum InferExpression<'db> {
     Bare(Expression<'db>),

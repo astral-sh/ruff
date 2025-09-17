@@ -1,7 +1,6 @@
 use std::cmp::Ordering;
 
 use crate::db::Db;
-use crate::types::{DivergenceKind, DivergentType};
 
 use super::{
     DynamicType, SuperOwnerKind, TodoType, Type, TypeIsType, class_base::ClassBase,
@@ -119,7 +118,7 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 (SubclassOfInner::Class(_), _) => Ordering::Less,
                 (_, SubclassOfInner::Class(_)) => Ordering::Greater,
                 (SubclassOfInner::Dynamic(left), SubclassOfInner::Dynamic(right)) => {
-                    dynamic_elements_ordering(db, left, right)
+                    dynamic_elements_ordering(left, right)
                 }
             }
         }
@@ -173,7 +172,7 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 (_, ClassBase::TypedDict) => Ordering::Greater,
 
                 (ClassBase::Dynamic(left), ClassBase::Dynamic(right)) => {
-                    dynamic_elements_ordering(db, left, right)
+                    dynamic_elements_ordering(left, right)
                 }
             })
             .then_with(|| match (left.owner(db), right.owner(db)) {
@@ -186,7 +185,7 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 (SuperOwnerKind::Instance(_), _) => Ordering::Less,
                 (_, SuperOwnerKind::Instance(_)) => Ordering::Greater,
                 (SuperOwnerKind::Dynamic(left), SuperOwnerKind::Dynamic(right)) => {
-                    dynamic_elements_ordering(db, left, right)
+                    dynamic_elements_ordering(left, right)
                 }
             })
         }
@@ -205,7 +204,7 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::PropertyInstance(_), _) => Ordering::Less,
         (_, Type::PropertyInstance(_)) => Ordering::Greater,
 
-        (Type::Dynamic(left), Type::Dynamic(right)) => dynamic_elements_ordering(db, *left, *right),
+        (Type::Dynamic(left), Type::Dynamic(right)) => dynamic_elements_ordering(*left, *right),
         (Type::Dynamic(_), _) => Ordering::Less,
         (_, Type::Dynamic(_)) => Ordering::Greater,
 
@@ -254,11 +253,7 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
 }
 
 /// Determine a canonical order for two instances of [`DynamicType`].
-fn dynamic_elements_ordering<'db>(
-    db: &'db dyn Db,
-    left: DynamicType<'db>,
-    right: DynamicType<'db>,
-) -> Ordering {
+fn dynamic_elements_ordering<'db>(left: DynamicType<'db>, right: DynamicType<'db>) -> Ordering {
     match (left, right) {
         (DynamicType::Any, _) => Ordering::Less,
         (_, DynamicType::Any) => Ordering::Greater,
@@ -281,9 +276,7 @@ fn dynamic_elements_ordering<'db>(
         (DynamicType::TodoTypeAlias, _) => Ordering::Less,
         (_, DynamicType::TodoTypeAlias) => Ordering::Greater,
 
-        (DynamicType::Divergent(left), DynamicType::Divergent(right)) => {
-            divergent_ordering(db, left, right)
-        }
+        (DynamicType::Divergent(left), DynamicType::Divergent(right)) => left.cmp(&right),
         (DynamicType::Divergent(_), _) => Ordering::Less,
         (_, DynamicType::Divergent(_)) => Ordering::Greater,
     }
@@ -308,101 +301,5 @@ fn typeis_ordering(db: &dyn Db, left: TypeIsType, right: TypeIsType) -> Ordering
             Ordering::Equal => union_or_intersection_elements_ordering(db, &left_ty, &right_ty),
             ordering => ordering,
         },
-    }
-}
-
-fn divergent_ordering<'db>(
-    db: &'db dyn Db,
-    left: DivergentType<'db>,
-    right: DivergentType<'db>,
-) -> Ordering {
-    match (left.kind(db), right.kind(db)) {
-        (DivergenceKind::InferReturnType(left), DivergenceKind::InferReturnType(right)) => {
-            left.cmp(right)
-        }
-        (DivergenceKind::InferReturnType(_), _) => Ordering::Less,
-        (_, DivergenceKind::InferReturnType(_)) => Ordering::Greater,
-
-        (
-            DivergenceKind::ImplicitAttribute {
-                class_body_scope: left_scope,
-                name: left_name,
-                target_method_decorator: left_deco,
-            },
-            DivergenceKind::ImplicitAttribute {
-                class_body_scope: right_scope,
-                name: right_name,
-                target_method_decorator: right_deco,
-            },
-        ) => left_scope
-            .cmp(right_scope)
-            .then_with(|| left_name.cmp(right_name))
-            .then_with(|| left_deco.cmp(right_deco)),
-        (DivergenceKind::ImplicitAttribute { .. }, _) => Ordering::Less,
-        (_, DivergenceKind::ImplicitAttribute { .. }) => Ordering::Greater,
-
-        (
-            DivergenceKind::MemberLookupWithPolicy {
-                self_type: left_ty,
-                name: left_name,
-                policy: left_policy,
-            },
-            DivergenceKind::MemberLookupWithPolicy {
-                self_type: right_ty,
-                name: right_name,
-                policy: right_policy,
-            },
-        ) => union_or_intersection_elements_ordering(db, left_ty, right_ty)
-            .then_with(|| left_name.cmp(right_name))
-            .then_with(|| left_policy.cmp(right_policy)),
-        (DivergenceKind::MemberLookupWithPolicy { .. }, _) => Ordering::Less,
-        (_, DivergenceKind::MemberLookupWithPolicy { .. }) => Ordering::Greater,
-
-        (
-            DivergenceKind::ClassLookupWithPolicy {
-                self_type: left_ty,
-                name: left_name,
-                policy: left_policy,
-            },
-            DivergenceKind::ClassLookupWithPolicy {
-                self_type: right_ty,
-                name: right_name,
-                policy: right_policy,
-            },
-        ) => union_or_intersection_elements_ordering(db, left_ty, right_ty)
-            .then_with(|| left_name.cmp(right_name))
-            .then_with(|| left_policy.cmp(right_policy)),
-        (DivergenceKind::ClassLookupWithPolicy { .. }, _) => Ordering::Less,
-        (_, DivergenceKind::ClassLookupWithPolicy { .. }) => Ordering::Greater,
-
-        (DivergenceKind::InferExpression(left), DivergenceKind::InferExpression(right)) => {
-            left.cmp(right)
-        }
-        (DivergenceKind::InferExpression(_), _) => Ordering::Less,
-        (_, DivergenceKind::InferExpression(_)) => Ordering::Greater,
-
-        (
-            DivergenceKind::InferExpressionTypes(left),
-            DivergenceKind::InferExpressionTypes(right),
-        ) => left.cmp(right),
-        (DivergenceKind::InferExpressionTypes(_), _) => Ordering::Less,
-        (_, DivergenceKind::InferExpressionTypes(_)) => Ordering::Greater,
-
-        (
-            DivergenceKind::InferDefinitionTypes(left),
-            DivergenceKind::InferDefinitionTypes(right),
-        ) => left.cmp(right),
-        (DivergenceKind::InferDefinitionTypes(_), _) => Ordering::Less,
-        (_, DivergenceKind::InferDefinitionTypes(_)) => Ordering::Greater,
-
-        (DivergenceKind::InferScopeTypes(left), DivergenceKind::InferScopeTypes(right)) => {
-            left.cmp(right)
-        }
-        (DivergenceKind::InferScopeTypes(_), _) => Ordering::Less,
-        (_, DivergenceKind::InferScopeTypes(_)) => Ordering::Greater,
-
-        (DivergenceKind::InferUnpackTypes(left), DivergenceKind::InferUnpackTypes(right)) => {
-            left.cmp(right)
-        }
     }
 }

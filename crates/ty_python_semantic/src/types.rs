@@ -7436,6 +7436,7 @@ pub(crate) type CycleRecoveryType<'db> = Type<'db>;
 /// Otherwise, type inference cannot converge properly.
 /// For detailed properties of this type, see the unit test at the end of the file.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[derive(PartialOrd, Ord)]
 pub struct DivergentType<'db> {
     /// The kind of divergence.
     #[returns(ref)]
