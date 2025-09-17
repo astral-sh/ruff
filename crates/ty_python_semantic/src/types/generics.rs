@@ -2,6 +2,7 @@ use std::borrow::Cow;
 
 use crate::types::constraints::ConstraintSet;
 
+use itertools::Itertools;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_python_ast as ast;
 use rustc_hash::FxHashMap;
@@ -18,8 +19,8 @@ use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
     IsEquivalentVisitor, KnownClass, KnownInstanceType, MaterializationKind, NormalizedVisitor,
-    Type, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarVariance,
-    UnionType, binding_type, declaration_type,
+    Type, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind,
+    TypeVarVariance, UnionType, binding_type, declaration_type,
 };
 use crate::{Db, FxOrderSet};
 
@@ -82,6 +83,17 @@ pub(crate) fn bind_typevar<'db>(
     typevar_binding_context: Option<Definition<'db>>,
     typevar: TypeVarInstance<'db>,
 ) -> Option<BoundTypeVarInstance<'db>> {
+    // typing.Self is treated like a legacy typevar, but doesn't follow the same scoping rules. It is always bound to the outermost method in the containing class.
+    if matches!(typevar.kind(db), TypeVarKind::TypingSelf) {
+        for ((_, inner), (_, outer)) in index.ancestor_scopes(containing_scope).tuple_windows() {
+            if outer.kind().is_class() {
+                if let NodeWithScopeKind::Function(function) = inner.node() {
+                    let definition = index.expect_single_definition(function.node(module));
+                    return Some(typevar.with_binding_context(db, definition));
+                }
+            }
+        }
+    }
     enclosing_generic_contexts(db, module, index, containing_scope)
         .find_map(|enclosing_context| enclosing_context.binds_typevar(db, typevar))
         .or_else(|| {
