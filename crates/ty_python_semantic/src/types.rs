@@ -3528,6 +3528,29 @@ impl<'db> Type<'db> {
                 .value_type(db)
                 .member_lookup_with_policy(db, name, policy),
 
+            Type::EnumLiteral(enum_literal)
+                if matches!(name_str, "name" | "_name_")
+                    && Type::ClassLiteral(enum_literal.enum_class(db))
+                        .is_subtype_of(db, KnownClass::Enum.to_subclass_of(db)) =>
+            {
+                Place::bound(Type::StringLiteral(StringLiteralType::new(
+                    db,
+                    enum_literal.name(db).as_str(),
+                )))
+                .into()
+            }
+
+            Type::EnumLiteral(enum_literal)
+                if matches!(name_str, "value" | "_value_")
+                    && Type::ClassLiteral(enum_literal.enum_class(db))
+                        .is_subtype_of(db, KnownClass::Enum.to_subclass_of(db)) =>
+            {
+                enum_metadata(db, enum_literal.enum_class(db))
+                    .and_then(|metadata| metadata.members.get(enum_literal.name(db)))
+                    .map_or_else(|| Place::Unbound, Place::bound)
+                    .into()
+            }
+
             Type::NominalInstance(..)
             | Type::ProtocolInstance(..)
             | Type::BooleanLiteral(..)
