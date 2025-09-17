@@ -51,40 +51,6 @@ class ColorStr(Enum):
 reveal_type(enum_members(ColorStr))
 ```
 
-### Generated `_name_` and `_value_` attributes
-
-```py
-from enum import Enum
-from typing import Literal
-
-class Color(Enum):
-    RED = 1
-    GREEN = 2
-    BLUE = 3
-
-reveal_type(Color.RED._name_)  # revealed: Literal["RED"]
-reveal_type(Color.RED._value_)  # revealed: Literal[1]
-```
-
-### `name` attribute Literal unions
-
-```py
-from enum import Enum
-from typing import Literal
-
-class Color(Enum):
-    RED = 1
-    GREEN = 2
-    BLUE = 3
-
-def func1(red_or_blue: Literal[Color.RED, Color.BLUE]):
-    reveal_type(red_or_blue.name)  # revealed: Literal["RED", "BLUE"]
-
-def func2(any_color: Color):
-    # TODO: Literal["RED", "GREEN", "BLUE"]
-    reveal_type(any_color.name)  # revealed: Any
-```
-
 ### When deriving from `IntEnum`
 
 ```py
@@ -531,6 +497,62 @@ callable: Callable[[str], None] = Printer.STDOUT
 callable("Hello again!")
 callable = Printer.STDERR
 callable("Another error!")
+```
+
+## Special attributes on enum members
+
+### `name` and `_name_`
+
+```py
+from enum import Enum
+from typing import Literal
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
+
+reveal_type(Color.RED._name_)  # revealed: Literal["RED"]
+
+def _(red_or_blue: Literal[Color.RED, Color.BLUE]):
+    reveal_type(red_or_blue.name)  # revealed: Literal["RED", "BLUE"]
+
+def _(any_color: Color):
+    # TODO: Literal["RED", "GREEN", "BLUE"]
+    reveal_type(any_color.name)  # revealed: Any
+```
+
+### `value` and `_value_`
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from enum import Enum, StrEnum
+from typing import Literal
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
+
+reveal_type(Color.RED.value)  # revealed: Literal[1]
+reveal_type(Color.RED._value_)  # revealed: Literal[1]
+
+reveal_type(Color.GREEN.value)  # revealed: Literal[2]
+reveal_type(Color.GREEN._value_)  # revealed: Literal[2]
+
+class Answer(StrEnum):
+    YES = "yes"
+    NO = "no"
+
+reveal_type(Answer.YES.value)  # revealed: Literal["yes"]
+reveal_type(Answer.YES._value_)  # revealed: Literal["yes"]
+
+reveal_type(Answer.NO.value)  # revealed: Literal["no"]
+reveal_type(Answer.NO._value_)  # revealed: Literal["no"]
 ```
 
 ## Properties of enum types
