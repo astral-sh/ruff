@@ -27,7 +27,7 @@ use crate::types::typed_dict::typed_dict_params_from_class_def;
 use crate::types::{
     ApplyTypeMappingVisitor, Binding, BoundSuperError, BoundSuperType, CallableType,
     DataclassParams, DeprecatedInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
-    IsEquivalentVisitor, KnownInstanceType, ManualPEP695TypeAliasType, MaterializationKind,
+    IsEquivalentVisitor, KnownInstanceType, ManualPEP695TypeAlias, MaterializationKind,
     NormalizedVisitor, PropertyInstanceType, StringLiteralType, TypeAliasType, TypeContext,
     TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind,
     TypedDictParams, UnionBuilder, VarianceInferable, declaration_type, determine_upper_bound,
@@ -5129,7 +5129,7 @@ impl KnownClass {
                     return;
                 };
                 overload.set_return_type(Type::KnownInstance(KnownInstanceType::TypeAliasType(
-                    TypeAliasType::ManualPEP695(ManualPEP695TypeAliasType::new(
+                    TypeAliasType::ManualPEP695(ManualPEP695TypeAlias::new(
                         db,
                         ast::name::Name::new(name.value(db)),
                         containing_assignment,

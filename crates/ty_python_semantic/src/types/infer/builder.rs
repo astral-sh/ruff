@@ -88,10 +88,11 @@ use crate::types::visitor::any_over_type;
 use crate::types::{
     CallDunderError, CallableType, ClassLiteral, ClassType, DataclassParams, DynamicType,
     IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, MemberLookupPolicy,
-    MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm, Parameters, SpecialFormType,
-    SubclassOfType, TrackedConstraintSet, Truthiness, Type, TypeAliasType, TypeAndQualifiers,
-    TypeContext, TypeQualifiers, TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation,
-    TypeVarInstance, TypeVarKind, UnionBuilder, UnionType, binding_type, todo_type,
+    MetaclassCandidate, PEP613TypeAlias, PEP695TypeAlias, Parameter, ParameterForm, Parameters,
+    SpecialFormType, SubclassOfType, TrackedConstraintSet, Truthiness, Type, TypeAliasType,
+    TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraintsEvaluation,
+    TypeVarDefaultEvaluation, TypeVarInstance, TypeVarKind, UnionBuilder, UnionType, binding_type,
+    todo_type,
 };
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::{EvaluationMode, UnpackPosition};
@@ -1225,6 +1226,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             DefinitionKind::TypeVar(typevar) => {
                 self.infer_typevar_deferred(typevar.node(self.module()));
+            }
+            DefinitionKind::AnnotatedAssignment(annotated_assignment) => {
+                self.infer_annotated_assignment_deferred(annotated_assignment);
             }
             _ => {}
         }
@@ -2587,7 +2591,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .to_scope_id(self.db(), self.file());
 
         let type_alias_ty = Type::KnownInstance(KnownInstanceType::TypeAliasType(
-            TypeAliasType::PEP695(PEP695TypeAliasType::new(
+            TypeAliasType::PEP695(PEP695TypeAlias::new(
                 self.db(),
                 &type_alias.name.as_name_expr().unwrap().id,
                 rhs_scope,
@@ -4058,6 +4062,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
+        // Handle assignments to `TYPE_CHECKING`.
         if target
             .as_name_expr()
             .is_some_and(|name| &name.id == "TYPE_CHECKING")
@@ -4086,6 +4091,43 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             declared.inner = Type::BooleanLiteral(true);
         }
 
+        // If the target of an assignment is not one of the place expressions we support,
+        // then they are not definitions, so we can only be here if the target is in a form supported as a place expression.
+        // In this case, we can simply store types in `target` below, instead of calling `infer_expression` (which would return `Never`).
+        debug_assert!(PlaceExpr::try_from_expr(target).is_some());
+
+        // Handle PEP 613 type aliases.
+        if matches!(
+            declared.inner,
+            Type::SpecialForm(SpecialFormType::TypeAlias)
+        ) {
+            let ty = if let Some(name_expr) = target.as_name_expr() {
+                if value.is_some() {
+                    self.deferred.insert(definition);
+                    Type::KnownInstance(KnownInstanceType::TypeAlias(TypeAliasType::PEP613(
+                        PEP613TypeAlias::new(self.db(), name_expr.id.clone(), definition),
+                    )))
+                } else {
+                    // TODO diagnostic: no RHS
+                    Type::unknown()
+                }
+            } else {
+                // TODO diagnostic: target is not a name
+                Type::unknown()
+            };
+            // TODO diagnostic if qualifiers are not empty
+            if value.is_some() || self.in_stub() {
+                self.add_declaration_with_binding(
+                    target.into(),
+                    definition,
+                    &DeclaredAndInferredType::AreTheSame(ty.into()),
+                );
+            } else {
+                self.add_declaration(target.into(), definition, ty.into());
+            }
+            return;
+        }
+
         // Handle various singletons.
         if let Some(name_expr) = target.as_name_expr() {
             if let Some(special_form) =
@@ -4094,11 +4136,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 declared.inner = Type::SpecialForm(special_form);
             }
         }
-
-        // If the target of an assignment is not one of the place expressions we support,
-        // then they are not definitions, so we can only be here if the target is in a form supported as a place expression.
-        // In this case, we can simply store types in `target` below, instead of calling `infer_expression` (which would return `Never`).
-        debug_assert!(PlaceExpr::try_from_expr(target).is_some());
 
         if let Some(value) = value {
             let inferred_ty = self
@@ -4155,6 +4192,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             self.store_expression_type(target, declared.inner_type());
         }
+    }
+
+    fn infer_annotated_assignment_deferred(
+        &mut self,
+        assignment: &'db AnnotatedAssignmentDefinitionKind,
+    ) {
+        // Annotated assignments defer the entire value expression in case of a PEP 613 type alias.
+        // SAFETY `infer_annotated_assignment_definition` does not defer it there is no RHS
+        let value_node = assignment.value(self.module()).unwrap();
+        self.infer_type_expression(value_node);
     }
 
     fn infer_augmented_assignment_statement(&mut self, assignment: &ast::StmtAugAssign) {
@@ -6997,8 +7044,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 todo @ Type::Dynamic(
                     DynamicType::Todo(_)
                     | DynamicType::TodoPEP695ParamSpec
-                    | DynamicType::TodoUnpack
-                    | DynamicType::TodoTypeAlias,
+                    | DynamicType::TodoUnpack,
                 ),
                 _,
                 _,
@@ -7008,8 +7054,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 todo @ Type::Dynamic(
                     DynamicType::Todo(_)
                     | DynamicType::TodoPEP695ParamSpec
-                    | DynamicType::TodoUnpack
-                    | DynamicType::TodoTypeAlias,
+                    | DynamicType::TodoUnpack,
                 ),
                 _,
             ) => Some(todo),
