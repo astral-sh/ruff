@@ -36,10 +36,10 @@ use crate::{FixAvailability, Violation};
 /// especially on older versions of Python.
 ///
 /// ## Fix Safety
-/// This rule's fix is always marked as unsafe because `os.path.expanduser` and `Path.expanduser` differ:
-/// if the home directory can't be resolved, `os.path.expanduser` returns the
-/// input unchanged, while `Path.expanduser` raises `RuntimeError`. This can
-/// change behavior in edge cases.
+/// This rule's fix is always marked as unsafe because the behaviors of
+/// `os.path.expanduser` and `Path.expanduser` differ when a user's home
+/// directory can't be resolved: `os.path.expanduser` returns the
+/// input unchanged, while `Path.expanduser` raises `RuntimeError`.
 ///
 /// ## References
 /// - [Python documentation: `Path.expanduser`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.expanduser)
