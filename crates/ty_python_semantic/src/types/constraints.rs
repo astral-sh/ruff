@@ -226,7 +226,7 @@ impl<'db> ConstraintSet<'db> {
         };
         let mut result = Self::always();
         for clause in clauses {
-            result.intersect_set(db, &clause.negate(db));
+            result.intersect_set(db, clause.negate(db));
         }
         result
     }
@@ -285,7 +285,10 @@ impl<'db> ConstraintSet<'db> {
         db: &'db dyn Db,
         constraint: Satisfiable<ConstrainedTypeVar<'db>>,
     ) {
-        self.union_clause(db, constraint.map(ConstraintClause::singleton));
+        self.union_clause(
+            db,
+            constraint.map(|constraint| ConstraintClause::singleton(db, constraint)),
+        );
     }
 
     /// Updates this set to be the union of itself and a clause. To maintain the invariants of this
@@ -419,9 +422,9 @@ impl<'db> ConstraintSet<'db> {
         // This is the distributive law:
         // (A ∪ B) ∩ (C ∪ D ∪ E) = (A ∩ C) ∪ (A ∩ D) ∪ (A ∩ E) ∪ (B ∩ C) ∪ (B ∩ D) ∪ (B ∩ E)
         let self_clauses = std::mem::take(self_clauses);
-        for self_clause in &self_clauses {
+        for self_clause in self_clauses {
             for other_clause in other_clauses {
-                self.union_clause(db, self_clause.intersect_clause(db, other_clause));
+                self.union_clause(db, self_clause.intersect_clause(db, *other_clause));
             }
         }
         if let Self::Clauses(clauses) = self {
@@ -470,13 +473,60 @@ impl From<bool> for ConstraintSet<'_> {
 /// This is called a "constraint set", and denoted _C_, in [[POPL2015][]].
 ///
 /// [POPL2015]: https://doi.org/10.1145/2676726.2676991
-#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
+#[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct ConstraintClause<'db> {
+    #[returns(ref)]
+    inner: ConstraintClauseInner<'db>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for ConstraintClause<'_> {}
+
+#[salsa::tracked]
+impl<'db> ConstraintClause<'db> {
+    /// Returns a clause containing a single constraint.
+    fn singleton(db: &'db dyn Db, constraint: ConstrainedTypeVar<'db>) -> Self {
+        let inner = ConstraintClauseInner {
+            constraints: smallvec![constraint],
+        };
+        Self::new_internal(db, inner)
+    }
+
+    /// Returns the intersection of this clause with another.
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    fn intersect_clause(self, db: &'db dyn Db, other: Self) -> Satisfiable<Self> {
+        self.inner(db)
+            .intersect_clause(db, other.inner(db))
+            .map(|inner| Self::new_internal(db, inner))
+    }
+
+    /// Tries to simplify the union of two clauses into a single clause, if possible.
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    fn simplify_clauses(self, db: &'db dyn Db, other: Self) -> Simplifiable<Self> {
+        self.inner(db)
+            .simplify_clauses(db, other.inner(db))
+            .map(|inner| Self::new_internal(db, inner))
+    }
+
+    /// Returns the negation of this clause. The result is a set since negating an intersection
+    /// produces a union.
+    #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+    fn negate(self, db: &'db dyn Db) -> ConstraintSet<'db> {
+        self.inner(db).negate(db)
+    }
+
+    fn display(self, db: &'db dyn Db) -> impl Display {
+        self.inner(db).display(db)
+    }
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
+pub struct ConstraintClauseInner<'db> {
     // NOTE: We use 1 here because most clauses only mention a single typevar.
     constraints: SmallVec<[ConstrainedTypeVar<'db>; 1]>,
 }
 
-impl<'db> ConstraintClause<'db> {
+impl<'db> ConstraintClauseInner<'db> {
     fn new(constraints: SmallVec<[ConstrainedTypeVar<'db>; 1]>) -> Satisfiable<Self> {
         if constraints.is_empty() {
             Satisfiable::Always
@@ -489,13 +539,6 @@ impl<'db> ConstraintClause<'db> {
     fn always() -> Self {
         Self {
             constraints: smallvec![],
-        }
-    }
-
-    /// Returns a clause containing a single constraint.
-    fn singleton(constraint: ConstrainedTypeVar<'db>) -> Self {
-        Self {
-            constraints: smallvec![constraint],
         }
     }
 
@@ -597,7 +640,7 @@ impl<'db> ConstraintClause<'db> {
     }
 
     /// Tries to simplify the union of two clauses into a single clause, if possible.
-    fn simplify_clauses(self, db: &'db dyn Db, other: Self) -> Simplifiable<Self> {
+    fn simplify_clauses(&self, db: &'db dyn Db, other: &Self) -> Simplifiable<Self> {
         // Saturation
         //
         // If either clause is always satisfiable, the union is too. (`1 ∪ C₂ = 1`, `C₁ ∪ 1 = 1`)
@@ -654,11 +697,11 @@ impl<'db> ConstraintClause<'db> {
         //
         // TODO: Consider checking both directions in one pass, possibly via a tri-valued return
         // value.
-        if self.subsumes_via_intersection(db, &other) {
-            return Simplifiable::Simplified(other);
+        if self.subsumes_via_intersection(db, other) {
+            return Simplifiable::Simplified(other.clone());
         }
-        if other.subsumes_via_intersection(db, &self) {
-            return Simplifiable::Simplified(self);
+        if other.subsumes_via_intersection(db, self) {
+            return Simplifiable::Simplified(self.clone());
         }
 
         // Distribution
@@ -687,12 +730,12 @@ impl<'db> ConstraintClause<'db> {
         //     # `(T ≤ int ∩ U ≤ str ∩ V ≤ bytes)`
         //     x: A[X1, Y1, Z2] | A[X2, Y2, Z2]
         // ```
-        if let Some(simplified) = self.simplifies_via_distribution(db, &other) {
+        if let Some(simplified) = self.simplifies_via_distribution(db, other) {
             return simplified;
         }
 
         // Can't be simplified
-        Simplifiable::NotSimplified(self, other)
+        Simplifiable::NotSimplified(self.clone(), other.clone())
     }
 
     /// Returns whether this clause subsumes `other` via intersection — that is, if the
@@ -838,7 +881,7 @@ impl<'db> ConstraintClause<'db> {
 
     fn display(&self, db: &'db dyn Db) -> impl Display {
         struct DisplayConstraintClause<'a, 'db> {
-            clause: &'a ConstraintClause<'db>,
+            clause: &'a ConstraintClauseInner<'db>,
             db: &'db dyn Db,
         }
 
