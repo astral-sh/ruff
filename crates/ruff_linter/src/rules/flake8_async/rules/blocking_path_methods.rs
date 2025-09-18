@@ -1,8 +1,8 @@
 use crate::Violation;
 use crate::checkers::ast::Checker;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, ExprCall};
-use ruff_python_semantic::analyze::typing::{PathlibPathChecker, check_type};
+use ruff_python_ast::{self as ast, Expr, ExprCall};
+use ruff_python_semantic::analyze::typing::{TypeChecker, check_type, traverse_union_and_optional};
 use ruff_text_size::Ranged;
 
 /// ## What it does
@@ -46,6 +46,63 @@ impl Violation for BlockingPathMethodInAsyncFunction {
             "Async functions should not use {path_library} methods, use trio.Path or anyio.path",
             path_library = self.path_library
         )
+    }
+}
+
+struct PathlibPathChecker;
+
+impl PathlibPathChecker {
+    fn is_pathlib_path_constructor(
+        semantic: &ruff_python_semantic::SemanticModel,
+        expr: &Expr,
+    ) -> bool {
+        let Some(qualified_name) = semantic.resolve_qualified_name(expr) else {
+            return false;
+        };
+
+        matches!(
+            qualified_name.segments(),
+            [
+                "pathlib",
+                "Path"
+                    | "PosixPath"
+                    | "PurePath"
+                    | "PurePosixPath"
+                    | "PureWindowsPath"
+                    | "WindowsPath"
+            ]
+        )
+    }
+}
+
+impl TypeChecker for PathlibPathChecker {
+    fn match_annotation(annotation: &Expr, semantic: &ruff_python_semantic::SemanticModel) -> bool {
+        if Self::is_pathlib_path_constructor(semantic, annotation) {
+            return true;
+        }
+
+        let mut found = false;
+        traverse_union_and_optional(
+            &mut |inner_expr, _| {
+                if Self::is_pathlib_path_constructor(semantic, inner_expr) {
+                    found = true;
+                }
+            },
+            semantic,
+            annotation,
+        );
+        found
+    }
+
+    fn match_initializer(
+        initializer: &Expr,
+        semantic: &ruff_python_semantic::SemanticModel,
+    ) -> bool {
+        let Expr::Call(ast::ExprCall { func, .. }) = initializer else {
+            return false;
+        };
+
+        Self::is_pathlib_path_constructor(semantic, func)
     }
 }
 

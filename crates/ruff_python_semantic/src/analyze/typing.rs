@@ -891,7 +891,7 @@ impl TypeChecker for IoBaseChecker {
 pub struct PathlibPathChecker;
 
 impl PathlibPathChecker {
-    pub fn is_pathlib_path_constructor(semantic: &SemanticModel, expr: &Expr) -> bool {
+    fn is_pathlib_path_constructor(semantic: &SemanticModel, expr: &Expr) -> bool {
         let Some(qualified_name) = semantic.resolve_qualified_name(expr) else {
             return false;
         };
@@ -912,22 +912,13 @@ impl PathlibPathChecker {
 }
 
 impl TypeChecker for PathlibPathChecker {
+    // match_annotation doesn't check `Path` in union
+    // or `Optional`.
+    // TODO: Once we have updated it to handle those
+    // cases, update `blocking_path_method.rs`(ASYNC240)
+    // to use this version of `PathlibPathChecker`.
     fn match_annotation(annotation: &Expr, semantic: &SemanticModel) -> bool {
-        if Self::is_pathlib_path_constructor(semantic, annotation) {
-            return true;
-        }
-
-        let mut found = false;
-        traverse_union_and_optional(
-            &mut |inner_expr, _| {
-                if Self::is_pathlib_path_constructor(semantic, inner_expr) {
-                    found = true;
-                }
-            },
-            semantic,
-            annotation,
-        );
-        found
+        Self::is_pathlib_path_constructor(semantic, annotation)
     }
 
     fn match_initializer(initializer: &Expr, semantic: &SemanticModel) -> bool {
