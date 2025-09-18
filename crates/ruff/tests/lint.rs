@@ -5891,3 +5891,113 @@ fn show_fixes_in_full_output_with_preview_enabled() {
     ",
     );
 }
+
+#[test]
+fn rule_panic_mixed_results_concise() -> Result<()> {
+    let tempdir = TempDir::new()?;
+
+    // Create python files
+    let file_a_path = tempdir.path().join("normal.py");
+    let file_b_path = tempdir.path().join("panic.py");
+    fs::write(&file_a_path, b"import os")?;
+    fs::write(&file_b_path, b"print('hello, world!')")?;
+
+    insta::with_settings!({
+        filters => vec![
+            (tempdir_filter(&tempdir).as_str(), "[TMP]/"),
+            (r"\\", r"/"),
+        ]
+    }, {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args(["check", "--select", "RUF9", "--preview", "--output-format=concise", "--no-cache"])
+            .args([file_a_path, file_b_path]),
+        @r"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+    [TMP]/normal.py:1:1: RUF900 Hey this is a stable test rule.
+    [TMP]/normal.py:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
+    [TMP]/normal.py:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
+    [TMP]/normal.py:1:1: RUF903 Hey this is a stable test rule with a display only fix.
+    [TMP]/normal.py:1:1: RUF911 Hey this is a preview test rule.
+    [TMP]/normal.py:1:1: RUF950 Hey this is a test rule that was redirected from another.
+    [TMP]/panic.py: panic: Fatal error while linting: This is a fake panic for testing.
+    Found 7 errors.
+    [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
+
+    ----- stderr -----
+    error: Panic during linting indicates a bug in Ruff. If you could open an issue at:
+
+    https://github.com/astral-sh/ruff/issues/new?title=%5BLinter%20panic%5D
+
+    ...with the relevant file contents, the `pyproject.toml` settings, and the stack trace above, we'd be very appreciative!
+    ");
+    });
+    Ok(())
+}
+
+#[test]
+fn rule_panic_mixed_results_full() -> Result<()> {
+    let tempdir = TempDir::new()?;
+
+    // Create python files
+    let file_a_path = tempdir.path().join("normal.py");
+    let file_b_path = tempdir.path().join("panic.py");
+    fs::write(&file_a_path, b"import os")?;
+    fs::write(&file_b_path, b"print('hello, world!')")?;
+
+    insta::with_settings!({
+        filters => vec![
+            (tempdir_filter(&tempdir).as_str(), "[TMP]/"),
+            (r"\\", r"/"),
+        ]
+    }, {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args(["check", "--select", "RUF9", "--preview", "--output-format=full", "--no-cache"])
+            .args([file_a_path, file_b_path]),
+        @r"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+    RUF900 Hey this is a stable test rule.
+    --> [TMP]/normal.py:1:1
+
+    RUF901 [*] Hey this is a stable test rule with a safe fix.
+    --> [TMP]/normal.py:1:1
+    1 + # fix from stable-test-rule-safe-fix
+    2 | import os
+
+    RUF902 Hey this is a stable test rule with an unsafe fix.
+    --> [TMP]/normal.py:1:1
+
+    RUF903 Hey this is a stable test rule with a display only fix.
+    --> [TMP]/normal.py:1:1
+
+    RUF911 Hey this is a preview test rule.
+    --> [TMP]/normal.py:1:1
+
+    RUF950 Hey this is a test rule that was redirected from another.
+    --> [TMP]/normal.py:1:1
+
+    panic: Fatal error while linting: This is a fake panic for testing.
+    --> [TMP]/panic.py:1:1
+    info: panicked at crates/ruff_linter/src/rules/ruff/rules/test_rules.rs:511:9:
+    This is a fake panic for testing.
+    run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+    Found 7 errors.
+    [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
+
+    ----- stderr -----
+    error: Panic during linting indicates a bug in Ruff. If you could open an issue at:
+
+    https://github.com/astral-sh/ruff/issues/new?title=%5BLinter%20panic%5D
+
+    ...with the relevant file contents, the `pyproject.toml` settings, and the stack trace above, we'd be very appreciative!
+    ");
+    });
+    Ok(())
+}

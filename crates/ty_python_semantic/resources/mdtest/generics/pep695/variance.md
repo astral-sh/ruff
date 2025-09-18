@@ -752,6 +752,36 @@ b_container = ClassContainer[B](B)
 a_instance: A = use_a_class_container(b_container)  # This should work
 ```
 
+## TypeIs
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+`TypeIs[T]` is invariant in `T`. See the [typing spec][typeis-spec] for a justification.
+
+```py
+from typing import TypeIs
+from ty_extensions import is_assignable_to, is_subtype_of, static_assert
+
+class A:
+    pass
+
+class B(A):
+    pass
+
+class C[T]:
+    def check(x: object) -> TypeIs[T]:
+        # this is a bad check, but we only care about it type-checking
+        return False
+
+static_assert(not is_subtype_of(C[B], C[A]))
+static_assert(not is_subtype_of(C[A], C[B]))
+static_assert(not is_assignable_to(C[B], C[A]))
+static_assert(not is_assignable_to(C[A], C[B]))
+```
+
 ## Inheriting from generic classes with inferred variance
 
 When inheriting from a generic class with our type variable substituted in, we count its occurrences
@@ -837,3 +867,4 @@ static_assert(is_subtype_of(DerivedContravariant[A], DerivedContravariant[B]))
 
 [linear-time-variance-talk]: https://www.youtube.com/watch?v=7uixlNTOY4s&t=9705s
 [spec]: https://typing.python.org/en/latest/spec/generics.html#variance
+[typeis-spec]: https://typing.python.org/en/latest/spec/narrowing.html#typeis

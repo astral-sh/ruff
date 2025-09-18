@@ -203,7 +203,7 @@ impl Workspace {
         // Extract the `# noqa` and `# isort: skip` directives from the source.
         let directives = directives::extract_directives(
             parsed.tokens(),
-            directives::Flags::empty(),
+            directives::Flags::from_settings(&self.settings.linter),
             &locator,
             &indexer,
         );

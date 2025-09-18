@@ -2626,7 +2626,7 @@ pub(crate) fn report_undeclared_protocol_member(
         let binding_type = binding_type(db, definition);
 
         let suggestion = binding_type
-            .literal_fallback_instance(db)
+            .literal_promotion_type(db)
             .unwrap_or(binding_type);
 
         if should_give_hint(db, suggestion) {

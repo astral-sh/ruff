@@ -425,6 +425,22 @@ impl TextRange {
     }
 }
 
+/// Conversion methods.
+impl TextRange {
+    /// A convenience routine for converting this range to a
+    /// standard library range that satisfies the `RangeBounds`
+    /// trait.
+    ///
+    /// This is also available as a `From` trait implementation,
+    /// but this method avoids the need to specify types to help
+    /// inference.
+    #[inline]
+    #[must_use]
+    pub fn to_std_range(&self) -> Range<usize> {
+        (*self).into()
+    }
+}
+
 impl Index<TextRange> for str {
     type Output = str;
     #[inline]

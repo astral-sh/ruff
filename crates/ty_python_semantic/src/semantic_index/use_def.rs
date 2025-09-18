@@ -670,7 +670,7 @@ pub(crate) struct EnclosingSnapshotKey {
 /// new binding.
 type EnclosingSnapshots = IndexVec<ScopedEnclosingSnapshotId, EnclosingSnapshot>;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct BindingWithConstraintsIterator<'map, 'db> {
     all_definitions: &'map IndexVec<ScopedDefinitionId, DefinitionState<'db>>,
     pub(crate) predicates: &'map Predicates<'db>,
