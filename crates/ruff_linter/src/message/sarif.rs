@@ -257,9 +257,7 @@ impl<'a> SarifResult<'a> {
     }
 
     fn fix(diagnostic: &'a Diagnostic, uri: &str) -> Option<SarifFix> {
-        let Some(fix) = diagnostic.fix() else {
-            return None;
-        };
+        let fix = diagnostic.fix()?;
 
         let Some(source_file) = diagnostic.ruff_source_file() else {
             debug_assert!(
