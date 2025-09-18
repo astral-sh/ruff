@@ -1585,6 +1585,7 @@ mod tests {
         let TestCase { db, src, .. } = TestCaseBuilder::new().with_src_files(SRC).build();
 
         let foo = resolve_module(&db, &ModuleName::new_static("foo").unwrap()).unwrap();
+        let foo_real = resolve_real_module(&db, &ModuleName::new_static("foo").unwrap()).unwrap();
         let foo_stub = src.join("foo.pyi");
 
         assert_eq!(&src, foo.search_path(&db).unwrap());
@@ -1592,9 +1593,10 @@ mod tests {
 
         assert_eq!(Some(foo), path_to_module(&db, &FilePath::System(foo_stub)));
         assert_eq!(
-            None,
+            Some(foo_real),
             path_to_module(&db, &FilePath::System(src.join("foo.py")))
         );
+        assert!(foo_real != foo);
     }
 
     #[test]
