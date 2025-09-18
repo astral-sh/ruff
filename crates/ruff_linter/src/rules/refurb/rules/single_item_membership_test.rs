@@ -30,11 +30,13 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// The fix is always marked as unsafe.
 ///
 /// When the right-hand side is a string, this fix can change the behavior of your program.
-/// This is because `c in "a"` is true both when `c` is `"a"` and when `c` is the empty string,
+/// This is because `c in "a"` is true both when `c` is `"a"` and when `c` is the empty string.
 ///
-/// Converting `in`/`not in` against a single-item container to `==`/`!=` can
-/// change runtime behavior: `in` may consider identity (e.g., `NaN`), it always
-/// yields a `bool`, and comments within the replacement range may be removed.
+/// Additionally, converting `in`/`not in` against a single-item container to `==`/`!=` can
+/// change runtime behavior: `in` may consider identity (e.g., `NaN`) and always
+/// yields a `bool`. 
+///
+/// Comments within the replacement range will also be removed.
 ///
 /// ## References
 /// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
