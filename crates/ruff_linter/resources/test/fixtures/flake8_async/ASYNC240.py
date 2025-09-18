@@ -55,6 +55,10 @@ async def anyio_path_in_foo():
     with Path("src/my_text.txt").open() as f: # OK
         ...
 
+async def path_open_in_foo():
+    path = Path("src/my_text.txt") # OK
+    path.open() # OK, covered by ASYNC230
+
 ## Invalid cases:
 
 async def os_path_in_foo():
@@ -66,22 +70,16 @@ async def os_path_in_foo():
 async def pathlib_path_in_foo():
     path = Path("src/my_text.txt")
     path.exists() # ASYNC240
-    with path.open() as f: # ASYNC240
-        ...
 
 async def pathlib_path_in_foo():
     import pathlib
 
     path = pathlib.Path("src/my_text.txt")
     path.exists() # ASYNC240
-    with path.open() as f: # ASYNC240
-        ...
 
 async def inline_path_method_call():
-    Path("src/my_text.txt").open() # ASYNC240
-    Path("src/my_text.txt").open().flush() # ASYNC240
-    with Path("src/my_text.txt").open() as f: # ASYNC240
-        ...
+    Path("src/my_text.txt").exists() # ASYNC240
+    Path("src/my_text.txt").absolute().exists() # ASYNC240
 
 async def aliased_path_in_foo():
     from pathlib import Path as PathAlias
