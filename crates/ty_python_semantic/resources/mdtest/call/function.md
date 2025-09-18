@@ -1118,3 +1118,38 @@ def _(kwargs: dict[str, int] | int):
     # error: [invalid-argument-type] "Argument expression after ** must be a mapping type: Found `InvalidMapping`"
     f(**InvalidMapping())
 ```
+
+### Generic
+
+For a generic keywords parameter, the type variable should be specialized to the value type of the
+mapping.
+
+```py
+from typing import TypeVar
+
+_T = TypeVar("_T")
+
+def f(**kwargs: _T) -> _T:
+    return kwargs["a"]
+
+def _(kwargs: dict[str, int]) -> None:
+    reveal_type(f(**kwargs))  # revealed: int
+```
+
+For a `TypedDict`, the type variable should be specialized to the union of all value types.
+
+```py
+from typing import TypeVar
+from typing_extensions import TypedDict
+
+_T = TypeVar("_T")
+
+class Foo(TypedDict):
+    a: int
+    b: str
+
+def f(**kwargs: _T) -> _T:
+    return kwargs["a"]
+
+reveal_type(f(**Foo(a=1, b="b")))  # revealed: int | str
+```

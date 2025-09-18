@@ -2090,6 +2090,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         &mut self,
         argument_index: usize,
         argument: Argument<'a>,
+        argument_type: Option<Type<'db>>,
         name: &str,
     ) -> Result<(), ()> {
         let Some((parameter_index, parameter)) = self
@@ -2106,7 +2107,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         self.assign_argument(
             argument_index,
             argument,
-            None,
+            argument_type,
             parameter_index,
             parameter,
             false,
@@ -2157,10 +2158,30 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
     ) {
         if let Some(Type::TypedDict(typed_dict)) = argument_type {
             // Special case TypedDict because we know which keys are present.
-            for (name, _field) in typed_dict.items(db) {
-                let _ = self.match_keyword(argument_index, Argument::Keywords, name.as_str());
+            for (name, field) in typed_dict.items(db) {
+                let _ = self.match_keyword(
+                    argument_index,
+                    Argument::Keywords,
+                    Some(field.declared_ty),
+                    name.as_str(),
+                );
             }
         } else {
+            let value_type = match argument_type.map(|ty| {
+                ty.member_lookup_with_policy(
+                    db,
+                    Name::new_static("__getitem__"),
+                    MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                )
+                .place
+            }) {
+                Some(Place::Type(keys_method, Boundness::Bound)) => keys_method
+                    .try_call(db, &CallArguments::positional([Type::unknown()]))
+                    .ok()
+                    .map_or_else(Type::unknown, |bindings| bindings.return_type(db)),
+                _ => Type::unknown(),
+            };
+
             for (parameter_index, parameter) in self.parameters.iter().enumerate() {
                 if self.parameter_matched[parameter_index] && !parameter.is_keyword_variadic() {
                     continue;
@@ -2174,7 +2195,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                 self.assign_argument(
                     argument_index,
                     Argument::Keywords,
-                    None,
+                    Some(value_type),
                     parameter_index,
                     parameter,
                     false,
@@ -2648,7 +2669,7 @@ impl<'db> Binding<'db> {
                     let _ = matcher.match_positional(argument_index, argument, None);
                 }
                 Argument::Keyword(name) => {
-                    let _ = matcher.match_keyword(argument_index, argument, name);
+                    let _ = matcher.match_keyword(argument_index, argument, None, name);
                 }
                 Argument::Variadic(length) => {
                     let _ =
