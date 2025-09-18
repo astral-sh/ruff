@@ -119,44 +119,59 @@ impl TypeChecker for PathlibPathChecker {
 }
 
 fn maybe_calling_io_operation(attr: &str) -> bool {
+    // ".open()" is added to the allow list to let ASYNC 230 handle
+    // that case.
     !matches!(
         attr,
-        // Pure path objects provide path-handling operations which don’t actually
-        // access a filesystem.
-        // https://docs.python.org/3/library/pathlib.html#pure-paths
-        // pathlib.PurePath methods and properties:
-        "anchor"
+        "ALLOW_MISSING"
+            | "altsep"
+            | "anchor"
             | "as_posix"
             | "as_uri"
+            | "basename"
+            | "commonpath"
+            | "commonprefix"
+            | "curdir"
+            | "defpath"
+            | "devnull"
+            | "dirname"
             | "drive"
+            | "expandvars"
+            | "extsep"
+            | "genericpath"
             | "is_absolute"
             | "is_relative_to"
             | "is_reserved"
+            | "isabs"
+            | "join"
             | "joinpath"
             | "match"
             | "name"
+            | "normcase"
+            | "os"
+            | "open"
+            | "pardir"
             | "parent"
             | "parents"
             | "parts"
+            | "pathsep"
             | "relative_to"
             | "root"
+            | "samestat"
+            | "sep"
+            | "split"
+            | "splitdrive"
+            | "splitext"
+            | "splitroot"
             | "stem"
             | "suffix"
             | "suffixes"
+            | "supports_unicode_filenames"
+            | "sys"
             | "with_name"
             | "with_segments"
             | "with_stem"
             | "with_suffix"
-            // Non I/O pathlib.Path or os.path methods:
-            | "join"
-            | "dirname"
-            | "basename"
-            | "splitroot"
-            | "splitdrive"
-            | "splitext"
-            | "split"
-            | "isabs"
-            | "normcase"
     )
 }
 
@@ -168,7 +183,7 @@ pub(crate) fn blocking_os_path(checker: &Checker, call: &ExprCall) {
     }
 
     // Check if an expression is calling I/O related os.path method.
-    // Just intializing pathlib.Path object is OK, we can return
+    // Just initializing pathlib.Path object is OK, we can return
     // early in that scenario.
     if let Some(qualified_name) = semantic.resolve_qualified_name(call.func.as_ref()) {
         let segments = qualified_name.segments();
