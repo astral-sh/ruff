@@ -15,10 +15,12 @@ exit_code: 1
 ----- stdout -----
 unformatted: File would be reformatted
 --> input.py:1:1
-  - \
 1 | from test import say_hy
 2 | 
-3 | if __name__ == "__main__":
+  - if __name__ == '__main__':
+  -     say_hy('dear Ruff contributor')
+3 + if __name__ == "__main__":
+4 +     say_hy("dear Ruff contributor")
 
 1 file would be reformatted
 

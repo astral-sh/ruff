@@ -18,8 +18,8 @@ exit_code: 1
     "cell": null,
     "code": "unformatted",
     "end_location": {
-      "column": 1,
-      "row": 1
+      "column": 34,
+      "row": 4
     },
     "filename": "[TMP]/input.py",
     "fix": {
@@ -29,7 +29,7 @@ exit_code: 1
           "content": "from test import say_hy\n\nif __name__ == \"__main__\":\n    say_hy(\"dear Ruff contributor\")\n",
           "end_location": {
             "column": 1,
-            "row": 6
+            "row": 5
           },
           "location": {
             "column": 1,
@@ -40,8 +40,8 @@ exit_code: 1
       "message": null
     },
     "location": {
-      "column": 1,
-      "row": 1
+      "column": 16,
+      "row": 3
     },
     "message": "File would be reformatted",
     "noqa_row": null,

@@ -13,6 +13,6 @@ info:
 success: false
 exit_code: 1
 ----- stdout -----
-input.py:1: [unformatted] File would be reformatted
+input.py:3: [unformatted] File would be reformatted
 
 ----- stderr -----

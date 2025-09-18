@@ -70,8 +70,8 @@ bar =     "needs formatting"
     success: false
     exit_code: 1
     ----- stdout -----
-    bar.py: unformatted: File would be reformatted
-    foo.py: unformatted: File would be reformatted
+    bar.py:1:1: unformatted: File would be reformatted
+    foo.py:1:1: unformatted: File would be reformatted
     2 files would be reformatted
 
     ----- stderr -----
@@ -492,8 +492,8 @@ OTHER = "OTHER"
     success: false
     exit_code: 1
     ----- stdout -----
-    main.py: unformatted: File would be reformatted
-    test.py: unformatted: File would be reformatted
+    main.py:1:1: unformatted: File would be reformatted
+    test.py:1:1: unformatted: File would be reformatted
     2 files would be reformatted
 
     ----- stderr -----
@@ -548,7 +548,7 @@ if __name__ == "__main__":
     success: false
     exit_code: 1
     ----- stdout -----
-    main.py: unformatted: File would be reformatted
+    main.py:1:1: unformatted: File would be reformatted
     1 file would be reformatted
 
     ----- stderr -----
@@ -594,12 +594,12 @@ if __name__ == "__main__":
 #[test_case::test_case("azure")]
 #[test_case::test_case("sarif")]
 fn output_format(output_format: &str) -> Result<()> {
-    const CONTENT: &str = r#"\
+    const CONTENT: &str = "\
 from test import say_hy
 
-if __name__ == "__main__":
-    say_hy("dear Ruff contributor")
-"#;
+if __name__ == '__main__':
+    say_hy('dear Ruff contributor')
+";
 
     let tempdir = TempDir::new()?;
     let input = tempdir.path().join("input.py");
@@ -773,7 +773,7 @@ OTHER = "OTHER"
     success: false
     exit_code: 1
     ----- stdout -----
-    main.py: unformatted: File would be reformatted
+    main.py:1:1: unformatted: File would be reformatted
     1 file would be reformatted
 
     ----- stderr -----

@@ -30,7 +30,7 @@ exit_code: 1
                     {
                       "deletedRegion": {
                         "endColumn": 1,
-                        "endLine": 6,
+                        "endLine": 5,
                         "startColumn": 1,
                         "startLine": 1
                       },
@@ -54,10 +54,10 @@ exit_code: 1
                   "uri": "[TMP]/input.py"
                 },
                 "region": {
-                  "endColumn": 1,
-                  "endLine": 1,
-                  "startColumn": 1,
-                  "startLine": 1
+                  "endColumn": 34,
+                  "endLine": 4,
+                  "startColumn": 16,
+                  "startLine": 3
                 }
               }
             }
