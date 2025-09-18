@@ -6620,6 +6620,7 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
                 .map(|ty| ty.variance_of(db, typevar))
                 .collect(),
             Type::SubclassOf(subclass_of_type) => subclass_of_type.variance_of(db, typevar),
+            Type::TypeIs(type_is_type) => type_is_type.variance_of(db, typevar),
             Type::Dynamic(_)
             | Type::Never
             | Type::WrapperDescriptor(_)
@@ -6640,7 +6641,6 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             | Type::BoundSuper(_)
             | Type::TypeVar(_)
             | Type::NonInferableTypeVar(_)
-            | Type::TypeIs(_)
             | Type::TypedDict(_)
             | Type::TypeAlias(_) => TypeVarVariance::Bivariant,
         };
@@ -10953,6 +10953,16 @@ impl<'db> TypeIsType<'db> {
 
     pub(crate) fn is_bound(self, db: &'db dyn Db) -> bool {
         self.place_info(db).is_some()
+    }
+}
+
+impl<'db> VarianceInferable<'db> for TypeIsType<'db> {
+    // See the [typing spec] on why `TypeIs` is invariant in its type.
+    // [typing spec]: https://typing.python.org/en/latest/spec/narrowing.html#typeis
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+        self.return_type(db)
+            .with_polarity(TypeVarVariance::Invariant)
+            .variance_of(db, typevar)
     }
 }
 
