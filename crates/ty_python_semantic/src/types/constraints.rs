@@ -62,7 +62,7 @@
 //! supertype of it.
 
 use std::cmp::Ordering;
-use std::fmt::Display;
+use std::fmt::{Display, Write};
 
 use itertools::{EitherOrBoth, Itertools};
 use smallvec::{SmallVec, smallvec};
@@ -1665,6 +1665,87 @@ impl<'db> Node<'db> {
         match self {
             Node::AlwaysTrue | Node::AlwaysFalse => self,
             Node::Interior(interior) => interior.simplify(db),
+        }
+    }
+
+    fn display(self, db: &'db dyn Db) -> impl Display {
+        // To render a BDD in DNF form, you perform a depth-first search of the BDD tree, looking
+        // for any path that leads to the AlwaysTrue terminal. Each such path represents one of the
+        // intersection clauses in the DNF Form. The path traverses zero or more interior nodes,
+        // and takes either the true or false edge from each one. That gives you the positive or
+        // negative individual constraints in the path's clause.
+        //
+        // To make things simpler, we're going to perform that search eagerly, rendering the result
+        // into a `String`, and just return that `String` as our `Display` impl.
+
+        struct DisplayNode {
+            result: String,
+            current_clause: String,
+            first_clause: bool,
+        }
+
+        impl DisplayNode {
+            fn display_node<'db>(&mut self, db: &'db dyn Db, node: Node<'db>) {
+                match node {
+                    Node::AlwaysFalse => return,
+
+                    Node::AlwaysTrue => {
+                        if self.first_clause {
+                            self.first_clause = false;
+                        } else {
+                            self.result.push_str(" ∨ ");
+                        }
+                        if self.current_clause.contains("∧") {
+                            self.result.push_str("(");
+                        }
+                        self.result.push_str(&self.current_clause);
+                        if self.current_clause.contains("∧") {
+                            self.result.push_str(")");
+                        }
+                    }
+
+                    Node::Interior(interior) => {
+                        let interior_atom = interior.atom(db);
+                        let current_length = self.current_clause.len();
+
+                        if current_length > 1 {
+                            self.current_clause.push_str(" ∧ ");
+                        }
+                        let _ = write!(&mut self.current_clause, "{}", interior_atom.display(db));
+                        self.display_node(db, interior.if_true(db));
+                        self.current_clause.truncate(current_length);
+
+                        if current_length > 1 {
+                            self.current_clause.push_str(" ∧ ");
+                        }
+                        let _ = write!(
+                            &mut self.current_clause,
+                            "¬{}",
+                            // Hack alert
+                            NegatedRangeConstraint {
+                                hole: interior_atom.constraint(db).positive.clone()
+                            }
+                            .display(db, interior_atom.typevar(db).display(db)),
+                        );
+                        self.display_node(db, interior.if_false(db));
+                        self.current_clause.truncate(current_length);
+                    }
+                }
+            }
+        }
+
+        match self {
+            Node::AlwaysTrue => String::from("always"),
+            Node::AlwaysFalse => String::from("never"),
+            Node::Interior(_) => {
+                let mut display = DisplayNode {
+                    result: String::new(),
+                    current_clause: String::new(),
+                    first_clause: true,
+                };
+                display.display_node(db, self);
+                display.result
+            }
         }
     }
 }
