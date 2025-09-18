@@ -91,7 +91,7 @@ fn build_fstring(joiner: &str, joinees: &[Expr], flags: FStringFlags) -> Option<
         let mut flags = flags?;
 
         // If the result is a raw string and contains a newline, use triple quotes.
-        if flags.prefix().is_raw() && (content.contains('\n') || content.contains('\r')) {
+        if flags.prefix().is_raw() && content.contains(['\n', '\r']) {
             flags = flags.with_triple_quotes(ruff_python_ast::str::TripleQuotes::Yes);
 
             // Prefer a delimiter that doesn't occur in the content; if both occur, bail.
