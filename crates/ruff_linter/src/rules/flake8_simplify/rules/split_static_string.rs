@@ -1,5 +1,3 @@
-use std::cmp::Ordering;
-
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::StringFlags;
 use ruff_python_ast::{
@@ -7,6 +5,8 @@ use ruff_python_ast::{
     StringLiteralValue, UnaryOp, str::TripleQuotes,
 };
 use ruff_text_size::{Ranged, TextRange};
+use std::cmp::Ordering;
+use std::fmt::{Display, Formatter};
 
 use crate::checkers::ast::Checker;
 use crate::preview::is_maxsplit_without_separator_fix_enabled;
@@ -47,14 +47,40 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `str.split`](https://docs.python.org/3/library/stdtypes.html#str.split)
 #[derive(ViolationMetadata)]
-pub(crate) struct SplitStaticString;
+pub(crate) struct SplitStaticString {
+    method: Method,
+}
+
+#[derive(Copy, Clone, Debug)]
+enum Method {
+    Split,
+    RSplit,
+}
+
+impl Method {
+    fn is_split(self) -> bool {
+        matches!(self, Method::Split)
+    }
+}
+
+impl Display for Method {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Method::Split => f.write_str("split"),
+            Method::RSplit => f.write_str("rsplit"),
+        }
+    }
+}
 
 impl Violation for SplitStaticString {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Consider using a list literal instead of `str.split`".to_string()
+        format!(
+            "Consider using a list literal instead of `str.{}`",
+            self.method
+        )
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -77,26 +103,21 @@ pub(crate) fn split_static_string(
     };
 
     // `split` vs `rsplit`.
-    let direction = if attr == "split" {
-        Direction::Left
+    let method = if attr == "split" {
+        Method::Split
     } else {
-        Direction::Right
+        Method::RSplit
     };
 
     let sep_arg = arguments.find_argument_value("sep", 0);
     let split_replacement = if let Some(sep) = sep_arg {
         match sep {
             Expr::NoneLiteral(_) => {
-                split_default(str_value, maxsplit_value, direction, checker.settings())
+                split_default(str_value, maxsplit_value, method, checker.settings())
             }
             Expr::StringLiteral(sep_value) => {
                 let sep_value_str = sep_value.value.to_str();
-                Some(split_sep(
-                    str_value,
-                    sep_value_str,
-                    maxsplit_value,
-                    direction,
-                ))
+                Some(split_sep(str_value, sep_value_str, maxsplit_value, method))
             }
             // Ignore names until type inference is available.
             _ => {
@@ -104,10 +125,10 @@ pub(crate) fn split_static_string(
             }
         }
     } else {
-        split_default(str_value, maxsplit_value, direction, checker.settings())
+        split_default(str_value, maxsplit_value, method, checker.settings())
     };
 
-    let mut diagnostic = checker.report_diagnostic(SplitStaticString, call.range());
+    let mut diagnostic = checker.report_diagnostic(SplitStaticString { method }, call.range());
     if let Some(ref replacement_expr) = split_replacement {
         diagnostic.set_fix(Fix::applicable_edit(
             Edit::range_replacement(checker.generator().expr(replacement_expr), call.range()),
@@ -177,7 +198,7 @@ fn construct_replacement(elts: &[&str], flags: StringLiteralFlags) -> Expr {
 fn split_default(
     str_value: &StringLiteralValue,
     max_split: i32,
-    direction: Direction,
+    method: Method,
     settings: &LinterSettings,
 ) -> Option<Expr> {
     // From the Python documentation:
@@ -196,7 +217,7 @@ fn split_default(
             let Ok(max_split) = usize::try_from(max_split) else {
                 return None;
             };
-            let list_items: Vec<&str> = if direction == Direction::Left {
+            let list_items: Vec<&str> = if method.is_split() {
                 string_val
                     .trim_start_matches(py_unicode_is_whitespace)
                     .splitn(max_split + 1, py_unicode_is_whitespace)
@@ -224,7 +245,7 @@ fn split_default(
             //   - " x ".rsplit(maxsplit=0) -> [' x']
             //   - "".split(maxsplit=0) -> []
             //   - " ".split(maxsplit=0) -> []
-            let processed_str = if direction == Direction::Left {
+            let processed_str = if method.is_split() {
                 string_val.trim_start_matches(py_unicode_is_whitespace)
             } else {
                 string_val.trim_end_matches(py_unicode_is_whitespace)
@@ -256,22 +277,22 @@ fn split_sep(
     str_value: &StringLiteralValue,
     sep_value: &str,
     max_split: i32,
-    direction: Direction,
+    method: Method,
 ) -> Expr {
     let value = str_value.to_str();
     let list_items: Vec<&str> = if let Ok(split_n) = usize::try_from(max_split) {
-        match direction {
-            Direction::Left => value.splitn(split_n + 1, sep_value).collect(),
-            Direction::Right => {
+        match method {
+            Method::Split => value.splitn(split_n + 1, sep_value).collect(),
+            Method::RSplit => {
                 let mut items: Vec<&str> = value.rsplitn(split_n + 1, sep_value).collect();
                 items.reverse();
                 items
             }
         }
     } else {
-        match direction {
-            Direction::Left => value.split(sep_value).collect(),
-            Direction::Right => {
+        match method {
+            Method::Split => value.split(sep_value).collect(),
+            Method::RSplit => {
                 let mut items: Vec<&str> = value.rsplit(sep_value).collect();
                 items.reverse();
                 items
@@ -314,12 +335,6 @@ fn get_maxsplit_value(arg: Option<&Expr>) -> Option<i32> {
         // Default value is -1 (no splits).
         Some(-1)
     }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Direction {
-    Left,
-    Right,
 }
 
 /// Like [`char::is_whitespace`] but with Python's notion of whitespace.
