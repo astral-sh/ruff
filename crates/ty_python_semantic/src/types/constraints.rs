@@ -294,9 +294,9 @@ impl<'db> ConstraintSet<'db> {
     /// Updates this set to be the union of itself and a clause. To maintain the invariants of this
     /// type, we must simplify this clause against all existing clauses, if possible.
     fn union_clause(&mut self, db: &'db dyn Db, clause: Satisfiable<ConstraintClause<'db>>) {
-        let mut clause = match clause {
-            // If the new constraint can always be satisfied, that causes this whole set to be
-            // always satisfied too.
+        let clause = match clause {
+            // If the new clause can always be satisfied, that causes this whole set to be always
+            // satisfied too.
             Satisfiable::Always => {
                 *self = Self::Always;
                 return;
@@ -326,10 +326,31 @@ impl<'db> ConstraintSet<'db> {
 
         // Naively, we would just append the new clause to the set's list of clauses. But that
         // doesn't ensure that the clauses are simplified with respect to each other. So instead,
-        // we iterate through the list of existing clauses, and try to simplify the new clause
-        // against each one in turn. (We can assume that the existing clauses are already
-        // simplified with respect to each other, since we can assume that the invariant holds upon
-        // entry to this method.)
+        // we perform two simplification passes.
+
+        // In the first pass, we see if the new clause can be simplified against the entire list of
+        // existing clauses. (This is primarily used when the new clause contains multiple
+        // constraints, to see if its negation is already in the set. In that case the new clause
+        // and its negation simplify to Always.)
+        let mut clause = match clause.simplify_with_set(db, clauses) {
+            // If the simpified clause can always be satisfied, that causes this whole set to be
+            // always satisfied too.
+            Satisfiable::Always => {
+                *self = Self::Always;
+                return;
+            }
+
+            // If the simplified clause can never satisfied, then the set does not change (any more
+            // than whatever changes `simplify_with_set` applied).
+            Satisfiable::Never => return,
+
+            Satisfiable::Constrained(clause) => clause,
+        };
+
+        // In the second pass, we iterate through the list of existing clauses, and try to simplify
+        // the new clause against each one in turn. (We can assume that the existing clauses are
+        // already simplified with respect to each other, since we can assume that the invariant
+        // holds upon entry to this method.)
         let mut existing_clauses = std::mem::take(clauses).into_iter();
         for existing in existing_clauses.by_ref() {
             // Try to simplify the new clause against an existing clause.
@@ -498,6 +519,28 @@ impl<'db> ConstraintClause<'db> {
         self.inner(db)
             .intersect_clause(db, other.inner(db))
             .map(|inner| Self::new_internal(db, inner))
+    }
+
+    /// Tries to simplify the union of a clause and a set.
+    fn simplify_with_set(
+        self,
+        db: &'db dyn Db,
+        clauses: &SmallVec<[ConstraintClause<'db>; 2]>,
+    ) -> Satisfiable<Self> {
+        // Check if the set already contains the negation of the new clause. If it does, the new
+        // clause and the negation simplify to always satisfiable. (In theory we could remove the
+        // negation from the existing list of clauses in the set, but by returning
+        // Satisfiable::Always the entire set simplifies away anyway, so that is redundant work.)
+        if let ConstraintSet::Clauses(negated) = self.negate(db) {
+            let contains_negation =
+                (negated.iter()).all(|negated_clause| clauses.contains(negated_clause));
+            if contains_negation {
+                return Satisfiable::Always;
+            }
+        }
+
+        // If not, the clause cannot be simplified.
+        Satisfiable::Constrained(self)
     }
 
     /// Tries to simplify the union of two clauses into a single clause, if possible.

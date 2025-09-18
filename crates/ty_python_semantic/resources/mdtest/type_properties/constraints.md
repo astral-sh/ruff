@@ -584,7 +584,6 @@ def _[T, U]() -> None:
     # TODO: revealed: ty_extensions.ConstraintSet[always]
     # revealed: ty_extensions.ConstraintSet[((T@_ ≤ Base) ∧ (U@_ ≤ Base)) ∨ ¬(T@_ ≤ Base) ∨ ¬(U@_ ≤ Base)]
     reveal_type(constraint | ~constraint)
-    # TODO: revealed: ty_extensions.ConstraintSet[always]
-    # revealed: ty_extensions.ConstraintSet[¬(T@_ ≤ Base) ∨ ¬(U@_ ≤ Base) ∨ ((T@_ ≤ Base) ∧ (U@_ ≤ Base))]
+    # revealed: ty_extensions.ConstraintSet[always]
     reveal_type(~constraint | constraint)
 ```
