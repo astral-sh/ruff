@@ -20,6 +20,7 @@ use crate::ast_node_ref::AstNodeRef;
 use crate::module_name::ModuleName;
 use crate::module_resolver::resolve_module;
 use crate::node_key::NodeKey;
+use crate::place::ReExportKind;
 use crate::semantic_index::ast_ids::AstIdsBuilder;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::definition::{
@@ -1436,6 +1437,12 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         (Name::new(alias.name.id.split('.').next().unwrap()), false)
                     };
 
+                    let is_reexported = if is_reexported {
+                        ReExportKind::Yes
+                    } else {
+                        ReExportKind::No
+                    };
+
                     let symbol = self.add_symbol(symbol_name);
                     self.add_definition(
                         symbol.into(),
@@ -1560,6 +1567,15 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         (&asname.id, asname.id == alias.name.id)
                     } else {
                         (&alias.name.id, false)
+                    };
+
+                    let is_reexported = if is_reexported {
+                        ReExportKind::Yes
+                    } else if node.level == 1 {
+                        // `from . import a`
+                        ReExportKind::InitIdiom
+                    } else {
+                        ReExportKind::No
                     };
 
                     // Look for imports `from __future__ import annotations`, ignore `as ...`

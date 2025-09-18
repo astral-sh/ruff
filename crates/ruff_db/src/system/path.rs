@@ -754,6 +754,25 @@ impl SystemVirtualPath {
         Path::new(&self.0).extension().and_then(|ext| ext.to_str())
     }
 
+    /// Extracts the file stem, if possible
+    ///
+    /// ```
+    /// use ruff_db::system::SystemVirtualPath;
+    ///
+    /// assert_eq!("Untitled-1", SystemVirtualPath::new("untitled:Untitled-1").extension().unwrap());
+    /// assert_eq!("Untitled-1", SystemVirtualPath::new("untitled:Untitled-1.ipynb").extension().unwrap());
+    /// assert_eq!("Untitled-1", SystemVirtualPath::new("vscode-notebook-cell:Untitled-1.ipynb").extension().unwrap());
+    /// assert_eq!("__init__", SystemVirtualPath::new("untitled:init.py").extension().unwrap());
+    /// assert_eq!("__init__", SystemVirtualPath::new("untitled:foo/init.pyi").extension().unwrap());
+    /// ```
+    ///
+    /// See [`Path::file_stem`] for more details.
+    pub fn file_stem(&self) -> Option<&str> {
+        Path::new(&self.0)
+            .file_stem()
+            .and_then(|stem| stem.to_str())
+    }
+
     /// Returns the path as a string slice.
     #[inline]
     pub fn as_str(&self) -> &str {

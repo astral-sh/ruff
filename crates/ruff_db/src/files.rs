@@ -459,6 +459,29 @@ impl File {
         self.source_type(db).is_stub()
     }
 
+    /// Returns `true` if the file is an `__init__.py(i)`
+    pub fn is_init(self, db: &dyn Db) -> bool {
+        let (name, extension) = match self.path(db) {
+            FilePath::System(path) => (
+                path.file_stem(),
+                path.extension().and_then(PySourceType::try_from_extension),
+            ),
+            FilePath::Vendored(path) => (
+                path.file_stem(),
+                path.extension().and_then(PySourceType::try_from_extension),
+            ),
+            FilePath::SystemVirtual(path) => (
+                path.file_stem(),
+                path.extension().and_then(PySourceType::try_from_extension),
+            ),
+        };
+        name == Some("__init__")
+            && matches!(
+                extension,
+                Some(PySourceType::Python) | Some(PySourceType::Stub)
+            )
+    }
+
     pub fn source_type(self, db: &dyn Db) -> PySourceType {
         match self.path(db) {
             FilePath::System(path) => path
