@@ -1524,7 +1524,9 @@ impl<'a> Generator<'a> {
             self.buffer += &s;
             return;
         }
-        let escape = UnicodeEscape::with_preferred_quote(&s, flags.quote_style());
+
+        let quote_style = self.preferred_quote.unwrap_or_else(|| flags.quote_style());
+        let escape = UnicodeEscape::with_preferred_quote(&s, quote_style);
         if let Some(len) = escape.layout().len {
             self.buffer.reserve(len);
         }
@@ -1549,6 +1551,9 @@ impl<'a> Generator<'a> {
         flags: AnyStringFlags,
     ) {
         self.p(flags.prefix().as_str());
+
+        let flags =
+            flags.with_quote_style(self.preferred_quote.unwrap_or_else(|| flags.quote_style()));
         self.p(flags.quote_str());
         self.unparse_interpolated_string_body(values, flags);
         self.p(flags.quote_str());
@@ -2090,6 +2095,8 @@ if True:
     #[test_case::test_case("'hello'", "'hello'", Quote::Single ; "remain str single")]
     #[test_case::test_case("x: list['str']", r#"x: list["str"]"#, Quote::Double ; "type ann double")]
     #[test_case::test_case(r#"x: list["str"]"#, "x: list['str']", Quote::Single ; "type ann single")]
+    #[test_case::test_case("f'hello'", r#"f"hello""#, Quote::Double ; "basic fstring double")]
+    #[test_case::test_case(r#"f"hello""#, "f'hello'", Quote::Single ; "basic fstring single")]
     fn preferred_quote(inp: &str, out: &str, quote: Quote) {
         let got = round_trip_with(
             &Indentation::default(),
