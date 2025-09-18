@@ -2082,14 +2082,14 @@ if True:
 
     #[test_case::test_case(r#""'hello'""#, r#""'hello'""#, Quote::Single ; "basic str ignored")]
     #[test_case::test_case(r#"b"'hello'""#, r#"b"'hello'""#, Quote::Single ; "basic bytes ignored")]
-    #[test_case::test_case(r#""hello""#, "'hello'", Quote::Single ; "basic str single")]
     #[test_case::test_case("'hello'", r#""hello""#, Quote::Double ; "basic str double")]
-    #[test_case::test_case(r#"b"hello""#, "b'hello'", Quote::Single ; "basic bytes single")]
+    #[test_case::test_case(r#""hello""#, "'hello'", Quote::Single ; "basic str single")]
     #[test_case::test_case("b'hello'", r#"b"hello""#, Quote::Double ; "basic bytes double")]
+    #[test_case::test_case(r#"b"hello""#, "b'hello'", Quote::Single ; "basic bytes single")]
     #[test_case::test_case(r#""hello""#,  r#""hello""#, Quote::Double ; "remain str double")]
     #[test_case::test_case("'hello'", "'hello'", Quote::Single ; "remain str single")]
-    #[test_case::test_case(r#"x: list["str"]"#, "x: list['str']", Quote::Single ; "type ann single")]
     #[test_case::test_case("x: list['str']", r#"x: list["str"]"#, Quote::Double ; "type ann double")]
+    #[test_case::test_case(r#"x: list["str"]"#, "x: list['str']", Quote::Single ; "type ann single")]
     fn preferred_quote(inp: &str, out: &str, quote: Quote) {
         let got = round_trip_with(
             &Indentation::default(),
