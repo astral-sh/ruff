@@ -8,6 +8,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 
 pub use self::render::{
     DisplayDiagnostic, DisplayDiagnostics, FileResolver, Input, ceil_char_boundary,
+    github::{DisplayGithubDiagnostics, GithubRenderer},
 };
 use crate::{Db, files::File};
 
@@ -499,10 +500,12 @@ impl Diagnostic {
     /// Panics if either diagnostic has no primary span, or if its file is not a `SourceFile`.
     pub fn ruff_start_ordering(&self, other: &Self) -> std::cmp::Ordering {
         let a = (
+            self.severity().is_fatal(),
             self.expect_ruff_source_file(),
             self.range().map(|r| r.start()),
         );
         let b = (
+            other.severity().is_fatal(),
             other.expect_ruff_source_file(),
             other.range().map(|r| r.start()),
         );
