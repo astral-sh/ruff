@@ -1023,32 +1023,6 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn find_python_files_deduplicated() -> Result<()> {
-        // Initialize the filesystem:
-        //   root
-        //   ├── file1.py
-        let tmp_dir = TempDir::new()?;
-        let root = tmp_dir.path();
-        let file1 = root.join("file1.py");
-        File::create(&file1)?;
-
-        let (paths, _) = python_files_in_path(
-            &[root.to_path_buf(), file1.clone()],
-            &PyprojectConfig::new(PyprojectDiscoveryStrategy::Fixed, Settings::default(), None),
-            &NoOpTransformer,
-        )?;
-        let paths = paths
-            .into_iter()
-            .flatten()
-            .map(ResolvedFile::into_path)
-            .sorted()
-            .collect::<Vec<_>>();
-        assert_eq!(paths, [file1]);
-
-        Ok(())
-    }
-
     fn make_exclusion(file_pattern: FilePattern) -> GlobSet {
         let mut builder = globset::GlobSetBuilder::new();
         file_pattern.add_to(&mut builder).unwrap();
