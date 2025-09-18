@@ -61,6 +61,76 @@ impl Violation for BlockingPathMethodInAsyncFunction {
     }
 }
 
+/// ASYNC240
+pub(crate) fn blocking_os_path(checker: &Checker, call: &ExprCall) {
+    let semantic = checker.semantic();
+    if !semantic.in_async_context() {
+        return;
+    }
+
+    // Check if an expression is calling I/O related os.path method.
+    // Just initializing pathlib.Path object is OK, we can return
+    // early in that scenario.
+    if let Some(qualified_name) = semantic.resolve_qualified_name(call.func.as_ref()) {
+        let segments = qualified_name.segments();
+        if !matches!(segments, ["os", "path", _]) {
+            return;
+        }
+
+        let Some(os_path_method) = segments.last() else {
+            return;
+        };
+
+        if maybe_calling_io_operation(os_path_method) {
+            checker.report_diagnostic(
+                BlockingPathMethodInAsyncFunction {
+                    path_library: "os.path".to_string(),
+                },
+                call.func.range(),
+            );
+        }
+        return;
+    }
+
+    let Some(ast::ExprAttribute { value, attr, .. }) = call.func.as_attribute_expr() else {
+        return;
+    };
+
+    if !maybe_calling_io_operation(attr.id.as_str()) {
+        return;
+    }
+
+    // Check if an expression is a pathlib.Path constructor that directly
+    // calls an I/O method.
+    if PathlibPathChecker::match_initializer(value, semantic) {
+        checker.report_diagnostic(
+            BlockingPathMethodInAsyncFunction {
+                path_library: "pathlib.Path".to_string(),
+            },
+            call.func.range(),
+        );
+        return;
+    }
+
+    // Lastly, check if a variable is a pathlib.Path instance and it's
+    // calling an I/O method.
+    let Some(name) = value.as_name_expr() else {
+        return;
+    };
+
+    let Some(binding) = semantic.only_binding(name).map(|id| semantic.binding(id)) else {
+        return;
+    };
+
+    if check_type::<PathlibPathChecker>(binding, semantic) {
+        checker.report_diagnostic(
+            BlockingPathMethodInAsyncFunction {
+                path_library: "pathlib.Path".to_string(),
+            },
+            call.func.range(),
+        );
+    }
+}
 struct PathlibPathChecker;
 
 impl PathlibPathChecker {
@@ -173,75 +243,4 @@ fn maybe_calling_io_operation(attr: &str) -> bool {
             | "with_stem"
             | "with_suffix"
     )
-}
-
-/// ASYNC240
-pub(crate) fn blocking_os_path(checker: &Checker, call: &ExprCall) {
-    let semantic = checker.semantic();
-    if !semantic.in_async_context() {
-        return;
-    }
-
-    // Check if an expression is calling I/O related os.path method.
-    // Just initializing pathlib.Path object is OK, we can return
-    // early in that scenario.
-    if let Some(qualified_name) = semantic.resolve_qualified_name(call.func.as_ref()) {
-        let segments = qualified_name.segments();
-        if !matches!(segments, ["os", "path", _]) {
-            return;
-        }
-
-        let Some(os_path_method) = segments.last() else {
-            return;
-        };
-
-        if maybe_calling_io_operation(os_path_method) {
-            checker.report_diagnostic(
-                BlockingPathMethodInAsyncFunction {
-                    path_library: "os.path".to_string(),
-                },
-                call.func.range(),
-            );
-        }
-        return;
-    }
-
-    let Some(ast::ExprAttribute { value, attr, .. }) = call.func.as_attribute_expr() else {
-        return;
-    };
-
-    if !maybe_calling_io_operation(attr.id.as_str()) {
-        return;
-    }
-
-    // Check if an expression is a pathlib.Path constructor that directly
-    // calls an I/O method.
-    if PathlibPathChecker::match_initializer(value, semantic) {
-        checker.report_diagnostic(
-            BlockingPathMethodInAsyncFunction {
-                path_library: "pathlib.Path".to_string(),
-            },
-            call.func.range(),
-        );
-        return;
-    }
-
-    // Lastly, check if a variable is a pathlib.Path instance and it's
-    // calling an I/O method.
-    let Some(name) = value.as_name_expr() else {
-        return;
-    };
-
-    let Some(binding) = semantic.only_binding(name).map(|id| semantic.binding(id)) else {
-        return;
-    };
-
-    if check_type::<PathlibPathChecker>(binding, semantic) {
-        checker.report_diagnostic(
-            BlockingPathMethodInAsyncFunction {
-                path_library: "pathlib.Path".to_string(),
-            },
-            call.func.range(),
-        );
-    }
 }
