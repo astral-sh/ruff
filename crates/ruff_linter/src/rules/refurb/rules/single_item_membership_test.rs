@@ -34,7 +34,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// Additionally, converting `in`/`not in` against a single-item container to `==`/`!=` can
 /// change runtime behavior: `in` may consider identity (e.g., `NaN`) and always
-/// yields a `bool`. 
+/// yields a `bool`.
 ///
 /// Comments within the replacement range will also be removed.
 ///
