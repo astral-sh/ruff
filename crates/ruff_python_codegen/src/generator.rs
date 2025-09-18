@@ -108,8 +108,7 @@ impl<'a> Generator<'a> {
     /// Set a preferred quote style for generated source code.
     ///
     /// - If [`None`], the generator will attempt to preserve the existing quote style whenever possible.
-    /// - If [`Some`], the generator will always use the specified quote style,
-    /// ignoring the one found in the source.
+    /// - If [`Some`], the generator will always use the specified quote style, ignoring the one found in the source.
     #[must_use]
     pub fn with_preferred_quote(mut self, quote: Option<Quote>) -> Self {
         self.preferred_quote = quote;
