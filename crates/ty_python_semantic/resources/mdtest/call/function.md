@@ -1087,3 +1087,34 @@ def _(kwargs: dict[str, int]) -> None:
     # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `str`, found `int`"
     f(**MappingProtocol())
 ```
+
+### `Unknown` type
+
+```py
+from ty_extensions import Unknown
+
+def f(**kwargs: int) -> None: ...
+def _(kwargs: Unknown):
+    f(**kwargs)
+```
+
+### Key is not a mapping
+
+```py
+def f(**kwargs: int) -> None: ...
+
+class A: ...
+
+class InvalidMapping:
+    def keys(self) -> A:
+        return A()
+
+    def __getitem__(self, key: str) -> int:
+        return 1
+
+def _(kwargs: dict[str, int] | int):
+    # error: [invalid-argument-type] "Argument expression after ** must be a mapping type: Found `dict[str, int] | int`"
+    f(**kwargs)
+    # error: [invalid-argument-type] "Argument expression after ** must be a mapping type: Found `InvalidMapping`"
+    f(**InvalidMapping())
+```
