@@ -849,9 +849,9 @@ fn rank_matches(binding: &Binding, prototype: &QualifiedName) -> (usize, std::cm
     (left, std::cmp::Reverse(qname.segments().len()))
 }
 
-fn best_match<'a, 'b, 'c>(
-    unused: &'a Vec<&'b Binding<'c>>,
-    prototype: &'a QualifiedName,
+fn best_match<'b, 'c>(
+    unused: &Vec<&'b Binding<'c>>,
+    prototype: &QualifiedName,
 ) -> Option<&'b Binding<'c>> {
     unused
         .iter()
