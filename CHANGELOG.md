@@ -42,7 +42,6 @@ Released on 2025-09-18.
 ### Other changes
 
 - Bump MSRV to Rust 1.88 ([#20470](https://github.com/astral-sh/ruff/pull/20470))
-- Revert "\[ruff\]: Build loongarch64 binaries in CI (#20361)" ([#20372](https://github.com/astral-sh/ruff/pull/20372))
 - Enable inline noqa for multiline strings in playground ([#20442](https://github.com/astral-sh/ruff/pull/20442))
 
 ### Contributors
