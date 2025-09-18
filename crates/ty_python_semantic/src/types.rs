@@ -1509,6 +1509,7 @@ impl<'db> Type<'db> {
     /// Return true if this type is a subtype of type `target`.
     ///
     /// See [`TypeRelation::Subtyping`] for more details.
+    #[salsa::tracked(cycle_fn=is_subtype_of_cycle_recover, cycle_initial=is_subtype_of_cycle_initial)]
     pub(crate) fn is_subtype_of(self, db: &'db dyn Db, target: Type<'db>) -> bool {
         self.when_subtype_of(db, target, InferableTypeVars::None)
             .is_always_satisfied()
@@ -7324,6 +7325,25 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
         );
         v
     }
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)]
+fn is_subtype_of_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &bool,
+    _count: u32,
+    _subtype: Type<'db>,
+    _supertype: Type<'db>,
+) -> salsa::CycleRecoveryAction<bool> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn is_subtype_of_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _subtype: Type<'db>,
+    _supertype: Type<'db>,
+) -> bool {
+    true
 }
 
 fn apply_specialization_cycle_recover<'db>(
