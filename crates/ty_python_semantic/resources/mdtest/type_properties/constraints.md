@@ -566,25 +566,44 @@ def _[T]() -> None:
 ### Negation of constraints involving two variables
 
 ```py
-from typing import Never
+from typing import final, Never
 from ty_extensions import range_constraint
 
 class Base: ...
+
+@final
+class Unrelated: ...
 
 def _[T, U]() -> None:
     # revealed: ty_extensions.ConstraintSet[¬(T@_ ≤ Base) ∨ ¬(U@_ ≤ Base)]
     reveal_type(~(range_constraint(Never, T, Base) & range_constraint(Never, U, Base)))
 ```
 
-The union of a range constraint and its negation should always be satisfiable.
+The union of a constraint and its negation should always be satisfiable.
 
 ```py
 def _[T, U]() -> None:
-    constraint = range_constraint(Never, T, Base) & range_constraint(Never, U, Base)
+    c1 = range_constraint(Never, T, Base) & range_constraint(Never, U, Base)
     # TODO: revealed: ty_extensions.ConstraintSet[always]
     # revealed: ty_extensions.ConstraintSet[((T@_ ≤ Base) ∧ (U@_ ≤ Base)) ∨ ¬(T@_ ≤ Base) ∨ ¬(U@_ ≤ Base)]
-    reveal_type(constraint | ~constraint)
+    reveal_type(c1 | ~c1)
     # TODO: revealed: ty_extensions.ConstraintSet[always]
     # revealed: ty_extensions.ConstraintSet[¬(T@_ ≤ Base) ∨ ¬(U@_ ≤ Base) ∨ ((T@_ ≤ Base) ∧ (U@_ ≤ Base))]
-    reveal_type(~constraint | constraint)
+    reveal_type(~c1 | c1)
+
+    c2 = range_constraint(Unrelated, T, object) & range_constraint(Unrelated, U, object)
+    # TODO: revealed: ty_extensions.ConstraintSet[always]
+    # revealed: ty_extensions.ConstraintSet[((Unrelated ≤ T@_) ∧ (Unrelated ≤ U@_)) ∨ ¬(Unrelated ≤ T@_) ∨ ¬(Unrelated ≤ U@_)]
+    reveal_type(c2 | ~c2)
+    # TODO: revealed: ty_extensions.ConstraintSet[always]
+    # revealed: ty_extensions.ConstraintSet[¬(Unrelated ≤ T@_) ∨ ¬(Unrelated ≤ U@_) ∨ ((Unrelated ≤ T@_) ∧ (Unrelated ≤ U@_))]
+    reveal_type(~c2 | c2)
+
+    union = c1 | c2
+    # TODO: revealed: ty_extensions.ConstraintSet[always]
+    # revealed: ty_extensions.ConstraintSet[((T@_ ≤ Base) ∧ (U@_ ≤ Base)) ∨ ((Unrelated ≤ T@_) ∧ (Unrelated ≤ U@_)) ∨ (¬(T@_ ≤ Base) ∧ ¬(Unrelated ≤ T@_)) ∨ (¬(T@_ ≤ Base) ∧ ¬(Unrelated ≤ U@_)) ∨ (¬(U@_ ≤ Base) ∧ ¬(Unrelated ≤ T@_)) ∨ (¬(U@_ ≤ Base) ∧ ¬(Unrelated ≤ U@_))]
+    reveal_type(union | ~union)
+    # TODO: revealed: ty_extensions.ConstraintSet[always]
+    # revealed: ty_extensions.ConstraintSet[(¬(T@_ ≤ Base) ∧ ¬(Unrelated ≤ T@_)) ∨ (¬(T@_ ≤ Base) ∧ ¬(Unrelated ≤ U@_)) ∨ (¬(U@_ ≤ Base) ∧ ¬(Unrelated ≤ T@_)) ∨ (¬(U@_ ≤ Base) ∧ ¬(Unrelated ≤ U@_)) ∨ ((T@_ ≤ Base) ∧ (U@_ ≤ Base)) ∨ ((Unrelated ≤ T@_) ∧ (Unrelated ≤ U@_))]
+    reveal_type(~union | union)
 ```
