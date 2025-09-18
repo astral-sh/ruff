@@ -271,3 +271,19 @@ class ChildI9(ParentI):
                 if False: super
                 if False: __class__
         builtins.super(ChildI9, self).f()
+
+
+# See: https://github.com/astral-sh/ruff/issues/20422
+# UP008 should not apply when the class variable is shadowed
+class A:
+    def f(self):
+        return 1
+
+class B(A):
+    def f(self):
+        return 2
+
+class C(B):
+    def f(self):
+        C = B  # Local variable C shadows the class name
+        return super(C, self).f()  # Should NOT trigger UP008
