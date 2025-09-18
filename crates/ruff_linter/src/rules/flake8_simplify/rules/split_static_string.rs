@@ -47,14 +47,19 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `str.split`](https://docs.python.org/3/library/stdtypes.html#str.split)
 #[derive(ViolationMetadata)]
-pub(crate) struct SplitStaticString;
+pub(crate) struct SplitStaticString {
+    method_name: String,
+}
 
 impl Violation for SplitStaticString {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Consider using a list literal instead of `str.split`".to_string()
+        format!(
+            "Consider using a list literal instead of `str.{}`",
+            self.method_name
+        )
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -107,7 +112,12 @@ pub(crate) fn split_static_string(
         split_default(str_value, maxsplit_value, direction, checker.settings())
     };
 
-    let mut diagnostic = checker.report_diagnostic(SplitStaticString, call.range());
+    let mut diagnostic = checker.report_diagnostic(
+        SplitStaticString {
+            method_name: attr.to_string(),
+        },
+        call.range(),
+    );
     if let Some(ref replacement_expr) = split_replacement {
         diagnostic.set_fix(Fix::applicable_edit(
             Edit::range_replacement(checker.generator().expr(replacement_expr), call.range()),
