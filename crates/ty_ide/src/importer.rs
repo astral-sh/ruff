@@ -1713,4 +1713,348 @@ import numpy as np
         (Bar)
         ");
     }
+
+    #[test]
+    fn conditional_imports_new_import() {
+        let test = CursorTest::builder()
+            .source("foo.py", "MAGIC = 1")
+            .source("bar.py", "MAGIC = 2")
+            .source("quux.py", "MAGIC = 3")
+            .source(
+                "main.py",
+                "\
+if os.getenv(\"WHATEVER\"):
+    from foo import MAGIC
+else:
+    from bar import MAGIC
+
+(<CURSOR>)
+        ",
+            )
+            .build();
+
+        assert_snapshot!(
+            test.import("quux", "MAGIC"), @r#"
+        import quux
+        if os.getenv("WHATEVER"):
+            from foo import MAGIC
+        else:
+            from bar import MAGIC
+
+        (quux.MAGIC)
+        "#);
+        assert_snapshot!(
+            test.import_from("quux", "MAGIC"), @r#"
+        import quux
+        if os.getenv("WHATEVER"):
+            from foo import MAGIC
+        else:
+            from bar import MAGIC
+
+        (quux.MAGIC)
+        "#);
+    }
+
+    // FIXME: This test (and the one below it) aren't
+    // quite right. Namely, because we aren't handling
+    // multiple binding sites correctly, we don't see the
+    // existing `MAGIC` symbol.
+    #[test]
+    fn conditional_imports_existing_import1() {
+        let test = CursorTest::builder()
+            .source("foo.py", "MAGIC = 1")
+            .source("bar.py", "MAGIC = 2")
+            .source("quux.py", "MAGIC = 3")
+            .source(
+                "main.py",
+                "\
+if os.getenv(\"WHATEVER\"):
+    from foo import MAGIC
+else:
+    from bar import MAGIC
+
+(<CURSOR>)
+        ",
+            )
+            .build();
+
+        assert_snapshot!(
+            test.import("foo", "MAGIC"), @r#"
+        import foo
+        if os.getenv("WHATEVER"):
+            from foo import MAGIC
+        else:
+            from bar import MAGIC
+
+        (foo.MAGIC)
+        "#);
+        assert_snapshot!(
+            test.import_from("foo", "MAGIC"), @r#"
+        import foo
+        if os.getenv("WHATEVER"):
+            from foo import MAGIC
+        else:
+            from bar import MAGIC
+
+        (foo.MAGIC)
+        "#);
+    }
+
+    #[test]
+    fn conditional_imports_existing_import2() {
+        let test = CursorTest::builder()
+            .source("foo.py", "MAGIC = 1")
+            .source("bar.py", "MAGIC = 2")
+            .source("quux.py", "MAGIC = 3")
+            .source(
+                "main.py",
+                "\
+if os.getenv(\"WHATEVER\"):
+    from foo import MAGIC
+else:
+    from bar import MAGIC
+
+(<CURSOR>)
+        ",
+            )
+            .build();
+
+        assert_snapshot!(
+            test.import("bar", "MAGIC"), @r#"
+        import bar
+        if os.getenv("WHATEVER"):
+            from foo import MAGIC
+        else:
+            from bar import MAGIC
+
+        (bar.MAGIC)
+        "#);
+        assert_snapshot!(
+            test.import_from("bar", "MAGIC"), @r#"
+        import bar
+        if os.getenv("WHATEVER"):
+            from foo import MAGIC
+        else:
+            from bar import MAGIC
+
+        (bar.MAGIC)
+        "#);
+    }
+
+    // FIXME: This test (and the one below it) aren't quite right. We
+    // don't recognize the multiple declaration sites for `fubar`.
+    //
+    // In this case, it's not totally clear what we should do. Since we
+    // are trying to import `MAGIC` from `foo`, we could add a `from
+    // foo import MAGIC` within the first `if` block. Or we could try
+    // and "infer" something about the code assuming that we know
+    // `MAGIC` is in both `foo` and `bar`.
+    #[test]
+    fn conditional_imports_existing_module1() {
+        let test = CursorTest::builder()
+            .source("foo.py", "MAGIC = 1")
+            .source("bar.py", "MAGIC = 2")
+            .source("quux.py", "MAGIC = 3")
+            .source(
+                "main.py",
+                "\
+if os.getenv(\"WHATEVER\"):
+    import foo as fubar
+else:
+    import bar as fubar
+
+(<CURSOR>)
+        ",
+            )
+            .build();
+
+        assert_snapshot!(
+            test.import("foo", "MAGIC"), @r#"
+        import foo
+        if os.getenv("WHATEVER"):
+            import foo as fubar
+        else:
+            import bar as fubar
+
+        (foo.MAGIC)
+        "#);
+        assert_snapshot!(
+            test.import_from("foo", "MAGIC"), @r#"
+        from foo import MAGIC
+        if os.getenv("WHATEVER"):
+            import foo as fubar
+        else:
+            import bar as fubar
+
+        (MAGIC)
+        "#);
+    }
+
+    #[test]
+    fn conditional_imports_existing_module2() {
+        let test = CursorTest::builder()
+            .source("foo.py", "MAGIC = 1")
+            .source("bar.py", "MAGIC = 2")
+            .source("quux.py", "MAGIC = 3")
+            .source(
+                "main.py",
+                "\
+if os.getenv(\"WHATEVER\"):
+    import foo as fubar
+else:
+    import bar as fubar
+
+(<CURSOR>)
+        ",
+            )
+            .build();
+
+        assert_snapshot!(
+            test.import("bar", "MAGIC"), @r#"
+        import bar
+        if os.getenv("WHATEVER"):
+            import foo as fubar
+        else:
+            import bar as fubar
+
+        (bar.MAGIC)
+        "#);
+        assert_snapshot!(
+            test.import_from("bar", "MAGIC"), @r#"
+        from bar import MAGIC
+        if os.getenv("WHATEVER"):
+            import foo as fubar
+        else:
+            import bar as fubar
+
+        (MAGIC)
+        "#);
+    }
+
+    #[test]
+    fn try_imports_new_import() {
+        let test = CursorTest::builder()
+            .source("foo.py", "MAGIC = 1")
+            .source("bar.py", "MAGIC = 2")
+            .source("quux.py", "MAGIC = 3")
+            .source(
+                "main.py",
+                "\
+try:
+    from foo import MAGIC
+except ImportError:
+    from bar import MAGIC
+
+(<CURSOR>)
+        ",
+            )
+            .build();
+
+        assert_snapshot!(
+            test.import("quux", "MAGIC"), @r"
+        import quux
+        try:
+            from foo import MAGIC
+        except ImportError:
+            from bar import MAGIC
+
+        (quux.MAGIC)
+        ");
+        assert_snapshot!(
+            test.import_from("quux", "MAGIC"), @r"
+        import quux
+        try:
+            from foo import MAGIC
+        except ImportError:
+            from bar import MAGIC
+
+        (quux.MAGIC)
+        ");
+    }
+
+    // FIXME: This test (and the one below it) aren't
+    // quite right. Namely, because we aren't handling
+    // multiple binding sites correctly, we don't see the
+    // existing `MAGIC` symbol.
+    #[test]
+    fn try_imports_existing_import1() {
+        let test = CursorTest::builder()
+            .source("foo.py", "MAGIC = 1")
+            .source("bar.py", "MAGIC = 2")
+            .source("quux.py", "MAGIC = 3")
+            .source(
+                "main.py",
+                "\
+try:
+    from foo import MAGIC
+except ImportError:
+    from bar import MAGIC
+
+(<CURSOR>)
+        ",
+            )
+            .build();
+
+        assert_snapshot!(
+            test.import("foo", "MAGIC"), @r"
+        import foo
+        try:
+            from foo import MAGIC
+        except ImportError:
+            from bar import MAGIC
+
+        (foo.MAGIC)
+        ");
+        assert_snapshot!(
+            test.import_from("foo", "MAGIC"), @r"
+        import foo
+        try:
+            from foo import MAGIC
+        except ImportError:
+            from bar import MAGIC
+
+        (foo.MAGIC)
+        ");
+    }
+
+    #[test]
+    fn try_imports_existing_import2() {
+        let test = CursorTest::builder()
+            .source("foo.py", "MAGIC = 1")
+            .source("bar.py", "MAGIC = 2")
+            .source("quux.py", "MAGIC = 3")
+            .source(
+                "main.py",
+                "\
+try:
+    from foo import MAGIC
+except ImportError:
+    from bar import MAGIC
+
+(<CURSOR>)
+        ",
+            )
+            .build();
+
+        assert_snapshot!(
+            test.import("bar", "MAGIC"), @r"
+        import bar
+        try:
+            from foo import MAGIC
+        except ImportError:
+            from bar import MAGIC
+
+        (bar.MAGIC)
+        ");
+        assert_snapshot!(
+            test.import_from("bar", "MAGIC"), @r"
+        import bar
+        try:
+            from foo import MAGIC
+        except ImportError:
+            from bar import MAGIC
+
+        (bar.MAGIC)
+        ");
+    }
 }
