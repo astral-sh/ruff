@@ -68,8 +68,8 @@ pub struct Generator<'a> {
     indent: &'a Indentation,
     /// The line ending to use.
     line_ending: LineEnding,
-    /// Forced quote style to use.
-    quote: Option<Quote>,
+    /// Preferred quote style to use.
+    preferred_quote: Option<Quote>,
     buffer: String,
     indent_depth: usize,
     num_newlines: usize,
@@ -81,7 +81,7 @@ impl<'a> From<&'a Stylist<'a>> for Generator<'a> {
         Self {
             indent: stylist.indentation(),
             line_ending: stylist.line_ending(),
-            quote: None,
+            preferred_quote: None,
             buffer: String::new(),
             indent_depth: 0,
             num_newlines: 0,
@@ -96,7 +96,7 @@ impl<'a> Generator<'a> {
             // Style preferences.
             indent,
             line_ending,
-            quote: None,
+            preferred_quote: None,
             // Internal state.
             buffer: String::new(),
             indent_depth: 0,
@@ -105,10 +105,10 @@ impl<'a> Generator<'a> {
         }
     }
 
-    /// Force quote style for generated source code.
+    /// Set a preferred quote style for generated source code.
     #[must_use]
-    pub fn with_quote(mut self, quote: Quote) -> Self {
-        self.quote = Some(quote);
+    pub fn with_preferred_quote(mut self, quote: Quote) -> Self {
+        self.preferred_quote = Some(quote);
         self
     }
 
@@ -181,13 +181,18 @@ impl<'a> Generator<'a> {
     }
 
     fn p_str_repr(&mut self, s: &str, flags: impl Into<AnyStringFlags>) {
-        let flags = flags.into();
+        let mut flags = flags.into();
         if flags.prefix().is_raw() {
             write!(self.buffer, "{}", flags.display_contents(s))
                 .expect("Writing to a String buffer should never fail");
             return;
         }
         self.p(flags.prefix().as_str());
+
+        if let Some(preferred_quote) = self.preferred_quote {
+            flags = flags.with_quote_style(preferred_quote);
+        };
+
         let escape = UnicodeEscape::with_preferred_quote(s, flags.quote_style());
         if let Some(len) = escape.layout().len {
             self.buffer.reserve(len);
@@ -1405,12 +1410,7 @@ impl<'a> Generator<'a> {
 
     fn unparse_string_literal(&mut self, string_literal: &ast::StringLiteral) {
         let ast::StringLiteral { value, flags, .. } = string_literal;
-        let flags = if let Some(quote) = self.quote {
-            flags.with_quote_style(quote)
-        } else {
-            *flags
-        };
-        self.p_str_repr(value, flags);
+        self.p_str_repr(value, *flags);
     }
 
     fn unparse_string_literal_value(&mut self, value: &ast::StringLiteralValue) {
@@ -1598,18 +1598,18 @@ mod tests {
         generator.generate()
     }
 
-    /// Like [`round_trip`] but configure the [`Generator`] with the requested `indentation` and
-    /// `line_ending` settings.
+    /// Like [`round_trip`] but configure the [`Generator`] with the requested
+    /// `indentation`, `line_ending` and `preferred_quote` settings.
     fn round_trip_with(
         indentation: &Indentation,
         line_ending: LineEnding,
-        quote: Option<Quote>,
+        preferred_quote: Option<Quote>,
         contents: &str,
     ) -> String {
         let module = parse_module(contents).unwrap();
         let mut generator = Generator::new(indentation, line_ending);
-        if let Some(quote) = quote {
-            generator = generator.with_quote(quote);
+        if let Some(preferred_quote) = preferred_quote {
+            generator = generator.with_preferred_quote(preferred_quote);
         }
         generator.unparse_suite(module.suite());
         generator.generate()
@@ -2082,7 +2082,7 @@ if True:
     }
 
     #[test]
-    fn set_quote() {
+    fn preferred_quote() {
         assert_eq!(
             round_trip_with(
                 &Indentation::default(),
