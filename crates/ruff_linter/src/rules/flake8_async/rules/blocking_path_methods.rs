@@ -68,7 +68,7 @@ pub(crate) fn blocking_os_path(checker: &Checker, call: &ExprCall) {
     }
 
     // Check if an expression is calling I/O related os.path method.
-    // Just intializing pathlib.Path object is OK, we can return
+    // Just initializing pathlib.Path object is OK, we can return
     // early in that scenario.
     if let Some(qualified_name) = semantic.resolve_qualified_name(call.func.as_ref()) {
         let segments = qualified_name.segments();
