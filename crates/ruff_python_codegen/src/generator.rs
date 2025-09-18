@@ -191,7 +191,7 @@ impl<'a> Generator<'a> {
 
         if let Some(preferred_quote) = self.preferred_quote {
             flags = flags.with_quote_style(preferred_quote);
-        };
+        }
 
         let escape = UnicodeEscape::with_preferred_quote(s, flags.quote_style());
         if let Some(len) = escape.layout().len {
