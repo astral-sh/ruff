@@ -185,7 +185,7 @@ impl<'a> Generator<'a> {
     }
 
     fn p_str_repr(&mut self, s: &str, flags: impl Into<AnyStringFlags>) {
-        let mut flags = flags.into();
+        let flags = flags.into();
         if flags.prefix().is_raw() {
             write!(self.buffer, "{}", flags.display_contents(s))
                 .expect("Writing to a String buffer should never fail");
@@ -193,11 +193,8 @@ impl<'a> Generator<'a> {
         }
         self.p(flags.prefix().as_str());
 
-        if let Some(preferred_quote) = self.preferred_quote {
-            flags = flags.with_quote_style(preferred_quote);
-        }
-
-        let escape = UnicodeEscape::with_preferred_quote(s, flags.quote_style());
+        let quote_style = self.preferred_quote.unwrap_or_else(|| flags.quote_style());
+        let escape = UnicodeEscape::with_preferred_quote(s, quote_style);
         if let Some(len) = escape.layout().len {
             self.buffer.reserve(len);
         }
