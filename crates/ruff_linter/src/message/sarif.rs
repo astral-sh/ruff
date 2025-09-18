@@ -305,6 +305,7 @@ impl<'a> SarifResult<'a> {
             .collect()
     }
 
+    #[allow(clippy::unnecessary_wraps)]
     fn uri(diagnostic: &Diagnostic) -> Result<String> {
         let path = normalize_path(&*diagnostic.expect_ruff_filename());
         #[cfg(not(target_arch = "wasm32"))]
