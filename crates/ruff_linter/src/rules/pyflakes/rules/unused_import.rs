@@ -671,38 +671,6 @@ fn unused_imports_in_scope<'a, 'b>(
         })
 }
 
-#[derive(Debug)]
-struct MarkedBindings<'a, 'b> {
-    bindings: Vec<&'a Binding<'b>>,
-    used: Vec<bool>,
-}
-
-impl<'a, 'b> MarkedBindings<'a, 'b> {
-    fn from_binding_id(semantic: &'a SemanticModel<'b>, id: BindingId, scope: &'a Scope) -> Self {
-        let bindings: Vec<_> = scope
-            .shadowed_bindings(id)
-            .map(|id| semantic.binding(id))
-            .collect();
-
-        Self {
-            used: vec![false; bindings.len()],
-            bindings,
-        }
-    }
-
-    fn into_unused(self) -> Vec<&'a Binding<'b>> {
-        self.bindings
-            .into_iter()
-            .zip(self.used)
-            .filter_map(|(bdg, is_used)| (!is_used).then_some(bdg))
-            .collect()
-    }
-
-    fn iter_mut(&mut self) -> impl Iterator<Item = (&'a Binding<'b>, &mut bool)> {
-        self.bindings.iter().copied().zip(self.used.iter_mut())
-    }
-}
-
 /// Returns a `Vec` of bindings to unused import statements that
 /// are shadowed by a given binding.
 ///
@@ -779,6 +747,38 @@ fn unused_imports_from_binding<'a, 'b>(
     }
 
     marked.into_unused()
+}
+
+#[derive(Debug)]
+struct MarkedBindings<'a, 'b> {
+    bindings: Vec<&'a Binding<'b>>,
+    used: Vec<bool>,
+}
+
+impl<'a, 'b> MarkedBindings<'a, 'b> {
+    fn from_binding_id(semantic: &'a SemanticModel<'b>, id: BindingId, scope: &'a Scope) -> Self {
+        let bindings: Vec<_> = scope
+            .shadowed_bindings(id)
+            .map(|id| semantic.binding(id))
+            .collect();
+
+        Self {
+            used: vec![false; bindings.len()],
+            bindings,
+        }
+    }
+
+    fn into_unused(self) -> Vec<&'a Binding<'b>> {
+        self.bindings
+            .into_iter()
+            .zip(self.used)
+            .filter_map(|(bdg, is_used)| (!is_used).then_some(bdg))
+            .collect()
+    }
+
+    fn iter_mut(&mut self) -> impl Iterator<Item = (&'a Binding<'b>, &mut bool)> {
+        self.bindings.iter().copied().zip(self.used.iter_mut())
+    }
 }
 
 fn expand_to_qualified_name_attribute<'b>(
