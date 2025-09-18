@@ -294,7 +294,7 @@ impl<'db> ConstraintSet<'db> {
     /// Updates this set to be the union of itself and a clause. To maintain the invariants of this
     /// type, we must simplify this clause against all existing clauses, if possible.
     fn union_clause(&mut self, db: &'db dyn Db, clause: Satisfiable<ConstraintClause<'db>>) {
-        let clause = match clause {
+        let mut clause = match clause {
             // If the new clause can always be satisfied, that causes this whole set to be always
             // satisfied too.
             Satisfiable::Always => {
@@ -328,29 +328,10 @@ impl<'db> ConstraintSet<'db> {
         // doesn't ensure that the clauses are simplified with respect to each other. So instead,
         // we perform two simplification passes.
 
-        // In the first pass, we see if the new clause can be simplified against the entire list of
-        // existing clauses. (This is primarily used when the new clause contains multiple
-        // constraints, to see if its negation is already in the set. In that case the new clause
-        // and its negation simplify to Always.)
-        let mut clause = match clause.simplify_with_set(db, clauses) {
-            // If the simpified clause can always be satisfied, that causes this whole set to be
-            // always satisfied too.
-            Satisfiable::Always => {
-                *self = Self::Always;
-                return;
-            }
-
-            // If the simplified clause can never satisfied, then the set does not change (any more
-            // than whatever changes `simplify_with_set` applied).
-            Satisfiable::Never => return,
-
-            Satisfiable::Constrained(clause) => clause,
-        };
-
-        // In the second pass, we iterate through the list of existing clauses, and try to simplify
-        // the new clause against each one in turn. (We can assume that the existing clauses are
-        // already simplified with respect to each other, since we can assume that the invariant
-        // holds upon entry to this method.)
+        // In the first simplification pass, we iterate through the list of existing clauses, and
+        // try to simplify the new clause against each one in turn. (We can assume that the
+        // existing clauses are already simplified with respect to each other, since we can assume
+        // that the invariant holds upon entry to this method.)
         let mut existing_clauses = std::mem::take(clauses).into_iter();
         for existing in existing_clauses.by_ref() {
             // Try to simplify the new clause against an existing clause.
@@ -394,6 +375,29 @@ impl<'db> ConstraintSet<'db> {
         // If we fall through then we need to add the new clause to the clause list (either because
         // we couldn't simplify it with anything, or because we did without it canceling out).
         clauses.push(clause);
+
+        // In the second simplification pass, we see if any clause can be simplified against the
+        // entire list of other clauses. (This is primarily used when one clause contains multiple
+        // constraints, to see if its negation is also in the set. In that case the entire set
+        // simplifies to Always.)
+        for clause in clauses.iter().copied() {
+            match clause.simplify_with_set(db, clauses) {
+                // If the simpified set can always or never be satisfied, we can return early.
+                Satisfiable::Always => {
+                    *self = Self::Always;
+                    return;
+                }
+
+                Satisfiable::Never => {
+                    *self = Self::Never;
+                    return;
+                }
+
+                // Otherwise this clause could not be simplified, and we continue on checking the
+                // others.
+                Satisfiable::Constrained(()) => {}
+            }
+        }
     }
 
     /// Updates this set to be the union of itself and another set.
@@ -526,11 +530,9 @@ impl<'db> ConstraintClause<'db> {
         self,
         db: &'db dyn Db,
         clauses: &SmallVec<[ConstraintClause<'db>; 2]>,
-    ) -> Satisfiable<Self> {
-        // Check if the set already contains the negation of the new clause. If it does, the new
-        // clause and the negation simplify to always satisfiable. (In theory we could remove the
-        // negation from the existing list of clauses in the set, but by returning
-        // Satisfiable::Always the entire set simplifies away anyway, so that is redundant work.)
+    ) -> Satisfiable<()> {
+        // Check if the set also contains the negation of the clause. If it does, the clause and
+        // its negation simplify to always satisfiable, and therefore the set as a whole does too.
         if let ConstraintSet::Clauses(negated) = self.negate(db) {
             let contains_negation =
                 (negated.iter()).all(|negated_clause| clauses.contains(negated_clause));
@@ -540,7 +542,7 @@ impl<'db> ConstraintClause<'db> {
         }
 
         // If not, the clause cannot be simplified.
-        Satisfiable::Constrained(self)
+        Satisfiable::Constrained(())
     }
 
     /// Tries to simplify the union of two clauses into a single clause, if possible.
