@@ -123,3 +123,16 @@
   color: var(--md-accent-fg-color) !important;
 }
 
+/* Omits the nav title "Ruff" entirely unless on a small screen, in which case
+the nav title is needed for backwards navigation in the collapsible
+nav variant.
+
+See https://github.com/astral-sh/uv/issues/5130 */
+.md-nav__title {
+  display: none;
+}
+@media screen and (max-width: 1219px) {
+  .md-nav__title {
+    display: flex ;
+  }
+}
