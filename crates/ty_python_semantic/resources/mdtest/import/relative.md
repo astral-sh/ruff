@@ -55,9 +55,9 @@ X: int = 42
 `package/bar.py`:
 
 ```py
-from .foo import X  # error: [unresolved-import]
+from .foo import X
 
-reveal_type(X)  # revealed: Unknown
+reveal_type(X)  # revealed: int
 ```
 
 `package/bar.pyi`:
