@@ -6,14 +6,15 @@ use ruff_python_semantic::analyze::typing::{TypeChecker, check_type, traverse_un
 use ruff_text_size::Ranged;
 
 /// ## What it does
-/// Checks that async functions do not use `os.path` or `pathlib.Path`.
+/// Checks that async functions do not call blocking `os.path` or `pathlib.Path`
+/// methods.
 ///
 /// ## Why is this bad?
-/// Calling `os.path` or `pathlib.Path` methods in an async function will block
+/// Calling some `os.path` or `pathlib.Path` methods in an async function will block
 /// the entire event loop, preventing it from executing other tasks while waiting
 /// for the operation. This negates the benefits of asynchronous programming.
 ///
-/// Instead of `os.path` or `pathlib.Path`, use `trio.Path` or `anyio.path` objects.
+/// Instead, use the methods' async equivalents from `trio.Path` or `anyio.Path`.
 ///
 /// ## Example
 /// ```python
@@ -33,6 +34,17 @@ use ruff_text_size::Ranged;
 /// async def func():
 ///     path = trio.Path("my_file.txt")
 ///     file_exists = await path.exists()
+/// ```
+///
+/// Non-blocking methods are OK to use:
+/// ```python
+/// import pathlib
+///
+///
+/// async def func():
+///     path = pathlib.Path("my_file.txt")
+///     file_dirname = path.dirname()
+///     new_path = os.path.join("/tmp/src/", path)
 /// ```
 #[derive(ViolationMetadata)]
 pub(crate) struct BlockingPathMethodInAsyncFunction {
@@ -106,16 +118,6 @@ impl TypeChecker for PathlibPathChecker {
     }
 }
 
-fn is_calling_os_path_method(segments: &[&str]) -> bool {
-    if segments.len() != 3 {
-        return false;
-    }
-    let Some(symbol_name) = segments.get(..2) else {
-        return false;
-    };
-    matches!(symbol_name, ["os", "path"])
-}
-
 fn maybe_calling_io_operation(attr: &str) -> bool {
     !matches!(
         attr,
@@ -170,7 +172,7 @@ pub(crate) fn blocking_os_path(checker: &Checker, call: &ExprCall) {
     // early in that scenario.
     if let Some(qualified_name) = semantic.resolve_qualified_name(call.func.as_ref()) {
         let segments = qualified_name.segments();
-        if !is_calling_os_path_method(segments) {
+        if !matches!(segments, ["os", "path", _]) {
             return;
         }
 
@@ -189,24 +191,23 @@ pub(crate) fn blocking_os_path(checker: &Checker, call: &ExprCall) {
         return;
     }
 
-    // Check if an expression is a pathlib.Path constructor that directly
-    // calls an I/O method.
     let Some(ast::ExprAttribute { value, attr, .. }) = call.func.as_attribute_expr() else {
         return;
     };
 
-    if let Some(ExprCall { func, .. }) = value.as_call_expr() {
-        if !PathlibPathChecker::is_pathlib_path_constructor(semantic, func) {
-            return;
-        }
-        if maybe_calling_io_operation(attr.id.as_str()) {
-            checker.report_diagnostic(
-                BlockingPathMethodInAsyncFunction {
-                    path_library: "pathlib.Path".to_string(),
-                },
-                call.func.range(),
-            );
-        }
+    if !maybe_calling_io_operation(attr.id.as_str()) {
+        return;
+    }
+
+    // Check if an expression is a pathlib.Path constructor that directly
+    // calls an I/O method.
+    if PathlibPathChecker::match_initializer(value, semantic) {
+        checker.report_diagnostic(
+            BlockingPathMethodInAsyncFunction {
+                path_library: "pathlib.Path".to_string(),
+            },
+            call.func.range(),
+        );
         return;
     }
 
@@ -221,13 +222,11 @@ pub(crate) fn blocking_os_path(checker: &Checker, call: &ExprCall) {
     };
 
     if check_type::<PathlibPathChecker>(binding, semantic) {
-        if maybe_calling_io_operation(attr.id.as_str()) {
-            checker.report_diagnostic(
-                BlockingPathMethodInAsyncFunction {
-                    path_library: "pathlib.Path".to_string(),
-                },
-                call.func.range(),
-            );
-        }
+        checker.report_diagnostic(
+            BlockingPathMethodInAsyncFunction {
+                path_library: "pathlib.Path".to_string(),
+            },
+            call.func.range(),
+        );
     }
 }
