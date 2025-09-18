@@ -115,6 +115,7 @@ ignore_labels = ["internal", "ci", "testing", "ty"]
 
 version_files = [
     "README.md",
+    "pyproject.toml",
     "docs/integrations.md",
     "docs/tutorial.md",
     "crates/ruff/Cargo.toml",
