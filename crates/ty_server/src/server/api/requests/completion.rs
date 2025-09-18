@@ -87,8 +87,8 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
                     sort_text: Some(format!("{i:-max_index_len$}")),
                     detail: type_display.clone(),
                     label_details: Some(CompletionItemLabelDetails {
-                        detail: type_display,
-                        description: comp.module_name.map(ToString::to_string),
+                        detail: comp.module_name.map(|name| format!(" (import {name})")),
+                        description: type_display,
                     }),
                     insert_text: comp.insert.map(String::from),
                     additional_text_edits: import_edit.map(|edit| vec![edit]),
