@@ -2080,14 +2080,14 @@ if True:
         );
     }
 
-    #[test_case::test_case(r#""'""#, r#""'""#, Quote::Single ; "basic str ignored")]
-    #[test_case::test_case(r#"b"'""#, r#"b"'""#, Quote::Single ; "basic bytes ignored")]
-    #[test_case::test_case(r#""a""#, "'a'", Quote::Single ; "basic str single")]
-    #[test_case::test_case("'a'", r#""a""#, Quote::Double ; "basic str double")]
-    #[test_case::test_case(r#"b"a""#, "b'a'", Quote::Single ; "basic bytes single")]
-    #[test_case::test_case("b'a'", r#"b"a""#, Quote::Double ; "basic bytes double")]
-    #[test_case::test_case(r#""a""#,  r#""a""#, Quote::Double ; "remain str double")]
-    #[test_case::test_case("'1'", "'1'", Quote::Single ; "remain str single")]
+    #[test_case::test_case(r#""'hello'""#, r#""'hello'""#, Quote::Single ; "basic str ignored")]
+    #[test_case::test_case(r#"b"'hello'""#, r#"b"'hello'""#, Quote::Single ; "basic bytes ignored")]
+    #[test_case::test_case(r#""hello""#, "'hello'", Quote::Single ; "basic str single")]
+    #[test_case::test_case("'hello'", r#""hello""#, Quote::Double ; "basic str double")]
+    #[test_case::test_case(r#"b"hello""#, "b'hello'", Quote::Single ; "basic bytes single")]
+    #[test_case::test_case("b'hello'", r#"b"hello""#, Quote::Double ; "basic bytes double")]
+    #[test_case::test_case(r#""hello""#,  r#""hello""#, Quote::Double ; "remain str double")]
+    #[test_case::test_case("'hello'", "'hello'", Quote::Single ; "remain str single")]
     #[test_case::test_case(r#"x: list["str"]"#, "x: list['str']", Quote::Single ; "type ann single")]
     #[test_case::test_case("x: list['str']", r#"x: list["str"]"#, Quote::Double ; "type ann double")]
     fn preferred_quote(inp: &str, out: &str, quote: Quote) {
