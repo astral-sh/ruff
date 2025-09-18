@@ -173,7 +173,8 @@ impl<'a> Generator<'a> {
                 return;
             }
         }
-        let escape = AsciiEscape::with_preferred_quote(s, flags.quote_style());
+        let quote_style = self.preferred_quote.unwrap_or_else(|| flags.quote_style());
+        let escape = AsciiEscape::with_preferred_quote(s, quote_style);
         if let Some(len) = escape.layout().len {
             self.buffer.reserve(len);
         }
