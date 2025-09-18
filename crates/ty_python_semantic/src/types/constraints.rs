@@ -61,6 +61,7 @@
 //! the constraint says that the typevar must specialize to that _exact_ type, not to a subtype or
 //! supertype of it.
 
+use std::cmp::Ordering;
 use std::fmt::Display;
 
 use itertools::{EitherOrBoth, Itertools};
@@ -813,6 +814,7 @@ impl<'db> ConstraintClause<'db> {
 }
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[derive(PartialOrd, Ord)]
 pub(crate) struct ConstrainedTypeVar<'db> {
     typevar: BoundTypeVarInstance<'db>,
     #[returns(ref)]
@@ -826,6 +828,13 @@ impl get_size2::GetSize for ConstrainedTypeVar<'_> {}
 impl<'db> ConstrainedTypeVar<'db> {
     fn clause_count(self, db: &'db dyn Db) -> usize {
         self.constraint(db).clause_count()
+    }
+
+    fn contains(self, db: &'db dyn Db, other: Self) -> bool {
+        if self.typevar(db) != other.typevar(db) {
+            return false;
+        }
+        self.constraint(db).contains(db, other.constraint(db))
     }
 
     /// Returns the intersection of this individual constraint and another, or `None` if the two
@@ -896,6 +905,10 @@ impl<'db> Constraint<'db> {
 
     fn clause_count(&self) -> usize {
         usize::from(!self.positive.is_always()) + self.negative.len()
+    }
+
+    fn contains(&self, db: &'db dyn Db, other: &Self) -> bool {
+        self.positive.contains(db, &other.positive)
     }
 
     fn satisfiable(self, db: &'db dyn Db) -> Satisfiable<Self> {
@@ -1513,5 +1526,305 @@ impl<T: salsa::Update> Simplifiable<T> {
             | Simplifiable::Simplified(_) => self,
             Simplifiable::NotSimplified(t1, t2) => Simplifiable::NotSimplified(t2, t1),
         }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
+enum Node<'db> {
+    AlwaysFalse,
+    AlwaysTrue,
+    Interior(InteriorNode<'db>),
+}
+
+impl<'db> Node<'db> {
+    fn new(
+        db: &'db dyn Db,
+        constraint: ConstrainedTypeVar<'db>,
+        if_true: Node<'db>,
+        if_false: Node<'db>,
+    ) -> Self {
+        debug_assert!(if_true.atom(db).is_none_or(|atom| atom > constraint));
+        debug_assert!(if_false.atom(db).is_none_or(|atom| atom > constraint));
+        if if_true == if_false {
+            return if_true;
+        }
+        Self::Interior(InteriorNode::new(db, constraint, if_true, if_false))
+    }
+
+    fn new_constraint(db: &'db dyn Db, constraint: ConstrainedTypeVar<'db>) -> Self {
+        Self::Interior(InteriorNode::new(
+            db,
+            constraint,
+            Node::AlwaysTrue,
+            Node::AlwaysFalse,
+        ))
+    }
+
+    fn atom(self, db: &'db dyn Db) -> Option<ConstrainedTypeVar<'db>> {
+        match self {
+            Node::Interior(interior) => Some(interior.atom(db)),
+            _ => None,
+        }
+    }
+
+    fn new_negated_constraint(db: &'db dyn Db, constraint: ConstrainedTypeVar<'db>) -> Self {
+        Self::Interior(InteriorNode::new(
+            db,
+            constraint,
+            Node::AlwaysFalse,
+            Node::AlwaysTrue,
+        ))
+    }
+
+    fn is_terminal(self) -> bool {
+        matches!(self, Node::AlwaysFalse | Node::AlwaysTrue)
+    }
+
+    fn is_always_satisfied(self) -> bool {
+        matches!(self, Node::AlwaysTrue)
+    }
+
+    fn is_never_satisfied(self) -> bool {
+        matches!(self, Node::AlwaysFalse)
+    }
+
+    fn negate(self, db: &'db dyn Db) -> Self {
+        match self {
+            Node::AlwaysTrue => Node::AlwaysFalse,
+            Node::AlwaysFalse => Node::AlwaysTrue,
+            Node::Interior(interior) => interior.negate(db),
+        }
+    }
+
+    fn or(self, db: &'db dyn Db, other: Self) -> Self {
+        match (self, other) {
+            (Node::AlwaysTrue, _) | (_, Node::AlwaysTrue) => Node::AlwaysTrue,
+            (Node::AlwaysFalse, other) | (other, Node::AlwaysFalse) => other,
+            (Node::Interior(a), Node::Interior(b)) => {
+                // OR is commutative, which lets us halve the cache requirements
+                let (a, b) = if b.0 < a.0 { (b, a) } else { (a, b) };
+                a.or(db, b)
+            }
+        }
+    }
+
+    fn and(self, db: &'db dyn Db, other: Self) -> Self {
+        match (self, other) {
+            (Node::AlwaysFalse, _) | (_, Node::AlwaysFalse) => Node::AlwaysFalse,
+            (Node::AlwaysTrue, other) | (other, Node::AlwaysTrue) => other,
+            (Node::Interior(a), Node::Interior(b)) => {
+                // AND is commutative, which lets us halve the cache requirements
+                let (a, b) = if b.0 < a.0 { (b, a) } else { (a, b) };
+                a.and(db, b)
+            }
+        }
+    }
+
+    fn implies(self, db: &'db dyn Db, other: Self) -> Self {
+        match (self, other) {
+            (Node::AlwaysFalse, _) | (_, Node::AlwaysTrue) => Node::AlwaysTrue,
+            (Node::AlwaysTrue, other) | (other, Node::AlwaysFalse) => other,
+            (Node::Interior(a), Node::Interior(b)) => {
+                // Implies is _not_ commutative, so we can't use the same trick as above.
+                a.implies(db, b)
+            }
+        }
+    }
+
+    // Andersen2011, figure 17, where d == other and u == self
+    fn simplify_relative_to(self, db: &'db dyn Db, relative_to: Self) -> Self {
+        match (self, relative_to) {
+            (_, Node::AlwaysFalse) => Node::AlwaysFalse,
+            (Node::AlwaysTrue | Node::AlwaysFalse, _) => self,
+            (Node::Interior(self_interior), Node::AlwaysTrue) => Node::new(
+                db,
+                self_interior.atom(db),
+                (self_interior.if_true(db)).simplify_relative_to(db, relative_to),
+                (self_interior.if_false(db)).simplify_relative_to(db, relative_to),
+            ),
+            (Node::Interior(self_interior), Node::Interior(relative_to)) => {
+                self_interior.simplify_relative_to(db, relative_to)
+            }
+        }
+    }
+
+    fn for_each_constraint(
+        self,
+        db: &'db dyn Db,
+        f: &mut dyn FnMut(ConstrainedTypeVar<'db>) -> (),
+    ) {
+        let Node::Interior(interior) = self else {
+            return;
+        };
+        f(interior.atom(db));
+        interior.if_true(db).for_each_constraint(db, f);
+        interior.if_false(db).for_each_constraint(db, f);
+    }
+
+    fn simplify(self, db: &'db dyn Db) -> Self {
+        match self {
+            Node::AlwaysTrue | Node::AlwaysFalse => self,
+            Node::Interior(interior) => interior.simplify(db),
+        }
+    }
+}
+
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+struct InteriorNode<'db> {
+    atom: ConstrainedTypeVar<'db>,
+    if_true: Node<'db>,
+    if_false: Node<'db>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for InteriorNode<'_> {}
+
+#[salsa::tracked]
+impl<'db> InteriorNode<'db> {
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    fn negate(self, db: &'db dyn Db) -> Node<'db> {
+        Node::new(
+            db,
+            self.atom(db),
+            self.if_true(db).negate(db),
+            self.if_false(db).negate(db),
+        )
+    }
+
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    fn or(self, db: &'db dyn Db, other: Self) -> Node<'db> {
+        let self_atom = self.atom(db);
+        let other_atom = other.atom(db);
+        match self_atom.cmp(&other_atom) {
+            Ordering::Equal => Node::new(
+                db,
+                self_atom,
+                self.if_true(db).or(db, other.if_true(db)),
+                self.if_false(db).or(db, other.if_false(db)),
+            ),
+            Ordering::Less => Node::new(
+                db,
+                self_atom,
+                self.if_true(db).or(db, Node::Interior(other)),
+                self.if_false(db).or(db, Node::Interior(other)),
+            ),
+            Ordering::Greater => Node::new(
+                db,
+                other_atom,
+                Node::Interior(self).or(db, other.if_true(db)),
+                Node::Interior(self).or(db, other.if_false(db)),
+            ),
+        }
+    }
+
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    fn and(self, db: &'db dyn Db, other: Self) -> Node<'db> {
+        let self_atom = self.atom(db);
+        let other_atom = other.atom(db);
+        match self_atom.cmp(&other_atom) {
+            Ordering::Equal => Node::new(
+                db,
+                self_atom,
+                self.if_true(db).and(db, other.if_true(db)),
+                self.if_false(db).and(db, other.if_false(db)),
+            ),
+            Ordering::Less => Node::new(
+                db,
+                self_atom,
+                self.if_true(db).and(db, Node::Interior(other)),
+                self.if_false(db).and(db, Node::Interior(other)),
+            ),
+            Ordering::Greater => Node::new(
+                db,
+                other_atom,
+                Node::Interior(self).and(db, other.if_true(db)),
+                Node::Interior(self).and(db, other.if_false(db)),
+            ),
+        }
+    }
+
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    fn implies(self, db: &'db dyn Db, other: Self) -> Node<'db> {
+        let self_atom = self.atom(db);
+        let other_atom = other.atom(db);
+        match self_atom.cmp(&other_atom) {
+            Ordering::Equal => Node::new(
+                db,
+                self_atom,
+                self.if_true(db).implies(db, other.if_true(db)),
+                self.if_false(db).implies(db, other.if_false(db)),
+            ),
+            Ordering::Less => Node::new(
+                db,
+                self_atom,
+                self.if_true(db).implies(db, Node::Interior(other)),
+                self.if_false(db).implies(db, Node::Interior(other)),
+            ),
+            Ordering::Greater => Node::new(
+                db,
+                other_atom,
+                Node::Interior(self).implies(db, other.if_true(db)),
+                Node::Interior(self).implies(db, other.if_false(db)),
+            ),
+        }
+    }
+
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    fn simplify_relative_to(self, db: &'db dyn Db, relative_to: Self) -> Node<'db> {
+        let self_atom = self.atom(db);
+        let relative_to_atom = relative_to.atom(db);
+        match self_atom.cmp(&relative_to_atom) {
+            Ordering::Equal => {
+                let relative_false = relative_to.if_false(db);
+                let relative_true = relative_to.if_true(db);
+                if relative_false.is_never_satisfied() {
+                    self.if_true(db).simplify_relative_to(db, relative_true)
+                } else if relative_true.is_never_satisfied() {
+                    self.if_false(db).simplify_relative_to(db, relative_false)
+                } else {
+                    Node::new(
+                        db,
+                        self_atom,
+                        self.if_true(db).simplify_relative_to(db, relative_true),
+                        self.if_false(db).simplify_relative_to(db, relative_false),
+                    )
+                }
+            }
+
+            Ordering::Less => Node::new(
+                db,
+                self_atom,
+                (self.if_true(db)).simplify_relative_to(db, Node::Interior(relative_to)),
+                (self.if_false(db)).simplify_relative_to(db, Node::Interior(relative_to)),
+            ),
+
+            Ordering::Greater => Node::new(
+                db,
+                relative_to_atom,
+                Node::Interior(self).simplify_relative_to(db, relative_to.if_true(db)),
+                Node::Interior(self).simplify_relative_to(db, relative_to.if_false(db)),
+            ),
+        }
+    }
+
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    fn simplify(self, db: &'db dyn Db) -> Node<'db> {
+        let self_atom = self.atom(db);
+        let mut simplified = Node::Interior(self);
+        Node::Interior(self).for_each_constraint(db, &mut |nested_constraint| {
+            let given = if self_atom == nested_constraint {
+                return;
+            } else if self_atom.contains(db, nested_constraint) {
+                Node::new_constraint(db, nested_constraint)
+                    .implies(db, Node::new_constraint(db, self_atom))
+            } else if nested_constraint.contains(db, self_atom) {
+                Node::new_constraint(db, self_atom)
+                    .implies(db, Node::new_constraint(db, nested_constraint))
+            } else {
+                return;
+            };
+            simplified = simplified.simplify_relative_to(db, given);
+        });
+        simplified
     }
 }
