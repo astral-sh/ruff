@@ -562,3 +562,29 @@ def _[T]() -> None:
     # revealed: ty_extensions.ConstraintSet[always]
     reveal_type(constraint | ~constraint)
 ```
+
+### Negation of constraints involving two variables
+
+```py
+from typing import Never
+from ty_extensions import range_constraint
+
+class Base: ...
+
+def _[T, U]() -> None:
+    # revealed: ty_extensions.ConstraintSet[¬(T@_ ≤ Base) ∨ ¬(U@_ ≤ Base)]
+    reveal_type(~(range_constraint(Never, T, Base) & range_constraint(Never, U, Base)))
+```
+
+The union of a range constraint and its negation should always be satisfiable.
+
+```py
+def _[T, U]() -> None:
+    constraint = range_constraint(Never, T, Base) & range_constraint(Never, U, Base)
+    # TODO: revealed: ty_extensions.ConstraintSet[always]
+    # revealed: ty_extensions.ConstraintSet[((T@_ ≤ Base) ∧ (U@_ ≤ Base)) ∨ ¬(T@_ ≤ Base) ∨ ¬(U@_ ≤ Base)]
+    reveal_type(constraint | ~constraint)
+    # TODO: revealed: ty_extensions.ConstraintSet[always]
+    # revealed: ty_extensions.ConstraintSet[¬(T@_ ≤ Base) ∨ ¬(U@_ ≤ Base) ∨ ((T@_ ≤ Base) ∧ (U@_ ≤ Base))]
+    reveal_type(~constraint | constraint)
+```
