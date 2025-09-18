@@ -15,38 +15,35 @@ Released on 2025-09-18.
 
 ### Bug fixes
 
-- Track t-strings and f-strings for token-based rules and suppression comments ([#20357](https://github.com/astral-sh/ruff/pull/20357))
+- Handle t-strings for token-based rules and suppression comments ([#20357](https://github.com/astral-sh/ruff/pull/20357))
 - \[`flake8-bandit`\] Fix truthiness: dict-only `**` displays not truthy for `shell` (`S602`, `S604`, `S609`) ([#20177](https://github.com/astral-sh/ruff/pull/20177))
-- \[`flake8-simplify`\] Fix diagnostic to show correct method name for rsplit calls (`SIM905`) ([#20459](https://github.com/astral-sh/ruff/pull/20459))
+- \[`flake8-simplify`\] Fix diagnostic to show correct method name for `str.rsplit` calls (`SIM905`) ([#20459](https://github.com/astral-sh/ruff/pull/20459))
 - \[`flynt`\] Use triple quotes for joined raw strings with newlines (`FLY002`) ([#20197](https://github.com/astral-sh/ruff/pull/20197))
 - \[`pyupgrade`\] Fix false positive when class name is shadowed by local variable (`UP008`) ([#20427](https://github.com/astral-sh/ruff/pull/20427))
 - \[`pyupgrade`\] Prevent infinite loop with `I002` and `UP026` ([#20327](https://github.com/astral-sh/ruff/pull/20327))
 - \[`ruff`\] Recognize t-strings, generators, and lambdas in `invalid-index-type` (`RUF016`) ([#20213](https://github.com/astral-sh/ruff/pull/20213))
-- [ty] Swap `detail` and `description` fields for `CompletionItemLabelDetails` ([#20466](https://github.com/astral-sh/ruff/pull/20466))
 
 ### Rule changes
 
 - \[`RUF102`\] Respect rule redirects in invalid rule code detection ([#20245](https://github.com/astral-sh/ruff/pull/20245))
 - \[`flake8-bugbear`\] Mark the fix for `unreliable-callable-check` as always unsafe (`B004`) ([#20318](https://github.com/astral-sh/ruff/pull/20318))
 - \[`ruff`\] Allow dataclass attribute value instantiation from nested frozen dataclass (`RUF009`) ([#20352](https://github.com/astral-sh/ruff/pull/20352))
-- [ruff] Treat panics as fatal diagnostics, sort panics last ([#20258](https://github.com/astral-sh/ruff/pull/20258))
 
 ### CLI
 
 - Add fixes to `output-format=sarif` ([#20300](https://github.com/astral-sh/ruff/pull/20300))
+- Treat panics as fatal diagnostics, sort panics last ([#20258](https://github.com/astral-sh/ruff/pull/20258))
 
 ### Documentation
 
 - \[`ruff`\] Add `analyze.string-imports-min-dots` to settings ([#20375](https://github.com/astral-sh/ruff/pull/20375))
-- [docs] Update README.md with Albumentations new repository URL ([#20415](https://github.com/astral-sh/ruff/pull/20415))
+- Update README.md with Albumentations new repository URL ([#20415](https://github.com/astral-sh/ruff/pull/20415))
 
 ### Other changes
 
 - Bump MSRV to Rust 1.88 ([#20470](https://github.com/astral-sh/ruff/pull/20470))
 - Revert "\[ruff\]: Build loongarch64 binaries in CI (#20361)" ([#20372](https://github.com/astral-sh/ruff/pull/20372))
-- \[`playground`\] Enable inline noqa for multiline strings in playground ([#20442](https://github.com/astral-sh/ruff/pull/20442))
-- [ty] Add mdtests that exercise constraint sets ([#20319](https://github.com/astral-sh/ruff/pull/20319))
-- bump mypy_primer pin ([#20378](https://github.com/astral-sh/ruff/pull/20378))
+- Enable inline noqa for multiline strings in playground ([#20442](https://github.com/astral-sh/ruff/pull/20442))
 
 ### Contributors
 
