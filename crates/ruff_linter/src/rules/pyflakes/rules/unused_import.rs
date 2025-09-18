@@ -679,14 +679,14 @@ struct MarkedBindings<'a, 'b> {
 
 impl<'a, 'b> MarkedBindings<'a, 'b> {
     fn from_binding_id(semantic: &'a SemanticModel<'b>, id: BindingId, scope: &'a Scope) -> Self {
-        let unused: Vec<_> = scope
+        let bindings: Vec<_> = scope
             .shadowed_bindings(id)
             .map(|id| semantic.binding(id))
             .collect();
 
         Self {
-            used: vec![false; unused.len()],
-            bindings: unused,
+            used: vec![false; bindings.len()],
+            bindings,
         }
     }
 
