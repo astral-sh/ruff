@@ -68,7 +68,7 @@ pub struct Generator<'a> {
     indent: &'a Indentation,
     /// The line ending to use.
     line_ending: LineEnding,
-    /// Preferred quote style to use.
+    /// Preferred quote style to use. For more info see [`Generator::with_preferred_quote`].
     preferred_quote: Option<Quote>,
     buffer: String,
     indent_depth: usize,
@@ -106,9 +106,13 @@ impl<'a> Generator<'a> {
     }
 
     /// Set a preferred quote style for generated source code.
+    ///
+    /// - If [`None`], the generator will attempt to preserve the existing quote style whenever possible.
+    /// - If [`Some`], the generator will always use the specified quote style,
+    /// ignoring the one found in the source.
     #[must_use]
-    pub fn with_preferred_quote(mut self, quote: Quote) -> Self {
-        self.preferred_quote = Some(quote);
+    pub fn with_preferred_quote(mut self, quote: Option<Quote>) -> Self {
+        self.preferred_quote = quote;
         self
     }
 
@@ -1607,10 +1611,8 @@ mod tests {
         contents: &str,
     ) -> String {
         let module = parse_module(contents).unwrap();
-        let mut generator = Generator::new(indentation, line_ending);
-        if let Some(preferred_quote) = preferred_quote {
-            generator = generator.with_preferred_quote(preferred_quote);
-        }
+        let mut generator =
+            Generator::new(indentation, line_ending).with_preferred_quote(preferred_quote);
         generator.unparse_suite(module.suite());
         generator.generate()
     }
