@@ -1420,6 +1420,7 @@ SIM905 [*] Consider using a list literal instead of `str.split`
 171 | " a b c d ".split(maxsplit=2)  # ["a", "b", "c d "]
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 172 | " a b c d ".rsplit(maxsplit=2)  # [" a b", "c", "d"]
+173 | "a  b".split(maxsplit=1)  # ["a", "b"]
     |
 help: Replace with list literal
 168 | print("<\x1c\x1d\x1e\x1f".rsplit(maxsplit=0))
@@ -1428,6 +1429,7 @@ help: Replace with list literal
     - " a b c d ".split(maxsplit=2)  # ["a", "b", "c d "]
 171 + ["a", "b", "c d "]  # ["a", "b", "c d "]
 172 | " a b c d ".rsplit(maxsplit=2)  # [" a b", "c", "d"]
+173 | "a  b".split(maxsplit=1)  # ["a", "b"]
 
 SIM905 [*] Consider using a list literal instead of `str.rsplit`
    --> SIM905.py:172:1
@@ -1436,6 +1438,7 @@ SIM905 [*] Consider using a list literal instead of `str.rsplit`
 171 | " a b c d ".split(maxsplit=2)  # ["a", "b", "c d "]
 172 | " a b c d ".rsplit(maxsplit=2)  # [" a b", "c", "d"]
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+173 | "a  b".split(maxsplit=1)  # ["a", "b"]
     |
 help: Replace with list literal
 169 | 
@@ -1443,3 +1446,19 @@ help: Replace with list literal
 171 | " a b c d ".split(maxsplit=2)  # ["a", "b", "c d "]
     - " a b c d ".rsplit(maxsplit=2)  # [" a b", "c", "d"]
 172 + [" a b", "c", "d"]  # [" a b", "c", "d"]
+173 | "a  b".split(maxsplit=1)  # ["a", "b"]
+
+SIM905 [*] Consider using a list literal instead of `str.split`
+   --> SIM905.py:173:1
+    |
+171 | " a b c d ".split(maxsplit=2)  # ["a", "b", "c d "]
+172 | " a b c d ".rsplit(maxsplit=2)  # [" a b", "c", "d"]
+173 | "a  b".split(maxsplit=1)  # ["a", "b"]
+    | ^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: Replace with list literal
+170 | # leading/trailing whitespace should not count towards maxsplit
+171 | " a b c d ".split(maxsplit=2)  # ["a", "b", "c d "]
+172 | " a b c d ".rsplit(maxsplit=2)  # [" a b", "c", "d"]
+    - "a  b".split(maxsplit=1)  # ["a", "b"]
+173 + ["a", "b"]  # ["a", "b"]

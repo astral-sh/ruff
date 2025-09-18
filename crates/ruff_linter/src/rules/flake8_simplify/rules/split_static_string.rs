@@ -58,8 +58,8 @@ enum Method {
 }
 
 impl Method {
-    fn is_split(self) -> bool {
-        matches!(self, Method::Split)
+    fn is_rsplit(self) -> bool {
+        matches!(self, Method::RSplit)
     }
 }
 
@@ -201,62 +201,16 @@ fn split_default(
     method: Method,
     settings: &LinterSettings,
 ) -> Option<Expr> {
-    // From the Python documentation:
-    // > If sep is not specified or is None, a different splitting algorithm is applied: runs of
-    // > consecutive whitespace are regarded as a single separator, and the result will contain
-    // > no empty strings at the start or end if the string has leading or trailing whitespace.
-    // > Consequently, splitting an empty string or a string consisting of just whitespace with
-    // > a None separator returns [].
-    // https://docs.python.org/3/library/stdtypes.html#str.split
     let string_val = str_value.to_str();
     match max_split.cmp(&0) {
-        Ordering::Greater => {
-            if !is_maxsplit_without_separator_fix_enabled(settings) {
-                return None;
-            }
+        Ordering::Greater if !is_maxsplit_without_separator_fix_enabled(settings) => None,
+        Ordering::Greater | Ordering::Equal => {
             let Ok(max_split) = usize::try_from(max_split) else {
                 return None;
             };
-            let list_items: Vec<&str> = if method.is_split() {
-                string_val
-                    .trim_start_matches(py_unicode_is_whitespace)
-                    .splitn(max_split + 1, py_unicode_is_whitespace)
-                    .filter(|s| !s.is_empty())
-                    .collect()
-            } else {
-                let mut items: Vec<&str> = string_val
-                    .trim_end_matches(py_unicode_is_whitespace)
-                    .rsplitn(max_split + 1, py_unicode_is_whitespace)
-                    .filter(|s| !s.is_empty())
-                    .collect();
-                items.reverse();
-                items
-            };
+            let list_items = split_whitespace_with_maxsplit(string_val, max_split, method);
             Some(construct_replacement(
                 &list_items,
-                str_value.first_literal_flags(),
-            ))
-        }
-        Ordering::Equal => {
-            // Behavior for maxsplit = 0 when sep is None:
-            // - If the string is empty or all whitespace, result is [].
-            // - Otherwise:
-            //   - " x ".split(maxsplit=0)  -> ['x ']
-            //   - " x ".rsplit(maxsplit=0) -> [' x']
-            //   - "".split(maxsplit=0) -> []
-            //   - " ".split(maxsplit=0) -> []
-            let processed_str = if method.is_split() {
-                string_val.trim_start_matches(py_unicode_is_whitespace)
-            } else {
-                string_val.trim_end_matches(py_unicode_is_whitespace)
-            };
-            let list_items: &[_] = if processed_str.is_empty() {
-                &[]
-            } else {
-                &[processed_str]
-            };
-            Some(construct_replacement(
-                list_items,
                 str_value.first_literal_flags(),
             ))
         }
@@ -366,4 +320,108 @@ const fn py_unicode_is_whitespace(ch: char) -> bool {
         | '\u{205F}'
         | '\u{3000}'
     )
+}
+
+struct WhitespaceMaxSplitIterator<'a> {
+    remaining: &'a str,
+    max_split: usize,
+    splits: usize,
+    method: Method,
+}
+
+impl<'a> WhitespaceMaxSplitIterator<'a> {
+    fn new(s: &'a str, max_split: usize, method: Method) -> Self {
+        let remaining = match method {
+            Method::Split => s.trim_start_matches(py_unicode_is_whitespace),
+            Method::RSplit => s.trim_end_matches(py_unicode_is_whitespace),
+        };
+
+        Self {
+            remaining,
+            max_split,
+            splits: 0,
+            method,
+        }
+    }
+}
+
+impl<'a> Iterator for WhitespaceMaxSplitIterator<'a> {
+    type Item = &'a str;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.remaining.is_empty() {
+            return None;
+        }
+
+        if self.splits >= self.max_split {
+            let result = self.remaining;
+            self.remaining = "";
+            return Some(result);
+        }
+
+        self.splits += 1;
+        match self.method {
+            Method::Split => match self.remaining.split_once(py_unicode_is_whitespace) {
+                Some((s, remaining)) => {
+                    self.remaining = remaining.trim_start_matches(py_unicode_is_whitespace);
+                    Some(s)
+                }
+                None => Some(std::mem::take(&mut self.remaining)),
+            },
+            Method::RSplit => match self.remaining.rsplit_once(py_unicode_is_whitespace) {
+                Some((remaining, s)) => {
+                    self.remaining = remaining.trim_end_matches(py_unicode_is_whitespace);
+                    Some(s)
+                }
+                None => Some(std::mem::take(&mut self.remaining)),
+            },
+        }
+    }
+}
+
+// From the Python documentation:
+// > If sep is not specified or is None, a different splitting algorithm is applied: runs of
+// > consecutive whitespace are regarded as a single separator, and the result will contain
+// > no empty strings at the start or end if the string has leading or trailing whitespace.
+// > Consequently, splitting an empty string or a string consisting of just whitespace with
+// > a None separator returns [].
+// https://docs.python.org/3/library/stdtypes.html#str.split
+fn split_whitespace_with_maxsplit(s: &str, max_split: usize, method: Method) -> Vec<&str> {
+    let mut result: Vec<_> = WhitespaceMaxSplitIterator::new(s, max_split, method).collect();
+    if method.is_rsplit() {
+        result.reverse();
+    }
+    result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Method, split_whitespace_with_maxsplit};
+    use test_case::test_case;
+
+    #[test_case("  ", 1, &[])]
+    #[test_case("a  b", 1, &["a", "b"])]
+    #[test_case("a  b", 2, &["a", "b"])]
+    #[test_case(" a b c d ", 2, &["a", "b", "c d "])]
+    #[test_case("  a  b  c  ", 1, &["a", "b  c  "])]
+    #[test_case(" x ", 0, &["x "])]
+    #[test_case(" ", 0, &[])]
+    #[test_case("a\u{3000}b", 1, &["a", "b"])]
+    fn test_split_whitespace_with_maxsplit(s: &str, max_split: usize, expected: &[&str]) {
+        let parts = split_whitespace_with_maxsplit(s, max_split, Method::Split);
+        assert_eq!(parts, expected);
+    }
+
+    #[test_case("  ", 1, &[])]
+    #[test_case("a  b", 1, &["a", "b"])]
+    #[test_case("a  b", 2, &["a", "b"])]
+    #[test_case(" a b c d ", 2, &[" a b", "c", "d"])]
+    #[test_case("  a  b  c  ", 1, &["  a  b", "c"])]
+    #[test_case(" x ", 0, &[" x"])]
+    #[test_case(" ", 0, &[])]
+    #[test_case("a\u{3000}b", 1, &["a", "b"])]
+    fn test_rsplit_whitespace_with_maxsplit(s: &str, max_split: usize, expected: &[&str]) {
+        let parts = split_whitespace_with_maxsplit(s, max_split, Method::RSplit);
+        assert_eq!(parts, expected);
+    }
 }
