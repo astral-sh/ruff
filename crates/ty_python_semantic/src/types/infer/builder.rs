@@ -5775,7 +5775,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_call_expression(
         &mut self,
         call_expression: &ast::ExprCall,
-        _tcx: TypeContext<'db>,
+        tcx: TypeContext<'db>,
     ) -> Type<'db> {
         let ast::ExprCall {
             range: _,
@@ -5955,7 +5955,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        let mut bindings = match bindings.check_types(self.db(), &call_arguments) {
+        let mut bindings = match bindings.check_types(self.db(), &call_arguments, &tcx) {
             Ok(bindings) => bindings,
             Err(CallError(_, bindings)) => {
                 bindings.report_diagnostics(&self.context, call_expression.into());
@@ -8521,7 +8521,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let binding = Binding::single(value_ty, generic_context.signature(self.db()));
         let bindings = match Bindings::from(binding)
             .match_parameters(self.db(), &call_argument_types)
-            .check_types(self.db(), &call_argument_types)
+            .check_types(self.db(), &call_argument_types, &TypeContext::default())
         {
             Ok(bindings) => bindings,
             Err(CallError(_, bindings)) => {
