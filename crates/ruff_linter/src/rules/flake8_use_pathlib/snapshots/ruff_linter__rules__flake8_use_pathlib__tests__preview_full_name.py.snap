@@ -931,6 +931,7 @@ help: Replace with `Path(...).mkdir(parents=True)`
 126 + pathlib.Path("name").mkdir(mode=0o777, exist_ok=False, parents=True)
 127 | 
 128 | os.makedirs("name", unknown_kwarg=True)
+129 | 
 
 PTH103 `os.makedirs()` should be replaced by `Path.mkdir(parents=True)`
    --> full_name.py:127:1
@@ -939,5 +940,102 @@ PTH103 `os.makedirs()` should be replaced by `Path.mkdir(parents=True)`
 126 |
 127 | os.makedirs("name", unknown_kwarg=True)
     | ^^^^^^^^^^^
+128 |
+129 | # https://github.com/astral-sh/ruff/issues/20134
     |
 help: Replace with `Path(...).mkdir(parents=True)`
+
+PTH101 [*] `os.chmod()` should be replaced by `Path.chmod()`
+   --> full_name.py:130:1
+    |
+129 | # https://github.com/astral-sh/ruff/issues/20134
+130 | os.chmod("pth1_link", mode=0o600, follow_symlinks=      False    )
+    | ^^^^^^^^
+131 | os.chmod("pth1_link", mode=0o600, follow_symlinks=True)
+    |
+help: Replace with `Path(...).chmod(...)`
+1   | import os
+2   | import os.path
+3   + import pathlib
+4   | 
+5   | p = "/foo"
+6   | q = "bar"
+--------------------------------------------------------------------------------
+128 | os.makedirs("name", unknown_kwarg=True)
+129 | 
+130 | # https://github.com/astral-sh/ruff/issues/20134
+    - os.chmod("pth1_link", mode=0o600, follow_symlinks=      False    )
+131 + pathlib.Path("pth1_link").chmod(mode=0o600, follow_symlinks=      False)
+132 | os.chmod("pth1_link", mode=0o600, follow_symlinks=True)
+133 | 
+134 | # Only diagnostic
+
+PTH101 [*] `os.chmod()` should be replaced by `Path.chmod()`
+   --> full_name.py:131:1
+    |
+129 | # https://github.com/astral-sh/ruff/issues/20134
+130 | os.chmod("pth1_link", mode=0o600, follow_symlinks=      False    )
+131 | os.chmod("pth1_link", mode=0o600, follow_symlinks=True)
+    | ^^^^^^^^
+132 |
+133 | # Only diagnostic
+    |
+help: Replace with `Path(...).chmod(...)`
+1   | import os
+2   | import os.path
+3   + import pathlib
+4   | 
+5   | p = "/foo"
+6   | q = "bar"
+--------------------------------------------------------------------------------
+129 | 
+130 | # https://github.com/astral-sh/ruff/issues/20134
+131 | os.chmod("pth1_link", mode=0o600, follow_symlinks=      False    )
+    - os.chmod("pth1_link", mode=0o600, follow_symlinks=True)
+132 + pathlib.Path("pth1_link").chmod(mode=0o600, follow_symlinks=True)
+133 | 
+134 | # Only diagnostic
+135 | os.chmod("pth1_file", 0o700, None, True, 1, *[1], **{"x": 1}, foo=1)
+
+PTH101 `os.chmod()` should be replaced by `Path.chmod()`
+   --> full_name.py:134:1
+    |
+133 | # Only diagnostic
+134 | os.chmod("pth1_file", 0o700, None, True, 1, *[1], **{"x": 1}, foo=1)
+    | ^^^^^^^^
+135 |
+136 | os.rename("pth1_file", "pth1_file1", None, None, 1, *[1], **{"x": 1}, foo=1)
+    |
+help: Replace with `Path(...).chmod(...)`
+
+PTH104 `os.rename()` should be replaced by `Path.rename()`
+   --> full_name.py:136:1
+    |
+134 | os.chmod("pth1_file", 0o700, None, True, 1, *[1], **{"x": 1}, foo=1)
+135 |
+136 | os.rename("pth1_file", "pth1_file1", None, None, 1, *[1], **{"x": 1}, foo=1)
+    | ^^^^^^^^^
+137 | os.replace("pth1_file1", "pth1_file", None, None, 1, *[1], **{"x": 1}, foo=1)
+    |
+help: Replace with `Path(...).rename(...)`
+
+PTH105 `os.replace()` should be replaced by `Path.replace()`
+   --> full_name.py:137:1
+    |
+136 | os.rename("pth1_file", "pth1_file1", None, None, 1, *[1], **{"x": 1}, foo=1)
+137 | os.replace("pth1_file1", "pth1_file", None, None, 1, *[1], **{"x": 1}, foo=1)
+    | ^^^^^^^^^^
+138 |
+139 | os.path.samefile("pth1_file", "pth1_link", 1, *[1], **{"x": 1}, foo=1)
+    |
+help: Replace with `Path(...).replace(...)`
+
+PTH121 `os.path.samefile()` should be replaced by `Path.samefile()`
+   --> full_name.py:139:1
+    |
+137 | os.replace("pth1_file1", "pth1_file", None, None, 1, *[1], **{"x": 1}, foo=1)
+138 |
+139 | os.path.samefile("pth1_file", "pth1_link", 1, *[1], **{"x": 1}, foo=1)
+    | ^^^^^^^^^^^^^^^^
+    |
+help: Replace with `Path(...).samefile()`

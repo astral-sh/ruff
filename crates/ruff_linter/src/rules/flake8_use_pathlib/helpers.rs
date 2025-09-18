@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr, ExprCall};
+use ruff_python_ast::{self as ast, Arguments, Expr, ExprCall};
 use ruff_python_semantic::{SemanticModel, analyze::typing};
 use ruff_text_size::Ranged;
 
@@ -6,7 +6,7 @@ use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use crate::{Applicability, Edit, Fix, Violation};
 
-pub(crate) fn is_keyword_only_argument_non_default(arguments: &ast::Arguments, name: &str) -> bool {
+pub(crate) fn is_keyword_only_argument_non_default(arguments: &Arguments, name: &str) -> bool {
     arguments
         .find_keyword(name)
         .is_some_and(|keyword| !keyword.value.is_none_literal_expr())
@@ -24,10 +24,7 @@ pub(crate) fn is_pathlib_path_call(checker: &Checker, expr: &Expr) -> bool {
 /// Check if the given segments represent a pathlib Path subclass or `PackagePath` with preview mode support.
 /// In stable mode, only checks for `Path` and `PurePath`. In preview mode, also checks for
 /// `PosixPath`, `PurePosixPath`, `WindowsPath`, `PureWindowsPath`, and `PackagePath`.
-pub(crate) fn is_pure_path_subclass_with_preview(
-    checker: &crate::checkers::ast::Checker,
-    segments: &[&str],
-) -> bool {
+pub(crate) fn is_pure_path_subclass_with_preview(checker: &Checker, segments: &[&str]) -> bool {
     let is_core_pathlib = matches!(segments, ["pathlib", "Path" | "PurePath"]);
 
     if is_core_pathlib {
@@ -193,7 +190,7 @@ pub(crate) fn check_os_pathlib_two_arg_calls(
 }
 
 pub(crate) fn has_unknown_keywords_or_starred_expr(
-    arguments: &ast::Arguments,
+    arguments: &Arguments,
     allowed: &[&str],
 ) -> bool {
     if arguments.args.iter().any(Expr::is_starred_expr) {
@@ -207,11 +204,7 @@ pub(crate) fn has_unknown_keywords_or_starred_expr(
 }
 
 /// Returns `true` if argument `name` is set to a non-default `None` value.
-pub(crate) fn is_argument_non_default(
-    arguments: &ast::Arguments,
-    name: &str,
-    position: usize,
-) -> bool {
+pub(crate) fn is_argument_non_default(arguments: &Arguments, name: &str, position: usize) -> bool {
     arguments
         .find_argument_value(name, position)
         .is_some_and(|expr| !expr.is_none_literal_expr())
