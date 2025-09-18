@@ -684,11 +684,9 @@ impl<'a, 'b> MarkedBindings<'a, 'b> {
             .map(|id| semantic.binding(id))
             .collect();
 
-        let num_unused = &unused.len();
-
         Self {
+            used: vec![false; unused.len()],
             bindings: unused,
-            used: vec![false; *num_unused],
         }
     }
 
