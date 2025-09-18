@@ -6,19 +6,15 @@ info:
     - format
     - "--no-cache"
     - "--output-format"
-    - full
+    - grouped
     - "--check"
     - input.py
 ---
 success: false
 exit_code: 1
 ----- stdout -----
-unformatted: File would be reformatted
---> input.py:1:1
-  - \
-1 | from test import say_hy
-2 | 
-3 | if __name__ == "__main__":
+input.py:
+  1:1 unformatted: File would be reformatted
 
 1 file would be reformatted
 

@@ -70,8 +70,8 @@ bar =     "needs formatting"
     success: false
     exit_code: 1
     ----- stdout -----
-    bar.py: error[unformatted] File would be reformatted
-    foo.py: error[unformatted] File would be reformatted
+    bar.py: unformatted: File would be reformatted
+    foo.py: unformatted: File would be reformatted
     2 files would be reformatted
 
     ----- stderr -----
@@ -492,8 +492,8 @@ OTHER = "OTHER"
     success: false
     exit_code: 1
     ----- stdout -----
-    main.py: error[unformatted] File would be reformatted
-    test.py: error[unformatted] File would be reformatted
+    main.py: unformatted: File would be reformatted
+    test.py: unformatted: File would be reformatted
     2 files would be reformatted
 
     ----- stderr -----
@@ -548,7 +548,7 @@ if __name__ == "__main__":
     success: false
     exit_code: 1
     ----- stdout -----
-    main.py: error[unformatted] File would be reformatted
+    main.py: unformatted: File would be reformatted
     1 file would be reformatted
 
     ----- stderr -----
@@ -586,13 +586,13 @@ if __name__ == "__main__":
 #[test_case::test_case("json")]
 #[test_case::test_case("json-lines")]
 #[test_case::test_case("junit")]
-// #[test_case::test_case("grouped")]
+#[test_case::test_case("grouped")]
 #[test_case::test_case("github")]
 #[test_case::test_case("gitlab")]
 #[test_case::test_case("pylint")]
 #[test_case::test_case("rdjson")]
 #[test_case::test_case("azure")]
-// #[test_case::test_case("sarif")]
+#[test_case::test_case("sarif")]
 fn output_format(output_format: &str) -> Result<()> {
     const CONTENT: &str = r#"\
 from test import say_hy
@@ -773,7 +773,7 @@ OTHER = "OTHER"
     success: false
     exit_code: 1
     ----- stdout -----
-    main.py: error[unformatted] File would be reformatted
+    main.py: unformatted: File would be reformatted
     1 file would be reformatted
 
     ----- stderr -----
