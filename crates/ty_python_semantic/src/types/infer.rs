@@ -352,7 +352,7 @@ struct ExpressionWithContext<'db> {
 /// more precise inference results, aka "bidirectional type inference".
 #[derive(Default, Copy, Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub(crate) struct TypeContext<'db> {
-    annotation: Option<Type<'db>>,
+    pub(crate) annotation: Option<Type<'db>>,
 }
 
 impl<'db> TypeContext<'db> {

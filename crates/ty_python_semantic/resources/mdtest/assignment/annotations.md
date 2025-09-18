@@ -234,3 +234,48 @@ reveal_type(x)  # revealed: Foo
 x: int = 1
 reveal_type(x) # revealed: Literal[1]
 ```
+
+## Annotations influence generic call inference
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Literal
+
+def f[T](x: T) -> list[T]:
+    return [x]
+
+a = f("a")
+reveal_type(a)  # revealed: list[Literal["a"]]
+
+b: list[int | Literal["a"]] = f("a")
+reveal_type(b)  # revealed: list[int | Literal["a"]]
+
+c: list[int | str] = f("a")
+reveal_type(c)  # revealed: list[int | str]
+
+d: list[int | tuple[int, int]] = f((1, 2))
+reveal_type(d)  # revealed: list[int | tuple[int, int]]
+
+e: list[int] = f(True)
+reveal_type(e)  # revealed: list[int]
+
+# TODO: the RHS should be inferred as `list[Literal["a"]]` here
+# error: [invalid-assignment] "Object of type `list[int | Literal["a"]]` is not assignable to `list[int]`"
+g: list[int] = f("a")
+
+# error: [invalid-assignment] "Object of type `list[Literal["a"]]` is not assignable to `tuple[int]`"
+h: tuple[int] = f("a")
+
+def f2[T: int](x: T) -> T:
+    return x
+
+i: int = f2(True)
+reveal_type(i)  # revealed: int
+
+j: int | str = f2(True)
+reveal_type(j)  # revealed: Literal[True]
+```
