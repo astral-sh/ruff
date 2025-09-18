@@ -813,11 +813,11 @@ fn mark_uses_of_qualified_name(marked: &mut MarkedBindings, prototype: &Qualifie
         return;
     };
 
-    let Some(bimp) = best.as_any_import() else {
+    let Some(best_import) = best.as_any_import() else {
         return;
     };
 
-    let bname = bimp.qualified_name();
+    let best_name = best_import.qualified_name();
 
     for (binding, is_used) in marked.iter_mut() {
         if *is_used {
@@ -826,7 +826,7 @@ fn mark_uses_of_qualified_name(marked: &mut MarkedBindings, prototype: &Qualifie
 
         if binding
             .as_any_import()
-            .is_some_and(|imp| imp.qualified_name() == bname)
+            .is_some_and(|imp| imp.qualified_name() == best_name)
         {
             *is_used = true;
         }
