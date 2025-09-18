@@ -2080,36 +2080,23 @@ if True:
         );
     }
 
-    #[test]
-    fn preferred_quote() {
-        assert_eq!(
-            round_trip_with(
-                &Indentation::default(),
-                LineEnding::default(),
-                None,
-                r#"x: list["str"]"#,
-            ),
-            r#"x: list["str"]"#,
+    #[test_case::test_case(r#""'""#, r#""'""#, Quote::Single ; "basic str ignored")]
+    #[test_case::test_case(r#"b"'""#, r#"b"'""#, Quote::Single ; "basic bytes ignored")]
+    #[test_case::test_case(r#""a""#, "'a'", Quote::Single ; "basic str single")]
+    #[test_case::test_case("'a'", r#""a""#, Quote::Double ; "basic str double")]
+    #[test_case::test_case(r#"b"a""#, "b'a'", Quote::Single ; "basic bytes single")]
+    #[test_case::test_case("b'a'", r#"b"a""#, Quote::Double ; "basic bytes double")]
+    #[test_case::test_case(r#""a""#,  r#""a""#, Quote::Double ; "remain str double")]
+    #[test_case::test_case("'1'", "'1'", Quote::Single ; "remain str single")]
+    #[test_case::test_case(r#"x: list["str"]"#, "x: list['str']", Quote::Single ; "type ann single")]
+    #[test_case::test_case("x: list['str']", r#"x: list["str"]"#, Quote::Double ; "type ann double")]
+    fn preferred_quote(inp: &str, out: &str, quote: Quote) {
+        let got = round_trip_with(
+            &Indentation::default(),
+            LineEnding::default(),
+            Some(quote),
+            inp,
         );
-
-        assert_eq!(
-            round_trip_with(
-                &Indentation::default(),
-                LineEnding::default(),
-                Some(Quote::Single),
-                r#"x: list["str"]"#,
-            ),
-            "x: list['str']",
-        );
-
-        assert_eq!(
-            round_trip_with(
-                &Indentation::default(),
-                LineEnding::default(),
-                Some(Quote::Single),
-                r#"x = "1""#,
-            ),
-            "x = '1'",
-        );
+        assert_eq!(got, out);
     }
 }
