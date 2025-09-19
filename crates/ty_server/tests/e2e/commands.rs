@@ -3,7 +3,6 @@ use lsp_types::{ExecuteCommandParams, WorkDoneProgressParams, request::ExecuteCo
 use ruff_db::system::SystemPath;
 
 use crate::{TestServer, TestServerBuilder};
-use serde_json::json;
 
 // Sends an executeCommand request to the TestServer
 fn execute_command(
@@ -21,7 +20,7 @@ fn execute_command(
 }
 
 #[test]
-fn debug_command_short() -> Result<()> {
+fn debug_command() -> Result<()> {
     let workspace_root = SystemPath::new("src");
     let foo = SystemPath::new("src/foo.py");
     let foo_content = "\
@@ -36,65 +35,7 @@ return 42
         .build()?
         .wait_until_workspaces_are_initialized()?;
 
-    let response = execute_command(
-        &mut server,
-        "ty.printDebugInformation".to_string(),
-        vec![json!("short")],
-    )?;
-
-    insta::assert_debug_snapshot!(response);
-
-    Ok(())
-}
-
-#[test]
-fn debug_command_mypy() -> Result<()> {
-    let workspace_root = SystemPath::new("src");
-    let foo = SystemPath::new("src/foo.py");
-    let foo_content = "\
-def foo() -> str:
-return 42
-";
-
-    let mut server = TestServerBuilder::new()?
-        .with_workspace(workspace_root, None)?
-        .with_file(foo, foo_content)?
-        .enable_pull_diagnostics(false)
-        .build()?
-        .wait_until_workspaces_are_initialized()?;
-
-    let response = execute_command(
-        &mut server,
-        "ty.printDebugInformation".to_string(),
-        vec![json!("mypy_primer")],
-    )?;
-
-    insta::assert_debug_snapshot!(response);
-
-    Ok(())
-}
-
-#[test]
-fn debug_command_full() -> Result<()> {
-    let workspace_root = SystemPath::new("src");
-    let foo = SystemPath::new("src/foo.py");
-    let foo_content = "\
-def foo() -> str:
-return 42
-";
-
-    let mut server = TestServerBuilder::new()?
-        .with_workspace(workspace_root, None)?
-        .with_file(foo, foo_content)?
-        .enable_pull_diagnostics(false)
-        .build()?
-        .wait_until_workspaces_are_initialized()?;
-
-    let response = execute_command(
-        &mut server,
-        "ty.printDebugInformation".to_string(),
-        vec![json!("full")],
-    )?;
+    let response = execute_command(&mut server, "ty.printDebugInformation".to_string(), vec![])?;
 
     insta::assert_debug_snapshot!(response);
 

@@ -26,11 +26,8 @@ impl SyncRequestHandler for ExecuteCommand {
             .with_failure_code(ErrorCode::InvalidParams)?;
 
         if command == SupportedCommand::Debug {
-            // TODO: Currently we only use the first argument i.e., the first document that's
-            // provided but we could expand this to consider all *open* documents.
-            let argument: &str = params.arguments.first().expect("no args").as_str().unwrap();
             return Ok(Some(serde_json::Value::String(
-                debug_information(session, argument).with_failure_code(ErrorCode::InternalError)?,
+                debug_information(session).with_failure_code(ErrorCode::InternalError)?,
             )));
         }
         Ok(None)
@@ -38,27 +35,16 @@ impl SyncRequestHandler for ExecuteCommand {
 }
 
 /// Returns a string with detailed memory usage.
-fn debug_information(session: &Session, report_type: &str) -> crate::Result<String> {
+fn debug_information(session: &Session) -> crate::Result<String> {
     let mut buffer = String::new();
 
-    writeln!(buffer, "report type: {report_type}")?;
     let db = session.project_dbs().next();
     match db {
-        Some(db) => match report_type {
-            "short" => {
-                let db_str = db.salsa_memory_dump().display_short().to_string();
-                writeln!(buffer, "{db_str}")?;
-            }
-            "mypy_primer" => {
-                let db_str = db.salsa_memory_dump().display_mypy_primer().to_string();
-                writeln!(buffer, "{db_str}")?;
-            }
-            "full" => {
-                let db_str = db.salsa_memory_dump().display_full().to_string();
-                writeln!(buffer, "{db_str}")?;
-            }
-            _ => {}
-        },
+        Some(db) => {
+            //salsa has different kind of mem reports, for debug we want the full one.
+            let db_str = db.salsa_memory_dump().display_full().to_string();
+            writeln!(buffer, "{db_str}")?;
+        }
         None => writeln!(buffer, "No db found")?,
     }
     Ok(buffer)

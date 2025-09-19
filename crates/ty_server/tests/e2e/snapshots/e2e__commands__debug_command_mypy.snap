@@ -1,8 +1,0 @@
----
-source: crates/ty_server/tests/e2e/commands.rs
-assertion_line: 72
-expression: response
----
-Some(
-    String("report type: mypy_primer\n=======SALSA SUMMARY=======/nTOTAL MEMORY USAGE: ~0MB\n    struct metadata = ~0MB\n    struct fields = ~0MB\n    memo metadata = ~0MB\n    memo fields = ~0MB\n\n"),
-)
