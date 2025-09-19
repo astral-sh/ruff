@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::add_argument;
+use crate::rules::flake8_bugbear::helpers::any_infinite_iterables;
 use crate::{AlwaysFixableViolation, Applicability, Fix};
 
 /// ## What it does
@@ -81,5 +82,3 @@ pub(crate) fn zip_without_explicit_strict(checker: &Checker, call: &ast::ExprCal
             ));
     }
 }
-
-use super::strict_utils::any_infinite_iterables;

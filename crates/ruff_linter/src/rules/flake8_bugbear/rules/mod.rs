@@ -70,7 +70,6 @@ mod reuse_of_groupby_generator;
 mod setattr_with_constant;
 mod star_arg_unpacking_after_keyword_arg;
 mod static_key_dict_comprehension;
-mod strict_utils;
 mod strip_with_multi_characters;
 mod unary_prefix_increment_decrement;
 mod unintentional_type_annotation;
