@@ -59,30 +59,18 @@ use crate::rules::pydocstyle::settings::Convention;
 /// ```
 #[derive(ViolationMetadata)]
 pub(crate) struct DocstringExtraneousParameter {
-    ids: Vec<String>,
+    id: String,
 }
 
 impl Violation for DocstringExtraneousParameter {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let DocstringExtraneousParameter { ids } = self;
-
-        if let [id] = ids.as_slice() {
-            format!("Documented parameter `{id}` is not in the function's signature")
-        } else {
-            format!(
-                "These documented parameters are not in the function's signature: {}",
-                ids.iter().map(|id| format!("`{id}`")).join(", ")
-            )
-        }
+        let DocstringExtraneousParameter { id } = self;
+        format!("Documented parameter `{id}` is not in the function's signature")
     }
 
     fn fix_title(&self) -> Option<String> {
-        let DocstringExtraneousParameter { ids } = self;
-        let s = if ids.len() == 1 { "" } else { "s" };
-        Some(format!(
-            "Remove the extraneous parameter{s} from the docstring"
-        ))
+        Some("Remove the extraneous parameter from the docstring".to_string())
     }
 }
 
@@ -1272,28 +1260,13 @@ pub(crate) fn check_docstring(
         // Don't report extraneous parameters if the signature defines *args or **kwargs
         if function_def.parameters.vararg.is_none() && function_def.parameters.kwarg.is_none() {
             if let Some(docstring_params) = docstring_sections.parameters {
-                let mut extraneous_parameters_names = Vec::new();
-                let mut extraneous_parameters = Vec::new();
                 for docstring_param in &docstring_params.parameters {
-                    let param_name: &str = docstring_param.name;
-                    if !signature_parameters.contains(&param_name) {
-                        extraneous_parameters_names.push(docstring_param.name.to_string());
-                        extraneous_parameters.push(docstring_param);
-                    }
-                }
-                if !extraneous_parameters_names.is_empty() {
-                    let mut diagnostic = checker.report_diagnostic(
-                        DocstringExtraneousParameter {
-                            ids: extraneous_parameters_names,
-                        },
-                        docstring_params.range(),
-                    );
-
-                    for extraneous_parameter in extraneous_parameters {
-                        let name = extraneous_parameter.name;
-                        diagnostic.secondary_annotation(
-                            format_args!("`{name}` is not in the signature"),
-                            extraneous_parameter.range,
+                    if !signature_parameters.contains(&docstring_param.name) {
+                        checker.report_diagnostic(
+                            DocstringExtraneousParameter {
+                                id: docstring_param.name.to_string(),
+                            },
+                            docstring_param.range(),
                         );
                     }
                 }
