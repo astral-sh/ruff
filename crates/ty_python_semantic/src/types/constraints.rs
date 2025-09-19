@@ -207,20 +207,20 @@ impl<'db> ConstraintSet<'db> {
 
     /// Updates this constraint set to hold the union of itself and another constraint set.
     pub(crate) fn union(&mut self, db: &'db dyn Db, other: Self) -> &Self {
-        self.node = self.node.or(db, other.node);
+        self.node = self.node.or(db, other.node).simplify(db);
         self
     }
 
     /// Updates this constraint set to hold the intersection of itself and another constraint set.
     pub(crate) fn intersect(&mut self, db: &'db dyn Db, other: &Self) -> &Self {
-        self.node = self.node.and(db, other.node);
+        self.node = self.node.and(db, other.node).simplify(db);
         self
     }
 
     /// Returns the negation of this constraint set.
     pub(crate) fn negate(&self, db: &'db dyn Db) -> Self {
         Self {
-            node: self.node.negate(db),
+            node: self.node.negate(db).simplify(db),
         }
     }
 
@@ -463,7 +463,7 @@ impl<'db> Node<'db> {
         match self {
             Node::AlwaysTrue => Node::AlwaysFalse,
             Node::AlwaysFalse => Node::AlwaysTrue,
-            Node::Interior(interior) => interior.negate(db).simplify(db),
+            Node::Interior(interior) => interior.negate(db),
         }
     }
 
@@ -474,7 +474,7 @@ impl<'db> Node<'db> {
             (Node::Interior(a), Node::Interior(b)) => {
                 // OR is commutative, which lets us halve the cache requirements
                 let (a, b) = if b.0 < a.0 { (b, a) } else { (a, b) };
-                a.or(db, b).simplify(db)
+                a.or(db, b)
             }
         }
     }
@@ -486,7 +486,7 @@ impl<'db> Node<'db> {
             (Node::Interior(a), Node::Interior(b)) => {
                 // AND is commutative, which lets us halve the cache requirements
                 let (a, b) = if b.0 < a.0 { (b, a) } else { (a, b) };
-                a.and(db, b).simplify(db)
+                a.and(db, b)
             }
         }
     }
@@ -497,7 +497,7 @@ impl<'db> Node<'db> {
             (Node::AlwaysTrue, other) | (other, Node::AlwaysFalse) => other,
             (Node::Interior(a), Node::Interior(b)) => {
                 // Implies is _not_ commutative, so we can't use the same trick as above.
-                a.implies(db, b).simplify(db)
+                a.implies(db, b)
             }
         }
     }
