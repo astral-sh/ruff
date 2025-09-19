@@ -61,13 +61,17 @@
 //! the constraint says that the typevar must specialize to that _exact_ type, not to a subtype or
 //! supertype of it.
 
+use std::cell::RefCell;
 use std::fmt::Display;
 
 use itertools::{EitherOrBoth, Itertools};
 use smallvec::{SmallVec, smallvec};
 
-use crate::Db;
-use crate::types::{BoundTypeVarInstance, IntersectionType, Type, UnionType};
+use crate::types::visitor::{NonAtomicType, TypeKind, TypeVisitor, walk_non_atomic_type};
+use crate::types::{
+    BoundTypeVarInstance, IntersectionType, Type, TypeVarBoundOrConstraints, UnionType,
+};
+use crate::{Db, FxIndexSet};
 
 fn comparable<'db>(db: &'db dyn Db, left: Type<'db>, right: Type<'db>) -> bool {
     left.is_subtype_of(db, right) || right.is_subtype_of(db, left)
@@ -177,32 +181,51 @@ where
 ///
 /// [POPL2015]: https://doi.org/10.1145/2676726.2676991
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
-pub struct ConstraintSet<'db> {
+pub enum ConstraintSet<'db> {
+    Never,
+    Always,
     // NOTE: We use 2 here because there are a couple of places where we create unions of 2 clauses
     // as temporary values — in particular when negating a constraint — and this lets us avoid
     // spilling the temporary value to the heap.
-    clauses: SmallVec<[ConstraintClause<'db>; 2]>,
+    Clauses(SmallVec<[ConstraintClause<'db>; 2]>),
 }
 
 impl<'db> ConstraintSet<'db> {
     fn never() -> Self {
-        Self {
-            clauses: smallvec![],
-        }
+        Self::Never
     }
 
     fn always() -> Self {
-        Self::singleton(ConstraintClause::always())
+        Self::Always
+    }
+
+    /// Returns a constraint set that constraints a typevar to a particular range of types.
+    pub(crate) fn constrain_typevar(
+        db: &'db dyn Db,
+        typevar: BoundTypeVarInstance<'db>,
+        lower: Type<'db>,
+        upper: Type<'db>,
+    ) -> Self {
+        let lower = lower.bottom_materialization(db);
+        let upper = upper.top_materialization(db);
+        match Constraint::range(db, lower, upper) {
+            Satisfiable::Never => Self::never(),
+            Satisfiable::Always => Self::always(),
+            Satisfiable::Constrained(constraint) => Self::singleton(ConstraintClause::singleton(
+                db,
+                constraint.constrain(db, typevar),
+            )),
+        }
     }
 
     /// Returns whether this constraint set never holds
     pub(crate) fn is_never_satisfied(&self) -> bool {
-        self.clauses.is_empty()
+        matches!(self, Self::Never)
     }
 
     /// Returns whether this constraint set always holds
     pub(crate) fn is_always_satisfied(&self) -> bool {
-        self.clauses.len() == 1 && self.clauses[0].is_always()
+        matches!(self, Self::Always)
     }
 
     /// Updates this constraint set to hold the union of itself and another constraint set.
@@ -219,9 +242,14 @@ impl<'db> ConstraintSet<'db> {
 
     /// Returns the negation of this constraint set.
     pub(crate) fn negate(&self, db: &'db dyn Db) -> Self {
+        let clauses = match self {
+            Self::Never => return Self::Always,
+            Self::Always => return Self::Never,
+            Self::Clauses(clauses) => clauses,
+        };
         let mut result = Self::always();
-        for clause in &self.clauses {
-            result.intersect_set(db, &clause.negate(db));
+        for clause in clauses {
+            result.intersect_set(db, clause.negate(db));
         }
         result
     }
@@ -246,11 +274,18 @@ impl<'db> ConstraintSet<'db> {
         self
     }
 
+    /// Returns a constraint set encoding that this constraint set implies another.
+    ///
+    /// In Boolean logic, `p → q` is usually translated into `¬p ∨ q`. However, we translate it
+    /// into the equivalent `¬p ∨ (p ∧ q)`. This ensures that the constraints under which `q` is
+    /// true are compatible with the assumptions introduced by `p`.
+    pub(crate) fn implies(self, db: &'db dyn Db, other: impl FnOnce() -> Self) -> Self {
+        self.clone().negate(db).or(db, || self.and(db, other))
+    }
+
     /// Returns a constraint set that contains a single clause.
     fn singleton(clause: ConstraintClause<'db>) -> Self {
-        Self {
-            clauses: smallvec![clause],
-        }
+        Self::Clauses(smallvec![clause])
     }
 
     pub(crate) fn range(
@@ -261,7 +296,7 @@ impl<'db> ConstraintSet<'db> {
     ) -> Self {
         let lower = lower.bottom_materialization(db);
         let upper = upper.top_materialization(db);
-        let constraint = Constraint::range(db, lower, upper).constrain(typevar);
+        let constraint = Constraint::range(db, lower, upper).constrain(db, typevar);
         let mut result = Self::never();
         result.union_constraint(db, constraint);
         result
@@ -275,7 +310,7 @@ impl<'db> ConstraintSet<'db> {
     ) -> Self {
         let lower = lower.bottom_materialization(db);
         let upper = upper.top_materialization(db);
-        let constraint = Constraint::negated_range(db, lower, upper).constrain(typevar);
+        let constraint = Constraint::negated_range(db, lower, upper).constrain(db, typevar);
         let mut result = Self::never();
         result.union_constraint(db, constraint);
         result
@@ -287,18 +322,20 @@ impl<'db> ConstraintSet<'db> {
         db: &'db dyn Db,
         constraint: Satisfiable<ConstrainedTypeVar<'db>>,
     ) {
-        self.union_clause(db, constraint.map(ConstraintClause::singleton));
+        self.union_clause(
+            db,
+            constraint.map(|constraint| ConstraintClause::singleton(db, constraint)),
+        );
     }
 
     /// Updates this set to be the union of itself and a clause. To maintain the invariants of this
     /// type, we must simplify this clause against all existing clauses, if possible.
     fn union_clause(&mut self, db: &'db dyn Db, clause: Satisfiable<ConstraintClause<'db>>) {
         let mut clause = match clause {
-            // If the new constraint can always be satisfied, that causes this whole set to be
-            // always satisfied too.
+            // If the new clause can always be satisfied, that causes this whole set to be always
+            // satisfied too.
             Satisfiable::Always => {
-                self.clauses.clear();
-                self.clauses.push(ConstraintClause::always());
+                *self = Self::Always;
                 return;
             }
 
@@ -308,29 +345,50 @@ impl<'db> ConstraintSet<'db> {
             Satisfiable::Constrained(clause) => clause,
         };
 
+        let clauses = match self {
+            // If the set is already always satisfied, unioning in anything else doesn't change
+            // that.
+            Self::Always => return,
+
+            // If the set was previously empty, we can just add the new clause without having to
+            // simplify it against anything.
+            Self::Never => {
+                *self = Self::Clauses(smallvec![clause]);
+                return;
+            }
+
+            // Otherwise, we have to simplify the new clause against any existing clauses.
+            Self::Clauses(clauses) => clauses,
+        };
+
         // Naively, we would just append the new clause to the set's list of clauses. But that
         // doesn't ensure that the clauses are simplified with respect to each other. So instead,
-        // we iterate through the list of existing clauses, and try to simplify the new clause
-        // against each one in turn. (We can assume that the existing clauses are already
-        // simplified with respect to each other, since we can assume that the invariant holds upon
-        // entry to this method.)
-        let mut existing_clauses = std::mem::take(&mut self.clauses).into_iter();
+        // we perform two simplification passes.
+
+        // In the first simplification pass, we iterate through the list of existing clauses, and
+        // try to simplify the new clause against each one in turn. (We can assume that the
+        // existing clauses are already simplified with respect to each other, since we can assume
+        // that the invariant holds upon entry to this method.)
+        let mut existing_clauses = std::mem::take(clauses).into_iter();
         for existing in existing_clauses.by_ref() {
             // Try to simplify the new clause against an existing clause.
             match existing.simplify_clauses(db, clause) {
                 Simplifiable::NeverSatisfiable => {
-                    // If two clauses cancel out to 0, that does NOT cause the entire set to become
-                    // 0.  We need to keep whatever clauses have already been added to the result,
-                    // and also need to copy over any later clauses that we hadn't processed yet.
-                    self.clauses.extend(existing_clauses);
+                    // If two clauses cancel out to 0, that does not necessarily cause the entire
+                    // set to become 0. We need to keep whatever clauses have already been added to
+                    // the result, and also need to copy over any later clauses that we hadn't
+                    // processed yet.
+                    clauses.extend(existing_clauses);
+                    if clauses.is_empty() {
+                        *self = Self::Never;
+                    }
                     return;
                 }
 
                 Simplifiable::AlwaysSatisfiable => {
                     // If two clauses cancel out to 1, that makes the entire set 1, and all
                     // existing clauses are simplified away.
-                    self.clauses.clear();
-                    self.clauses.push(ConstraintClause::always());
+                    *self = Self::Always;
                     return;
                 }
 
@@ -338,7 +396,7 @@ impl<'db> ConstraintSet<'db> {
                     // We couldn't simplify the new clause relative to this existing clause, so add
                     // the existing clause to the result. Continue trying to simplify the new
                     // clause against the later existing clauses.
-                    self.clauses.push(existing);
+                    clauses.push(existing);
                     clause = c;
                 }
 
@@ -353,24 +411,87 @@ impl<'db> ConstraintSet<'db> {
 
         // If we fall through then we need to add the new clause to the clause list (either because
         // we couldn't simplify it with anything, or because we did without it canceling out).
-        self.clauses.push(clause);
+        clauses.push(clause);
+
+        // In the second simplification pass, we see if any clause can be simplified against the
+        // entire list of other clauses. (This is primarily used when one clause contains multiple
+        // constraints, to see if its negation is also in the set. In that case the entire set
+        // simplifies to Always.)
+        for clause in clauses.iter().copied() {
+            match clause.simplify_with_set(db, clauses) {
+                // If the simpified set can always or never be satisfied, we can return early.
+                Satisfiable::Always => {
+                    *self = Self::Always;
+                    return;
+                }
+
+                Satisfiable::Never => {
+                    *self = Self::Never;
+                    return;
+                }
+
+                // Otherwise this clause could not be simplified, and we continue on checking the
+                // others.
+                Satisfiable::Constrained(()) => {}
+            }
+        }
     }
 
     /// Updates this set to be the union of itself and another set.
     fn union_set(&mut self, db: &'db dyn Db, other: Self) {
-        for clause in other.clauses {
-            self.union_clause(db, Satisfiable::Constrained(clause));
+        match other {
+            // If the new set can never satisfied, then the current set does not change.
+            Self::Never => {}
+
+            // If the new set can always be satisfied, that causes this whole set to be always
+            // satisfied too.
+            Self::Always => {
+                *self = Self::Always;
+            }
+
+            // Otherwise we have to add the new set's clauses to the current set.
+            Self::Clauses(clauses) => {
+                for clause in clauses {
+                    self.union_clause(db, Satisfiable::Constrained(clause));
+                }
+            }
         }
     }
 
     /// Updates this set to be the intersection of itself and another set.
     fn intersect_set(&mut self, db: &'db dyn Db, other: &Self) {
+        // If either set can never be satisfied, the result cannot either. If either set can always
+        // be satisfied, the result is the other set. Otherwise we have to add the new set's
+        // clauses to the current set.
+        let self_clauses = match self {
+            Self::Never => return,
+            Self::Always => {
+                *self = other.clone();
+                return;
+            }
+            Self::Clauses(clauses) => clauses,
+        };
+
+        let other_clauses = match other {
+            Self::Never => {
+                *self = Self::Never;
+                return;
+            }
+            Self::Always => return,
+            Self::Clauses(clauses) => clauses,
+        };
+
         // This is the distributive law:
         // (A ∪ B) ∩ (C ∪ D ∪ E) = (A ∩ C) ∪ (A ∩ D) ∪ (A ∩ E) ∪ (B ∩ C) ∪ (B ∩ D) ∪ (B ∩ E)
-        let self_clauses = std::mem::take(&mut self.clauses);
-        for self_clause in &self_clauses {
-            for other_clause in &other.clauses {
-                self.union_clause(db, self_clause.intersect_clause(db, other_clause));
+        let self_clauses = std::mem::take(self_clauses);
+        for self_clause in self_clauses {
+            for other_clause in other_clauses {
+                self.union_clause(db, self_clause.intersect_clause(db, *other_clause));
+            }
+        }
+        if let Self::Clauses(clauses) = self {
+            if clauses.is_empty() {
+                *self = Self::Never;
             }
         }
     }
@@ -383,10 +504,13 @@ impl<'db> ConstraintSet<'db> {
 
         impl Display for DisplayConstraintSet<'_, '_> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                if self.set.clauses.is_empty() {
-                    return f.write_str("0");
-                }
-                for (i, clause) in self.set.clauses.iter().enumerate() {
+                let clauses = match self.set {
+                    ConstraintSet::Never => return f.write_str("0"),
+                    ConstraintSet::Always => return f.write_str("1"),
+                    ConstraintSet::Clauses(clauses) => clauses,
+                };
+                assert!(!clauses.is_empty());
+                for (i, clause) in clauses.iter().enumerate() {
                     if i > 0 {
                         f.write_str(" ∨ ")?;
                     }
@@ -411,13 +535,80 @@ impl From<bool> for ConstraintSet<'_> {
 /// This is called a "constraint set", and denoted _C_, in [[POPL2015][]].
 ///
 /// [POPL2015]: https://doi.org/10.1145/2676726.2676991
+#[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
+pub struct ConstraintClause<'db> {
+    #[returns(ref)]
+    inner: ConstraintClauseInner<'db>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for ConstraintClause<'_> {}
+
+#[salsa::tracked]
+impl<'db> ConstraintClause<'db> {
+    /// Returns a clause containing a single constraint.
+    fn singleton(db: &'db dyn Db, constraint: ConstrainedTypeVar<'db>) -> Self {
+        let inner = ConstraintClauseInner {
+            constraints: smallvec![constraint],
+        };
+        Self::new_internal(db, inner)
+    }
+
+    /// Returns the intersection of this clause with another.
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    fn intersect_clause(self, db: &'db dyn Db, other: Self) -> Satisfiable<Self> {
+        self.inner(db)
+            .intersect_clause(db, other.inner(db))
+            .map(|inner| Self::new_internal(db, inner))
+    }
+
+    /// Tries to simplify the union of a clause and a set.
+    fn simplify_with_set(
+        self,
+        db: &'db dyn Db,
+        clauses: &SmallVec<[ConstraintClause<'db>; 2]>,
+    ) -> Satisfiable<()> {
+        // Check if the set also contains the negation of the clause. If it does, the clause and
+        // its negation simplify to always satisfiable, and therefore the set as a whole does too.
+        if let ConstraintSet::Clauses(negated) = self.negate(db) {
+            let contains_negation =
+                (negated.iter()).all(|negated_clause| clauses.contains(negated_clause));
+            if contains_negation {
+                return Satisfiable::Always;
+            }
+        }
+
+        // If not, the clause cannot be simplified.
+        Satisfiable::Constrained(())
+    }
+
+    /// Tries to simplify the union of two clauses into a single clause, if possible.
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    fn simplify_clauses(self, db: &'db dyn Db, other: Self) -> Simplifiable<Self> {
+        self.inner(db)
+            .simplify_clauses(db, other.inner(db))
+            .map(|inner| Self::new_internal(db, inner))
+    }
+
+    /// Returns the negation of this clause. The result is a set since negating an intersection
+    /// produces a union.
+    #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+    fn negate(self, db: &'db dyn Db) -> ConstraintSet<'db> {
+        self.inner(db).negate(db)
+    }
+
+    fn display(self, db: &'db dyn Db) -> impl Display {
+        self.inner(db).display(db)
+    }
+}
+
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
-pub(crate) struct ConstraintClause<'db> {
+pub struct ConstraintClauseInner<'db> {
     // NOTE: We use 1 here because most clauses only mention a single typevar.
     constraints: SmallVec<[ConstrainedTypeVar<'db>; 1]>,
 }
 
-impl<'db> ConstraintClause<'db> {
+impl<'db> ConstraintClauseInner<'db> {
     fn new(constraints: SmallVec<[ConstrainedTypeVar<'db>; 1]>) -> Satisfiable<Self> {
         if constraints.is_empty() {
             Satisfiable::Always
@@ -430,13 +621,6 @@ impl<'db> ConstraintClause<'db> {
     fn always() -> Self {
         Self {
             constraints: smallvec![],
-        }
-    }
-
-    /// Returns a clause containing a single constraint.
-    fn singleton(constraint: ConstrainedTypeVar<'db>) -> Self {
-        Self {
-            constraints: smallvec![constraint],
         }
     }
 
@@ -481,7 +665,7 @@ impl<'db> ConstraintClause<'db> {
         let mut existing_constraints = std::mem::take(&mut self.constraints).into_iter();
         for existing in existing_constraints.by_ref() {
             // Try to simplify the new constraint against an existing constraint.
-            match existing.intersect(db, &constraint) {
+            match existing.intersect(db, constraint) {
                 Some(Satisfiable::Never) => {
                     // If two constraints cancel out to 0, that makes the entire clause 0, and all
                     // existing constraints are simplified away.
@@ -501,7 +685,7 @@ impl<'db> ConstraintClause<'db> {
                     // We couldn't simplify the new constraint relative to this existing
                     // constraint, so add the existing constraint to the result. Continue trying to
                     // simplify the new constraint against the later existing constraints.
-                    self.constraints.push(existing.clone());
+                    self.constraints.push(existing);
                 }
 
                 Some(Satisfiable::Constrained(simplified)) => {
@@ -525,7 +709,7 @@ impl<'db> ConstraintClause<'db> {
         // Add each `other` constraint in turn. Short-circuit if the result ever becomes 0.
         let mut result = self.clone();
         for constraint in &other.constraints {
-            match result.intersect_constraint(db, Satisfiable::Constrained(constraint.clone())) {
+            match result.intersect_constraint(db, Satisfiable::Constrained(*constraint)) {
                 Satisfiable::Never => return Satisfiable::Never,
                 Satisfiable::Always | Satisfiable::Constrained(()) => {}
             }
@@ -538,7 +722,7 @@ impl<'db> ConstraintClause<'db> {
     }
 
     /// Tries to simplify the union of two clauses into a single clause, if possible.
-    fn simplify_clauses(self, db: &'db dyn Db, other: Self) -> Simplifiable<Self> {
+    fn simplify_clauses(&self, db: &'db dyn Db, other: &Self) -> Simplifiable<Self> {
         // Saturation
         //
         // If either clause is always satisfiable, the union is too. (`1 ∪ C₂ = 1`, `C₁ ∪ 1 = 1`)
@@ -595,11 +779,11 @@ impl<'db> ConstraintClause<'db> {
         //
         // TODO: Consider checking both directions in one pass, possibly via a tri-valued return
         // value.
-        if self.subsumes_via_intersection(db, &other) {
-            return Simplifiable::Simplified(other);
+        if self.subsumes_via_intersection(db, other) {
+            return Simplifiable::Simplified(other.clone());
         }
-        if other.subsumes_via_intersection(db, &self) {
-            return Simplifiable::Simplified(self);
+        if other.subsumes_via_intersection(db, self) {
+            return Simplifiable::Simplified(self.clone());
         }
 
         // Distribution
@@ -628,12 +812,12 @@ impl<'db> ConstraintClause<'db> {
         //     # `(T ≤ int ∩ U ≤ str ∩ V ≤ bytes)`
         //     x: A[X1, Y1, Z2] | A[X2, Y2, Z2]
         // ```
-        if let Some(simplified) = self.simplifies_via_distribution(db, &other) {
+        if let Some(simplified) = self.simplifies_via_distribution(db, other) {
             return simplified;
         }
 
         // Can't be simplified
-        Simplifiable::NotSimplified(self, other)
+        Simplifiable::NotSimplified(self.clone(), other.clone())
     }
 
     /// Returns whether this clause subsumes `other` via intersection — that is, if the
@@ -647,7 +831,7 @@ impl<'db> ConstraintClause<'db> {
         }
 
         let pairwise = (self.constraints.iter())
-            .merge_join_by(&other.constraints, |a, b| a.typevar.cmp(&b.typevar));
+            .merge_join_by(&other.constraints, |a, b| a.typevar(db).cmp(&b.typevar(db)));
         for pair in pairwise {
             match pair {
                 // `other` contains a constraint whose typevar doesn't appear in `self`, so `self`
@@ -661,7 +845,7 @@ impl<'db> ConstraintClause<'db> {
                 // Both clauses contain a constraint with this typevar; verify that the constraint
                 // in `self` is smaller.
                 EitherOrBoth::Both(self_constraint, other_constraint) => {
-                    if !self_constraint.subsumes(db, other_constraint) {
+                    if !self_constraint.subsumes(db, *other_constraint) {
                         return false;
                     }
                 }
@@ -705,7 +889,7 @@ impl<'db> ConstraintClause<'db> {
         // simplify.
         let mut simplified_index = None;
         let pairwise = (self.constraints.iter())
-            .merge_join_by(&other.constraints, |a, b| a.typevar.cmp(&b.typevar));
+            .merge_join_by(&other.constraints, |a, b| a.typevar(db).cmp(&b.typevar(db)));
         for (index, pair) in pairwise.enumerate() {
             match pair {
                 // If either clause contains a constraint whose typevar doesn't appear in the
@@ -717,7 +901,7 @@ impl<'db> ConstraintClause<'db> {
                         continue;
                     }
                     let Some(union_constraint) =
-                        self_constraint.simplified_union(db, other_constraint)
+                        self_constraint.simplified_union(db, *other_constraint)
                     else {
                         // The constraints for this typevar are not identical, nor do they
                         // simplify.
@@ -779,7 +963,7 @@ impl<'db> ConstraintClause<'db> {
 
     fn display(&self, db: &'db dyn Db) -> impl Display {
         struct DisplayConstraintClause<'a, 'db> {
-            clause: &'a ConstraintClause<'db>,
+            clause: &'a ConstraintClauseInner<'db>,
             db: &'db dyn Db,
         }
 
@@ -790,7 +974,7 @@ impl<'db> ConstraintClause<'db> {
                 }
 
                 let clause_count: usize = (self.clause.constraints.iter())
-                    .map(ConstrainedTypeVar::clause_count)
+                    .map(|constraint| constraint.clause_count(self.db))
                     .sum();
                 if clause_count > 1 {
                     f.write_str("(")?;
@@ -812,60 +996,70 @@ impl<'db> ConstraintClause<'db> {
     }
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub(crate) struct ConstrainedTypeVar<'db> {
     typevar: BoundTypeVarInstance<'db>,
+    #[returns(ref)]
     constraint: Constraint<'db>,
 }
 
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for ConstrainedTypeVar<'_> {}
+
+#[salsa::tracked]
 impl<'db> ConstrainedTypeVar<'db> {
-    fn clause_count(&self) -> usize {
-        self.constraint.clause_count()
+    fn clause_count(self, db: &'db dyn Db) -> usize {
+        self.constraint(db).clause_count()
     }
 
     /// Returns the intersection of this individual constraint and another, or `None` if the two
     /// constraints do not refer to the same typevar (and therefore cannot be simplified to a
     /// single constraint).
-    fn intersect(&self, db: &'db dyn Db, other: &Self) -> Option<Satisfiable<Self>> {
-        if self.typevar != other.typevar {
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    fn intersect(self, db: &'db dyn Db, other: Self) -> Option<Satisfiable<Self>> {
+        if self.typevar(db) != other.typevar(db) {
             return None;
         }
         Some(
-            self.constraint
-                .intersect(db, &other.constraint)
-                .map(|constraint| constraint.constrain(self.typevar)),
+            self.constraint(db)
+                .intersect(db, other.constraint(db))
+                .map(|constraint| constraint.constrain(db, self.typevar(db))),
         )
     }
 
     /// Returns the union of this individual constraint and another, if it can be simplified to a
     /// union of two constraints or fewer. Returns `None` if the union cannot be simplified that
     /// much.
-    fn simplified_union(&self, db: &'db dyn Db, other: &Self) -> Option<Simplifiable<Self>> {
-        if self.typevar != other.typevar {
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    fn simplified_union(self, db: &'db dyn Db, other: Self) -> Option<Simplifiable<Self>> {
+        if self.typevar(db) != other.typevar(db) {
             return None;
         }
-        self.constraint
-            .simplified_union(db, &other.constraint)
-            .map(|constraint| constraint.map(|constraint| constraint.constrain(self.typevar)))
+        self.constraint(db)
+            .simplified_union(db, other.constraint(db))
+            .map(|constraint| {
+                constraint.map(|constraint| constraint.constrain(db, self.typevar(db)))
+            })
     }
 
     /// Adds the negation of this individual constraint to a constraint set.
-    fn negate_into(&self, db: &'db dyn Db, set: &mut ConstraintSet<'db>) {
-        self.constraint.negate_into(db, self.typevar, set);
+    fn negate_into(self, db: &'db dyn Db, set: &mut ConstraintSet<'db>) {
+        self.constraint(db).negate_into(db, self.typevar(db), set);
     }
 
     /// Returns whether `self` has tighter bounds than `other` — that is, if the intersection of
     /// `self` and `other` is `self`.
-    fn subsumes(&self, db: &'db dyn Db, other: &Self) -> bool {
-        debug_assert_eq!(self.typevar, other.typevar);
+    fn subsumes(self, db: &'db dyn Db, other: Self) -> bool {
+        debug_assert_eq!(self.typevar(db), other.typevar(db));
         match self.intersect(db, other) {
-            Some(Satisfiable::Constrained(intersection)) => intersection == *self,
+            Some(Satisfiable::Constrained(intersection)) => intersection == self,
             _ => false,
         }
     }
 
-    fn display(&self, db: &'db dyn Db) -> impl Display {
-        self.constraint.display(db, self.typevar.display(db))
+    fn display(self, db: &'db dyn Db) -> impl Display {
+        self.constraint(db)
+            .display(db, self.typevar(db).display(db))
     }
 }
 
@@ -876,11 +1070,12 @@ pub(crate) struct Constraint<'db> {
 }
 
 impl<'db> Constraint<'db> {
-    fn constrain(self, typevar: BoundTypeVarInstance<'db>) -> ConstrainedTypeVar<'db> {
-        ConstrainedTypeVar {
-            typevar,
-            constraint: self,
-        }
+    fn constrain(
+        self,
+        db: &'db dyn Db,
+        typevar: BoundTypeVarInstance<'db>,
+    ) -> ConstrainedTypeVar<'db> {
+        ConstrainedTypeVar::new(db, typevar, self)
     }
 
     fn clause_count(&self) -> usize {
@@ -1116,13 +1311,14 @@ impl<'db> Constraint<'db> {
         for negative in &self.negative {
             set.union_constraint(
                 db,
-                Constraint::range(db, negative.hole.lower, negative.hole.upper).constrain(typevar),
+                Constraint::range(db, negative.hole.lower, negative.hole.upper)
+                    .constrain(db, typevar),
             );
         }
         set.union_constraint(
             db,
             Constraint::negated_range(db, self.positive.lower, self.positive.upper)
-                .constrain(typevar),
+                .constrain(db, typevar),
         );
     }
 
@@ -1163,8 +1359,12 @@ impl<'db> Constraint<'db> {
 }
 
 impl<'db> Satisfiable<Constraint<'db>> {
-    fn constrain(self, typevar: BoundTypeVarInstance<'db>) -> Satisfiable<ConstrainedTypeVar<'db>> {
-        self.map(|constraint| constraint.constrain(typevar))
+    fn constrain(
+        self,
+        db: &'db dyn Db,
+        typevar: BoundTypeVarInstance<'db>,
+    ) -> Satisfiable<ConstrainedTypeVar<'db>> {
+        self.map(|constraint| constraint.constrain(db, typevar))
     }
 }
 
@@ -1430,15 +1630,15 @@ impl<'db> NegatedRangeConstraint<'db> {
 
 /// Wraps a constraint (or clause, or set), while using distinct variants to represent when the
 /// constraint is never satisfiable or always satisfiable.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum Satisfiable<T> {
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
+enum Satisfiable<T: salsa::Update> {
     Never,
     Always,
     Constrained(T),
 }
 
-impl<T> Satisfiable<T> {
-    fn map<U>(self, f: impl FnOnce(T) -> U) -> Satisfiable<U> {
+impl<T: salsa::Update> Satisfiable<T> {
+    fn map<U: salsa::Update>(self, f: impl FnOnce(T) -> U) -> Satisfiable<U> {
         match self {
             Satisfiable::Never => Satisfiable::Never,
             Satisfiable::Always => Satisfiable::Always,
@@ -1450,15 +1650,15 @@ impl<T> Satisfiable<T> {
 /// The result of trying to simplify two constraints (or clauses, or sets). Like [`Satisfiable`],
 /// we use distinct variants to represent when the simplification is never satisfiable or always
 /// satisfiable.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum Simplifiable<T> {
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
+pub(crate) enum Simplifiable<T: salsa::Update> {
     NeverSatisfiable,
     AlwaysSatisfiable,
     Simplified(T),
     NotSimplified(T, T),
 }
 
-impl<T> Simplifiable<T> {
+impl<T: salsa::Update> Simplifiable<T> {
     fn from_one(constraint: Satisfiable<T>) -> Self {
         match constraint {
             Satisfiable::Never => Simplifiable::NeverSatisfiable,
@@ -1466,9 +1666,7 @@ impl<T> Simplifiable<T> {
             Satisfiable::Constrained(constraint) => Simplifiable::Simplified(constraint),
         }
     }
-}
 
-impl<T> Simplifiable<T> {
     fn from_union(first: Satisfiable<T>, second: Satisfiable<T>) -> Self {
         match (first, second) {
             (Satisfiable::Always, _) | (_, Satisfiable::Always) => Simplifiable::AlwaysSatisfiable,
@@ -1483,7 +1681,7 @@ impl<T> Simplifiable<T> {
         }
     }
 
-    fn map<U>(self, mut f: impl FnMut(T) -> U) -> Simplifiable<U> {
+    fn map<U: salsa::Update>(self, mut f: impl FnMut(T) -> U) -> Simplifiable<U> {
         match self {
             Simplifiable::NeverSatisfiable => Simplifiable::NeverSatisfiable,
             Simplifiable::AlwaysSatisfiable => Simplifiable::AlwaysSatisfiable,
@@ -1499,5 +1697,69 @@ impl<T> Simplifiable<T> {
             | Simplifiable::Simplified(_) => self,
             Simplifiable::NotSimplified(t1, t2) => Simplifiable::NotSimplified(t2, t1),
         }
+    }
+}
+
+/// Returns a constraint set describing the valid specializations of a typevar.
+impl<'db> BoundTypeVarInstance<'db> {
+    pub(crate) fn valid_specializations(self, db: &'db dyn Db) -> ConstraintSet<'db> {
+        match self.typevar(db).bound_or_constraints(db) {
+            None => ConstraintSet::from(true),
+            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                ConstraintSet::constrain_typevar(db, self, Type::Never, bound)
+            }
+            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                constraints.elements(db).iter().when_any(db, |constraint| {
+                    ConstraintSet::constrain_typevar(db, self, *constraint, *constraint)
+                })
+            }
+        }
+    }
+}
+
+/// Returns a constraint set describing the valid specializations of any typevar mentioned in a
+/// type.
+impl<'db> Type<'db> {
+    pub(crate) fn valid_specializations(self, db: &'db dyn Db) -> ConstraintSet<'db> {
+        struct ValidSpecializationsVisitor<'db> {
+            seen_types: RefCell<FxIndexSet<NonAtomicType<'db>>>,
+            result: RefCell<ConstraintSet<'db>>,
+        }
+
+        impl<'db> TypeVisitor<'db> for ValidSpecializationsVisitor<'db> {
+            fn should_visit_lazy_type_attributes(&self) -> bool {
+                false
+            }
+
+            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+                match ty {
+                    Type::NonInferableTypeVar(bound_typevar) | Type::TypeVar(bound_typevar) => {
+                        let valid_specializations = bound_typevar.valid_specializations(db);
+                        self.result
+                            .borrow_mut()
+                            .intersect(db, &valid_specializations);
+                    }
+                    _ => {}
+                }
+
+                match TypeKind::from(ty) {
+                    TypeKind::Atomic => {}
+                    TypeKind::NonAtomic(non_atomic_type) => {
+                        if !self.seen_types.borrow_mut().insert(non_atomic_type) {
+                            // If we have already seen this type, we can skip it.
+                            return;
+                        }
+                        walk_non_atomic_type(db, non_atomic_type, self);
+                    }
+                }
+            }
+        }
+
+        let visitor = ValidSpecializationsVisitor {
+            seen_types: RefCell::new(FxIndexSet::default()),
+            result: RefCell::new(ConstraintSet::from(true)),
+        };
+        visitor.visit_type(db, self);
+        visitor.result.into_inner()
     }
 }

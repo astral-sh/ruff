@@ -30,8 +30,9 @@ use crate::types::signatures::{Parameter, ParameterForm, Parameters};
 use crate::types::tuple::{TupleLength, TupleType};
 use crate::types::{
     BoundMethodType, ClassLiteral, DataclassParams, FieldInstance, KnownBoundMethodType,
-    KnownClass, KnownInstanceType, PropertyInstanceType, SpecialFormType, TrackedConstraintSet,
-    TypeAliasType, TypeMapping, UnionType, WrapperDescriptorKind, enums, ide_support, todo_type,
+    KnownClass, KnownInstanceType, PropertyInstanceType, SpecialFormType, TypeAliasType,
+    TypeMapping, UnionType, ValidSpecializationsConstraintSet, WrapperDescriptorKind, enums,
+    ide_support, todo_type,
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, PythonVersion};
@@ -590,9 +591,15 @@ impl<'db> Bindings<'db> {
                         Some(KnownFunction::IsEquivalentTo) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
                                 let constraints = ty_a.when_equivalent_to(db, *ty_b);
-                                let tracked = TrackedConstraintSet::new(db, constraints);
+                                let valid_specializations = (ty_a.valid_specializations(db))
+                                    .and(db, || ty_b.valid_specializations(db));
+                                let result = ValidSpecializationsConstraintSet::new(
+                                    db,
+                                    Some(valid_specializations),
+                                    constraints,
+                                );
                                 overload.set_return_type(Type::KnownInstance(
-                                    KnownInstanceType::ConstraintSet(tracked),
+                                    KnownInstanceType::ConstraintSet(result),
                                 ));
                             }
                         }
@@ -600,9 +607,15 @@ impl<'db> Bindings<'db> {
                         Some(KnownFunction::IsSubtypeOf) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
                                 let constraints = ty_a.when_subtype_of(db, *ty_b);
-                                let tracked = TrackedConstraintSet::new(db, constraints);
+                                let valid_specializations = (ty_a.valid_specializations(db))
+                                    .and(db, || ty_b.valid_specializations(db));
+                                let result = ValidSpecializationsConstraintSet::new(
+                                    db,
+                                    Some(valid_specializations),
+                                    constraints,
+                                );
                                 overload.set_return_type(Type::KnownInstance(
-                                    KnownInstanceType::ConstraintSet(tracked),
+                                    KnownInstanceType::ConstraintSet(result),
                                 ));
                             }
                         }
@@ -610,9 +623,15 @@ impl<'db> Bindings<'db> {
                         Some(KnownFunction::IsAssignableTo) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
                                 let constraints = ty_a.when_assignable_to(db, *ty_b);
-                                let tracked = TrackedConstraintSet::new(db, constraints);
+                                let valid_specializations = (ty_a.valid_specializations(db))
+                                    .and(db, || ty_b.valid_specializations(db));
+                                let result = ValidSpecializationsConstraintSet::new(
+                                    db,
+                                    Some(valid_specializations),
+                                    constraints,
+                                );
                                 overload.set_return_type(Type::KnownInstance(
-                                    KnownInstanceType::ConstraintSet(tracked),
+                                    KnownInstanceType::ConstraintSet(result),
                                 ));
                             }
                         }
@@ -620,9 +639,15 @@ impl<'db> Bindings<'db> {
                         Some(KnownFunction::IsDisjointFrom) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
                                 let constraints = ty_a.when_disjoint_from(db, *ty_b);
-                                let tracked = TrackedConstraintSet::new(db, constraints);
+                                let valid_specializations = (ty_a.valid_specializations(db))
+                                    .and(db, || ty_b.valid_specializations(db));
+                                let result = ValidSpecializationsConstraintSet::new(
+                                    db,
+                                    Some(valid_specializations),
+                                    constraints,
+                                );
                                 overload.set_return_type(Type::KnownInstance(
-                                    KnownInstanceType::ConstraintSet(tracked),
+                                    KnownInstanceType::ConstraintSet(result),
                                 ));
                             }
                         }
