@@ -13,6 +13,6 @@ info:
 success: false
 exit_code: 1
 ----- stdout -----
-##vso[task.logissue type=error;sourcepath=[TMP]/input.py;linenumber=3;columnnumber=16;code=unformatted;]File would be reformatted
+##vso[task.logissue type=error;sourcepath=[TMP]/input.py;code=unformatted;]File would be reformatted
 
 ----- stderr -----

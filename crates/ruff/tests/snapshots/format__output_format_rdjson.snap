@@ -20,17 +20,7 @@ exit_code: 1
         "value": "unformatted"
       },
       "location": {
-        "path": "[TMP]/input.py",
-        "range": {
-          "end": {
-            "column": 34,
-            "line": 4
-          },
-          "start": {
-            "column": 16,
-            "line": 3
-          }
-        }
+        "path": "[TMP]/input.py"
       },
       "message": "File would be reformatted",
       "suggestions": [
@@ -38,7 +28,7 @@ exit_code: 1
           "range": {
             "end": {
               "column": 1,
-              "line": 5
+              "line": 6
             },
             "start": {
               "column": 1,

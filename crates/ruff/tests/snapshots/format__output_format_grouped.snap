@@ -14,7 +14,7 @@ success: false
 exit_code: 1
 ----- stdout -----
 input.py:
-  3:16 unformatted: File would be reformatted
+  1:1 unformatted: File would be reformatted
 
 1 file would be reformatted
 
