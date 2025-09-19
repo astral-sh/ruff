@@ -413,6 +413,7 @@ impl<'db> RangeConstraint<'db> {
 enum Node<'db> {
     AlwaysFalse,
     AlwaysTrue,
+    Impossible,
     Interior(InteriorNode<'db>),
 }
 
@@ -461,6 +462,7 @@ impl<'db> Node<'db> {
 
     fn negate(self, db: &'db dyn Db) -> Self {
         match self {
+            Node::Impossible => Node::Impossible,
             Node::AlwaysTrue => Node::AlwaysFalse,
             Node::AlwaysFalse => Node::AlwaysTrue,
             Node::Interior(interior) => interior.negate(db),
@@ -469,8 +471,21 @@ impl<'db> Node<'db> {
 
     fn or(self, db: &'db dyn Db, other: Self) -> Self {
         match (self, other) {
-            (Node::AlwaysTrue, _) | (_, Node::AlwaysTrue) => Node::AlwaysTrue,
+            (Node::Impossible, _) | (_, Node::Impossible) => Node::Impossible,
             (Node::AlwaysFalse, other) | (other, Node::AlwaysFalse) => other,
+            (Node::AlwaysTrue, Node::AlwaysTrue) => Node::AlwaysTrue,
+            (a @ Node::AlwaysTrue, Node::Interior(b)) => Node::new(
+                db,
+                b.atom(db),
+                a.or(db, b.if_true(db)),
+                a.or(db, b.if_false(db)),
+            ),
+            (Node::Interior(a), b @ Node::AlwaysTrue) => Node::new(
+                db,
+                a.atom(db),
+                a.if_true(db).or(db, b),
+                a.if_false(db).or(db, b),
+            ),
             (Node::Interior(a), Node::Interior(b)) => {
                 // OR is commutative, which lets us halve the cache requirements
                 let (a, b) = if b.0 < a.0 { (b, a) } else { (a, b) };
@@ -481,8 +496,21 @@ impl<'db> Node<'db> {
 
     fn and(self, db: &'db dyn Db, other: Self) -> Self {
         match (self, other) {
-            (Node::AlwaysFalse, _) | (_, Node::AlwaysFalse) => Node::AlwaysFalse,
+            (Node::Impossible, _) | (_, Node::Impossible) => Node::Impossible,
             (Node::AlwaysTrue, other) | (other, Node::AlwaysTrue) => other,
+            (Node::AlwaysFalse, Node::AlwaysFalse) => Node::AlwaysFalse,
+            (a @ Node::AlwaysFalse, Node::Interior(b)) => Node::new(
+                db,
+                b.atom(db),
+                a.and(db, b.if_true(db)),
+                a.and(db, b.if_false(db)),
+            ),
+            (Node::Interior(a), b @ Node::AlwaysFalse) => Node::new(
+                db,
+                a.atom(db),
+                a.if_true(db).and(db, b),
+                a.if_false(db).and(db, b),
+            ),
             (Node::Interior(a), Node::Interior(b)) => {
                 // AND is commutative, which lets us halve the cache requirements
                 let (a, b) = if b.0 < a.0 { (b, a) } else { (a, b) };
@@ -493,28 +521,25 @@ impl<'db> Node<'db> {
 
     fn implies(self, db: &'db dyn Db, other: Self) -> Self {
         match (self, other) {
-            (Node::AlwaysFalse, _) | (_, Node::AlwaysTrue) => Node::AlwaysTrue,
-            (Node::AlwaysTrue, other) | (other, Node::AlwaysFalse) => other,
+            (Node::Impossible, _) | (_, Node::Impossible) => Node::Impossible,
+            (Node::AlwaysFalse, Node::AlwaysTrue | Node::AlwaysFalse) => other,
+            (Node::AlwaysTrue, Node::AlwaysFalse) => Node::Impossible,
+            (Node::AlwaysTrue, Node::AlwaysTrue) => Node::AlwaysTrue,
+            (a @ (Node::AlwaysTrue | Node::AlwaysFalse), Node::Interior(b)) => Node::new(
+                db,
+                b.atom(db),
+                a.implies(db, b.if_true(db)),
+                a.implies(db, b.if_false(db)),
+            ),
+            (Node::Interior(a), b @ (Node::AlwaysTrue | Node::AlwaysFalse)) => Node::new(
+                db,
+                a.atom(db),
+                a.if_true(db).implies(db, b),
+                a.if_false(db).implies(db, b),
+            ),
             (Node::Interior(a), Node::Interior(b)) => {
                 // Implies is _not_ commutative, so we can't use the same trick as above.
                 a.implies(db, b)
-            }
-        }
-    }
-
-    // Andersen2011, figure 17, where d == other and u == self
-    fn simplify_relative_to(self, db: &'db dyn Db, relative_to: Self) -> Self {
-        match (self, relative_to) {
-            (_, Node::AlwaysFalse) => Node::AlwaysFalse,
-            (Node::AlwaysTrue | Node::AlwaysFalse, _) => self,
-            (Node::Interior(self_interior), Node::AlwaysTrue) => Node::new(
-                db,
-                self_interior.atom(db),
-                (self_interior.if_true(db)).simplify_relative_to(db, relative_to),
-                (self_interior.if_false(db)).simplify_relative_to(db, relative_to),
-            ),
-            (Node::Interior(self_interior), Node::Interior(relative_to)) => {
-                self_interior.simplify_relative_to(db, relative_to)
             }
         }
     }
@@ -534,7 +559,7 @@ impl<'db> Node<'db> {
 
     fn simplify(self, db: &'db dyn Db) -> Self {
         match self {
-            Node::AlwaysTrue | Node::AlwaysFalse => self,
+            Node::Impossible | Node::AlwaysTrue | Node::AlwaysFalse => self,
             Node::Interior(interior) => interior.simplify(db),
         }
     }
@@ -550,9 +575,9 @@ impl<'db> Node<'db> {
         // into a `String`, and just return that `String` as our `Display` impl.
 
         struct DisplayNode {
-            result: String,
+            true_clauses: String,
+            impossible_clauses: String,
             current_clause: String,
-            first_clause: bool,
         }
 
         impl DisplayNode {
@@ -561,17 +586,30 @@ impl<'db> Node<'db> {
                     Node::AlwaysFalse => return,
 
                     Node::AlwaysTrue => {
-                        if self.first_clause {
-                            self.first_clause = false;
+                        if !self.true_clauses.is_empty() {
+                            self.true_clauses.push_str(" ∨ ");
+                        }
+                        if self.current_clause.contains("∧") {
+                            self.true_clauses.push_str("(");
+                        }
+                        self.true_clauses.push_str(&self.current_clause);
+                        if self.current_clause.contains("∧") {
+                            self.true_clauses.push_str(")");
+                        }
+                    }
+
+                    Node::Impossible => {
+                        if self.impossible_clauses.is_empty() {
+                            self.impossible_clauses.push_str(", impossibilities: ");
                         } else {
-                            self.result.push_str(" ∨ ");
+                            self.impossible_clauses.push_str(" ∨ ");
                         }
                         if self.current_clause.contains("∧") {
-                            self.result.push_str("(");
+                            self.impossible_clauses.push_str("(");
                         }
-                        self.result.push_str(&self.current_clause);
+                        self.impossible_clauses.push_str(&self.current_clause);
                         if self.current_clause.contains("∧") {
-                            self.result.push_str(")");
+                            self.impossible_clauses.push_str(")");
                         }
                     }
 
@@ -602,16 +640,22 @@ impl<'db> Node<'db> {
         }
 
         match self {
+            Node::Impossible => String::from("impossible"),
             Node::AlwaysTrue => String::from("always"),
             Node::AlwaysFalse => String::from("never"),
             Node::Interior(_) => {
                 let mut display = DisplayNode {
-                    result: String::new(),
+                    true_clauses: String::new(),
+                    impossible_clauses: String::new(),
                     current_clause: String::new(),
-                    first_clause: true,
                 };
                 display.display_node(db, self);
-                display.result
+                let mut result = display.true_clauses;
+                if result.is_empty() {
+                    result.push_str("always");
+                }
+                result.push_str(&display.impossible_clauses);
+                result
             }
         }
     }
@@ -718,44 +762,6 @@ impl<'db> InteriorNode<'db> {
     }
 
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-    fn simplify_relative_to(self, db: &'db dyn Db, relative_to: Self) -> Node<'db> {
-        let self_atom = self.atom(db);
-        let relative_to_atom = relative_to.atom(db);
-        match self_atom.cmp(&relative_to_atom) {
-            Ordering::Equal => {
-                let relative_false = relative_to.if_false(db);
-                let relative_true = relative_to.if_true(db);
-                if relative_false.is_never_satisfied() {
-                    self.if_true(db).simplify_relative_to(db, relative_true)
-                } else if relative_true.is_never_satisfied() {
-                    self.if_false(db).simplify_relative_to(db, relative_false)
-                } else {
-                    Node::new(
-                        db,
-                        self_atom,
-                        self.if_true(db).simplify_relative_to(db, relative_true),
-                        self.if_false(db).simplify_relative_to(db, relative_false),
-                    )
-                }
-            }
-
-            Ordering::Less => Node::new(
-                db,
-                self_atom,
-                (self.if_true(db)).simplify_relative_to(db, Node::Interior(relative_to)),
-                (self.if_false(db)).simplify_relative_to(db, Node::Interior(relative_to)),
-            ),
-
-            Ordering::Greater => Node::new(
-                db,
-                relative_to_atom,
-                Node::Interior(self).simplify_relative_to(db, relative_to.if_true(db)),
-                Node::Interior(self).simplify_relative_to(db, relative_to.if_false(db)),
-            ),
-        }
-    }
-
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     fn simplify(self, db: &'db dyn Db) -> Node<'db> {
         let self_atom = self.atom(db);
         let mut simplified = Node::Interior(self);
@@ -771,7 +777,7 @@ impl<'db> InteriorNode<'db> {
             } else {
                 return;
             };
-            simplified = simplified.simplify_relative_to(db, given);
+            simplified = simplified.and(db, given);
         });
         simplified
     }
