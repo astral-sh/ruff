@@ -25,7 +25,8 @@ pub use self::diagnostic::TypeCheckDiagnostics;
 pub(crate) use self::diagnostic::register_lints;
 pub(crate) use self::infer::{
     TypeContext, infer_deferred_types, infer_definition_types, infer_expression_type,
-    infer_expression_types, infer_scope_types, static_expression_truthiness,
+    infer_expression_types, infer_isolated_expression, infer_scope_types,
+    static_expression_truthiness,
 };
 pub(crate) use self::signatures::{CallableSignature, Signature};
 pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};

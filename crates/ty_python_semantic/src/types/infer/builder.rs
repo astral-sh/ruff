@@ -1522,7 +1522,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         if !bound_ty.is_assignable_to(db, declared_ty) {
-            report_invalid_assignment(&self.context, node, declared_ty, bound_ty);
+            report_invalid_assignment(&self.context, node, binding, declared_ty, bound_ty);
             // allow declarations to override inference in case of invalid assignment
             bound_ty = declared_ty;
         }
@@ -1679,9 +1679,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     report_invalid_assignment(
                         &self.context,
                         node,
+                        definition,
                         declared_ty.inner_type(),
                         inferred_ty,
                     );
+
                     // if the assignment is invalid, fall back to assuming the annotation is correct
                     (declared_ty, declared_ty.inner_type())
                 }
@@ -5336,29 +5338,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             panic!("Typeshed should always have a `{name}` class in `builtins.pyi` with a single type variable")
         });
 
-        let mut elements_are_assignable = true;
-        let mut inferred_elt_tys = Vec::with_capacity(elts.len());
-
-        // Infer the type of each element in the collection literal.
-        for elt in elts {
-            let inferred_elt_ty = self.infer_expression(elt, TypeContext::new(annotated_elts_ty));
-            inferred_elt_tys.push(inferred_elt_ty);
-
-            if let Some(annotated_elts_ty) = annotated_elts_ty {
-                elements_are_assignable &=
-                    inferred_elt_ty.is_assignable_to(self.db(), annotated_elts_ty);
-            }
-        }
-
         // Create a set of constraints to infer a precise type for `T`.
         let mut builder = SpecializationBuilder::new(self.db());
 
         match annotated_elts_ty {
-            // If the inferred type of any element is not assignable to the type annotation, we
-            // ignore it, as to provide a more precise error message.
-            Some(_) if !elements_are_assignable => {}
-
-            // Otherwise, the annotated type acts as a constraint for `T`.
+            // The annotated type acts as a constraint for `T`.
             //
             // Note that we infer the annotated type _before_ the elements, to closer match the order
             // of any unions written in the type annotation.
@@ -5372,7 +5356,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         // The inferred type of each element acts as an additional constraint on `T`.
-        for inferred_elt_ty in inferred_elt_tys {
+        for elt in elts {
+            let inferred_elt_ty = self.infer_expression(elt, TypeContext::new(annotated_elts_ty));
+
             // Convert any element literals to their promoted type form to avoid excessively large
             // unions for large nested list literals, which the constraint solver struggles with.
             let inferred_elt_ty =
@@ -9030,6 +9016,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ast::TypeParam::TypeVarTuple(node) => self.infer_definition(node),
             }
         }
+    }
+
+    /// Infer the type of the given expression in isolation, ignoring the surrounding region.
+    pub(super) fn infer_isolated_expression(mut self, expr: &ast::Expr) -> Type<'db> {
+        let expr_ty = self.infer_expression_impl(expr, TypeContext::default());
+        let _ = self.context.finish();
+        expr_ty
     }
 
     pub(super) fn finish_expression(mut self) -> ExpressionInference<'db> {

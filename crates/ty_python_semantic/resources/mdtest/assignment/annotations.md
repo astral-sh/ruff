@@ -131,12 +131,12 @@ m: IntList = [1, 2, 3]
 reveal_type(m)  # revealed: list[int]
 
 # TODO: this should type-check and avoid literal promotion
-# error: [invalid-assignment] "Object of type `list[int]` is not assignable to `list[Literal[1, 2, 3]]`"
+# error: [invalid-assignment] "Object of type `list[Unknown | int]` is not assignable to `list[Literal[1, 2, 3]]`"
 n: list[typing.Literal[1, 2, 3]] = [1, 2, 3]
 reveal_type(n)  # revealed: list[Literal[1, 2, 3]]
 
 # TODO: this should type-check and avoid literal promotion
-# error: [invalid-assignment] "Object of type `list[str]` is not assignable to `list[LiteralString]`"
+# error: [invalid-assignment] "Object of type `list[Unknown | str]` is not assignable to `list[LiteralString]`"
 o: list[typing.LiteralString] = ["a", "b", "c"]
 reveal_type(o)  # revealed: list[LiteralString]
 ```
@@ -144,10 +144,10 @@ reveal_type(o)  # revealed: list[LiteralString]
 ## Incorrect collection literal assignments are complained aobut
 
 ```py
-# error: [invalid-assignment] "Object of type `list[int]` is not assignable to `list[str]`"
+# error: [invalid-assignment] "Object of type `list[Unknown | int]` is not assignable to `list[str]`"
 a: list[str] = [1, 2, 3]
 
-# error: [invalid-assignment] "Object of type `set[int | str]` is not assignable to `set[int]`"
+# error: [invalid-assignment] "Object of type `set[Unknown | int | str]` is not assignable to `set[int]`"
 b: set[int] = {1, 2, "3"}
 ```
 
@@ -263,8 +263,7 @@ reveal_type(d)  # revealed: list[int | tuple[int, int]]
 e: list[int] = f(True)
 reveal_type(e)  # revealed: list[int]
 
-# TODO: the RHS should be inferred as `list[Literal["a"]]` here
-# error: [invalid-assignment] "Object of type `list[int | Literal["a"]]` is not assignable to `list[int]`"
+# error: [invalid-assignment] "Object of type `list[Literal["a"]]` is not assignable to `list[int]`"
 g: list[int] = f("a")
 
 # error: [invalid-assignment] "Object of type `list[Literal["a"]]` is not assignable to `tuple[int]`"
