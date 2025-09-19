@@ -565,81 +565,64 @@ impl<'db> Node<'db> {
         }
     }
 
-    fn display(self, db: &'db dyn Db) -> impl Display {
-        // To render a BDD in DNF form, you perform a depth-first search of the BDD tree, looking
-        // for any path that leads to the AlwaysTrue terminal. Each such path represents one of the
-        // intersection clauses in the DNF Form. The path traverses zero or more interior nodes,
-        // and takes either the true or false edge from each one. That gives you the positive or
-        // negative individual constraints in the path's clause.
-        //
-        // To make things simpler, we're going to perform that search eagerly, rendering the result
-        // into a `String`, and just return that `String` as our `Display` impl.
-
-        struct DisplayNode {
-            result: String,
-            current_clause: String,
-            first_clause: bool,
+    fn satisfied_clauses(self, db: &'db dyn Db) -> Vec<SatisfiedClause<'db>> {
+        struct Searcher<'db> {
+            clauses: Vec<SatisfiedClause<'db>>,
+            current_clause: SatisfiedClause<'db>,
         }
 
-        impl DisplayNode {
-            fn display_node<'db>(&mut self, db: &'db dyn Db, node: Node<'db>) {
+        impl<'db> Searcher<'db> {
+            fn visit_node(&mut self, db: &'db dyn Db, node: Node<'db>) {
                 match node {
-                    Node::AlwaysFalse => return,
-
-                    Node::AlwaysTrue => {
-                        if self.first_clause {
-                            self.first_clause = false;
-                        } else {
-                            self.result.push_str(" ∨ ");
-                        }
-                        if self.current_clause.contains("∧") {
-                            self.result.push_str("(");
-                        }
-                        self.result.push_str(&self.current_clause);
-                        if self.current_clause.contains("∧") {
-                            self.result.push_str(")");
-                        }
-                    }
-
+                    Node::AlwaysFalse => {}
+                    Node::AlwaysTrue => self.clauses.push(self.current_clause.clone()),
                     Node::Interior(interior) => {
                         let interior_atom = interior.atom(db);
-                        let current_length = self.current_clause.len();
-
-                        if current_length > 1 {
-                            self.current_clause.push_str(" ∧ ");
-                        }
-                        let _ = write!(&mut self.current_clause, "{}", interior_atom.display(db));
-                        self.display_node(db, interior.if_true(db));
-                        self.current_clause.truncate(current_length);
-
-                        if current_length > 1 {
-                            self.current_clause.push_str(" ∧ ");
-                        }
-                        let _ = write!(
-                            &mut self.current_clause,
-                            "{}",
-                            interior.atom(db).display_negated(db)
-                        );
-                        self.display_node(db, interior.if_false(db));
-                        self.current_clause.truncate(current_length);
+                        self.current_clause
+                            .push(SatisfiedConstraint::Positive(interior_atom));
+                        self.visit_node(db, interior.if_true(db));
+                        self.current_clause.pop();
+                        self.current_clause
+                            .push(SatisfiedConstraint::Negative(interior_atom));
+                        self.visit_node(db, interior.if_false(db));
+                        self.current_clause.pop();
                     }
                 }
             }
         }
 
+        let mut searcher = Searcher {
+            clauses: Vec::new(),
+            current_clause: SatisfiedClause::default(),
+        };
+        searcher.visit_node(db, self);
+        searcher.clauses
+    }
+
+    fn display(self, db: &'db dyn Db) -> impl Display {
+        // To render a BDD in DNF form, you perform a depth-first search of the BDD tree, looking
+        // for any path that leads to the AlwaysTrue terminal. Each such path represents one of the
+        // intersection clauses in the DNF form. The path traverses zero or more interior nodes,
+        // and takes either the true or false edge from each one. That gives you the positive or
+        // negative individual constraints in the path's clause.
+
         match self {
-            Node::AlwaysTrue => String::from("always"),
-            Node::AlwaysFalse => String::from("never"),
-            Node::Interior(_) => {
-                let mut display = DisplayNode {
-                    result: String::new(),
-                    current_clause: String::new(),
-                    first_clause: true,
-                };
-                display.display_node(db, self);
-                display.result
-            }
+            Node::AlwaysTrue => return String::from("always"),
+            Node::AlwaysFalse => return String::from("never"),
+            Node::Interior(_) => {}
         }
+        let clauses = self.satisfied_clauses(db);
+        let mut result = String::new();
+        if clauses.is_empty() {
+            result.push_str("always");
+        }
+        for (i, clause) in clauses.into_iter().enumerate() {
+            if i > 0 {
+                result.push_str(" ∨ ");
+            }
+            clause.render(db, &mut result);
+        }
+        result
     }
 }
 
@@ -767,5 +750,71 @@ impl<'db> InteriorNode<'db> {
             simplified = simplified.simplify_relative_to(db, given);
         });
         simplified
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum SatisfiedConstraint<'db> {
+    Positive(ConstrainedTypeVar<'db>),
+    Negative(ConstrainedTypeVar<'db>),
+}
+
+impl SatisfiedConstraint<'_> {
+    fn flip(self) -> Self {
+        match self {
+            SatisfiedConstraint::Positive(constraint) => SatisfiedConstraint::Negative(constraint),
+            SatisfiedConstraint::Negative(constraint) => SatisfiedConstraint::Positive(constraint),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default)]
+struct SatisfiedClause<'db> {
+    constraints: Vec<SatisfiedConstraint<'db>>,
+}
+
+impl<'db> SatisfiedClause<'db> {
+    fn to_singleton(&self) -> Option<SatisfiedConstraint<'db>> {
+        match self.constraints.as_slice() {
+            [constraint] => Some(*constraint),
+            _ => None,
+        }
+    }
+
+    fn remove_redundant_constraint(&mut self, redundant: SatisfiedConstraint<'db>) {
+        self.constraints
+            .retain(|constraint| *constraint != redundant);
+    }
+
+    fn push(&mut self, constraint: SatisfiedConstraint<'db>) {
+        self.constraints.push(constraint);
+    }
+
+    fn pop(&mut self) {
+        self.constraints
+            .pop()
+            .expect("clause vector should not be empty");
+    }
+
+    fn render(&self, db: &'db dyn Db, result: &mut String) {
+        if self.constraints.len() > 1 {
+            result.push_str("(");
+        }
+        for (i, constraint) in self.constraints.iter().enumerate() {
+            if i > 0 {
+                result.push_str(" ∧ ");
+            }
+            let _ = match constraint {
+                SatisfiedConstraint::Positive(constraint) => {
+                    write!(result, "{}", constraint.display(db))
+                }
+                SatisfiedConstraint::Negative(constraint) => {
+                    write!(result, "{}", constraint.display_negated(db))
+                }
+            };
+        }
+        if self.constraints.len() > 1 {
+            result.push_str(")");
+        }
     }
 }
