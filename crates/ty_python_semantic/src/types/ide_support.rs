@@ -875,7 +875,7 @@ fn definition_parameter_offsets(
                 .map(|param| (param.name().to_string(), param.name().range()))
                 .collect(),
         ),
-        // Todo: lambda functions
+        // TODO: lambda functions
         _ => None,
     }
 }
