@@ -564,10 +564,10 @@ impl<'db> Node<'db> {
         }
     }
 
-    fn clauses(self, db: &'db dyn Db) -> (Vec<SatisfiedClause<'db>>, Vec<SatisfiedClause<'db>>) {
+    fn clauses(self, db: &'db dyn Db) -> (SatisfiedClauses<'db>, SatisfiedClauses<'db>) {
         struct Searcher<'db> {
-            true_clauses: Vec<SatisfiedClause<'db>>,
-            impossible_clauses: Vec<SatisfiedClause<'db>>,
+            true_clauses: SatisfiedClauses<'db>,
+            impossible_clauses: SatisfiedClauses<'db>,
             current_clause: SatisfiedClause<'db>,
         }
 
@@ -593,8 +593,8 @@ impl<'db> Node<'db> {
         }
 
         let mut searcher = Searcher {
-            true_clauses: Vec::new(),
-            impossible_clauses: Vec::new(),
+            true_clauses: SatisfiedClauses::default(),
+            impossible_clauses: SatisfiedClauses::default(),
             current_clause: SatisfiedClause::default(),
         };
         searcher.visit_node(db, self);
@@ -619,20 +619,11 @@ impl<'db> Node<'db> {
         if true_clauses.is_empty() {
             result.push_str("always");
         }
-        for (i, clause) in true_clauses.into_iter().enumerate() {
-            if i > 0 {
-                result.push_str(" ∨ ");
-            }
-            clause.render(db, &mut result);
+        true_clauses.render(db, &mut result);
+        if !impossible_clauses.is_empty() {
+            result.push_str(", impossibilities: ");
         }
-        for (i, clause) in impossible_clauses.into_iter().enumerate() {
-            if i == 0 {
-                result.push_str(", impossibilities: ");
-            } else {
-                result.push_str(" ∨ ");
-            }
-            clause.render(db, &mut result);
-        }
+        impossible_clauses.render(db, &mut result);
         result
     }
 }
@@ -821,6 +812,30 @@ impl<'db> SatisfiedClause<'db> {
         }
         if self.constraints.len() > 1 {
             result.push_str(")");
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+struct SatisfiedClauses<'db> {
+    clauses: Vec<SatisfiedClause<'db>>,
+}
+
+impl<'db> SatisfiedClauses<'db> {
+    fn is_empty(&self) -> bool {
+        self.clauses.is_empty()
+    }
+
+    fn push(&mut self, clause: SatisfiedClause<'db>) {
+        self.clauses.push(clause);
+    }
+
+    fn render(&self, db: &'db dyn Db, result: &mut String) {
+        for (i, clause) in self.clauses.iter().enumerate() {
+            if i > 0 {
+                result.push_str(" ∨ ");
+            }
+            clause.render(db, result);
         }
     }
 }
