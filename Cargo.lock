@@ -956,7 +956,7 @@ dependencies = [
  "libc",
  "option-ext",
  "redox_users",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.0",
 ]
 
 [[package]]
@@ -1042,7 +1042,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "778e2ac28f6c47af28e4907f13ffd1e1ddbd400980a9abd7c8df189bf578a5ad"
 dependencies = [
  "libc",
- "windows-sys 0.59.0",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -1168,9 +1168,9 @@ dependencies = [
 
 [[package]]
 name = "get-size-derive2"
-version = "0.6.2"
+version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "75a17a226478b2e8294ded60782c03efe54476aa8cd1371d0e5ad9d1071e74e0"
+checksum = "b5a443e77201a230c25f0c11574e9b20e5705f749520e0f30ab0d0974fb1a794"
 dependencies = [
  "attribute-derive",
  "quote",
@@ -1179,13 +1179,13 @@ dependencies = [
 
 [[package]]
 name = "get-size2"
-version = "0.6.2"
+version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5697765925a05c9d401dd04a93dfd662d336cc25fdcc3301220385a1ffcfdde5"
+checksum = "0594e2a78d082f2f8b1615c728391c6a5277f6c017474a7249934fc735945d55"
 dependencies = [
  "compact_str",
  "get-size-derive2",
- "hashbrown 0.15.5",
+ "hashbrown 0.16.0",
  "smallvec",
 ]
 
@@ -1278,6 +1278,15 @@ dependencies = [
  "allocator-api2",
  "equivalent",
  "foldhash",
+]
+
+[[package]]
+name = "hashbrown"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5419bdc4f6a9207fbeba6d11b604d481addf78ecd10c11ad51e76c2f6482748d"
+dependencies = [
+ "equivalent",
 ]
 
 [[package]]
@@ -2994,7 +3003,7 @@ dependencies = [
  "fern",
  "glob",
  "globset",
- "hashbrown 0.15.5",
+ "hashbrown 0.16.0",
  "imperative",
  "insta",
  "is-macro",
@@ -3435,7 +3444,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.59.0",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -3830,7 +3839,7 @@ dependencies = [
  "getrandom 0.3.3",
  "once_cell",
  "rustix",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.0",
 ]
 
 [[package]]
@@ -4303,7 +4312,7 @@ dependencies = [
  "drop_bomb",
  "get-size2",
  "glob",
- "hashbrown 0.15.5",
+ "hashbrown 0.16.0",
  "indexmap",
  "insta",
  "itertools 0.14.0",
