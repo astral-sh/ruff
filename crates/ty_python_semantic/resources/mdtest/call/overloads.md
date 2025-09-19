@@ -139,8 +139,7 @@ reveal_type(f(A()))  # revealed: A
 reveal_type(f(*(A(),)))  # revealed: A
 
 reveal_type(f(B()))  # revealed: A
-# TODO: revealed: A
-reveal_type(f(*(B(),)))  # revealed: Unknown
+reveal_type(f(*(B(),)))  # revealed: A
 
 # But, in this case, the arity check filters out the first overload, so we only have one match:
 reveal_type(f(B(), 1))  # revealed: B
@@ -551,16 +550,13 @@ from overloaded import MyEnumSubclass, ActualEnum, f
 
 def _(actual_enum: ActualEnum, my_enum_instance: MyEnumSubclass):
     reveal_type(f(actual_enum))  # revealed: Both
-    # TODO: revealed: Both
-    reveal_type(f(*(actual_enum,)))  # revealed: Unknown
+    reveal_type(f(*(actual_enum,)))  # revealed: Both
 
     reveal_type(f(ActualEnum.A))  # revealed: OnlyA
-    # TODO: revealed: OnlyA
-    reveal_type(f(*(ActualEnum.A,)))  # revealed: Unknown
+    reveal_type(f(*(ActualEnum.A,)))  # revealed: OnlyA
 
     reveal_type(f(ActualEnum.B))  # revealed: OnlyB
-    # TODO: revealed: OnlyB
-    reveal_type(f(*(ActualEnum.B,)))  # revealed: Unknown
+    reveal_type(f(*(ActualEnum.B,)))  # revealed: OnlyB
 
     reveal_type(f(my_enum_instance))  # revealed: MyEnumSubclass
     reveal_type(f(*(my_enum_instance,)))  # revealed: MyEnumSubclass
@@ -969,12 +965,10 @@ reveal_type(f(*(1,)))  # revealed: str
 
 def _(list_int: list[int], list_any: list[Any]):
     reveal_type(f(list_int))  # revealed: int
-    # TODO: revealed: int
-    reveal_type(f(*(list_int,)))  # revealed: Unknown
+    reveal_type(f(*(list_int,)))  # revealed: int
 
     reveal_type(f(list_any))  # revealed: int
-    # TODO: revealed: int
-    reveal_type(f(*(list_any,)))  # revealed: Unknown
+    reveal_type(f(*(list_any,)))  # revealed: int
 ```
 
 ### Single list argument (ambiguous)
@@ -1008,8 +1002,7 @@ def _(list_int: list[int], list_any: list[Any]):
     # All materializations of `list[int]` are assignable to `list[int]`, so it matches the first
     # overload.
     reveal_type(f(list_int))  # revealed: int
-    # TODO: revealed: int
-    reveal_type(f(*(list_int,)))  # revealed: Unknown
+    reveal_type(f(*(list_int,)))  # revealed: int
 
     # All materializations of `list[Any]` are assignable to `list[int]` and `list[Any]`, but the
     # return type of first and second overloads are not equivalent, so the overload matching
@@ -1042,25 +1035,21 @@ reveal_type(f("a"))  # revealed: str
 reveal_type(f(*("a",)))  # revealed: str
 
 reveal_type(f((1, "b")))  # revealed: int
-# TODO: revealed: int
-reveal_type(f(*((1, "b"),)))  # revealed: Unknown
+reveal_type(f(*((1, "b"),)))  # revealed: int
 
 reveal_type(f((1, 2)))  # revealed: int
-# TODO: revealed: int
-reveal_type(f(*((1, 2),)))  # revealed: Unknown
+reveal_type(f(*((1, 2),)))  # revealed: int
 
 def _(int_str: tuple[int, str], int_any: tuple[int, Any], any_any: tuple[Any, Any]):
     # All materializations are assignable to first overload, so second and third overloads are
     # eliminated
     reveal_type(f(int_str))  # revealed: int
-    # TODO: revealed: int
-    reveal_type(f(*(int_str,)))  # revealed: Unknown
+    reveal_type(f(*(int_str,)))  # revealed: int
 
     # All materializations are assignable to second overload, so the third overload is eliminated;
     # the return type of first and second overload is equivalent
     reveal_type(f(int_any))  # revealed: int
-    # TODO: revealed: int
-    reveal_type(f(*(int_any,)))  # revealed: Unknown
+    reveal_type(f(*(int_any,)))  # revealed: int
 
     # All materializations of `tuple[Any, Any]` are assignable to the parameters of all the
     # overloads, but the return types aren't equivalent, so the overload matching is ambiguous
@@ -1188,8 +1177,7 @@ from overloaded import f
 
 def _(literal: LiteralString, string: str, any: Any):
     reveal_type(f(literal))  # revealed: LiteralString
-    # TODO: revealed: LiteralString
-    reveal_type(f(*(literal,)))  # revealed: Unknown
+    reveal_type(f(*(literal,)))  # revealed: LiteralString
 
     reveal_type(f(string))  # revealed: str
     reveal_type(f(*(string,)))  # revealed: str
@@ -1227,12 +1215,10 @@ from overloaded import f
 
 def _(list_int: list[int], list_str: list[str], list_any: list[Any], any: Any):
     reveal_type(f(list_int))  # revealed: A
-    # TODO: revealed: A
-    reveal_type(f(*(list_int,)))  # revealed: Unknown
+    reveal_type(f(*(list_int,)))  # revealed: A
 
     reveal_type(f(list_str))  # revealed: str
-    # TODO: Should be `str`
-    reveal_type(f(*(list_str,)))  # revealed: Unknown
+    reveal_type(f(*(list_str,)))  # revealed: str
 
     reveal_type(f(list_any))  # revealed: Unknown
     reveal_type(f(*(list_any,)))  # revealed: Unknown
@@ -1433,12 +1419,10 @@ def _(any: Any):
     reveal_type(f(*(any,), flag=False))  # revealed: str
 
 def _(args: tuple[Any, Literal[True]]):
-    # TODO: revealed: int
-    reveal_type(f(*args))  # revealed: Unknown
+    reveal_type(f(*args))  # revealed: int
 
 def _(args: tuple[Any, Literal[False]]):
-    # TODO: revealed: str
-    reveal_type(f(*args))  # revealed: Unknown
+    reveal_type(f(*args))  # revealed: str
 ```
 
 ### Argument type expansion
