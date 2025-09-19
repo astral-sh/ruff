@@ -8,7 +8,7 @@ use ruff_python_semantic::analyze::visibility::is_staticmethod;
 use ruff_python_semantic::analyze::{function_type, visibility};
 use ruff_python_semantic::{Definition, SemanticModel};
 use ruff_source_file::NewlineWithTrailingNewline;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
@@ -464,6 +464,19 @@ impl GenericSection {
     }
 }
 
+/// A parameter in a docstring with its text range.
+#[derive(Debug, Clone)]
+struct ParameterEntry<'a> {
+    name: &'a str,
+    range: TextRange,
+}
+
+impl Ranged for ParameterEntry<'_> {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
 /// A "Raises" section in a docstring.
 #[derive(Debug)]
 struct RaisesSection<'a> {
@@ -491,7 +504,7 @@ impl<'a> RaisesSection<'a> {
 /// An "Args" or "Parameters" section in a docstring.
 #[derive(Debug)]
 struct ParametersSection<'a> {
-    parameters: Vec<&'a str>,
+    parameters: Vec<ParameterEntry<'a>>,
     range: TextRange,
 }
 
@@ -506,7 +519,11 @@ impl<'a> ParametersSection<'a> {
     /// an "Args" or "Parameters" section.
     fn from_section(section: &SectionContext<'a>, style: Option<SectionStyle>) -> Self {
         Self {
-            parameters: parse_parameters(section.following_lines_str(), style),
+            parameters: parse_parameters(
+                section.following_lines_str(),
+                section.following_range().start(),
+                style,
+            ),
             range: section.section_name_range(),
         }
     }
@@ -549,14 +566,18 @@ impl<'a> DocstringSections<'a> {
 ///
 /// Attempts to parse using the specified [`SectionStyle`], falling back to the other style if no
 /// entries are found.
-fn parse_parameters(content: &str, style: Option<SectionStyle>) -> Vec<&str> {
+fn parse_parameters(
+    content: &str,
+    content_start: TextSize,
+    style: Option<SectionStyle>,
+) -> Vec<ParameterEntry<'_>> {
     match style {
-        Some(SectionStyle::Google) => parse_parameters_google(content),
-        Some(SectionStyle::Numpy) => parse_parameters_numpy(content),
+        Some(SectionStyle::Google) => parse_parameters_google(content, content_start),
+        Some(SectionStyle::Numpy) => parse_parameters_numpy(content, content_start),
         None => {
-            let entries = parse_parameters_google(content);
+            let entries = parse_parameters_google(content, content_start);
             if entries.is_empty() {
-                parse_parameters_numpy(content)
+                parse_parameters_numpy(content, content_start)
             } else {
                 entries
             }
@@ -571,28 +592,47 @@ fn parse_parameters(content: &str, style: Option<SectionStyle>) -> Vec<&str> {
 ///     a (int): The first number to add.
 ///     b (int): The second number to add.
 /// ```
-fn parse_parameters_google(content: &str) -> Vec<&str> {
-    let mut entries: Vec<&str> = Vec::new();
+fn parse_parameters_google(content: &str, content_start: TextSize) -> Vec<ParameterEntry<'_>> {
+    let mut entries: Vec<ParameterEntry> = Vec::new();
     // Find first entry to determine indentation
     let Some(first_arg) = content.lines().next() else {
         return entries;
     };
     let indentation = &first_arg[..first_arg.len() - first_arg.trim_start().len()];
-    for potential in content.lines() {
-        if let Some(entry) = potential.strip_prefix(indentation) {
+
+    let mut current_pos = 0;
+    for line in content.lines() {
+        let line_start = current_pos;
+        let line_end = current_pos + line.len();
+
+        if let Some(entry) = line.strip_prefix(indentation) {
             if entry
                 .chars()
                 .next()
                 .is_some_and(|first_char| !first_char.is_whitespace())
             {
                 let Some((before_colon, _)) = entry.split_once(':') else {
+                    current_pos = line_end + 1;
                     continue;
                 };
                 if let Some(param) = before_colon.split_whitespace().next() {
-                    entries.push(param.trim_start_matches('*'));
+                    let param_name = param.trim_start_matches('*');
+                    let param_start_in_line =
+                        indentation.len() + before_colon.find(param).unwrap_or(0);
+                    let param_start = line_start + param_start_in_line;
+                    let param_end = param_start + param.len();
+
+                    entries.push(ParameterEntry {
+                        name: param_name,
+                        range: TextRange::new(
+                            content_start + TextSize::new(param_start as u32),
+                            content_start + TextSize::new(param_end as u32),
+                        ),
+                    });
                 }
             }
         }
+        current_pos = line_end + 1;
     }
     entries
 }
@@ -607,14 +647,19 @@ fn parse_parameters_google(content: &str) -> Vec<&str> {
 /// b : int
 ///     The second number to add.
 /// ```
-fn parse_parameters_numpy(content: &str) -> Vec<&str> {
-    let mut entries: Vec<&str> = Vec::new();
+fn parse_parameters_numpy(content: &str, content_start: TextSize) -> Vec<ParameterEntry<'_>> {
+    let mut entries: Vec<ParameterEntry> = Vec::new();
     let mut lines = content.lines();
     let Some(dashes) = lines.next() else {
         return entries;
     };
     let indentation = &dashes[..dashes.len() - dashes.trim_start().len()];
+
+    let mut current_pos = dashes.len() + 1;
     for potential in lines {
+        let line_start = current_pos;
+        let line_end = current_pos + potential.len();
+
         if let Some(entry) = potential.strip_prefix(indentation) {
             if entry
                 .chars()
@@ -622,10 +667,21 @@ fn parse_parameters_numpy(content: &str) -> Vec<&str> {
                 .is_some_and(|first_char| !first_char.is_whitespace())
             {
                 if let Some(param) = entry.split(':').next() {
-                    entries.push(param.trim_end().trim_start_matches('*'));
+                    let param_name = param.trim_end().trim_start_matches('*');
+                    let param_start = line_start + indentation.len();
+                    let param_end = param_start + param.len();
+
+                    entries.push(ParameterEntry {
+                        name: param_name,
+                        range: TextRange::new(
+                            content_start + TextSize::new(param_start as u32),
+                            content_start + TextSize::new(param_end as u32),
+                        ),
+                    });
                 }
             }
         }
+        current_pos = line_end + 1;
     }
     entries
 }
@@ -1216,22 +1272,30 @@ pub(crate) fn check_docstring(
         // Don't report extraneous parameters if the signature defines **kwargs
         if function_def.parameters.kwarg.is_none() {
             if let Some(docstring_params) = docstring_sections.parameters {
+                let mut extraneous_parameters_names = Vec::new();
                 let mut extraneous_parameters = Vec::new();
                 for docstring_param in &docstring_params.parameters {
-                    if !signature_parameters
-                        .iter()
-                        .any(|param| param == docstring_param)
-                    {
-                        extraneous_parameters.push((*docstring_param).to_string());
+                    let param_name: &str = docstring_param.name;
+                    if !signature_parameters.contains(&param_name) {
+                        extraneous_parameters_names.push(docstring_param.name.to_string());
+                        extraneous_parameters.push(docstring_param);
                     }
                 }
-                if !extraneous_parameters.is_empty() {
-                    checker.report_diagnostic(
+                if !extraneous_parameters_names.is_empty() {
+                    let mut diagnostic = checker.report_diagnostic(
                         DocstringExtraneousParameter {
-                            ids: extraneous_parameters,
+                            ids: extraneous_parameters_names,
                         },
                         docstring_params.range(),
                     );
+
+                    for extraneous_parameter in extraneous_parameters {
+                        let name = extraneous_parameter.name;
+                        diagnostic.secondary_annotation(
+                            format_args!("`{name}` is not in the signature"),
+                            extraneous_parameter.range,
+                        );
+                    }
                 }
             }
         }

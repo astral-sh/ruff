@@ -9,6 +9,7 @@ DOC102 Documented parameter `a` is not in the function's signature
 6 |     Args:
   |     ^^^^
 7 |         a (int): The first number to add.
+  |         - `a` is not in the signature
 8 |         b (int): The second number to add.
   |
 help: Remove the extraneous parameter from the docstring
@@ -22,6 +23,9 @@ DOC102 Documented parameter `multiplier` is not in the function's signature
    |     ^^^^
 22 |         lst (list of int): A list of integers.
 23 |         multiplier (int): The multiplier for each element in the list.
+   |         ---------- `multiplier` is not in the signature
+24 |
+25 |     Returns:
    |
 help: Remove the extraneous parameter from the docstring
 
@@ -33,6 +37,9 @@ DOC102 Documented parameter `numbers` is not in the function's signature
 36 |     Args:
    |     ^^^^
 37 |         numbers (list of int): A list of integers to search through.
+   |         ------- `numbers` is not in the signature
+38 |
+39 |     Returns:
    |
 help: Remove the extraneous parameter from the docstring
 
@@ -44,7 +51,12 @@ DOC102 These documented parameters are not in the function's signature: `name`, 
 50 |     Args:
    |     ^^^^
 51 |         name (str): The name of the user.
+   |         ---- `name` is not in the signature
 52 |         age (int): The age of the user.
+   |         --- `age` is not in the signature
+53 |         email (str): The user's email address.
+   |         ----- `email` is not in the signature
+54 |         location (str): The location of the user.
    |
 help: Remove the extraneous parameters from the docstring
 
@@ -57,6 +69,8 @@ DOC102 Documented parameter `tax_rate` is not in the function's signature
    |     ^^^^
 73 |         item_prices (list of float): A list of prices for each item.
 74 |         tax_rate (float): The tax rate to apply.
+   |         -------- `tax_rate` is not in the signature
+75 |         discount (float): The discount to subtract from the total.
    |
 help: Remove the extraneous parameter from the docstring
 
@@ -69,6 +83,11 @@ DOC102 These documented parameters are not in the function's signature: `to_addr
    |     ^^^^
 92 |         subject (str): The subject of the email.
 93 |         body (str): The content of the email.
+94 |         to_address (str): The recipient's email address.
+   |         ---------- `to_address` is not in the signature
+95 |         cc_address (str, optional): The email address for CC. Defaults to None.
+   |         ---------- `cc_address` is not in the signature
+96 |         bcc_address (str, optional): The email address for BCC. Defaults to None.
    |
 help: Remove the extraneous parameters from the docstring
 
@@ -80,6 +99,7 @@ DOC102 Documented parameter `separator` is not in the function's signature
 109 |     Args:
     |     ^^^^
 110 |         separator (str): The separator to use between strings.
+    |         --------- `separator` is not in the signature
 111 |         *args (str): Variable length argument list of strings to concatenate.
     |
 help: Remove the extraneous parameter from the docstring
@@ -93,6 +113,11 @@ DOC102 These documented parameters are not in the function's signature: `items`,
     |     ^^^^
 125 |         order_id (int): The unique identifier for the order.
 126 |         *items (str): Variable length argument list of items in the order.
+    |         ------ `items` is not in the signature
+127 |         **details (dict): Additional details such as shipping method and address.
+    |         --------- `details` is not in the signature
+128 |
+129 |     Returns:
     |
 help: Remove the extraneous parameters from the docstring
 
@@ -104,7 +129,9 @@ DOC102 Documented parameter `value` is not in the function's signature
 149 |         Args:
     |         ^^^^
 150 |             value (int, optional): The initial value of the calculator. Defaults to 0.
+    |             ----- `value` is not in the signature
 151 |         """
+152 |         self.value = value
     |
 help: Remove the extraneous parameter from the docstring
 
@@ -116,6 +143,9 @@ DOC102 Documented parameter `number` is not in the function's signature
 159 |         Args:
     |         ^^^^
 160 |             number (int or float): The number to add to the current value.
+    |             ------ `number` is not in the signature
+161 |
+162 |         Returns:
     |
 help: Remove the extraneous parameter from the docstring
 
@@ -127,6 +157,9 @@ DOC102 Documented parameter `value_str` is not in the function's signature
 174 |         Args:
     |         ^^^^
 175 |             value_str (str): The string representing the initial value.
+    |             --------- `value_str` is not in the signature
+176 |
+177 |         Returns:
     |
 help: Remove the extraneous parameter from the docstring
 
@@ -138,6 +171,9 @@ DOC102 Documented parameter `number` is not in the function's signature
 189 |         Args:
     |         ^^^^
 190 |             number (any): The value to check.
+    |             ------ `number` is not in the signature
+191 |
+192 |         Returns:
     |
 help: Remove the extraneous parameter from the docstring
 
@@ -149,6 +185,7 @@ DOC102 Documented parameter `a` is not in the function's signature
 257 |     Args:
     |     ^^^^
 258 |         a: The first number to add.
+    |         - `a` is not in the signature
 259 |         b: The second number to add.
     |
 help: Remove the extraneous parameter from the docstring

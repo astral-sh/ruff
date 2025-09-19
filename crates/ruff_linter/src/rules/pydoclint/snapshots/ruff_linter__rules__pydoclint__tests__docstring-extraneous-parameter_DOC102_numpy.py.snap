@@ -2,15 +2,18 @@
 source: crates/ruff_linter/src/rules/pydoclint/mod.rs
 ---
 DOC102 Documented parameter `a` is not in the function's signature
- --> DOC102_numpy.py:6:5
-  |
-4 |     Adds two numbers and returns the result.
-5 |
-6 |     Parameters
-  |     ^^^^^^^^^^
-7 |     ----------
-8 |     a : int
-  |
+  --> DOC102_numpy.py:6:5
+   |
+ 4 |     Adds two numbers and returns the result.
+ 5 |
+ 6 |     Parameters
+   |     ^^^^^^^^^^
+ 7 |     ----------
+ 8 |     a : int
+   |     -- `a` is not in the signature
+ 9 |         The first number to add.
+10 |     b : int
+   |
 help: Remove the extraneous parameter from the docstring
 
 DOC102 Documented parameter `multiplier` is not in the function's signature
@@ -22,6 +25,10 @@ DOC102 Documented parameter `multiplier` is not in the function's signature
    |     ^^^^^^^^^^
 27 |     ----------
 28 |     lst : list of int
+29 |         A list of integers.
+30 |     multiplier : int
+   |     ----------- `multiplier` is not in the signature
+31 |         The multiplier for each element in the list.
    |
 help: Remove the extraneous parameter from the docstring
 
@@ -34,6 +41,8 @@ DOC102 Documented parameter `numbers` is not in the function's signature
    |     ^^^^^^^^^^
 47 |     ----------
 48 |     numbers : list of int
+   |     -------- `numbers` is not in the signature
+49 |         A list of integers to search through.
    |
 help: Remove the extraneous parameter from the docstring
 
@@ -46,6 +55,15 @@ DOC102 These documented parameters are not in the function's signature: `name`, 
    |     ^^^^^^^^^^
 65 |     ----------
 66 |     name : str
+   |     ----- `name` is not in the signature
+67 |         The name of the user.
+68 |     age : int
+   |     ---- `age` is not in the signature
+69 |         The age of the user.
+70 |     email : str
+   |     ------ `email` is not in the signature
+71 |         The user's email address.
+72 |     location : str, optional
    |
 help: Remove the extraneous parameters from the docstring
 
@@ -58,6 +76,11 @@ DOC102 Documented parameter `tax_rate` is not in the function's signature
    |     ^^^^^^^^^^
 94 |     ----------
 95 |     item_prices : list of float
+96 |         A list of prices for each item.
+97 |     tax_rate : float
+   |     --------- `tax_rate` is not in the signature
+98 |         The tax rate to apply.
+99 |     discount : float
    |
 help: Remove the extraneous parameter from the docstring
 
@@ -71,6 +94,18 @@ DOC102 These documented parameters are not in the function's signature: `to_addr
 119 |     ----------
 120 |     subject : str
     |
+   ::: DOC102_numpy.py:124:5
+    |
+122 |     body : str
+123 |         The content of the email.
+124 |     to_address : str
+    |     ----------- `to_address` is not in the signature
+125 |         The recipient's email address.
+126 |     cc_address : str, optional
+    |     ----------- `cc_address` is not in the signature
+127 |         The email address for CC, by default None.
+128 |     bcc_address : str, optional
+    |
 help: Remove the extraneous parameters from the docstring
 
 DOC102 Documented parameter `separator` is not in the function's signature
@@ -82,6 +117,9 @@ DOC102 Documented parameter `separator` is not in the function's signature
     |     ^^^^^^^^^^
 145 |     ----------
 146 |     separator : str
+    |     ---------- `separator` is not in the signature
+147 |         The separator to use between strings.
+148 |     *args : str
     |
 help: Remove the extraneous parameter from the docstring
 
@@ -94,6 +132,13 @@ DOC102 These documented parameters are not in the function's signature: `items`,
     |     ^^^^^^^^^^
 165 |     ----------
 166 |     order_id : int
+167 |         The unique identifier for the order.
+168 |     *items : str
+    |     ------- `items` is not in the signature
+169 |         Variable length argument list of items in the order.
+170 |     **details : dict
+    |     ---------- `details` is not in the signature
+171 |         Additional details such as shipping method and address.
     |
 help: Remove the extraneous parameters from the docstring
 
@@ -106,6 +151,9 @@ DOC102 Documented parameter `value` is not in the function's signature
     |         ^^^^^^^^^^
 196 |         ----------
 197 |         value : int, optional
+    |         ------ `value` is not in the signature
+198 |             The initial value of the calculator, by default 0.
+199 |         """
     |
 help: Remove the extraneous parameter from the docstring
 
@@ -118,6 +166,9 @@ DOC102 Documented parameter `number` is not in the function's signature
     |         ^^^^^^^^^^
 208 |         ----------
 209 |         number : int or float
+    |         ------- `number` is not in the signature
+210 |             The first number to add.
+211 |         number2 : int or float
     |
 help: Remove the extraneous parameter from the docstring
 
@@ -130,6 +181,8 @@ DOC102 Documented parameter `value_str` is not in the function's signature
     |         ^^^^^^^^^^
 229 |         ----------
 230 |         value_str : str
+    |         ---------- `value_str` is not in the signature
+231 |             The string representing the initial value.
     |
 help: Remove the extraneous parameter from the docstring
 
@@ -142,6 +195,8 @@ DOC102 Documented parameter `number` is not in the function's signature
     |         ^^^^^^^^^^
 248 |         ----------
 249 |         number : any
+    |         ------- `number` is not in the signature
+250 |             The value to check.
     |
 help: Remove the extraneous parameter from the docstring
 
@@ -154,5 +209,8 @@ DOC102 Documented parameter `a` is not in the function's signature
     |     ^^^^^^^^^^
 299 |     ----------
 300 |     a
+    |     - `a` is not in the signature
+301 |         The first number to add.
+302 |     b
     |
 help: Remove the extraneous parameter from the docstring
