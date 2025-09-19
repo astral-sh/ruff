@@ -8,6 +8,7 @@ use std::fmt;
 
 use itertools::{Either, Itertools};
 use ruff_db::parsed::parsed_module;
+use ruff_python_ast::name::Name;
 use smallvec::{SmallVec, smallvec, smallvec_inline};
 
 use super::{Argument, CallArguments, CallError, CallErrorKind, InferContext, Signature, Type};
@@ -16,7 +17,6 @@ use crate::db::Db;
 use crate::dunder_all::dunder_all_names;
 use crate::place::{Boundness, Place};
 use crate::types::call::arguments::{Expansion, is_expandable_type};
-use crate::types::constraints::{ConstraintSet, Constraints};
 use crate::types::diagnostic::{
     CALL_NON_CALLABLE, CONFLICTING_ARGUMENT_FORMS, INVALID_ARGUMENT_TYPE, MISSING_ARGUMENT,
     NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED, TOO_MANY_POSITIONAL_ARGUMENTS,
@@ -30,9 +30,10 @@ use crate::types::generics::{Specialization, SpecializationBuilder, Specializati
 use crate::types::signatures::{Parameter, ParameterForm, Parameters};
 use crate::types::tuple::{TupleLength, TupleType};
 use crate::types::{
-    BoundMethodType, ClassLiteral, DataclassParams, FieldInstance, KnownClass, KnownInstanceType,
-    MethodWrapperKind, PropertyInstanceType, SpecialFormType, TypeMapping, UnionType,
-    WrapperDescriptorKind, enums, ide_support, todo_type,
+    BoundMethodType, ClassLiteral, DataclassParams, FieldInstance, KnownBoundMethodType,
+    KnownClass, KnownInstanceType, MemberLookupPolicy, PropertyInstanceType, SpecialFormType,
+    TrackedConstraintSet, TypeAliasType, TypeMapping, UnionType, WrapperDescriptorKind, enums,
+    ide_support, todo_type,
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, PythonVersion};
@@ -51,9 +52,7 @@ pub(crate) struct Bindings<'db> {
     elements: SmallVec<[CallableBinding<'db>; 1]>,
 
     /// Whether each argument will be used as a value and/or a type form in this call.
-    pub(crate) argument_forms: Box<[Option<ParameterForm>]>,
-
-    conflicting_forms: Box<[bool]>,
+    argument_forms: ArgumentForms,
 }
 
 impl<'db> Bindings<'db> {
@@ -71,8 +70,7 @@ impl<'db> Bindings<'db> {
         Self {
             callable_type,
             elements,
-            argument_forms: Box::from([]),
-            conflicting_forms: Box::from([]),
+            argument_forms: ArgumentForms::new(0),
         }
     }
 
@@ -89,6 +87,10 @@ impl<'db> Bindings<'db> {
         for binding in &mut self.elements {
             binding.dunder_call_is_possibly_unbound = true;
         }
+    }
+
+    pub(crate) fn argument_forms(&self) -> &[Option<ParameterForm>] {
+        &self.argument_forms.values
     }
 
     /// Match the arguments of a call site against the parameters of a collection of possibly
@@ -109,7 +111,8 @@ impl<'db> Bindings<'db> {
         for binding in &mut self.elements {
             binding.match_parameters(db, arguments, &mut argument_forms);
         }
-        (self.argument_forms, self.conflicting_forms) = argument_forms.into_boxed_slice();
+        argument_forms.shrink_to_fit();
+        self.argument_forms = argument_forms;
         self
     }
 
@@ -128,11 +131,11 @@ impl<'db> Bindings<'db> {
         argument_types: &CallArguments<'_, 'db>,
     ) -> Result<Self, CallError<'db>> {
         for element in &mut self.elements {
-            if let Some(updated_argument_forms) = element.check_types(db, argument_types) {
+            if let Some(mut updated_argument_forms) = element.check_types(db, argument_types) {
                 // If this element returned a new set of argument forms (indicating successful
                 // argument type expansion), update the `Bindings` with these forms.
-                (self.argument_forms, self.conflicting_forms) =
-                    updated_argument_forms.into_boxed_slice();
+                updated_argument_forms.shrink_to_fit();
+                self.argument_forms = updated_argument_forms;
             }
         }
 
@@ -156,7 +159,7 @@ impl<'db> Bindings<'db> {
         let mut all_ok = true;
         let mut any_binding_error = false;
         let mut all_not_callable = true;
-        if self.conflicting_forms.contains(&true) {
+        if self.argument_forms.conflicting.contains(&true) {
             all_ok = false;
             any_binding_error = true;
             all_not_callable = false;
@@ -229,7 +232,7 @@ impl<'db> Bindings<'db> {
             return;
         }
 
-        for (index, conflicting_form) in self.conflicting_forms.iter().enumerate() {
+        for (index, conflicting_form) in self.argument_forms.conflicting.iter().enumerate() {
             if *conflicting_form {
                 let node = BindingError::get_node(node, Some(index));
                 if let Some(builder) = context.report_lint(&CONFLICTING_ARGUMENT_FORMS, node) {
@@ -273,7 +276,9 @@ impl<'db> Bindings<'db> {
             let binding_type = binding.callable_type;
             for (overload_index, overload) in binding.matching_overloads_mut() {
                 match binding_type {
-                    Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(function)) => {
+                    Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(
+                        function,
+                    )) => {
                         if function.is_classmethod(db) {
                             match overload.parameter_types() {
                                 [_, Some(owner)] => {
@@ -437,7 +442,7 @@ impl<'db> Bindings<'db> {
                         }
                     }
 
-                    Type::MethodWrapper(MethodWrapperKind::PropertyDunderGet(property)) => {
+                    Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderGet(property)) => {
                         match overload.parameter_types() {
                             [Some(instance), ..] if instance.is_none(db) => {
                                 overload.set_return_type(Type::PropertyInstance(property));
@@ -490,7 +495,7 @@ impl<'db> Bindings<'db> {
                         }
                     }
 
-                    Type::MethodWrapper(MethodWrapperKind::PropertyDunderSet(property)) => {
+                    Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderSet(property)) => {
                         if let [Some(instance), Some(value), ..] = overload.parameter_types() {
                             if let Some(setter) = property.setter(db) {
                                 if let Err(_call_error) = setter
@@ -508,7 +513,7 @@ impl<'db> Bindings<'db> {
                         }
                     }
 
-                    Type::MethodWrapper(MethodWrapperKind::StrStartswith(literal)) => {
+                    Type::KnownBoundMethod(KnownBoundMethodType::StrStartswith(literal)) => {
                         if let [Some(Type::StringLiteral(prefix)), None, None] =
                             overload.parameter_types()
                         {
@@ -586,32 +591,40 @@ impl<'db> Bindings<'db> {
                     Type::FunctionLiteral(function_type) => match function_type.known(db) {
                         Some(KnownFunction::IsEquivalentTo) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
-                                overload.set_return_type(Type::BooleanLiteral(
-                                    ty_a.is_equivalent_to(db, *ty_b),
+                                let constraints = ty_a.when_equivalent_to(db, *ty_b);
+                                let tracked = TrackedConstraintSet::new(db, constraints);
+                                overload.set_return_type(Type::KnownInstance(
+                                    KnownInstanceType::ConstraintSet(tracked),
                                 ));
                             }
                         }
 
                         Some(KnownFunction::IsSubtypeOf) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
-                                overload.set_return_type(Type::BooleanLiteral(
-                                    ty_a.is_subtype_of(db, *ty_b),
+                                let constraints = ty_a.when_subtype_of(db, *ty_b);
+                                let tracked = TrackedConstraintSet::new(db, constraints);
+                                overload.set_return_type(Type::KnownInstance(
+                                    KnownInstanceType::ConstraintSet(tracked),
                                 ));
                             }
                         }
 
                         Some(KnownFunction::IsAssignableTo) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
-                                overload.set_return_type(Type::BooleanLiteral(
-                                    ty_a.is_assignable_to(db, *ty_b),
+                                let constraints = ty_a.when_assignable_to(db, *ty_b);
+                                let tracked = TrackedConstraintSet::new(db, constraints);
+                                overload.set_return_type(Type::KnownInstance(
+                                    KnownInstanceType::ConstraintSet(tracked),
                                 ));
                             }
                         }
 
                         Some(KnownFunction::IsDisjointFrom) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
-                                overload.set_return_type(Type::BooleanLiteral(
-                                    ty_a.is_disjoint_from(db, *ty_b),
+                                let constraints = ty_a.when_disjoint_from(db, *ty_b);
+                                let tracked = TrackedConstraintSet::new(db, constraints);
+                                overload.set_return_type(Type::KnownInstance(
+                                    KnownInstanceType::ConstraintSet(tracked),
                                 ));
                             }
                         }
@@ -664,6 +677,13 @@ impl<'db> Bindings<'db> {
                                         function_generic_context(bound_method.function(db))
                                     }
 
+                                    Type::KnownInstance(KnownInstanceType::TypeAliasType(
+                                        TypeAliasType::PEP695(alias),
+                                    )) => alias
+                                        .generic_context(db)
+                                        .map(|generic_context| generic_context.as_tuple(db))
+                                        .unwrap_or_else(|| Type::none(db)),
+
                                     _ => Type::none(db),
                                 });
                             }
@@ -706,7 +726,7 @@ impl<'db> Bindings<'db> {
                                                 db,
                                                 metadata
                                                     .members
-                                                    .iter()
+                                                    .keys()
                                                     .map(|member| Type::string_literal(db, member)),
                                             )
                                         } else {
@@ -1053,17 +1073,15 @@ impl<'db> Bindings<'db> {
                             // `tuple(range(42))` => `tuple[int, ...]`
                             // BUT `tuple((1, 2))` => `tuple[Literal[1], Literal[2]]` rather than `tuple[Literal[1, 2], ...]`
                             if let [Some(argument)] = overload.parameter_types() {
-                                let Ok(tuple_spec) = argument.try_iterate(db) else {
-                                    tracing::debug!(
-                                        "type" = %argument.display(db),
-                                        "try_iterate() should not fail on a type \
-                                            assignable to `Iterable`",
-                                    );
-                                    continue;
-                                };
+                                // We deliberately use `.iterate()` here (falling back to `Unknown` if it isn't iterable)
+                                // rather than `.try_iterate().expect()`. Even though we know at this point that the input
+                                // type is assignable to `Iterable`, that doesn't mean that the input type is *actually*
+                                // iterable (it could be a Liskov-uncompliant subtype of the `Iterable` class that sets
+                                // `__iter__ = None`, for example). That would be badly written Python code, but we still
+                                // need to be able to handle it without crashing.
                                 overload.set_return_type(Type::tuple(TupleType::new(
                                     db,
-                                    tuple_spec.as_ref(),
+                                    &argument.iterate(db),
                                 )));
                             }
                         }
@@ -1106,8 +1124,7 @@ impl<'db> From<CallableBinding<'db>> for Bindings<'db> {
         Bindings {
             callable_type: from.callable_type,
             elements: smallvec_inline![from],
-            argument_forms: Box::from([]),
-            conflicting_forms: Box::from([]),
+            argument_forms: ArgumentForms::new(0),
         }
     }
 }
@@ -1128,8 +1145,7 @@ impl<'db> From<Binding<'db>> for Bindings<'db> {
         Bindings {
             callable_type,
             elements: smallvec_inline![callable_binding],
-            argument_forms: Box::from([]),
-            conflicting_forms: Box::from([]),
+            argument_forms: ArgumentForms::new(0),
         }
     }
 }
@@ -1775,9 +1791,9 @@ impl<'db> CallableBinding<'db> {
                         FunctionKind::BoundMethod,
                         bound_method.function(context.db()),
                     )),
-                    Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(function)) => {
-                        Some((FunctionKind::MethodWrapper, function))
-                    }
+                    Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(
+                        function,
+                    )) => Some((FunctionKind::MethodWrapper, function)),
                     _ => None,
                 };
 
@@ -1915,7 +1931,7 @@ enum MatchingOverloadIndex {
     Multiple(Vec<usize>),
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 struct ArgumentForms {
     values: Vec<Option<ParameterForm>>,
     conflicting: Vec<bool>,
@@ -1959,11 +1975,9 @@ impl ArgumentForms {
         }
     }
 
-    fn into_boxed_slice(self) -> (Box<[Option<ParameterForm>]>, Box<[bool]>) {
-        (
-            self.values.into_boxed_slice(),
-            self.conflicting.into_boxed_slice(),
-        )
+    fn shrink_to_fit(&mut self) {
+        self.values.shrink_to_fit();
+        self.conflicting.shrink_to_fit();
     }
 }
 
@@ -2080,6 +2094,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         &mut self,
         argument_index: usize,
         argument: Argument<'a>,
+        argument_type: Option<Type<'db>>,
         name: &str,
     ) -> Result<(), ()> {
         let Some((parameter_index, parameter)) = self
@@ -2096,7 +2111,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         self.assign_argument(
             argument_index,
             argument,
-            None,
+            argument_type,
             parameter_index,
             parameter,
             false,
@@ -2137,6 +2152,60 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         }
 
         Ok(())
+    }
+
+    fn match_keyword_variadic(
+        &mut self,
+        db: &'db dyn Db,
+        argument_index: usize,
+        argument_type: Option<Type<'db>>,
+    ) {
+        if let Some(Type::TypedDict(typed_dict)) = argument_type {
+            // Special case TypedDict because we know which keys are present.
+            for (name, field) in typed_dict.items(db) {
+                let _ = self.match_keyword(
+                    argument_index,
+                    Argument::Keywords,
+                    Some(field.declared_ty),
+                    name.as_str(),
+                );
+            }
+        } else {
+            let value_type = match argument_type.map(|ty| {
+                ty.member_lookup_with_policy(
+                    db,
+                    Name::new_static("__getitem__"),
+                    MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                )
+                .place
+            }) {
+                Some(Place::Type(keys_method, Boundness::Bound)) => keys_method
+                    .try_call(db, &CallArguments::positional([Type::unknown()]))
+                    .ok()
+                    .map_or_else(Type::unknown, |bindings| bindings.return_type(db)),
+                _ => Type::unknown(),
+            };
+
+            for (parameter_index, parameter) in self.parameters.iter().enumerate() {
+                if self.parameter_matched[parameter_index] && !parameter.is_keyword_variadic() {
+                    continue;
+                }
+                if matches!(
+                    parameter.kind(),
+                    ParameterKind::PositionalOnly { .. } | ParameterKind::Variadic { .. }
+                ) {
+                    continue;
+                }
+                self.assign_argument(
+                    argument_index,
+                    Argument::Keywords,
+                    Some(value_type),
+                    parameter_index,
+                    parameter,
+                    false,
+                );
+            }
+        }
     }
 
     fn finish(self) -> Box<[MatchedArgument<'db>]> {
@@ -2299,8 +2368,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             // constraint set that we get from this assignability check, instead of inferring and
             // building them in an earlier separate step.
             if argument_type
-                .when_assignable_to::<ConstraintSet>(self.db, expected_ty)
-                .is_never_satisfied(self.db)
+                .when_assignable_to(self.db, expected_ty)
+                .is_never_satisfied()
             {
                 let positional = matches!(argument, Argument::Positional | Argument::Synthetic)
                     && !parameter.is_variadic();
@@ -2327,47 +2396,159 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         for (argument_index, adjusted_argument_index, argument, argument_type) in
             self.enumerate_argument_types()
         {
-            // If the argument isn't splatted, just check its type directly.
-            let Argument::Variadic(_) = argument else {
-                for parameter_index in &self.argument_matches[argument_index].parameters {
-                    self.check_argument_type(
-                        adjusted_argument_index,
-                        argument,
-                        argument_type,
-                        *parameter_index,
-                    );
+            match argument {
+                Argument::Variadic(_) => self.check_variadic_argument_type(
+                    argument_index,
+                    adjusted_argument_index,
+                    argument,
+                    argument_type,
+                ),
+                Argument::Keywords => self.check_keyword_variadic_argument_type(
+                    argument_index,
+                    adjusted_argument_index,
+                    argument,
+                    argument_type,
+                ),
+                _ => {
+                    // If the argument isn't splatted, just check its type directly.
+                    for parameter_index in &self.argument_matches[argument_index].parameters {
+                        self.check_argument_type(
+                            adjusted_argument_index,
+                            argument,
+                            argument_type,
+                            *parameter_index,
+                        );
+                    }
                 }
-                continue;
-            };
+            }
+        }
+    }
 
-            // If the argument is splatted, convert its type into a tuple describing the splatted
-            // elements. For tuples, we don't have to do anything! For other types, we treat it as
-            // an iterator, and create a homogeneous tuple of its output type, since we don't know
-            // how many elements the iterator will produce.
-            let argument_types = argument_type.iterate(self.db);
+    fn check_variadic_argument_type(
+        &mut self,
+        argument_index: usize,
+        adjusted_argument_index: Option<usize>,
+        argument: Argument<'a>,
+        argument_type: Type<'db>,
+    ) {
+        // If the argument is splatted, convert its type into a tuple describing the splatted
+        // elements. For tuples, we don't have to do anything! For other types, we treat it as
+        // an iterator, and create a homogeneous tuple of its output type, since we don't know
+        // how many elements the iterator will produce.
+        let argument_types = argument_type.iterate(self.db);
 
-            // Resize the tuple of argument types to line up with the number of parameters this
-            // argument was matched against. If parameter matching succeeded, then we can (TODO:
-            // should be able to, see above) guarantee that all of the required elements of the
-            // splatted tuple will have been matched with a parameter. But if parameter matching
-            // failed, there might be more required elements. That means we can't use
-            // TupleLength::Fixed below, because we would otherwise get a "too many values" error
-            // when parameter matching failed.
-            let desired_size =
-                TupleLength::Variable(self.argument_matches[argument_index].parameters.len(), 0);
-            let argument_types = argument_types
-                .resize(self.db, desired_size)
-                .expect("argument type should be consistent with its arity");
+        // Resize the tuple of argument types to line up with the number of parameters this
+        // argument was matched against. If parameter matching succeeded, then we can (TODO:
+        // should be able to, see above) guarantee that all of the required elements of the
+        // splatted tuple will have been matched with a parameter. But if parameter matching
+        // failed, there might be more required elements. That means we can't use
+        // TupleLength::Fixed below, because we would otherwise get a "too many values" error
+        // when parameter matching failed.
+        let desired_size =
+            TupleLength::Variable(self.argument_matches[argument_index].parameters.len(), 0);
+        let argument_types = argument_types
+            .resize(self.db, desired_size)
+            .expect("argument type should be consistent with its arity");
 
-            // Check the types by zipping through the splatted argument types and their matched
-            // parameters.
-            for (argument_type, parameter_index) in (argument_types.all_elements())
+        // Check the types by zipping through the splatted argument types and their matched
+        // parameters.
+        for (argument_type, parameter_index) in
+            (argument_types.all_elements()).zip(&self.argument_matches[argument_index].parameters)
+        {
+            self.check_argument_type(
+                adjusted_argument_index,
+                argument,
+                *argument_type,
+                *parameter_index,
+            );
+        }
+    }
+
+    fn check_keyword_variadic_argument_type(
+        &mut self,
+        argument_index: usize,
+        adjusted_argument_index: Option<usize>,
+        argument: Argument<'a>,
+        argument_type: Type<'db>,
+    ) {
+        if let Type::TypedDict(typed_dict) = argument_type {
+            for (argument_type, parameter_index) in typed_dict
+                .items(self.db)
+                .iter()
+                .map(|(_, field)| field.declared_ty)
                 .zip(&self.argument_matches[argument_index].parameters)
             {
                 self.check_argument_type(
                     adjusted_argument_index,
                     argument,
-                    *argument_type,
+                    argument_type,
+                    *parameter_index,
+                );
+            }
+        } else {
+            // TODO: Instead of calling the `keys` and `__getitem__` methods, we should instead
+            // get the constraints which satisfies the `SupportsKeysAndGetItem` protocol i.e., the
+            // key and value type.
+            let key_type = match argument_type
+                .member_lookup_with_policy(
+                    self.db,
+                    Name::new_static("keys"),
+                    MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                )
+                .place
+            {
+                Place::Type(keys_method, Boundness::Bound) => keys_method
+                    .try_call(self.db, &CallArguments::none())
+                    .ok()
+                    .and_then(|bindings| {
+                        Some(
+                            bindings
+                                .return_type(self.db)
+                                .try_iterate(self.db)
+                                .ok()?
+                                .homogeneous_element_type(self.db),
+                        )
+                    }),
+                _ => None,
+            };
+
+            let Some(key_type) = key_type else {
+                self.errors.push(BindingError::KeywordsNotAMapping {
+                    argument_index: adjusted_argument_index,
+                    provided_ty: argument_type,
+                });
+                return;
+            };
+
+            if !key_type.is_assignable_to(self.db, KnownClass::Str.to_instance(self.db)) {
+                self.errors.push(BindingError::InvalidKeyType {
+                    argument_index: adjusted_argument_index,
+                    provided_ty: key_type,
+                });
+            }
+
+            let value_type = match argument_type
+                .member_lookup_with_policy(
+                    self.db,
+                    Name::new_static("__getitem__"),
+                    MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                )
+                .place
+            {
+                Place::Type(keys_method, Boundness::Bound) => keys_method
+                    .try_call(self.db, &CallArguments::positional([Type::unknown()]))
+                    .ok()
+                    .map_or_else(Type::unknown, |bindings| bindings.return_type(self.db)),
+                _ => Type::unknown(),
+            };
+
+            for (argument_type, parameter_index) in
+                std::iter::repeat(value_type).zip(&self.argument_matches[argument_index].parameters)
+            {
+                self.check_argument_type(
+                    adjusted_argument_index,
+                    Argument::Keywords,
+                    argument_type,
                     *parameter_index,
                 );
             }
@@ -2485,23 +2666,26 @@ impl<'db> Binding<'db> {
         let parameters = self.signature.parameters();
         let mut matcher =
             ArgumentMatcher::new(arguments, parameters, argument_forms, &mut self.errors);
+        let mut keywords_arguments = vec![];
         for (argument_index, (argument, argument_type)) in arguments.iter().enumerate() {
             match argument {
                 Argument::Positional | Argument::Synthetic => {
                     let _ = matcher.match_positional(argument_index, argument, None);
                 }
                 Argument::Keyword(name) => {
-                    let _ = matcher.match_keyword(argument_index, argument, name);
+                    let _ = matcher.match_keyword(argument_index, argument, None, name);
                 }
                 Argument::Variadic(length) => {
                     let _ =
                         matcher.match_variadic(db, argument_index, argument, argument_type, length);
                 }
                 Argument::Keywords => {
-                    // TODO
-                    continue;
+                    keywords_arguments.push((argument_index, argument_type));
                 }
             }
+        }
+        for (keywords_index, keywords_type) in keywords_arguments {
+            matcher.match_keyword_variadic(db, keywords_index, keywords_type);
         }
         self.return_ty = self.signature.return_ty.unwrap_or(Type::unknown());
         self.parameter_tys = vec![None; parameters.len()].into_boxed_slice();
@@ -2778,13 +2962,13 @@ impl<'db> CallableDescription<'db> {
                 kind: "bound method",
                 name: bound_method.function(db).name(db),
             }),
-            Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(function)) => {
+            Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(function)) => {
                 Some(CallableDescription {
                     kind: "method wrapper `__get__` of function",
                     name: function.name(db),
                 })
             }
-            Type::MethodWrapper(MethodWrapperKind::PropertyDunderGet(_)) => {
+            Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderGet(_)) => {
                 Some(CallableDescription {
                     kind: "method wrapper",
                     name: "`__get__` of property",
@@ -2864,6 +3048,15 @@ pub(crate) enum BindingError<'db> {
         parameter: ParameterContext,
         argument_index: Option<usize>,
         expected_ty: Type<'db>,
+        provided_ty: Type<'db>,
+    },
+    /// The type of the keyword-variadic argument's key is not `str`.
+    InvalidKeyType {
+        argument_index: Option<usize>,
+        provided_ty: Type<'db>,
+    },
+    KeywordsNotAMapping {
+        argument_index: Option<usize>,
         provided_ty: Type<'db>,
     },
     /// One or more required parameters (that is, with no default) is not supplied by any argument.
@@ -3005,6 +3198,45 @@ impl<'db> BindingError<'db> {
                 }
             }
 
+            Self::InvalidKeyType {
+                argument_index,
+                provided_ty,
+            } => {
+                let range = Self::get_node(node, *argument_index);
+                let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, range) else {
+                    return;
+                };
+
+                let provided_ty_display = provided_ty.display(context.db());
+                let mut diag = builder.into_diagnostic(
+                    "Argument expression after ** must be a mapping with `str` key type",
+                );
+                diag.set_primary_message(format_args!("Found `{provided_ty_display}`"));
+
+                if let Some(union_diag) = union_diag {
+                    union_diag.add_union_context(context.db(), &mut diag);
+                }
+            }
+
+            Self::KeywordsNotAMapping {
+                argument_index,
+                provided_ty,
+            } => {
+                let range = Self::get_node(node, *argument_index);
+                let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, range) else {
+                    return;
+                };
+
+                let provided_ty_display = provided_ty.display(context.db());
+                let mut diag =
+                    builder.into_diagnostic("Argument expression after ** must be a mapping type");
+                diag.set_primary_message(format_args!("Found `{provided_ty_display}`"));
+
+                if let Some(union_diag) = union_diag {
+                    union_diag.add_union_context(context.db(), &mut diag);
+                }
+            }
+
             Self::TooManyPositionalArguments {
                 first_excess_argument_index,
                 expected_positional_count,
@@ -3132,14 +3364,20 @@ impl<'db> BindingError<'db> {
                         String::new()
                     }
                 ));
-                diag.set_primary_message(format_args!(
-                    "Argument type `{argument_ty_display}` does not satisfy {} of type variable `{}`",
-                    match error {
-                        SpecializationError::MismatchedBound {..} => "upper bound",
-                        SpecializationError::MismatchedConstraint {..} => "constraints",
-                    },
-                    typevar.name(context.db()),
-                ));
+
+                let typevar_name = typevar.name(context.db());
+                match error {
+                    SpecializationError::MismatchedBound { .. } => {
+                        diag.set_primary_message(format_args!("Argument type `{argument_ty_display}` does not satisfy upper bound `{}` of type variable `{typevar_name}`",
+                        typevar.upper_bound(context.db()).expect("type variable should have an upper bound if this error occurs").display(context.db())
+                    ));
+                    }
+                    SpecializationError::MismatchedConstraint { .. } => {
+                        diag.set_primary_message(format_args!("Argument type `{argument_ty_display}` does not satisfy constraints ({}) of type variable `{typevar_name}`",
+                        typevar.constraints(context.db()).expect("type variable should have constraints if this error occurs").iter().map(|ty| format!("`{}`", ty.display(context.db()))).join(", ")
+                    ));
+                    }
+                }
 
                 if let Some(typevar_definition) = typevar.definition(context.db()) {
                     let module = parsed_module(context.db(), typevar_definition.file(context.db()))

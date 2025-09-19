@@ -1,6 +1,8 @@
 //! Insert statements into Python code.
+
 use std::ops::Add;
 
+use ruff_diagnostics::Edit;
 use ruff_python_ast::Stmt;
 use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_codegen::Stylist;
@@ -9,9 +11,6 @@ use ruff_python_trivia::is_python_whitespace;
 use ruff_python_trivia::{PythonWhitespace, textwrap::indent};
 use ruff_source_file::{LineRanges, UniversalNewlineIterator};
 use ruff_text_size::{Ranged, TextSize};
-
-use crate::Edit;
-use crate::Locator;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum Placement<'a> {
@@ -25,7 +24,7 @@ pub(super) enum Placement<'a> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct Insertion<'a> {
+pub struct Insertion<'a> {
     /// The content to add before the insertion.
     prefix: &'a str,
     /// The location at which to insert.
@@ -50,33 +49,31 @@ impl<'a> Insertion<'a> {
     ///
     /// The insertion returned will begin at the start of the `import os` statement, and will
     /// include a trailing newline.
-    pub(super) fn start_of_file(
-        body: &[Stmt],
-        locator: &Locator,
-        stylist: &Stylist,
-    ) -> Insertion<'static> {
+    pub fn start_of_file(body: &[Stmt], contents: &str, stylist: &Stylist) -> Insertion<'static> {
         // Skip over any docstrings.
         let mut location = if let Some(mut location) = match_docstring_end(body) {
             // If the first token after the docstring is a semicolon, insert after the semicolon as
             // an inline statement.
-            if let Some(offset) = match_semicolon(locator.after(location)) {
+            if let Some(offset) = match_semicolon(&contents[location.to_usize()..]) {
                 return Insertion::inline(" ", location.add(offset).add(TextSize::of(';')), ";");
             }
 
             // While the first token after the docstring is a continuation character (i.e. "\"), advance
             // additional rows to prevent inserting in the same logical line.
-            while match_continuation(locator.after(location)).is_some() {
-                location = locator.full_line_end(location);
+            while match_continuation(&contents[location.to_usize()..]).is_some() {
+                location = contents.full_line_end(location);
             }
 
             // Otherwise, advance to the next row.
-            locator.full_line_end(location)
+            contents.full_line_end(location)
         } else {
-            locator.bom_start_offset()
+            contents.bom_start_offset()
         };
 
         // Skip over commented lines, with whitespace separation.
-        for line in UniversalNewlineIterator::with_offset(locator.after(location), location) {
+        for line in
+            UniversalNewlineIterator::with_offset(&contents[location.to_usize()..], location)
+        {
             let trimmed_line = line.trim_whitespace_start();
             if trimmed_line.is_empty() {
                 continue;
@@ -111,17 +108,13 @@ impl<'a> Insertion<'a> {
     /// in this case is the line after `import math`, and will include a trailing newline.
     ///
     /// The statement itself is assumed to be at the top-level of the module.
-    pub(super) fn end_of_statement(
-        stmt: &Stmt,
-        locator: &Locator,
-        stylist: &Stylist,
-    ) -> Insertion<'static> {
+    pub fn end_of_statement(stmt: &Stmt, contents: &str, stylist: &Stylist) -> Insertion<'static> {
         let location = stmt.end();
-        if let Some(offset) = match_semicolon(locator.after(location)) {
+        if let Some(offset) = match_semicolon(&contents[location.to_usize()..]) {
             // If the first token after the statement is a semicolon, insert after the semicolon as
             // an inline statement.
             Insertion::inline(" ", location.add(offset).add(TextSize::of(';')), ";")
-        } else if match_continuation(locator.after(location)).is_some() {
+        } else if match_continuation(&contents[location.to_usize()..]).is_some() {
             // If the first token after the statement is a continuation, insert after the statement
             // with a semicolon.
             Insertion::inline("; ", location, "")
@@ -129,10 +122,61 @@ impl<'a> Insertion<'a> {
             // Otherwise, insert on the next line.
             Insertion::own_line(
                 "",
-                locator.full_line_end(location),
+                contents.full_line_end(location),
                 stylist.line_ending().as_str(),
             )
         }
+    }
+
+    /// Create an [`Insertion`] to insert an additional member to import
+    /// into a `from <module> import member1, member2, ...` statement.
+    ///
+    /// For example, given the following code:
+    ///
+    /// ```python
+    /// """Hello, world!"""
+    ///
+    /// from collections import Counter
+    ///
+    ///
+    /// def foo():
+    ///     pass
+    /// ```
+    ///
+    /// The insertion returned will begin after `Counter` but before the
+    /// newline terminator. Callers can then call [`Insertion::into_edit`]
+    /// with the additional member to add. A comma delimiter is handled
+    /// automatically.
+    ///
+    /// The statement itself is assumed to be at the top-level of the module.
+    ///
+    /// This returns `None` when `stmt` isn't a `from ... import ...`
+    /// statement.
+    pub fn existing_import(stmt: &Stmt, tokens: &Tokens) -> Option<Insertion<'static>> {
+        let Stmt::ImportFrom(ref import_from) = *stmt else {
+            return None;
+        };
+        if let Some(at) = import_from.names.last().map(Ranged::end) {
+            return Some(Insertion::inline(", ", at, ""));
+        }
+        // Our AST can deal with partial `from ... import`
+        // statements, so we might not have any members
+        // yet. In this case, we don't need the comma.
+        //
+        // ... however, unless we can be certain that
+        // inserting this name leads to a valid AST, we
+        // give up.
+        let at = import_from.end();
+        if !matches!(
+            tokens
+                .before(at)
+                .last()
+                .map(ruff_python_parser::Token::kind),
+            Some(TokenKind::Import)
+        ) {
+            return None;
+        }
+        Some(Insertion::inline(" ", at, ""))
     }
 
     /// Create an [`Insertion`] to insert (e.g.) an import statement at the start of a given
@@ -149,9 +193,9 @@ impl<'a> Insertion<'a> {
     /// include a trailing newline.
     ///
     /// The block itself is assumed to be at the top-level of the module.
-    pub(super) fn start_of_block(
+    pub fn start_of_block(
         mut location: TextSize,
-        locator: &Locator<'a>,
+        contents: &'a str,
         stylist: &Stylist,
         tokens: &Tokens,
     ) -> Insertion<'a> {
@@ -204,7 +248,7 @@ impl<'a> Insertion<'a> {
                             "",
                             token.start(),
                             stylist.line_ending().as_str(),
-                            locator.slice(token),
+                            &contents[token.range()],
                         );
                     }
                     _ => {
@@ -220,7 +264,7 @@ impl<'a> Insertion<'a> {
     }
 
     /// Convert this [`Insertion`] into an [`Edit`] that inserts the given content.
-    pub(super) fn into_edit(self, content: &str) -> Edit {
+    pub fn into_edit(self, content: &str) -> Edit {
         let Insertion {
             prefix,
             location,
@@ -240,7 +284,7 @@ impl<'a> Insertion<'a> {
     }
 
     /// Returns `true` if this [`Insertion`] is inline.
-    pub(super) fn is_inline(&self) -> bool {
+    pub fn is_inline(&self) -> bool {
         matches!(self.placement, Placement::Inline)
     }
 
@@ -321,9 +365,7 @@ mod tests {
     use ruff_python_codegen::Stylist;
     use ruff_python_parser::parse_module;
     use ruff_source_file::LineEnding;
-    use ruff_text_size::TextSize;
-
-    use crate::Locator;
+    use ruff_text_size::{Ranged, TextSize};
 
     use super::Insertion;
 
@@ -331,9 +373,8 @@ mod tests {
     fn start_of_file() -> Result<()> {
         fn insert(contents: &str) -> Result<Insertion<'_>> {
             let parsed = parse_module(contents)?;
-            let locator = Locator::new(contents);
-            let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
-            Ok(Insertion::start_of_file(parsed.suite(), &locator, &stylist))
+            let stylist = Stylist::from_tokens(parsed.tokens(), contents);
+            Ok(Insertion::start_of_file(parsed.suite(), contents, &stylist))
         }
 
         let contents = "";
@@ -463,9 +504,8 @@ x = 1
     fn start_of_block() {
         fn insert(contents: &str, offset: TextSize) -> Insertion<'_> {
             let parsed = parse_module(contents).unwrap();
-            let locator = Locator::new(contents);
-            let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
-            Insertion::start_of_block(offset, &locator, &stylist, parsed.tokens())
+            let stylist = Stylist::from_tokens(parsed.tokens(), contents);
+            Insertion::start_of_block(offset, contents, &stylist, parsed.tokens())
         }
 
         let contents = "if True: pass";
@@ -482,6 +522,288 @@ if True:
         assert_eq!(
             insert(contents, TextSize::from(0)),
             Insertion::indented("", TextSize::from(9), "\n", "    ")
+        );
+    }
+
+    #[test]
+    fn existing_import_works() {
+        fn snapshot(content: &str, member: &str) -> String {
+            let parsed = parse_module(content).unwrap();
+            let edit = Insertion::existing_import(parsed.suite().first().unwrap(), parsed.tokens())
+                .unwrap()
+                .into_edit(member);
+            let insert_text = edit.content().expect("edit should be non-empty");
+
+            let mut content = content.to_string();
+            content.replace_range(edit.range().to_std_range(), insert_text);
+            content
+        }
+
+        let source = r#"
+from collections import Counter
+"#;
+        insta::assert_snapshot!(
+            snapshot(source, "defaultdict"),
+            @r"
+        from collections import Counter, defaultdict
+        ",
+        );
+
+        let source = r#"
+from collections import Counter, OrderedDict
+"#;
+        insta::assert_snapshot!(
+            snapshot(source, "defaultdict"),
+            @r"
+        from collections import Counter, OrderedDict, defaultdict
+        ",
+        );
+
+        let source = r#"
+from collections import (Counter)
+"#;
+        insta::assert_snapshot!(
+            snapshot(source, "defaultdict"),
+            @"from collections import (Counter, defaultdict)",
+        );
+
+        let source = r#"
+from collections import (Counter, OrderedDict)
+"#;
+        insta::assert_snapshot!(
+            snapshot(source, "defaultdict"),
+            @"from collections import (Counter, OrderedDict, defaultdict)",
+        );
+
+        let source = r#"
+from collections import (Counter,)
+"#;
+        insta::assert_snapshot!(
+            snapshot(source, "defaultdict"),
+            @"from collections import (Counter, defaultdict,)",
+        );
+
+        let source = r#"
+from collections import (Counter, OrderedDict,)
+"#;
+        insta::assert_snapshot!(
+            snapshot(source, "defaultdict"),
+            @"from collections import (Counter, OrderedDict, defaultdict,)",
+        );
+
+        let source = r#"
+from collections import (
+  Counter
+)
+"#;
+        insta::assert_snapshot!(
+            snapshot(source, "defaultdict"),
+            @r"
+        from collections import (
+          Counter, defaultdict
+        )
+        ",
+        );
+
+        let source = r#"
+from collections import (
+  Counter,
+)
+"#;
+        insta::assert_snapshot!(
+            snapshot(source, "defaultdict"),
+            @r"
+        from collections import (
+          Counter, defaultdict,
+        )
+        ",
+        );
+
+        let source = r#"
+from collections import (
+  Counter,
+  OrderedDict
+)
+"#;
+        insta::assert_snapshot!(
+            snapshot(source, "defaultdict"),
+            @r"
+        from collections import (
+          Counter,
+          OrderedDict, defaultdict
+        )
+        ",
+        );
+
+        let source = r#"
+from collections import (
+  Counter,
+  OrderedDict,
+)
+"#;
+        insta::assert_snapshot!(
+            snapshot(source, "defaultdict"),
+            @r"
+        from collections import (
+          Counter,
+          OrderedDict, defaultdict,
+        )
+        ",
+        );
+
+        let source = r#"
+from collections import \
+  Counter
+"#;
+        insta::assert_snapshot!(
+            snapshot(source, "defaultdict"),
+            @r"
+        from collections import \
+          Counter, defaultdict
+        ",
+        );
+
+        let source = r#"
+from collections import \
+  Counter, OrderedDict
+"#;
+        insta::assert_snapshot!(
+            snapshot(source, "defaultdict"),
+            @r"
+        from collections import \
+          Counter, OrderedDict, defaultdict
+        ",
+        );
+
+        let source = r#"
+from collections import \
+  Counter, \
+  OrderedDict
+"#;
+        insta::assert_snapshot!(
+            snapshot(source, "defaultdict"),
+            @r"
+        from collections import \
+          Counter, \
+          OrderedDict, defaultdict
+        ",
+        );
+
+        /*
+        from collections import (
+            Collector # comment
+        )
+
+        from collections import (
+            Collector, # comment
+        )
+
+        from collections import (
+            Collector # comment
+            ,
+        )
+
+        from collections import (
+            Collector
+            # comment
+            ,
+        )
+                 */
+
+        let source = r#"
+from collections import (
+  Counter # comment
+)
+"#;
+        insta::assert_snapshot!(
+            snapshot(source, "defaultdict"),
+            @r"
+        from collections import (
+          Counter, defaultdict # comment
+        )
+        ",
+        );
+
+        let source = r#"
+from collections import (
+  Counter, # comment
+)
+"#;
+        insta::assert_snapshot!(
+            snapshot(source, "defaultdict"),
+            @r"
+        from collections import (
+          Counter, defaultdict, # comment
+        )
+        ",
+        );
+
+        let source = r#"
+from collections import (
+  Counter # comment
+  ,
+)
+"#;
+        insta::assert_snapshot!(
+            snapshot(source, "defaultdict"),
+            @r"
+        from collections import (
+          Counter, defaultdict # comment
+          ,
+        )
+        ",
+        );
+
+        let source = r#"
+from collections import (
+  Counter
+  # comment
+  ,
+)
+"#;
+        insta::assert_snapshot!(
+            snapshot(source, "defaultdict"),
+            @r"
+        from collections import (
+          Counter, defaultdict
+          # comment
+          ,
+        )
+        ",
+        );
+
+        let source = r#"
+from collections import (
+  # comment 1
+  Counter # comment 2
+  # comment 3
+)
+"#;
+        insta::assert_snapshot!(
+            snapshot(source, "defaultdict"),
+            @r"
+        from collections import (
+          # comment 1
+          Counter, defaultdict # comment 2
+          # comment 3
+        )
+        ",
+        );
+
+        let source = r#"
+from collections import Counter # comment
+"#;
+        insta::assert_snapshot!(
+            snapshot(source, "defaultdict"),
+            @"from collections import Counter, defaultdict # comment",
+        );
+
+        let source = r#"
+from collections import Counter, OrderedDict # comment
+"#;
+        insta::assert_snapshot!(
+            snapshot(source, "defaultdict"),
+            @"from collections import Counter, OrderedDict, defaultdict # comment",
         );
     }
 }

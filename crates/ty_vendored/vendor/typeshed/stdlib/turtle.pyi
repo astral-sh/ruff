@@ -1930,7 +1930,8 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         >>> turtle.end_fill()
         """
 
-    def dot(self, size: int | None = None, *color: _Color) -> None:
+    @overload
+    def dot(self, size: int | _Color | None = None) -> None:
         """Draw a dot with diameter size, using color.
 
         Optional arguments:
@@ -1945,6 +1946,10 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         >>> turtle.fd(50); turtle.dot(20, "blue"); turtle.fd(50)
         """
 
+    @overload
+    def dot(self, size: int | None, color: _Color, /) -> None: ...
+    @overload
+    def dot(self, size: int | None, r: float, g: float, b: float, /) -> None: ...
     def write(
         self, arg: object, move: bool = False, align: str = "left", font: tuple[str, int, str] = ("Arial", 8, "normal")
     ) -> None:
@@ -3827,7 +3832,8 @@ def end_fill() -> None:
     >>> end_fill()
     """
 
-def dot(size: int | None = None, *color: _Color) -> None:
+@overload
+def dot(size: int | _Color | None = None) -> None:
     """Draw a dot with diameter size, using color.
 
     Optional arguments:
@@ -3842,6 +3848,10 @@ def dot(size: int | None = None, *color: _Color) -> None:
     >>> fd(50); dot(20, "blue"); fd(50)
     """
 
+@overload
+def dot(size: int | None, color: _Color, /) -> None: ...
+@overload
+def dot(size: int | None, r: float, g: float, b: float, /) -> None: ...
 def write(arg: object, move: bool = False, align: str = "left", font: tuple[str, int, str] = ("Arial", 8, "normal")) -> None:
     """Write text at the current turtle position.
 

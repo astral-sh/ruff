@@ -312,14 +312,14 @@ mod tests {
                 This is such a great class!!
 
                     Don't you know?
-                
+
                 Everyone loves my class!!
 
             '''
             def __init__(self, val):
                 """initializes MyClass (perfectly)"""
                 self.val = val
-            
+
             def my_method(self, a, b):
                 '''This is such a great func!!
 
@@ -379,14 +379,14 @@ mod tests {
                 This is such a great class!!
 
                     Don't you know?
-                
+
                 Everyone loves my class!!
 
             '''
             def __init__(self, val):
                 """initializes MyClass (perfectly)"""
                 self.val = val
-            
+
             def my_method(self, a, b):
                 '''This is such a great func!!
 
@@ -444,14 +444,14 @@ mod tests {
                 This is such a great class!!
 
                     Don't you know?
-                
+
                 Everyone loves my class!!
 
             '''
             def __init__(self, val):
                 """initializes MyClass (perfectly)"""
                 self.val = val
-            
+
             def my_method(self, a, b):
                 '''This is such a great func!!
 
@@ -505,7 +505,7 @@ mod tests {
                 This is such a great class!!
 
                     Don't you know?
-                
+
                 Everyone loves my class!!
 
             '''
@@ -562,13 +562,13 @@ mod tests {
                 This is such a great class!!
 
                     Don't you know?
-                
+
                 Everyone loves my class!!
 
             '''
             def __init__(self, val):
                 self.val = val
-            
+
             def my_method(self, a, b):
                 '''This is such a great func!!
 
@@ -628,14 +628,14 @@ mod tests {
                 This is such a great class!!
 
                     Don't you know?
-                
+
                 Everyone loves my class!!
 
             '''
             def __init__(self, val):
                 """initializes MyClass (perfectly)"""
                 self.val = val
-            
+
             def my_method(self, a, b):
                 '''This is such a great func!!
 
@@ -1589,12 +1589,11 @@ def ab(a: int, *, c: int):
             "#,
         );
 
-        // TODO: This should render T@Alias once we create GenericContexts for type alias scopes.
         assert_snapshot!(test.hover(), @r"
-        typing.TypeVar
+        T@Alias
         ---------------------------------------------
         ```python
-        typing.TypeVar
+        T@Alias
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -1875,9 +1874,9 @@ def ab(a: int, *, c: int):
             def foo(a: str | None, b):
                 '''
                     My cool func
-                
+
                     Args:
-                        a: hopefully a string, right?!   
+                        a: hopefully a string, right?!
                 '''
                 if a is not None:
                     print(a<CURSOR>)

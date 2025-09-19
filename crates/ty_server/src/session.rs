@@ -790,7 +790,6 @@ impl Session {
         // But while this seemed to work for the project root, it
         // simply wouldn't result in any file notifications for changes
         // to files outside of the project root.
-        #[allow(clippy::if_not_else)] // no! it reads better this way ---AG
         let watchers = if !self.client_capabilities().supports_relative_file_watcher() {
             tracing::warn!(
                 "Your LSP client doesn't support file watching outside of project: \

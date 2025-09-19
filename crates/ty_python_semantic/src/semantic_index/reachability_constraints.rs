@@ -208,8 +208,8 @@ use crate::semantic_index::predicate::{
     Predicates, ScopedPredicateId,
 };
 use crate::types::{
-    IntersectionBuilder, Truthiness, Type, UnionBuilder, UnionType, infer_expression_type,
-    static_expression_truthiness,
+    IntersectionBuilder, Truthiness, Type, TypeContext, UnionBuilder, UnionType,
+    infer_expression_type, static_expression_truthiness,
 };
 
 /// A ternary formula that defines under what conditions a binding is visible. (A ternary formula
@@ -328,10 +328,12 @@ fn singleton_to_type(db: &dyn Db, singleton: ruff_python_ast::Singleton) -> Type
 fn pattern_kind_to_type<'db>(db: &'db dyn Db, kind: &PatternPredicateKind<'db>) -> Type<'db> {
     match kind {
         PatternPredicateKind::Singleton(singleton) => singleton_to_type(db, *singleton),
-        PatternPredicateKind::Value(value) => infer_expression_type(db, *value),
+        PatternPredicateKind::Value(value) => {
+            infer_expression_type(db, *value, TypeContext::default())
+        }
         PatternPredicateKind::Class(class_expr, kind) => {
             if kind.is_irrefutable() {
-                infer_expression_type(db, *class_expr)
+                infer_expression_type(db, *class_expr, TypeContext::default())
                     .to_instance(db)
                     .unwrap_or(Type::Never)
             } else {
@@ -344,7 +346,7 @@ fn pattern_kind_to_type<'db>(db: &'db dyn Db, kind: &PatternPredicateKind<'db>) 
         PatternPredicateKind::As(pattern, _) => pattern
             .as_deref()
             .map(|p| pattern_kind_to_type(db, p))
-            .unwrap_or_else(|| Type::object(db)),
+            .unwrap_or_else(Type::object),
         PatternPredicateKind::Unsupported => Type::Never,
     }
 }
@@ -718,7 +720,7 @@ impl ReachabilityConstraints {
     ) -> Truthiness {
         match predicate_kind {
             PatternPredicateKind::Value(value) => {
-                let value_ty = infer_expression_type(db, *value);
+                let value_ty = infer_expression_type(db, *value, TypeContext::default());
 
                 if subject_ty.is_single_valued(db) {
                     Truthiness::from(subject_ty.is_equivalent_to(db, value_ty))
@@ -769,7 +771,8 @@ impl ReachabilityConstraints {
                 truthiness
             }
             PatternPredicateKind::Class(class_expr, kind) => {
-                let class_ty = infer_expression_type(db, *class_expr).to_instance(db);
+                let class_ty =
+                    infer_expression_type(db, *class_expr, TypeContext::default()).to_instance(db);
 
                 class_ty.map_or(Truthiness::Ambiguous, |class_ty| {
                     if subject_ty.is_subtype_of(db, class_ty) {
@@ -797,7 +800,7 @@ impl ReachabilityConstraints {
     }
 
     fn analyze_single_pattern_predicate(db: &dyn Db, predicate: PatternPredicate) -> Truthiness {
-        let subject_ty = infer_expression_type(db, predicate.subject(db));
+        let subject_ty = infer_expression_type(db, predicate.subject(db), TypeContext::default());
 
         let narrowed_subject_ty = IntersectionBuilder::new(db)
             .add_positive(subject_ty)
@@ -837,7 +840,7 @@ impl ReachabilityConstraints {
                 // selection algorithm).
                 // Avoiding this on the happy-path is important because these constraints can be
                 // very large in number, since we add them on all statement level function calls.
-                let ty = infer_expression_type(db, callable);
+                let ty = infer_expression_type(db, callable, TypeContext::default());
 
                 // Short-circuit for well known types that are known not to return `Never` when called.
                 // Without the short-circuit, we've seen that threads keep blocking each other
@@ -875,7 +878,7 @@ impl ReachabilityConstraints {
                 } else if all_overloads_return_never {
                     Truthiness::AlwaysTrue
                 } else {
-                    let call_expr_ty = infer_expression_type(db, call_expr);
+                    let call_expr_ty = infer_expression_type(db, call_expr, TypeContext::default());
                     if call_expr_ty.is_equivalent_to(db, Type::Never) {
                         Truthiness::AlwaysTrue
                     } else {

@@ -303,3 +303,18 @@ reveal_type(attr_property.fset(c, "a"))  # revealed: None
 # error: [invalid-argument-type]
 attr_property.fset(c, 1)
 ```
+
+At runtime, `attr_property.__get__` and `attr_property.__set__` are both instances of
+`types.MethodWrapperType`:
+
+```py
+import types
+from ty_extensions import TypeOf, static_assert, is_subtype_of
+
+static_assert(is_subtype_of(TypeOf[attr_property.__get__], types.MethodWrapperType))
+static_assert(is_subtype_of(TypeOf[attr_property.__set__], types.MethodWrapperType))
+static_assert(not is_subtype_of(TypeOf[attr_property.__get__], types.WrapperDescriptorType))
+static_assert(not is_subtype_of(TypeOf[attr_property.__set__], types.WrapperDescriptorType))
+static_assert(not is_subtype_of(TypeOf[attr_property.__get__], types.BuiltinMethodType))
+static_assert(not is_subtype_of(TypeOf[attr_property.__set__], types.BuiltinMethodType))
+```

@@ -13,7 +13,8 @@ use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor};
 use ruff_python_ast::{Expr, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 use ty_project::Db;
-use ty_python_semantic::CompletionKind;
+
+use crate::completion::CompletionKind;
 
 /// A compiled query pattern used for searching symbols.
 ///

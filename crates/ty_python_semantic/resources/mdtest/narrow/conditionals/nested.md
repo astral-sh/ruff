@@ -249,6 +249,13 @@ def f(x: str | None):
     x = None
 
 def f(x: str | None):
+    def _(x: str | None):
+        if x is not None:
+            def closure():
+                reveal_type(x)  # revealed: str
+    x = None
+
+def f(x: str | None):
     class C:
         def _():
             if x is not None:
@@ -303,13 +310,13 @@ no longer valid in the inner lazy scope.
 def f(l: list[str | None]):
     if l[0] is not None:
         def _():
-            reveal_type(l[0])  # revealed: str | None
+            reveal_type(l[0])  # revealed: str | None | Unknown
         l = [None]
 
 def f(l: list[str | None]):
     l[0] = "a"
     def _():
-        reveal_type(l[0])  # revealed: str | None
+        reveal_type(l[0])  # revealed: str | None | Unknown
     l = [None]
 
 def f(l: list[str | None]):
@@ -317,8 +324,7 @@ def f(l: list[str | None]):
     def _():
         l: list[str | None] = [None]
         def _():
-            # TODO: should be `str | None`
-            reveal_type(l[0])  # revealed: @Todo(list literal element type)
+            reveal_type(l[0])  # revealed: str | None
 
     def _():
         def _():

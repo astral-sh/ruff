@@ -19,6 +19,7 @@ help: Replace with `callable()`
 4 |         print("Ooh, callable! Or is it?")
 5 |     if getattr(o, "__call__", False):
 6 |         print("Ooh, callable! Or is it?")
+note: This is an unsafe fix and may change runtime behavior
 
 B004 Using `hasattr(x, "__call__")` to test if x is callable is unreliable. Use `callable(x)` for consistent results.
  --> B004.py:5:8
@@ -50,6 +51,7 @@ help: Replace with `callable()`
 13 |         print("B U G")
 14 |     if builtins.getattr(o, "__call__", False):
 15 |         print("B   U   G")
+note: This is an unsafe fix and may change runtime behavior
 
 B004 Using `hasattr(x, "__call__")` to test if x is callable is unreliable. Use `callable(x)` for consistent results.
   --> B004.py:14:8
@@ -85,6 +87,7 @@ help: Replace with `callable()`
 26 |         print("STILL a bug!")
 27 | 
 28 | 
+note: This is an unsafe fix and may change runtime behavior
 
 B004 [*] Using `hasattr(x, "__call__")` to test if x is callable is unreliable. Use `callable(x)` for consistent results.
   --> B004.py:35:1
@@ -99,6 +102,8 @@ B004 [*] Using `hasattr(x, "__call__")` to test if x is callable is unreliable. 
 40 | |     # comment 5
 41 | | )
    | |_^
+42 |
+43 |   import operator
    |
 help: Replace with `callable()`
 32 | 
@@ -112,4 +117,43 @@ help: Replace with `callable()`
    -     # comment 5
    - )
 35 + callable(obj)
+36 | 
+37 | import operator
+38 | 
+note: This is an unsafe fix and may change runtime behavior
+
+B004 [*] Using `hasattr(x, "__call__")` to test if x is callable is unreliable. Use `callable(x)` for consistent results.
+  --> B004.py:45:8
+   |
+43 | import operator
+44 |
+45 | assert hasattr(operator, "__call__")
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+46 | assert callable(operator) is False
+   |
+help: Replace with `callable()`
+42 | 
+43 | import operator
+44 | 
+   - assert hasattr(operator, "__call__")
+45 + assert callable(operator)
+46 | assert callable(operator) is False
+47 | 
+48 | 
+note: This is an unsafe fix and may change runtime behavior
+
+B004 [*] Using `hasattr(x, "__call__")` to test if x is callable is unreliable. Use `callable(x)` for consistent results.
+  --> B004.py:53:8
+   |
+53 | assert hasattr(A(), "__call__")
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^
+54 | assert callable(A()) is False
+   |
+help: Replace with `callable()`
+50 |     def __init__(self): self.__call__ = None
+51 | 
+52 | 
+   - assert hasattr(A(), "__call__")
+53 + assert callable(A())
+54 | assert callable(A()) is False
 note: This is an unsafe fix and may change runtime behavior
