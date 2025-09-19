@@ -394,6 +394,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Bugbear, "905") => (RuleGroup::Stable, rules::flake8_bugbear::rules::ZipWithoutExplicitStrict),
         (Flake8Bugbear, "909") => (RuleGroup::Preview, rules::flake8_bugbear::rules::LoopIteratorMutation),
         (Flake8Bugbear, "911") => (RuleGroup::Stable, rules::flake8_bugbear::rules::BatchedWithoutExplicitStrict),
+        (Flake8Bugbear, "912") => (RuleGroup::Preview, rules::flake8_bugbear::rules::MapWithoutExplicitStrict),
 
         // flake8-blind-except
         (Flake8BlindExcept, "001") => (RuleGroup::Stable, rules::flake8_blind_except::rules::BlindExcept),
