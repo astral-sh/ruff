@@ -293,7 +293,19 @@ fn handle_non_finite_float_special_case(
         return None;
     };
     let normalized = as_non_finite_float_string_literal(float_arg)?;
-    let replacement_text = format!(r#"{constructor_name}("{normalized}")"#);
+    let replacement_text = format!(
+        r#"{constructor_name}("{}")"#,
+        // `Decimal.from_float(float(" -nan")) == Decimal("nan")`
+        if normalized == "-nan" {
+            // Here we do not attempt to remove just the '-' character.
+            // It may have been encoded (e.g. as '\N{hyphen-minus}')
+            // in the original source slice, and the added complexity
+            // does not make sense for this edge case.
+            "nan"
+        } else {
+            normalized
+        }
+    );
     Some(Edit::range_replacement(replacement_text, call.range()))
 }
 
