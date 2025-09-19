@@ -234,7 +234,7 @@ def function_with_kwargs(param1, param2, **kwargs):
         extra_param (str): An extra parameter that may be passed via **kwargs.
         another_extra (int): Another extra parameter.
     """
-    ...
+    return
 
 # OK
 def add_numbers(b):
@@ -247,7 +247,7 @@ def add_numbers(b):
     Returns:
         int: The sum of the two numbers.
     """
-    ...
+    return
 
 # DOC102
 def add_numbers(b):

@@ -153,7 +153,7 @@ def concatenate_strings(*args):
     str
         A single concatenated string.
     """
-    ...
+    return True
 
 
 # DOC102
@@ -271,7 +271,7 @@ def function_with_kwargs(param1, param2, **kwargs):
     another_extra : int
         Another extra parameter.
     """
-    ...
+    return True
 
 # OK
 def add_numbers(b):
@@ -309,9 +309,9 @@ def add_numbers(b):
     """
     return a + b
 
-# OK
 class Foo:
-    async def send_help(self, *args: Any) -> Any:
+    # OK
+    def send_help(self, *args: Any) -> Any:
         """|coro|
 
         Shows the help command for the specified entity if given.
@@ -339,4 +339,34 @@ class Foo:
         Any
             The result of the help command, if any.
         """
-        ...
+        return
+
+    # OK
+    @classmethod
+    async def convert(cls, ctx: Context, argument: str) -> Self:
+        """|coro|
+
+        The method that actually converters an argument to the flag mapping.
+
+        Parameters
+        ----------
+        cls: Type[:class:`FlagConverter`]
+            The flag converter class.
+        ctx: :class:`Context`
+            The invocation context.
+        argument: :class:`str`
+            The argument to convert from.
+
+        Raises
+        ------
+        FlagError
+            A flag related parsing error.
+        CommandError
+            A command related error.
+
+        Returns
+        -------
+        :class:`FlagConverter`
+            The flag converter instance with all flags parsed.
+        """
+        return

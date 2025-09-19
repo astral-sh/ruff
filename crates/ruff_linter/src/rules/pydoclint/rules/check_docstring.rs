@@ -1093,20 +1093,12 @@ fn is_generator_function_annotated_as_returning_none(
         .is_some_and(GeneratorOrIteratorArguments::indicates_none_returned)
 }
 
-fn parameters_from_signature<'a>(
-    docstring: &'a Docstring,
-    semantic: &'a SemanticModel,
-) -> Vec<&'a str> {
+fn parameters_from_signature<'a>(docstring: &'a Docstring) -> Vec<&'a str> {
     let mut parameters = Vec::new();
     let Some(function) = docstring.definition.as_function_def() else {
         return parameters;
     };
-    // Here we check if the function is a method (and not a staticmethod)
-    // in which case we skip the first argument which should be `self` or
-    // `cls`.
-    for param in function.parameters.iter().skip(usize::from(
-        docstring.definition.is_method() && !is_staticmethod(&function.decorator_list, semantic),
-    )) {
+    for param in function.parameters.iter() {
         parameters.push(param.name());
     }
     parameters
@@ -1165,7 +1157,7 @@ pub(crate) fn check_docstring(
         visitor.finish()
     };
 
-    let signature_parameters = parameters_from_signature(docstring, semantic);
+    let signature_parameters = parameters_from_signature(docstring);
 
     // DOC201
     if checker.is_rule_enabled(Rule::DocstringMissingReturns) {
