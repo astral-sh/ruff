@@ -55,9 +55,10 @@ use crate::types::generics::{
     walk_partial_specialization, walk_specialization,
 };
 pub use crate::types::ide_support::{
-    CallSignatureDetails, Member, all_members, call_signature_details, definition_kind_for_name,
-    definitions_for_attribute, definitions_for_imported_symbol, definitions_for_keyword_argument,
-    definitions_for_name, find_active_signature_from_details, inlay_hint_call_argument_details,
+    CallSignatureDetails, Member, MemberWithDefinition, all_members, call_signature_details,
+    definition_kind_for_name, definitions_for_attribute, definitions_for_imported_symbol,
+    definitions_for_keyword_argument, definitions_for_name, find_active_signature_from_details,
+    inlay_hint_call_argument_details,
 };
 use crate::types::infer::infer_unpack_types;
 use crate::types::mro::{Mro, MroError, MroIterator};
