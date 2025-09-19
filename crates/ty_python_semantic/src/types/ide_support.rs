@@ -12,7 +12,10 @@ use crate::semantic_index::{
 };
 use crate::types::call::{CallArguments, MatchedArgument};
 use crate::types::signatures::Signature;
-use crate::types::{ClassBase, ClassLiteral, DynamicType, KnownClass, KnownInstanceType, Type};
+use crate::types::{
+    ClassBase, ClassLiteral, DynamicType, KnownClass, KnownInstanceType, Type,
+    class::CodeGeneratorKind,
+};
 use crate::{Db, HasType, NameKind, SemanticModel};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
@@ -27,35 +30,55 @@ use resolve_definition::{find_symbol_in_scope, resolve_definition};
 pub(crate) fn all_declarations_and_bindings<'db>(
     db: &'db dyn Db,
     scope_id: ScopeId<'db>,
-) -> impl Iterator<Item = Member<'db>> + 'db {
+) -> impl Iterator<Item = MemberWithDefinition<'db>> + 'db {
     let use_def_map = use_def_map(db, scope_id);
     let table = place_table(db, scope_id);
 
     use_def_map
         .all_end_of_scope_symbol_declarations()
         .filter_map(move |(symbol_id, declarations)| {
-            place_from_declarations(db, declarations)
+            let place_result = place_from_declarations(db, declarations);
+            let definition = place_result.single_declaration;
+            place_result
                 .ignore_conflicting_declarations()
                 .place
                 .ignore_possibly_unbound()
                 .map(|ty| {
                     let symbol = table.symbol(symbol_id);
-                    Member {
+                    let member = Member {
                         name: symbol.name().clone(),
                         ty,
-                    }
+                    };
+                    MemberWithDefinition { member, definition }
                 })
         })
         .chain(use_def_map.all_end_of_scope_symbol_bindings().filter_map(
             move |(symbol_id, bindings)| {
+                // It's not clear to AG how to using a bindings
+                // iterator here to get the correct definition for
+                // this binding. Below, we look through all bindings
+                // with a definition and only take one if there is
+                // exactly one. I don't think this can be wrong, but
+                // it's probably omitting definitions in some cases.
+                let mut definition = None;
+                for binding in bindings.clone() {
+                    if let Some(def) = binding.binding.definition() {
+                        if definition.is_some() {
+                            definition = None;
+                            break;
+                        }
+                        definition = Some(def);
+                    }
+                }
                 place_from_bindings(db, bindings)
                     .ignore_possibly_unbound()
                     .map(|ty| {
                         let symbol = table.symbol(symbol_id);
-                        Member {
+                        let member = Member {
                             name: symbol.name().clone(),
                             ty,
-                        }
+                        };
+                        MemberWithDefinition { member, definition }
                     })
             },
         ))
@@ -95,8 +118,13 @@ impl<'db> AllMembers<'db> {
             ),
 
             Type::NominalInstance(instance) => {
-                let (class_literal, _specialization) = instance.class(db).class_literal(db);
+                let class_literal = instance.class_literal(db);
                 self.extend_with_instance_members(db, ty, class_literal);
+
+                // If this is a NamedTuple instance, include members from NamedTupleFallback
+                if CodeGeneratorKind::NamedTuple.matches(db, class_literal) {
+                    self.extend_with_type(db, KnownClass::NamedTupleFallback.to_class_literal(db));
+                }
             }
 
             Type::ClassLiteral(class_literal) if class_literal.is_typed_dict(db) => {
@@ -114,6 +142,10 @@ impl<'db> AllMembers<'db> {
             Type::ClassLiteral(class_literal) => {
                 self.extend_with_class_members(db, ty, class_literal);
 
+                if CodeGeneratorKind::NamedTuple.matches(db, class_literal) {
+                    self.extend_with_type(db, KnownClass::NamedTupleFallback.to_class_literal(db));
+                }
+
                 if let Type::ClassLiteral(meta_class_literal) = ty.to_meta_type(db) {
                     self.extend_with_class_members(db, ty, meta_class_literal);
                 }
@@ -121,12 +153,23 @@ impl<'db> AllMembers<'db> {
 
             Type::GenericAlias(generic_alias) => {
                 let class_literal = generic_alias.origin(db);
+                if CodeGeneratorKind::NamedTuple.matches(db, class_literal) {
+                    self.extend_with_type(db, KnownClass::NamedTupleFallback.to_class_literal(db));
+                }
                 self.extend_with_class_members(db, ty, class_literal);
             }
 
             Type::SubclassOf(subclass_of_type) => {
-                if let Some(class_literal) = subclass_of_type.subclass_of().into_class() {
-                    self.extend_with_class_members(db, ty, class_literal.class_literal(db).0);
+                if let Some(class_type) = subclass_of_type.subclass_of().into_class() {
+                    let class_literal = class_type.class_literal(db).0;
+                    self.extend_with_class_members(db, ty, class_literal);
+
+                    if CodeGeneratorKind::NamedTuple.matches(db, class_literal) {
+                        self.extend_with_type(
+                            db,
+                            KnownClass::NamedTupleFallback.to_class_literal(db),
+                        );
+                    }
                 }
             }
 
@@ -211,7 +254,7 @@ impl<'db> AllMembers<'db> {
                         match ty {
                             Type::NominalInstance(instance)
                                 if matches!(
-                                    instance.class(db).known(db),
+                                    instance.known_class(db),
                                     Some(
                                         KnownClass::TypeVar
                                             | KnownClass::TypeVarTuple
@@ -282,12 +325,15 @@ impl<'db> AllMembers<'db> {
             .map(|class| class.class_literal(db).0)
         {
             let parent_scope = parent.body_scope(db);
-            for Member { name, .. } in all_declarations_and_bindings(db, parent_scope) {
-                let result = ty.member(db, name.as_str());
+            for memberdef in all_declarations_and_bindings(db, parent_scope) {
+                let result = ty.member(db, memberdef.member.name.as_str());
                 let Some(ty) = result.place.ignore_possibly_unbound() else {
                     continue;
                 };
-                self.members.insert(Member { name, ty });
+                self.members.insert(Member {
+                    name: memberdef.member.name,
+                    ty,
+                });
             }
         }
     }
@@ -327,15 +373,25 @@ impl<'db> AllMembers<'db> {
             // class member. This gets us the right type for each
             // member, e.g., `SomeClass.__delattr__` is not a bound
             // method, but `instance_of_SomeClass.__delattr__` is.
-            for Member { name, .. } in all_declarations_and_bindings(db, class_body_scope) {
-                let result = ty.member(db, name.as_str());
+            for memberdef in all_declarations_and_bindings(db, class_body_scope) {
+                let result = ty.member(db, memberdef.member.name.as_str());
                 let Some(ty) = result.place.ignore_possibly_unbound() else {
                     continue;
                 };
-                self.members.insert(Member { name, ty });
+                self.members.insert(Member {
+                    name: memberdef.member.name,
+                    ty,
+                });
             }
         }
     }
+}
+
+/// A member of a type with an optional definition.
+#[derive(Clone, Debug)]
+pub struct MemberWithDefinition<'db> {
+    pub member: Member<'db>,
+    pub definition: Option<Definition<'db>>,
 }
 
 /// A member of a type.
@@ -792,7 +848,7 @@ pub struct CallSignatureDetails<'db> {
     pub parameter_label_offsets: Vec<TextRange>,
 
     /// Offsets for each parameter in the signature definition.
-    pub definition_parameter_offsets: Option<HashMap<String, TextRange>>,
+    pub definition_parameter_offsets: HashMap<String, TextRange>,
 
     /// The names of the parameters in the signature, in order.
     /// This provides easy access to parameter names for documentation lookup.
@@ -854,12 +910,15 @@ pub fn call_signature_details<'db>(
                 let display_details = signature.display(db).to_string_parts();
                 let parameter_label_offsets = display_details.parameter_ranges.clone();
                 let parameter_names = display_details.parameter_names.clone();
-                let definition_parameter_offsets = signature.definition().and_then(|definition| {
-                    let file = definition.file(db);
-                    let module_ref = parsed_module(db, file).load(db);
+                let definition_parameter_offsets = signature
+                    .definition()
+                    .and_then(|definition| {
+                        let file = definition.file(db);
+                        let module_ref = parsed_module(db, file).load(db);
 
-                    definition_parameter_offsets(definition.kind(db), &module_ref)
-                });
+                        definition_parameter_offsets(definition.kind(db), &module_ref)
+                    })
+                    .unwrap_or_default();
 
                 CallSignatureDetails {
                     signature: signature.clone(),
@@ -976,13 +1035,7 @@ pub fn inlay_hint_call_argument_details<'db>(
             continue;
         };
 
-        let parameter_label_offset =
-            definition_parameter_offsets
-                .as_ref()
-                .and_then(|offsets| match param.name() {
-                    Some(name) => offsets.get(&name.to_string()),
-                    None => None,
-                });
+        let parameter_label_offset = definition_parameter_offsets.get(&param.name()?.to_string());
 
         // Only add hints for parameters that can be specified by name
         if !param.is_positional_only() && !param.is_variadic() && !param.is_keyword_variadic() {

@@ -5,7 +5,7 @@ resolver = "2"
 [workspace.package]
 # Please update rustfmt.toml when bumping the Rust edition
 edition = "2024"
-rust-version = "1.87"
+rust-version = "1.88"
 homepage = "https://docs.astral.sh/ruff"
 documentation = "https://docs.astral.sh/ruff"
 repository = "https://github.com/astral-sh/ruff"
@@ -29,6 +29,7 @@ ruff_options_metadata = { path = "crates/ruff_options_metadata" }
 ruff_python_ast = { path = "crates/ruff_python_ast" }
 ruff_python_codegen = { path = "crates/ruff_python_codegen" }
 ruff_python_formatter = { path = "crates/ruff_python_formatter" }
+ruff_python_importer = { path = "crates/ruff_python_importer" }
 ruff_python_index = { path = "crates/ruff_python_index" }
 ruff_python_literal = { path = "crates/ruff_python_literal" }
 ruff_python_parser = { path = "crates/ruff_python_parser" }
@@ -143,7 +144,7 @@ regex-automata = { version = "0.4.9" }
 rustc-hash = { version = "2.0.0" }
 rustc-stable-hash = { version = "0.1.2" }
 # When updating salsa, make sure to also update the revision in `fuzz/Cargo.toml`
-salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "a3ffa22cb26756473d56f867aedec3fd907c4dd9", default-features = false, features = [
+salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "3713cd7eb30821c0c086591832dd6f59f2af7fe7", default-features = false, features = [
     "compact_str",
     "macros",
     "salsa_unstable",

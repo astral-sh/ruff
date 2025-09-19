@@ -409,13 +409,13 @@ f(**kwargs<CURSOR>)
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type-definition]: Type definition
-            --> stdlib/builtins.pyi:2917:7
+            --> stdlib/builtins.pyi:2916:7
              |
-        2916 | @disjoint_base
-        2917 | class dict(MutableMapping[_KT, _VT]):
+        2915 | @disjoint_base
+        2916 | class dict(MutableMapping[_KT, _VT]):
              |       ^^^^
-        2918 |     """dict() -> new empty dictionary
-        2919 |     dict(mapping) -> new dictionary initialized from a mapping object's
+        2917 |     """dict() -> new empty dictionary
+        2918 |     dict(mapping) -> new dictionary initialized from a mapping object's
              |
         info: Source
          --> main.py:6:5

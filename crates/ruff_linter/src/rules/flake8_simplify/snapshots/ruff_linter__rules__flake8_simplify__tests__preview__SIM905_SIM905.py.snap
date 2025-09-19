@@ -894,7 +894,7 @@ help: Replace with list literal
 105 | # https://github.com/astral-sh/ruff/issues/18042
 106 | print("a,b".rsplit(","))
 
-SIM905 [*] Consider using a list literal instead of `str.split`
+SIM905 [*] Consider using a list literal instead of `str.rsplit`
    --> SIM905.py:111:7
     |
 110 | # https://github.com/astral-sh/ruff/issues/18042
@@ -912,7 +912,7 @@ help: Replace with list literal
 113 | 
 114 | # https://github.com/astral-sh/ruff/issues/18069
 
-SIM905 [*] Consider using a list literal instead of `str.split`
+SIM905 [*] Consider using a list literal instead of `str.rsplit`
    --> SIM905.py:112:7
     |
 110 | # https://github.com/astral-sh/ruff/issues/18042
@@ -1091,7 +1091,7 @@ help: Replace with list literal
 125 | print("".rsplit(sep=None, maxsplit=0))
 126 | print(" ".rsplit(maxsplit=0))
 
-SIM905 [*] Consider using a list literal instead of `str.split`
+SIM905 [*] Consider using a list literal instead of `str.rsplit`
    --> SIM905.py:124:7
     |
 122 | print("  x  ".split(maxsplit=0))
@@ -1111,7 +1111,7 @@ help: Replace with list literal
 126 | print(" ".rsplit(maxsplit=0))
 127 | print(" ".rsplit(sep=None, maxsplit=0))
 
-SIM905 [*] Consider using a list literal instead of `str.split`
+SIM905 [*] Consider using a list literal instead of `str.rsplit`
    --> SIM905.py:125:7
     |
 123 | print("  x  ".split(sep=None, maxsplit=0))
@@ -1131,7 +1131,7 @@ help: Replace with list literal
 127 | print(" ".rsplit(sep=None, maxsplit=0))
 128 | print(" x ".rsplit(maxsplit=0))
 
-SIM905 [*] Consider using a list literal instead of `str.split`
+SIM905 [*] Consider using a list literal instead of `str.rsplit`
    --> SIM905.py:126:7
     |
 124 | print("".rsplit(maxsplit=0))
@@ -1151,7 +1151,7 @@ help: Replace with list literal
 128 | print(" x ".rsplit(maxsplit=0))
 129 | print(" x ".rsplit(maxsplit=0))
 
-SIM905 [*] Consider using a list literal instead of `str.split`
+SIM905 [*] Consider using a list literal instead of `str.rsplit`
    --> SIM905.py:127:7
     |
 125 | print("".rsplit(sep=None, maxsplit=0))
@@ -1171,7 +1171,7 @@ help: Replace with list literal
 129 | print(" x ".rsplit(maxsplit=0))
 130 | print(" x ".rsplit(sep=None, maxsplit=0))
 
-SIM905 [*] Consider using a list literal instead of `str.split`
+SIM905 [*] Consider using a list literal instead of `str.rsplit`
    --> SIM905.py:128:7
     |
 126 | print(" ".rsplit(maxsplit=0))
@@ -1191,7 +1191,7 @@ help: Replace with list literal
 130 | print(" x ".rsplit(sep=None, maxsplit=0))
 131 | print("  x  ".rsplit(maxsplit=0))
 
-SIM905 [*] Consider using a list literal instead of `str.split`
+SIM905 [*] Consider using a list literal instead of `str.rsplit`
    --> SIM905.py:129:7
     |
 127 | print(" ".rsplit(sep=None, maxsplit=0))
@@ -1211,7 +1211,7 @@ help: Replace with list literal
 131 | print("  x  ".rsplit(maxsplit=0))
 132 | print("  x  ".rsplit(sep=None, maxsplit=0))
 
-SIM905 [*] Consider using a list literal instead of `str.split`
+SIM905 [*] Consider using a list literal instead of `str.rsplit`
    --> SIM905.py:130:7
     |
 128 | print(" x ".rsplit(maxsplit=0))
@@ -1231,7 +1231,7 @@ help: Replace with list literal
 132 | print("  x  ".rsplit(sep=None, maxsplit=0))
 133 | 
 
-SIM905 [*] Consider using a list literal instead of `str.split`
+SIM905 [*] Consider using a list literal instead of `str.rsplit`
    --> SIM905.py:131:7
     |
 129 | print(" x ".rsplit(maxsplit=0))
@@ -1250,7 +1250,7 @@ help: Replace with list literal
 133 | 
 134 | # https://github.com/astral-sh/ruff/issues/19581 - embedded quotes in raw strings
 
-SIM905 [*] Consider using a list literal instead of `str.split`
+SIM905 [*] Consider using a list literal instead of `str.rsplit`
    --> SIM905.py:132:7
     |
 130 | print(" x ".rsplit(sep=None, maxsplit=0))
@@ -1393,7 +1393,7 @@ help: Replace with list literal
 169 | 
 170 | # leading/trailing whitespace should not count towards maxsplit
 
-SIM905 [*] Consider using a list literal instead of `str.split`
+SIM905 [*] Consider using a list literal instead of `str.rsplit`
    --> SIM905.py:168:7
     |
 166 | print("S\x1cP\x1dL\x1eI\x1fT".split())
@@ -1420,6 +1420,7 @@ SIM905 [*] Consider using a list literal instead of `str.split`
 171 | " a b c d ".split(maxsplit=2)  # ["a", "b", "c d "]
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 172 | " a b c d ".rsplit(maxsplit=2)  # [" a b", "c", "d"]
+173 | "a  b".split(maxsplit=1)  # ["a", "b"]
     |
 help: Replace with list literal
 168 | print("<\x1c\x1d\x1e\x1f".rsplit(maxsplit=0))
@@ -1428,14 +1429,16 @@ help: Replace with list literal
     - " a b c d ".split(maxsplit=2)  # ["a", "b", "c d "]
 171 + ["a", "b", "c d "]  # ["a", "b", "c d "]
 172 | " a b c d ".rsplit(maxsplit=2)  # [" a b", "c", "d"]
+173 | "a  b".split(maxsplit=1)  # ["a", "b"]
 
-SIM905 [*] Consider using a list literal instead of `str.split`
+SIM905 [*] Consider using a list literal instead of `str.rsplit`
    --> SIM905.py:172:1
     |
 170 | # leading/trailing whitespace should not count towards maxsplit
 171 | " a b c d ".split(maxsplit=2)  # ["a", "b", "c d "]
 172 | " a b c d ".rsplit(maxsplit=2)  # [" a b", "c", "d"]
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+173 | "a  b".split(maxsplit=1)  # ["a", "b"]
     |
 help: Replace with list literal
 169 | 
@@ -1443,3 +1446,19 @@ help: Replace with list literal
 171 | " a b c d ".split(maxsplit=2)  # ["a", "b", "c d "]
     - " a b c d ".rsplit(maxsplit=2)  # [" a b", "c", "d"]
 172 + [" a b", "c", "d"]  # [" a b", "c", "d"]
+173 | "a  b".split(maxsplit=1)  # ["a", "b"]
+
+SIM905 [*] Consider using a list literal instead of `str.split`
+   --> SIM905.py:173:1
+    |
+171 | " a b c d ".split(maxsplit=2)  # ["a", "b", "c d "]
+172 | " a b c d ".rsplit(maxsplit=2)  # [" a b", "c", "d"]
+173 | "a  b".split(maxsplit=1)  # ["a", "b"]
+    | ^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: Replace with list literal
+170 | # leading/trailing whitespace should not count towards maxsplit
+171 | " a b c d ".split(maxsplit=2)  # ["a", "b", "c d "]
+172 | " a b c d ".rsplit(maxsplit=2)  # [" a b", "c", "d"]
+    - "a  b".split(maxsplit=1)  # ["a", "b"]
+173 + ["a", "b"]  # ["a", "b"]

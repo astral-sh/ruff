@@ -30,9 +30,7 @@ class Shape:
 
     def nested_func_without_enclosing_binding(self):
         def inner(x: Self):
-            # TODO: revealed: Self@nested_func_without_enclosing_binding
-            # (The outer method binds an implicit `Self`)
-            reveal_type(x)  # revealed: Self@inner
+            reveal_type(x)  # revealed: Self@nested_func_without_enclosing_binding
         inner(self)
 
     def implicit_self(self) -> Self:
@@ -237,6 +235,38 @@ class D(C): ...
 reveal_type(D().instance_method)
 # revealed: bound method <class 'D'>.class_method() -> D
 reveal_type(D.class_method)
+```
+
+In nested functions `self` binds to the method. So in the following example the `self` in `C.b` is
+bound at `C.f`.
+
+```py
+from typing import Self
+from ty_extensions import generic_context
+
+class C[T]():
+    def f(self: Self):
+        def b(x: Self):
+            reveal_type(x)  # revealed: Self@f
+        reveal_type(generic_context(b))  # revealed: None
+
+reveal_type(generic_context(C.f))  # revealed: tuple[Self@f]
+```
+
+Even if the `Self` annotation appears first in the nested function, it is the method that binds
+`Self`.
+
+```py
+from typing import Self
+from ty_extensions import generic_context
+
+class C:
+    def f(self: "C"):
+        def b(x: Self):
+            reveal_type(x)  # revealed: Self@f
+        reveal_type(generic_context(b))  # revealed: None
+
+reveal_type(generic_context(C.f))  # revealed: None
 ```
 
 [self attribute]: https://typing.python.org/en/latest/spec/generics.html#use-in-attribute-annotations

@@ -69,6 +69,10 @@ impl<'db> ClassBase<'db> {
             .map_or(Self::unknown(), Self::Class)
     }
 
+    pub(super) const fn is_typed_dict(self) -> bool {
+        matches!(self, ClassBase::TypedDict)
+    }
+
     /// Attempt to resolve `ty` into a `ClassBase`.
     ///
     /// Return `None` if `ty` is not an acceptable type for a class base.
@@ -82,7 +86,7 @@ impl<'db> ClassBase<'db> {
             Type::ClassLiteral(literal) => Some(Self::Class(literal.default_specialization(db))),
             Type::GenericAlias(generic) => Some(Self::Class(ClassType::Generic(generic))),
             Type::NominalInstance(instance)
-                if instance.class(db).is_known(db, KnownClass::GenericAlias) =>
+                if instance.has_known_class(db, KnownClass::GenericAlias) =>
             {
                 Self::try_from_type(db, todo_type!("GenericAlias instance"), subclass)
             }
@@ -166,7 +170,8 @@ impl<'db> ClassBase<'db> {
                 KnownInstanceType::TypeAliasType(_)
                 | KnownInstanceType::TypeVar(_)
                 | KnownInstanceType::Deprecated(_)
-                | KnownInstanceType::Field(_) => None,
+                | KnownInstanceType::Field(_)
+                | KnownInstanceType::ConstraintSet(_) => None,
             },
 
             Type::SpecialForm(special_form) => match special_form {

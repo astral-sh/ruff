@@ -683,6 +683,30 @@ fn gitlab_diagnostics() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[test]
+fn github_diagnostics() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "test.py",
+        r#"
+        print(x)     # [unresolved-reference]
+        print(4[1])  # [non-subscriptable]
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(case.command().arg("--output-format=github").arg("--warn").arg("unresolved-reference"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    ::warning title=ty (unresolved-reference),file=test.py,line=2,col=7,endLine=2,endColumn=8::test.py:2:7: unresolved-reference: Name `x` used when not defined
+    ::error title=ty (non-subscriptable),file=test.py,line=3,col=7,endLine=3,endColumn=8::test.py:3:7: non-subscriptable: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    Ok(())
+}
+
 /// This tests the diagnostic format for revealed type.
 ///
 /// This test was introduced because changes were made to

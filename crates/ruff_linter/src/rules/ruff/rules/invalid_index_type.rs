@@ -89,7 +89,9 @@ pub(crate) fn invalid_index_type(checker: &Checker, expr: &ExprSubscript) {
 
     if index_type.is_literal() {
         // If the index is a literal, require an integer
-        if index_type != CheckableExprType::IntLiteral {
+        if index_type != CheckableExprType::IntLiteral
+            && index_type != CheckableExprType::BooleanLiteral
+        {
             checker.report_diagnostic(
                 InvalidIndexType {
                     value_type: value_type.to_string(),
@@ -111,7 +113,9 @@ pub(crate) fn invalid_index_type(checker: &Checker, expr: &ExprSubscript) {
                 // If the index is a slice, require integer or null bounds
                 if !matches!(
                     is_slice_type,
-                    CheckableExprType::IntLiteral | CheckableExprType::NoneLiteral
+                    CheckableExprType::IntLiteral
+                        | CheckableExprType::NoneLiteral
+                        | CheckableExprType::BooleanLiteral
                 ) {
                     checker.report_diagnostic(
                         InvalidIndexType {
@@ -154,6 +158,7 @@ pub(crate) fn invalid_index_type(checker: &Checker, expr: &ExprSubscript) {
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 enum CheckableExprType {
     FString,
+    TString,
     StringLiteral,
     BytesLiteral,
     IntLiteral,
@@ -170,12 +175,15 @@ enum CheckableExprType {
     Dict,
     Tuple,
     Slice,
+    Generator,
+    Lambda,
 }
 
 impl fmt::Display for CheckableExprType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::FString => f.write_str("str"),
+            Self::TString => f.write_str("Template"),
             Self::StringLiteral => f.write_str("str"),
             Self::BytesLiteral => f.write_str("bytes"),
             Self::IntLiteral => f.write_str("int"),
@@ -192,6 +200,8 @@ impl fmt::Display for CheckableExprType {
             Self::Slice => f.write_str("slice"),
             Self::Dict => f.write_str("dict"),
             Self::Tuple => f.write_str("tuple"),
+            Self::Generator => f.write_str("generator"),
+            Self::Lambda => f.write_str("lambda"),
         }
     }
 }
@@ -209,6 +219,7 @@ impl CheckableExprType {
             Expr::BooleanLiteral(_) => Some(Self::BooleanLiteral),
             Expr::NoneLiteral(_) => Some(Self::NoneLiteral),
             Expr::EllipsisLiteral(_) => Some(Self::EllipsisLiteral),
+            Expr::TString(_) => Some(Self::TString),
             Expr::FString(_) => Some(Self::FString),
             Expr::List(_) => Some(Self::List),
             Expr::ListComp(_) => Some(Self::ListComp),
@@ -218,6 +229,8 @@ impl CheckableExprType {
             Expr::Dict(_) => Some(Self::Dict),
             Expr::Tuple(_) => Some(Self::Tuple),
             Expr::Slice(_) => Some(Self::Slice),
+            Expr::Generator(_) => Some(Self::Generator),
+            Expr::Lambda(_) => Some(Self::Lambda),
             _ => None,
         }
     }

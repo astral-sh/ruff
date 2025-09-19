@@ -137,6 +137,18 @@ from ty_extensions import is_equivalent_to, static_assert
 static_assert(is_equivalent_to(Y, A | B | C | D))
 ```
 
+## In binary ops
+
+```py
+from typing import Literal
+
+type X = tuple[Literal[1], Literal[2]]
+
+def _(x: X, y: tuple[Literal[1], Literal[3]]):
+    reveal_type(x == y)  # revealed: Literal[False]
+    reveal_type(x < y)  # revealed: Literal[True]
+```
+
 ## `TypeAliasType` properties
 
 Two `TypeAliasType`s are distinct and disjoint, even if they refer to the same type
@@ -338,4 +350,13 @@ def f(x: A):
     reveal_type(x)  # revealed: list[A | str | None]
     for item in x:
         reveal_type(item)  # revealed: list[A | str | None] | str | None
+```
+
+### Tuple comparison
+
+```py
+type X = tuple[X, int]
+
+def _(x: X):
+    reveal_type(x is x)  # revealed: bool
 ```

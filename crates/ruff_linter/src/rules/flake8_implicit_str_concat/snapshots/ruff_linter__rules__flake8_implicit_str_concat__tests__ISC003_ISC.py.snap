@@ -337,3 +337,23 @@ help: Remove redundant '+' operator to implicitly concatenate
 187 | 		# leading comment
 188 |     "end"
 189 | )
+
+ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+   --> ISC.py:201:5
+    |
+199 |   # ISC003
+200 |   (
+201 | /     t"The quick brown fox jumps over the lazy "
+202 | |     + t"dog"
+    | |____________^
+203 |   )
+    |
+help: Remove redundant '+' operator to implicitly concatenate
+199 | # ISC003
+200 | (
+201 |     t"The quick brown fox jumps over the lazy "
+    -     + t"dog"
+202 +      t"dog"
+203 | )
+204 | 
+205 | # nested examples with both t and f-strings
