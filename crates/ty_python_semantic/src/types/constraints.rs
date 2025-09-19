@@ -611,7 +611,8 @@ impl<'db> Node<'db> {
             Node::AlwaysFalse => return String::from("never"),
             Node::Interior(_) => {}
         }
-        let clauses = self.satisfied_clauses(db);
+        let mut clauses = self.satisfied_clauses(db);
+        clauses.simplify();
         clauses.render(db)
     }
 }
@@ -771,9 +772,9 @@ impl<'db> SatisfiedClause<'db> {
         }
     }
 
-    fn remove_redundant_constraint(&mut self, redundant: SatisfiedConstraint<'db>) {
+    fn remove(&mut self, to_remove: SatisfiedConstraint<'db>) {
         self.constraints
-            .retain(|constraint| *constraint != redundant);
+            .retain(|constraint| *constraint != to_remove);
     }
 
     fn push(&mut self, constraint: SatisfiedConstraint<'db>) {
@@ -817,6 +818,23 @@ struct SatisfiedClauses<'db> {
 impl<'db> SatisfiedClauses<'db> {
     fn push(&mut self, clause: SatisfiedClause<'db>) {
         self.clauses.push(clause);
+    }
+
+    fn simplify(&mut self) {
+        let mut existing_clauses = std::mem::take(&mut self.clauses);
+        self.clauses.reserve_exact(existing_clauses.len());
+        while let Some((i, constraint)) = (existing_clauses.iter().enumerate())
+            .find_map(|(i, clause)| clause.to_singleton().map(|constraint| (i, constraint)))
+        {
+            let clause = existing_clauses.swap_remove(i);
+            self.clauses.push(clause);
+
+            let redundant_constraint = constraint.flip();
+            for other_clause in &mut existing_clauses {
+                other_clause.remove(redundant_constraint);
+            }
+        }
+        self.clauses.extend(existing_clauses);
     }
 
     fn render(&self, db: &'db dyn Db) -> String {
