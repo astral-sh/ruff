@@ -9,6 +9,7 @@ use lsp_server::ErrorCode;
 use lsp_types::{self as types, request as req};
 use std::fmt::Write;
 use std::str::FromStr;
+use ty_project::Db;
 
 pub(crate) struct ExecuteCommand;
 
@@ -38,14 +39,38 @@ impl SyncRequestHandler for ExecuteCommand {
 fn debug_information(session: &Session) -> crate::Result<String> {
     let mut buffer = String::new();
 
-    let db = session.project_dbs().next();
-    match db {
-        Some(db) => {
-            //salsa has different kind of mem reports, for debug we want the full one.
-            let db_str = db.salsa_memory_dump().display_full().to_string();
-            writeln!(buffer, "{db_str}")?;
-        }
-        None => writeln!(buffer, "No db found")?,
+    writeln!(
+        buffer,
+        "Client capabilities: {:#?}",
+        session.client_capabilities()
+    )?;
+    writeln!(
+        buffer,
+        "Position encoding: {:#?}",
+        session.position_encoding()
+    )?;
+    writeln!(buffer, "Global settings: {:#?}", session.global_settings())?;
+    writeln!(
+        buffer,
+        "Open text documents: {}",
+        session.text_document_keys().count()
+    )?;
+
+    for (root, workspace) in session.workspaces() {
+        writeln!(buffer, "Workspace {root} ({})", workspace.url())?;
+        writeln!(buffer, "  Settings:\n\n{:#?}", workspace.settings())?;
+        writeln!(buffer, "\n")?;
+    }
+
+    for db in session.project_dbs() {
+        writeln!(buffer, "\n")?;
+        writeln!(buffer, "Project at {}", db.project().root(db))?;
+        writeln!(buffer, "  Settings:\n{:#?}", db.project().settings(db))?;
+        writeln!(
+            buffer,
+            "  Memory report:\n{}",
+            db.salsa_memory_dump().display_full()
+        )?;
     }
     Ok(buffer)
 }
