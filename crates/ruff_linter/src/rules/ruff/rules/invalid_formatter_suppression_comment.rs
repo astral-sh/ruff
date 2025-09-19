@@ -189,10 +189,27 @@ impl<'src, 'loc> UselessSuppressionComments<'src, 'loc> {
                 }
             }
 
-            // Check if the comment is after a class definition (as a trailing comment)
-            if let Some(AnyNodeRef::StmtClassDef(_)) = comment.enclosing {
-                if comment.line_position.is_own_line() {
-                    return Err(IgnoredReason::AroundClassSignature);
+            // Check if the comment is directly after a class definition line (as a trailing comment)
+            if let Some(AnyNodeRef::StmtClassDef(StmtClassDef {
+                name,
+                decorator_list,
+                ..
+            })) = comment.enclosing
+            {
+                // Only flag if the comment is on the same line as the class definition
+                // or immediately after the class name/colon
+                if !comment.line_position.is_own_line() {
+                    // Check if it's a trailing comment on the class definition line
+                    let class_end = if let Some(last_decorator) = decorator_list.last() {
+                        last_decorator.end()
+                    } else {
+                        name.end()
+                    };
+
+                    // Only flag if the comment is very close to the class signature
+                    if comment.range.start() > class_end {
+                        return Err(IgnoredReason::AroundClassSignature);
+                    }
                 }
             }
         }

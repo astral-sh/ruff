@@ -122,3 +122,34 @@ class TestClassSignature3:
 class TestClassSignature4:
     pass
 # fmt: on
+
+# Test cases that should NOT be flagged (valid uses inside class body)
+class ValidClassWithFmtOff:
+    # fmt: off
+    TRANSFORMERS = {
+        "key1": (None, transformer1),
+        "key2": (None, transformer2),
+        "key3": (None, transformer3),
+    }
+    # fmt: on
+    
+    def method(self):
+        pass
+
+class AnotherValidClass:
+    def method(self):
+        pass
+    
+    # fmt: off
+    ANOTHER_DICT = {
+        "a": 1,
+        "b": 2,
+    }
+    # fmt: on
+
+# Test case for trailing comment on class definition line (should be flagged)
+class ClassWithTrailingComment:  # fmt: off
+    pass
+
+class AnotherClassWithTrailing:  # fmt: on
+    pass

@@ -314,3 +314,60 @@ help: Remove this comment
 121 | class TestClassSignature4:
 122 |     pass
 note: This is an unsafe fix and may change runtime behavior
+
+RUF028 [*] This suppression comment is invalid because it cannot be around a class signature
+   --> RUF028.py:124:1
+    |
+122 | class TestClassSignature4:
+123 |     pass
+124 | # fmt: on
+    | ^^^^^^^^^
+125 |
+126 | # Test cases that should NOT be flagged (valid uses inside class body)
+    |
+help: Remove this comment
+121 | 
+122 | class TestClassSignature4:
+123 |     pass
+    - # fmt: on
+124 | 
+125 | # Test cases that should NOT be flagged (valid uses inside class body)
+126 | class ValidClassWithFmtOff:
+note: This is an unsafe fix and may change runtime behavior
+
+RUF028 [*] This suppression comment is invalid because it cannot be around a class signature
+   --> RUF028.py:151:34
+    |
+150 | # Test case for trailing comment on class definition line (should be flagged)
+151 | class ClassWithTrailingComment:  # fmt: off
+    |                                  ^^^^^^^^^^
+152 |     pass
+    |
+help: Remove this comment
+148 |     # fmt: on
+149 | 
+150 | # Test case for trailing comment on class definition line (should be flagged)
+    - class ClassWithTrailingComment:  # fmt: off
+151 + class ClassWithTrailingComment:
+152 |     pass
+153 | 
+154 | class AnotherClassWithTrailing:  # fmt: on
+note: This is an unsafe fix and may change runtime behavior
+
+RUF028 [*] This suppression comment is invalid because it cannot be around a class signature
+   --> RUF028.py:154:34
+    |
+152 |     pass
+153 |
+154 | class AnotherClassWithTrailing:  # fmt: on
+    |                                  ^^^^^^^^^
+155 |     pass
+    |
+help: Remove this comment
+151 | class ClassWithTrailingComment:  # fmt: off
+152 |     pass
+153 | 
+    - class AnotherClassWithTrailing:  # fmt: on
+154 + class AnotherClassWithTrailing:
+155 |     pass
+note: This is an unsafe fix and may change runtime behavior
