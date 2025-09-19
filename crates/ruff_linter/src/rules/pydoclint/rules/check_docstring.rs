@@ -4,7 +4,6 @@ use ruff_python_ast::helpers::{map_callable, map_subscript};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, Stmt, visitor};
-use ruff_python_semantic::analyze::visibility::is_staticmethod;
 use ruff_python_semantic::analyze::{function_type, visibility};
 use ruff_python_semantic::{Definition, SemanticModel};
 use ruff_source_file::NewlineWithTrailingNewline;
@@ -1098,7 +1097,7 @@ fn parameters_from_signature<'a>(docstring: &'a Docstring) -> Vec<&'a str> {
     let Some(function) = docstring.definition.as_function_def() else {
         return parameters;
     };
-    for param in function.parameters.iter() {
+    for param in &function.parameters {
         parameters.push(param.name());
     }
     parameters
