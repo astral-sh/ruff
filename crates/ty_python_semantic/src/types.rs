@@ -1632,6 +1632,31 @@ impl<'db> Type<'db> {
             // be specialized to `Never`.)
             (_, Type::NonInferableTypeVar(_)) => ConstraintSet::from(false),
 
+            (Type::TypeVar(_), _) if relation.is_assignability() => {
+                // The implicit lower bound of a typevar is `Never`, which means
+                // that it is always assignable to any other type.
+
+                // TODO: record the unification constraints
+
+                ConstraintSet::from(true)
+            }
+
+            (_, Type::TypeVar(typevar))
+                if relation.is_assignability()
+                    && typevar.typevar(db).upper_bound(db).is_none_or(|bound| {
+                        !self
+                            .has_relation_to_impl(db, bound, relation, visitor)
+                            .is_never_satisfied()
+                    }) =>
+            {
+                // TODO: record the unification constraints
+
+                typevar
+                    .typevar(db)
+                    .upper_bound(db)
+                    .when_none_or(|bound| self.has_relation_to_impl(db, bound, relation, visitor))
+            }
+
             // TODO: Infer specializations here
             (Type::TypeVar(_), _) | (_, Type::TypeVar(_)) => ConstraintSet::from(false),
 
@@ -5662,13 +5687,25 @@ impl<'db> Type<'db> {
                             ],
                         });
                     };
-                    let instance = Type::instance(db, class.unknown_specialization(db));
+
+                    let upper_bound = Type::instance(
+                        db,
+                        class.apply_specialization(db, |generic_context| {
+                            let types = generic_context
+                                .variables(db)
+                                .iter()
+                                .map(|typevar| Type::NonInferableTypeVar(*typevar));
+
+                            generic_context.specialize(db, types.collect())
+                        }),
+                    );
+
                     let class_definition = class.definition(db);
                     let typevar = TypeVarInstance::new(
                         db,
                         ast::name::Name::new_static("Self"),
                         Some(class_definition),
-                        Some(TypeVarBoundOrConstraints::UpperBound(instance).into()),
+                        Some(TypeVarBoundOrConstraints::UpperBound(upper_bound).into()),
                         // According to the [spec], we can consider `Self`
                         // equivalent to an invariant type variable
                         // [spec]: https://typing.python.org/en/latest/spec/generics.html#self
@@ -6010,8 +6047,8 @@ impl<'db> Type<'db> {
                     partial.get(db, bound_typevar).unwrap_or(self)
                 }
                 TypeMapping::MarkTypeVarsInferable(binding_context) => {
-                    if bound_typevar.binding_context(db) == *binding_context {
-                        Type::TypeVar(bound_typevar)
+                    if binding_context.is_none_or(|context| context == bound_typevar.binding_context(db)) {
+                        Type::TypeVar(bound_typevar.mark_typevars_inferable(db, visitor))
                     } else {
                         self
                     }
@@ -6695,8 +6732,9 @@ pub enum TypeMapping<'a, 'db> {
     BindSelf(Type<'db>),
     /// Replaces occurrences of `typing.Self` with a new `Self` type variable with the given upper bound.
     ReplaceSelf { new_upper_bound: Type<'db> },
-    /// Marks the typevars that are bound by a generic class or function as inferable.
-    MarkTypeVarsInferable(BindingContext<'db>),
+    /// Marks the typevars that are bound by a generic class or function as inferable. If the parameter
+    /// is `None`, *all* typevars are marked as inferable.
+    MarkTypeVarsInferable(Option<BindingContext<'db>>),
     /// Create the top or bottom materialization of a type.
     Materialize(MaterializationKind),
 }
@@ -7637,6 +7675,40 @@ impl<'db> TypeVarInstance<'db> {
         )
     }
 
+    fn mark_typevars_inferable(
+        self,
+        db: &'db dyn Db,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        let type_mapping = &TypeMapping::MarkTypeVarsInferable(None);
+
+        Self::new(
+            db,
+            self.name(db),
+            self.definition(db),
+            self._bound_or_constraints(db)
+                .map(|bound_or_constraints| match bound_or_constraints {
+                    TypeVarBoundOrConstraintsEvaluation::Eager(bound_or_constraints) => {
+                        bound_or_constraints
+                            .mark_typevars_inferable(db, visitor)
+                            .into()
+                    }
+                    TypeVarBoundOrConstraintsEvaluation::LazyUpperBound
+                    | TypeVarBoundOrConstraintsEvaluation::LazyConstraints => bound_or_constraints,
+                }),
+            self.explicit_variance(db),
+            self._default(db).and_then(|default| match default {
+                TypeVarDefaultEvaluation::Eager(ty) => {
+                    Some(ty.apply_type_mapping_impl(db, type_mapping, visitor).into())
+                }
+                TypeVarDefaultEvaluation::Lazy => self
+                    .lazy_default(db)
+                    .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, visitor).into()),
+            }),
+            self.kind(db),
+        )
+    }
+
     fn to_instance(self, db: &'db dyn Db) -> Option<Self> {
         let bound_or_constraints = match self.bound_or_constraints(db)? {
             TypeVarBoundOrConstraints::UpperBound(upper_bound) => {
@@ -7867,6 +7939,18 @@ impl<'db> BoundTypeVarInstance<'db> {
         )
     }
 
+    fn mark_typevars_inferable(
+        self,
+        db: &'db dyn Db,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        Self::new(
+            db,
+            self.typevar(db).mark_typevars_inferable(db, visitor),
+            self.binding_context(db),
+        )
+    }
+
     fn to_instance(self, db: &'db dyn Db) -> Option<Self> {
         Some(Self::new(
             db,
@@ -7966,6 +8050,31 @@ impl<'db> TypeVarBoundOrConstraints<'db> {
                         .elements(db)
                         .iter()
                         .map(|ty| ty.materialize(db, materialization_kind, visitor))
+                        .collect::<Vec<_>>()
+                        .into_boxed_slice(),
+                ))
+            }
+        }
+    }
+
+    fn mark_typevars_inferable<'a>(
+        self,
+        db: &'db dyn Db,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        let type_mapping = &TypeMapping::MarkTypeVarsInferable(None);
+
+        match self {
+            TypeVarBoundOrConstraints::UpperBound(bound) => TypeVarBoundOrConstraints::UpperBound(
+                bound.apply_type_mapping_impl(db, type_mapping, visitor),
+            ),
+            TypeVarBoundOrConstraints::Constraints(constraints) => {
+                TypeVarBoundOrConstraints::Constraints(UnionType::new(
+                    db,
+                    constraints
+                        .elements(db)
+                        .iter()
+                        .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, visitor))
                         .collect::<Vec<_>>()
                         .into_boxed_slice(),
                 ))

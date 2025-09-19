@@ -491,6 +491,18 @@ fn is_subtype_in_invariant_position<'db>(
     let base_bottom = base_type.bottom_materialization(db);
 
     let is_subtype_of = |derived: Type<'db>, base: Type<'db>| {
+        // TODO:
+        // This should be removed and properly handled in the respective
+        // `(Type::TypeVar(_), _) | (_, Type::TypeVar(_))` branch of
+        // `Type::has_relation_to_impl`. Right now, we can not generally
+        // return `ConstraintSet::from(true)` from that branch, as that
+        // leads to union simplification, which means that we lose track
+        // of type variables without recording the constraints under which
+        // the relation holds.
+        if matches!(base, Type::TypeVar(_)) || matches!(derived, Type::TypeVar(_)) {
+            return ConstraintSet::from(true);
+        }
+
         derived.has_relation_to_impl(db, base, TypeRelation::Subtyping, visitor)
     };
     match (derived_materialization, base_materialization) {
