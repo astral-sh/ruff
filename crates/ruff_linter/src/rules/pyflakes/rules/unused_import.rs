@@ -848,10 +848,10 @@ fn rank_matches(binding: &Binding, prototype: &QualifiedName) -> (usize, std::cm
 }
 
 fn best_match<'b, 'c>(
-    unused: &Vec<&'b Binding<'c>>,
+    bindings: &Vec<&'b Binding<'c>>,
     prototype: &QualifiedName,
 ) -> Option<&'b Binding<'c>> {
-    unused
+    bindings
         .iter()
         .copied()
         .max_by_key(|binding| rank_matches(binding, prototype))
