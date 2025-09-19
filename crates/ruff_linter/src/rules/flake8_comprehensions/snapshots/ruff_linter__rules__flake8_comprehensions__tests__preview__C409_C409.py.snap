@@ -344,3 +344,36 @@ help: Rewrite as a generator
 42 |         x for x in [1,2,3]
 43 |     }
 note: This is an unsafe fix and may change runtime behavior
+
+C409 [*] Unnecessary list literal passed to `tuple()` (rewrite as a tuple literal)
+  --> C409.py:46:6
+   |
+44 | )
+45 |
+46 | t9 = tuple([1],)
+   |      ^^^^^^^^^^^
+47 | t10 = tuple([1, 2],)
+   |
+help: Rewrite as a tuple literal
+43 |     }
+44 | )
+45 | 
+   - t9 = tuple([1],)
+46 + t9 = (1,)
+47 | t10 = tuple([1, 2],)
+note: This is an unsafe fix and may change runtime behavior
+
+C409 [*] Unnecessary list literal passed to `tuple()` (rewrite as a tuple literal)
+  --> C409.py:47:7
+   |
+46 | t9 = tuple([1],)
+47 | t10 = tuple([1, 2],)
+   |       ^^^^^^^^^^^^^^
+   |
+help: Rewrite as a tuple literal
+44 | )
+45 | 
+46 | t9 = tuple([1],)
+   - t10 = tuple([1, 2],)
+47 + t10 = (1, 2)
+note: This is an unsafe fix and may change runtime behavior
