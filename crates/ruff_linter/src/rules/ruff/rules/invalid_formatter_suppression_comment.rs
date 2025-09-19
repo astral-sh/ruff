@@ -167,7 +167,7 @@ impl<'src, 'loc> UselessSuppressionComments<'src, 'loc> {
 
         // Check if fmt: off/on comments are around class signatures
         if comment.kind == SuppressionKind::Off || comment.kind == SuppressionKind::On {
-            // Check if the comment is directly before a class definition (enclosing is None, following is class)
+            // Check if the comment is before a class definition (enclosing is None, following is class)
             if comment.enclosing.is_none() {
                 if let Some(AnyNodeRef::StmtClassDef(StmtClassDef {
                     name: _,
@@ -177,18 +177,14 @@ impl<'src, 'loc> UselessSuppressionComments<'src, 'loc> {
                 {
                     // The comment is before a class definition
                     if comment.line_position.is_own_line() {
-                        // Only flag if this comment is not preceded by another statement
-                        // i.e., only flag if the comment is directly before the class signature
-                        if comment.preceding.is_none() {
-                            // Check if the comment is after any decorators
-                            if let Some(last_decorator) = decorator_list.last() {
-                                if comment.range.start() > last_decorator.end() {
-                                    return Err(IgnoredReason::AroundClassSignature);
-                                }
+                        // Check if the comment is after any decorators
+                        if let Some(last_decorator) = decorator_list.last() {
+                            if comment.range.start() > last_decorator.end() {
+                                return Err(IgnoredReason::AroundClassSignature);
                             }
-                            // No decorators, so any comment before the class is invalid
-                            return Err(IgnoredReason::AroundClassSignature);
                         }
+                        // No decorators, so any comment before the class is invalid
+                        return Err(IgnoredReason::AroundClassSignature);
                     }
                 }
             }
