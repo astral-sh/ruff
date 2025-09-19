@@ -625,8 +625,8 @@ fn parse_parameters_google(content: &str, content_start: TextSize) -> Vec<Parame
                     entries.push(ParameterEntry {
                         name: param_name,
                         range: TextRange::new(
-                            content_start + TextSize::new(param_start as u32),
-                            content_start + TextSize::new(param_end as u32),
+                            content_start + TextSize::try_from(param_start).unwrap(),
+                            content_start + TextSize::try_from(param_end).unwrap(),
                         ),
                     });
                 }
