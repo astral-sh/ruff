@@ -1060,6 +1060,17 @@ def _(kwargs1: dict[SubStr, int], kwargs2: dict[SubInt, int]) -> None:
     f(**kwargs2)
 ```
 
+Or, it can be a type that is assignable to `str`.
+
+```py
+from typing import Any
+from ty_extensions import Unknown
+
+def _(kwargs1: dict[Any, int], kwargs2: dict[Unknown, int]) -> None:
+    f(**kwargs1)
+    f(**kwargs2)
+```
+
 ### Invalid value type
 
 ```py
@@ -1098,7 +1109,7 @@ def _(kwargs: Unknown):
     f(**kwargs)
 ```
 
-### Key is not a mapping
+### Not a mapping
 
 ```py
 def f(**kwargs: int) -> None: ...
