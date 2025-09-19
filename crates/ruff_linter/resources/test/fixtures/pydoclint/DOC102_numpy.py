@@ -153,7 +153,7 @@ def concatenate_strings(*args):
     str
         A single concatenated string.
     """
-    return separator.join(args)
+    ...
 
 
 # DOC102
@@ -308,3 +308,35 @@ def add_numbers(b):
         The sum of the two numbers.
     """
     return a + b
+
+# OK
+class Foo:
+    async def send_help(self, *args: Any) -> Any:
+        """|coro|
+
+        Shows the help command for the specified entity if given.
+        The entity can be a command or a cog.
+
+        If no entity is given, then it'll show help for the
+        entire bot.
+
+        If the entity is a string, then it looks up whether it's a
+        :class:`Cog` or a :class:`Command`.
+
+        .. note::
+
+            Due to the way this function works, instead of returning
+            something similar to :meth:`~.commands.HelpCommand.command_not_found`
+            this returns :class:`None` on bad input or no help command.
+
+        Parameters
+        ----------
+        entity: Optional[Union[:class:`Command`, :class:`Cog`, :class:`str`]]
+            The entity to show help for.
+
+        Returns
+        -------
+        Any
+            The result of the help command, if any.
+        """
+        ...

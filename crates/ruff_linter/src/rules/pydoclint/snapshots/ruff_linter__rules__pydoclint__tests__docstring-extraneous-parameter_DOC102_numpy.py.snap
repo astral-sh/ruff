@@ -108,21 +108,6 @@ DOC102 These documented parameters are not in the function's signature: `to_addr
     |
 help: Remove the extraneous parameters from the docstring
 
-DOC102 Documented parameter `separator` is not in the function's signature
-   --> DOC102_numpy.py:144:5
-    |
-142 |     Concatenates multiple strings with a specified separator.
-143 |
-144 |     Parameters
-    |     ^^^^^^^^^^
-145 |     ----------
-146 |     separator : str
-    |     ---------- `separator` is not in the signature
-147 |         The separator to use between strings.
-148 |     *args : str
-    |
-help: Remove the extraneous parameter from the docstring
-
 DOC102 These documented parameters are not in the function's signature: `items`, `details`
    --> DOC102_numpy.py:164:5
     |

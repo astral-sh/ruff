@@ -91,19 +91,6 @@ DOC102 These documented parameters are not in the function's signature: `to_addr
    |
 help: Remove the extraneous parameters from the docstring
 
-DOC102 Documented parameter `separator` is not in the function's signature
-   --> DOC102_google.py:109:5
-    |
-107 |     Concatenates multiple strings with a specified separator.
-108 |
-109 |     Args:
-    |     ^^^^
-110 |         separator (str): The separator to use between strings.
-    |         --------- `separator` is not in the signature
-111 |         *args (str): Variable length argument list of strings to concatenate.
-    |
-help: Remove the extraneous parameter from the docstring
-
 DOC102 These documented parameters are not in the function's signature: `items`, `details`
    --> DOC102_google.py:124:5
     |
