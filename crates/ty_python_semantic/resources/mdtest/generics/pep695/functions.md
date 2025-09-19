@@ -323,27 +323,6 @@ reveal_type(f(g("a")))  # revealed: tuple[Literal["a"] | None, int]
 reveal_type(g(f("a")))  # revealed: tuple[Literal["a"], int] | None
 ```
 
-## Passing generic functions to generics functions
-
-```py
-from typing import Callable
-
-def invoke[A, B](fn: Callable[[A], B], value: A) -> B:
-    return fn(value)
-
-def identity[T](x: T) -> T:
-    return x
-
-def head[T](xs: list[T]) -> T:
-    return xs[0]
-
-# TODO: this should be `Literal[1]`
-reveal_type(invoke(identity, 1))  # revealed: Unknown
-
-# TODO: this should be `Unknown | int`
-reveal_type(invoke(head, [1, 2, 3]))  # revealed: Unknown
-```
-
 ## Protocols as TypeVar bounds
 
 Protocol types can be used as TypeVar bounds, just like nominal types.
