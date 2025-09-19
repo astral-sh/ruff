@@ -650,6 +650,8 @@ fn unused_imports_in_scope<'a, 'b>(
         .filter(|(_, bdg)| !bdg.is_global() && !bdg.is_nonlocal() && !bdg.is_explicit_export())
         .flat_map(|(id, bdg)| {
             if is_refined_submodule_import_match_enabled(settings)
+                // No need to apply refined logic if there is only a single binding
+                && scope.shadowed_bindings(id).nth(1).is_some()
                 // Only apply the new logic when all shadowed bindings
                 // are un-aliased imports and submodule imports to avoid
                 // complexity, false positives, and intersection with
