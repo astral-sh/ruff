@@ -321,8 +321,10 @@ a covariant generic, this is equivalent to using the upper bound of the type par
 `object`):
 
 ```py
+from typing import Self
+
 class Covariant[T]:
-    def get(self) -> T:
+    def get(self: Self) -> T:
         raise NotImplementedError
 
 def _(x: object):
@@ -335,11 +337,12 @@ Similarly, contravariant type parameters use their lower bound of `Never`:
 
 ```py
 class Contravariant[T]:
-    def push(self, x: T) -> None: ...
+    def push(self: Self, x: T) -> None: ...
 
 def _(x: object):
     if isinstance(x, Contravariant):
         reveal_type(x)  # revealed: Contravariant[Never]
+        # error: [invalid-argument-type] "Argument to bound method `push` is incorrect: Argument type `Contravariant[Never]` does not satisfy upper bound `Contravariant[T@Contravariant]` of type variable `Self`"
         # error: [invalid-argument-type] "Argument to bound method `push` is incorrect: Expected `Never`, found `Literal[42]`"
         x.push(42)
 ```
@@ -350,8 +353,8 @@ the type system, so we represent it with the internal `Top[]` special form.
 
 ```py
 class Invariant[T]:
-    def push(self, x: T) -> None: ...
-    def get(self) -> T:
+    def push(self: Self, x: T) -> None: ...
+    def get(self: Self) -> T:
         raise NotImplementedError
 
 def _(x: object):

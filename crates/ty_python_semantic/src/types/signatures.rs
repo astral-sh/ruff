@@ -367,7 +367,9 @@ impl<'db> Signature<'db> {
             let plain_return_ty = definition_expression_type(db, definition, returns.as_ref())
                 .apply_type_mapping(
                     db,
-                    &TypeMapping::MarkTypeVarsInferable(BindingContext::Definition(definition)),
+                    &TypeMapping::MarkTypeVarsInferable(Some(BindingContext::Definition(
+                        definition,
+                    ))),
                 );
             if function_node.is_async && !is_generator {
                 KnownClass::CoroutineType
@@ -1549,7 +1551,9 @@ impl<'db> Parameter<'db> {
             annotated_type: parameter.annotation().map(|annotation| {
                 definition_expression_type(db, definition, annotation).apply_type_mapping(
                     db,
-                    &TypeMapping::MarkTypeVarsInferable(BindingContext::Definition(definition)),
+                    &TypeMapping::MarkTypeVarsInferable(Some(BindingContext::Definition(
+                        definition,
+                    ))),
                 )
             }),
             kind,
