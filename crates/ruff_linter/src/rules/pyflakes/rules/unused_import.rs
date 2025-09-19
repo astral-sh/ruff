@@ -727,7 +727,7 @@ fn unused_imports_from_binding<'a, 'b>(
         if !marked_dunder_all && resolved_reference.in_dunder_all_definition() {
             let first = binding
                 .as_any_import()
-                .expect("Binding to be an import binding")
+                .expect("binding to be import binding since current function called after restricting to these in `unused_imports_in_scope`")
                 .qualified_name()
                 .segments()[0];
             mark_uses_of_qualified_name(&mut marked, &QualifiedName::user_defined(first));
