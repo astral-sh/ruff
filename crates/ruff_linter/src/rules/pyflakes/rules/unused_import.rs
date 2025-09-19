@@ -853,6 +853,6 @@ fn best_match<'b, 'c>(
 ) -> Option<&'b Binding<'c>> {
     unused
         .iter()
+        .copied()
         .max_by_key(|binding| rank_matches(binding, prototype))
-        .map(|v| &**v)
 }
