@@ -500,6 +500,35 @@ OTHER = "OTHER"
     Ok(())
 }
 
+/// Regression test for <https://github.com/astral-sh/ruff/issues/20035>
+#[test]
+fn deduplicate_directory_and_explicit_file() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let root = tempdir.path();
+
+    let main = root.join("main.py");
+    fs::write(&main, "x   = 1\n")?;
+
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .current_dir(root)
+            .args(["format", "--no-cache", "--check"])
+            .arg(".")
+            .arg("main.py"),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    Would reformat: main.py
+    1 file would be reformatted
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
 #[test]
 fn syntax_error() -> Result<()> {
     let tempdir = TempDir::new()?;
