@@ -1731,7 +1731,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let mut call_arguments =
                 CallArguments::from_arguments(self.db(), arguments, |argument, splatted_value| {
                     let ty = self.infer_expression(splatted_value, TypeContext::default());
-                    self.store_expression_type(argument, ty);
+                    if let Some(argument) = argument {
+                        self.store_expression_type(argument, ty);
+                    }
                     ty
                 });
             let argument_forms = vec![Some(ParameterForm::Value); call_arguments.len()];
@@ -4944,7 +4946,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         for (((_, argument_type), form), arg_or_keyword) in iter {
             let argument = match arg_or_keyword {
                 // We already inferred the type of splatted arguments.
-                ast::ArgOrKeyword::Arg(ast::Expr::Starred(_)) => continue,
+                ast::ArgOrKeyword::Arg(ast::Expr::Starred(_))
+                | ast::ArgOrKeyword::Keyword(ast::Keyword { arg: None, .. }) => continue,
                 ast::ArgOrKeyword::Arg(arg) => arg,
                 ast::ArgOrKeyword::Keyword(ast::Keyword { value, .. }) => value,
             };
@@ -5787,7 +5790,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut call_arguments =
             CallArguments::from_arguments(self.db(), arguments, |argument, splatted_value| {
                 let ty = self.infer_expression(splatted_value, TypeContext::default());
-                self.store_expression_type(argument, ty);
+                if let Some(argument) = argument {
+                    self.store_expression_type(argument, ty);
+                }
                 ty
             });
 
