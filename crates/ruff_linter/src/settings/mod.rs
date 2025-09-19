@@ -475,11 +475,6 @@ impl LinterSettings {
             .is_match(path)
             .map_or(self.unresolved_target_version, TargetVersion::from)
     }
-
-    pub fn future_annotations(&self) -> bool {
-        // TODO(brent) we can just access the field directly once this is stabilized.
-        self.future_annotations && crate::preview::is_add_future_annotations_imports_enabled(self)
-    }
 }
 
 impl Default for LinterSettings {

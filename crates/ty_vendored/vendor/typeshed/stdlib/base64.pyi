@@ -93,10 +93,13 @@ def urlsafe_b64decode(s: str | ReadableBuffer) -> bytes:
     """
 
 def b32encode(s: ReadableBuffer) -> bytes:
-    """Encode the bytes-like objects using base32 and return a bytes object."""
+    """
+    Encode the bytes-like objects using base32 and return a bytes object.
+    """
 
 def b32decode(s: str | ReadableBuffer, casefold: bool = False, map01: str | ReadableBuffer | None = None) -> bytes:
-    """Decode the base32 encoded bytes-like object or ASCII string s.
+    """
+    Decode the base32 encoded bytes-like object or ASCII string s.
 
     Optional casefold is a flag specifying whether a lowercase alphabet is
     acceptable as input.  For security purposes, the default is False.
@@ -130,10 +133,13 @@ def b16decode(s: str | ReadableBuffer, casefold: bool = False) -> bytes:
 
 if sys.version_info >= (3, 10):
     def b32hexencode(s: ReadableBuffer) -> bytes:
-        """Encode the bytes-like objects using base32hex and return a bytes object."""
+        """
+        Encode the bytes-like objects using base32hex and return a bytes object.
+        """
 
     def b32hexdecode(s: str | ReadableBuffer, casefold: bool = False) -> bytes:
-        """Decode the base32hex encoded bytes-like object or ASCII string s.
+        """
+        Decode the base32hex encoded bytes-like object or ASCII string s.
 
         Optional casefold is a flag specifying whether a lowercase alphabet is
         acceptable as input.  For security purposes, the default is False.

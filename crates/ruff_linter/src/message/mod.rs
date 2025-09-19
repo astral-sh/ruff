@@ -1,7 +1,5 @@
-use std::collections::BTreeMap;
 use std::fmt::Display;
 use std::io::Write;
-use std::ops::Deref;
 
 use rustc_hash::FxHashMap;
 
@@ -11,11 +9,9 @@ use ruff_db::diagnostic::{
 };
 use ruff_db::files::File;
 
-pub use github::GithubEmitter;
-pub use gitlab::GitlabEmitter;
 pub use grouped::GroupedEmitter;
 use ruff_notebook::NotebookIndex;
-use ruff_source_file::{LineColumn, SourceFile};
+use ruff_source_file::SourceFile;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 pub use sarif::SarifEmitter;
 pub use text::TextEmitter;
@@ -23,9 +19,6 @@ pub use text::TextEmitter;
 use crate::Fix;
 use crate::registry::Rule;
 
-mod diff;
-mod github;
-mod gitlab;
 mod grouped;
 mod sarif;
 mod text;
@@ -33,8 +26,7 @@ mod text;
 /// Creates a `Diagnostic` from a syntax error, with the format expected by Ruff.
 ///
 /// This is almost identical to `ruff_db::diagnostic::create_syntax_error_diagnostic`, except the
-/// `message` is stored as the primary diagnostic message instead of on the primary annotation, and
-/// `SyntaxError: ` is prepended to the message.
+/// `message` is stored as the primary diagnostic message instead of on the primary annotation.
 ///
 /// TODO(brent) These should be unified at some point, but we keep them separate for now to avoid a
 /// ton of snapshot changes while combining ruff's diagnostic type with `Diagnostic`.
@@ -43,11 +35,7 @@ pub fn create_syntax_error_diagnostic(
     message: impl std::fmt::Display,
     range: impl Ranged,
 ) -> Diagnostic {
-    let mut diag = Diagnostic::new(
-        DiagnosticId::InvalidSyntax,
-        Severity::Error,
-        format_args!("SyntaxError: {message}"),
-    );
+    let mut diag = Diagnostic::new(DiagnosticId::InvalidSyntax, Severity::Error, message);
     let span = span.into().with_range(range.range());
     diag.annotate(Annotation::primary(span));
     diag
@@ -75,7 +63,15 @@ where
     );
 
     let span = Span::from(file).with_range(range);
-    let annotation = Annotation::primary(span);
+    let mut annotation = Annotation::primary(span);
+    // The `0..0` range is used to highlight file-level diagnostics.
+    //
+    // TODO(brent) We should instead set this flag on annotations for individual lint rules that
+    // actually need it, but we need to be able to cache the new diagnostic model first. See
+    // https://github.com/astral-sh/ruff/issues/19688.
+    if range == TextRange::default() {
+        annotation.set_file_level(true);
+    }
     diagnostic.annotate(annotation);
 
     if let Some(suggestion) = suggestion {
@@ -129,35 +125,6 @@ impl FileResolver for EmitterContext<'_> {
     fn current_directory(&self) -> &std::path::Path {
         crate::fs::get_cwd()
     }
-}
-
-struct MessageWithLocation<'a> {
-    message: &'a Diagnostic,
-    start_location: LineColumn,
-}
-
-impl Deref for MessageWithLocation<'_> {
-    type Target = Diagnostic;
-
-    fn deref(&self) -> &Self::Target {
-        self.message
-    }
-}
-
-fn group_diagnostics_by_filename(
-    diagnostics: &[Diagnostic],
-) -> BTreeMap<String, Vec<MessageWithLocation>> {
-    let mut grouped_messages = BTreeMap::default();
-    for diagnostic in diagnostics {
-        grouped_messages
-            .entry(diagnostic.expect_ruff_filename())
-            .or_insert_with(Vec::new)
-            .push(MessageWithLocation {
-                message: diagnostic,
-                start_location: diagnostic.expect_ruff_start_location(),
-            });
-    }
-    grouped_messages
 }
 
 /// Display format for [`Diagnostic`]s.

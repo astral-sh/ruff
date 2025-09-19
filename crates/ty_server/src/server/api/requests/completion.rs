@@ -2,13 +2,17 @@ use std::borrow::Cow;
 use std::time::Instant;
 
 use lsp_types::request::Completion;
-use lsp_types::{CompletionItem, CompletionItemKind, CompletionParams, CompletionResponse, Url};
+use lsp_types::{
+    CompletionItem, CompletionItemKind, CompletionItemLabelDetails, CompletionParams,
+    CompletionResponse, Documentation, TextEdit, Url,
+};
 use ruff_db::source::{line_index, source_text};
-use ty_ide::completion;
+use ruff_source_file::OneIndexed;
+use ruff_text_size::Ranged;
+use ty_ide::{CompletionKind, CompletionSettings, completion};
 use ty_project::ProjectDatabase;
-use ty_python_semantic::CompletionKind;
 
-use crate::document::PositionExt;
+use crate::document::{PositionExt, ToRangeExt};
 use crate::server::api::traits::{
     BackgroundDocumentRequestHandler, RequestHandler, RetriableRequestHandler,
 };
@@ -22,19 +26,22 @@ impl RequestHandler for CompletionRequestHandler {
 }
 
 impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
-    fn document_url(params: &CompletionParams) -> Cow<Url> {
+    fn document_url(params: &CompletionParams) -> Cow<'_, Url> {
         Cow::Borrowed(&params.text_document_position.text_document.uri)
     }
 
     fn run_with_snapshot(
         db: &ProjectDatabase,
-        snapshot: DocumentSnapshot,
+        snapshot: &DocumentSnapshot,
         _client: &Client,
         params: CompletionParams,
     ) -> crate::server::Result<Option<CompletionResponse>> {
         let start = Instant::now();
 
-        if snapshot.client_settings().is_language_services_disabled() {
+        if snapshot
+            .workspace_settings()
+            .is_language_services_disabled()
+        {
             return Ok(None);
         }
 
@@ -49,21 +56,45 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
             &line_index,
             snapshot.encoding(),
         );
-        let completions = completion(db, file, offset);
+        let settings = CompletionSettings {
+            auto_import: snapshot.global_settings().is_auto_import_enabled(),
+        };
+        let completions = completion(db, &settings, file, offset);
         if completions.is_empty() {
             return Ok(None);
         }
 
-        let max_index_len = completions.len().saturating_sub(1).to_string().len();
+        // Safety: we just checked that completions is not empty.
+        let max_index_len = OneIndexed::new(completions.len()).unwrap().digits().get();
         let items: Vec<CompletionItem> = completions
             .into_iter()
             .enumerate()
             .map(|(i, comp)| {
                 let kind = comp.kind(db).map(ty_kind_to_lsp_kind);
+                let type_display = comp.ty.map(|ty| ty.display(db).to_string());
+                let import_edit = comp.import.as_ref().map(|edit| {
+                    let range =
+                        edit.range()
+                            .to_lsp_range(&source, &line_index, snapshot.encoding());
+                    TextEdit {
+                        range,
+                        new_text: edit.content().map(ToString::to_string).unwrap_or_default(),
+                    }
+                });
                 CompletionItem {
                     label: comp.name.into(),
                     kind,
                     sort_text: Some(format!("{i:-max_index_len$}")),
+                    detail: type_display.clone(),
+                    label_details: Some(CompletionItemLabelDetails {
+                        detail: comp.module_name.map(|name| format!(" (import {name})")),
+                        description: type_display,
+                    }),
+                    insert_text: comp.insert.map(String::from),
+                    additional_text_edits: import_edit.map(|edit| vec![edit]),
+                    documentation: comp
+                        .documentation
+                        .map(|docstring| Documentation::String(docstring.render_plaintext())),
                     ..Default::default()
                 }
             })

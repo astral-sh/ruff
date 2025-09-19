@@ -124,6 +124,7 @@ compileall: 3.0-
 compression: 3.14-
 concurrent: 3.2-
 concurrent.futures.interpreter: 3.14-
+concurrent.interpreters: 3.14-
 configparser: 3.0-
 contextlib: 3.0-
 contextvars: 3.7-

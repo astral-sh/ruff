@@ -6,7 +6,10 @@ use ruff_source_file::{LineColumn, SourceCode, SourceFile};
 use ruff_annotate_snippets::Level as AnnotateLevel;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-pub use self::render::{DisplayDiagnostic, DisplayDiagnostics, FileResolver, Input};
+pub use self::render::{
+    DisplayDiagnostic, DisplayDiagnostics, FileResolver, Input, ceil_char_boundary,
+    github::{DisplayGithubDiagnostics, GithubRenderer},
+};
 use crate::{Db, files::File};
 
 mod render;
@@ -19,7 +22,7 @@ mod stylesheet;
 /// characteristics in the inputs given to the tool. Typically, but not always,
 /// a characteristic is a deficiency. An example of a characteristic that is
 /// _not_ a deficiency is the `reveal_type` diagnostic for our type checker.
-#[derive(Debug, Clone, Eq, PartialEq, get_size2::GetSize)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, get_size2::GetSize)]
 pub struct Diagnostic {
     /// The actual diagnostic.
     ///
@@ -210,7 +213,7 @@ impl Diagnostic {
     /// The type returned implements the `std::fmt::Display` trait. In most
     /// cases, just converting it to a string (or printing it) will do what
     /// you want.
-    pub fn concise_message(&self) -> ConciseMessage {
+    pub fn concise_message(&self) -> ConciseMessage<'_> {
         let main = self.inner.message.as_str();
         let annotation = self
             .primary_annotation()
@@ -250,6 +253,11 @@ impl Diagnostic {
             .annotations
             .iter_mut()
             .find(|ann| ann.is_primary)
+    }
+
+    /// Returns a mutable borrow of all annotations of this diagnostic.
+    pub fn annotations_mut(&mut self) -> impl Iterator<Item = &mut Annotation> {
+        Arc::make_mut(&mut self.inner).annotations.iter_mut()
     }
 
     /// Returns the "primary" span of this diagnostic if one exists.
@@ -308,9 +316,19 @@ impl Diagnostic {
         &self.inner.subs
     }
 
+    /// Returns a mutable borrow of the sub-diagnostics of this diagnostic.
+    pub fn sub_diagnostics_mut(&mut self) -> impl Iterator<Item = &mut SubDiagnostic> {
+        Arc::make_mut(&mut self.inner).subs.iter_mut()
+    }
+
     /// Returns the fix for this diagnostic if it exists.
     pub fn fix(&self) -> Option<&Fix> {
         self.inner.fix.as_ref()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn fix_mut(&mut self) -> Option<&mut Fix> {
+        Arc::make_mut(&mut self.inner).fix.as_mut()
     }
 
     /// Set the fix for this diagnostic.
@@ -330,6 +348,13 @@ impl Diagnostic {
     /// Returns `true` if the diagnostic contains a [`Fix`].
     pub fn fixable(&self) -> bool {
         self.fix().is_some()
+    }
+
+    /// Returns `true` if the diagnostic is [`fixable`](Diagnostic::fixable) and applies at the
+    /// configured applicability level.
+    pub fn has_applicable_fix(&self, config: &DisplayDiagnosticConfig) -> bool {
+        self.fix()
+            .is_some_and(|fix| fix.applies(config.fix_applicability))
     }
 
     /// Returns the offset of the parent statement for this diagnostic if it exists.
@@ -362,6 +387,16 @@ impl Diagnostic {
     /// secondary codes (yet), but in Ruff the noqa code is used.
     pub fn secondary_code(&self) -> Option<&SecondaryCode> {
         self.inner.secondary_code.as_ref()
+    }
+
+    /// Returns the secondary code for the diagnostic if it exists, or the lint name otherwise.
+    ///
+    /// This is a common pattern for Ruff diagnostics, which want to use the noqa code in general,
+    /// but fall back on the `invalid-syntax` identifier for syntax errors, which don't have
+    /// secondary codes.
+    pub fn secondary_code_or_id(&self) -> &str {
+        self.secondary_code()
+            .map_or_else(|| self.inner.id.as_str(), SecondaryCode::as_str)
     }
 
     /// Set the secondary code for this diagnostic.
@@ -420,24 +455,26 @@ impl Diagnostic {
 
     /// Computes the start source location for the message.
     ///
-    /// Panics if the diagnostic has no primary span, if its file is not a `SourceFile`, or if the
-    /// span has no range.
-    pub fn expect_ruff_start_location(&self) -> LineColumn {
-        self.expect_primary_span()
-            .expect_ruff_file()
-            .to_source_code()
-            .line_column(self.expect_range().start())
+    /// Returns None if the diagnostic has no primary span, if its file is not a `SourceFile`,
+    /// or if the span has no range.
+    pub fn ruff_start_location(&self) -> Option<LineColumn> {
+        Some(
+            self.ruff_source_file()?
+                .to_source_code()
+                .line_column(self.range()?.start()),
+        )
     }
 
     /// Computes the end source location for the message.
     ///
-    /// Panics if the diagnostic has no primary span, if its file is not a `SourceFile`, or if the
-    /// span has no range.
-    pub fn expect_ruff_end_location(&self) -> LineColumn {
-        self.expect_primary_span()
-            .expect_ruff_file()
-            .to_source_code()
-            .line_column(self.expect_range().end())
+    /// Returns None if the diagnostic has no primary span, if its file is not a `SourceFile`,
+    /// or if the span has no range.
+    pub fn ruff_end_location(&self) -> Option<LineColumn> {
+        Some(
+            self.ruff_source_file()?
+                .to_source_code()
+                .line_column(self.range()?.end()),
+        )
     }
 
     /// Returns the [`SourceFile`] which the message belongs to.
@@ -458,26 +495,26 @@ impl Diagnostic {
         self.primary_span()?.range()
     }
 
-    /// Returns the [`TextRange`] for the diagnostic.
-    ///
-    /// Panics if the diagnostic has no primary span or if the span has no range.
-    pub fn expect_range(&self) -> TextRange {
-        self.range().expect("Expected a range for the primary span")
-    }
-
     /// Returns the ordering of diagnostics based on the start of their ranges, if they have any.
     ///
-    /// Panics if either diagnostic has no primary span, if the span has no range, or if its file is
-    /// not a `SourceFile`.
+    /// Panics if either diagnostic has no primary span, or if its file is not a `SourceFile`.
     pub fn ruff_start_ordering(&self, other: &Self) -> std::cmp::Ordering {
-        (self.expect_ruff_source_file(), self.expect_range().start()).cmp(&(
+        let a = (
+            self.severity().is_fatal(),
+            self.expect_ruff_source_file(),
+            self.range().map(|r| r.start()),
+        );
+        let b = (
+            other.severity().is_fatal(),
             other.expect_ruff_source_file(),
-            other.expect_range().start(),
-        ))
+            other.range().map(|r| r.start()),
+        );
+
+        a.cmp(&b)
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, get_size2::GetSize)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, get_size2::GetSize)]
 struct DiagnosticInner {
     id: DiagnosticId,
     severity: Severity,
@@ -553,7 +590,7 @@ impl Eq for RenderingSortKey<'_> {}
 /// Currently, the order in which sub-diagnostics are rendered relative to one
 /// another (for a single parent diagnostic) is the order in which they were
 /// attached to the diagnostic.
-#[derive(Debug, Clone, Eq, PartialEq, get_size2::GetSize)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, get_size2::GetSize)]
 pub struct SubDiagnostic {
     /// Like with `Diagnostic`, we box the `SubDiagnostic` to make it
     /// pointer-sized.
@@ -609,6 +646,11 @@ impl SubDiagnostic {
         &self.inner.annotations
     }
 
+    /// Returns a mutable borrow of the annotations of this sub-diagnostic.
+    pub fn annotations_mut(&mut self) -> impl Iterator<Item = &mut Annotation> {
+        self.inner.annotations.iter_mut()
+    }
+
     /// Returns a shared borrow of the "primary" annotation of this diagnostic
     /// if one exists.
     ///
@@ -642,7 +684,7 @@ impl SubDiagnostic {
     /// The type returned implements the `std::fmt::Display` trait. In most
     /// cases, just converting it to a string (or printing it) will do what
     /// you want.
-    pub fn concise_message(&self) -> ConciseMessage {
+    pub fn concise_message(&self) -> ConciseMessage<'_> {
         let main = self.inner.message.as_str();
         let annotation = self
             .primary_annotation()
@@ -657,7 +699,7 @@ impl SubDiagnostic {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, get_size2::GetSize)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, get_size2::GetSize)]
 struct SubDiagnosticInner {
     severity: SubDiagnosticSeverity,
     message: DiagnosticMessage,
@@ -685,7 +727,7 @@ struct SubDiagnosticInner {
 ///
 /// Messages attached to annotations should also be as brief and specific as
 /// possible. Long messages could negative impact the quality of rendering.
-#[derive(Debug, Clone, Eq, PartialEq, get_size2::GetSize)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, get_size2::GetSize)]
 pub struct Annotation {
     /// The span of this annotation, corresponding to some subsequence of the
     /// user's input that we want to highlight.
@@ -700,6 +742,11 @@ pub struct Annotation {
     is_primary: bool,
     /// The diagnostic tags associated with this annotation.
     tags: Vec<DiagnosticTag>,
+    /// Whether this annotation is a file-level or full-file annotation.
+    ///
+    /// When set, rendering will only include the file's name and (optional) range. Everything else
+    /// is omitted, including any file snippet or message.
+    is_file_level: bool,
 }
 
 impl Annotation {
@@ -718,6 +765,7 @@ impl Annotation {
             message: None,
             is_primary: true,
             tags: Vec::new(),
+            is_file_level: false,
         }
     }
 
@@ -734,6 +782,7 @@ impl Annotation {
             message: None,
             is_primary: false,
             tags: Vec::new(),
+            is_file_level: false,
         }
     }
 
@@ -799,13 +848,28 @@ impl Annotation {
     pub fn push_tag(&mut self, tag: DiagnosticTag) {
         self.tags.push(tag);
     }
+
+    /// Set whether or not this annotation is file-level.
+    ///
+    /// File-level annotations are only rendered with their file name and range, if available. This
+    /// is intended for backwards compatibility with Ruff diagnostics, which historically used
+    /// `TextRange::default` to indicate a file-level diagnostic. In the new diagnostic model, a
+    /// [`Span`] with a range of `None` should be used instead, as mentioned in the `Span`
+    /// documentation.
+    ///
+    /// TODO(brent) update this usage in Ruff and remove `is_file_level` entirely. See
+    /// <https://github.com/astral-sh/ruff/issues/19688>, especially my first comment, for more
+    /// details.
+    pub fn set_file_level(&mut self, yes: bool) {
+        self.is_file_level = yes;
+    }
 }
 
 /// Tags that can be associated with an annotation.
 ///
 /// These tags are used to provide additional information about the annotation.
 /// and are passed through to the language server protocol.
-#[derive(Debug, Clone, Eq, PartialEq, get_size2::GetSize)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, get_size2::GetSize)]
 pub enum DiagnosticTag {
     /// Unused or unnecessary code. Used for unused parameters, unreachable code, etc.
     Unnecessary,
@@ -1014,7 +1078,7 @@ impl std::fmt::Display for DiagnosticId {
 ///
 /// This enum presents a unified interface to these two types for the sake of creating [`Span`]s and
 /// emitting diagnostics from both ty and ruff.
-#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub enum UnifiedFile {
     Ty(File),
     Ruff(SourceFile),
@@ -1065,7 +1129,7 @@ enum DiagnosticSource {
 
 impl DiagnosticSource {
     /// Returns this input as a `SourceCode` for convenient querying.
-    fn as_source_code(&self) -> SourceCode {
+    fn as_source_code(&self) -> SourceCode<'_, '_> {
         match self {
             DiagnosticSource::Ty(input) => SourceCode::new(input.text.as_str(), &input.line_index),
             DiagnosticSource::Ruff(source) => SourceCode::new(source.source_text(), source.index()),
@@ -1078,7 +1142,7 @@ impl DiagnosticSource {
 /// It consists of a `File` and an optional range into that file. When the
 /// range isn't present, it semantically implies that the diagnostic refers to
 /// the entire file. For example, when the file should be executable but isn't.
-#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub struct Span {
     file: UnifiedFile,
     range: Option<TextRange>,
@@ -1156,7 +1220,7 @@ impl From<crate::files::FileRange> for Span {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Ord, PartialOrd, get_size2::GetSize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Hash, get_size2::GetSize)]
 pub enum Severity {
     Info,
     Warning,
@@ -1191,7 +1255,7 @@ impl Severity {
 /// This type only exists to add an additional `Help` severity that isn't present in `Severity` or
 /// used for main diagnostics. If we want to add `Severity::Help` in the future, this type could be
 /// deleted and the two combined again.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Ord, PartialOrd, get_size2::GetSize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Hash, get_size2::GetSize)]
 pub enum SubDiagnosticSeverity {
     Help,
     Info,
@@ -1245,6 +1309,10 @@ pub struct DisplayDiagnosticConfig {
     hide_severity: bool,
     /// Whether to show the availability of a fix in a diagnostic.
     show_fix_status: bool,
+    /// Whether to show the diff for an available fix after the main diagnostic.
+    ///
+    /// This currently only applies to `DiagnosticFormat::Full`.
+    show_fix_diff: bool,
     /// The lowest applicability that should be shown when reporting diagnostics.
     fix_applicability: Applicability,
 }
@@ -1292,6 +1360,14 @@ impl DisplayDiagnosticConfig {
         }
     }
 
+    /// Whether to show a diff for an available fix after the main diagnostic.
+    pub fn show_fix_diff(self, yes: bool) -> DisplayDiagnosticConfig {
+        DisplayDiagnosticConfig {
+            show_fix_diff: yes,
+            ..self
+        }
+    }
+
     /// Set the lowest fix applicability that should be shown.
     ///
     /// In other words, an applicability of `Safe` (the default) would suppress showing fixes or fix
@@ -1315,6 +1391,7 @@ impl Default for DisplayDiagnosticConfig {
             preview: false,
             hide_severity: false,
             show_fix_status: false,
+            show_fix_diff: false,
             fix_applicability: Applicability::Safe,
         }
     }
@@ -1368,6 +1445,16 @@ pub enum DiagnosticFormat {
     /// Print diagnostics in the format expected by JUnit.
     #[cfg(feature = "junit")]
     Junit,
+    /// Print diagnostics in the JSON format used by GitLab [Code Quality] reports.
+    ///
+    /// [Code Quality]: https://docs.gitlab.com/ci/testing/code_quality/#code-quality-report-format
+    #[cfg(feature = "serde")]
+    Gitlab,
+
+    /// Print diagnostics in the format used by [GitHub Actions] workflow error annotations.
+    ///
+    /// [GitHub Actions]: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#setting-an-error-message
+    Github,
 }
 
 /// A representation of the kinds of messages inside a diagnostic.
@@ -1426,7 +1513,7 @@ impl std::fmt::Display for ConciseMessage<'_> {
 /// In most cases, callers shouldn't need to use this. Instead, there is
 /// a blanket trait implementation for `IntoDiagnosticMessage` for
 /// anything that implements `std::fmt::Display`.
-#[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize)]
 pub struct DiagnosticMessage(Box<str>);
 
 impl DiagnosticMessage {

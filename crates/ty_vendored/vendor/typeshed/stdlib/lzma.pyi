@@ -251,6 +251,7 @@ def open(
     For text mode, an LZMAFile object is created, and wrapped in an
     io.TextIOWrapper instance with the specified encoding, error
     handling behavior, and line ending(s).
+
     """
 
 @overload

@@ -27,7 +27,7 @@ fn empty_config() {
         "if (1, 2):\n    pass",
         r#"{}"#,
         [ExpandedMessage {
-            code: Some(Rule::IfTuple.noqa_code().to_string()),
+            code: Rule::IfTuple.noqa_code().to_string(),
             message: "If test is a tuple, which is always `True`".to_string(),
             start_location: Location {
                 row: OneIndexed::from_zero_indexed(0),
@@ -50,8 +50,8 @@ fn syntax_error() {
         "x =\ny = 1\n",
         r#"{}"#,
         [ExpandedMessage {
-            code: None,
-            message: "SyntaxError: Expected an expression".to_string(),
+            code: "invalid-syntax".to_string(),
+            message: "Expected an expression".to_string(),
             start_location: Location {
                 row: OneIndexed::from_zero_indexed(0),
                 column: OneIndexed::from_zero_indexed(3)
@@ -73,8 +73,9 @@ fn unsupported_syntax_error() {
         "match 2:\n    case 1: ...",
         r#"{"target-version": "py39"}"#,
         [ExpandedMessage {
-            code: None,
-            message: "SyntaxError: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)".to_string(),
+            code: "invalid-syntax".to_string(),
+            message: "Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)"
+                .to_string(),
             start_location: Location {
                 row: OneIndexed::from_zero_indexed(0),
                 column: OneIndexed::from_zero_indexed(0)

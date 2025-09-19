@@ -255,13 +255,13 @@ class Bdb:
         If no breakpoints are set, return an empty list.
         """
 
-    def get_file_breaks(self, filename: str) -> list[Breakpoint]:
+    def get_file_breaks(self, filename: str) -> list[int]:
         """Return all lines with breakpoints for filename.
 
         If no breakpoints are set, return an empty list.
         """
 
-    def get_all_breaks(self) -> list[Breakpoint]:
+    def get_all_breaks(self) -> dict[str, list[int]]:
         """Return all breakpoints that are set."""
 
     def get_stack(self, f: FrameType | None, t: TracebackType | None) -> tuple[list[tuple[FrameType, int]], int]:
@@ -278,6 +278,7 @@ class Bdb:
         return string contains the canonical filename, the function name
         or '<lambda>', the input arguments, the return value, and the
         line of code (if it exists).
+
         """
 
     def run(self, cmd: str | CodeType, globals: dict[str, Any] | None = None, locals: Mapping[str, Any] | None = None) -> None:
@@ -374,6 +375,7 @@ class Breakpoint:
         The information includes the breakpoint number, temporary
         status, file:line position, break condition, number of times to
         ignore, and number of times hit.
+
         """
 
 def checkfuncname(b: Breakpoint, frame: FrameType) -> bool:

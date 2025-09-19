@@ -354,7 +354,10 @@ impl Renamer {
                 ))
             }
             // Avoid renaming builtins and other "special" bindings.
-            BindingKind::FutureImport | BindingKind::Builtin | BindingKind::Export(_) => None,
+            BindingKind::FutureImport
+            | BindingKind::Builtin
+            | BindingKind::Export(_)
+            | BindingKind::DunderClassCell => None,
             // By default, replace the binding's name with the target name.
             BindingKind::Annotation
             | BindingKind::Argument

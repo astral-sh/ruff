@@ -350,6 +350,25 @@ def _(target: None | Foo):
     reveal_type(y)  # revealed: Literal[1, 3]
 ```
 
+## `as` patterns
+
+```py
+def _(target: int | str):
+    y = 1
+
+    match target:
+        case 1 as x:
+            y = 2
+            reveal_type(x)  # revealed: @Todo(`match` pattern definition types)
+        case "foo" as x:
+            y = 3
+            reveal_type(x)  # revealed: @Todo(`match` pattern definition types)
+        case _:
+            y = 4
+
+    reveal_type(y)  # revealed: Literal[2, 3, 4]
+```
+
 ## Guard with object that implements `__bool__` incorrectly
 
 ```py

@@ -15,11 +15,8 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix;
-use crate::preview::{
-    is_dunder_init_fix_unused_import_enabled, is_full_path_match_source_strategy_enabled,
-};
+use crate::preview::is_dunder_init_fix_unused_import_enabled;
 use crate::registry::Rule;
-use crate::rules::isort::categorize::MatchSourceStrategy;
 use crate::rules::{isort, isort::ImportSection, isort::ImportType};
 use crate::{Applicability, Fix, FixAvailability, Violation};
 
@@ -63,6 +60,10 @@ use crate::{Applicability, Fix, FixAvailability, Violation};
 /// to remove third-party and standard library imports -- the fix is unsafe because the module's
 /// interface changes.
 ///
+/// See [this FAQ section](https://docs.astral.sh/ruff/faq/#how-does-ruff-determine-which-of-my-imports-are-first-party-third-party-etc)
+/// for more details on how Ruff
+/// determines whether an import is first or third-party.
+///
 /// ## Example
 ///
 /// ```python
@@ -91,11 +92,6 @@ use crate::{Applicability, Fix, FixAvailability, Violation};
 ///     print("numpy is not installed")
 /// ```
 ///
-/// ## Preview
-/// When [preview](https://docs.astral.sh/ruff/preview/) is enabled,
-/// the criterion for determining whether an import is first-party
-/// is stricter, which could affect the suggested fix. See [this FAQ section](https://docs.astral.sh/ruff/faq/#how-does-ruff-determine-which-of-my-imports-are-first-party-third-party-etc) for more details.
-///
 /// ## Options
 /// - `lint.ignore-init-module-imports`
 /// - `lint.pyflakes.allowed-unused-imports`
@@ -103,7 +99,7 @@ use crate::{Applicability, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `import`](https://docs.python.org/3/reference/simple_stmts.html#the-import-statement)
 /// - [Python documentation: `importlib.util.find_spec`](https://docs.python.org/3/library/importlib.html#importlib.util.find_spec)
-/// - [Typing documentation: interface conventions](https://typing.python.org/en/latest/source/libraries.html#library-interface-public-and-private-symbols)
+/// - [Typing documentation: interface conventions](https://typing.python.org/en/latest/spec/distributing.html#library-interface-public-and-private-symbols)
 #[derive(ViolationMetadata)]
 pub(crate) struct UnusedImport {
     /// Qualified name of the import
@@ -231,11 +227,6 @@ enum UnusedImportContext {
 
 fn is_first_party(import: &AnyImport, checker: &Checker) -> bool {
     let source_name = import.source_name().join(".");
-    let match_source_strategy = if is_full_path_match_source_strategy_enabled(checker.settings()) {
-        MatchSourceStrategy::FullPath
-    } else {
-        MatchSourceStrategy::Root
-    };
     let category = isort::categorize(
         &source_name,
         import.qualified_name().is_unresolved_import(),
@@ -247,7 +238,6 @@ fn is_first_party(import: &AnyImport, checker: &Checker) -> bool {
         checker.settings().isort.no_sections,
         &checker.settings().isort.section_order,
         &checker.settings().isort.default_section,
-        match_source_strategy,
     );
     matches! {
         category,
@@ -255,7 +245,7 @@ fn is_first_party(import: &AnyImport, checker: &Checker) -> bool {
     }
 }
 
-/// Find the `Expr` for top level `__all__` bindings.
+/// Find the `Expr` for top-level `__all__` bindings.
 fn find_dunder_all_exprs<'a>(semantic: &'a SemanticModel) -> Vec<&'a ast::Expr> {
     semantic
         .global_scope()
@@ -334,7 +324,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
             .allowed_unused_imports
             .iter()
             .any(|allowed_unused_import| {
-                let allowed_unused_import = QualifiedName::from_dotted_name(allowed_unused_import);
+                let allowed_unused_import = QualifiedName::user_defined(allowed_unused_import);
                 import.qualified_name().starts_with(&allowed_unused_import)
             })
         {
@@ -541,7 +531,7 @@ fn fix_by_removing_imports<'a>(
         checker.indexer(),
     )?;
 
-    // It's unsafe to remove things from `__init__.py` because it can break public interfaces
+    // It's unsafe to remove things from `__init__.py` because it can break public interfaces.
     let applicability = if in_init {
         Applicability::Unsafe
     } else {
@@ -556,7 +546,7 @@ fn fix_by_removing_imports<'a>(
 }
 
 /// Generate a [`Fix`] to make bindings in a statement explicit, either by adding them to `__all__`
-/// or changing them from `import a` to `import a as a`.
+/// or by changing them from `import a` to `import a as a`.
 fn fix_by_reexporting<'a>(
     checker: &Checker,
     node_id: NodeId,
@@ -585,7 +575,7 @@ fn fix_by_reexporting<'a>(
         _ => bail!("Cannot offer a fix when there are multiple __all__ definitions"),
     };
 
-    // Only emit a fix if there are edits
+    // Only emit a fix if there are edits.
     let mut tail = edits.into_iter();
     let head = tail.next().ok_or(anyhow!("No edits to make"))?;
 

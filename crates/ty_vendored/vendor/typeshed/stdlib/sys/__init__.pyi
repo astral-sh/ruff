@@ -289,6 +289,18 @@ class _flags(_UninstantiableStructseq, tuple[int, ...]):
         @property
         def safe_path(self) -> bool:
             """-P"""
+    if sys.version_info >= (3, 13):
+        @property
+        def gil(self) -> Literal[0, 1]:
+            """-X gil"""
+    if sys.version_info >= (3, 14):
+        @property
+        def thread_inherit_context(self) -> Literal[0, 1]:
+            """-X thread_inherit_context"""
+
+        @property
+        def context_aware_warnings(self) -> Literal[0, 1]:
+            """-X context_aware_warnings"""
     # Whether or not this exists on lower versions of Python
     # may depend on which patch release you're using
     # (it was backported to all Python versions on 3.8+ as a security fix)
@@ -540,7 +552,7 @@ def call_tracing(func: Callable[..., _T], args: Any, /) -> _T:
     """
 
 if sys.version_info >= (3, 13):
-    @deprecated("Deprecated in Python 3.13; use _clear_internal_caches() instead.")
+    @deprecated("Deprecated since Python 3.13. Use `_clear_internal_caches()` instead.")
     def _clear_type_cache() -> None:
         """Clear the internal type lookup cache."""
 
@@ -688,6 +700,7 @@ def settrace(function: TraceFunction | None, /) -> None:
 if sys.platform == "win32":
     # A tuple of length 5, even though it has more than 5 attributes.
     @final
+    @type_check_only
     class _WinVersion(_UninstantiableStructseq, tuple[int, int, int, int, str]):
         @property
         def major(self) -> int: ...
@@ -840,15 +853,30 @@ def set_asyncgen_hooks(firstiter: _AsyncgenHook = ..., finalizer: _AsyncgenHook 
     """
 
 if sys.platform == "win32":
-    def _enablelegacywindowsfsencoding() -> None:
-        """Changes the default filesystem encoding to mbcs:replace.
+    if sys.version_info >= (3, 13):
+        @deprecated(
+            "Deprecated since Python 3.13; will be removed in Python 3.16. "
+            "Use the `PYTHONLEGACYWINDOWSFSENCODING` environment variable instead."
+        )
+        def _enablelegacywindowsfsencoding() -> None:
+            """Changes the default filesystem encoding to mbcs:replace.
 
-        This is done for consistency with earlier versions of Python. See PEP
-        529 for more information.
+            This is done for consistency with earlier versions of Python. See PEP
+            529 for more information.
 
-        This is equivalent to defining the PYTHONLEGACYWINDOWSFSENCODING
-        environment variable before launching Python.
-        """
+            This is equivalent to defining the PYTHONLEGACYWINDOWSFSENCODING
+            environment variable before launching Python.
+            """
+    else:
+        def _enablelegacywindowsfsencoding() -> None:
+            """Changes the default filesystem encoding to mbcs:replace.
+
+            This is done for consistency with earlier versions of Python. See PEP
+            529 for more information.
+
+            This is equivalent to defining the PYTHONLEGACYWINDOWSFSENCODING
+            environment variable before launching Python.
+            """
 
 def get_coroutine_origin_tracking_depth() -> int:
     """Check status of origin tracking for coroutine objects in this thread."""

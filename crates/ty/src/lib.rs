@@ -21,13 +21,14 @@ use clap::{CommandFactory, Parser};
 use colored::Colorize;
 use crossbeam::channel as crossbeam_channel;
 use rayon::ThreadPoolBuilder;
-use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, Severity};
+use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, DisplayDiagnostics, Severity};
+use ruff_db::files::File;
 use ruff_db::max_parallelism;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
-use salsa::plumbing::ZalsaDatabase;
+use salsa::Database;
 use ty_project::metadata::options::ProjectOptionsOverrides;
 use ty_project::watch::ProjectWatcher;
-use ty_project::{Db, watch};
+use ty_project::{CollectReporter, Db, watch};
 use ty_project::{ProjectDatabase, ProjectMetadata};
 use ty_server::run_server;
 
@@ -61,6 +62,10 @@ pub(crate) fn version() -> Result<()> {
 }
 
 fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
+    // Enabled ANSI colors on Windows 10.
+    #[cfg(windows)]
+    assert!(colored::control::set_virtual_terminal(true).is_ok());
+
     set_colored_override(args.color);
 
     let verbosity = args.verbosity.level();
@@ -155,7 +160,9 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     match std::env::var(EnvVars::TY_MEMORY_REPORT).as_deref() {
         Ok("short") => write!(stdout, "{}", db.salsa_memory_dump().display_short())?,
         Ok("mypy_primer") => write!(stdout, "{}", db.salsa_memory_dump().display_mypy_primer())?,
-        Ok("full") => write!(stdout, "{}", db.salsa_memory_dump().display_full())?,
+        Ok("full") => {
+            write!(stdout, "{}", db.salsa_memory_dump().display_full())?;
+        }
         Ok(other) => {
             tracing::warn!(
                 "Unknown value for `TY_MEMORY_REPORT`: `{other}`. Valid values are `short`, `mypy_primer`, and `full`."
@@ -238,11 +245,6 @@ impl MainLoop {
         })?;
 
         self.watcher = Some(ProjectWatcher::new(watcher, db));
-
-        // Do not show progress bars with `--watch`, indicatif does not seem to
-        // handle cancelling independent progress bars very well.
-        // TODO(zanieb): We can probably use `MultiProgress` to handle this case in the future.
-        self.printer = self.printer.with_no_progress();
         self.run(db)?;
 
         Ok(ExitStatus::Success)
@@ -265,6 +267,9 @@ impl MainLoop {
         let mut revision = 0u64;
 
         while let Ok(message) = self.receiver.recv() {
+            if self.watcher.is_some() {
+                Printer::clear_screen()?;
+            }
             match message {
                 MainLoopMessage::CheckWorkspace => {
                     let db = db.clone();
@@ -273,9 +278,13 @@ impl MainLoop {
                     // Spawn a new task that checks the project. This needs to be done in a separate thread
                     // to prevent blocking the main loop here.
                     rayon::spawn(move || {
+                        let mut reporter = IndicatifReporter::from(self.printer);
+                        let bar = reporter.bar.clone();
+
                         match salsa::Cancelled::catch(|| {
-                            let mut reporter = IndicatifReporter::from(self.printer);
-                            db.check_with_reporter(&mut reporter)
+                            db.check_with_reporter(&mut reporter);
+                            reporter.bar.finish();
+                            reporter.collector.into_sorted(&db)
                         }) {
                             Ok(result) => {
                                 // Send the result back to the main loop for printing.
@@ -284,6 +293,7 @@ impl MainLoop {
                                     .unwrap();
                             }
                             Err(cancelled) => {
+                                bar.finish_and_clear();
                                 tracing::debug!("Check has been cancelled: {cancelled:?}");
                             }
                         }
@@ -309,37 +319,48 @@ impl MainLoop {
                             return Ok(ExitStatus::Success);
                         }
 
+                        let is_human_readable = terminal_settings.output_format.is_human_readable();
+
                         if result.is_empty() {
-                            writeln!(
-                                self.printer.stream_for_success_summary(),
-                                "{}",
-                                "All checks passed!".green().bold()
-                            )?;
+                            if is_human_readable {
+                                writeln!(
+                                    self.printer.stream_for_success_summary(),
+                                    "{}",
+                                    "All checks passed!".green().bold()
+                                )?;
+                            }
 
                             if self.watcher.is_none() {
                                 return Ok(ExitStatus::Success);
                             }
                         } else {
-                            let mut max_severity = Severity::Info;
                             let diagnostics_count = result.len();
 
                             let mut stdout = self.printer.stream_for_details().lock();
-                            for diagnostic in result {
-                                // Only render diagnostics if they're going to be displayed, since doing
-                                // so is expensive.
-                                if stdout.is_enabled() {
-                                    write!(stdout, "{}", diagnostic.display(db, &display_config))?;
-                                }
+                            let max_severity = result
+                                .iter()
+                                .map(Diagnostic::severity)
+                                .max()
+                                .unwrap_or(Severity::Info);
 
-                                max_severity = max_severity.max(diagnostic.severity());
+                            // Only render diagnostics if they're going to be displayed, since doing
+                            // so is expensive.
+                            if stdout.is_enabled() {
+                                write!(
+                                    stdout,
+                                    "{}",
+                                    DisplayDiagnostics::new(db, &display_config, &result)
+                                )?;
                             }
 
-                            writeln!(
-                                self.printer.stream_for_failure_summary(),
-                                "Found {} diagnostic{}",
-                                diagnostics_count,
-                                if diagnostics_count > 1 { "s" } else { "" }
-                            )?;
+                            if is_human_readable {
+                                writeln!(
+                                    self.printer.stream_for_failure_summary(),
+                                    "Found {} diagnostic{}",
+                                    diagnostics_count,
+                                    if diagnostics_count > 1 { "s" } else { "" }
+                                )?;
+                            }
 
                             if max_severity.is_fatal() {
                                 tracing::warn!(
@@ -380,9 +401,7 @@ impl MainLoop {
                 }
                 MainLoopMessage::Exit => {
                     // Cancel any pending queries and wait for them to complete.
-                    // TODO: Don't use Salsa internal APIs
-                    //  [Zulip-Thread](https://salsa.zulipchat.com/#narrow/stream/333573-salsa-3.2E0/topic/Expose.20an.20API.20to.20cancel.20other.20queries)
-                    let _ = db.zalsa_mut();
+                    db.trigger_cancellation();
                     return Ok(ExitStatus::Success);
                 }
             }
@@ -395,54 +414,52 @@ impl MainLoop {
 }
 
 /// A progress reporter for `ty check`.
-enum IndicatifReporter {
-    /// A constructed reporter that is not yet ready, contains the target for the progress bar.
-    Pending(indicatif::ProgressDrawTarget),
+struct IndicatifReporter {
+    collector: CollectReporter,
+
     /// A reporter that is ready, containing a progress bar to report to.
     ///
     /// Initialization of the bar is deferred to [`ty_project::ProgressReporter::set_files`] so we
     /// do not initialize the bar too early as it may take a while to collect the number of files to
     /// process and we don't want to display an empty "0/0" bar.
-    Initialized(indicatif::ProgressBar),
+    bar: indicatif::ProgressBar,
+
+    printer: Printer,
 }
 
 impl From<Printer> for IndicatifReporter {
     fn from(printer: Printer) -> Self {
-        Self::Pending(printer.progress_target())
+        Self {
+            bar: indicatif::ProgressBar::hidden(),
+            collector: CollectReporter::default(),
+            printer,
+        }
     }
 }
 
 impl ty_project::ProgressReporter for IndicatifReporter {
     fn set_files(&mut self, files: usize) {
-        let target = match std::mem::replace(
-            self,
-            IndicatifReporter::Pending(indicatif::ProgressDrawTarget::hidden()),
-        ) {
-            Self::Pending(target) => target,
-            Self::Initialized(_) => panic!("The progress reporter should only be initialized once"),
-        };
+        self.collector.set_files(files);
 
-        let bar = indicatif::ProgressBar::with_draw_target(Some(files as u64), target);
-        bar.set_style(
+        self.bar.set_length(files as u64);
+        self.bar.set_message("Checking");
+        self.bar.set_style(
             indicatif::ProgressStyle::with_template(
                 "{msg:8.dim} {bar:60.green/dim} {pos}/{len} files",
             )
             .unwrap()
             .progress_chars("--"),
         );
-        bar.set_message("Checking");
-        *self = Self::Initialized(bar);
+        self.bar.set_draw_target(self.printer.progress_target());
     }
 
-    fn report_file(&self, _file: &ruff_db::files::File) {
-        match self {
-            IndicatifReporter::Initialized(progress_bar) => {
-                progress_bar.inc(1);
-            }
-            IndicatifReporter::Pending(_) => {
-                panic!("`report_file` called before `set_files`")
-            }
-        }
+    fn report_checked_file(&self, db: &dyn Db, file: File, diagnostics: &[Diagnostic]) {
+        self.collector.report_checked_file(db, file, diagnostics);
+        self.bar.inc(1);
+    }
+
+    fn report_diagnostics(&mut self, db: &dyn Db, diagnostics: Vec<Diagnostic>) {
+        self.collector.report_diagnostics(db, diagnostics);
     }
 }
 

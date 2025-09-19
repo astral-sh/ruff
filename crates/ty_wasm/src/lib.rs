@@ -3,21 +3,23 @@ use std::any::Any;
 use js_sys::{Error, JsString};
 use ruff_db::Db as _;
 use ruff_db::diagnostic::{self, DisplayDiagnosticConfig};
-use ruff_db::files::{File, FileRange, system_path_to_file};
+use ruff_db::files::{File, FilePath, FileRange, system_path_to_file, vendored_path_to_file};
 use ruff_db::source::{SourceText, line_index, source_text};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
 use ruff_db::system::{
     CaseSensitivity, DirectoryEntry, GlobError, MemoryFileSystem, Metadata, PatternError, System,
     SystemPath, SystemPathBuf, SystemVirtualPath, WritableSystem,
 };
+use ruff_db::vendored::VendoredPath;
 use ruff_notebook::Notebook;
 use ruff_python_formatter::formatted_file;
 use ruff_source_file::{LineIndex, OneIndexed, SourceLocation};
 use ruff_text_size::{Ranged, TextSize};
 use ty_ide::{
-    MarkupKind, NavigationTargets, RangedValue, document_highlights, goto_declaration,
-    goto_definition, goto_references, goto_type_definition, hover, inlay_hints, signature_help,
+    InlayHintSettings, MarkupKind, RangedValue, document_highlights, goto_declaration,
+    goto_definition, goto_references, goto_type_definition, hover, inlay_hints,
 };
+use ty_ide::{NavigationTargets, signature_help};
 use ty_project::metadata::options::Options;
 use ty_project::metadata::value::ValueSource;
 use ty_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
@@ -158,28 +160,35 @@ impl Workspace {
 
         self.db.project().open_file(&mut self.db, file);
 
-        Ok(FileHandle { path, file })
+        Ok(FileHandle {
+            path: path.into(),
+            file,
+        })
     }
 
     #[wasm_bindgen(js_name = "updateFile")]
     pub fn update_file(&mut self, file_id: &FileHandle, contents: &str) -> Result<(), Error> {
-        if !self.system.fs.exists(&file_id.path) {
+        let system_path = file_id.path.as_system_path().ok_or_else(|| {
+            Error::new("Cannot update non-system files (vendored files are read-only)")
+        })?;
+
+        if !self.system.fs.exists(system_path) {
             return Err(Error::new("File does not exist"));
         }
 
         self.system
             .fs
-            .write_file(&file_id.path, contents)
+            .write_file(system_path, contents)
             .map_err(into_error)?;
 
         self.db.apply_changes(
             vec![
                 ChangeEvent::Changed {
-                    path: file_id.path.to_path_buf(),
+                    path: system_path.to_path_buf(),
                     kind: ChangedKind::FileContent,
                 },
                 ChangeEvent::Changed {
-                    path: file_id.path.to_path_buf(),
+                    path: system_path.to_path_buf(),
                     kind: ChangedKind::FileMetadata,
                 },
             ],
@@ -198,18 +207,22 @@ impl Workspace {
         let file = file_id.file;
 
         self.db.project().close_file(&mut self.db, file);
-        self.system
-            .fs
-            .remove_file(&file_id.path)
-            .map_err(into_error)?;
 
-        self.db.apply_changes(
-            vec![ChangeEvent::Deleted {
-                path: file_id.path.to_path_buf(),
-                kind: DeletedKind::File,
-            }],
-            None,
-        );
+        // Only close system files (vendored files can't be closed/deleted)
+        if let Some(system_path) = file_id.path.as_system_path() {
+            self.system
+                .fs
+                .remove_file(system_path)
+                .map_err(into_error)?;
+
+            self.db.apply_changes(
+                vec![ChangeEvent::Deleted {
+                    path: system_path.to_path_buf(),
+                    kind: DeletedKind::File,
+                }],
+                None,
+            );
+        }
 
         Ok(())
     }
@@ -402,13 +415,40 @@ impl Workspace {
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
 
-        let completions = ty_ide::completion(&self.db, file_id.file, offset);
+        // NOTE: At time of writing, 2025-08-29, auto-import isn't
+        // ready to be enabled by default yet. Once it is, we should
+        // either just enable it or provide a way to configure it.
+        let settings = ty_ide::CompletionSettings { auto_import: false };
+        let completions = ty_ide::completion(&self.db, &settings, file_id.file, offset);
 
         Ok(completions
             .into_iter()
-            .map(|completion| Completion {
-                kind: completion.kind(&self.db).map(CompletionKind::from),
-                name: completion.name.into(),
+            .map(|comp| {
+                let kind = comp.kind(&self.db).map(CompletionKind::from);
+                let type_display = comp.ty.map(|ty| ty.display(&self.db).to_string());
+                let import_edit = comp.import.as_ref().map(|edit| {
+                    let range = Range::from_text_range(
+                        edit.range(),
+                        &index,
+                        &source,
+                        self.position_encoding,
+                    );
+                    TextEdit {
+                        range,
+                        new_text: edit.content().map(ToString::to_string).unwrap_or_default(),
+                    }
+                });
+                Completion {
+                    name: comp.name.into(),
+                    kind,
+                    detail: type_display,
+                    description: comp.module_name.map(ToString::to_string),
+                    insert_text: comp.insert.map(String::from),
+                    additional_text_edits: import_edit.map(|edit| vec![edit]),
+                    documentation: comp
+                        .documentation
+                        .map(|docstring| docstring.render_plaintext()),
+                }
             })
             .collect())
     }
@@ -422,18 +462,24 @@ impl Workspace {
             &self.db,
             file_id.file,
             range.to_text_range(&index, &source, self.position_encoding)?,
+            // TODO: Provide a way to configure this
+            &InlayHintSettings {
+                variable_types: true,
+                call_argument_names: true,
+            },
         );
 
         Ok(result
             .into_iter()
             .map(|hint| InlayHint {
-                markdown: hint.display(&self.db).to_string(),
+                markdown: hint.display().to_string(),
                 position: Position::from_text_size(
                     hint.position,
                     &index,
                     &source,
                     self.position_encoding,
                 ),
+                kind: hint.kind.into(),
             })
             .collect())
     }
@@ -514,7 +560,9 @@ impl Workspace {
 
                 SignatureInformation {
                     label: sig.label,
-                    documentation: sig.documentation,
+                    documentation: sig
+                        .documentation
+                        .map(|docstring| docstring.render_plaintext()),
                     parameters,
                     active_parameter: sig.active_parameter.and_then(|p| u32::try_from(p).ok()),
                 }
@@ -555,6 +603,22 @@ impl Workspace {
                 kind: target.kind().into(),
             })
             .collect())
+    }
+
+    /// Gets a file handle for a vendored file by its path.
+    /// This allows vendored files to participate in LSP features like hover, completions, etc.
+    #[wasm_bindgen(js_name = "getVendoredFile")]
+    pub fn get_vendored_file(&self, path: &str) -> Result<FileHandle, Error> {
+        let vendored_path = VendoredPath::new(path);
+
+        // Try to get the vendored file as a File
+        let file = vendored_path_to_file(&self.db, vendored_path)
+            .map_err(|err| Error::new(&format!("Vendored file not found: {path}: {err}")))?;
+
+        Ok(FileHandle {
+            file,
+            path: vendored_path.to_path_buf().into(),
+        })
     }
 }
 
@@ -598,7 +662,7 @@ fn map_targets_to_links(
 #[derive(Debug, Eq, PartialEq)]
 #[wasm_bindgen(inspectable)]
 pub struct FileHandle {
-    path: SystemPathBuf,
+    path: FilePath,
     file: File,
 }
 
@@ -872,6 +936,16 @@ pub struct Completion {
     #[wasm_bindgen(getter_with_clone)]
     pub name: String,
     pub kind: Option<CompletionKind>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub insert_text: Option<String>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub additional_text_edits: Option<Vec<TextEdit>>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub documentation: Option<String>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub detail: Option<String>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub description: Option<String>,
 }
 
 #[wasm_bindgen]
@@ -904,34 +978,58 @@ pub enum CompletionKind {
     TypeParameter,
 }
 
-impl From<ty_python_semantic::CompletionKind> for CompletionKind {
-    fn from(value: ty_python_semantic::CompletionKind) -> Self {
+impl From<ty_ide::CompletionKind> for CompletionKind {
+    fn from(value: ty_ide::CompletionKind) -> Self {
         match value {
-            ty_python_semantic::CompletionKind::Text => Self::Text,
-            ty_python_semantic::CompletionKind::Method => Self::Method,
-            ty_python_semantic::CompletionKind::Function => Self::Function,
-            ty_python_semantic::CompletionKind::Constructor => Self::Constructor,
-            ty_python_semantic::CompletionKind::Field => Self::Field,
-            ty_python_semantic::CompletionKind::Variable => Self::Variable,
-            ty_python_semantic::CompletionKind::Class => Self::Class,
-            ty_python_semantic::CompletionKind::Interface => Self::Interface,
-            ty_python_semantic::CompletionKind::Module => Self::Module,
-            ty_python_semantic::CompletionKind::Property => Self::Property,
-            ty_python_semantic::CompletionKind::Unit => Self::Unit,
-            ty_python_semantic::CompletionKind::Value => Self::Value,
-            ty_python_semantic::CompletionKind::Enum => Self::Enum,
-            ty_python_semantic::CompletionKind::Keyword => Self::Keyword,
-            ty_python_semantic::CompletionKind::Snippet => Self::Snippet,
-            ty_python_semantic::CompletionKind::Color => Self::Color,
-            ty_python_semantic::CompletionKind::File => Self::File,
-            ty_python_semantic::CompletionKind::Reference => Self::Reference,
-            ty_python_semantic::CompletionKind::Folder => Self::Folder,
-            ty_python_semantic::CompletionKind::EnumMember => Self::EnumMember,
-            ty_python_semantic::CompletionKind::Constant => Self::Constant,
-            ty_python_semantic::CompletionKind::Struct => Self::Struct,
-            ty_python_semantic::CompletionKind::Event => Self::Event,
-            ty_python_semantic::CompletionKind::Operator => Self::Operator,
-            ty_python_semantic::CompletionKind::TypeParameter => Self::TypeParameter,
+            ty_ide::CompletionKind::Text => Self::Text,
+            ty_ide::CompletionKind::Method => Self::Method,
+            ty_ide::CompletionKind::Function => Self::Function,
+            ty_ide::CompletionKind::Constructor => Self::Constructor,
+            ty_ide::CompletionKind::Field => Self::Field,
+            ty_ide::CompletionKind::Variable => Self::Variable,
+            ty_ide::CompletionKind::Class => Self::Class,
+            ty_ide::CompletionKind::Interface => Self::Interface,
+            ty_ide::CompletionKind::Module => Self::Module,
+            ty_ide::CompletionKind::Property => Self::Property,
+            ty_ide::CompletionKind::Unit => Self::Unit,
+            ty_ide::CompletionKind::Value => Self::Value,
+            ty_ide::CompletionKind::Enum => Self::Enum,
+            ty_ide::CompletionKind::Keyword => Self::Keyword,
+            ty_ide::CompletionKind::Snippet => Self::Snippet,
+            ty_ide::CompletionKind::Color => Self::Color,
+            ty_ide::CompletionKind::File => Self::File,
+            ty_ide::CompletionKind::Reference => Self::Reference,
+            ty_ide::CompletionKind::Folder => Self::Folder,
+            ty_ide::CompletionKind::EnumMember => Self::EnumMember,
+            ty_ide::CompletionKind::Constant => Self::Constant,
+            ty_ide::CompletionKind::Struct => Self::Struct,
+            ty_ide::CompletionKind::Event => Self::Event,
+            ty_ide::CompletionKind::Operator => Self::Operator,
+            ty_ide::CompletionKind::TypeParameter => Self::TypeParameter,
+        }
+    }
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TextEdit {
+    range: Range,
+    #[wasm_bindgen(getter_with_clone)]
+    new_text: String,
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Clone, PartialEq, Eq, Copy)]
+pub enum InlayHintKind {
+    Type,
+    Parameter,
+}
+
+impl From<ty_ide::InlayHintKind> for InlayHintKind {
+    fn from(kind: ty_ide::InlayHintKind) -> Self {
+        match kind {
+            ty_ide::InlayHintKind::Type => Self::Type,
+            ty_ide::InlayHintKind::CallArgumentName => Self::Parameter,
         }
     }
 }
@@ -943,6 +1041,8 @@ pub struct InlayHint {
     pub markdown: String,
 
     pub position: Position,
+
+    pub kind: InlayHintKind,
 }
 
 #[wasm_bindgen]
@@ -1167,6 +1267,10 @@ impl System for WasmSystem {
 
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
+    }
+
+    fn dyn_clone(&self) -> Box<dyn System> {
+        Box::new(self.clone())
     }
 }
 

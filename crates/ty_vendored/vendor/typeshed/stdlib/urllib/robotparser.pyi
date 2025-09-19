@@ -24,6 +24,7 @@ class RequestRate(NamedTuple):
 class RobotFileParser:
     """This class provides a set of methods to read, parse and answer
     questions about a single robots.txt file.
+
     """
 
     def __init__(self, url: str = "") -> None: ...
@@ -48,11 +49,13 @@ class RobotFileParser:
 
         This is useful for long-running web spiders that need to
         check for new robots.txt files periodically.
+
         """
 
     def modified(self) -> None:
         """Sets the time the robots.txt file was last fetched to the
         current time.
+
         """
 
     def crawl_delay(self, useragent: str) -> str | None: ...

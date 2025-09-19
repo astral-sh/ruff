@@ -1580,10 +1580,19 @@ reveal_type(A()(1))  # revealed: str
 
 ### Class literals
 
+This section also tests assignability of class-literals to callback protocols, since the rules for
+assignability of class-literals to callback protocols are the same as the rules for assignability of
+class-literals to `Callable` types.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
 #### Classes with metaclasses
 
 ```py
-from typing import Callable, overload
+from typing import Callable, Protocol, overload
 from typing_extensions import Self
 from ty_extensions import TypeOf, static_assert, is_subtype_of
 
@@ -1593,8 +1602,16 @@ class MetaWithReturn(type):
 
 class A(metaclass=MetaWithReturn): ...
 
+class Returns[T](Protocol):
+    def __call__(self) -> T: ...
+
+class ReturnsWithArgument[T1, T2](Protocol):
+    def __call__(self, arg: T1, /) -> T2: ...
+
 static_assert(is_subtype_of(TypeOf[A], Callable[[], A]))
+static_assert(is_subtype_of(TypeOf[A], Returns[A]))
 static_assert(not is_subtype_of(TypeOf[A], Callable[[object], A]))
+static_assert(not is_subtype_of(TypeOf[A], ReturnsWithArgument[object, A]))
 
 class MetaWithDifferentReturn(type):
     def __call__(cls) -> int:
@@ -1603,7 +1620,9 @@ class MetaWithDifferentReturn(type):
 class B(metaclass=MetaWithDifferentReturn): ...
 
 static_assert(is_subtype_of(TypeOf[B], Callable[[], int]))
+static_assert(is_subtype_of(TypeOf[B], Returns[int]))
 static_assert(not is_subtype_of(TypeOf[B], Callable[[], B]))
+static_assert(not is_subtype_of(TypeOf[B], Returns[B]))
 
 class MetaWithOverloadReturn(type):
     @overload
@@ -1617,20 +1636,30 @@ class C(metaclass=MetaWithOverloadReturn): ...
 
 static_assert(is_subtype_of(TypeOf[C], Callable[[int], int]))
 static_assert(is_subtype_of(TypeOf[C], Callable[[], str]))
+static_assert(is_subtype_of(TypeOf[C], ReturnsWithArgument[int, int]))
+static_assert(is_subtype_of(TypeOf[C], Returns[str]))
 ```
 
 #### Classes with `__new__`
 
 ```py
-from typing import Callable, overload
+from typing import Callable, overload, Protocol
 from ty_extensions import TypeOf, static_assert, is_subtype_of
 
 class A:
     def __new__(cls, a: int) -> int:
         return a
 
+class Returns[T](Protocol):
+    def __call__(self) -> T: ...
+
+class ReturnsWithArgument[T1, T2](Protocol):
+    def __call__(self, arg: T1, /) -> T2: ...
+
 static_assert(is_subtype_of(TypeOf[A], Callable[[int], int]))
+static_assert(is_subtype_of(TypeOf[A], ReturnsWithArgument[int, int]))
 static_assert(not is_subtype_of(TypeOf[A], Callable[[], int]))
+static_assert(not is_subtype_of(TypeOf[A], Returns[int]))
 
 class B: ...
 class C(B): ...
@@ -1644,9 +1673,13 @@ class E(D):
         return C()
 
 static_assert(is_subtype_of(TypeOf[E], Callable[[], C]))
+static_assert(is_subtype_of(TypeOf[E], Returns[C]))
 static_assert(is_subtype_of(TypeOf[E], Callable[[], B]))
+static_assert(is_subtype_of(TypeOf[E], Returns[B]))
 static_assert(not is_subtype_of(TypeOf[D], Callable[[], C]))
+static_assert(not is_subtype_of(TypeOf[D], Returns[C]))
 static_assert(is_subtype_of(TypeOf[D], Callable[[], B]))
+static_assert(is_subtype_of(TypeOf[D], Returns[B]))
 
 class F:
     @overload
@@ -1668,7 +1701,7 @@ static_assert(not is_subtype_of(TypeOf[F], Callable[[str], F]))
 If `__call__` and `__new__` are both present, `__call__` takes precedence.
 
 ```py
-from typing import Callable
+from typing import Callable, Protocol
 from ty_extensions import TypeOf, static_assert, is_subtype_of
 
 class MetaWithIntReturn(type):
@@ -1679,21 +1712,34 @@ class F(metaclass=MetaWithIntReturn):
     def __new__(cls) -> str:
         return super().__new__(cls)
 
+class Returns[T](Protocol):
+    def __call__(self) -> T: ...
+
 static_assert(is_subtype_of(TypeOf[F], Callable[[], int]))
+static_assert(is_subtype_of(TypeOf[F], Returns[int]))
 static_assert(not is_subtype_of(TypeOf[F], Callable[[], str]))
+static_assert(not is_subtype_of(TypeOf[F], Returns[str]))
 ```
 
 #### Classes with `__init__`
 
 ```py
-from typing import Callable, overload
+from typing import Callable, overload, Protocol
 from ty_extensions import TypeOf, static_assert, is_subtype_of
+
+class Returns[T](Protocol):
+    def __call__(self) -> T: ...
+
+class ReturnsWithArgument[T1, T2](Protocol):
+    def __call__(self, arg: T1, /) -> T2: ...
 
 class A:
     def __init__(self, a: int) -> None: ...
 
 static_assert(is_subtype_of(TypeOf[A], Callable[[int], A]))
+static_assert(is_subtype_of(TypeOf[A], ReturnsWithArgument[int, A]))
 static_assert(not is_subtype_of(TypeOf[A], Callable[[], A]))
+static_assert(not is_subtype_of(TypeOf[A], Returns[A]))
 
 class B:
     @overload
@@ -1703,26 +1749,36 @@ class B:
     def __init__(self, a: int | None = None) -> None: ...
 
 static_assert(is_subtype_of(TypeOf[B], Callable[[int], B]))
+static_assert(is_subtype_of(TypeOf[B], ReturnsWithArgument[int, B]))
 static_assert(is_subtype_of(TypeOf[B], Callable[[], B]))
+static_assert(is_subtype_of(TypeOf[B], Returns[B]))
 
 class C: ...
 
-# TODO: This assertion should be true once we understand `Self`
-# error: [static-assert-error] "Static assertion error: argument evaluates to `False`"
-static_assert(is_subtype_of(TypeOf[C], Callable[[], C]))
+# TODO: These assertions should be true once we understand `Self`
+static_assert(is_subtype_of(TypeOf[C], Callable[[], C]))  # error: [static-assert-error]
+static_assert(is_subtype_of(TypeOf[C], Returns[C]))  # error: [static-assert-error]
 
 class D[T]:
     def __init__(self, x: T) -> None: ...
 
 static_assert(is_subtype_of(TypeOf[D[int]], Callable[[int], D[int]]))
+static_assert(is_subtype_of(TypeOf[D[int]], ReturnsWithArgument[int, D[int]]))
 static_assert(not is_subtype_of(TypeOf[D[int]], Callable[[str], D[int]]))
+static_assert(not is_subtype_of(TypeOf[D[int]], ReturnsWithArgument[str, D[int]]))
 ```
 
 #### Classes with `__init__` and `__new__`
 
 ```py
-from typing import Callable, overload, Self
+from typing import Callable, overload, Self, Protocol
 from ty_extensions import TypeOf, static_assert, is_subtype_of
+
+class Returns[T](Protocol):
+    def __call__(self) -> T: ...
+
+class ReturnsWithArgument[T1, T2](Protocol):
+    def __call__(self, arg: T1, /) -> T2: ...
 
 class A:
     def __new__(cls, a: int) -> Self:
@@ -1731,7 +1787,9 @@ class A:
     def __init__(self, a: int) -> None: ...
 
 static_assert(is_subtype_of(TypeOf[A], Callable[[int], A]))
+static_assert(is_subtype_of(TypeOf[A], ReturnsWithArgument[int, A]))
 static_assert(not is_subtype_of(TypeOf[A], Callable[[], A]))
+static_assert(not is_subtype_of(TypeOf[A], Returns[A]))
 
 class B:
     def __new__(cls, a: int) -> int:
@@ -1740,7 +1798,9 @@ class B:
     def __init__(self, a: str) -> None: ...
 
 static_assert(is_subtype_of(TypeOf[B], Callable[[int], int]))
+static_assert(is_subtype_of(TypeOf[B], ReturnsWithArgument[int, int]))
 static_assert(not is_subtype_of(TypeOf[B], Callable[[str], B]))
+static_assert(not is_subtype_of(TypeOf[B], ReturnsWithArgument[str, B]))
 
 class C:
     def __new__(cls, *args, **kwargs) -> "C":
@@ -1750,7 +1810,9 @@ class C:
 
 # Not subtype because __new__ signature is not fully static
 static_assert(not is_subtype_of(TypeOf[C], Callable[[int], C]))
+static_assert(not is_subtype_of(TypeOf[C], ReturnsWithArgument[int, C]))
 static_assert(not is_subtype_of(TypeOf[C], Callable[[], C]))
+static_assert(not is_subtype_of(TypeOf[C], Returns[C]))
 
 class D: ...
 
@@ -1765,7 +1827,9 @@ class E:
     def __init__(self, y: str) -> None: ...
 
 static_assert(is_subtype_of(TypeOf[E], Callable[[int], D]))
+static_assert(is_subtype_of(TypeOf[E], ReturnsWithArgument[int, D]))
 static_assert(is_subtype_of(TypeOf[E], Callable[[], int]))
+static_assert(is_subtype_of(TypeOf[E], Returns[int]))
 
 class F[T]:
     def __new__(cls, x: T) -> "F[T]":
@@ -1774,7 +1838,9 @@ class F[T]:
     def __init__(self, x: T) -> None: ...
 
 static_assert(is_subtype_of(TypeOf[F[int]], Callable[[int], F[int]]))
+static_assert(is_subtype_of(TypeOf[F[int]], ReturnsWithArgument[int, F[int]]))
 static_assert(not is_subtype_of(TypeOf[F[int]], Callable[[str], F[int]]))
+static_assert(not is_subtype_of(TypeOf[F[int]], ReturnsWithArgument[str, F[int]]))
 ```
 
 #### Classes with `__call__`, `__new__` and `__init__`
@@ -1782,8 +1848,14 @@ static_assert(not is_subtype_of(TypeOf[F[int]], Callable[[str], F[int]]))
 If `__call__`, `__new__` and `__init__` are all present, `__call__` takes precedence.
 
 ```py
-from typing import Callable
+from typing import Callable, Protocol
 from ty_extensions import TypeOf, static_assert, is_subtype_of
+
+class Returns[T](Protocol):
+    def __call__(self) -> T: ...
+
+class ReturnsWithArgument[T1, T2](Protocol):
+    def __call__(self, arg: T1, /) -> T2: ...
 
 class MetaWithIntReturn(type):
     def __call__(cls) -> int:
@@ -1796,8 +1868,11 @@ class F(metaclass=MetaWithIntReturn):
     def __init__(self, x: int) -> None: ...
 
 static_assert(is_subtype_of(TypeOf[F], Callable[[], int]))
+static_assert(is_subtype_of(TypeOf[F], Returns[int]))
 static_assert(not is_subtype_of(TypeOf[F], Callable[[], str]))
+static_assert(not is_subtype_of(TypeOf[F], Returns[str]))
 static_assert(not is_subtype_of(TypeOf[F], Callable[[int], F]))
+static_assert(not is_subtype_of(TypeOf[F], ReturnsWithArgument[int, F]))
 ```
 
 ### Subclass of
@@ -1865,7 +1940,7 @@ static_assert(not is_subtype_of(TypeOf[a.f], Callable[[float], int]))
 static_assert(not is_subtype_of(TypeOf[A.g], Callable[[], int]))
 
 # TODO: This assertion should be true
-# error: [static-assert-error] "Static assertion error: argument evaluates to `False`"
+# error: [static-assert-error] "Static assertion error: argument of type `ty_extensions.ConstraintSet[never]` is statically known to be falsy"
 static_assert(is_subtype_of(TypeOf[A.f], Callable[[A, int], int]))
 ```
 

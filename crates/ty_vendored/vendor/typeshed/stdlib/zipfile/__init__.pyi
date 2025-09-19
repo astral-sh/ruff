@@ -11,7 +11,7 @@ from collections.abc import Callable, Iterable, Iterator
 from io import TextIOWrapper
 from os import PathLike
 from types import TracebackType
-from typing import IO, Final, Literal, Protocol, overload
+from typing import IO, Final, Literal, Protocol, overload, type_check_only
 from typing_extensions import Self, TypeAlias
 
 __all__ = [
@@ -46,10 +46,12 @@ BadZipfile = BadZipFile
 error = BadZipfile
 
 class LargeZipFile(Exception):
-    """Raised when writing a zipfile, the zipfile requires ZIP64 extensions
+    """
+    Raised when writing a zipfile, the zipfile requires ZIP64 extensions
     and those extensions are disabled.
     """
 
+@type_check_only
 class _ZipStream(Protocol):
     def read(self, n: int, /) -> bytes: ...
     # The following methods are optional:
@@ -58,11 +60,13 @@ class _ZipStream(Protocol):
     # def seek(self, n: int, /) -> object: ...
 
 # Stream shape as required by _EndRecData() and _EndRecData64().
+@type_check_only
 class _SupportsReadSeekTell(Protocol):
     def read(self, n: int = ..., /) -> bytes: ...
     def seek(self, cookie: int, whence: int, /) -> object: ...
     def tell(self) -> int: ...
 
+@type_check_only
 class _ClosableZipStream(_ZipStream, Protocol):
     def close(self) -> object: ...
 
@@ -119,18 +123,23 @@ class ZipExtFile(io.BufferedIOBase):
 
     def seek(self, offset: int, whence: int = 0) -> int: ...
 
+@type_check_only
 class _Writer(Protocol):
     def write(self, s: str, /) -> object: ...
 
+@type_check_only
 class _ZipReadable(Protocol):
     def seek(self, offset: int, whence: int = 0, /) -> int: ...
     def read(self, n: int = -1, /) -> bytes: ...
 
+@type_check_only
 class _ZipTellable(Protocol):
     def tell(self) -> int: ...
 
+@type_check_only
 class _ZipReadableTellable(_ZipReadable, _ZipTellable, Protocol): ...
 
+@type_check_only
 class _ZipWritable(Protocol):
     def flush(self) -> None: ...
     def close(self) -> None: ...
@@ -160,6 +169,7 @@ class ZipFile:
                    When using ZIP_ZSTANDARD integers -7 though 22 are common,
                    see the CompressionParameter enum in compression.zstd for
                    details.
+
     """
 
     filename: str | None
@@ -207,7 +217,7 @@ class ZipFile:
         def __init__(
             self,
             file: StrPath | _ZipWritable,
-            mode: Literal["w", "x"] = ...,
+            mode: Literal["w", "x"],
             compression: int = 0,
             allowZip64: bool = True,
             compresslevel: int | None = None,
@@ -219,7 +229,7 @@ class ZipFile:
         def __init__(
             self,
             file: StrPath | _ZipReadableTellable,
-            mode: Literal["a"] = ...,
+            mode: Literal["a"],
             compression: int = 0,
             allowZip64: bool = True,
             compresslevel: int | None = None,
@@ -258,7 +268,7 @@ class ZipFile:
         def __init__(
             self,
             file: StrPath | _ZipWritable,
-            mode: Literal["w", "x"] = ...,
+            mode: Literal["w", "x"],
             compression: int = 0,
             allowZip64: bool = True,
             compresslevel: int | None = None,
@@ -269,7 +279,7 @@ class ZipFile:
         def __init__(
             self,
             file: StrPath | _ZipReadableTellable,
-            mode: Literal["a"] = ...,
+            mode: Literal["a"],
             compression: int = 0,
             allowZip64: bool = True,
             compresslevel: int | None = None,
@@ -379,12 +389,6 @@ class ZipFile:
     if sys.version_info >= (3, 11):
         def mkdir(self, zinfo_or_directory_name: str | ZipInfo, mode: int = 0o777) -> None:
             """Creates a directory inside the zip archive."""
-    if sys.version_info >= (3, 14):
-        @property
-        def data_offset(self) -> int | None:
-            """The offset to the start of zip data in the file or None if
-            unavailable.
-            """
 
     def __del__(self) -> None:
         """Call the "close()" method in case the user forgot."""
@@ -413,6 +417,29 @@ class PyZipFile(ZipFile):
 class ZipInfo:
     """Class with attributes describing each file in the ZIP archive."""
 
+    __slots__ = (
+        "orig_filename",
+        "filename",
+        "date_time",
+        "compress_type",
+        "compress_level",
+        "comment",
+        "extra",
+        "create_system",
+        "create_version",
+        "extract_version",
+        "reserved",
+        "flag_bits",
+        "volume",
+        "internal_attr",
+        "external_attr",
+        "header_offset",
+        "CRC",
+        "compress_size",
+        "file_size",
+        "_raw_time",
+        "_end_offset",
+    )
     filename: str
     date_time: _DateTuple
     compress_type: int
@@ -462,19 +489,22 @@ if sys.version_info >= (3, 12):
 
 else:
     class CompleteDirs(ZipFile):
-        """A ZipFile subclass that ensures that implied directories
+        """
+        A ZipFile subclass that ensures that implied directories
         are always included in the namelist.
         """
 
         def resolve_dir(self, name: str) -> str:
-            """If the name represents a directory, return that name
+            """
+            If the name represents a directory, return that name
             as a directory (with the trailing slash).
             """
 
         @overload
         @classmethod
         def make(cls, source: ZipFile) -> CompleteDirs:
-            """Given a source (filename or zipfile), return an
+            """
+            Given a source (filename or zipfile), return an
             appropriate CompleteDirs subclass.
             """
 
@@ -483,7 +513,8 @@ else:
         def make(cls, source: StrPath | IO[bytes]) -> Self: ...
 
     class Path:
-        """A pathlib-compatible interface for zip files.
+        """
+        A pathlib-compatible interface for zip files.
 
         Consider a zip file with this structure::
 
@@ -562,7 +593,8 @@ else:
         root: CompleteDirs
         at: str
         def __init__(self, root: ZipFile | StrPath | IO[bytes], at: str = "") -> None:
-            """Construct a Path from a ZipFile or filename.
+            """
+            Construct a Path from a ZipFile or filename.
 
             Note: When the source is an existing ZipFile object,
             its type (__class__) will be mutated to a
@@ -598,7 +630,8 @@ else:
             *,
             pwd: bytes | None = None,
         ) -> TextIOWrapper:
-            """Open this entry as text or binary following the semantics
+            """
+            Open this entry as text or binary following the semantics
             of ``pathlib.Path.open()`` by passing arguments through
             to io.TextIOWrapper().
             """

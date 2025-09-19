@@ -9,7 +9,7 @@ import sys
 from _typeshed import BytesPath, ExcInfo, FileDescriptorOrPath, MaybeNone, StrOrBytesPath, StrPath, SupportsRead, SupportsWrite
 from collections.abc import Callable, Iterable, Sequence
 from tarfile import _TarfileFilter
-from typing import Any, AnyStr, NamedTuple, NoReturn, Protocol, TypeVar, overload
+from typing import Any, AnyStr, NamedTuple, NoReturn, Protocol, TypeVar, overload, type_check_only
 from typing_extensions import TypeAlias, deprecated
 
 __all__ = [
@@ -79,6 +79,7 @@ def copyfile(src: StrOrBytesPath, dst: _StrOrBytesPathT, *, follow_symlinks: boo
 
     If follow_symlinks is not set and src is a symbolic link, a new
     symlink will be created instead of copying the file it points to.
+
     """
 
 def copymode(src: StrOrBytesPath, dst: StrOrBytesPath, *, follow_symlinks: bool = True) -> None:
@@ -87,6 +88,7 @@ def copymode(src: StrOrBytesPath, dst: StrOrBytesPath, *, follow_symlinks: bool 
     If follow_symlinks is not set, symlinks aren't followed if and only
     if both `src` and `dst` are symlinks.  If `lchmod` isn't available
     (e.g. Linux) this method does nothing.
+
     """
 
 def copystat(src: StrOrBytesPath, dst: StrOrBytesPath, *, follow_symlinks: bool = True) -> None:
@@ -113,6 +115,7 @@ def copy(src: StrPath, dst: _StrPathT, *, follow_symlinks: bool = True) -> _StrP
 
     If source and destination are the same file, a SameFileError will be
     raised.
+
     """
 
 @overload
@@ -190,6 +193,7 @@ def copytree(
 _OnErrorCallback: TypeAlias = Callable[[Callable[..., Any], str, ExcInfo], object]
 _OnExcCallback: TypeAlias = Callable[[Callable[..., Any], str, BaseException], object]
 
+@type_check_only
 class _RmtreeType(Protocol):
     avoids_symlink_attacks: bool
     if sys.version_info >= (3, 12):
@@ -270,6 +274,7 @@ def move(src: StrPath, dst: _StrPathT, copy_function: _CopyFn = ...) -> _StrPath
 
     A lot more could be done here...  A look at a mv.c shows a lot of
     the issues this implementation glosses over.
+
     """
 
 class _ntuple_diskusage(NamedTuple):
@@ -357,6 +362,7 @@ if sys.platform == "win32" and sys.version_info < (3, 12):
         `mode` defaults to os.F_OK | os.X_OK. `path` defaults to the result
         of os.environ.get("PATH"), or can be overridden with a custom search
         path.
+
         """
 
 @overload
@@ -368,6 +374,7 @@ def which(cmd: StrPath, mode: int = 1, path: StrPath | None = None) -> str | Non
     `mode` defaults to os.F_OK | os.X_OK. `path` defaults to the result
     of os.environ.get("PATH"), or can be overridden with a custom search
     path.
+
     """
 
 @overload
@@ -387,7 +394,7 @@ def make_archive(
 
     'base_name' is the name of the file to create, minus any format-specific
     extension; 'format' is the archive format: one of "zip", "tar", "gztar",
-    "bztar", "zstdtar", or "xztar".  Or any other registered format.
+    "bztar", "xztar", or "zstdtar".  Or any other registered format.
 
     'root_dir' is a directory that will be the root directory of the
     archive; ie. we typically chdir into 'root_dir' before creating the
@@ -435,7 +442,7 @@ def unpack_archive(
     is unpacked. If not provided, the current working directory is used.
 
     `format` is the archive format: one of "zip", "tar", "gztar", "bztar",
-    or "xztar".  Or any other registered format.  If not provided,
+    "xztar", or "zstdtar".  Or any other registered format.  If not provided,
     unpack_archive will use the filename extension and see if an unpacker
     was registered for that extension.
 

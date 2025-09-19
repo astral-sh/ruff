@@ -151,6 +151,28 @@ class Foo(type[int]): ...
 reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, @Todo(GenericAlias instance), <class 'object'>]
 ```
 
+## Display of generic `type[]` types
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Generic, TypeVar
+
+class Foo[T]: ...
+
+S = TypeVar("S")
+
+class Bar(Generic[S]): ...
+
+def _(x: Foo[int], y: Bar[str], z: list[bytes]):
+    reveal_type(type(x))  # revealed: type[Foo[int]]
+    reveal_type(type(y))  # revealed: type[Bar[str]]
+    reveal_type(type(z))  # revealed: type[list[bytes]]
+```
+
 ## `@final` classes
 
 `type[]` types are eagerly converted to class-literal types if a class decorated with `@final` is

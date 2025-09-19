@@ -182,16 +182,19 @@ class ContextManagerThatMightNotRunToCompletion:
 with ContextManagerThatMightNotRunToCompletion() as L:
     U = ...
 
-match 42:
+def get_object() -> object:
+    pass
+
+match get_object():
     case {"something": M}:
         ...
     case [*N]:
         ...
     case [O]:
         ...
-    case P | Q:  # error: [invalid-syntax] "name capture `P` makes remaining patterns unreachable"
+    case I(foo=R):
         ...
-    case object(foo=R):
+    case P | Q:
         ...
 
 match 56:
@@ -1396,7 +1399,7 @@ X: bool = True
 
 ```py
 def f():
-    # TODO: we should emit a syntax error here (tracked by https://github.com/astral-sh/ruff/issues/17412)
+    # error: [invalid-syntax]
     from exporter import *
 
     # error: [unresolved-reference]

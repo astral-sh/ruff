@@ -755,6 +755,18 @@ def f(never: Never):
         reveal_type(x)  # revealed: Unknown
 ```
 
+## Iterating over literals
+
+```py
+from typing import Literal
+
+for char in "abcde":
+    reveal_type(char)  # revealed: Literal["a", "b", "c", "d", "e"]
+
+for char in b"abcde":
+    reveal_type(char)  # revealed: Literal[97, 98, 99, 100, 101]
+```
+
 ## A class literal is iterable if it inherits from `Any`
 
 A class literal can be iterated over if it has `Any` or `Unknown` in its MRO, since the

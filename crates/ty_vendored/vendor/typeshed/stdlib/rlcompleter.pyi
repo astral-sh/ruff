@@ -54,6 +54,7 @@ class Completer:
 
         This is called successively with state == 0, 1, 2, ... until it
         returns None.  The completion should begin with 'text'.
+
         """
 
     def attr_matches(self, text: str) -> list[str]:
@@ -66,6 +67,7 @@ class Completer:
 
         WARNING: this can still invoke arbitrary C code, if an object
         with a __getattr__ hook is evaluated.
+
         """
 
     def global_matches(self, text: str) -> list[str]:
@@ -73,4 +75,5 @@ class Completer:
 
         Return a list of all keywords, built-in functions and names currently
         defined in self.namespace that match.
+
         """

@@ -141,7 +141,8 @@ def print_stack(f: FrameType | None = None, limit: int | None = None, file: Supp
     """
 
 def extract_tb(tb: TracebackType | None, limit: int | None = None) -> StackSummary:
-    """Return a StackSummary object representing a list of
+    """
+    Return a StackSummary object representing a list of
     pre-processed entries from traceback.
 
     This is useful for alternate formatting of stack traces.  If
@@ -234,6 +235,7 @@ else:
 
         The message indicating which exception occurred is always the last
         string in the list.
+
         """
 
 def format_exc(limit: int | None = None, chain: bool = True) -> str:
@@ -331,7 +333,7 @@ class TracebackException:
         @property
         def exc_type_str(self) -> str: ...
         @property
-        @deprecated("Deprecated in 3.13. Use exc_type_str instead.")
+        @deprecated("Deprecated since Python 3.13. Use `exc_type_str` instead.")
         def exc_type(self) -> type[BaseException] | None: ...
     else:
         exc_type: type[BaseException]
@@ -503,6 +505,23 @@ class FrameSummary:
       mapping the name to the repr() of the variable.
     """
 
+    if sys.version_info >= (3, 13):
+        __slots__ = (
+            "filename",
+            "lineno",
+            "end_lineno",
+            "colno",
+            "end_colno",
+            "name",
+            "_lines",
+            "_lines_dedented",
+            "locals",
+            "_code",
+        )
+    elif sys.version_info >= (3, 11):
+        __slots__ = ("filename", "lineno", "end_lineno", "colno", "end_colno", "name", "_line", "locals")
+    else:
+        __slots__ = ("filename", "lineno", "name", "_line", "locals")
     if sys.version_info >= (3, 11):
         def __init__(
             self,
@@ -598,7 +617,8 @@ class StackSummary(list[FrameSummary]):
 
     @classmethod
     def from_list(cls, a_list: Iterable[FrameSummary | _FrameSummaryTuple]) -> StackSummary:
-        """Create a StackSummary object from a supplied list of
+        """
+        Create a StackSummary object from a supplied list of
         FrameSummary objects or old-style list of tuples.
         """
     if sys.version_info >= (3, 11):

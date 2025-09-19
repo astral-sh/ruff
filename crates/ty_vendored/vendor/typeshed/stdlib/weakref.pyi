@@ -11,7 +11,7 @@ from _weakrefset import WeakSet as WeakSet
 from collections.abc import Callable, Iterable, Iterator, Mapping, MutableMapping
 from types import GenericAlias
 from typing import Any, ClassVar, Generic, TypeVar, final, overload
-from typing_extensions import ParamSpec, Self
+from typing_extensions import ParamSpec, Self, disjoint_base
 
 __all__ = [
     "ref",
@@ -59,6 +59,7 @@ class ProxyType(Generic[_T]):  # "weakproxy"
     def __getattr__(self, attr: str) -> Any: ...
     __hash__: ClassVar[None]  # type: ignore[assignment]
 
+@disjoint_base
 class ReferenceType(Generic[_T]):  # "weakref"
     __callback__: Callable[[Self], Any]
     def __new__(cls, o: _T, callback: Callable[[Self], Any] | None = ..., /) -> Self: ...
@@ -75,10 +76,12 @@ ref = ReferenceType
 # everything below here is implemented in weakref.py
 
 class WeakMethod(ref[_CallableT]):
-    """A custom `weakref.ref` subclass which simulates a weak reference to
+    """
+    A custom `weakref.ref` subclass which simulates a weak reference to
     a bound method, working around the lifetime problem of bound methods.
     """
 
+    __slots__ = ("_func_ref", "_meth_type", "_alive", "__weakref__")
     def __new__(cls, meth: _CallableT, callback: Callable[[Self], Any] | None = None) -> Self: ...
     def __call__(self) -> _CallableT | None: ...
     def __eq__(self, other: object) -> bool: ...
@@ -134,6 +137,7 @@ class WeakValueDictionary(MutableMapping[_KT, _VT]):
         to be checked before being used.  This can be used to avoid
         creating references that will cause the garbage collector to
         keep the values around longer than needed.
+
         """
 
     def valuerefs(self) -> list[KeyedRef[_KT, _VT]]:
@@ -144,6 +148,7 @@ class WeakValueDictionary(MutableMapping[_KT, _VT]):
         to be checked before being used.  This can be used to avoid
         creating references that will cause the garbage collector to
         keep the values around longer than needed.
+
         """
 
     def setdefault(self, key: _KT, default: _VT) -> _VT: ...
@@ -174,8 +179,10 @@ class KeyedRef(ref[_T], Generic[_KT, _T]):
     a function object for each key stored in the mapping.  A shared
     callback object can use the 'key' attribute of a KeyedRef instead
     of getting a reference to the key from an enclosing scope.
+
     """
 
+    __slots__ = ("key",)
     key: _KT
     def __new__(type, ob: _T, callback: Callable[[Self], Any], key: _KT) -> Self: ...
     def __init__(self, ob: _T, callback: Callable[[Self], Any], key: _KT) -> None: ...
@@ -222,6 +229,7 @@ class WeakKeyDictionary(MutableMapping[_KT, _VT]):
         to be checked before being used.  This can be used to avoid
         creating references that will cause the garbage collector to
         keep the keys around longer than needed.
+
         """
     # Keep WeakKeyDictionary.setdefault in line with MutableMapping.setdefault, modulo positional-only differences
     @overload
@@ -262,6 +270,7 @@ class finalize(Generic[_P, _T]):
     By default atexit is true.
     """
 
+    __slots__ = ()
     def __init__(self, obj: _T, func: Callable[_P, Any], /, *args: _P.args, **kwargs: _P.kwargs) -> None: ...
     def __call__(self, _: Any = None) -> Any | None:
         """If alive then mark as dead and return func(*args, **kwargs);

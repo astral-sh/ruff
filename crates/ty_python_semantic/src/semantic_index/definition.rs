@@ -22,7 +22,7 @@ use crate::unpack::{Unpack, UnpackPosition};
 /// because a new scope gets inserted before the `Definition` or a new place is inserted
 /// before this `Definition`. However, the ID can be considered stable and it is okay to use
 /// `Definition` in cross-module` salsa queries or as a field on other salsa tracked structs.
-#[salsa::tracked(debug)]
+#[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct Definition<'db> {
     /// The file in which the definition occurs.
     pub file: File,
@@ -38,7 +38,7 @@ pub struct Definition<'db> {
     #[no_eq]
     #[returns(ref)]
     #[tracked]
-    pub(crate) kind: DefinitionKind<'db>,
+    pub kind: DefinitionKind<'db>,
 
     /// This is a dedicated field to avoid accessing `kind` to compute this value.
     pub(crate) is_reexported: bool,
@@ -58,6 +58,35 @@ impl<'db> Definition<'db> {
 
     pub fn focus_range(self, db: &'db dyn Db, module: &ParsedModuleRef) -> FileRange {
         FileRange::new(self.file(db), self.kind(db).target_range(module))
+    }
+
+    /// Returns the name of the item being defined, if applicable.
+    pub fn name(self, db: &'db dyn Db) -> Option<String> {
+        let file = self.file(db);
+        let module = parsed_module(db, file).load(db);
+        let kind = self.kind(db);
+        match kind {
+            DefinitionKind::Function(def) => {
+                let node = def.node(&module);
+                Some(node.name.as_str().to_string())
+            }
+            DefinitionKind::Class(def) => {
+                let node = def.node(&module);
+                Some(node.name.as_str().to_string())
+            }
+            DefinitionKind::TypeAlias(def) => {
+                let node = def.node(&module);
+                Some(
+                    node.name
+                        .as_name_expr()
+                        .expect("type alias name should be a NameExpr")
+                        .id
+                        .as_str()
+                        .to_string(),
+                )
+            }
+            _ => None,
+        }
     }
 
     /// Extract a docstring from this definition, if applicable.
@@ -84,7 +113,14 @@ impl<'db> Definition<'db> {
     }
 }
 
-/// Extract a docstring from a function or class body.
+/// Get the module-level docstring for the given file
+pub(crate) fn module_docstring(db: &dyn Db, file: File) -> Option<String> {
+    let module = parsed_module(db, file).load(db);
+    docstring_from_body(module.suite())
+        .map(|docstring_expr| docstring_expr.value.to_str().to_owned())
+}
+
+/// Extract a docstring from a function, module, or class body.
 fn docstring_from_body(body: &[ast::Stmt]) -> Option<&ast::ExprStringLiteral> {
     let stmt = body.first()?;
     // Require the docstring to be a standalone expression.
@@ -616,7 +652,7 @@ impl DefinitionCategory {
 /// [`DefinitionKind`] fields in salsa tracked structs should be tracked (attributed with `#[tracked]`)
 /// because the kind is a thin wrapper around [`AstNodeRef`]. See the [`AstNodeRef`] documentation
 /// for an in-depth explanation of why this is necessary.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, get_size2::GetSize)]
 pub enum DefinitionKind<'db> {
     Import(ImportDefinitionKind),
     ImportFrom(ImportFromDefinitionKind),
@@ -664,6 +700,17 @@ impl DefinitionKind<'_> {
                 | DefinitionKind::ImportFrom(_)
                 | DefinitionKind::StarImport(_)
         )
+    }
+
+    pub(crate) const fn is_unannotated_assignment(&self) -> bool {
+        matches!(self, DefinitionKind::Assignment(_))
+    }
+
+    pub(crate) fn as_typevar(&self) -> Option<&AstNodeRef<ast::TypeParamTypeVar>> {
+        match self {
+            DefinitionKind::TypeVar(type_var) => Some(type_var),
+            _ => None,
+        }
     }
 
     /// Returns the [`TextRange`] of the definition target.
@@ -722,13 +769,14 @@ impl DefinitionKind<'_> {
                 target_range.cover(value_range)
             }
             DefinitionKind::AnnotatedAssignment(assign) => {
-                let target_range = assign.target.node(module).range();
+                let mut full_range = assign.target.node(module).range();
+                full_range = full_range.cover(assign.annotation.node(module).range());
+
                 if let Some(ref value) = assign.value {
-                    let value_range = value.node(module).range();
-                    target_range.cover(value_range)
-                } else {
-                    target_range
+                    full_range = full_range.cover(value.node(module).range());
                 }
+
+                full_range
             }
             DefinitionKind::AugmentedAssignment(aug_assign) => aug_assign.node(module).range(),
             DefinitionKind::For(for_stmt) => for_stmt.target.node(module).range(),
@@ -805,7 +853,7 @@ impl DefinitionKind<'_> {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Hash, get_size2::GetSize)]
 pub(crate) enum TargetKind<'db> {
     Sequence(UnpackPosition, Unpack<'db>),
     /// Name, attribute, or subscript.
@@ -821,14 +869,14 @@ impl<'db> From<Option<(UnpackPosition, Unpack<'db>)>> for TargetKind<'db> {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, get_size2::GetSize)]
 pub struct StarImportDefinitionKind {
     node: AstNodeRef<ast::StmtImportFrom>,
     symbol_id: ScopedSymbolId,
 }
 
 impl StarImportDefinitionKind {
-    pub(crate) fn import<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::StmtImportFrom {
+    pub fn import<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::StmtImportFrom {
         self.node.node(module)
     }
 
@@ -851,7 +899,7 @@ impl StarImportDefinitionKind {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, get_size2::GetSize)]
 pub struct MatchPatternDefinitionKind {
     pattern: AstNodeRef<ast::Pattern>,
     identifier: AstNodeRef<ast::Identifier>,
@@ -873,7 +921,7 @@ impl MatchPatternDefinitionKind {
 /// But if the target is an attribute or subscript, its definition is not in the comprehension's scope;
 /// it is in the scope in which the root variable is bound.
 /// TODO: currently we don't model this correctly and simply assume that it is in a scope outside the comprehension.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, get_size2::GetSize)]
 pub struct ComprehensionDefinitionKind<'db> {
     target_kind: TargetKind<'db>,
     iterable: AstNodeRef<ast::Expr>,
@@ -904,7 +952,7 @@ impl<'db> ComprehensionDefinitionKind<'db> {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, get_size2::GetSize)]
 pub struct ImportDefinitionKind {
     node: AstNodeRef<ast::StmtImport>,
     alias_index: usize,
@@ -912,7 +960,7 @@ pub struct ImportDefinitionKind {
 }
 
 impl ImportDefinitionKind {
-    pub(crate) fn import<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::StmtImport {
+    pub fn import<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::StmtImport {
         self.node.node(module)
     }
 
@@ -925,7 +973,7 @@ impl ImportDefinitionKind {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, get_size2::GetSize)]
 pub struct ImportFromDefinitionKind {
     node: AstNodeRef<ast::StmtImportFrom>,
     alias_index: usize,
@@ -933,7 +981,7 @@ pub struct ImportFromDefinitionKind {
 }
 
 impl ImportFromDefinitionKind {
-    pub(crate) fn import<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::StmtImportFrom {
+    pub fn import<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::StmtImportFrom {
         self.node.node(module)
     }
 
@@ -946,7 +994,7 @@ impl ImportFromDefinitionKind {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, get_size2::GetSize)]
 pub struct AssignmentDefinitionKind<'db> {
     target_kind: TargetKind<'db>,
     value: AstNodeRef<ast::Expr>,
@@ -967,7 +1015,7 @@ impl<'db> AssignmentDefinitionKind<'db> {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, get_size2::GetSize)]
 pub struct AnnotatedAssignmentDefinitionKind {
     annotation: AstNodeRef<ast::Expr>,
     value: Option<AstNodeRef<ast::Expr>>,
@@ -988,7 +1036,7 @@ impl AnnotatedAssignmentDefinitionKind {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, get_size2::GetSize)]
 pub struct WithItemDefinitionKind<'db> {
     target_kind: TargetKind<'db>,
     context_expr: AstNodeRef<ast::Expr>,
@@ -1014,7 +1062,7 @@ impl<'db> WithItemDefinitionKind<'db> {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, get_size2::GetSize)]
 pub struct ForStmtDefinitionKind<'db> {
     target_kind: TargetKind<'db>,
     iterable: AstNodeRef<ast::Expr>,
@@ -1040,7 +1088,7 @@ impl<'db> ForStmtDefinitionKind<'db> {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, get_size2::GetSize)]
 pub struct ExceptHandlerDefinitionKind {
     handler: AstNodeRef<ast::ExceptHandlerExceptHandler>,
     is_star: bool,
@@ -1177,5 +1225,14 @@ impl From<&ast::TypeParamParamSpec> for DefinitionNodeKey {
 impl From<&ast::TypeParamTypeVarTuple> for DefinitionNodeKey {
     fn from(value: &ast::TypeParamTypeVarTuple) -> Self {
         Self(NodeKey::from_node(value))
+    }
+}
+
+impl<T> From<&AstNodeRef<T>> for DefinitionNodeKey
+where
+    for<'a> &'a T: Into<DefinitionNodeKey>,
+{
+    fn from(value: &AstNodeRef<T>) -> Self {
+        Self(NodeKey::from_node_ref(value))
     }
 }

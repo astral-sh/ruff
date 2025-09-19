@@ -308,7 +308,7 @@ impl Bindings {
         self.live_bindings.iter()
     }
 
-    fn merge(
+    pub(super) fn merge(
         &mut self,
         b: Self,
         narrowing_constraints: &mut NarrowingConstraintsBuilder,

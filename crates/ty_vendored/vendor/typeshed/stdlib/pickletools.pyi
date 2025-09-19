@@ -12,7 +12,7 @@ dis(pickle, out=None, memo=None, indentlevel=4)
 
 import sys
 from collections.abc import Callable, Iterator, MutableMapping
-from typing import IO, Any
+from typing import IO, Any, Final
 from typing_extensions import TypeAlias
 
 __all__ = ["dis", "genops", "optimize"]
@@ -20,13 +20,14 @@ __all__ = ["dis", "genops", "optimize"]
 _Reader: TypeAlias = Callable[[IO[bytes]], Any]
 bytes_types: tuple[type[Any], ...]
 
-UP_TO_NEWLINE: int
-TAKEN_FROM_ARGUMENT1: int
-TAKEN_FROM_ARGUMENT4: int
-TAKEN_FROM_ARGUMENT4U: int
-TAKEN_FROM_ARGUMENT8U: int
+UP_TO_NEWLINE: Final = -1
+TAKEN_FROM_ARGUMENT1: Final = -2
+TAKEN_FROM_ARGUMENT4: Final = -3
+TAKEN_FROM_ARGUMENT4U: Final = -4
+TAKEN_FROM_ARGUMENT8U: Final = -5
 
 class ArgumentDescriptor:
+    __slots__ = ("name", "n", "reader", "doc")
     name: str
     n: int
     reader: _Reader
@@ -34,7 +35,8 @@ class ArgumentDescriptor:
     def __init__(self, name: str, n: int, reader: _Reader, doc: str) -> None: ...
 
 def read_uint1(f: IO[bytes]) -> int:
-    """>>> import io
+    """
+    >>> import io
     >>> read_uint1(io.BytesIO(b'\\xff'))
     255
     """
@@ -42,7 +44,8 @@ def read_uint1(f: IO[bytes]) -> int:
 uint1: ArgumentDescriptor
 
 def read_uint2(f: IO[bytes]) -> int:
-    """>>> import io
+    """
+    >>> import io
     >>> read_uint2(io.BytesIO(b'\\xff\\x00'))
     255
     >>> read_uint2(io.BytesIO(b'\\xff\\xff'))
@@ -52,7 +55,8 @@ def read_uint2(f: IO[bytes]) -> int:
 uint2: ArgumentDescriptor
 
 def read_int4(f: IO[bytes]) -> int:
-    """>>> import io
+    """
+    >>> import io
     >>> read_int4(io.BytesIO(b'\\xff\\x00\\x00\\x00'))
     255
     >>> read_int4(io.BytesIO(b'\\x00\\x00\\x00\\x80')) == -(2**31)
@@ -62,7 +66,8 @@ def read_int4(f: IO[bytes]) -> int:
 int4: ArgumentDescriptor
 
 def read_uint4(f: IO[bytes]) -> int:
-    """>>> import io
+    """
+    >>> import io
     >>> read_uint4(io.BytesIO(b'\\xff\\x00\\x00\\x00'))
     255
     >>> read_uint4(io.BytesIO(b'\\x00\\x00\\x00\\x80')) == 2**31
@@ -72,7 +77,8 @@ def read_uint4(f: IO[bytes]) -> int:
 uint4: ArgumentDescriptor
 
 def read_uint8(f: IO[bytes]) -> int:
-    """>>> import io
+    """
+    >>> import io
     >>> read_uint8(io.BytesIO(b'\\xff\\x00\\x00\\x00\\x00\\x00\\x00\\x00'))
     255
     >>> read_uint8(io.BytesIO(b'\\xff' * 8)) == 2**64-1
@@ -83,7 +89,8 @@ uint8: ArgumentDescriptor
 
 if sys.version_info >= (3, 12):
     def read_stringnl(f: IO[bytes], decode: bool = True, stripquotes: bool = True, *, encoding: str = "latin-1") -> bytes | str:
-        """>>> import io
+        """
+        >>> import io
         >>> read_stringnl(io.BytesIO(b"'abcd'\\nefg\\n"))
         'abcd'
 
@@ -110,7 +117,8 @@ if sys.version_info >= (3, 12):
 
 else:
     def read_stringnl(f: IO[bytes], decode: bool = True, stripquotes: bool = True) -> bytes | str:
-        """>>> import io
+        """
+        >>> import io
         >>> read_stringnl(io.BytesIO(b"'abcd'\\nefg\\n"))
         'abcd'
 
@@ -142,7 +150,8 @@ def read_stringnl_noescape(f: IO[bytes]) -> str: ...
 stringnl_noescape: ArgumentDescriptor
 
 def read_stringnl_noescape_pair(f: IO[bytes]) -> str:
-    """>>> import io
+    """
+    >>> import io
     >>> read_stringnl_noescape_pair(io.BytesIO(b"Queue\\nEmpty\\njunk"))
     'Queue Empty'
     """
@@ -150,7 +159,8 @@ def read_stringnl_noescape_pair(f: IO[bytes]) -> str:
 stringnl_noescape_pair: ArgumentDescriptor
 
 def read_string1(f: IO[bytes]) -> str:
-    """>>> import io
+    """
+    >>> import io
     >>> read_string1(io.BytesIO(b"\\x00"))
     ''
     >>> read_string1(io.BytesIO(b"\\x03abcdef"))
@@ -160,7 +170,8 @@ def read_string1(f: IO[bytes]) -> str:
 string1: ArgumentDescriptor
 
 def read_string4(f: IO[bytes]) -> str:
-    """>>> import io
+    """
+    >>> import io
     >>> read_string4(io.BytesIO(b"\\x00\\x00\\x00\\x00abc"))
     ''
     >>> read_string4(io.BytesIO(b"\\x03\\x00\\x00\\x00abcdef"))
@@ -174,7 +185,8 @@ def read_string4(f: IO[bytes]) -> str:
 string4: ArgumentDescriptor
 
 def read_bytes1(f: IO[bytes]) -> bytes:
-    """>>> import io
+    """
+    >>> import io
     >>> read_bytes1(io.BytesIO(b"\\x00"))
     b''
     >>> read_bytes1(io.BytesIO(b"\\x03abcdef"))
@@ -184,7 +196,8 @@ def read_bytes1(f: IO[bytes]) -> bytes:
 bytes1: ArgumentDescriptor
 
 def read_bytes4(f: IO[bytes]) -> bytes:
-    """>>> import io
+    """
+    >>> import io
     >>> read_bytes4(io.BytesIO(b"\\x00\\x00\\x00\\x00abc"))
     b''
     >>> read_bytes4(io.BytesIO(b"\\x03\\x00\\x00\\x00abcdef"))
@@ -198,7 +211,8 @@ def read_bytes4(f: IO[bytes]) -> bytes:
 bytes4: ArgumentDescriptor
 
 def read_bytes8(f: IO[bytes]) -> bytes:
-    """>>> import io, struct, sys
+    """
+    >>> import io, struct, sys
     >>> read_bytes8(io.BytesIO(b"\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00abc"))
     b''
     >>> read_bytes8(io.BytesIO(b"\\x03\\x00\\x00\\x00\\x00\\x00\\x00\\x00abcdef"))
@@ -213,7 +227,8 @@ def read_bytes8(f: IO[bytes]) -> bytes:
 bytes8: ArgumentDescriptor
 
 def read_unicodestringnl(f: IO[bytes]) -> str:
-    """>>> import io
+    """
+    >>> import io
     >>> read_unicodestringnl(io.BytesIO(b"abc\\\\uabcd\\njunk")) == 'abc\\uabcd'
     True
     """
@@ -221,7 +236,8 @@ def read_unicodestringnl(f: IO[bytes]) -> str:
 unicodestringnl: ArgumentDescriptor
 
 def read_unicodestring1(f: IO[bytes]) -> str:
-    """>>> import io
+    """
+    >>> import io
     >>> s = 'abcd\\uabcd'
     >>> enc = s.encode('utf-8')
     >>> enc
@@ -240,7 +256,8 @@ def read_unicodestring1(f: IO[bytes]) -> str:
 unicodestring1: ArgumentDescriptor
 
 def read_unicodestring4(f: IO[bytes]) -> str:
-    """>>> import io
+    """
+    >>> import io
     >>> s = 'abcd\\uabcd'
     >>> enc = s.encode('utf-8')
     >>> enc
@@ -259,7 +276,8 @@ def read_unicodestring4(f: IO[bytes]) -> str:
 unicodestring4: ArgumentDescriptor
 
 def read_unicodestring8(f: IO[bytes]) -> str:
-    """>>> import io
+    """
+    >>> import io
     >>> s = 'abcd\\uabcd'
     >>> enc = s.encode('utf-8')
     >>> enc
@@ -278,7 +296,8 @@ def read_unicodestring8(f: IO[bytes]) -> str:
 unicodestring8: ArgumentDescriptor
 
 def read_decimalnl_short(f: IO[bytes]) -> int:
-    """>>> import io
+    """
+    >>> import io
     >>> read_decimalnl_short(io.BytesIO(b"1234\\n56"))
     1234
 
@@ -289,7 +308,8 @@ def read_decimalnl_short(f: IO[bytes]) -> int:
     """
 
 def read_decimalnl_long(f: IO[bytes]) -> int:
-    """>>> import io
+    """
+    >>> import io
 
     >>> read_decimalnl_long(io.BytesIO(b"1234L\\n56"))
     1234
@@ -302,7 +322,8 @@ decimalnl_short: ArgumentDescriptor
 decimalnl_long: ArgumentDescriptor
 
 def read_floatnl(f: IO[bytes]) -> float:
-    """>>> import io
+    """
+    >>> import io
     >>> read_floatnl(io.BytesIO(b"-1.25\\n6"))
     -1.25
     """
@@ -310,7 +331,8 @@ def read_floatnl(f: IO[bytes]) -> float:
 floatnl: ArgumentDescriptor
 
 def read_float8(f: IO[bytes]) -> float:
-    """>>> import io, struct
+    """
+    >>> import io, struct
     >>> raw = struct.pack(">d", -1.25)
     >>> raw
     b'\\xbf\\xf4\\x00\\x00\\x00\\x00\\x00\\x00'
@@ -321,7 +343,8 @@ def read_float8(f: IO[bytes]) -> float:
 float8: ArgumentDescriptor
 
 def read_long1(f: IO[bytes]) -> int:
-    """>>> import io
+    """
+    >>> import io
     >>> read_long1(io.BytesIO(b"\\x00"))
     0
     >>> read_long1(io.BytesIO(b"\\x02\\xff\\x00"))
@@ -337,7 +360,8 @@ def read_long1(f: IO[bytes]) -> int:
 long1: ArgumentDescriptor
 
 def read_long4(f: IO[bytes]) -> int:
-    """>>> import io
+    """
+    >>> import io
     >>> read_long4(io.BytesIO(b"\\x02\\x00\\x00\\x00\\xff\\x00"))
     255
     >>> read_long4(io.BytesIO(b"\\x02\\x00\\x00\\x00\\xff\\x7f"))
@@ -353,6 +377,7 @@ def read_long4(f: IO[bytes]) -> int:
 long4: ArgumentDescriptor
 
 class StackObject:
+    __slots__ = ("name", "obtype", "doc")
     name: str
     obtype: type[Any] | tuple[type[Any], ...]
     doc: str
@@ -378,6 +403,7 @@ markobject: StackObject
 stackslice: StackObject
 
 class OpcodeInfo:
+    __slots__ = ("name", "code", "arg", "stack_before", "stack_after", "proto", "doc")
     name: str
     code: str
     arg: ArgumentDescriptor | None

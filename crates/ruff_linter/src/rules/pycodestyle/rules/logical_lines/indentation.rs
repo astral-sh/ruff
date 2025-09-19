@@ -269,7 +269,7 @@ pub(crate) fn indentation(
     range: TextRange,
     context: &LintContext,
 ) {
-    if indent_level % indent_size != 0 {
+    if !indent_level.is_multiple_of(indent_size) {
         if logical_line.is_comment_only() {
             context.report_diagnostic_if_enabled(
                 IndentationWithInvalidMultipleComment {

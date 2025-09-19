@@ -44,6 +44,7 @@ else:
             This method is deprecated in favor of loader.exec_module(). If
             exec_module() exists then it is used to provide a backwards-compatible
             functionality for this method.
+
             """
 
         def module_repr(self, module: types.ModuleType) -> str:
@@ -53,6 +54,7 @@ else:
             NotImplementedError.
 
             This method is deprecated.
+
             """
 
         def create_module(self, spec: ModuleSpec) -> types.ModuleType | None:
@@ -67,6 +69,7 @@ else:
         def exec_module(self, module: types.ModuleType) -> None: ...
 
 if sys.version_info < (3, 12):
+    @deprecated("Deprecated since Python 3.3; removed in Python 3.12. Use `MetaPathFinder` or `PathEntryFinder` instead.")
     class Finder(metaclass=ABCMeta):
         """Legacy abstract base class for import finders.
 
@@ -78,12 +81,16 @@ if sys.version_info < (3, 12):
         Deprecated since Python 3.3
         """
 
-@deprecated("Deprecated as of Python 3.7: Use importlib.resources.abc.TraversableResources instead.")
+@deprecated("Deprecated since Python 3.7. Use `importlib.resources.abc.TraversableResources` instead.")
 class ResourceLoader(Loader):
     """Abstract base class for loaders which can return data from their
-    back-end storage.
+    back-end storage to facilitate reading data to perform an import.
 
     This ABC represents one of the optional protocols specified by PEP 302.
+
+    For directly loading resources, use TraversableResources instead. This class
+    primarily exists for backwards compatibility with other ABCs in this module.
+
     """
 
     @abstractmethod
@@ -97,6 +104,7 @@ class InspectLoader(Loader):
     modules they can load.
 
     This ABC represents one of the optional protocols specified by PEP 302.
+
     """
 
     def is_package(self, fullname: str) -> bool:
@@ -141,6 +149,7 @@ class ExecutionLoader(InspectLoader):
     modules as scripts.
 
     This ABC represents one of the optional protocols specified in PEP 302.
+
     """
 
     @abstractmethod
@@ -164,9 +173,10 @@ class SourceLoader(_bootstrap_external.SourceLoader, ResourceLoader, ExecutionLo
 
         * ResourceLoader.get_data
         * ExecutionLoader.get_filename
+
     """
 
-    @deprecated("Deprecated as of Python 3.3: Use importlib.resources.abc.SourceLoader.path_stats instead.")
+    @deprecated("Deprecated since Python 3.3. Use `importlib.resources.abc.SourceLoader.path_stats` instead.")
     def path_mtime(self, path: str) -> float:
         """Return the (int) modification time for the path (str)."""
 
@@ -198,6 +208,7 @@ if sys.version_info >= (3, 10):
         """Abstract base class for import finders on sys.meta_path."""
 
         if sys.version_info < (3, 12):
+            @deprecated("Deprecated since Python 3.4; removed in Python 3.12. Use `MetaPathFinder.find_spec()` instead.")
             def find_module(self, fullname: str, path: Sequence[str] | None) -> Loader | None:
                 """Return a loader for the module.
 
@@ -207,6 +218,7 @@ if sys.version_info >= (3, 10):
                 This method is deprecated since Python 3.4 in favor of
                 finder.find_spec(). If find_spec() exists then backwards-compatible
                 functionality is provided for this method.
+
                 """
 
         def invalidate_caches(self) -> None:
@@ -222,13 +234,16 @@ if sys.version_info >= (3, 10):
         """Abstract base class for path entry finders used by PathFinder."""
 
         if sys.version_info < (3, 12):
+            @deprecated("Deprecated since Python 3.4; removed in Python 3.12. Use `PathEntryFinder.find_spec()` instead.")
             def find_module(self, fullname: str) -> Loader | None:
                 """Try to find a loader for the specified module by delegating to
                 self.find_loader().
 
                 This method is deprecated in favor of finder.find_spec().
+
                 """
 
+            @deprecated("Deprecated since Python 3.4; removed in Python 3.12. Use `find_spec()` instead.")
             def find_loader(self, fullname: str) -> tuple[Loader | None, Sequence[str]]:
                 """Return (loader, namespace portion) for the path entry.
 
@@ -266,6 +281,7 @@ else:
             This method is deprecated since Python 3.4 in favor of
             finder.find_spec(). If find_spec() exists then backwards-compatible
             functionality is provided for this method.
+
             """
 
         def invalidate_caches(self) -> None:
@@ -285,6 +301,7 @@ else:
             self.find_loader().
 
             This method is deprecated in favor of finder.find_spec().
+
             """
 
         def find_loader(self, fullname: str) -> tuple[Loader | None, Sequence[str]]:
@@ -332,6 +349,7 @@ class FileLoader(_bootstrap_external.FileLoader, ResourceLoader, ExecutionLoader
         """Load a module from a file.
 
         This method is deprecated.  Use exec_module() instead.
+
         """
 
 if sys.version_info < (3, 11):
@@ -372,35 +390,45 @@ if sys.version_info < (3, 11):
 
     @runtime_checkable
     class Traversable(Protocol):
-        """An object with a subset of pathlib.Path methods suitable for
+        """
+        An object with a subset of pathlib.Path methods suitable for
         traversing directories and opening files.
         """
 
         @abstractmethod
         def is_dir(self) -> bool:
-            """Return True if self is a dir"""
+            """
+            Return True if self is a dir
+            """
 
         @abstractmethod
         def is_file(self) -> bool:
-            """Return True if self is a file"""
+            """
+            Return True if self is a file
+            """
 
         @abstractmethod
         def iterdir(self) -> Iterator[Traversable]:
-            """Yield Traversable objects in self"""
+            """
+            Yield Traversable objects in self
+            """
         if sys.version_info >= (3, 11):
             @abstractmethod
             def joinpath(self, *descendants: str) -> Traversable: ...
         else:
             @abstractmethod
             def joinpath(self, child: str, /) -> Traversable:
-                """Return Traversable child in self"""
+                """
+                Return Traversable child in self
+                """
         # The documentation and runtime protocol allows *args, **kwargs arguments,
         # but this would mean that all implementers would have to support them,
         # which is not the case.
         @overload
         @abstractmethod
         def open(self, mode: Literal["r"] = "r", *, encoding: str | None = None, errors: str | None = None) -> IO[str]:
-            """mode may be 'r' or 'rb' to open as text or binary. Return a handle
+            """
+            mode may be 'r' or 'rb' to open as text or binary. Return a handle
             suitable for reading (same as pathlib.Path.open).
 
             When opening as text, accepts encoding parameters such as those
@@ -413,25 +441,36 @@ if sys.version_info < (3, 11):
         @property
         @abstractmethod
         def name(self) -> str:
-            """The base name of this object without any parent references."""
+            """
+            The base name of this object without any parent references.
+            """
         if sys.version_info >= (3, 10):
             def __truediv__(self, child: str, /) -> Traversable:
-                """Return Traversable child in self"""
+                """
+                Return Traversable child in self
+                """
         else:
             @abstractmethod
             def __truediv__(self, child: str, /) -> Traversable:
-                """Return Traversable child in self"""
+                """
+                Return Traversable child in self
+                """
 
         @abstractmethod
         def read_bytes(self) -> bytes:
-            """Read contents of self as bytes"""
+            """
+            Read contents of self as bytes
+            """
 
         @abstractmethod
         def read_text(self, encoding: str | None = None) -> str:
-            """Read contents of self as text"""
+            """
+            Read contents of self as text
+            """
 
     class TraversableResources(ResourceReader):
-        """The required interface for providing traversable
+        """
+        The required interface for providing traversable
         resources.
         """
 

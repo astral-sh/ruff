@@ -52,3 +52,7 @@ f"{repr(lambda: 1)}"
 f"{repr(x := 2)}"
 
 f"{str(object=3)}"
+
+f"{str(x for x in [])}"
+
+f"{str((x for x in []))}"

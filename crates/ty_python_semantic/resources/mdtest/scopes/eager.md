@@ -410,4 +410,47 @@ reveal_type(C.var)  # revealed: int | str
 x = str
 ```
 
+### Annotation scopes
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+#### Type alias annotation scopes are lazy
+
+```py
+type Foo = Bar
+
+class Bar:
+    pass
+
+def _(x: Foo):
+    if isinstance(x, Bar):
+        reveal_type(x)  # revealed: Bar
+    else:
+        reveal_type(x)  # revealed: Never
+```
+
+#### Type-param scopes are eager, but bounds/constraints are deferred
+
+```py
+# error: [unresolved-reference]
+class D[T](Bar):
+    pass
+
+class E[T: Bar]:
+    pass
+
+# error: [unresolved-reference]
+def g[T](x: Bar):
+    pass
+
+def h[T: Bar](x: T):
+    pass
+
+class Bar:
+    pass
+```
+
 [generators]: https://docs.python.org/3/reference/expressions.html#generator-expressions

@@ -290,16 +290,10 @@ from overloaded import A, f
 
 def _(x: int, y: A | int):
     reveal_type(f(x))  # revealed: int
-    # TODO: revealed: int
-    # TODO: no error
-    # error: [no-matching-overload]
-    reveal_type(f(*(x,)))  # revealed: Unknown
+    reveal_type(f(*(x,)))  # revealed: int
 
     reveal_type(f(y))  # revealed: A | int
-    # TODO: revealed: A | int
-    # TODO: no error
-    # error: [no-matching-overload]
-    reveal_type(f(*(y,)))  # revealed: Unknown
+    reveal_type(f(*(y,)))  # revealed: A | int
 ```
 
 ### Generics (PEP 695)
@@ -328,16 +322,10 @@ from overloaded import B, f
 
 def _(x: int, y: B | int):
     reveal_type(f(x))  # revealed: int
-    # TODO: revealed: int
-    # TODO: no error
-    # error: [no-matching-overload]
-    reveal_type(f(*(x,)))  # revealed: Unknown
+    reveal_type(f(*(x,)))  # revealed: int
 
     reveal_type(f(y))  # revealed: B | int
-    # TODO: revealed: B | int
-    # TODO: no error
-    # error: [no-matching-overload]
-    reveal_type(f(*(y,)))  # revealed: Unknown
+    reveal_type(f(*(y,)))  # revealed: B | int
 ```
 
 ### Expanding `bool`
@@ -620,6 +608,329 @@ def _(ab: A | B, ac: A | C, cd: C | D):
     reveal_type(f(*(cd,)))  # revealed: Unknown
 ```
 
+### Optimization: Avoid argument type expansion
+
+Argument type expansion could lead to exponential growth of the number of argument lists that needs
+to be evaluated, so ty deploys some heuristics to prevent this from happening.
+
+Heuristic: If an argument type that cannot be expanded and cannot be assighned to any of the
+remaining overloads before argument type expansion, then even with argument type expansion, it won't
+lead to a successful evaluation of the call.
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+class A: ...
+class B: ...
+class C: ...
+
+@overload
+def f() -> None: ...
+@overload
+def f(**kwargs: int) -> C: ...
+@overload
+def f(x: A, /, **kwargs: int) -> A: ...
+@overload
+def f(x: B, /, **kwargs: int) -> B: ...
+
+class Foo:
+    @overload
+    def f(self) -> None: ...
+    @overload
+    def f(self, **kwargs: int) -> C: ...
+    @overload
+    def f(self, x: A, /, **kwargs: int) -> A: ...
+    @overload
+    def f(self, x: B, /, **kwargs: int) -> B: ...
+```
+
+```py
+from overloaded import A, B, C, Foo, f
+from typing_extensions import Any, reveal_type
+
+def _(ab: A | B, a: int | Any):
+    reveal_type(f(a1=a, a2=a, a3=a))  # revealed: C
+    reveal_type(f(A(), a1=a, a2=a, a3=a))  # revealed: A
+    reveal_type(f(B(), a1=a, a2=a, a3=a))  # revealed: B
+
+    # Here, the arity check filters out the first and second overload, type checking fails on the
+    # remaining overloads, so ty moves on to argument type expansion. But, the first argument (`C`)
+    # isn't assignable to any of the remaining overloads (3 and 4), so there's no point in expanding
+    # the other 30 arguments of type `Unknown | Literal[1]` which would result in allocating a
+    # vector containing 2**30 argument lists after expanding all of the arguments.
+    reveal_type(
+        # error: [no-matching-overload]
+        # revealed: Unknown
+        f(
+            C(),
+            a1=a,
+            a2=a,
+            a3=a,
+            a4=a,
+            a5=a,
+            a6=a,
+            a7=a,
+            a8=a,
+            a9=a,
+            a10=a,
+            a11=a,
+            a12=a,
+            a13=a,
+            a14=a,
+            a15=a,
+            a16=a,
+            a17=a,
+            a18=a,
+            a19=a,
+            a20=a,
+            a21=a,
+            a22=a,
+            a23=a,
+            a24=a,
+            a25=a,
+            a26=a,
+            a27=a,
+            a28=a,
+            a29=a,
+            a30=a,
+        )
+    )
+
+    # Here, the heuristics won't come into play because all arguments can be expanded but expanding
+    # the first argument resutls in a successful evaluation of the call, so there's no exponential
+    # growth of the number of argument lists.
+    reveal_type(
+        # revealed: A | B
+        f(
+            ab,
+            a1=a,
+            a2=a,
+            a3=a,
+            a4=a,
+            a5=a,
+            a6=a,
+            a7=a,
+            a8=a,
+            a9=a,
+            a10=a,
+            a11=a,
+            a12=a,
+            a13=a,
+            a14=a,
+            a15=a,
+            a16=a,
+            a17=a,
+            a18=a,
+            a19=a,
+            a20=a,
+            a21=a,
+            a22=a,
+            a23=a,
+            a24=a,
+            a25=a,
+            a26=a,
+            a27=a,
+            a28=a,
+            a29=a,
+            a30=a,
+        )
+    )
+
+def _(foo: Foo, ab: A | B, a: int | Any):
+    reveal_type(foo.f(a1=a, a2=a, a3=a))  # revealed: C
+    reveal_type(foo.f(A(), a1=a, a2=a, a3=a))  # revealed: A
+    reveal_type(foo.f(B(), a1=a, a2=a, a3=a))  # revealed: B
+
+    reveal_type(
+        # error: [no-matching-overload]
+        # revealed: Unknown
+        foo.f(
+            C(),
+            a1=a,
+            a2=a,
+            a3=a,
+            a4=a,
+            a5=a,
+            a6=a,
+            a7=a,
+            a8=a,
+            a9=a,
+            a10=a,
+            a11=a,
+            a12=a,
+            a13=a,
+            a14=a,
+            a15=a,
+            a16=a,
+            a17=a,
+            a18=a,
+            a19=a,
+            a20=a,
+            a21=a,
+            a22=a,
+            a23=a,
+            a24=a,
+            a25=a,
+            a26=a,
+            a27=a,
+            a28=a,
+            a29=a,
+            a30=a,
+        )
+    )
+
+    reveal_type(
+        # revealed: A | B
+        foo.f(
+            ab,
+            a1=a,
+            a2=a,
+            a3=a,
+            a4=a,
+            a5=a,
+            a6=a,
+            a7=a,
+            a8=a,
+            a9=a,
+            a10=a,
+            a11=a,
+            a12=a,
+            a13=a,
+            a14=a,
+            a15=a,
+            a16=a,
+            a17=a,
+            a18=a,
+            a19=a,
+            a20=a,
+            a21=a,
+            a22=a,
+            a23=a,
+            a24=a,
+            a25=a,
+            a26=a,
+            a27=a,
+            a28=a,
+            a29=a,
+            a30=a,
+        )
+    )
+```
+
+### Optimization: Limit expansion size
+
+<!-- snapshot-diagnostics -->
+
+To prevent combinatorial explosion, ty limits the number of argument lists created by expanding a
+single argument.
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+class A: ...
+class B: ...
+class C: ...
+
+@overload
+def f() -> None: ...
+@overload
+def f(**kwargs: int) -> C: ...
+@overload
+def f(x: A, /, **kwargs: int) -> A: ...
+@overload
+def f(x: B, /, **kwargs: int) -> B: ...
+```
+
+```py
+from overloaded import A, B, f
+from typing_extensions import reveal_type
+
+def _(a: int | None):
+    reveal_type(
+        # error: [no-matching-overload]
+        # revealed: Unknown
+        f(
+            A(),
+            a1=a,
+            a2=a,
+            a3=a,
+            a4=a,
+            a5=a,
+            a6=a,
+            a7=a,
+            a8=a,
+            a9=a,
+            a10=a,
+            a11=a,
+            a12=a,
+            a13=a,
+            a14=a,
+            a15=a,
+            a16=a,
+            a17=a,
+            a18=a,
+            a19=a,
+            a20=a,
+            a21=a,
+            a22=a,
+            a23=a,
+            a24=a,
+            a25=a,
+            a26=a,
+            a27=a,
+            a28=a,
+            a29=a,
+            a30=a,
+        )
+    )
+```
+
+### Retry from parameter matching
+
+As per the spec, the argument type expansion should retry evaluating the expanded argument list from
+the type checking step. However, that creates an issue when variadic arguments are involved because
+if a variadic argument is a union type, it could be expanded to have different arities. So, ty
+retries it from the start which includes parameter matching as well.
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+@overload
+def f(x: int, y: int) -> None: ...
+@overload
+def f(x: int, y: str, z: int) -> None: ...
+```
+
+```py
+from overloaded import f
+
+# Test all of the above with a number of different splatted argument types
+
+def _(t: tuple[int, str]) -> None:
+    # This correctly produces an error because the first element of the union has a precise arity of
+    # 2, which matches the first overload, but the second element of the tuple doesn't match the
+    # second parameter type, yielding an `invalid-argument-type` error.
+    f(*t)  # error: [invalid-argument-type]
+
+def _(t: tuple[int, str, int]) -> None:
+    # This correctly produces no error because the first element of the union has a precise arity of
+    # 3, which matches the second overload.
+    f(*t)
+
+def _(t: tuple[int, str] | tuple[int, str, int]) -> None:
+    # This produces an error because the expansion produces two argument lists: `[*tuple[int, str]]`
+    # and `[*tuple[int, str, int]]`. The first list produces produces a type checking error as
+    # described in the first example, while the second list matches the second overload. And,
+    # because not all of the expanded argument list evaluates successfully, we produce an error.
+    f(*t)  # error: [no-matching-overload]
+```
+
 ## Filtering based on `Any` / `Unknown`
 
 This is the step 5 of the overload call evaluation algorithm which specifies that:
@@ -757,6 +1068,49 @@ def _(int_str: tuple[int, str], int_any: tuple[int, Any], any_any: tuple[Any, An
     reveal_type(f(*(any_any,)))  # revealed: Unknown
 ```
 
+### `Unknown` passed into an overloaded function annotated with protocols
+
+`Foo.join()` here has similar annotations to `str.join()` in typeshed:
+
+`module.pyi`:
+
+```pyi
+from typing_extensions import Iterable, overload, LiteralString, Protocol
+from ty_extensions import Unknown, is_assignable_to
+
+class Foo:
+    @overload
+    def join(self, iterable: Iterable[LiteralString], /) -> LiteralString: ...
+    @overload
+    def join(self, iterable: Iterable[str], /) -> str: ...
+```
+
+`main.py`:
+
+```py
+from module import Foo
+from typing_extensions import LiteralString
+
+def f(a: Foo, b: list[str], c: list[LiteralString], e):
+    reveal_type(e)  # revealed: Unknown
+
+    # TODO: we should select the second overload here and reveal `str`
+    # (the incorrect result is due to missing logic in protocol subtyping/assignability)
+    reveal_type(a.join(b))  # revealed: LiteralString
+
+    reveal_type(a.join(c))  # revealed: LiteralString
+
+    # since both overloads match and they have return types that are not equivalent,
+    # step (5) of the overload evaluation algorithm says we must evaluate the result of the
+    # call as `Unknown`.
+    #
+    # Note: although the spec does not state as such (since intersections in general are not
+    # specified currently), `(str | LiteralString) & Unknown` might also be a reasonable type
+    # here (the union of all overload returns, intersected with `Unknown`) -- here that would
+    # simplify to `str & Unknown`.
+    reveal_type(a.join(e))  # revealed: Unknown
+```
+
 ### Multiple arguments
 
 `overloaded.pyi`:
@@ -876,8 +1230,7 @@ def _(list_int: list[int], list_str: list[str], list_any: list[Any], any: Any):
     # TODO: revealed: A
     reveal_type(f(*(list_int,)))  # revealed: Unknown
 
-    # TODO: Should be `str`
-    reveal_type(f(list_str))  # revealed: Unknown
+    reveal_type(f(list_str))  # revealed: str
     # TODO: Should be `str`
     reveal_type(f(*(list_str,)))  # revealed: Unknown
 
@@ -913,21 +1266,14 @@ def _(integer: int, string: str, any: Any, list_any: list[Any]):
     reveal_type(f(*(integer, string)))  # revealed: int
 
     reveal_type(f(string, integer))  # revealed: int
-    # TODO: revealed: int
-    # TODO: no error
-    # error: [no-matching-overload]
-    reveal_type(f(*(string, integer)))  # revealed: Unknown
+    reveal_type(f(*(string, integer)))  # revealed: int
 
     # This matches the second overload and is _not_ the case of ambiguous overload matching.
     reveal_type(f(string, any))  # revealed: Any
-    # TODO: Any
-    reveal_type(f(*(string, any)))  # revealed: tuple[str, Any]
+    reveal_type(f(*(string, any)))  # revealed: Any
 
     reveal_type(f(string, list_any))  # revealed: list[Any]
-    # TODO: revealed: list[Any]
-    # TODO: no error
-    # error: [no-matching-overload]
-    reveal_type(f(*(string, list_any)))  # revealed: Unknown
+    reveal_type(f(*(string, list_any)))  # revealed: list[Any]
 ```
 
 ### Generic `self`

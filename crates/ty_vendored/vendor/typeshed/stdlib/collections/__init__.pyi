@@ -18,8 +18,8 @@ import sys
 from _collections_abc import dict_items, dict_keys, dict_values
 from _typeshed import SupportsItems, SupportsKeysAndGetItem, SupportsRichComparison, SupportsRichComparisonT
 from types import GenericAlias
-from typing import Any, ClassVar, Generic, NoReturn, SupportsIndex, TypeVar, final, overload
-from typing_extensions import Self
+from typing import Any, ClassVar, Generic, NoReturn, SupportsIndex, TypeVar, final, overload, type_check_only
+from typing_extensions import Self, disjoint_base
 
 if sys.version_info >= (3, 10):
     from collections.abc import (
@@ -77,6 +77,7 @@ def namedtuple(
     Point(x=11, y=22)
     >>> p._replace(x=100)               # _replace() is like str.replace() but targets named fields
     Point(x=100, y=22)
+
     """
 
 class UserDict(MutableMapping[_KT, _VT]):
@@ -270,6 +271,7 @@ class UserString(Sequence[UserString]):
     def upper(self) -> Self: ...
     def zfill(self, width: int) -> Self: ...
 
+@disjoint_base
 class deque(MutableSequence[_T]):
     """A list-like sequence optimized for data accesses near its endpoints."""
 
@@ -404,6 +406,7 @@ class Counter(dict[_T, int], Generic[_T]):
     >>> c['b'] -= 2                     # reduce the count of 'b' by two
     >>> c.most_common()                 # 'b' is still in, but its count is zero
     [('a', 3), ('c', 1), ('b', 0)]
+
     """
 
     @overload
@@ -416,6 +419,7 @@ class Counter(dict[_T, int], Generic[_T]):
         >>> c = Counter('gallahad')                 # a new counter from an iterable
         >>> c = Counter({'a': 4, 'b': 2})           # a new counter from a mapping
         >>> c = Counter(a=4, b=2)                   # a new counter from keyword args
+
         """
 
     @overload
@@ -443,6 +447,7 @@ class Counter(dict[_T, int], Generic[_T]):
 
         Note, if an element's count has been set to zero or is a negative
         number, elements() will ignore it.
+
         """
 
     def most_common(self, n: int | None = None) -> list[tuple[_T, int]]:
@@ -451,6 +456,7 @@ class Counter(dict[_T, int], Generic[_T]):
 
         >>> Counter('abracadabra').most_common(3)
         [('a', 5), ('b', 2), ('r', 2)]
+
         """
 
     @classmethod
@@ -470,6 +476,7 @@ class Counter(dict[_T, int], Generic[_T]):
         0
         >>> c['w']                          # 1 in which, minus 1 in witch, minus 1 in watch
         -1
+
         """
 
     @overload
@@ -494,6 +501,7 @@ class Counter(dict[_T, int], Generic[_T]):
         >>> c.update(d)                 # add elements from another counter
         >>> c['h']                      # four 'h' in which, witch, and watch
         4
+
         """
 
     @overload
@@ -517,6 +525,7 @@ class Counter(dict[_T, int], Generic[_T]):
 
         >>> Counter('abbb') + Counter('bcc')
         Counter({'b': 4, 'c': 2, 'a': 1})
+
         """
 
     def __sub__(self, other: Counter[_T]) -> Counter[_T]:
@@ -524,6 +533,7 @@ class Counter(dict[_T, int], Generic[_T]):
 
         >>> Counter('abbbc') - Counter('bccd')
         Counter({'b': 2, 'a': 1})
+
         """
 
     def __and__(self, other: Counter[_T]) -> Counter[_T]:
@@ -531,6 +541,7 @@ class Counter(dict[_T, int], Generic[_T]):
 
         >>> Counter('abbb') & Counter('bcc')
         Counter({'b': 1})
+
         """
 
     def __or__(self, other: Counter[_S]) -> Counter[_T | _S]:  # type: ignore[override]
@@ -538,6 +549,7 @@ class Counter(dict[_T, int], Generic[_T]):
 
         >>> Counter('abbb') | Counter('bcc')
         Counter({'b': 3, 'c': 2, 'a': 1})
+
         """
 
     def __pos__(self) -> Counter[_T]:
@@ -546,6 +558,7 @@ class Counter(dict[_T, int], Generic[_T]):
     def __neg__(self) -> Counter[_T]:
         """Subtracts from an empty counter.  Strips positive and zero counts,
         and flips the sign on negative counts.
+
         """
     # several type: ignores because __iadd__ is supposedly incompatible with __add__, etc.
     def __iadd__(self, other: SupportsItems[_T, int]) -> Self:  # type: ignore[misc]
@@ -555,6 +568,7 @@ class Counter(dict[_T, int], Generic[_T]):
         >>> c += Counter('bcc')
         >>> c
         Counter({'b': 4, 'c': 2, 'a': 1})
+
         """
 
     def __isub__(self, other: SupportsItems[_T, int]) -> Self:
@@ -564,6 +578,7 @@ class Counter(dict[_T, int], Generic[_T]):
         >>> c -= Counter('bccd')
         >>> c
         Counter({'b': 2, 'a': 1})
+
         """
 
     def __iand__(self, other: SupportsItems[_T, int]) -> Self:
@@ -573,6 +588,7 @@ class Counter(dict[_T, int], Generic[_T]):
         >>> c &= Counter('bcc')
         >>> c
         Counter({'b': 1})
+
         """
 
     def __ior__(self, other: SupportsItems[_T, int]) -> Self:  # type: ignore[override,misc]
@@ -582,6 +598,7 @@ class Counter(dict[_T, int], Generic[_T]):
         >>> c |= Counter('bcc')
         >>> c
         Counter({'b': 3, 'c': 2, 'a': 1})
+
         """
     if sys.version_info >= (3, 10):
         def total(self) -> int:
@@ -615,17 +632,21 @@ class _OrderedDictValuesView(ValuesView[_VT_co]):
 # but they are not exposed anywhere)
 # pyright doesn't have a specific error code for subclassing error!
 @final
+@type_check_only
 class _odict_keys(dict_keys[_KT_co, _VT_co]):  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues]
     def __reversed__(self) -> Iterator[_KT_co]: ...
 
 @final
+@type_check_only
 class _odict_items(dict_items[_KT_co, _VT_co]):  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues]
     def __reversed__(self) -> Iterator[tuple[_KT_co, _VT_co]]: ...
 
 @final
+@type_check_only
 class _odict_values(dict_values[_KT_co, _VT_co]):  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues]
     def __reversed__(self) -> Iterator[_VT_co]: ...
 
+@disjoint_base
 class OrderedDict(dict[_KT, _VT]):
     """Dictionary that remembers insertion order"""
 
@@ -698,6 +719,7 @@ class OrderedDict(dict[_KT, _VT]):
     @overload
     def __ror__(self, value: dict[_T1, _T2], /) -> OrderedDict[_KT | _T1, _VT | _T2]: ...  # type: ignore[misc]
 
+@disjoint_base
 class defaultdict(dict[_KT, _VT]):
     """defaultdict(default_factory=None, /, [...]) --> dict with default factory
 
@@ -779,12 +801,14 @@ class ChainMap(MutableMapping[_KT, _VT]):
     Lookups search the underlying mappings successively until a key is found.
     In contrast, writes, updates, and deletions only operate on the first
     mapping.
+
     """
 
     maps: list[MutableMapping[_KT, _VT]]
     def __init__(self, *maps: MutableMapping[_KT, _VT]) -> None:
         """Initialize a ChainMap by setting *maps* to the given mappings.
         If no mappings are provided, a single empty dictionary is used.
+
         """
 
     def new_child(self, m: MutableMapping[_KT, _VT] | None = None) -> Self:
@@ -831,15 +855,23 @@ class ChainMap(MutableMapping[_KT, _VT]):
     __copy__ = copy
     # All arguments to `fromkeys` are passed to `dict.fromkeys` at runtime,
     # so the signature should be kept in line with `dict.fromkeys`.
-    @classmethod
-    @overload
-    def fromkeys(cls, iterable: Iterable[_T]) -> ChainMap[_T, Any | None]:
-        """Create a new ChainMap with keys from iterable and values set to value."""
+    if sys.version_info >= (3, 13):
+        @classmethod
+        @overload
+        def fromkeys(cls, iterable: Iterable[_T], /) -> ChainMap[_T, Any | None]:
+            """Create a new ChainMap with keys from iterable and values set to value."""
+    else:
+        @classmethod
+        @overload
+        def fromkeys(cls, iterable: Iterable[_T]) -> ChainMap[_T, Any | None]:
+            """Create a ChainMap with a single dict created from the iterable."""
 
     @classmethod
     @overload
     # Special-case None: the user probably wants to add non-None values later.
-    def fromkeys(cls, iterable: Iterable[_T], value: None, /) -> ChainMap[_T, Any | None]: ...
+    def fromkeys(cls, iterable: Iterable[_T], value: None, /) -> ChainMap[_T, Any | None]:
+        """Create a new ChainMap with keys from iterable and values set to value."""
+
     @classmethod
     @overload
     def fromkeys(cls, iterable: Iterable[_T], value: _S, /) -> ChainMap[_T, _S]: ...

@@ -62,7 +62,7 @@ pub(super) trait BackgroundDocumentRequestHandler: RequestHandler {
     /// [`define_document_url`]: super::define_document_url
     fn document_url(
         params: &<<Self as RequestHandler>::RequestType as Request>::Params,
-    ) -> std::borrow::Cow<lsp_types::Url>;
+    ) -> std::borrow::Cow<'_, lsp_types::Url>;
 
     fn run_with_snapshot(
         snapshot: DocumentSnapshot,
@@ -100,7 +100,7 @@ pub(super) trait BackgroundDocumentNotificationHandler: NotificationHandler {
     /// [`define_document_url`]: super::define_document_url
     fn document_url(
         params: &<<Self as NotificationHandler>::NotificationType as LSPNotification>::Params,
-    ) -> std::borrow::Cow<lsp_types::Url>;
+    ) -> std::borrow::Cow<'_, lsp_types::Url>;
 
     fn run_with_snapshot(
         snapshot: DocumentSnapshot,

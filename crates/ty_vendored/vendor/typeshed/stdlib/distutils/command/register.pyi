@@ -52,6 +52,7 @@ class register(PyPIRCCommand):
          1. use existing login,
          2. register as a new user, or
          3. set the password to a random string and email the user.
+
         """
 
     def build_post_data(self, action): ...

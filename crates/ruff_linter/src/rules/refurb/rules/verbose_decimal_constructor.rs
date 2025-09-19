@@ -30,12 +30,16 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// ## Example
 /// ```python
+/// from decimal import Decimal
+///
 /// Decimal("0")
 /// Decimal(float("Infinity"))
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// from decimal import Decimal
+///
 /// Decimal(0)
 /// Decimal("Infinity")
 /// ```

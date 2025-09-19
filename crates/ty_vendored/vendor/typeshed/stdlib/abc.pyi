@@ -70,7 +70,7 @@ def abstractmethod(funcobj: _FuncT) -> _FuncT:
                 ...
     """
 
-@deprecated("Use 'classmethod' with 'abstractmethod' instead")
+@deprecated("Deprecated since Python 3.3. Use `@classmethod` stacked on top of `@abstractmethod` instead.")
 class abstractclassmethod(classmethod[_T, _P, _R_co]):
     """A decorator indicating abstract classmethods.
 
@@ -81,12 +81,13 @@ class abstractclassmethod(classmethod[_T, _P, _R_co]):
             @abstractmethod
             def my_abstract_classmethod(cls, ...):
                 ...
+
     """
 
     __isabstractmethod__: Literal[True]
     def __init__(self, callable: Callable[Concatenate[type[_T], _P], _R_co]) -> None: ...
 
-@deprecated("Use 'staticmethod' with 'abstractmethod' instead")
+@deprecated("Deprecated since Python 3.3. Use `@staticmethod` stacked on top of `@abstractmethod` instead.")
 class abstractstaticmethod(staticmethod[_P, _R_co]):
     """A decorator indicating abstract staticmethods.
 
@@ -97,12 +98,13 @@ class abstractstaticmethod(staticmethod[_P, _R_co]):
             @abstractmethod
             def my_abstract_staticmethod(...):
                 ...
+
     """
 
     __isabstractmethod__: Literal[True]
     def __init__(self, callable: Callable[_P, _R_co]) -> None: ...
 
-@deprecated("Use 'property' with 'abstractmethod' instead")
+@deprecated("Deprecated since Python 3.3. Use `@property` stacked on top of `@abstractmethod` instead.")
 class abstractproperty(property):
     """A decorator indicating abstract properties.
 
@@ -113,6 +115,7 @@ class abstractproperty(property):
             @abstractmethod
             def my_abstract_property(self):
                 ...
+
     """
 
     __isabstractmethod__: Literal[True]

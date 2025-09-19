@@ -4,8 +4,10 @@ The 'interpreters' module provides a more convenient interface.
 
 import types
 from collections.abc import Callable
-from typing import Any, Final, Literal, SupportsIndex
-from typing_extensions import TypeAlias
+from typing import Any, Final, Literal, SupportsIndex, TypeVar, overload
+from typing_extensions import TypeAlias, disjoint_base
+
+_R = TypeVar("_R")
 
 _Configs: TypeAlias = Literal["default", "isolated", "legacy", "empty", ""]
 _SharedDict: TypeAlias = dict[str, Any]  # many objects can be shared
@@ -18,6 +20,7 @@ class InterpreterNotFoundError(InterpreterError):
 
 class NotShareableError(ValueError): ...
 
+@disjoint_base
 class CrossInterpreterBufferView:
     def __buffer__(self, flags: int, /) -> memoryview:
         """Return a buffer object that exposes the underlying memory of the object."""
@@ -58,19 +61,19 @@ def destroy(id: SupportsIndex, *, restrict: bool = False) -> None:
     So does an unrecognized ID.
     """
 
-def list_all(*, require_ready: bool) -> list[tuple[int, int]]:
+def list_all(*, require_ready: bool = False) -> list[tuple[int, _Whence]]:
     """list_all() -> [(ID, whence)]
 
     Return a list containing the ID of every existing interpreter.
     """
 
-def get_current() -> tuple[int, int]:
+def get_current() -> tuple[int, _Whence]:
     """get_current() -> (ID, whence)
 
     Return the ID of current interpreter.
     """
 
-def get_main() -> tuple[int, int]:
+def get_main() -> tuple[int, _Whence]:
     """get_main() -> (ID, whence)
 
     Return the ID of main interpreter.
@@ -88,18 +91,14 @@ def get_config(id: SupportsIndex, *, restrict: bool = False) -> types.SimpleName
     Return a representation of the config used to initialize the interpreter.
     """
 
-def whence(id: SupportsIndex) -> int:
+def whence(id: SupportsIndex) -> _Whence:
     """whence(id) -> int
 
     Return an identifier for where the interpreter was created.
     """
 
 def exec(
-    id: SupportsIndex,
-    code: str | types.CodeType | Callable[[], object],
-    shared: _SharedDict | None = None,
-    *,
-    restrict: bool = False,
+    id: SupportsIndex, code: str | types.CodeType | Callable[[], object], shared: _SharedDict = {}, *, restrict: bool = False
 ) -> None | types.SimpleNamespace:
     """exec(id, code, shared=None, *, restrict=False)
 
@@ -120,12 +119,13 @@ def exec(
 
 def call(
     id: SupportsIndex,
-    callable: Callable[..., object],
-    args: tuple[object, ...] | None = None,
-    kwargs: dict[str, object] | None = None,
+    callable: Callable[..., _R],
+    args: tuple[Any, ...] = (),
+    kwargs: dict[str, Any] = {},
     *,
+    preserve_exc: bool = False,
     restrict: bool = False,
-) -> object:
+) -> tuple[_R, types.SimpleNamespace]:
     """call(id, callable, args=None, kwargs=None, *, restrict=False)
 
     Call the provided object in the identified interpreter.
@@ -133,11 +133,7 @@ def call(
     """
 
 def run_string(
-    id: SupportsIndex,
-    script: str | types.CodeType | Callable[[], object],
-    shared: _SharedDict | None = None,
-    *,
-    restrict: bool = False,
+    id: SupportsIndex, script: str | types.CodeType | Callable[[], object], shared: _SharedDict = {}, *, restrict: bool = False
 ) -> None:
     """run_string(id, script, shared=None, *, restrict=False)
 
@@ -147,7 +143,7 @@ def run_string(
     """
 
 def run_func(
-    id: SupportsIndex, func: types.CodeType | Callable[[], object], shared: _SharedDict | None = None, *, restrict: bool = False
+    id: SupportsIndex, func: types.CodeType | Callable[[], object], shared: _SharedDict = {}, *, restrict: bool = False
 ) -> None:
     """run_func(id, func, shared=None, *, restrict=False)
 
@@ -173,7 +169,8 @@ def is_shareable(obj: object) -> bool:
     False otherwise.
     """
 
-def capture_exception(exc: BaseException | None = None) -> types.SimpleNamespace:
+@overload
+def capture_exception(exc: BaseException) -> types.SimpleNamespace:
     """capture_exception(exc=None) -> types.SimpleNamespace
 
     Return a snapshot of an exception.  If "exc" is None
@@ -182,6 +179,10 @@ def capture_exception(exc: BaseException | None = None) -> types.SimpleNamespace
     The returned snapshot is the same as what _interpreters.exec() returns.
     """
 
+@overload
+def capture_exception(exc: None = None) -> types.SimpleNamespace | None: ...
+
+_Whence: TypeAlias = Literal[0, 1, 2, 3, 4, 5]
 WHENCE_UNKNOWN: Final = 0
 WHENCE_RUNTIME: Final = 1
 WHENCE_LEGACY_CAPI: Final = 2

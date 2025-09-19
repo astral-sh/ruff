@@ -260,6 +260,11 @@ def f(cond: bool) -> int:
 
 <!-- snapshot-diagnostics -->
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ```py
 # error: [invalid-return-type]
 def f() -> int:
@@ -279,6 +284,18 @@ T = TypeVar("T")
 
 # error: [invalid-return-type]
 def m(x: T) -> T: ...
+
+class A[T]: ...
+
+def f() -> A[int]:
+    class A[T]: ...
+    return A[int]()  # error: [invalid-return-type]
+
+class B: ...
+
+def g() -> B:
+    class B: ...
+    return B()  # error: [invalid-return-type]
 ```
 
 ## Invalid return type in stub file
@@ -433,6 +450,8 @@ def f(cond: bool) -> str:
 
 <!-- snapshot-diagnostics -->
 
+### Synchronous
+
 A function with a `yield` or `yield from` expression anywhere in its body is a
 [generator function](https://docs.python.org/3/glossary.html#term-generator). A generator function
 implicitly returns an instance of `types.GeneratorType` even if it does not contain any `return`
@@ -460,6 +479,8 @@ def i2() -> typing.Generator:
 def j() -> str:  # error: [invalid-return-type]
     yield 42
 ```
+
+### Asynchronous
 
 If it is an `async` function with a `yield` statement in its body, it is an
 [asynchronous generator function](https://docs.python.org/3/glossary.html#term-asynchronous-generator).
@@ -500,4 +521,17 @@ class Abstract(Protocol):
 
 class Concrete(Abstract):
     def method(self) -> str: ...  # error: [invalid-return-type]
+```
+
+## Diagnostics for `invalid-return-type` on dynamic type
+
+```toml
+environment.python-version = "3.12"
+```
+
+```py
+from typing import Never, Any
+
+def f(func: Any) -> Never:  # error: [invalid-return-type]
+    func()
 ```

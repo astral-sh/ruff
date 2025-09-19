@@ -38,7 +38,8 @@ if sys.version_info >= (3, 11):
 
     @runtime_checkable
     class Traversable(Protocol):
-        """An object with a subset of pathlib.Path methods suitable for
+        """
+        An object with a subset of pathlib.Path methods suitable for
         traversing directories and opening files.
 
         Any exceptions that occur when accessing the backing resource
@@ -47,19 +48,26 @@ if sys.version_info >= (3, 11):
 
         @abstractmethod
         def is_dir(self) -> bool:
-            """Return True if self is a directory"""
+            """
+            Return True if self is a directory
+            """
 
         @abstractmethod
         def is_file(self) -> bool:
-            """Return True if self is a file"""
+            """
+            Return True if self is a file
+            """
 
         @abstractmethod
         def iterdir(self) -> Iterator[Traversable]:
-            """Yield Traversable objects in self"""
+            """
+            Yield Traversable objects in self
+            """
 
         @abstractmethod
         def joinpath(self, *descendants: str) -> Traversable:
-            """Return Traversable resolved with any descendants applied.
+            """
+            Return Traversable resolved with any descendants applied.
 
             Each descendant should be a path segment relative to self
             and each may contain multiple levels separated by
@@ -71,7 +79,8 @@ if sys.version_info >= (3, 11):
         @overload
         @abstractmethod
         def open(self, mode: Literal["r"] = "r", *, encoding: str | None = None, errors: str | None = None) -> IO[str]:
-            """mode may be 'r' or 'rb' to open as text or binary. Return a handle
+            """
+            mode may be 'r' or 'rb' to open as text or binary. Return a handle
             suitable for reading (same as pathlib.Path.open).
 
             When opening as text, accepts encoding parameters such as those
@@ -84,21 +93,30 @@ if sys.version_info >= (3, 11):
         @property
         @abstractmethod
         def name(self) -> str:
-            """The base name of this object without any parent references."""
+            """
+            The base name of this object without any parent references.
+            """
 
         def __truediv__(self, child: str, /) -> Traversable:
-            """Return Traversable child in self"""
+            """
+            Return Traversable child in self
+            """
 
         @abstractmethod
         def read_bytes(self) -> bytes:
-            """Read contents of self as bytes"""
+            """
+            Read contents of self as bytes
+            """
 
         @abstractmethod
         def read_text(self, encoding: str | None = None) -> str:
-            """Read contents of self as text"""
+            """
+            Read contents of self as text
+            """
 
     class TraversableResources(ResourceReader):
-        """The required interface for providing traversable
+        """
+        The required interface for providing traversable
         resources.
         """
 

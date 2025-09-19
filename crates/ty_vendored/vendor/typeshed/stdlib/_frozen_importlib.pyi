@@ -15,6 +15,7 @@ from _typeshed.importlib import LoaderProtocol
 from collections.abc import Mapping, Sequence
 from types import ModuleType
 from typing import Any, ClassVar
+from typing_extensions import deprecated
 
 # Signature of `builtins.__import__` should be kept identical to `importlib.__import__`
 def __import__(
@@ -32,6 +33,7 @@ def __import__(
     being imported (e.g. ``from module import <fromlist>``).  The 'level'
     argument represents the package location to import from in a relative
     import (e.g. ``from ..pkg import mod`` would have a 'level' of 2).
+
     """
 
 def spec_from_loader(
@@ -80,6 +82,7 @@ class ModuleSpec:
 
     Only finders (see importlib.abc.MetaPathFinder and
     importlib.abc.PathEntryFinder) should modify ModuleSpec instances.
+
     """
 
     def __init__(
@@ -109,17 +112,20 @@ class BuiltinImporter(importlib.abc.MetaPathFinder, importlib.abc.InspectLoader)
 
     All methods are either class or static methods to avoid the need to
     instantiate the class.
+
     """
 
     # MetaPathFinder
     if sys.version_info < (3, 12):
         @classmethod
+        @deprecated("Deprecated since Python 3.4; removed in Python 3.12. Use `find_spec()` instead.")
         def find_module(cls, fullname: str, path: Sequence[str] | None = None) -> importlib.abc.Loader | None:
             """Find the built-in module.
 
             If 'path' is ever specified then the search is considered a failure.
 
             This method is deprecated.  Use find_spec() instead.
+
             """
 
     @classmethod
@@ -136,6 +142,7 @@ class BuiltinImporter(importlib.abc.MetaPathFinder, importlib.abc.InspectLoader)
         """Load the specified module into sys.modules and return it.
 
         This method is deprecated.  Use loader.exec_module() instead.
+
         """
 
     @classmethod
@@ -148,10 +155,15 @@ class BuiltinImporter(importlib.abc.MetaPathFinder, importlib.abc.InspectLoader)
     # Loader
     if sys.version_info < (3, 12):
         @staticmethod
+        @deprecated(
+            "Deprecated since Python 3.4; removed in Python 3.12. "
+            "The module spec is now used by the import machinery to generate a module repr."
+        )
         def module_repr(module: types.ModuleType) -> str:
             """Return repr for the module.
 
             The method is deprecated.  The import machinery does the job itself.
+
             """
     if sys.version_info >= (3, 10):
         @staticmethod
@@ -175,15 +187,18 @@ class FrozenImporter(importlib.abc.MetaPathFinder, importlib.abc.InspectLoader):
 
     All methods are either class or static methods to avoid the need to
     instantiate the class.
+
     """
 
     # MetaPathFinder
     if sys.version_info < (3, 12):
         @classmethod
+        @deprecated("Deprecated since Python 3.4; removed in Python 3.12. Use `find_spec()` instead.")
         def find_module(cls, fullname: str, path: Sequence[str] | None = None) -> importlib.abc.Loader | None:
             """Find a frozen module.
 
             This method is deprecated.  Use find_spec() instead.
+
             """
 
     @classmethod
@@ -200,6 +215,7 @@ class FrozenImporter(importlib.abc.MetaPathFinder, importlib.abc.InspectLoader):
         """Load a frozen module.
 
         This method is deprecated.  Use exec_module() instead.
+
         """
 
     @classmethod
@@ -212,10 +228,15 @@ class FrozenImporter(importlib.abc.MetaPathFinder, importlib.abc.InspectLoader):
     # Loader
     if sys.version_info < (3, 12):
         @staticmethod
+        @deprecated(
+            "Deprecated since Python 3.4; removed in Python 3.12. "
+            "The module spec is now used by the import machinery to generate a module repr."
+        )
         def module_repr(m: types.ModuleType) -> str:
             """Return repr for the module.
 
             The method is deprecated.  The import machinery does the job itself.
+
             """
     if sys.version_info >= (3, 10):
         @staticmethod

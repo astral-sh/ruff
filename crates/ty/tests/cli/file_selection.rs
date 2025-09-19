@@ -724,3 +724,231 @@ fn invalid_exclude_pattern() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+/// Test that ty works correctly with Bazel's symlinked file structure
+#[test]
+#[cfg(unix)]
+fn bazel_symlinked_files() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        // Original source files in the project
+        (
+            "main.py",
+            r#"
+import library
+
+result = library.process_data()
+print(undefined_var)  # error: unresolved-reference
+            "#,
+        ),
+        (
+            "library.py",
+            r#"
+def process_data():
+    return missing_value  # error: unresolved-reference
+            "#,
+        ),
+        // Another source file that won't be symlinked
+        (
+            "other.py",
+            r#"
+print(other_undefined)  # error: unresolved-reference
+            "#,
+        ),
+    ])?;
+
+    // Create Bazel-style symlinks pointing to the actual source files
+    // Bazel typically creates symlinks in bazel-out/k8-fastbuild/bin/ that point to actual sources
+    std::fs::create_dir_all(case.project_dir.join("bazel-out/k8-fastbuild/bin"))?;
+
+    // Use absolute paths to ensure the symlinks work correctly
+    case.write_symlink(
+        case.project_dir.join("main.py"),
+        "bazel-out/k8-fastbuild/bin/main.py",
+    )?;
+    case.write_symlink(
+        case.project_dir.join("library.py"),
+        "bazel-out/k8-fastbuild/bin/library.py",
+    )?;
+
+    // Change to the bazel-out directory and run ty from there
+    // The symlinks should be followed and errors should be found
+    assert_cmd_snapshot!(case.command().current_dir(case.project_dir.join("bazel-out/k8-fastbuild/bin")), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `missing_value` used when not defined
+     --> library.py:3:12
+      |
+    2 | def process_data():
+    3 |     return missing_value  # error: unresolved-reference
+      |            ^^^^^^^^^^^^^
+      |
+    info: rule `unresolved-reference` is enabled by default
+
+    error[unresolved-reference]: Name `undefined_var` used when not defined
+     --> main.py:5:7
+      |
+    4 | result = library.process_data()
+    5 | print(undefined_var)  # error: unresolved-reference
+      |       ^^^^^^^^^^^^^
+      |
+    info: rule `unresolved-reference` is enabled by default
+
+    Found 2 diagnostics
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    // Test that when checking a specific symlinked file from the bazel-out directory, it works correctly
+    assert_cmd_snapshot!(case.command().current_dir(case.project_dir.join("bazel-out/k8-fastbuild/bin")).arg("main.py"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `undefined_var` used when not defined
+     --> main.py:5:7
+      |
+    4 | result = library.process_data()
+    5 | print(undefined_var)  # error: unresolved-reference
+      |       ^^^^^^^^^^^^^
+      |
+    info: rule `unresolved-reference` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    Ok(())
+}
+
+/// Test that exclude patterns match on symlink source names, not target names
+#[test]
+#[cfg(unix)]
+fn exclude_symlink_source_not_target() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        // Target files with generic names
+        (
+            "src/module.py",
+            r#"
+def process():
+    return undefined_var  # error: unresolved-reference
+            "#,
+        ),
+        (
+            "src/utils.py",
+            r#"
+def helper():
+    return missing_value  # error: unresolved-reference
+            "#,
+        ),
+        (
+            "regular.py",
+            r#"
+print(regular_undefined)  # error: unresolved-reference
+            "#,
+        ),
+    ])?;
+
+    // Create symlinks with names that differ from their targets
+    // This simulates build systems that rename files during symlinking
+    case.write_symlink("src/module.py", "generated_module.py")?;
+    case.write_symlink("src/utils.py", "generated_utils.py")?;
+
+    // Exclude pattern should match on the symlink name (generated_*), not the target name
+    assert_cmd_snapshot!(case.command().arg("--exclude").arg("generated_*.py"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `regular_undefined` used when not defined
+     --> regular.py:2:7
+      |
+    2 | print(regular_undefined)  # error: unresolved-reference
+      |       ^^^^^^^^^^^^^^^^^
+      |
+    info: rule `unresolved-reference` is enabled by default
+
+    error[unresolved-reference]: Name `undefined_var` used when not defined
+     --> src/module.py:3:12
+      |
+    2 | def process():
+    3 |     return undefined_var  # error: unresolved-reference
+      |            ^^^^^^^^^^^^^
+      |
+    info: rule `unresolved-reference` is enabled by default
+
+    error[unresolved-reference]: Name `missing_value` used when not defined
+     --> src/utils.py:3:12
+      |
+    2 | def helper():
+    3 |     return missing_value  # error: unresolved-reference
+      |            ^^^^^^^^^^^^^
+      |
+    info: rule `unresolved-reference` is enabled by default
+
+    Found 3 diagnostics
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    // Exclude pattern on target path should not affect symlinks with different names
+    assert_cmd_snapshot!(case.command().arg("--exclude").arg("src/*.py"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `undefined_var` used when not defined
+     --> generated_module.py:3:12
+      |
+    2 | def process():
+    3 |     return undefined_var  # error: unresolved-reference
+      |            ^^^^^^^^^^^^^
+      |
+    info: rule `unresolved-reference` is enabled by default
+
+    error[unresolved-reference]: Name `missing_value` used when not defined
+     --> generated_utils.py:3:12
+      |
+    2 | def helper():
+    3 |     return missing_value  # error: unresolved-reference
+      |            ^^^^^^^^^^^^^
+      |
+    info: rule `unresolved-reference` is enabled by default
+
+    error[unresolved-reference]: Name `regular_undefined` used when not defined
+     --> regular.py:2:7
+      |
+    2 | print(regular_undefined)  # error: unresolved-reference
+      |       ^^^^^^^^^^^^^^^^^
+      |
+    info: rule `unresolved-reference` is enabled by default
+
+    Found 3 diagnostics
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    // Test that explicitly passing a symlink always checks it, even if excluded
+    assert_cmd_snapshot!(case.command().arg("--exclude").arg("generated_*.py").arg("generated_module.py"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `undefined_var` used when not defined
+     --> generated_module.py:3:12
+      |
+    2 | def process():
+    3 |     return undefined_var  # error: unresolved-reference
+      |            ^^^^^^^^^^^^^
+      |
+    info: rule `unresolved-reference` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    Ok(())
+}

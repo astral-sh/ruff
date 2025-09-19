@@ -57,7 +57,7 @@ export interface Diagnostic {
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
 pub struct ExpandedMessage {
-    pub code: Option<String>,
+    pub code: String,
     pub message: String,
     pub start_location: Location,
     pub end_location: Location,
@@ -203,7 +203,7 @@ impl Workspace {
         // Extract the `# noqa` and `# isort: skip` directives from the source.
         let directives = directives::extract_directives(
             parsed.tokens(),
-            directives::Flags::empty(),
+            directives::Flags::from_settings(&self.settings.linter),
             &locator,
             &indexer,
         );
@@ -229,10 +229,14 @@ impl Workspace {
         let messages: Vec<ExpandedMessage> = diagnostics
             .into_iter()
             .map(|msg| ExpandedMessage {
-                code: msg.secondary_code().map(ToString::to_string),
+                code: msg.secondary_code_or_id().to_string(),
                 message: msg.body().to_string(),
-                start_location: source_code.line_column(msg.expect_range().start()).into(),
-                end_location: source_code.line_column(msg.expect_range().end()).into(),
+                start_location: source_code
+                    .line_column(msg.range().unwrap_or_default().start())
+                    .into(),
+                end_location: source_code
+                    .line_column(msg.range().unwrap_or_default().end())
+                    .into(),
                 fix: msg.fix().map(|fix| ExpandedFix {
                     message: msg.first_help_text().map(ToString::to_string),
                     edits: fix
@@ -308,7 +312,7 @@ impl<'a> ParsedModule<'a> {
         })
     }
 
-    fn format(&self, settings: &Settings) -> FormatResult<Formatted<PyFormatContext>> {
+    fn format(&self, settings: &Settings) -> FormatResult<Formatted<PyFormatContext<'_>>> {
         // TODO(konstin): Add an options for py/pyi to the UI (2/2)
         let options = settings
             .formatter

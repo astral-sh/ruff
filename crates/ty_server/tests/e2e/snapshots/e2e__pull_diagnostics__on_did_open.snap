@@ -7,7 +7,9 @@ Report(
         RelatedFullDocumentDiagnosticReport {
             related_documents: None,
             full_document_diagnostic_report: FullDocumentDiagnosticReport {
-                result_id: None,
+                result_id: Some(
+                    "[RESULT_ID]",
+                ),
                 items: [
                     Diagnostic {
                         range: Range {

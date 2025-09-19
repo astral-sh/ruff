@@ -19,20 +19,34 @@ if sys.platform != "win32":
         Open a pty master/slave pair, using os.openpty() if possible.
         """
     if sys.version_info < (3, 14):
-        @deprecated("Deprecated in 3.12, to be removed in 3.14; use openpty() instead")
-        def master_open() -> tuple[int, str]:
-            """master_open() -> (master_fd, slave_name)
-            Open a pty master and return the fd, and the filename of the slave end.
-            Deprecated, use openpty() instead.
-            """
+        if sys.version_info >= (3, 12):
+            @deprecated("Deprecated since Python 3.12; removed in Python 3.14. Use `openpty()` instead.")
+            def master_open() -> tuple[int, str]:
+                """master_open() -> (master_fd, slave_name)
+                Open a pty master and return the fd, and the filename of the slave end.
+                Deprecated, use openpty() instead.
+                """
 
-        @deprecated("Deprecated in 3.12, to be removed in 3.14; use openpty() instead")
-        def slave_open(tty_name: str) -> int:
-            """slave_open(tty_name) -> slave_fd
-            Open the pty slave and acquire the controlling terminal, returning
-            opened filedescriptor.
-            Deprecated, use openpty() instead.
-            """
+            @deprecated("Deprecated since Python 3.12; removed in Python 3.14. Use `openpty()` instead.")
+            def slave_open(tty_name: str) -> int:
+                """slave_open(tty_name) -> slave_fd
+                Open the pty slave and acquire the controlling terminal, returning
+                opened filedescriptor.
+                Deprecated, use openpty() instead.
+                """
+        else:
+            def master_open() -> tuple[int, str]:
+                """master_open() -> (master_fd, slave_name)
+                Open a pty master and return the fd, and the filename of the slave end.
+                Deprecated, use openpty() instead.
+                """
+
+            def slave_open(tty_name: str) -> int:
+                """slave_open(tty_name) -> slave_fd
+                Open the pty slave and acquire the controlling terminal, returning
+                opened filedescriptor.
+                Deprecated, use openpty() instead.
+                """
 
     def fork() -> tuple[int, int]:
         """fork() -> (pid, master_fd)

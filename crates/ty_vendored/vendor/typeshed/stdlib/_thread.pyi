@@ -9,7 +9,7 @@ from collections.abc import Callable
 from threading import Thread
 from types import TracebackType
 from typing import Any, Final, NoReturn, final, overload
-from typing_extensions import TypeVarTuple, Unpack
+from typing_extensions import TypeVarTuple, Unpack, disjoint_base
 
 _Ts = TypeVarTuple("_Ts")
 
@@ -253,7 +253,7 @@ def start_new(function: Callable[[Unpack[_Ts]], object], args: tuple[Unpack[_Ts]
 def start_new(function: Callable[..., object], args: tuple[Any, ...], kwargs: dict[str, Any], /) -> int: ...
 
 if sys.version_info >= (3, 10):
-    def interrupt_main(signum: signal.Signals = ..., /) -> None:
+    def interrupt_main(signum: signal.Signals = signal.SIGINT, /) -> None:
         """Simulate the arrival of the given signal in the main thread,
         where the corresponding signal handler will be executed.
         If *signum* is omitted, SIGINT is assumed.
@@ -315,7 +315,7 @@ def stack_size(size: int = 0, /) -> int:
     the suggested approach in the absence of more specific information).
     """
 
-TIMEOUT_MAX: float
+TIMEOUT_MAX: Final[float]
 
 def get_native_id() -> int:  # only available on some platforms
     """Return a non-negative integer identifying the thread as reported
@@ -361,6 +361,7 @@ if sys.version_info >= (3, 14):
     def set_name(name: str) -> None:
         """Set the name of the current thread."""
 
+@disjoint_base
 class _local:
     """Thread-local data"""
 

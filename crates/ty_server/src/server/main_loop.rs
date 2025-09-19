@@ -1,14 +1,12 @@
 use crate::server::schedule::Scheduler;
 use crate::server::{Server, api};
-use crate::session::ClientOptions;
-use crate::session::client::Client;
+use crate::session::client::{Client, ClientResponseHandler};
+use crate::session::{ClientOptions, SuspendedWorkspaceDiagnosticRequest};
 use anyhow::anyhow;
 use crossbeam::select;
 use lsp_server::Message;
 use lsp_types::notification::Notification;
-use lsp_types::{
-    ConfigurationParams, DidChangeWatchedFilesRegistrationOptions, FileSystemWatcher, Url,
-};
+use lsp_types::{ConfigurationParams, Url};
 use serde_json::Value;
 
 pub(crate) type ConnectionSender = crossbeam::channel::Sender<Message>;
@@ -49,7 +47,8 @@ impl Server {
 
                             if self.session.is_shutdown_requested() {
                                 tracing::warn!(
-                                    "Received request after server shutdown was requested, discarding"
+                                    "Received request `{}` after server shutdown was requested, discarding",
+                                    &req.method
                                 );
                                 client.respond_err(
                                     req.id,
@@ -87,7 +86,7 @@ impl Server {
                                 .outgoing_mut()
                                 .complete(&response.id)
                             {
-                                handler(&client, response);
+                                handler.handle_response(&client, response);
                             } else {
                                 tracing::error!(
                                     "Received a response with ID {}, which was not expected",
@@ -130,7 +129,8 @@ impl Server {
                             .incoming()
                             .is_pending(&request.id)
                         {
-                            api::request(request);
+                            let task = api::request(request);
+                            scheduler.dispatch(task, &mut self.session, client);
                         } else {
                             tracing::debug!(
                                 "Request {}/{} was cancelled, not retrying",
@@ -139,9 +139,23 @@ impl Server {
                             );
                         }
                     }
+
+                    Action::SendRequest(request) => client.send_request_raw(&self.session, request),
+
+                    Action::SuspendWorkspaceDiagnostics(suspended_request) => {
+                        self.session.set_suspended_workspace_diagnostics_request(
+                            *suspended_request,
+                            &client,
+                        );
+                    }
+
                     Action::InitializeWorkspaces(workspaces_with_options) => {
                         self.session
                             .initialize_workspaces(workspaces_with_options, &client);
+                        // We do this here after workspaces have been initialized
+                        // so that the file watcher globs can take project search
+                        // paths into account.
+                        // self.try_register_file_watcher(&client);
                     }
                 },
             }
@@ -182,12 +196,42 @@ impl Server {
     }
 
     fn initialize(&mut self, client: &Client) {
+        self.request_workspace_configurations(client);
+    }
+
+    /// Requests workspace configurations from the client for all the workspaces in the session.
+    ///
+    /// If the client does not support workspace configuration, it initializes the workspaces
+    /// using the initialization options provided by the client.
+    fn request_workspace_configurations(&mut self, client: &Client) {
+        if !self
+            .session
+            .client_capabilities()
+            .supports_workspace_configuration()
+        {
+            tracing::info!(
+                "Client does not support workspace configuration, initializing workspaces \
+                using the initialization options"
+            );
+            self.session.initialize_workspaces(
+                self.session
+                    .workspaces()
+                    .urls()
+                    .cloned()
+                    .map(|url| (url, self.session.initialization_options().options.clone()))
+                    .collect::<Vec<_>>(),
+                client,
+            );
+            return;
+        }
+
         let urls = self
             .session
             .workspaces()
             .urls()
             .cloned()
             .collect::<Vec<_>>();
+
         let items = urls
             .iter()
             .map(|root| lsp_types::ConfigurationItem {
@@ -197,97 +241,47 @@ impl Server {
             .collect();
 
         tracing::debug!("Requesting workspace configuration for workspaces");
-        client
-            .send_request::<lsp_types::request::WorkspaceConfiguration>(
-                &self.session,
-                ConfigurationParams { items },
-                |client, result: Vec<Value>| {
-                    tracing::debug!("Received workspace configurations, initializing workspaces");
-                    assert_eq!(result.len(), urls.len());
+        client.send_request::<lsp_types::request::WorkspaceConfiguration>(
+            &self.session,
+            ConfigurationParams { items },
+            |client, result: Vec<Value>| {
+                tracing::debug!("Received workspace configurations, initializing workspaces");
 
-                    let workspaces_with_options: Vec<_> = urls
-                        .into_iter()
-                        .zip(result)
-                        .map(|(url, value)| {
-                            let options: ClientOptions = serde_json::from_value(value).unwrap_or_else(|err| {
-                                tracing::warn!("Failed to deserialize workspace options for {url}: {err}. Using default options.");
+                // This shouldn't fail because, as per the spec, the client needs to provide a
+                // `null` value even if it cannot provide a configuration for a workspace.
+                assert_eq!(
+                    result.len(),
+                    urls.len(),
+                    "Mismatch in number of workspace URLs ({}) and configuration results ({})",
+                    urls.len(),
+                    result.len()
+                );
+
+                let workspaces_with_options: Vec<_> = urls
+                    .into_iter()
+                    .zip(result)
+                    .map(|(url, value)| {
+                        if value.is_null() {
+                            tracing::debug!(
+                                "No workspace options provided for {url}, using default options"
+                            );
+                            return (url, ClientOptions::default());
+                        }
+                        let options: ClientOptions =
+                            serde_json::from_value(value).unwrap_or_else(|err| {
+                                tracing::error!(
+                                    "Failed to deserialize workspace options for {url}: {err}. \
+                                        Using default options"
+                                );
                                 ClientOptions::default()
                             });
-
-                            (url, options)
-                        })
-                        .collect();
-
-
-                    client.queue_action(Action::InitializeWorkspaces(workspaces_with_options));
-                },
-            );
-
-        let fs_watcher = self
-            .client_capabilities
-            .workspace
-            .as_ref()
-            .and_then(|workspace| workspace.did_change_watched_files?.dynamic_registration)
-            .unwrap_or_default();
-
-        if fs_watcher {
-            let registration = lsp_types::Registration {
-                id: "workspace/didChangeWatchedFiles".to_owned(),
-                method: "workspace/didChangeWatchedFiles".to_owned(),
-                register_options: Some(
-                    serde_json::to_value(DidChangeWatchedFilesRegistrationOptions {
-                        watchers: vec![
-                            FileSystemWatcher {
-                                glob_pattern: lsp_types::GlobPattern::String("**/ty.toml".into()),
-                                kind: None,
-                            },
-                            FileSystemWatcher {
-                                glob_pattern: lsp_types::GlobPattern::String(
-                                    "**/.gitignore".into(),
-                                ),
-                                kind: None,
-                            },
-                            FileSystemWatcher {
-                                glob_pattern: lsp_types::GlobPattern::String("**/.ignore".into()),
-                                kind: None,
-                            },
-                            FileSystemWatcher {
-                                glob_pattern: lsp_types::GlobPattern::String(
-                                    "**/pyproject.toml".into(),
-                                ),
-                                kind: None,
-                            },
-                            FileSystemWatcher {
-                                glob_pattern: lsp_types::GlobPattern::String("**/*.py".into()),
-                                kind: None,
-                            },
-                            FileSystemWatcher {
-                                glob_pattern: lsp_types::GlobPattern::String("**/*.pyi".into()),
-                                kind: None,
-                            },
-                            FileSystemWatcher {
-                                glob_pattern: lsp_types::GlobPattern::String("**/*.ipynb".into()),
-                                kind: None,
-                            },
-                        ],
+                        (url, options)
                     })
-                    .unwrap(),
-                ),
-            };
-            let response_handler = move |_: &Client, ()| {
-                tracing::info!("File watcher successfully registered");
-            };
+                    .collect();
 
-            client.send_request::<lsp_types::request::RegisterCapability>(
-                &self.session,
-                lsp_types::RegistrationParams {
-                    registrations: vec![registration],
-                },
-                response_handler,
-            );
-        } else {
-            tracing::warn!("The client does not support file system watching.");
-        }
+                client.queue_action(Action::InitializeWorkspaces(workspaces_with_options));
+            },
+        );
     }
 }
 
@@ -300,6 +294,11 @@ pub(crate) enum Action {
     /// Retry a request that previously failed due to a salsa cancellation.
     RetryRequest(lsp_server::Request),
 
+    /// Send a request from the server to the client.
+    SendRequest(SendRequest),
+
+    SuspendWorkspaceDiagnostics(Box<SuspendedWorkspaceDiagnosticRequest>),
+
     /// Initialize the workspace after the server received
     /// the options from the client.
     InitializeWorkspaces(Vec<(Url, ClientOptions)>),
@@ -311,4 +310,19 @@ pub(crate) enum Event {
     Message(lsp_server::Message),
 
     Action(Action),
+}
+
+pub(crate) struct SendRequest {
+    pub(crate) method: String,
+    pub(crate) params: serde_json::Value,
+    pub(crate) response_handler: ClientResponseHandler,
+}
+
+impl std::fmt::Debug for SendRequest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SendRequest")
+            .field("method", &self.method)
+            .field("params", &self.params)
+            .finish_non_exhaustive()
+    }
 }

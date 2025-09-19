@@ -19,42 +19,60 @@ exit_code: 1
 [
   {
     "check_name": "F401",
-    "description": "`os` imported but unused",
+    "description": "F401: `os` imported but unused",
+    "severity": "major",
     "fingerprint": "4dbad37161e65c72",
     "location": {
-      "lines": {
-        "begin": 1,
-        "end": 1
-      },
-      "path": "input.py"
-    },
-    "severity": "major"
+      "path": "input.py",
+      "positions": {
+        "begin": {
+          "line": 1,
+          "column": 8
+        },
+        "end": {
+          "line": 1,
+          "column": 10
+        }
+      }
+    }
   },
   {
     "check_name": "F821",
-    "description": "Undefined name `y`",
+    "description": "F821: Undefined name `y`",
+    "severity": "major",
     "fingerprint": "7af59862a085230",
     "location": {
-      "lines": {
-        "begin": 2,
-        "end": 2
-      },
-      "path": "input.py"
-    },
-    "severity": "major"
+      "path": "input.py",
+      "positions": {
+        "begin": {
+          "line": 2,
+          "column": 5
+        },
+        "end": {
+          "line": 2,
+          "column": 6
+        }
+      }
+    }
   },
   {
-    "check_name": "syntax-error",
-    "description": "Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)",
+    "check_name": "invalid-syntax",
+    "description": "invalid-syntax: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)",
+    "severity": "major",
     "fingerprint": "e558cec859bb66e8",
     "location": {
-      "lines": {
-        "begin": 3,
-        "end": 3
-      },
-      "path": "input.py"
-    },
-    "severity": "major"
+      "path": "input.py",
+      "positions": {
+        "begin": {
+          "line": 3,
+          "column": 1
+        },
+        "end": {
+          "line": 3,
+          "column": 6
+        }
+      }
+    }
   }
 ]
 ----- stderr -----

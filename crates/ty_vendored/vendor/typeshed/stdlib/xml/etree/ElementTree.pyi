@@ -38,7 +38,7 @@ from _collections_abc import dict_keys
 from _typeshed import FileDescriptorOrPath, ReadableBuffer, SupportsRead, SupportsWrite
 from collections.abc import Callable, Generator, ItemsView, Iterable, Iterator, Mapping, Sequence
 from typing import Any, Final, Generic, Literal, Protocol, SupportsIndex, TypeVar, overload, type_check_only
-from typing_extensions import TypeAlias, TypeGuard, deprecated
+from typing_extensions import TypeAlias, TypeGuard, deprecated, disjoint_base
 from xml.parsers.expat import XMLParserType
 
 __all__ = [
@@ -128,14 +128,13 @@ def canonicalize(
 ) -> None: ...
 
 # The tag for Element can be set to the Comment or ProcessingInstruction
-# functions defined in this module. _ElementCallable could be a recursive
-# type, but defining it that way uncovered a bug in pytype.
-_ElementCallable: TypeAlias = Callable[..., Element[Any]]
-_CallableElement: TypeAlias = Element[_ElementCallable]
+# functions defined in this module.
+_ElementCallable: TypeAlias = Callable[..., Element[_ElementCallable]]
 
 _Tag = TypeVar("_Tag", default=str, bound=str | _ElementCallable)
 _OtherTag = TypeVar("_OtherTag", default=str, bound=str | _ElementCallable)
 
+@disjoint_base
 class Element(Generic[_Tag]):
     tag: _Tag
     attrib: dict[str, str]
@@ -196,16 +195,17 @@ class Element(Generic[_Tag]):
         """True if self else False"""
 
 def SubElement(parent: Element, tag: str, attrib: dict[str, str] = ..., **extra: str) -> Element: ...
-def Comment(text: str | None = None) -> _CallableElement:
+def Comment(text: str | None = None) -> Element[_ElementCallable]:
     """Comment element factory.
 
     This function creates a special element which the standard serializer
     serializes as an XML comment.
 
     *text* is a string containing the comment string.
+
     """
 
-def ProcessingInstruction(target: str, text: str | None = None) -> _CallableElement:
+def ProcessingInstruction(target: str, text: str | None = None) -> Element[_ElementCallable]:
     """Processing Instruction element factory.
 
     This function creates a special element which the standard serializer
@@ -213,6 +213,7 @@ def ProcessingInstruction(target: str, text: str | None = None) -> _CallableElem
 
     *target* is a string containing the processing instruction, *text* is a
     string containing the processing instruction contents, if any.
+
     """
 
 PI = ProcessingInstruction
@@ -229,6 +230,7 @@ class QName:
     *tag* is an optional argument which if given, will make the first
     argument (text_or_uri) be interpreted as a URI, and this argument (tag)
     be interpreted as a local name.
+
     """
 
     text: str
@@ -251,6 +253,7 @@ class ElementTree(Generic[_Root]):
     *element* is an optional root element node,
     *file* is an optional file handle or file name of an XML file whose
     contents will be used to initialize the tree with.
+
     """
 
     def __init__(self, element: Element | None = None, file: _FileRead | None = None) -> None: ...
@@ -266,6 +269,7 @@ class ElementTree(Generic[_Root]):
         ParseError is raised if the parser fails to parse the document.
 
         Returns the root element of the given source document.
+
         """
 
     def iter(self, tag: str | None = None) -> Generator[Element, None, None]:
@@ -275,6 +279,7 @@ class ElementTree(Generic[_Root]):
 
         *tag* is a string with the tag name to iterate over
         (default is to return all elements).
+
         """
 
     def find(self, path: str, namespaces: dict[str, str] | None = None) -> Element | None:
@@ -286,6 +291,7 @@ class ElementTree(Generic[_Root]):
         *namespaces* is an optional mapping from namespace prefix to full name.
 
         Return the first matching element, or None if no element was found.
+
         """
 
     @overload
@@ -298,6 +304,7 @@ class ElementTree(Generic[_Root]):
         *namespaces* is an optional mapping from namespace prefix to full name.
 
         Return the first matching element, or None if no element was found.
+
         """
 
     @overload
@@ -311,6 +318,7 @@ class ElementTree(Generic[_Root]):
         *namespaces* is an optional mapping from namespace prefix to full name.
 
         Return list containing all matching elements in document order.
+
         """
 
     @overload
@@ -323,6 +331,7 @@ class ElementTree(Generic[_Root]):
         *namespaces* is an optional mapping from namespace prefix to full name.
 
         Return an iterable yielding all matching elements in document order.
+
         """
 
     @overload
@@ -358,11 +367,12 @@ class ElementTree(Generic[_Root]):
                                     they are emitted as a single self-closed
                                     tag, otherwise they are emitted as a pair
                                     of start/end tags
+
         """
 
     def write_c14n(self, file: _FileWriteC14N) -> None: ...
 
-HTML_EMPTY: set[str]
+HTML_EMPTY: Final[set[str]]
 
 def register_namespace(prefix: str, uri: str) -> None:
     """Register a namespace prefix.
@@ -374,6 +384,7 @@ def register_namespace(prefix: str, uri: str) -> None:
     attributes in this namespace will be serialized with prefix if possible.
 
     ValueError is raised if prefix is reserved or is invalid.
+
     """
 
 @overload
@@ -397,6 +408,7 @@ def tostring(
     sets the default XML namespace (for "xmlns").
 
     Returns an (optionally) encoded string containing the XML data.
+
     """
 
 @overload
@@ -457,6 +469,7 @@ def dump(elem: Element | ElementTree[Any]) -> None:
     *elem* is either an ElementTree, or a single Element.  The exact output
     format is implementation dependent.  In this version, it's written as an
     ordinary XML file.
+
     """
 
 def indent(tree: Element | ElementTree[Any], space: str = "  ", level: int = 0) -> None:
@@ -482,6 +495,7 @@ def parse(source: _FileRead, parser: XMLParser[Any] | None = None) -> ElementTre
     *parser* is an optional parser instance defaulting to XMLParser.
 
     Return an ElementTree instance.
+
     """
 
 # This class is defined inside the body of iterparse
@@ -506,6 +520,7 @@ def iterparse(source: _FileRead, events: Sequence[str] | None = None, parser: XM
     a list of events to report back, *parser* is an optional parser instance.
 
     Returns an iterator providing (event, elem) pairs.
+
     """
 
 _EventQueue: TypeAlias = tuple[str] | tuple[str, tuple[str, str]] | tuple[str, None]
@@ -540,6 +555,7 @@ def XML(text: str | ReadableBuffer, parser: XMLParser | None = None) -> Element:
     optional parser instance, defaulting to the standard XMLParser.
 
     Returns an Element instance.
+
     """
 
 def XMLID(text: str | ReadableBuffer, parser: XMLParser | None = None) -> tuple[Element, dict[str, Element]]:
@@ -550,6 +566,7 @@ def XMLID(text: str | ReadableBuffer, parser: XMLParser | None = None) -> tuple[
 
     Returns an (Element, dict) tuple, in which the
     dict maps element id:s to elements.
+
     """
 
 # This is aliased to XML in the source.
@@ -562,6 +579,7 @@ def fromstringlist(sequence: Sequence[str | ReadableBuffer], parser: XMLParser |
     instance, defaulting to the standard XMLParser.
 
     Returns an Element instance.
+
     """
 
 # This type is both not precise enough and too precise. The TreeBuilder
@@ -575,6 +593,7 @@ def fromstringlist(sequence: Sequence[str | ReadableBuffer], parser: XMLParser |
 # elementfactories.
 _ElementFactory: TypeAlias = Callable[[Any, dict[Any, Any]], Element]
 
+@disjoint_base
 class TreeBuilder:
     # comment_factory can take None because passing None to Comment is not an error
     def __init__(
@@ -600,7 +619,8 @@ class TreeBuilder:
     def pi(self, target: str, text: str | None = None, /) -> Element[Any]: ...
 
 class C14NWriterTarget:
-    """Canonicalization writer target for the XMLParser.
+    """
+    Canonicalization writer target for the XMLParser.
 
     Serialises parse events to XML C14N 2.0.
 
@@ -643,6 +663,7 @@ class C14NWriterTarget:
 # The target type is tricky, because the implementation doesn't
 # require any particular attribute to be present. This documents the attributes
 # that can be present, but uncommenting any of them would require them.
+@type_check_only
 class _Target(Protocol):
     # start: Callable[str, dict[str, str], Any] | None
     # end: Callable[[str], Any] | None
@@ -660,6 +681,7 @@ _E = TypeVar("_E", default=Element)
 # The default target is TreeBuilder, which returns Element.
 # C14NWriterTarget does not implement a close method, so using it results
 # in a type of XMLParser[None].
+@disjoint_base
 class XMLParser(Generic[_E]):
     parser: XMLParserType
     target: _Target

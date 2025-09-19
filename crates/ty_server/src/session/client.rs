@@ -1,14 +1,12 @@
 use crate::Session;
-use crate::server::{Action, ConnectionSender};
+use crate::server::{Action, ConnectionSender, SendRequest};
 use crate::server::{Event, MainLoopSender};
 use lsp_server::{ErrorCode, Message, Notification, RequestId, ResponseError};
 use serde_json::Value;
 use std::any::TypeId;
 use std::fmt::Display;
 
-pub(crate) type ClientResponseHandler = Box<dyn FnOnce(&Client, lsp_server::Response) + Send>;
-
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct Client {
     /// Channel to send messages back to the main loop.
     main_loop_sender: MainLoopSender,
@@ -33,12 +31,9 @@ impl Client {
     /// The `response_handler` will be dispatched as soon as the client response
     /// is processed on the main-loop. The handler always runs on the main-loop thread.
     ///
-    /// # Note
-    /// This method takes a `session` so that we can register the pending-request
-    /// and send the response directly to the client. If this ever becomes too limiting (because we
-    /// need to send a request from somewhere where we don't have access to session), consider introducing
-    /// a new `send_deferred_request` method that doesn't take a session and instead sends
-    /// an `Action` to the main loop to send the request (the main loop has always access to session).
+    /// Use [`self.send_deferred_request`] if you are in a background task
+    /// where you don't have access to the session. But note, that the
+    /// request won't be send immediately, but rather queued up in the main loop
     pub(crate) fn send_request<R>(
         &self,
         session: &Session,
@@ -47,63 +42,56 @@ impl Client {
     ) where
         R: lsp_types::request::Request,
     {
-        let response_handler = Box::new(move |client: &Client, response: lsp_server::Response| {
-            let _span =
-                tracing::debug_span!("client_response", id=%response.id, method = R::METHOD)
-                    .entered();
+        self.send_request_raw(
+            session,
+            SendRequest {
+                method: R::METHOD.to_string(),
+                params: serde_json::to_value(params).expect("Params to be serializable"),
+                response_handler: ClientResponseHandler::for_request::<R>(response_handler),
+            },
+        );
+    }
 
-            match (response.error, response.result) {
-                (Some(err), _) => {
-                    tracing::error!(
-                        "Got an error from the client (code {code}, method {method}): {message}",
-                        code = err.code,
-                        message = err.message,
-                        method = R::METHOD
-                    );
-                }
-                (None, Some(response)) => match serde_json::from_value(response) {
-                    Ok(response) => response_handler(client, response),
-                    Err(error) => {
-                        tracing::error!(
-                            "Failed to deserialize client response (method={method}): {error}",
-                            method = R::METHOD
-                        );
-                    }
-                },
-                (None, None) => {
-                    if TypeId::of::<R::Result>() == TypeId::of::<()>() {
-                        // We can't call `response_handler(())` directly here, but
-                        // since we _know_ the type expected is `()`, we can use
-                        // `from_value(Value::Null)`. `R::Result` implements `DeserializeOwned`,
-                        // so this branch works in the general case but we'll only
-                        // hit it if the concrete type is `()`, so the `unwrap()` is safe here.
-                        response_handler(client, serde_json::from_value(Value::Null).unwrap());
-                    } else {
-                        tracing::error!(
-                            "Invalid client response: did not contain a result or error (method={method})",
-                            method = R::METHOD
-                        );
-                    }
-                }
-            }
-        });
+    /// Sends a request of kind `R` to the client, with associated parameters.
+    ///
+    /// The request isn't sent immediately, but rather queued up in the main loop.
+    /// The `response_handler` will be dispatched as soon as the client response
+    /// is processed on the main-loop. The handler always runs on the main-loop thread.
+    ///
+    /// Use [`self.send_request`] if you are in a foreground task and have access to the session.
+    pub(crate) fn send_deferred_request<R>(
+        &self,
+        params: R::Params,
+        response_handler: impl FnOnce(&Client, R::Result) + Send + 'static,
+    ) where
+        R: lsp_types::request::Request,
+    {
+        self.main_loop_sender
+            .send(Event::Action(Action::SendRequest(SendRequest {
+                method: R::METHOD.to_string(),
+                params: serde_json::to_value(params).expect("Params to be serializable"),
+                response_handler: ClientResponseHandler::for_request::<R>(response_handler),
+            })))
+            .unwrap();
+    }
 
+    pub(crate) fn send_request_raw(&self, session: &Session, request: SendRequest) {
         let id = session
             .request_queue()
             .outgoing()
-            .register(response_handler);
+            .register(request.response_handler);
 
         if let Err(err) = self
             .client_sender
             .send(Message::Request(lsp_server::Request {
                 id,
-                method: R::METHOD.to_string(),
-                params: serde_json::to_value(params).expect("Params to be serializable"),
+                method: request.method.clone(),
+                params: request.params,
             }))
         {
             tracing::error!(
                 "Failed to send request `{}` because the client sender is closed: {err}",
-                R::METHOD
+                request.method
             );
         }
     }
@@ -113,17 +101,16 @@ impl Client {
     where
         N: lsp_types::notification::Notification,
     {
-        let method = N::METHOD.to_string();
-
         if let Err(err) =
             self.client_sender
                 .send(lsp_server::Message::Notification(Notification::new(
-                    method, params,
+                    N::METHOD.to_string(),
+                    params,
                 )))
         {
             tracing::error!(
-                "Failed to send notification `{}` because the client sender is closed: {err}",
-                N::METHOD
+                "Failed to send notification `{method}` because the client sender is closed: {err}",
+                method = N::METHOD,
             );
         }
     }
@@ -248,5 +235,64 @@ impl Client {
                 );
             }
         }
+    }
+}
+
+/// Type erased handler for client responses.
+#[allow(clippy::type_complexity)]
+pub(crate) struct ClientResponseHandler(Box<dyn FnOnce(&Client, lsp_server::Response) + Send>);
+
+impl ClientResponseHandler {
+    fn for_request<R>(response_handler: impl FnOnce(&Client, R::Result) + Send + 'static) -> Self
+    where
+        R: lsp_types::request::Request,
+    {
+        Self(Box::new(
+            move |client: &Client, response: lsp_server::Response| {
+                let _span =
+                    tracing::debug_span!("client_response", id=%response.id, method = R::METHOD)
+                        .entered();
+
+                match (response.error, response.result) {
+                    (Some(err), _) => {
+                        tracing::error!(
+                            "Got an error from the client (code {code}, method {method}): {message}",
+                            code = err.code,
+                            message = &err.message,
+                            method = R::METHOD
+                        );
+                    }
+                    (None, Some(response)) => match serde_json::from_value(response) {
+                        Ok(response) => response_handler(client, response),
+                        Err(error) => {
+                            tracing::error!(
+                                "Failed to deserialize client response (method={method}): {error}",
+                                method = R::METHOD
+                            );
+                        }
+                    },
+                    (None, None) => {
+                        if TypeId::of::<R::Result>() == TypeId::of::<()>() {
+                            // We can't call `response_handler(())` directly here, but
+                            // since we _know_ the type expected is `()`, we can use
+                            // `from_value(Value::Null)`. `R::Result` implements `DeserializeOwned`,
+                            // so this branch works in the general case but we'll only
+                            // hit it if the concrete type is `()`, so the `unwrap()` is safe here.
+                            response_handler(client, serde_json::from_value(Value::Null).unwrap());
+                        } else {
+                            tracing::error!(
+                                "Invalid client response: did not contain a result or error (method={method})",
+                                method = R::METHOD
+                            );
+                        }
+                    }
+                }
+            },
+        ))
+    }
+
+    pub(crate) fn handle_response(self, client: &Client, response: lsp_server::Response) {
+        let handler = self.0;
+        handler(client, response);
     }
 }

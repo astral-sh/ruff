@@ -1,32 +1,31 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
-snapshot_kind: text
 ---
-runtime_evaluated_decorators_3.py:6:18: TC003 [*] Move standard library import `uuid.UUID` into a type-checking block
+TC003 [*] Move standard library import `uuid.UUID` into a type-checking block
+ --> runtime_evaluated_decorators_3.py:6:18
   |
 4 | from array import array
 5 | from dataclasses import dataclass
 6 | from uuid import UUID  # TC003
-  |                  ^^^^ TC003
+  |                  ^^^^
 7 | from collections.abc import Sequence
 8 | from pydantic import validate_call
   |
-  = help: Move into type-checking block
-
-ℹ Unsafe fix
-3  3  | import datetime
-4  4  | from array import array
-5  5  | from dataclasses import dataclass
-6     |-from uuid import UUID  # TC003
-7  6  | from collections.abc import Sequence
-8  7  | from pydantic import validate_call
-9  8  | 
-10 9  | import attrs
-11 10 | from attrs import frozen
-   11 |+from typing import TYPE_CHECKING
-   12 |+
-   13 |+if TYPE_CHECKING:
-   14 |+    from uuid import UUID
-12 15 | 
-13 16 | 
-14 17 | @attrs.define(auto_attribs=True)
+help: Move into type-checking block
+3  | import datetime
+4  | from array import array
+5  | from dataclasses import dataclass
+   - from uuid import UUID  # TC003
+6  | from collections.abc import Sequence
+7  | from pydantic import validate_call
+8  | 
+9  | import attrs
+10 | from attrs import frozen
+11 + from typing import TYPE_CHECKING
+12 + 
+13 + if TYPE_CHECKING:
+14 +     from uuid import UUID
+15 | 
+16 | 
+17 | @attrs.define(auto_attribs=True)
+note: This is an unsafe fix and may change runtime behavior

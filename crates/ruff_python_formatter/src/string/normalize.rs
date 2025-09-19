@@ -645,7 +645,7 @@ pub(crate) fn normalize_string(
     start_offset: usize,
     new_flags: AnyStringFlags,
     escape_braces: bool,
-) -> Cow<str> {
+) -> Cow<'_, str> {
     // The normalized string if `input` is not yet normalized.
     // `output` must remain empty if `input` is already normalized.
     let mut output = String::new();
@@ -798,7 +798,7 @@ impl UnicodeEscape {
     ///
     /// * `\u`, `\U'` and `\x`: To use lower case for the characters `a-f`.
     /// * `\N`: To use uppercase letters
-    fn normalize(self, input: &str) -> Option<Cow<str>> {
+    fn normalize(self, input: &str) -> Option<Cow<'_, str>> {
         let mut normalised = String::new();
 
         let len = match self {

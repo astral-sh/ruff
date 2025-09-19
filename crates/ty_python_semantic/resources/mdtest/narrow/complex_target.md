@@ -136,19 +136,19 @@ def f(a: int | None):
         reveal_type(c.y)  # revealed: int | None
 
 def g[T](c: C[T]):
-    reveal_type(c.x)  # revealed: T
-    reveal_type(c.y)  # revealed: T
-    reveal_type(c)  # revealed: C[T]
+    reveal_type(c.x)  # revealed: T@g
+    reveal_type(c.y)  # revealed: T@g
+    reveal_type(c)  # revealed: C[T@g]
 
     if isinstance(c.x, int):
-        reveal_type(c.x)  # revealed: T & int
-        reveal_type(c.y)  # revealed: T
-        reveal_type(c)  # revealed: C[T]
+        reveal_type(c.x)  # revealed: T@g & int
+        reveal_type(c.y)  # revealed: T@g
+        reveal_type(c)  # revealed: C[T@g]
     if isinstance(c.x, int) and isinstance(c.y, int):
-        reveal_type(c.x)  # revealed: T & int
-        reveal_type(c.y)  # revealed: T & int
+        reveal_type(c.x)  # revealed: T@g & int
+        reveal_type(c.y)  # revealed: T@g & int
         # TODO: Probably better if inferred as `C[T & int]` (mypy and pyright don't support this)
-        reveal_type(c)  # revealed: C[T]
+        reveal_type(c)  # revealed: C[T@g]
 ```
 
 ### With intermediate scopes

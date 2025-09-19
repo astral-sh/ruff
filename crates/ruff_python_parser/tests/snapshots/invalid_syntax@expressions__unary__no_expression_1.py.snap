@@ -7,21 +7,21 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/unary/no_exp
 ```
 Module(
     ModModule {
-        node_index: AtomicNodeIndex(..),
+        node_index: NodeIndex(None),
         range: 0..8,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 0..1,
                     value: UnaryOp(
                         ExprUnaryOp {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 0..1,
                             op: UAdd,
                             operand: Name(
                                 ExprName {
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     range: 1..1,
                                     id: Name(""),
                                     ctx: Invalid,
@@ -33,15 +33,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 3..8,
                     value: BinOp(
                         ExprBinOp {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 3..8,
                             left: Name(
                                 ExprName {
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     range: 3..4,
                                     id: Name("x"),
                                     ctx: Load,
@@ -50,7 +50,7 @@ Module(
                             op: Add,
                             right: Name(
                                 ExprName {
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     range: 7..8,
                                     id: Name("y"),
                                     ctx: Load,

@@ -89,7 +89,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
 
     // Assert that there's an `unresolved-reference` diagnostic (error)
     // and an unresolved-import (error) diagnostic by default.
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -101,6 +101,9 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     3 |
     4 | y = 4 / 0
       |
+    info: Searched in the following paths during module resolution:
+    info:   1. <temp_dir>/ (first-party code)
+    info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
 
@@ -118,7 +121,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
 
     ----- stderr -----
     WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    "###);
+    ");
 
     assert_cmd_snapshot!(
         case
@@ -141,6 +144,9 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     3 |
     4 | y = 4 / 0
       |
+    info: Searched in the following paths during module resolution:
+    info:   1. <temp_dir>/ (first-party code)
+    info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` was selected on the command line
 
@@ -863,10 +869,18 @@ fn overrides_unknown_rules() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r#"
+    assert_cmd_snapshot!(case.command(), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
+    error[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
+     --> main.py:2:5
+      |
+    2 | y = 4 / 0
+      |     ^^^^^
+      |
+    info: rule `division-by-zero` was selected in the configuration file
+
     warning[unknown-rule]: Unknown lint rule `division-by-zer`
       --> pyproject.toml:10:1
        |
@@ -875,14 +889,6 @@ fn overrides_unknown_rules() -> anyhow::Result<()> {
     10 | division-by-zer = "error"  # incorrect rule name
        | ^^^^^^^^^^^^^^^
        |
-
-    error[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
-     --> main.py:2:5
-      |
-    2 | y = 4 / 0
-      |     ^^^^^
-      |
-    info: rule `division-by-zero` was selected in the configuration file
 
     warning[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
      --> tests/test_main.py:2:5
@@ -896,7 +902,7 @@ fn overrides_unknown_rules() -> anyhow::Result<()> {
 
     ----- stderr -----
     WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    "#);
+    "###);
 
     Ok(())
 }

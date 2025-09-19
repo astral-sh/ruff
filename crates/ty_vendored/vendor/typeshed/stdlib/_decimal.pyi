@@ -56,19 +56,20 @@ if sys.version_info >= (3, 11):
     def localcontext(
         ctx: Context | None = None,
         *,
-        prec: int | None = ...,
-        rounding: str | None = ...,
-        Emin: int | None = ...,
-        Emax: int | None = ...,
-        capitals: int | None = ...,
-        clamp: int | None = ...,
-        traps: dict[_TrapType, bool] | None = ...,
-        flags: dict[_TrapType, bool] | None = ...,
+        prec: int | None = None,
+        rounding: str | None = None,
+        Emin: int | None = None,
+        Emax: int | None = None,
+        capitals: int | None = None,
+        clamp: int | None = None,
+        traps: dict[_TrapType, bool] | None = None,
+        flags: dict[_TrapType, bool] | None = None,
     ) -> _ContextManager:
         """Return a context manager that will set the default context to a copy of ctx
         on entry to the with-statement and restore the previous default context when
         exiting the with-statement. If no context is specified, a copy of the current
         default context is used.
+
         """
 
 else:
@@ -77,6 +78,7 @@ else:
         on entry to the with-statement and restore the previous default context when
         exiting the with-statement. If no context is specified, a copy of the current
         default context is used.
+
         """
 
 if sys.version_info >= (3, 14):
@@ -84,6 +86,7 @@ if sys.version_info >= (3, 14):
         """Return a context object initialized to the proper values for one of the
         IEEE interchange formats.  The argument must be a multiple of 32 and less
         than IEEE_CONTEXT_MAX_BITS.
+
         """
 
 DefaultContext: Context

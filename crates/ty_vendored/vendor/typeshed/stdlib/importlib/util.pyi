@@ -14,11 +14,15 @@ from importlib._bootstrap_external import (
     spec_from_file_location as spec_from_file_location,
 )
 from importlib.abc import Loader
-from typing_extensions import ParamSpec
+from typing_extensions import ParamSpec, deprecated
 
 _P = ParamSpec("_P")
 
 if sys.version_info < (3, 12):
+    @deprecated(
+        "Deprecated since Python 3.4; removed in Python 3.12. "
+        "`__name__`, `__package__` and `__loader__` are now set automatically."
+    )
     def module_for_loader(fxn: Callable[_P, types.ModuleType]) -> Callable[_P, types.ModuleType]:
         """Decorator to handle selecting the proper module for loaders.
 
@@ -35,18 +39,29 @@ if sys.version_info < (3, 12):
 
         The decorator assumes that the decorated function takes the module name as
         the second argument.
+
         """
 
+    @deprecated(
+        "Deprecated since Python 3.4; removed in Python 3.12. "
+        "`__name__`, `__package__` and `__loader__` are now set automatically."
+    )
     def set_loader(fxn: Callable[_P, types.ModuleType]) -> Callable[_P, types.ModuleType]:
         """Set __loader__ on the returned module.
 
         This function is deprecated.
+
         """
 
+    @deprecated(
+        "Deprecated since Python 3.4; removed in Python 3.12. "
+        "`__name__`, `__package__` and `__loader__` are now set automatically."
+    )
     def set_package(fxn: Callable[_P, types.ModuleType]) -> Callable[_P, types.ModuleType]:
         """Set __package__ on the returned module.
 
         This function is deprecated.
+
         """
 
 def resolve_name(name: str, package: str | None) -> str:
@@ -67,6 +82,7 @@ def find_spec(name: str, package: str | None = None) -> importlib.machinery.Modu
 
     The name and package arguments work the same as importlib.import_module().
     In other words, relative module names (with leading dots) work.
+
     """
 
 class LazyLoader(Loader):

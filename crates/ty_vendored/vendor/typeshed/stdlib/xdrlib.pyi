@@ -19,6 +19,7 @@ class Error(Exception):
 
     Public ivars:
         msg -- contains the message
+
     """
 
     msg: str

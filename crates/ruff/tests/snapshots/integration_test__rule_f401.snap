@@ -55,6 +55,10 @@ either a redundant alias or, if already present in the file, an `__all__` entry.
 to remove third-party and standard library imports -- the fix is unsafe because the module's
 interface changes.
 
+See [this FAQ section](https://docs.astral.sh/ruff/faq/#how-does-ruff-determine-which-of-my-imports-are-first-party-third-party-etc)
+for more details on how Ruff
+determines whether an import is first or third-party.
+
 ## Example
 
 ```python
@@ -83,11 +87,6 @@ else:
     print("numpy is not installed")
 ```
 
-## Preview
-When [preview](https://docs.astral.sh/ruff/preview/) is enabled,
-the criterion for determining whether an import is first-party
-is stricter, which could affect the suggested fix. See [this FAQ section](https://docs.astral.sh/ruff/faq/#how-does-ruff-determine-which-of-my-imports-are-first-party-third-party-etc) for more details.
-
 ## Options
 - `lint.ignore-init-module-imports`
 - `lint.pyflakes.allowed-unused-imports`
@@ -95,6 +94,6 @@ is stricter, which could affect the suggested fix. See [this FAQ section](https:
 ## References
 - [Python documentation: `import`](https://docs.python.org/3/reference/simple_stmts.html#the-import-statement)
 - [Python documentation: `importlib.util.find_spec`](https://docs.python.org/3/library/importlib.html#importlib.util.find_spec)
-- [Typing documentation: interface conventions](https://typing.python.org/en/latest/source/libraries.html#library-interface-public-and-private-symbols)
+- [Typing documentation: interface conventions](https://typing.python.org/en/latest/spec/distributing.html#library-interface-public-and-private-symbols)
 
 ----- stderr -----

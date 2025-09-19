@@ -33,6 +33,14 @@ jobs:
           fi
 
       - uses: dawidd6/action-download-artifact@20319c5641d495c8a52e688b7dc5fada6c3a9fbc # v8
+        name: Download typing conformance suite commit
+        with:
+          name: conformance-suite-commit
+          run_id: ${{ github.event.workflow_run.id ||  github.event.inputs.workflow_run_id }}
+          if_no_artifact_found: ignore
+          allow_forks: true
+
+      - uses: dawidd6/action-download-artifact@20319c5641d495c8a52e688b7dc5fada6c3a9fbc # v8
         name: "Download typing_conformance results"
         id: download-typing_conformance_diff
         if: steps.pr-number.outputs.pr-number
@@ -61,7 +69,14 @@ jobs:
           # subsequent runs
           echo '<!-- generated-comment typing_conformance_diagnostics_diff -->' >> comment.txt
 
-          echo '## Diagnostic diff on typing conformance tests' >> comment.txt
+          if [[ -f conformance-suite-commit ]]
+          then
+            echo "## Diagnostic diff on [typing conformance tests](https://github.com/python/typing/tree/$(<conformance-suite-commit)/conformance)" >> comment.txt
+          else
+            echo "conformance-suite-commit file not found"
+            echo "## Diagnostic diff on typing conformance tests" >> comment.txt
+          fi
+
           if [ -s "pr/typing_conformance_diagnostics_diff/typing_conformance_diagnostics.diff" ]; then
             echo '<details>' >> comment.txt
             echo '<summary>Changes were detected when running ty on typing conformance tests</summary>' >> comment.txt

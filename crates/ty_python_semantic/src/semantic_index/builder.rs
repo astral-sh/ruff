@@ -47,9 +47,9 @@ use crate::semantic_index::symbol::{ScopedSymbolId, Symbol};
 use crate::semantic_index::use_def::{
     EnclosingSnapshotKey, FlowSnapshot, ScopedEnclosingSnapshotId, UseDefMapBuilder,
 };
-use crate::semantic_index::{ArcUseDefMap, ExpressionsScopeMap, SemanticIndex};
+use crate::semantic_index::{ExpressionsScopeMap, SemanticIndex, VisibleAncestorsIter};
 use crate::semantic_model::HasTrackedScope;
-use crate::unpack::{Unpack, UnpackKind, UnpackPosition, UnpackValue};
+use crate::unpack::{EvaluationMode, Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::{Db, Program};
 
 mod except_handlers;
@@ -115,6 +115,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     ///
     /// [generator functions]: https://docs.python.org/3/glossary.html#term-generator
     generator_functions: FxHashSet<FileScopeId>,
+    /// Snapshots of enclosing-scope place states visible from nested scopes.
     enclosing_snapshots: FxHashMap<EnclosingSnapshotKey, ScopedEnclosingSnapshotId>,
     /// Errors collected by the `semantic_checker`.
     semantic_syntax_errors: RefCell<Vec<SemanticSyntaxError>>,
@@ -199,7 +200,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         match self.scopes[parent.file_scope_id].kind() {
             ScopeKind::Class => Some(parent.file_scope_id),
-            ScopeKind::Annotation => {
+            ScopeKind::TypeParams => {
                 // If the function is generic, the parent scope is an annotation scope.
                 // In this case, we need to go up one level higher to find the class scope.
                 let grandparent = scopes_rev.next()?;
@@ -316,11 +317,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     nested_scope: popped_scope_id,
                     nested_laziness: ScopeLaziness::Eager,
                 };
-                let eager_snapshot = self.use_def_maps[enclosing_scope_id].snapshot_outer_state(
-                    enclosing_place_id,
-                    enclosing_scope_kind,
-                    enclosing_place,
-                );
+                let eager_snapshot = self.use_def_maps[enclosing_scope_id]
+                    .snapshot_enclosing_state(
+                        enclosing_place_id,
+                        enclosing_scope_kind,
+                        enclosing_place,
+                    );
                 self.enclosing_snapshots.insert(key, eager_snapshot);
             }
 
@@ -356,7 +358,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             for nested_symbol in self.place_tables[popped_scope_id].symbols() {
                 // For the same reason, symbols declared as nonlocal or global are not recorded.
                 // Also, if the enclosing scope allows its members to be modified from elsewhere, the snapshot will not be recorded.
-                if self.scopes[enclosing_scope_id].visibility().is_public() {
+                // (In the case of class scopes, class variables can be modified from elsewhere, but this has no effect in nested scopes,
+                // as class variables are not visible to them)
+                if self.scopes[enclosing_scope_id].kind().is_module() {
                     continue;
                 }
 
@@ -388,7 +392,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     nested_scope: popped_scope_id,
                     nested_laziness: ScopeLaziness::Lazy,
                 };
-                let lazy_snapshot = self.use_def_maps[enclosing_scope_id].snapshot_outer_state(
+                let lazy_snapshot = self.use_def_maps[enclosing_scope_id].snapshot_enclosing_state(
                     enclosed_symbol_id.into(),
                     enclosing_scope_kind,
                     enclosing_place.into(),
@@ -398,17 +402,74 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
-    /// Any lazy snapshots of places that have been reassigned or modified are no longer valid, so delete them.
-    fn sweep_lazy_snapshots(&mut self, popped_scope_id: FileScopeId) {
-        self.enclosing_snapshots.retain(|key, _| {
-            let place_table = &self.place_tables[key.enclosing_scope];
-            key.nested_laziness.is_eager()
-                || key.enclosing_scope != popped_scope_id
-                || !key
-                    .enclosing_place
-                    .as_symbol()
-                    .is_some_and(|symbol_id| place_table.symbol(symbol_id).is_reassigned())
-        });
+    /// Any lazy snapshots of the place that have been reassigned are obsolete, so update them.
+    /// ```py
+    /// def outer() -> None:
+    ///     x = None
+    ///
+    ///     def inner2() -> None:
+    ///         # `inner` can be referenced before its definition,
+    ///         # but `inner2` must still be called after the definition of `inner` for this call to be valid.
+    ///         inner()
+    ///
+    ///         # In this scope, `x` may refer to `x = None` or `x = 1`.
+    ///         reveal_type(x)  # revealed: None | Literal[1]
+    ///
+    ///     # Reassignment of `x` after the definition of `inner2`.
+    ///     # Update lazy snapshots of `x` for `inner2`.
+    ///     x = 1
+    ///
+    ///     def inner() -> None:
+    ///         # In this scope, `x = None` appears as being shadowed by `x = 1`.
+    ///         reveal_type(x)  # revealed: Literal[1]
+    ///
+    ///     # No reassignment of `x` after the definition of `inner`, so we can safely use a lazy snapshot for `inner` as is.
+    ///     inner()
+    ///     inner2()
+    /// ```
+    fn update_lazy_snapshots(&mut self, symbol: ScopedSymbolId) {
+        let current_scope = self.current_scope();
+        let current_place_table = &self.place_tables[current_scope];
+        let symbol = current_place_table.symbol(symbol);
+        // Optimization: if this is the first binding of the symbol we've seen, there can't be any
+        // lazy snapshots of it to update.
+        if !symbol.is_reassigned() {
+            return;
+        }
+        for (key, snapshot_id) in &self.enclosing_snapshots {
+            if let Some(enclosing_symbol) = key.enclosing_place.as_symbol() {
+                let name = self.place_tables[key.enclosing_scope]
+                    .symbol(enclosing_symbol)
+                    .name();
+                let is_reassignment_of_snapshotted_symbol = || {
+                    for (ancestor, _) in
+                        VisibleAncestorsIter::new(&self.scopes, key.enclosing_scope)
+                    {
+                        if ancestor == current_scope {
+                            return true;
+                        }
+                        let ancestor_table = &self.place_tables[ancestor];
+                        // If there is a symbol binding in an ancestor scope,
+                        // then a reassignment in the current scope is not relevant to the snapshot.
+                        if ancestor_table
+                            .symbol_id(name)
+                            .is_some_and(|id| ancestor_table.symbol(id).is_bound())
+                        {
+                            return false;
+                        }
+                    }
+                    false
+                };
+
+                if key.nested_laziness.is_lazy()
+                    && symbol.name() == name
+                    && is_reassignment_of_snapshotted_symbol()
+                {
+                    self.use_def_maps[key.enclosing_scope]
+                        .update_enclosing_snapshot(*snapshot_id, enclosing_symbol);
+                }
+            }
+        }
     }
 
     fn sweep_nonlocal_lazy_snapshots(&mut self) {
@@ -449,8 +510,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .scope_stack
             .pop()
             .expect("Root scope should be present");
-
-        self.sweep_lazy_snapshots(popped_scope_id);
 
         let children_end = self.scopes.next_index();
 
@@ -642,6 +701,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             DefinitionCategory::Binding => {
                 use_def.record_binding(place, definition);
                 self.delete_associated_bindings(place);
+            }
+        }
+
+        if category.is_binding() {
+            if let Some(id) = place.as_symbol() {
+                self.update_lazy_snapshots(id);
             }
         }
 
@@ -838,6 +903,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     .collect();
                 PatternPredicateKind::Or(predicates)
             }
+            ast::Pattern::MatchAs(pattern) => PatternPredicateKind::As(
+                pattern
+                    .pattern
+                    .as_ref()
+                    .map(|p| Box::new(self.predicate_kind(p))),
+                pattern.name.as_ref().map(|name| name.id.clone()),
+            ),
             _ => PatternPredicateKind::Unsupported,
         }
     }
@@ -1175,7 +1247,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let mut use_def_maps: IndexVec<_, _> = self
             .use_def_maps
             .into_iter()
-            .map(|builder| ArcUseDefMap::new(builder.finish()))
+            .map(|builder| Arc::new(builder.finish()))
             .collect();
 
         let mut ast_ids: IndexVec<_, _> = self
@@ -1292,7 +1364,6 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // used to collect all the overloaded definitions of a function. This needs to be
                 // done on the `Identifier` node as opposed to `ExprName` because that's what the
                 // AST uses.
-                self.mark_symbol_used(symbol);
                 let use_id = self.current_ast_ids().record_use(name);
                 self.current_use_def_map_mut().record_use(
                     symbol.into(),
@@ -1301,6 +1372,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 );
 
                 self.add_definition(symbol.into(), function_def);
+                self.mark_symbol_used(symbol);
             }
             ast::Stmt::ClassDef(class) => {
                 for decorator in &class.decorator_list {
@@ -2623,12 +2695,12 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
             match scope.kind() {
                 ScopeKind::Class | ScopeKind::Lambda => return false,
                 ScopeKind::Function => {
-                    return scope.node().expect_function(self.module).is_async;
+                    return scope.node().expect_function().node(self.module).is_async;
                 }
                 ScopeKind::Comprehension
                 | ScopeKind::Module
                 | ScopeKind::TypeAlias
-                | ScopeKind::Annotation => {}
+                | ScopeKind::TypeParams => {}
             }
         }
         false
@@ -2643,7 +2715,7 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
                 ScopeKind::Comprehension
                 | ScopeKind::Module
                 | ScopeKind::TypeAlias
-                | ScopeKind::Annotation => {}
+                | ScopeKind::TypeParams => {}
             }
         }
         false
@@ -2655,7 +2727,7 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
             match scope.kind() {
                 ScopeKind::Class | ScopeKind::Comprehension => return false,
                 ScopeKind::Function | ScopeKind::Lambda => return true,
-                ScopeKind::Module | ScopeKind::TypeAlias | ScopeKind::Annotation => {}
+                ScopeKind::Module | ScopeKind::TypeAlias | ScopeKind::TypeParams => {}
             }
         }
         false
@@ -2804,8 +2876,18 @@ impl<'ast> Unpackable<'ast> {
     const fn kind(&self) -> UnpackKind {
         match self {
             Unpackable::Assign(_) => UnpackKind::Assign,
-            Unpackable::For(_) | Unpackable::Comprehension { .. } => UnpackKind::Iterable,
-            Unpackable::WithItem { .. } => UnpackKind::ContextManager,
+            Unpackable::For(ast::StmtFor { is_async, .. }) => UnpackKind::Iterable {
+                mode: EvaluationMode::from_is_async(*is_async),
+            },
+            Unpackable::Comprehension {
+                node: ast::Comprehension { is_async, .. },
+                ..
+            } => UnpackKind::Iterable {
+                mode: EvaluationMode::from_is_async(*is_async),
+            },
+            Unpackable::WithItem { is_async, .. } => UnpackKind::ContextManager {
+                mode: EvaluationMode::from_is_async(*is_async),
+            },
         }
     }
 

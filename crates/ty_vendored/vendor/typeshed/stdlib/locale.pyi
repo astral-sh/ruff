@@ -30,6 +30,7 @@ from builtins import str as _str
 from collections.abc import Callable, Iterable
 from decimal import Decimal
 from typing import Any
+from typing_extensions import deprecated
 
 if sys.version_info >= (3, 11):
     from _locale import getencoding as getencoding
@@ -160,6 +161,7 @@ def getdefaultlocale(envvars: tuple[_str, ...] = ("LC_ALL", "LC_CTYPE", "LANG", 
     Except for the code 'C', the language code corresponds to RFC
     1766.  code and encoding can be None in case the values cannot
     be determined.
+
     """
 
 def getlocale(category: int = ...) -> tuple[_str | None, _str | None]:
@@ -172,6 +174,7 @@ def getlocale(category: int = ...) -> tuple[_str | None, _str | None]:
     Except for the code 'C', the language code corresponds to RFC
     1766.  code and encoding can be None in case the values cannot
     be determined.
+
     """
 
 def setlocale(category: int, locale: _str | Iterable[_str | None] | None = None) -> _str:
@@ -183,6 +186,7 @@ def setlocale(category: int, locale: _str | Iterable[_str | None] | None = None)
     engine.  Locale strings are passed directly to the C lib.
 
     category may be given as one of the LC_* values.
+
     """
 
 def getpreferredencoding(do_setlocale: bool = True) -> _str:
@@ -203,17 +207,30 @@ def normalize(localename: _str) -> _str:
     If the given encoding is not known, the function defaults to
     the default encoding for the locale code just like setlocale()
     does.
+
     """
 
 if sys.version_info < (3, 13):
-    def resetlocale(category: int = ...) -> None:
-        """Sets the locale for category to the default setting.
+    if sys.version_info >= (3, 11):
+        @deprecated("Deprecated since Python 3.11; removed in Python 3.13. Use `locale.setlocale(locale.LC_ALL, '')` instead.")
+        def resetlocale(category: int = ...) -> None:
+            """Sets the locale for category to the default setting.
 
-        The default setting is determined by calling
-        getdefaultlocale(). category defaults to LC_ALL.
-        """
+            The default setting is determined by calling
+            getdefaultlocale(). category defaults to LC_ALL.
+
+            """
+    else:
+        def resetlocale(category: int = ...) -> None:
+            """Sets the locale for category to the default setting.
+
+            The default setting is determined by calling
+            getdefaultlocale(). category defaults to LC_ALL.
+
+            """
 
 if sys.version_info < (3, 12):
+    @deprecated("Deprecated since Python 3.7; removed in Python 3.12. Use `locale.format_string()` instead.")
     def format(percent: _str, value: float | Decimal, grouping: bool = False, monetary: bool = False, *additional: Any) -> _str:
         """Deprecated, use format_string instead."""
 

@@ -4997,6 +4997,37 @@ fn flake8_import_convention_invalid_aliases_config_module_name() -> Result<()> {
 }
 
 #[test]
+fn flake8_import_convention_nfkc_normalization() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+[lint.flake8-import-conventions.aliases]
+"test.module" = "_﹏𝘥𝘦𝘣𝘶𝘨﹏﹏"
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--config")
+            .arg(&ruff_toml)
+    , @r"
+        success: false
+        exit_code: 2
+        ----- stdout -----
+
+        ----- stderr -----
+        ruff failed
+          Cause: Invalid alias for module 'test.module': alias normalizes to '__debug__', which is not allowed.
+        ");});
+    Ok(())
+}
+
+#[test]
 fn flake8_import_convention_unused_aliased_import() {
     assert_cmd_snapshot!(
         Command::new(get_cargo_bin(BIN_NAME))
@@ -5025,6 +5056,59 @@ fn flake8_import_convention_unused_aliased_import_no_conflict() {
             .arg("--fix")
             .arg("-")
             .pass_stdin("1")
+    );
+}
+
+// https://github.com/astral-sh/ruff/issues/19842
+#[test]
+fn pyupgrade_up026_respects_isort_required_import_fix() {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .arg("--isolated")
+            .arg("check")
+            .arg("-")
+            .args(["--select", "I002,UP026"])
+            .arg("--config")
+            .arg(r#"lint.isort.required-imports=["import mock"]"#)
+            .arg("--fix")
+            .arg("--no-cache")
+            .pass_stdin("1\n"),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    import mock
+    1
+
+    ----- stderr -----
+    Found 1 error (1 fixed, 0 remaining).
+    "
+    );
+}
+
+// https://github.com/astral-sh/ruff/issues/19842
+#[test]
+fn pyupgrade_up026_respects_isort_required_import_from_fix() {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .arg("--isolated")
+            .arg("check")
+            .arg("-")
+            .args(["--select", "I002,UP026"])
+            .arg("--config")
+            .arg(r#"lint.isort.required-imports = ["from mock import mock"]"#)
+            .arg("--fix")
+            .arg("--no-cache")
+            .pass_stdin("from mock import mock\n"),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    from mock import mock
+
+    ----- stderr -----
+    All checks passed!
+    "
     );
 }
 
@@ -5389,7 +5473,7 @@ fn walrus_before_py38() {
     success: false
     exit_code: 1
     ----- stdout -----
-    test.py:1:2: SyntaxError: Cannot use named assignment expression (`:=`) on Python 3.7 (syntax was added in Python 3.8)
+    test.py:1:2: invalid-syntax: Cannot use named assignment expression (`:=`) on Python 3.7 (syntax was added in Python 3.8)
     Found 1 error.
 
     ----- stderr -----
@@ -5435,15 +5519,15 @@ match 2:
         print("it's one")
 "#
         ),
-        @r###"
+        @r"
     success: false
     exit_code: 1
     ----- stdout -----
-    test.py:2:1: SyntaxError: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
+    test.py:2:1: invalid-syntax: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
     Found 1 error.
 
     ----- stderr -----
-    "###
+    "
     );
 
     // syntax error on 3.9 with preview
@@ -5464,7 +5548,7 @@ match 2:
     success: false
     exit_code: 1
     ----- stdout -----
-    test.py:2:1: SyntaxError: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
+    test.py:2:1: invalid-syntax: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
     Found 1 error.
 
     ----- stderr -----
@@ -5492,7 +5576,7 @@ fn cache_syntax_errors() -> Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    main.py:1:1: SyntaxError: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
+    main.py:1:1: invalid-syntax: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
 
     ----- stderr -----
     "
@@ -5505,7 +5589,7 @@ fn cache_syntax_errors() -> Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    main.py:1:1: SyntaxError: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
+    main.py:1:1: invalid-syntax: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
 
     ----- stderr -----
     "
@@ -5557,15 +5641,15 @@ fn cookiecutter_globbing() -> Result<()> {
                 .args(STDIN_BASE_OPTIONS)
                 .arg("--select=F811")
                 .current_dir(tempdir.path()), @r"
-			success: false
-			exit_code: 1
-			----- stdout -----
-			{{cookiecutter.repo_name}}/tests/maintest.py:3:8: F811 [*] Redefinition of unused `foo` from line 1
-			Found 1 error.
-			[*] 1 fixable with the `--fix` option.
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        {{cookiecutter.repo_name}}/tests/maintest.py:3:8: F811 [*] Redefinition of unused `foo` from line 1: `foo` redefined here
+        Found 1 error.
+        [*] 1 fixable with the `--fix` option.
 
-			----- stderr -----
-		");
+        ----- stderr -----
+        ");
     });
 
     Ok(())
@@ -5618,7 +5702,7 @@ fn semantic_syntax_errors() -> Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    main.py:1:3: SyntaxError: assignment expression cannot rebind comprehension variable
+    main.py:1:3: invalid-syntax: assignment expression cannot rebind comprehension variable
     main.py:1:20: F821 Undefined name `foo`
 
     ----- stderr -----
@@ -5632,7 +5716,7 @@ fn semantic_syntax_errors() -> Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    main.py:1:3: SyntaxError: assignment expression cannot rebind comprehension variable
+    main.py:1:3: invalid-syntax: assignment expression cannot rebind comprehension variable
     main.py:1:20: F821 Undefined name `foo`
 
     ----- stderr -----
@@ -5651,7 +5735,7 @@ fn semantic_syntax_errors() -> Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:3: SyntaxError: assignment expression cannot rebind comprehension variable
+    -:1:3: invalid-syntax: assignment expression cannot rebind comprehension variable
     Found 1 error.
 
     ----- stderr -----
@@ -5750,23 +5834,170 @@ match 42:  # invalid-syntax
 }
 
 #[test]
-fn future_annotations_preview_warning() {
+fn up045_nested_optional_flatten_all() {
+    let contents = "\
+from typing import Optional
+nested_optional: Optional[Optional[Optional[str]]] = None
+";
+
     assert_cmd_snapshot!(
         Command::new(get_cargo_bin(BIN_NAME))
             .args(STDIN_BASE_OPTIONS)
-            .args(["--config", "lint.future-annotations = true"])
-            .args(["--select", "F"])
-            .arg("--no-preview")
+            .args(["--select", "UP045", "--diff", "--target-version", "py312"])
             .arg("-")
-            .pass_stdin("1"),
+            .pass_stdin(contents),
         @r"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
-    All checks passed!
+    @@ -1,2 +1,2 @@
+     from typing import Optional
+    -nested_optional: Optional[Optional[Optional[str]]] = None
+    +nested_optional: str | None = None
+
 
     ----- stderr -----
-    warning: The `lint.future-annotations` setting will have no effect because `preview` is disabled
+    Would fix 1 error.
     ",
     );
+}
+
+#[test]
+fn show_fixes_in_full_output_with_preview_enabled() {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args(["check", "--no-cache", "--output-format", "full"])
+            .args(["--select", "F401"])
+            .arg("--preview")
+            .arg("-")
+            .pass_stdin("import math"),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    F401 [*] `math` imported but unused
+     --> -:1:8
+      |
+    1 | import math
+      |        ^^^^
+      |
+    help: Remove unused import: `math`
+      - import math
+
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    ",
+    );
+}
+
+#[test]
+fn rule_panic_mixed_results_concise() -> Result<()> {
+    let tempdir = TempDir::new()?;
+
+    // Create python files
+    let file_a_path = tempdir.path().join("normal.py");
+    let file_b_path = tempdir.path().join("panic.py");
+    fs::write(&file_a_path, b"import os")?;
+    fs::write(&file_b_path, b"print('hello, world!')")?;
+
+    insta::with_settings!({
+        filters => vec![
+            (tempdir_filter(&tempdir).as_str(), "[TMP]/"),
+            (r"\\", r"/"),
+        ]
+    }, {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args(["check", "--select", "RUF9", "--preview", "--output-format=concise", "--no-cache"])
+            .args([file_a_path, file_b_path]),
+        @r"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+    [TMP]/normal.py:1:1: RUF900 Hey this is a stable test rule.
+    [TMP]/normal.py:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
+    [TMP]/normal.py:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
+    [TMP]/normal.py:1:1: RUF903 Hey this is a stable test rule with a display only fix.
+    [TMP]/normal.py:1:1: RUF911 Hey this is a preview test rule.
+    [TMP]/normal.py:1:1: RUF950 Hey this is a test rule that was redirected from another.
+    [TMP]/panic.py: panic: Fatal error while linting: This is a fake panic for testing.
+    Found 7 errors.
+    [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
+
+    ----- stderr -----
+    error: Panic during linting indicates a bug in Ruff. If you could open an issue at:
+
+    https://github.com/astral-sh/ruff/issues/new?title=%5BLinter%20panic%5D
+
+    ...with the relevant file contents, the `pyproject.toml` settings, and the stack trace above, we'd be very appreciative!
+    ");
+    });
+    Ok(())
+}
+
+#[test]
+fn rule_panic_mixed_results_full() -> Result<()> {
+    let tempdir = TempDir::new()?;
+
+    // Create python files
+    let file_a_path = tempdir.path().join("normal.py");
+    let file_b_path = tempdir.path().join("panic.py");
+    fs::write(&file_a_path, b"import os")?;
+    fs::write(&file_b_path, b"print('hello, world!')")?;
+
+    insta::with_settings!({
+        filters => vec![
+            (tempdir_filter(&tempdir).as_str(), "[TMP]/"),
+            (r"\\", r"/"),
+        ]
+    }, {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args(["check", "--select", "RUF9", "--preview", "--output-format=full", "--no-cache"])
+            .args([file_a_path, file_b_path]),
+        @r"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+    RUF900 Hey this is a stable test rule.
+    --> [TMP]/normal.py:1:1
+
+    RUF901 [*] Hey this is a stable test rule with a safe fix.
+    --> [TMP]/normal.py:1:1
+    1 + # fix from stable-test-rule-safe-fix
+    2 | import os
+
+    RUF902 Hey this is a stable test rule with an unsafe fix.
+    --> [TMP]/normal.py:1:1
+
+    RUF903 Hey this is a stable test rule with a display only fix.
+    --> [TMP]/normal.py:1:1
+
+    RUF911 Hey this is a preview test rule.
+    --> [TMP]/normal.py:1:1
+
+    RUF950 Hey this is a test rule that was redirected from another.
+    --> [TMP]/normal.py:1:1
+
+    panic: Fatal error while linting: This is a fake panic for testing.
+    --> [TMP]/panic.py:1:1
+    info: panicked at crates/ruff_linter/src/rules/ruff/rules/test_rules.rs:511:9:
+    This is a fake panic for testing.
+    run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+    Found 7 errors.
+    [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
+
+    ----- stderr -----
+    error: Panic during linting indicates a bug in Ruff. If you could open an issue at:
+
+    https://github.com/astral-sh/ruff/issues/new?title=%5BLinter%20panic%5D
+
+    ...with the relevant file contents, the `pyproject.toml` settings, and the stack trace above, we'd be very appreciative!
+    ");
+    });
+    Ok(())
 }

@@ -33,8 +33,8 @@ from _ast import (
 )
 from _typeshed import ReadableBuffer, Unused
 from collections.abc import Iterable, Iterator, Sequence
-from typing import Any, ClassVar, Generic, Literal, TypedDict, TypeVar as _TypeVar, overload
-from typing_extensions import Self, Unpack, deprecated
+from typing import Any, ClassVar, Generic, Literal, TypedDict, TypeVar as _TypeVar, overload, type_check_only
+from typing_extensions import Self, Unpack, deprecated, disjoint_base
 
 if sys.version_info >= (3, 13):
     from _ast import PyCF_OPTIMIZED_AST as PyCF_OPTIMIZED_AST
@@ -43,6 +43,7 @@ if sys.version_info >= (3, 13):
 _EndPositionT = typing_extensions.TypeVar("_EndPositionT", int, int | None, default=int | None)
 
 # Corresponds to the names in the `_attributes` class variable which is non-empty in certain AST nodes
+@type_check_only
 class _Attributes(TypedDict, Generic[_EndPositionT], total=False):
     lineno: int
     col_offset: int
@@ -52,17 +53,25 @@ class _Attributes(TypedDict, Generic[_EndPositionT], total=False):
 # The various AST classes are implemented in C, and imported from _ast at runtime,
 # but they consider themselves to live in the ast module,
 # so we'll define the stubs in this file.
-class AST:
-    if sys.version_info >= (3, 10):
+if sys.version_info >= (3, 12):
+    @disjoint_base
+    class AST:
         __match_args__ = ()
-    _attributes: ClassVar[tuple[str, ...]]
-    _fields: ClassVar[tuple[str, ...]]
-    if sys.version_info >= (3, 13):
-        _field_types: ClassVar[dict[str, Any]]
+        _attributes: ClassVar[tuple[str, ...]]
+        _fields: ClassVar[tuple[str, ...]]
+        if sys.version_info >= (3, 13):
+            _field_types: ClassVar[dict[str, Any]]
 
-    if sys.version_info >= (3, 14):
-        def __replace__(self) -> Self:
-            """Return a copy of the AST node with new values for the specified fields."""
+        if sys.version_info >= (3, 14):
+            def __replace__(self) -> Self:
+                """Return a copy of the AST node with new values for the specified fields."""
+
+else:
+    class AST:
+        if sys.version_info >= (3, 10):
+            __match_args__ = ()
+        _attributes: ClassVar[tuple[str, ...]]
+        _fields: ClassVar[tuple[str, ...]]
 
 class mod(AST):
     """mod = Module(stmt* body, type_ignore* type_ignores)
@@ -1330,19 +1339,21 @@ class Constant(expr):
     kind: str | None
     if sys.version_info < (3, 14):
         # Aliases for value, for backwards compatibility
-        @deprecated("Will be removed in Python 3.14; use value instead")
         @property
+        @deprecated("Removed in Python 3.14. Use `value` instead.")
         def n(self) -> _ConstantValue:
             """Deprecated. Use value instead."""
 
         @n.setter
+        @deprecated("Removed in Python 3.14. Use `value` instead.")
         def n(self, value: _ConstantValue) -> None: ...
-        @deprecated("Will be removed in Python 3.14; use value instead")
         @property
+        @deprecated("Removed in Python 3.14. Use `value` instead.")
         def s(self) -> _ConstantValue:
             """Deprecated. Use value instead."""
 
         @s.setter
+        @deprecated("Removed in Python 3.14. Use `value` instead.")
         def s(self, value: _ConstantValue) -> None: ...
 
     def __init__(self, value: _ConstantValue, kind: str | None = None, **kwargs: Unpack[_Attributes]) -> None: ...
@@ -1464,7 +1475,7 @@ class Slice(expr):
         ) -> Self:
             """Return a copy of the AST node with new values for the specified fields."""
 
-@deprecated("Deprecated since Python 3.9. Use ast.Tuple instead.")
+@deprecated("Deprecated since Python 3.9. Use `ast.Tuple` instead.")
 class ExtSlice(slice):
     """Deprecated AST node class. Use ast.Tuple instead."""
 
@@ -2121,35 +2132,41 @@ if sys.version_info >= (3, 12):
             ) -> Self:
                 """Return a copy of the AST node with new values for the specified fields."""
 
-class _ABC(type):
-    def __init__(cls, *args: Unused) -> None: ...
+if sys.version_info >= (3, 14):
+    @type_check_only
+    class _ABC(type):
+        def __init__(cls, *args: Unused) -> None: ...
+
+else:
+    class _ABC(type):
+        def __init__(cls, *args: Unused) -> None: ...
 
 if sys.version_info < (3, 14):
-    @deprecated("Replaced by ast.Constant; removed in Python 3.14")
+    @deprecated("Removed in Python 3.14. Use `ast.Constant` instead.")
     class Num(Constant, metaclass=_ABC):
         """Deprecated AST node class. Use ast.Constant instead"""
 
         def __new__(cls, n: complex, **kwargs: Unpack[_Attributes]) -> Constant: ...  # type: ignore[misc]  # pyright: ignore[reportInconsistentConstructor]
 
-    @deprecated("Replaced by ast.Constant; removed in Python 3.14")
+    @deprecated("Removed in Python 3.14. Use `ast.Constant` instead.")
     class Str(Constant, metaclass=_ABC):
         """Deprecated AST node class. Use ast.Constant instead"""
 
         def __new__(cls, s: str, **kwargs: Unpack[_Attributes]) -> Constant: ...  # type: ignore[misc]  # pyright: ignore[reportInconsistentConstructor]
 
-    @deprecated("Replaced by ast.Constant; removed in Python 3.14")
+    @deprecated("Removed in Python 3.14. Use `ast.Constant` instead.")
     class Bytes(Constant, metaclass=_ABC):
         """Deprecated AST node class. Use ast.Constant instead"""
 
         def __new__(cls, s: bytes, **kwargs: Unpack[_Attributes]) -> Constant: ...  # type: ignore[misc]  # pyright: ignore[reportInconsistentConstructor]
 
-    @deprecated("Replaced by ast.Constant; removed in Python 3.14")
+    @deprecated("Removed in Python 3.14. Use `ast.Constant` instead.")
     class NameConstant(Constant, metaclass=_ABC):
         """Deprecated AST node class. Use ast.Constant instead"""
 
         def __new__(cls, value: _ConstantValue, kind: str | None, **kwargs: Unpack[_Attributes]) -> Constant: ...  # type: ignore[misc]  # pyright: ignore[reportInconsistentConstructor]
 
-    @deprecated("Replaced by ast.Constant; removed in Python 3.14")
+    @deprecated("Removed in Python 3.14. Use `ast.Constant` instead.")
     class Ellipsis(Constant, metaclass=_ABC):
         """Deprecated AST node class. Use ast.Constant instead"""
 
@@ -2170,7 +2187,8 @@ if sys.version_info >= (3, 13):
         feature_version: None | int | tuple[int, int] = None,
         optimize: Literal[-1, 0, 1, 2] = -1,
     ) -> Module:
-        """Parse the source into an AST node.
+        """
+        Parse the source into an AST node.
         Equivalent to compile(source, filename, mode, PyCF_ONLY_AST).
         Pass type_comments=True to get back type comments where the syntax allows.
         """
@@ -2253,7 +2271,8 @@ else:
         type_comments: bool = False,
         feature_version: None | int | tuple[int, int] = None,
     ) -> Module:
-        """Parse the source into an AST node.
+        """
+        Parse the source into an AST node.
         Equivalent to compile(source, filename, mode, PyCF_ONLY_AST).
         Pass type_comments=True to get back type comments where the syntax allows.
         """
@@ -2320,7 +2339,8 @@ else:
     ) -> mod: ...
 
 def literal_eval(node_or_string: str | AST) -> Any:
-    """Evaluate an expression node or a string containing only a Python
+    """
+    Evaluate an expression node or a string containing only a Python
     expression.  The string or node provided may only consist of the following
     Python literal structures: strings, bytes, numbers, tuples, lists, dicts,
     sets, booleans, and None.
@@ -2337,7 +2357,8 @@ if sys.version_info >= (3, 13):
         indent: int | str | None = None,
         show_empty: bool = False,
     ) -> str:
-        """Return a formatted dump of the tree in node.  This is mainly useful for
+        """
+        Return a formatted dump of the tree in node.  This is mainly useful for
         debugging purposes.  If annotate_fields is true (by default),
         the returned string will show the names and the values for fields.
         If annotate_fields is false, the result string will be more compact by
@@ -2354,7 +2375,8 @@ else:
     def dump(
         node: AST, annotate_fields: bool = True, include_attributes: bool = False, *, indent: int | str | None = None
     ) -> str:
-        """Return a formatted dump of the tree in node.  This is mainly useful for
+        """
+        Return a formatted dump of the tree in node.  This is mainly useful for
         debugging purposes.  If annotate_fields is true (by default),
         the returned string will show the names and the values for fields.
         If annotate_fields is false, the result string will be more compact by
@@ -2366,12 +2388,14 @@ else:
         """
 
 def copy_location(new_node: _T, old_node: AST) -> _T:
-    """Copy source location (`lineno`, `col_offset`, `end_lineno`, and `end_col_offset`
+    """
+    Copy source location (`lineno`, `col_offset`, `end_lineno`, and `end_col_offset`
     attributes) from *old_node* to *new_node* if possible, and return *new_node*.
     """
 
 def fix_missing_locations(node: _T) -> _T:
-    """When you compile a node tree with compile(), the compiler expects lineno and
+    """
+    When you compile a node tree with compile(), the compiler expects lineno and
     col_offset attributes for every node that supports them.  This is rather
     tedious to fill in for generated nodes, so this helper adds these attributes
     recursively where not already set, by setting them to the values of the
@@ -2379,23 +2403,27 @@ def fix_missing_locations(node: _T) -> _T:
     """
 
 def increment_lineno(node: _T, n: int = 1) -> _T:
-    """Increment the line number and end line number of each node in the tree
+    """
+    Increment the line number and end line number of each node in the tree
     starting at *node* by *n*. This is useful to "move code" to a different
     location in a file.
     """
 
 def iter_fields(node: AST) -> Iterator[tuple[str, Any]]:
-    """Yield a tuple of ``(fieldname, value)`` for each field in ``node._fields``
+    """
+    Yield a tuple of ``(fieldname, value)`` for each field in ``node._fields``
     that is present on *node*.
     """
 
 def iter_child_nodes(node: AST) -> Iterator[AST]:
-    """Yield all direct child nodes of *node*, that is, all fields that are nodes
+    """
+    Yield all direct child nodes of *node*, that is, all fields that are nodes
     and all items of fields that are lists of nodes.
     """
 
 def get_docstring(node: AsyncFunctionDef | FunctionDef | ClassDef | Module, clean: bool = True) -> str | None:
-    """Return the docstring for the given node or None if no docstring can
+    """
+    Return the docstring for the given node or None if no docstring can
     be found.  If the node provided does not have docstrings a TypeError
     will be raised.
 
@@ -2414,7 +2442,8 @@ def get_source_segment(source: str, node: AST, *, padded: bool = False) -> str |
     """
 
 def walk(node: AST) -> Iterator[AST]:
-    """Recursively yield all descendant nodes in the tree starting at *node*
+    """
+    Recursively yield all descendant nodes in the tree starting at *node*
     (including *node* itself), in no specified order.  This is useful if you
     only want to modify nodes in place and don't care about the context.
     """
@@ -2431,7 +2460,8 @@ if sys.version_info >= (3, 14):
         """
 
 class NodeVisitor:
-    """A node visitor base class that walks the abstract syntax tree and calls a
+    """
+    A node visitor base class that walks the abstract syntax tree and calls a
     visitor function for every node found.  This function may return a value
     which is forwarded by the `visit` method.
 
@@ -2583,19 +2613,20 @@ class NodeVisitor:
     def visit_Param(self, node: Param) -> Any: ...
 
     if sys.version_info < (3, 14):
-        @deprecated("Replaced by visit_Constant; removed in Python 3.14")
+        @deprecated("Removed in Python 3.14. Use `visit_Constant` instead.")
         def visit_Num(self, node: Num) -> Any: ...  # type: ignore[deprecated]
-        @deprecated("Replaced by visit_Constant; removed in Python 3.14")
+        @deprecated("Removed in Python 3.14. Use `visit_Constant` instead.")
         def visit_Str(self, node: Str) -> Any: ...  # type: ignore[deprecated]
-        @deprecated("Replaced by visit_Constant; removed in Python 3.14")
+        @deprecated("Removed in Python 3.14. Use `visit_Constant` instead.")
         def visit_Bytes(self, node: Bytes) -> Any: ...  # type: ignore[deprecated]
-        @deprecated("Replaced by visit_Constant; removed in Python 3.14")
+        @deprecated("Removed in Python 3.14. Use `visit_Constant` instead.")
         def visit_NameConstant(self, node: NameConstant) -> Any: ...  # type: ignore[deprecated]
-        @deprecated("Replaced by visit_Constant; removed in Python 3.14")
+        @deprecated("Removed in Python 3.14. Use `visit_Constant` instead.")
         def visit_Ellipsis(self, node: Ellipsis) -> Any: ...  # type: ignore[deprecated]
 
 class NodeTransformer(NodeVisitor):
-    """A :class:`NodeVisitor` subclass that walks the abstract syntax tree and
+    """
+    A :class:`NodeVisitor` subclass that walks the abstract syntax tree and
     allows modification of nodes.
 
     The `NodeTransformer` will walk the AST and use the return value of the

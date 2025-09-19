@@ -9,12 +9,13 @@ ValueError being raised during parsing. The default value of this variable is 0,
 meaning the request size is unlimited.
 """
 
+import os
 from _typeshed import SupportsContainsAndGetItem, SupportsGetItem, SupportsItemAccess, Unused
 from builtins import list as _list, type as _type
 from collections.abc import Iterable, Iterator, Mapping
 from email.message import Message
 from types import TracebackType
-from typing import IO, Any, Protocol
+from typing import IO, Any, Protocol, type_check_only
 from typing_extensions import Self
 
 __all__ = [
@@ -34,7 +35,7 @@ __all__ = [
 
 def parse(
     fp: IO[Any] | None = None,
-    environ: SupportsItemAccess[str, str] = ...,
+    environ: SupportsItemAccess[str, str] = os.environ,
     keep_blank_values: bool = ...,
     strict_parsing: bool = ...,
     separator: str = "&",
@@ -78,6 +79,7 @@ def parse_multipart(
     is a list of strings.
     """
 
+@type_check_only
 class _Environ(Protocol):
     def __getitem__(self, k: str, /) -> str: ...
     def keys(self) -> Iterable[str]: ...
@@ -86,16 +88,18 @@ def parse_header(line: str) -> tuple[str, dict[str, str]]:
     """Parse a Content-type like header.
 
     Return the main content-type and a dictionary of options.
+
     """
 
-def test(environ: _Environ = ...) -> None:
+def test(environ: _Environ = os.environ) -> None:
     """Robust test CGI script, usable as main program.
 
     Write minimal HTTP headers and dump all information provided to
     the script in HTML form.
+
     """
 
-def print_environ(environ: _Environ = ...) -> None:
+def print_environ(environ: _Environ = os.environ) -> None:
     """Dump the shell environment as HTML."""
 
 def print_form(form: dict[str, Any]) -> None:
@@ -164,6 +168,7 @@ class FieldStorage:
     a file open for reading and writing.  This makes it possible to
     override the default choice of storing all files in a temporary
     directory and unlinking them as soon as they have been opened.
+
     """
 
     FieldStorageClass: _type | None
@@ -193,7 +198,7 @@ class FieldStorage:
         fp: IO[Any] | None = None,
         headers: Mapping[str, str] | Message | None = None,
         outerboundary: bytes = b"",
-        environ: SupportsContainsAndGetItem[str, str] = ...,
+        environ: SupportsContainsAndGetItem[str, str] = os.environ,
         keep_blank_values: int = 0,
         strict_parsing: int = 0,
         limit: int | None = None,
@@ -243,6 +248,7 @@ class FieldStorage:
 
         max_num_fields: int. If set, then __init__ throws a ValueError
             if there are more than n fields read by parse_qsl().
+
         """
 
     def __enter__(self) -> Self: ...
@@ -294,6 +300,7 @@ class FieldStorage:
         that is nevertheless automatically deleted when the script
         terminates, try defining a __del__ method in a derived class
         which unlinks the temporary files you have created.
+
         """
 
 def print_exception(

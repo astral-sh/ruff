@@ -26,6 +26,8 @@ Class HtmlDiff:
     For producing HTML side by side comparison with change highlights.
 """
 
+import re
+import sys
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from types import GenericAlias
 from typing import Any, AnyStr, Generic, Literal, NamedTuple, TypeVar, overload
@@ -55,7 +57,8 @@ class Match(NamedTuple):
     size: int
 
 class SequenceMatcher(Generic[_T]):
-    """SequenceMatcher is a flexible class for comparing pairs of sequences of
+    """
+    SequenceMatcher is a flexible class for comparing pairs of sequences of
     any type, so long as the sequence elements are hashable.  The basic
     algorithm predates, and is a little fancier than, an algorithm
     published in the late 1980's by Ratcliff and Obershelp under the
@@ -411,7 +414,8 @@ def get_close_matches(
 ) -> list[Sequence[_T]]: ...
 
 class Differ:
-    """Differ is a class for comparing sequences of lines of text, and
+    """
+    Differ is a class for comparing sequences of lines of text, and
     producing human-readable differences or deltas.  Differ uses
     SequenceMatcher both to compare sequences of lines, and to compare
     sequences of characters within similar (near-matching) lines.
@@ -496,7 +500,8 @@ class Differ:
     """
 
     def __init__(self, linejunk: Callable[[str], bool] | None = None, charjunk: Callable[[str], bool] | None = None) -> None:
-        """Construct a text differencer, with optional filters.
+        """
+        Construct a text differencer, with optional filters.
 
         The two optional keyword parameters are for filter functions:
 
@@ -515,7 +520,8 @@ class Differ:
         """
 
     def compare(self, a: Sequence[str], b: Sequence[str]) -> Iterator[str]:
-        """Compare two sequences of lines; generate the resulting delta.
+        """
+        Compare two sequences of lines; generate the resulting delta.
 
         Each sequence must contain individual single-line strings ending with
         newlines. Such sequences can be obtained from the `readlines()` method
@@ -539,21 +545,39 @@ class Differ:
         + emu
         """
 
-def IS_LINE_JUNK(line: str, pat: Any = ...) -> bool:  # pat is undocumented
-    """Return True for ignorable line: if `line` is blank or contains a single '#'.
+if sys.version_info >= (3, 14):
+    def IS_LINE_JUNK(line: str, pat: Callable[[str], re.Match[str] | None] | None = None) -> bool:
+        """
+        Return True for ignorable line: if `line` is blank or contains a single '#'.
 
-    Examples:
+        Examples:
 
-    >>> IS_LINE_JUNK('\\n')
-    True
-    >>> IS_LINE_JUNK('  #   \\n')
-    True
-    >>> IS_LINE_JUNK('hello\\n')
-    False
-    """
+        >>> IS_LINE_JUNK('\\n')
+        True
+        >>> IS_LINE_JUNK('  #   \\n')
+        True
+        >>> IS_LINE_JUNK('hello\\n')
+        False
+        """
+
+else:
+    def IS_LINE_JUNK(line: str, pat: Callable[[str], re.Match[str] | None] = ...) -> bool:
+        """
+        Return True for ignorable line: iff `line` is blank or contains a single '#'.
+
+        Examples:
+
+        >>> IS_LINE_JUNK('\\n')
+        True
+        >>> IS_LINE_JUNK('  #   \\n')
+        True
+        >>> IS_LINE_JUNK('hello\\n')
+        False
+        """
 
 def IS_CHARACTER_JUNK(ch: str, ws: str = " \t") -> bool:  # ws is undocumented
-    """Return True for ignorable character: iff `ch` is a space or tab.
+    """
+    Return True for ignorable character: iff `ch` is a space or tab.
 
     Examples:
 
@@ -577,7 +601,8 @@ def unified_diff(
     n: int = 3,
     lineterm: str = "\n",
 ) -> Iterator[str]:
-    """Compare two sequences of lines; generate the delta as a unified diff.
+    """
+    Compare two sequences of lines; generate the delta as a unified diff.
 
     Unified diffs are a compact way of showing line changes and a few
     lines of context.  The number of context lines is set by 'n' which
@@ -625,7 +650,8 @@ def context_diff(
     n: int = 3,
     lineterm: str = "\n",
 ) -> Iterator[str]:
-    """Compare two sequences of lines; generate the delta as a context diff.
+    """
+    Compare two sequences of lines; generate the delta as a context diff.
 
     Context diffs are a compact way of showing line changes and a few
     lines of context.  The number of context lines is set by 'n' which
@@ -672,7 +698,8 @@ def ndiff(
     linejunk: Callable[[str], bool] | None = None,
     charjunk: Callable[[str], bool] | None = ...,
 ) -> Iterator[str]:
-    """Compare `a` and `b` (lists of strings); return a `Differ`-style delta.
+    """
+    Compare `a` and `b` (lists of strings); return a `Differ`-style delta.
 
     Optional keyword parameters `linejunk` and `charjunk` are for filter
     functions, or can be None:
@@ -794,7 +821,8 @@ class HtmlDiff:
         """
 
 def restore(delta: Iterable[str], which: int) -> Iterator[str]:
-    """Generate one of the two sequences that generated a delta.
+    """
+    Generate one of the two sequences that generated a delta.
 
     Given a `delta` produced by `Differ.compare()` or `ndiff()`, extract
     lines originating from file 1 or 2 (parameter `which`), stripping off line
@@ -826,7 +854,8 @@ def diff_bytes(
     n: int = 3,
     lineterm: bytes | bytearray = b"\n",
 ) -> Iterator[bytes]:
-    """Compare `a` and `b`, two sequences of lines represented as bytes rather
+    """
+    Compare `a` and `b`, two sequences of lines represented as bytes rather
     than str. This is a wrapper for `dfunc`, which is typically either
     unified_diff() or context_diff(). Inputs are losslessly converted to
     strings so that `dfunc` only has to worry about strings, and encoded

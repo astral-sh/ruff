@@ -571,8 +571,8 @@ class C:
         if (2 + 3) < 4:
             self.x: str = "a"
 
-# error: [unresolved-attribute]
-reveal_type(C().x)  # revealed: Unknown
+# TODO: this would ideally raise an `unresolved-attribute` error
+reveal_type(C().x)  # revealed: str
 ```
 
 ```py
@@ -600,9 +600,10 @@ class C:
         def set_e(self, e: str) -> None:
             self.e = e
 
-reveal_type(C(True).a)  # revealed: Unknown | Literal[1]
-# error: [unresolved-attribute]
-reveal_type(C(True).b)  # revealed: Unknown
+# TODO: this would ideally be `Unknown | Literal[1]`
+reveal_type(C(True).a)  # revealed: Unknown | Literal[1, "a"]
+# TODO: this would ideally raise an `unresolved-attribute` error
+reveal_type(C(True).b)  # revealed: Unknown | Literal[2]
 reveal_type(C(True).c)  # revealed: Unknown | Literal[3] | str
 # Ideally, this would just be `Unknown | Literal[5]`, but we currently do not
 # attempt to analyze control flow within methods more closely. All reachable
@@ -1916,7 +1917,7 @@ d = True
 reveal_type(d.__class__)  # revealed: <class 'bool'>
 
 e = (42, 42)
-reveal_type(e.__class__)  # revealed: <class 'tuple[Literal[42], Literal[42]]'>
+reveal_type(e.__class__)  # revealed: type[tuple[Literal[42], Literal[42]]]
 
 def f(a: int, b: typing_extensions.LiteralString, c: int | str, d: type[str]):
     reveal_type(a.__class__)  # revealed: type[int]
@@ -2056,8 +2057,13 @@ reveal_type(f.__kwdefaults__)  # revealed: dict[str, Any] | None
 Some attributes are special-cased, however:
 
 ```py
+import types
+from ty_extensions import static_assert, TypeOf, is_subtype_of
+
 reveal_type(f.__get__)  # revealed: <method-wrapper `__get__` of `f`>
 reveal_type(f.__call__)  # revealed: <method-wrapper `__call__` of `f`>
+static_assert(is_subtype_of(TypeOf[f.__get__], types.MethodWrapperType))
+static_assert(is_subtype_of(TypeOf[f.__call__], types.MethodWrapperType))
 ```
 
 ### Int-literal attributes
@@ -2288,6 +2294,40 @@ class H:
         self.x = other.x or self.x
 ```
 
+An attribute definition can be guarded by a condition involving that attribute. This is a regression
+test for <https://github.com/astral-sh/ty/issues/692>:
+
+```py
+from typing import Literal
+
+def check(x) -> Literal[False]:
+    return False
+
+class Toggle:
+    def __init__(self: "Toggle"):
+        if not self.x:
+            self.x: Literal[True] = True
+        if check(self.y):
+            self.y = True
+
+reveal_type(Toggle().x)  # revealed: Literal[True]
+reveal_type(Toggle().y)  # revealed:  Unknown | Literal[True]
+```
+
+Make sure that the growing union of literals `Literal[0, 1, 2, ...]` collapses to `int` during
+fixpoint iteration. This is a regression test for <https://github.com/astral-sh/ty/issues/660>.
+
+```py
+class Counter:
+    def __init__(self: "Counter"):
+        self.count = 0
+
+    def increment(self: "Counter"):
+        self.count = self.count + 1
+
+reveal_type(Counter().count)  # revealed: Unknown | int
+```
+
 ### Builtin types attributes
 
 This test can probably be removed eventually, but we currently include it because we do not yet
@@ -2375,8 +2415,18 @@ class Answer(enum.Enum):
     YES = 1
 
 reveal_type(Answer.NO)  # revealed: Literal[Answer.NO]
-reveal_type(Answer.NO.value)  # revealed: Any
+reveal_type(Answer.NO.value)  # revealed: Literal[0]
 reveal_type(Answer.__members__)  # revealed: MappingProxyType[str, Unknown]
+```
+
+## Divergent inferred implicit instance attribute types
+
+```py
+class C:
+    def f(self, other: "C"):
+        self.x = (other.x, 1)
+
+reveal_type(C().x)  # revealed: Unknown | tuple[Divergent, Literal[1]]
 ```
 
 ## References

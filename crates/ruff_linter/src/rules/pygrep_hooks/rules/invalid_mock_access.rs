@@ -5,7 +5,6 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::preview::is_invalid_async_mock_access_check_enabled;
 
 #[derive(Debug, PartialEq, Eq)]
 enum Reason {
@@ -62,18 +61,16 @@ pub(crate) fn uncalled_mock_method(checker: &Checker, expr: &Expr) {
                 | "assert_has_calls"
                 | "assert_not_called"
         );
-        let is_uncalled_async_mock_method =
-            is_invalid_async_mock_access_check_enabled(checker.settings())
-                && matches!(
-                    attr.as_str(),
-                    "assert_awaited"
-                        | "assert_awaited_once"
-                        | "assert_awaited_with"
-                        | "assert_awaited_once_with"
-                        | "assert_any_await"
-                        | "assert_has_awaits"
-                        | "assert_not_awaited"
-                );
+        let is_uncalled_async_mock_method = matches!(
+            attr.as_str(),
+            "assert_awaited"
+                | "assert_awaited_once"
+                | "assert_awaited_with"
+                | "assert_awaited_once_with"
+                | "assert_any_await"
+                | "assert_has_awaits"
+                | "assert_not_awaited"
+        );
         if is_uncalled_mock_method || is_uncalled_async_mock_method {
             checker.report_diagnostic(
                 InvalidMockAccess {
@@ -104,18 +101,16 @@ pub(crate) fn non_existent_mock_method(checker: &Checker, test: &Expr) {
             | "has_calls"
             | "not_called"
     );
-    let is_missing_async_mock_method =
-        is_invalid_async_mock_access_check_enabled(checker.settings())
-            && matches!(
-                attr.as_str(),
-                "awaited"
-                    | "awaited_once"
-                    | "awaited_with"
-                    | "awaited_once_with"
-                    | "any_await"
-                    | "has_awaits"
-                    | "not_awaited"
-            );
+    let is_missing_async_mock_method = matches!(
+        attr.as_str(),
+        "awaited"
+            | "awaited_once"
+            | "awaited_with"
+            | "awaited_once_with"
+            | "any_await"
+            | "has_awaits"
+            | "not_awaited"
+    );
     if is_missing_mock_method || is_missing_async_mock_method {
         checker.report_diagnostic(
             InvalidMockAccess {

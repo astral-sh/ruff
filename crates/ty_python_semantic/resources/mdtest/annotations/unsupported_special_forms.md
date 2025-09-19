@@ -17,6 +17,7 @@ Alias: TypeAlias = int
 def f(*args: Unpack[Ts]) -> tuple[Unpack[Ts]]:
     reveal_type(args)  # revealed: tuple[@Todo(`Unpack[]` special form), ...]
     reveal_type(Alias)  # revealed: @Todo(Support for `typing.TypeAlias`)
+    return args
 
 def g() -> TypeGuard[int]: ...
 def i(callback: Callable[Concatenate[int, P], R_co], *args: P.args, **kwargs: P.kwargs) -> R_co:
@@ -26,7 +27,24 @@ def i(callback: Callable[Concatenate[int, P], R_co], *args: P.args, **kwargs: P.
 
 class Foo:
     def method(self, x: Self):
-        reveal_type(x)  # revealed: Self
+        reveal_type(x)  # revealed: Self@method
+
+def ex2(msg: str):
+    def wrapper(fn: Callable[P, R_co]) -> Callable[P, R_co]:
+        def wrapped(*args: P.args, **kwargs: P.kwargs) -> R_co:
+            print(msg)
+            return fn(*args, **kwargs)
+        return wrapped
+    return wrapper
+
+def ex3(msg: str):
+    P = ParamSpec("P")
+    def wrapper(fn: Callable[P, R_co]) -> Callable[P, R_co]:
+        def wrapped(*args: P.args, **kwargs: P.kwargs) -> R_co:
+            print(msg)
+            return fn(*args, **kwargs)
+        return wrapped
+    return wrapper
 ```
 
 ## Type expressions

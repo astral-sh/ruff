@@ -8,7 +8,7 @@ import sys
 from abc import abstractmethod
 from time import struct_time
 from typing import ClassVar, Final, NoReturn, SupportsIndex, final, overload, type_check_only
-from typing_extensions import CapsuleType, Self, TypeAlias, deprecated
+from typing_extensions import CapsuleType, Self, TypeAlias, deprecated, disjoint_base
 
 if sys.version_info >= (3, 11):
     __all__ = ("date", "datetime", "time", "timedelta", "timezone", "tzinfo", "MINYEAR", "MAXYEAR", "UTC")
@@ -74,6 +74,7 @@ class _IsoCalendarDate(tuple[int, int, int]):
     @property
     def weekday(self) -> int: ...
 
+@disjoint_base
 class date:
     """date(year, month, day) --> date object"""
 
@@ -181,6 +182,7 @@ class date:
     def isocalendar(self) -> _IsoCalendarDate:
         """Return a named tuple containing ISO year, week number, and weekday."""
 
+@disjoint_base
 class time:
     """time([hour[, minute[, second[, microsecond[, tzinfo]]]]]) --> a time object
 
@@ -193,13 +195,13 @@ class time:
     resolution: ClassVar[timedelta]
     def __new__(
         cls,
-        hour: SupportsIndex = ...,
-        minute: SupportsIndex = ...,
-        second: SupportsIndex = ...,
-        microsecond: SupportsIndex = ...,
-        tzinfo: _TzInfo | None = ...,
+        hour: SupportsIndex = 0,
+        minute: SupportsIndex = 0,
+        second: SupportsIndex = 0,
+        microsecond: SupportsIndex = 0,
+        tzinfo: _TzInfo | None = None,
         *,
-        fold: int = ...,
+        fold: int = 0,
     ) -> Self: ...
     @property
     def hour(self) -> int: ...
@@ -219,7 +221,7 @@ class time:
     def __gt__(self, value: time, /) -> bool: ...
     def __eq__(self, value: object, /) -> bool: ...
     def __hash__(self) -> int: ...
-    def isoformat(self, timespec: str = ...) -> str:
+    def isoformat(self, timespec: str = "auto") -> str:
         """Return string in ISO 8601 format, [HH[:MM[:SS[.mmm[uuu]]]]][+HH:MM].
 
         The optional argument timespec specifies the number of additional terms
@@ -284,6 +286,7 @@ class time:
 _Date: TypeAlias = date
 _Time: TypeAlias = time
 
+@disjoint_base
 class timedelta:
     """Difference between two datetime values.
 
@@ -298,13 +301,13 @@ class timedelta:
     resolution: ClassVar[timedelta]
     def __new__(
         cls,
-        days: float = ...,
-        seconds: float = ...,
-        microseconds: float = ...,
-        milliseconds: float = ...,
-        minutes: float = ...,
-        hours: float = ...,
-        weeks: float = ...,
+        days: float = 0,
+        seconds: float = 0,
+        microseconds: float = 0,
+        milliseconds: float = 0,
+        minutes: float = 0,
+        hours: float = 0,
+        weeks: float = 0,
     ) -> Self: ...
     @property
     def days(self) -> int:
@@ -376,6 +379,7 @@ class timedelta:
 
     def __hash__(self) -> int: ...
 
+@disjoint_base
 class datetime(date):
     """datetime(year, month, day[, hour[, minute[, second[, microsecond[,tzinfo]]]]])
 
@@ -390,13 +394,13 @@ class datetime(date):
         year: SupportsIndex,
         month: SupportsIndex,
         day: SupportsIndex,
-        hour: SupportsIndex = ...,
-        minute: SupportsIndex = ...,
-        second: SupportsIndex = ...,
-        microsecond: SupportsIndex = ...,
-        tzinfo: _TzInfo | None = ...,
+        hour: SupportsIndex = 0,
+        minute: SupportsIndex = 0,
+        second: SupportsIndex = 0,
+        microsecond: SupportsIndex = 0,
+        tzinfo: _TzInfo | None = None,
         *,
-        fold: int = ...,
+        fold: int = 0,
     ) -> Self: ...
     @property
     def hour(self) -> int: ...
@@ -415,11 +419,11 @@ class datetime(date):
     # meaning it is only *safe* to pass it as a keyword argument on 3.12+
     if sys.version_info >= (3, 12):
         @classmethod
-        def fromtimestamp(cls, timestamp: float, tz: _TzInfo | None = ...) -> Self:
+        def fromtimestamp(cls, timestamp: float, tz: _TzInfo | None = None) -> Self:
             """timestamp[, tz] -> tz's local time from POSIX timestamp."""
     else:
         @classmethod
-        def fromtimestamp(cls, timestamp: float, /, tz: _TzInfo | None = ...) -> Self:
+        def fromtimestamp(cls, timestamp: float, /, tz: _TzInfo | None = None) -> Self:
             """timestamp[, tz] -> tz's local time from POSIX timestamp."""
 
     @classmethod
@@ -492,10 +496,10 @@ class datetime(date):
     ) -> Self:
         """Return datetime with new specified fields."""
 
-    def astimezone(self, tz: _TzInfo | None = ...) -> Self:
+    def astimezone(self, tz: _TzInfo | None = None) -> Self:
         """tz -> convert to local time in new timezone tz"""
 
-    def isoformat(self, sep: str = ..., timespec: str = ...) -> str:
+    def isoformat(self, sep: str = "T", timespec: str = "auto") -> str:
         """[sep] -> string in ISO 8601 format, YYYY-MM-DDT[HH[:MM[:SS[.mmm[uuu]]]]][+HH:MM].
         sep is used to separate the year from the time, and defaults to 'T'.
         The optional argument timespec specifies the number of additional terms

@@ -1,20 +1,26 @@
 use std::borrow::Cow;
 
-use ruff_db::parsed::{ParsedModuleRef, parsed_module};
+use crate::types::constraints::ConstraintSet;
+
+use itertools::Itertools;
+use ruff_db::parsed::ParsedModuleRef;
 use ruff_python_ast as ast;
 use rustc_hash::FxHashMap;
 
+use crate::semantic_index::SemanticIndex;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::{FileScopeId, NodeWithScopeKind};
-use crate::semantic_index::{SemanticIndex, semantic_index};
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
-use crate::types::instance::{NominalInstanceType, Protocol, ProtocolInstanceType};
+use crate::types::infer::infer_definition_types;
+use crate::types::instance::{Protocol, ProtocolInstanceType};
 use crate::types::signatures::{Parameter, Parameters, Signature};
-use crate::types::tuple::{TupleSpec, TupleType};
+use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
-    KnownInstanceType, Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarBoundOrConstraints,
-    TypeVarInstance, TypeVarVariance, UnionType, binding_type, declaration_type,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
+    IsEquivalentVisitor, KnownClass, KnownInstanceType, MaterializationKind, NormalizedVisitor,
+    Type, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind,
+    TypeVarVariance, UnionType, binding_type, declaration_type,
 };
 use crate::{Db, FxOrderSet};
 
@@ -30,33 +36,71 @@ fn enclosing_generic_contexts<'db>(
         .ancestor_scopes(scope)
         .filter_map(|(_, ancestor_scope)| match ancestor_scope.node() {
             NodeWithScopeKind::Class(class) => {
-                binding_type(db, index.expect_single_definition(class.node(module)))
+                let definition = index.expect_single_definition(class.node(module));
+                binding_type(db, definition)
                     .into_class_literal()?
                     .generic_context(db)
             }
             NodeWithScopeKind::Function(function) => {
-                binding_type(db, index.expect_single_definition(function.node(module)))
+                let definition = index.expect_single_definition(function.node(module));
+                infer_definition_types(db, definition)
+                    .undecorated_type()
+                    .expect("function should have undecorated type")
                     .into_function_literal()?
-                    .signature(db)
-                    .iter()
-                    .last()
-                    .expect("function should have at least one overload")
+                    .last_definition_signature(db)
                     .generic_context
+            }
+            NodeWithScopeKind::TypeAlias(type_alias) => {
+                let definition = index.expect_single_definition(type_alias.node(module));
+                binding_type(db, definition)
+                    .into_type_alias()?
+                    .into_pep_695_type_alias()?
+                    .generic_context(db)
             }
             _ => None,
         })
 }
 
-/// Returns the legacy typevars that have been bound in the given scope or any enclosing scope.
-fn bound_legacy_typevars<'db>(
+/// Binds an unbound typevar.
+///
+/// When a typevar is first created, we will have a [`TypeVarInstance`] which does not have an
+/// associated binding context. When the typevar is used in a generic class or function, we "bind"
+/// it, adding the [`Definition`] of the generic class or function as its "binding context".
+///
+/// When an expression resolves to a typevar, our inferred type will refer to the unbound
+/// [`TypeVarInstance`] from when the typevar was first created. This function walks the scopes
+/// that enclosing the expression, looking for the innermost binding context that binds the
+/// typevar.
+///
+/// If no enclosing scope has already bound the typevar, we might be in a syntactic position that
+/// is about to bind it (indicated by a non-`None` `typevar_binding_context`), in which case we
+/// bind the typevar with that new binding context.
+pub(crate) fn bind_typevar<'db>(
     db: &'db dyn Db,
     module: &ParsedModuleRef,
-    index: &'db SemanticIndex<'db>,
-    scope: FileScopeId,
-) -> impl Iterator<Item = TypeVarInstance<'db>> {
-    enclosing_generic_contexts(db, module, index, scope)
-        .flat_map(|generic_context| generic_context.variables(db).iter().copied())
-        .filter(|typevar| typevar.is_legacy(db))
+    index: &SemanticIndex<'db>,
+    containing_scope: FileScopeId,
+    typevar_binding_context: Option<Definition<'db>>,
+    typevar: TypeVarInstance<'db>,
+) -> Option<BoundTypeVarInstance<'db>> {
+    // typing.Self is treated like a legacy typevar, but doesn't follow the same scoping rules. It is always bound to the outermost method in the containing class.
+    if matches!(typevar.kind(db), TypeVarKind::TypingSelf) {
+        for ((_, inner), (_, outer)) in index.ancestor_scopes(containing_scope).tuple_windows() {
+            if outer.kind().is_class() {
+                if let NodeWithScopeKind::Function(function) = inner.node() {
+                    let definition = index.expect_single_definition(function.node(module));
+                    return Some(typevar.with_binding_context(db, definition));
+                }
+            }
+        }
+    }
+    enclosing_generic_contexts(db, module, index, containing_scope)
+        .find_map(|enclosing_context| enclosing_context.binds_typevar(db, typevar))
+        .or_else(|| {
+            typevar_binding_context.map(|typevar_binding_context| {
+                typevar.with_binding_context(db, typevar_binding_context)
+            })
+        })
 }
 
 /// A list of formal type variables for a generic function, class, or type alias.
@@ -67,20 +111,20 @@ fn bound_legacy_typevars<'db>(
 /// # Ordering
 /// Ordering is based on the context's salsa-assigned id and not on its values.
 /// The id may change between runs, or when the context was garbage collected and recreated.
-#[salsa::interned(debug)]
+#[salsa::interned(debug, heap_size=GenericContext::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct GenericContext<'db> {
     #[returns(ref)]
-    pub(crate) variables: FxOrderSet<TypeVarInstance<'db>>,
+    pub(crate) variables: FxOrderSet<BoundTypeVarInstance<'db>>,
 }
 
 pub(super) fn walk_generic_context<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     context: GenericContext<'db>,
-    visitor: &mut V,
+    visitor: &V,
 ) {
-    for typevar in context.variables(db) {
-        visitor.visit_type_var_type(db, *typevar);
+    for bound_typevar in context.variables(db) {
+        visitor.visit_bound_type_var_type(db, *bound_typevar);
     }
 }
 
@@ -92,20 +136,42 @@ impl<'db> GenericContext<'db> {
     pub(crate) fn from_type_params(
         db: &'db dyn Db,
         index: &'db SemanticIndex<'db>,
+        binding_context: Definition<'db>,
         type_params_node: &ast::TypeParams,
     ) -> Self {
-        let variables: FxOrderSet<_> = type_params_node
-            .iter()
-            .filter_map(|type_param| Self::variable_from_type_param(db, index, type_param))
-            .collect();
-        Self::new(db, variables)
+        let variables = type_params_node.iter().filter_map(|type_param| {
+            Self::variable_from_type_param(db, index, binding_context, type_param)
+        });
+
+        Self::from_typevar_instances(db, variables)
+    }
+
+    /// Creates a generic context from a list of `BoundTypeVarInstance`s.
+    pub(crate) fn from_typevar_instances(
+        db: &'db dyn Db,
+        type_params: impl IntoIterator<Item = BoundTypeVarInstance<'db>>,
+    ) -> Self {
+        Self::new(db, type_params.into_iter().collect::<FxOrderSet<_>>())
+    }
+
+    /// Merge this generic context with another, returning a new generic context that
+    /// contains type variables from both contexts.
+    pub(crate) fn merge(self, db: &'db dyn Db, other: Self) -> Self {
+        Self::from_typevar_instances(
+            db,
+            self.variables(db)
+                .iter()
+                .chain(other.variables(db).iter())
+                .copied(),
+        )
     }
 
     fn variable_from_type_param(
         db: &'db dyn Db,
         index: &'db SemanticIndex<'db>,
+        binding_context: Definition<'db>,
         type_param_node: &ast::TypeParam,
-    ) -> Option<TypeVarInstance<'db>> {
+    ) -> Option<BoundTypeVarInstance<'db>> {
         match type_param_node {
             ast::TypeParam::TypeVar(node) => {
                 let definition = index.expect_single_definition(node);
@@ -114,7 +180,7 @@ impl<'db> GenericContext<'db> {
                 else {
                     return None;
                 };
-                Some(typevar)
+                Some(typevar.with_binding_context(db, binding_context))
             }
             // TODO: Support these!
             ast::TypeParam::ParamSpec(_) => None,
@@ -134,23 +200,14 @@ impl<'db> GenericContext<'db> {
         let mut variables = FxOrderSet::default();
         for param in parameters {
             if let Some(ty) = param.annotated_type() {
-                ty.find_legacy_typevars(db, &mut variables);
+                ty.find_legacy_typevars(db, Some(definition), &mut variables);
             }
             if let Some(ty) = param.default_type() {
-                ty.find_legacy_typevars(db, &mut variables);
+                ty.find_legacy_typevars(db, Some(definition), &mut variables);
             }
         }
         if let Some(ty) = return_type {
-            ty.find_legacy_typevars(db, &mut variables);
-        }
-
-        // Then remove any that were bound in enclosing scopes.
-        let file = definition.file(db);
-        let module = parsed_module(db, file).load(db);
-        let index = semantic_index(db, file);
-        let containing_scope = definition.file_scope(db);
-        for typevar in bound_legacy_typevars(db, &module, index, containing_scope) {
-            variables.remove(&typevar);
+            ty.find_legacy_typevars(db, Some(definition), &mut variables);
         }
 
         if variables.is_empty() {
@@ -167,7 +224,7 @@ impl<'db> GenericContext<'db> {
     ) -> Option<Self> {
         let mut variables = FxOrderSet::default();
         for base in bases {
-            base.find_legacy_typevars(db, &mut variables);
+            base.find_legacy_typevars(db, None, &mut variables);
         }
         if variables.is_empty() {
             return None;
@@ -188,7 +245,11 @@ impl<'db> GenericContext<'db> {
         Signature::new(parameters, None)
     }
 
-    fn parameter_from_typevar(db: &'db dyn Db, typevar: TypeVarInstance<'db>) -> Parameter<'db> {
+    fn parameter_from_typevar(
+        db: &'db dyn Db,
+        bound_typevar: BoundTypeVarInstance<'db>,
+    ) -> Parameter<'db> {
+        let typevar = bound_typevar.typevar(db);
         let mut parameter = Parameter::positional_only(Some(typevar.name(db).clone()));
         match typevar.bound_or_constraints(db) {
             Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
@@ -199,20 +260,40 @@ impl<'db> GenericContext<'db> {
                 // TODO: This should be a new type variant where only these exact types are
                 // assignable, and not subclasses of them, nor a union of them.
                 parameter = parameter
-                    .with_annotated_type(UnionType::from_elements(db, constraints.iter(db)));
+                    .with_annotated_type(UnionType::from_elements(db, constraints.elements(db)));
             }
             None => {}
         }
-        if let Some(default_ty) = typevar.default_ty(db) {
+        if let Some(default_ty) = bound_typevar.default_type(db) {
             parameter = parameter.with_default_type(default_ty);
         }
         parameter
     }
 
-    pub(crate) fn default_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
-        self.specialize_partial(db, &vec![None; self.variables(db).len()])
+    pub(crate) fn default_specialization(
+        self,
+        db: &'db dyn Db,
+        known_class: Option<KnownClass>,
+    ) -> Specialization<'db> {
+        let partial =
+            self.specialize_partial(db, std::iter::repeat_n(None, self.variables(db).len()));
+        if known_class == Some(KnownClass::Tuple) {
+            Specialization::new(
+                db,
+                self,
+                partial.types(db),
+                None,
+                Some(TupleType::homogeneous(db, Type::unknown())),
+            )
+        } else {
+            partial
+        }
     }
 
+    /// Returns a specialization of this generic context where each typevar is mapped to itself.
+    /// (And in particular, to an _inferable_ version of itself, since this will be used in our
+    /// class constructor invocation machinery to infer a specialization for the class from the
+    /// arguments passed to its constructor.)
     pub(crate) fn identity_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
         let types = self
             .variables(db)
@@ -229,7 +310,7 @@ impl<'db> GenericContext<'db> {
 
     /// Returns a tuple type of the typevars introduced by this generic context.
     pub(crate) fn as_tuple(self, db: &'db dyn Db) -> Type<'db> {
-        TupleType::from_elements(
+        Type::heterogeneous_tuple(
             db,
             self.variables(db)
                 .iter()
@@ -239,6 +320,17 @@ impl<'db> GenericContext<'db> {
 
     pub(crate) fn is_subset_of(self, db: &'db dyn Db, other: GenericContext<'db>) -> bool {
         self.variables(db).is_subset(other.variables(db))
+    }
+
+    pub(crate) fn binds_typevar(
+        self,
+        db: &'db dyn Db,
+        typevar: TypeVarInstance<'db>,
+    ) -> Option<BoundTypeVarInstance<'db>> {
+        self.variables(db)
+            .iter()
+            .find(|self_bound_typevar| self_bound_typevar.typevar(db) == typevar)
+            .copied()
     }
 
     /// Creates a specialization of this generic context. Panics if the length of `types` does not
@@ -251,27 +343,28 @@ impl<'db> GenericContext<'db> {
         types: Box<[Type<'db>]>,
     ) -> Specialization<'db> {
         assert!(self.variables(db).len() == types.len());
-        Specialization::new(db, self, types, None)
+        Specialization::new(db, self, types, None, None)
     }
 
     /// Creates a specialization of this generic context for the `tuple` class.
     pub(crate) fn specialize_tuple(
         self,
         db: &'db dyn Db,
+        element_type: Type<'db>,
         tuple: TupleType<'db>,
     ) -> Specialization<'db> {
-        let element_type = tuple.tuple(db).homogeneous_element_type(db);
-        Specialization::new(db, self, Box::from([element_type]), Some(tuple))
+        Specialization::new(db, self, Box::from([element_type]), None, Some(tuple))
     }
 
     /// Creates a specialization of this generic context. Panics if the length of `types` does not
     /// match the number of typevars in the generic context. If any provided type is `None`, we
     /// will use the corresponding typevar's default type.
-    pub(crate) fn specialize_partial(
-        self,
-        db: &'db dyn Db,
-        types: &[Option<Type<'db>>],
-    ) -> Specialization<'db> {
+    pub(crate) fn specialize_partial<I>(self, db: &'db dyn Db, types: I) -> Specialization<'db>
+    where
+        I: IntoIterator<Item = Option<Type<'db>>>,
+        I::IntoIter: ExactSizeIterator,
+    {
+        let types = types.into_iter();
         let variables = self.variables(db);
         assert!(variables.len() == types.len());
 
@@ -284,13 +377,13 @@ impl<'db> GenericContext<'db> {
         // If there is a mapping for `T`, we want to map `U` to that type, not to `T`. To handle
         // this, we repeatedly apply the specialization to itself, until we reach a fixed point.
         let mut expanded = vec![Type::unknown(); types.len()];
-        for (idx, (ty, typevar)) in types.iter().zip(variables).enumerate() {
+        for (idx, (ty, typevar)) in types.zip(variables).enumerate() {
             if let Some(ty) = ty {
-                expanded[idx] = *ty;
+                expanded[idx] = ty;
                 continue;
             }
 
-            let Some(default) = typevar.default_ty(db) else {
+            let Some(default) = typevar.default_type(db) else {
                 continue;
             };
 
@@ -306,20 +399,20 @@ impl<'db> GenericContext<'db> {
             expanded[idx] = default;
         }
 
-        Specialization::new(db, self, expanded.into_boxed_slice(), None)
+        Specialization::new(db, self, expanded.into_boxed_slice(), None, None)
     }
 
-    pub(crate) fn normalized_impl(
-        self,
-        db: &'db dyn Db,
-        visitor: &mut TypeTransformer<'db>,
-    ) -> Self {
-        let variables: FxOrderSet<_> = self
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+        let variables = self
             .variables(db)
             .iter()
-            .map(|ty| ty.normalized_impl(db, visitor))
-            .collect();
-        Self::new(db, variables)
+            .map(|bound_typevar| bound_typevar.normalized_impl(db, visitor));
+
+        Self::from_typevar_instances(db, variables)
+    }
+
+    fn heap_size((variables,): &(FxOrderSet<BoundTypeVarInstance<'db>>,)) -> usize {
+        ruff_memory_usage::order_set_heap_size(variables)
     }
 }
 
@@ -348,54 +441,185 @@ impl std::fmt::Display for LegacyGenericBase {
 ///
 /// TODO: Handle nested specializations better, with actual parent links to the specialization of
 /// the lexically containing context.
-#[salsa::interned(debug)]
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct Specialization<'db> {
     pub(crate) generic_context: GenericContext<'db>,
     #[returns(deref)]
     pub(crate) types: Box<[Type<'db>]>,
+    /// The materialization kind of the specialization. For example, given an invariant
+    /// generic type `A`, `Top[A[Any]]` is a supertype of all materializations of `A[Any]`,
+    /// and is represented here with `Some(MaterializationKind::Top)`. Similarly,
+    /// `Bottom[A[Any]]` is a subtype of all materializations of `A[Any]`, and is represented
+    /// with `Some(MaterializationKind::Bottom)`.
+    /// The `materialization_kind` field may be non-`None` only if the specialization contains
+    /// dynamic types in invariant positions.
+    pub(crate) materialization_kind: Option<MaterializationKind>,
 
     /// For specializations of `tuple`, we also store more detailed information about the tuple's
     /// elements, above what the class's (single) typevar can represent.
     tuple_inner: Option<TupleType<'db>>,
 }
 
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for Specialization<'_> {}
+
 pub(super) fn walk_specialization<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     specialization: Specialization<'db>,
-    visitor: &mut V,
+    visitor: &V,
 ) {
     walk_generic_context(db, specialization.generic_context(db), visitor);
     for ty in specialization.types(db) {
         visitor.visit_type(db, *ty);
     }
     if let Some(tuple) = specialization.tuple_inner(db) {
-        visitor.visit_tuple_type(db, tuple);
+        walk_tuple_type(db, tuple, visitor);
+    }
+}
+
+fn is_subtype_in_invariant_position<'db>(
+    db: &'db dyn Db,
+    derived_type: &Type<'db>,
+    derived_materialization: MaterializationKind,
+    base_type: &Type<'db>,
+    base_materialization: MaterializationKind,
+    visitor: &HasRelationToVisitor<'db>,
+) -> ConstraintSet<'db> {
+    let derived_top = derived_type.top_materialization(db);
+    let derived_bottom = derived_type.bottom_materialization(db);
+    let base_top = base_type.top_materialization(db);
+    let base_bottom = base_type.bottom_materialization(db);
+
+    let is_subtype_of = |derived: Type<'db>, base: Type<'db>| {
+        derived.has_relation_to_impl(db, base, TypeRelation::Subtyping, visitor)
+    };
+    match (derived_materialization, base_materialization) {
+        // `Derived` is a subtype of `Base` if the range of materializations covered by `Derived`
+        // is a subset of the range covered by `Base`.
+        (MaterializationKind::Top, MaterializationKind::Top) => {
+            is_subtype_of(base_bottom, derived_bottom)
+                .and(db, || is_subtype_of(derived_top, base_top))
+        }
+        // One bottom is a subtype of another if it covers a strictly larger set of materializations.
+        (MaterializationKind::Bottom, MaterializationKind::Bottom) => {
+            is_subtype_of(derived_bottom, base_bottom)
+                .and(db, || is_subtype_of(base_top, derived_top))
+        }
+        // The bottom materialization of `Derived` is a subtype of the top materialization
+        // of `Base` if there is some type that is both within the
+        // range of types covered by derived and within the range covered by base, because if such a type
+        // exists, it's a subtype of `Top[base]` and a supertype of `Bottom[derived]`.
+        (MaterializationKind::Bottom, MaterializationKind::Top) => {
+            (is_subtype_of(base_bottom, derived_bottom)
+                .and(db, || is_subtype_of(derived_bottom, base_top)))
+            .or(db, || {
+                is_subtype_of(base_bottom, derived_top)
+                    .and(db, || is_subtype_of(derived_top, base_top))
+            })
+            .or(db, || {
+                is_subtype_of(base_top, derived_top)
+                    .and(db, || is_subtype_of(derived_bottom, base_top))
+            })
+        }
+        // A top materialization is a subtype of a bottom materialization only if both original
+        // un-materialized types are the same fully static type.
+        (MaterializationKind::Top, MaterializationKind::Bottom) => {
+            is_subtype_of(derived_top, base_bottom)
+                .and(db, || is_subtype_of(base_top, derived_bottom))
+        }
+    }
+}
+
+/// Whether two types encountered in an invariant position
+/// have a relation (subtyping or assignability), taking into account
+/// that the two types may come from a top or bottom materialization.
+fn has_relation_in_invariant_position<'db>(
+    db: &'db dyn Db,
+    derived_type: &Type<'db>,
+    derived_materialization: Option<MaterializationKind>,
+    base_type: &Type<'db>,
+    base_materialization: Option<MaterializationKind>,
+    relation: TypeRelation,
+    visitor: &HasRelationToVisitor<'db>,
+) -> ConstraintSet<'db> {
+    match (derived_materialization, base_materialization, relation) {
+        // Top and bottom materializations are fully static types, so subtyping
+        // is the same as assignability.
+        (Some(derived_mat), Some(base_mat), _) => is_subtype_in_invariant_position(
+            db,
+            derived_type,
+            derived_mat,
+            base_type,
+            base_mat,
+            visitor,
+        ),
+        // Subtyping between invariant type parameters without a top/bottom materialization involved
+        // is equivalence
+        (None, None, TypeRelation::Subtyping) => derived_type.when_equivalent_to(db, *base_type),
+        (None, None, TypeRelation::Assignability) => derived_type
+            .has_relation_to_impl(db, *base_type, TypeRelation::Assignability, visitor)
+            .and(db, || {
+                base_type.has_relation_to_impl(
+                    db,
+                    *derived_type,
+                    TypeRelation::Assignability,
+                    visitor,
+                )
+            }),
+        // For gradual types, A <: B (subtyping) is defined as Top[A] <: Bottom[B]
+        (None, Some(base_mat), TypeRelation::Subtyping) => is_subtype_in_invariant_position(
+            db,
+            derived_type,
+            MaterializationKind::Top,
+            base_type,
+            base_mat,
+            visitor,
+        ),
+        (Some(derived_mat), None, TypeRelation::Subtyping) => is_subtype_in_invariant_position(
+            db,
+            derived_type,
+            derived_mat,
+            base_type,
+            MaterializationKind::Bottom,
+            visitor,
+        ),
+        // And A <~ B (assignability) is Bottom[A] <: Top[B]
+        (None, Some(base_mat), TypeRelation::Assignability) => is_subtype_in_invariant_position(
+            db,
+            derived_type,
+            MaterializationKind::Bottom,
+            base_type,
+            base_mat,
+            visitor,
+        ),
+        (Some(derived_mat), None, TypeRelation::Assignability) => is_subtype_in_invariant_position(
+            db,
+            derived_type,
+            derived_mat,
+            base_type,
+            MaterializationKind::Top,
+            visitor,
+        ),
     }
 }
 
 impl<'db> Specialization<'db> {
     /// Returns the tuple spec for a specialization of the `tuple` class.
-    pub(crate) fn tuple(self, db: &'db dyn Db) -> &'db TupleSpec<'db> {
-        if let Some(tuple) = self.tuple_inner(db).map(|tuple_type| tuple_type.tuple(db)) {
-            return tuple;
-        }
-        if let [element_type] = self.types(db) {
-            if let Some(tuple) = TupleType::new(db, TupleSpec::homogeneous(*element_type)) {
-                return tuple.tuple(db);
-            }
-        }
-        TupleType::new(db, TupleSpec::homogeneous(Type::unknown()))
-            .expect("tuple[Unknown, ...] should never contain Never")
-            .tuple(db)
+    pub(crate) fn tuple(self, db: &'db dyn Db) -> Option<&'db TupleSpec<'db>> {
+        self.tuple_inner(db).map(|tuple_type| tuple_type.tuple(db))
     }
 
     /// Returns the type that a typevar is mapped to, or None if the typevar isn't part of this
     /// mapping.
-    pub(crate) fn get(self, db: &'db dyn Db, typevar: TypeVarInstance<'db>) -> Option<Type<'db>> {
+    pub(crate) fn get(
+        self,
+        db: &'db dyn Db,
+        bound_typevar: BoundTypeVarInstance<'db>,
+    ) -> Option<Type<'db>> {
         let index = self
             .generic_context(db)
             .variables(db)
-            .get_index_of(&typevar)?;
+            .get_index_of(&bound_typevar)?;
         self.types(db).get(index).copied()
     }
 
@@ -413,7 +637,15 @@ impl<'db> Specialization<'db> {
     /// That lets us produce the generic alias `A[int]`, which is the corresponding entry in the
     /// MRO of `B[int]`.
     pub(crate) fn apply_specialization(self, db: &'db dyn Db, other: Specialization<'db>) -> Self {
-        self.apply_type_mapping(db, &TypeMapping::Specialization(other))
+        let new_specialization = self.apply_type_mapping(db, &TypeMapping::Specialization(other));
+        match other.materialization_kind(db) {
+            None => new_specialization,
+            Some(materialization_kind) => new_specialization.materialize_impl(
+                db,
+                materialization_kind,
+                &ApplyTypeMappingVisitor::default(),
+            ),
+        }
     }
 
     pub(crate) fn apply_type_mapping<'a>(
@@ -421,15 +653,34 @@ impl<'db> Specialization<'db> {
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
     ) -> Self {
+        self.apply_type_mapping_impl(db, type_mapping, &ApplyTypeMappingVisitor::default())
+    }
+
+    pub(crate) fn apply_type_mapping_impl<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        if let TypeMapping::Materialize(materialization_kind) = type_mapping {
+            return self.materialize_impl(db, *materialization_kind, visitor);
+        }
         let types: Box<[_]> = self
             .types(db)
             .iter()
-            .map(|ty| ty.apply_type_mapping(db, type_mapping))
+            .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, visitor))
             .collect();
+
         let tuple_inner = self
             .tuple_inner(db)
-            .and_then(|tuple| tuple.apply_type_mapping(db, type_mapping));
-        Specialization::new(db, self.generic_context(db), types, tuple_inner)
+            .and_then(|tuple| tuple.apply_type_mapping_impl(db, type_mapping, visitor));
+        Specialization::new(
+            db,
+            self.generic_context(db),
+            types,
+            self.materialization_kind(db),
+            tuple_inner,
+        )
     }
 
     /// Applies an optional specialization to this specialization.
@@ -467,14 +718,11 @@ impl<'db> Specialization<'db> {
             })
             .collect();
         // TODO: Combine the tuple specs too
-        Specialization::new(db, self.generic_context(db), types, None)
+        // TODO(jelle): specialization type?
+        Specialization::new(db, self.generic_context(db), types, None, None)
     }
 
-    pub(crate) fn normalized_impl(
-        self,
-        db: &'db dyn Db,
-        visitor: &mut TypeTransformer<'db>,
-    ) -> Self {
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         let types: Box<[_]> = self
             .types(db)
             .iter()
@@ -484,56 +732,112 @@ impl<'db> Specialization<'db> {
             .tuple_inner(db)
             .and_then(|tuple| tuple.normalized_impl(db, visitor));
         let context = self.generic_context(db).normalized_impl(db, visitor);
-        Self::new(db, context, types, tuple_inner)
+        Self::new(
+            db,
+            context,
+            types,
+            self.materialization_kind(db),
+            tuple_inner,
+        )
     }
 
-    pub(super) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+    pub(super) fn materialize_impl(
+        self,
+        db: &'db dyn Db,
+        materialization_kind: MaterializationKind,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        // The top and bottom materializations are fully static types already, so materializing them
+        // further does nothing.
+        if self.materialization_kind(db).is_some() {
+            return self;
+        }
+        let mut has_dynamic_invariant_typevar = false;
         let types: Box<[_]> = self
             .generic_context(db)
             .variables(db)
             .into_iter()
             .zip(self.types(db))
-            .map(|(typevar, vartype)| {
-                let variance = match typevar.variance(db) {
-                    TypeVarVariance::Invariant => TypeVarVariance::Invariant,
-                    TypeVarVariance::Covariant => variance,
-                    TypeVarVariance::Contravariant => variance.flip(),
-                    TypeVarVariance::Bivariant => unreachable!(),
-                };
-                vartype.materialize(db, variance)
+            .map(|(bound_typevar, vartype)| {
+                match bound_typevar.variance(db) {
+                    TypeVarVariance::Bivariant => {
+                        // With bivariance, all specializations are subtypes of each other,
+                        // so any materialization is acceptable.
+                        vartype.materialize(db, MaterializationKind::Top, visitor)
+                    }
+                    TypeVarVariance::Covariant => {
+                        vartype.materialize(db, materialization_kind, visitor)
+                    }
+                    TypeVarVariance::Contravariant => {
+                        vartype.materialize(db, materialization_kind.flip(), visitor)
+                    }
+                    TypeVarVariance::Invariant => {
+                        let top_materialization =
+                            vartype.materialize(db, MaterializationKind::Top, visitor);
+                        if !vartype.is_equivalent_to(db, top_materialization) {
+                            has_dynamic_invariant_typevar = true;
+                        }
+                        *vartype
+                    }
+                }
             })
             .collect();
         let tuple_inner = self.tuple_inner(db).and_then(|tuple| {
             // Tuples are immutable, so tuple element types are always in covariant position.
-            tuple.materialize(db, variance)
+            tuple.apply_type_mapping_impl(
+                db,
+                &TypeMapping::Materialize(materialization_kind),
+                visitor,
+            )
         });
-        Specialization::new(db, self.generic_context(db), types, tuple_inner)
+        let new_materialization_kind = if has_dynamic_invariant_typevar {
+            Some(materialization_kind)
+        } else {
+            None
+        };
+        Specialization::new(
+            db,
+            self.generic_context(db),
+            types,
+            new_materialization_kind,
+            tuple_inner,
+        )
     }
 
-    pub(crate) fn has_relation_to(
+    pub(crate) fn has_relation_to_impl(
         self,
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
-    ) -> bool {
+        visitor: &HasRelationToVisitor<'db>,
+    ) -> ConstraintSet<'db> {
         let generic_context = self.generic_context(db);
         if generic_context != other.generic_context(db) {
-            return false;
+            return ConstraintSet::from(false);
         }
 
         if let (Some(self_tuple), Some(other_tuple)) = (self.tuple_inner(db), other.tuple_inner(db))
         {
-            return self_tuple.has_relation_to(db, other_tuple, relation);
+            return self_tuple.has_relation_to_impl(db, other_tuple, relation, visitor);
         }
 
-        for ((typevar, self_type), other_type) in (generic_context.variables(db).into_iter())
+        let self_materialization_kind = self.materialization_kind(db);
+        let other_materialization_kind = other.materialization_kind(db);
+
+        let mut result = ConstraintSet::from(true);
+        for ((bound_typevar, self_type), other_type) in (generic_context.variables(db).into_iter())
             .zip(self.types(db))
             .zip(other.types(db))
         {
-            if self_type.is_dynamic() || other_type.is_dynamic() {
+            // As an optimization, we can return early if either type is dynamic, unless
+            // we're dealing with a top or bottom materialization.
+            if other_materialization_kind.is_none()
+                && self_materialization_kind.is_none()
+                && (self_type.is_dynamic() || other_type.is_dynamic())
+            {
                 match relation {
                     TypeRelation::Assignability => continue,
-                    TypeRelation::Subtyping => return false,
+                    TypeRelation::Subtyping => return ConstraintSet::from(false),
                 }
             }
 
@@ -543,35 +847,48 @@ impl<'db> Specialization<'db> {
             //   - contravariant: verify that other_type <: self_type
             //   - invariant: verify that self_type <: other_type AND other_type <: self_type
             //   - bivariant: skip, can't make subtyping/assignability false
-            let compatible = match typevar.variance(db) {
-                TypeVarVariance::Invariant => match relation {
-                    TypeRelation::Subtyping => self_type.is_equivalent_to(db, *other_type),
-                    TypeRelation::Assignability => {
-                        self_type.is_assignable_to(db, *other_type)
-                            && other_type.is_assignable_to(db, *self_type)
-                    }
-                },
-                TypeVarVariance::Covariant => self_type.has_relation_to(db, *other_type, relation),
-                TypeVarVariance::Contravariant => {
-                    other_type.has_relation_to(db, *self_type, relation)
+            let compatible = match bound_typevar.variance(db) {
+                TypeVarVariance::Invariant => has_relation_in_invariant_position(
+                    db,
+                    self_type,
+                    self_materialization_kind,
+                    other_type,
+                    other_materialization_kind,
+                    relation,
+                    visitor,
+                ),
+                TypeVarVariance::Covariant => {
+                    self_type.has_relation_to_impl(db, *other_type, relation, visitor)
                 }
-                TypeVarVariance::Bivariant => true,
+                TypeVarVariance::Contravariant => {
+                    other_type.has_relation_to_impl(db, *self_type, relation, visitor)
+                }
+                TypeVarVariance::Bivariant => ConstraintSet::from(true),
             };
-            if !compatible {
-                return false;
+            if result.intersect(db, &compatible).is_never_satisfied() {
+                return result;
             }
         }
 
-        true
+        result
     }
 
-    pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Specialization<'db>) -> bool {
+    pub(crate) fn is_equivalent_to_impl(
+        self,
+        db: &'db dyn Db,
+        other: Specialization<'db>,
+        visitor: &IsEquivalentVisitor<'db>,
+    ) -> ConstraintSet<'db> {
+        if self.materialization_kind(db) != other.materialization_kind(db) {
+            return ConstraintSet::from(false);
+        }
         let generic_context = self.generic_context(db);
         if generic_context != other.generic_context(db) {
-            return false;
+            return ConstraintSet::from(false);
         }
 
-        for ((typevar, self_type), other_type) in (generic_context.variables(db).into_iter())
+        let mut result = ConstraintSet::from(true);
+        for ((bound_typevar, self_type), other_type) in (generic_context.variables(db).into_iter())
             .zip(self.types(db))
             .zip(other.types(db))
         {
@@ -581,28 +898,45 @@ impl<'db> Specialization<'db> {
             //   - contravariant: verify that other_type == self_type
             //   - invariant: verify that self_type == other_type
             //   - bivariant: skip, can't make equivalence false
-            let compatible = match typevar.variance(db) {
+            let compatible = match bound_typevar.variance(db) {
                 TypeVarVariance::Invariant
                 | TypeVarVariance::Covariant
-                | TypeVarVariance::Contravariant => self_type.is_equivalent_to(db, *other_type),
-                TypeVarVariance::Bivariant => true,
+                | TypeVarVariance::Contravariant => {
+                    self_type.is_equivalent_to_impl(db, *other_type, visitor)
+                }
+                TypeVarVariance::Bivariant => ConstraintSet::from(true),
             };
-            if !compatible {
-                return false;
+            if result.intersect(db, &compatible).is_never_satisfied() {
+                return result;
             }
         }
 
-        true
+        match (self.tuple_inner(db), other.tuple_inner(db)) {
+            (Some(_), None) | (None, Some(_)) => return ConstraintSet::from(false),
+            (None, None) => {}
+            (Some(self_tuple), Some(other_tuple)) => {
+                let compatible = self_tuple.is_equivalent_to_impl(db, other_tuple, visitor);
+                if result.intersect(db, &compatible).is_never_satisfied() {
+                    return result;
+                }
+            }
+        }
+
+        result
     }
 
-    pub(crate) fn find_legacy_typevars(
+    pub(crate) fn find_legacy_typevars_impl(
         self,
         db: &'db dyn Db,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+        binding_context: Option<Definition<'db>>,
+        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+        visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         for ty in self.types(db) {
-            ty.find_legacy_typevars(db, typevars);
+            ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
         }
+        // A tuple's specialization will include all of its element types, so we don't need to also
+        // look in `self.tuple`.
     }
 }
 
@@ -610,7 +944,7 @@ impl<'db> Specialization<'db> {
 ///
 /// You will usually use [`Specialization`] instead of this type. This type is used when we need to
 /// substitute types for type variables before we have fully constructed a [`Specialization`].
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
 pub struct PartialSpecialization<'a, 'db> {
     generic_context: GenericContext<'db>,
     types: Cow<'a, [Type<'db>]>,
@@ -619,7 +953,7 @@ pub struct PartialSpecialization<'a, 'db> {
 pub(super) fn walk_partial_specialization<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     specialization: &PartialSpecialization<'_, 'db>,
-    visitor: &mut V,
+    visitor: &V,
 ) {
     walk_generic_context(db, specialization.generic_context, visitor);
     for ty in &*specialization.types {
@@ -630,8 +964,15 @@ pub(super) fn walk_partial_specialization<'db, V: super::visitor::TypeVisitor<'d
 impl<'db> PartialSpecialization<'_, 'db> {
     /// Returns the type that a typevar is mapped to, or None if the typevar isn't part of this
     /// mapping.
-    pub(crate) fn get(&self, db: &'db dyn Db, typevar: TypeVarInstance<'db>) -> Option<Type<'db>> {
-        let index = self.generic_context.variables(db).get_index_of(&typevar)?;
+    pub(crate) fn get(
+        &self,
+        db: &'db dyn Db,
+        bound_typevar: BoundTypeVarInstance<'db>,
+    ) -> Option<Type<'db>> {
+        let index = self
+            .generic_context
+            .variables(db)
+            .get_index_of(&bound_typevar)?;
         self.types.get(index).copied()
     }
 
@@ -645,7 +986,7 @@ impl<'db> PartialSpecialization<'_, 'db> {
     pub(crate) fn normalized_impl(
         &self,
         db: &'db dyn Db,
-        visitor: &mut TypeTransformer<'db>,
+        visitor: &NormalizedVisitor<'db>,
     ) -> PartialSpecialization<'db, 'db> {
         let generic_context = self.generic_context.normalized_impl(db, visitor);
         let types: Cow<_> = self
@@ -665,7 +1006,7 @@ impl<'db> PartialSpecialization<'_, 'db> {
 /// specialization of a generic function.
 pub(crate) struct SpecializationBuilder<'db> {
     db: &'db dyn Db,
-    types: FxHashMap<TypeVarInstance<'db>, Type<'db>>,
+    types: FxHashMap<BoundTypeVarInstance<'db>, Type<'db>>,
 }
 
 impl<'db> SpecializationBuilder<'db> {
@@ -677,23 +1018,17 @@ impl<'db> SpecializationBuilder<'db> {
     }
 
     pub(crate) fn build(&mut self, generic_context: GenericContext<'db>) -> Specialization<'db> {
-        let types: Box<[_]> = generic_context
+        let types = generic_context
             .variables(self.db)
             .iter()
-            .map(|variable| {
-                self.types
-                    .get(variable)
-                    .copied()
-                    .unwrap_or(variable.default_ty(self.db).unwrap_or(Type::unknown()))
-            })
-            .collect();
+            .map(|variable| self.types.get(variable).copied());
         // TODO Infer the tuple spec for a tuple type
-        Specialization::new(self.db, generic_context, types, None)
+        generic_context.specialize_partial(self.db, types)
     }
 
-    fn add_type_mapping(&mut self, typevar: TypeVarInstance<'db>, ty: Type<'db>) {
+    fn add_type_mapping(&mut self, bound_typevar: BoundTypeVarInstance<'db>, ty: Type<'db>) {
         self.types
-            .entry(typevar)
+            .entry(bound_typevar)
             .and_modify(|existing| {
                 *existing = UnionType::from_elements(self.db, [*existing, ty]);
             })
@@ -705,6 +1040,10 @@ impl<'db> SpecializationBuilder<'db> {
         formal: Type<'db>,
         actual: Type<'db>,
     ) -> Result<(), SpecializationError<'db>> {
+        if formal == actual {
+            return Ok(());
+        }
+
         // If the actual type is a subtype of the formal type, then return without adding any new
         // type mappings. (Note that if the formal type contains any typevars, this check will
         // fail, since no non-typevar types are assignable to a typevar. Also note that we are
@@ -729,89 +1068,6 @@ impl<'db> SpecializationBuilder<'db> {
         }
 
         match (formal, actual) {
-            (Type::TypeVar(typevar), ty) | (ty, Type::TypeVar(typevar)) => {
-                match typevar.bound_or_constraints(self.db) {
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        if !ty.is_assignable_to(self.db, bound) {
-                            return Err(SpecializationError::MismatchedBound {
-                                typevar,
-                                argument: ty,
-                            });
-                        }
-                        self.add_type_mapping(typevar, ty);
-                    }
-                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        for constraint in constraints.iter(self.db) {
-                            if ty.is_assignable_to(self.db, *constraint) {
-                                self.add_type_mapping(typevar, *constraint);
-                                return Ok(());
-                            }
-                        }
-                        return Err(SpecializationError::MismatchedConstraint {
-                            typevar,
-                            argument: ty,
-                        });
-                    }
-                    _ => {
-                        self.add_type_mapping(typevar, ty);
-                    }
-                }
-            }
-
-            (Type::Tuple(formal_tuple), Type::Tuple(actual_tuple)) => {
-                let formal_tuple = formal_tuple.tuple(self.db);
-                let actual_tuple = actual_tuple.tuple(self.db);
-                match (formal_tuple, actual_tuple) {
-                    (TupleSpec::Fixed(formal_tuple), TupleSpec::Fixed(actual_tuple)) => {
-                        if formal_tuple.len() == actual_tuple.len() {
-                            for (formal_element, actual_element) in formal_tuple.elements().zip(actual_tuple.elements()) {
-                                self.infer(*formal_element, *actual_element)?;
-                            }
-                        }
-                    }
-
-                    // TODO: Infer specializations of variable-length tuples
-                    (TupleSpec::Variable(_), _) | (_, TupleSpec::Variable(_)) => {}
-                }
-            }
-
-            (
-                Type::NominalInstance(NominalInstanceType {
-                    class: ClassType::Generic(formal_alias),
-                    ..
-                })
-                // TODO: This will only handle classes that explicit implement a generic protocol
-                // by listing it as a base class. To handle classes that implicitly implement a
-                // generic protocol, we will need to check the types of the protocol members to be
-                // able to infer the specialization of the protocol that the class implements.
-                | Type::ProtocolInstance(ProtocolInstanceType {
-                    inner: Protocol::FromClass(ClassType::Generic(formal_alias)),
-                    ..
-                }),
-                Type::NominalInstance(NominalInstanceType {
-                    class: actual_class,
-                    ..
-                }),
-            ) => {
-                let formal_origin = formal_alias.origin(self.db);
-                for base in actual_class.iter_mro(self.db) {
-                    let ClassBase::Class(ClassType::Generic(base_alias)) = base else {
-                        continue;
-                    };
-                    if formal_origin != base_alias.origin(self.db) {
-                        continue;
-                    }
-                    let formal_specialization = formal_alias.specialization(self.db).types(self.db);
-                    let base_specialization = base_alias.specialization(self.db).types(self.db);
-                    for (formal_ty, base_ty) in
-                        formal_specialization.iter().zip(base_specialization)
-                    {
-                        self.infer(*formal_ty, *base_ty)?;
-                    }
-                    return Ok(());
-                }
-            }
-
             (Type::Union(formal), _) => {
                 // TODO: We haven't implemented a full unification solver yet. If typevars appear
                 // in multiple union elements, we ideally want to express that _only one_ of them
@@ -823,14 +1079,15 @@ impl<'db> SpecializationBuilder<'db> {
                 // and add a mapping between that typevar and the actual type. (Note that we've
                 // already handled above the case where the actual is assignable to a _non-typevar_
                 // union element.)
-                let mut typevars = formal.iter(self.db).filter_map(|ty| match ty {
-                    Type::TypeVar(typevar) => Some(*typevar),
-                    _ => None,
-                });
-                let typevar = typevars.next();
-                let additional_typevars = typevars.next();
-                if let (Some(typevar), None) = (typevar, additional_typevars) {
-                    self.add_type_mapping(typevar, actual);
+                let mut bound_typevars =
+                    formal.elements(self.db).iter().filter_map(|ty| match ty {
+                        Type::TypeVar(bound_typevar) => Some(*bound_typevar),
+                        _ => None,
+                    });
+                let bound_typevar = bound_typevars.next();
+                let additional_bound_typevars = bound_typevars.next();
+                if let (Some(bound_typevar), None) = (bound_typevar, additional_bound_typevars) {
+                    self.add_type_mapping(bound_typevar, actual);
                 }
             }
 
@@ -841,6 +1098,98 @@ impl<'db> SpecializationBuilder<'db> {
                 // intersection, but that doesn't help us infer any type mappings.)
                 for positive in formal.iter_positive(self.db) {
                     self.infer(positive, actual)?;
+                }
+            }
+
+            (Type::TypeVar(bound_typevar), ty) | (ty, Type::TypeVar(bound_typevar)) => {
+                match bound_typevar.typevar(self.db).bound_or_constraints(self.db) {
+                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                        if !ty.is_assignable_to(self.db, bound) {
+                            return Err(SpecializationError::MismatchedBound {
+                                bound_typevar,
+                                argument: ty,
+                            });
+                        }
+                        self.add_type_mapping(bound_typevar, ty);
+                    }
+                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        for constraint in constraints.elements(self.db) {
+                            if ty.is_assignable_to(self.db, *constraint) {
+                                self.add_type_mapping(bound_typevar, *constraint);
+                                return Ok(());
+                            }
+                        }
+                        return Err(SpecializationError::MismatchedConstraint {
+                            bound_typevar,
+                            argument: ty,
+                        });
+                    }
+                    _ => {
+                        self.add_type_mapping(bound_typevar, ty);
+                    }
+                }
+            }
+
+            (formal, Type::NominalInstance(actual_nominal)) => {
+                // Special case: `formal` and `actual` are both tuples.
+                if let (Some(formal_tuple), Some(actual_tuple)) = (
+                    formal.tuple_instance_spec(self.db),
+                    actual_nominal.tuple_spec(self.db),
+                ) {
+                    let Some(most_precise_length) =
+                        formal_tuple.len().most_precise(actual_tuple.len())
+                    else {
+                        return Ok(());
+                    };
+                    let Ok(formal_tuple) = formal_tuple.resize(self.db, most_precise_length) else {
+                        return Ok(());
+                    };
+                    let Ok(actual_tuple) = actual_tuple.resize(self.db, most_precise_length) else {
+                        return Ok(());
+                    };
+                    for (formal_element, actual_element) in
+                        formal_tuple.all_elements().zip(actual_tuple.all_elements())
+                    {
+                        self.infer(*formal_element, *actual_element)?;
+                    }
+                    return Ok(());
+                }
+
+                // Extract formal_alias if this is a generic class
+                let formal_alias = match formal {
+                    Type::NominalInstance(formal_nominal) => {
+                        formal_nominal.class(self.db).into_generic_alias()
+                    }
+                    // TODO: This will only handle classes that explicit implement a generic protocol
+                    // by listing it as a base class. To handle classes that implicitly implement a
+                    // generic protocol, we will need to check the types of the protocol members to be
+                    // able to infer the specialization of the protocol that the class implements.
+                    Type::ProtocolInstance(ProtocolInstanceType {
+                        inner: Protocol::FromClass(ClassType::Generic(alias)),
+                        ..
+                    }) => Some(alias),
+                    _ => None,
+                };
+
+                if let Some(formal_alias) = formal_alias {
+                    let formal_origin = formal_alias.origin(self.db);
+                    for base in actual_nominal.class(self.db).iter_mro(self.db) {
+                        let ClassBase::Class(ClassType::Generic(base_alias)) = base else {
+                            continue;
+                        };
+                        if formal_origin != base_alias.origin(self.db) {
+                            continue;
+                        }
+                        let formal_specialization =
+                            formal_alias.specialization(self.db).types(self.db);
+                        let base_specialization = base_alias.specialization(self.db).types(self.db);
+                        for (formal_ty, base_ty) in
+                            formal_specialization.iter().zip(base_specialization)
+                        {
+                            self.infer(*formal_ty, *base_ty)?;
+                        }
+                        return Ok(());
+                    }
                 }
             }
 
@@ -855,20 +1204,20 @@ impl<'db> SpecializationBuilder<'db> {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum SpecializationError<'db> {
     MismatchedBound {
-        typevar: TypeVarInstance<'db>,
+        bound_typevar: BoundTypeVarInstance<'db>,
         argument: Type<'db>,
     },
     MismatchedConstraint {
-        typevar: TypeVarInstance<'db>,
+        bound_typevar: BoundTypeVarInstance<'db>,
         argument: Type<'db>,
     },
 }
 
 impl<'db> SpecializationError<'db> {
-    pub(crate) fn typevar(&self) -> TypeVarInstance<'db> {
+    pub(crate) fn bound_typevar(&self) -> BoundTypeVarInstance<'db> {
         match self {
-            Self::MismatchedBound { typevar, .. } => *typevar,
-            Self::MismatchedConstraint { typevar, .. } => *typevar,
+            Self::MismatchedBound { bound_typevar, .. } => *bound_typevar,
+            Self::MismatchedConstraint { bound_typevar, .. } => *bound_typevar,
         }
     }
 

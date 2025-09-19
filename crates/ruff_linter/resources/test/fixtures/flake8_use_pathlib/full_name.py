@@ -107,3 +107,33 @@ os.replace("src", "dst", dst_dir_fd=2)
 
 os.getcwd()
 os.getcwdb()
+
+os.mkdir(path="directory")
+
+os.mkdir(
+    # comment 1
+    "directory",
+    mode=0o777
+)
+
+os.mkdir("directory", mode=0o777, dir_fd=1)
+
+os.makedirs("name", 0o777, exist_ok=False)
+
+os.makedirs("name", 0o777, False)
+
+os.makedirs(name="name", mode=0o777, exist_ok=False)
+
+os.makedirs("name", unknown_kwarg=True)
+
+# https://github.com/astral-sh/ruff/issues/20134
+os.chmod("pth1_link", mode=0o600, follow_symlinks=      False    )
+os.chmod("pth1_link", mode=0o600, follow_symlinks=True)
+
+# Only diagnostic
+os.chmod("pth1_file", 0o700, None, True, 1, *[1], **{"x": 1}, foo=1)
+
+os.rename("pth1_file", "pth1_file1", None, None, 1, *[1], **{"x": 1}, foo=1)
+os.replace("pth1_file1", "pth1_file", None, None, 1, *[1], **{"x": 1}, foo=1)
+
+os.path.samefile("pth1_file", "pth1_link", 1, *[1], **{"x": 1}, foo=1)

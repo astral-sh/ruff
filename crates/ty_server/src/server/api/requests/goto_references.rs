@@ -20,17 +20,20 @@ impl RequestHandler for ReferencesRequestHandler {
 }
 
 impl BackgroundDocumentRequestHandler for ReferencesRequestHandler {
-    fn document_url(params: &ReferenceParams) -> Cow<Url> {
+    fn document_url(params: &ReferenceParams) -> Cow<'_, Url> {
         Cow::Borrowed(&params.text_document_position.text_document.uri)
     }
 
     fn run_with_snapshot(
         db: &ProjectDatabase,
-        snapshot: DocumentSnapshot,
+        snapshot: &DocumentSnapshot,
         _client: &Client,
         params: ReferenceParams,
     ) -> crate::server::Result<Option<Vec<Location>>> {
-        if snapshot.client_settings().is_language_services_disabled() {
+        if snapshot
+            .workspace_settings()
+            .is_language_services_disabled()
+        {
             return Ok(None);
         }
 

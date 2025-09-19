@@ -24,6 +24,8 @@ enum TokenType {
     Def,
     For,
     Lambda,
+    Class,
+    Type,
     Irrelevant,
 }
 
@@ -69,6 +71,8 @@ impl From<(TokenKind, TextRange)> for SimpleToken {
             TokenKind::Lbrace => TokenType::OpeningCurlyBracket,
             TokenKind::Rbrace => TokenType::ClosingBracket,
             TokenKind::Def => TokenType::Def,
+            TokenKind::Class => TokenType::Class,
+            TokenKind::Type => TokenType::Type,
             TokenKind::For => TokenType::For,
             TokenKind::Lambda => TokenType::Lambda,
             // Import treated like a function.
@@ -98,6 +102,8 @@ enum ContextType {
     Dict,
     /// Lambda parameter list, e.g. `lambda a, b`.
     LambdaParameters,
+    /// Type parameter list, e.g. `def foo[T, U](): ...`
+    TypeParameters,
 }
 
 /// Comma context - described a comma-delimited "situation".
@@ -244,23 +250,23 @@ pub(crate) fn trailing_commas(
     locator: &Locator,
     indexer: &Indexer,
 ) {
-    let mut fstrings = 0u32;
+    let mut interpolated_strings = 0u32;
     let simple_tokens = tokens.iter().filter_map(|token| {
         match token.kind() {
             // Completely ignore comments -- they just interfere with the logic.
             TokenKind::Comment => None,
-            // F-strings are handled as `String` token type with the complete range
-            // of the outermost f-string. This means that the expression inside the
-            // f-string is not checked for trailing commas.
-            TokenKind::FStringStart => {
-                fstrings = fstrings.saturating_add(1);
+            // F-strings and t-strings are handled as `String` token type with the complete range
+            // of the outermost interpolated string. This means that the expression inside the
+            // interpolated string is not checked for trailing commas.
+            TokenKind::FStringStart | TokenKind::TStringStart => {
+                interpolated_strings = interpolated_strings.saturating_add(1);
                 None
             }
-            TokenKind::FStringEnd => {
-                fstrings = fstrings.saturating_sub(1);
-                if fstrings == 0 {
+            TokenKind::FStringEnd | TokenKind::TStringEnd => {
+                interpolated_strings = interpolated_strings.saturating_sub(1);
+                if interpolated_strings == 0 {
                     indexer
-                        .fstring_ranges()
+                        .interpolated_string_ranges()
                         .outermost(token.start())
                         .map(|range| SimpleToken::new(TokenType::String, range))
                 } else {
@@ -268,7 +274,7 @@ pub(crate) fn trailing_commas(
                 }
             }
             _ => {
-                if fstrings == 0 {
+                if interpolated_strings == 0 {
                     Some(SimpleToken::from(token.as_tuple()))
                 } else {
                     None
@@ -326,6 +332,7 @@ fn check_token(
             ContextType::No => false,
             ContextType::FunctionParameters => true,
             ContextType::CallArguments => true,
+            ContextType::TypeParameters => true,
             // `(1)` is not equivalent to `(1,)`.
             ContextType::Tuple => context.num_commas != 0,
             // `x[1]` is not equivalent to `x[1,]`.
@@ -355,8 +362,7 @@ fn check_token(
         if let Some(mut diagnostic) =
             lint_context.report_diagnostic_if_enabled(ProhibitedTrailingComma, prev.range())
         {
-            let range = diagnostic.expect_range();
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(range)));
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(prev.range)));
             return;
         }
     }
@@ -417,8 +423,11 @@ fn update_context(
             }
             _ => Context::new(ContextType::Tuple),
         },
-        TokenType::OpeningSquareBracket => match prev.ty {
-            TokenType::ClosingBracket | TokenType::Named | TokenType::String => {
+        TokenType::OpeningSquareBracket => match (prev.ty, prev_prev.ty) {
+            (TokenType::Named, TokenType::Def | TokenType::Class | TokenType::Type) => {
+                Context::new(ContextType::TypeParameters)
+            }
+            (TokenType::ClosingBracket | TokenType::Named | TokenType::String, _) => {
                 Context::new(ContextType::Subscript)
             }
             _ => Context::new(ContextType::List),

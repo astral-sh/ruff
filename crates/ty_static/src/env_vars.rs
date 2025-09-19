@@ -27,7 +27,7 @@ impl EnvVars {
     /// Accepted values:
     ///
     /// * `short` - Display short memory report
-    /// * `mypy_primer` - Display mypy_primer format and suppress workspace diagnostics
+    /// * `mypy_primer` - Display `mypy_primer` format and suppress workspace diagnostics
     /// * `full` - Display full memory report
     #[attr_hidden]
     pub const TY_MEMORY_REPORT: &'static str = "TY_MEMORY_REPORT";
@@ -41,6 +41,9 @@ impl EnvVars {
 
     /// Used to detect an activated virtual environment.
     pub const VIRTUAL_ENV: &'static str = "VIRTUAL_ENV";
+
+    /// Used to determine if an active Conda environment is the base environment or not.
+    pub const CONDA_DEFAULT_ENV: &'static str = "CONDA_DEFAULT_ENV";
 
     /// Used to detect an activated Conda environment location.
     /// If both `VIRTUAL_ENV` and `CONDA_PREFIX` are present, `VIRTUAL_ENV` will be preferred.

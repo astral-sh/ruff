@@ -69,13 +69,17 @@ impl<'a> ConciseRenderer<'a> {
                         "{code} ",
                         code = fmt_styled(code, stylesheet.secondary_code)
                     )?;
+                } else {
+                    write!(
+                        f,
+                        "{id}: ",
+                        id = fmt_styled(diag.inner.id.as_str(), stylesheet.secondary_code)
+                    )?;
                 }
                 if self.config.show_fix_status {
-                    if let Some(fix) = diag.fix() {
-                        // Do not display an indicator for inapplicable fixes
-                        if fix.applies(self.config.fix_applicability) {
-                            write!(f, "[{fix}] ", fix = fmt_styled("*", stylesheet.separator))?;
-                        }
+                    // Do not display an indicator for inapplicable fixes
+                    if diag.has_applicable_fix(self.config) {
+                        write!(f, "[{fix}] ", fix = fmt_styled("*", stylesheet.separator))?;
                     }
                 }
             } else {
@@ -156,8 +160,8 @@ mod tests {
         env.show_fix_status(true);
         env.fix_applicability(Applicability::DisplayOnly);
         insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r"
-        syntax_errors.py:1:15: SyntaxError: Expected one or more symbol names after import
-        syntax_errors.py:3:12: SyntaxError: Expected ')', found newline
+        syntax_errors.py:1:15: invalid-syntax: Expected one or more symbol names after import
+        syntax_errors.py:3:12: invalid-syntax: Expected ')', found newline
         ");
     }
 
@@ -165,8 +169,8 @@ mod tests {
     fn syntax_errors() {
         let (env, diagnostics) = create_syntax_error_diagnostics(DiagnosticFormat::Concise);
         insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r"
-        syntax_errors.py:1:15: error[invalid-syntax] SyntaxError: Expected one or more symbol names after import
-        syntax_errors.py:3:12: error[invalid-syntax] SyntaxError: Expected ')', found newline
+        syntax_errors.py:1:15: error[invalid-syntax] Expected one or more symbol names after import
+        syntax_errors.py:3:12: error[invalid-syntax] Expected ')', found newline
         ");
     }
 

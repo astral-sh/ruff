@@ -5,7 +5,7 @@ resolver = "2"
 [workspace.package]
 # Please update rustfmt.toml when bumping the Rust edition
 edition = "2024"
-rust-version = "1.86"
+rust-version = "1.88"
 homepage = "https://docs.astral.sh/ruff"
 documentation = "https://docs.astral.sh/ruff"
 repository = "https://github.com/astral-sh/ruff"
@@ -23,11 +23,13 @@ ruff_graph = { path = "crates/ruff_graph" }
 ruff_index = { path = "crates/ruff_index" }
 ruff_linter = { path = "crates/ruff_linter" }
 ruff_macros = { path = "crates/ruff_macros" }
+ruff_memory_usage = { path = "crates/ruff_memory_usage" }
 ruff_notebook = { path = "crates/ruff_notebook" }
 ruff_options_metadata = { path = "crates/ruff_options_metadata" }
 ruff_python_ast = { path = "crates/ruff_python_ast" }
 ruff_python_codegen = { path = "crates/ruff_python_codegen" }
 ruff_python_formatter = { path = "crates/ruff_python_formatter" }
+ruff_python_importer = { path = "crates/ruff_python_importer" }
 ruff_python_index = { path = "crates/ruff_python_index" }
 ruff_python_literal = { path = "crates/ruff_python_literal" }
 ruff_python_parser = { path = "crates/ruff_python_parser" }
@@ -40,6 +42,7 @@ ruff_text_size = { path = "crates/ruff_text_size" }
 ruff_workspace = { path = "crates/ruff_workspace" }
 
 ty = { path = "crates/ty" }
+ty_combine = { path = "crates/ty_combine" }
 ty_ide = { path = "crates/ty_ide" }
 ty_project = { path = "crates/ty_project", default-features = false }
 ty_python_semantic = { path = "crates/ty_python_semantic" }
@@ -73,7 +76,7 @@ console_error_panic_hook = { version = "0.1.7" }
 console_log = { version = "1.0.0" }
 countme = { version = "3.0.1" }
 compact_str = "0.9.0"
-criterion = { version = "0.6.0", default-features = false }
+criterion = { version = "0.7.0", default-features = false }
 crossbeam = { version = "0.8.4" }
 dashmap = { version = "6.0.1" }
 dir-test = { version = "0.4.0" }
@@ -83,7 +86,7 @@ etcetera = { version = "0.10.0" }
 fern = { version = "0.7.0" }
 filetime = { version = "0.2.23" }
 getrandom = { version = "0.3.1" }
-get-size2 = { version = "0.5.0", features = [
+get-size2 = { version = "0.6.2", features = [
     "derive",
     "smallvec",
     "hashbrown",
@@ -113,7 +116,7 @@ jiff = { version = "0.2.0" }
 js-sys = { version = "0.3.69" }
 jod-thread = { version = "1.0.0" }
 libc = { version = "0.2.153" }
-libcst = { version = "1.1.0", default-features = false }
+libcst = { version = "1.8.4", default-features = false }
 log = { version = "0.4.17" }
 lsp-server = { version = "0.7.6" }
 lsp-types = { git = "https://github.com/astral-sh/lsp-types.git", rev = "3512a9f", features = [
@@ -141,7 +144,12 @@ regex-automata = { version = "0.4.9" }
 rustc-hash = { version = "2.0.0" }
 rustc-stable-hash = { version = "0.1.2" }
 # When updating salsa, make sure to also update the revision in `fuzz/Cargo.toml`
-salsa = { git = "https://github.com/salsa-rs/salsa", rev = "dba66f1a37acca014c2402f231ed5b361bd7d8fe" }
+salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "3713cd7eb30821c0c086591832dd6f59f2af7fe7", default-features = false, features = [
+    "compact_str",
+    "macros",
+    "salsa_unstable",
+    "inventory",
+] }
 schemars = { version = "0.8.16" }
 seahash = { version = "4.1.0" }
 serde = { version = "1.0.197", features = ["derive"] }
@@ -208,6 +216,8 @@ unexpected_cfgs = { level = "warn", check-cfg = [
 
 [workspace.lints.clippy]
 pedantic = { level = "warn", priority = -2 }
+# Enabled at the crate level
+disallowed_methods = "allow"
 # Allowed pedantic lints
 char_lit_as_u8 = "allow"
 collapsible_else_if = "allow"
@@ -242,9 +252,18 @@ rest_pat_in_fully_bound_structs = "warn"
 redundant_clone = "warn"
 debug_assert_with_mut_call = "warn"
 unused_peekable = "warn"
+# This lint sometimes flags code whose `if` and `else`
+# bodies could be flipped when a `!` operator is removed.
+# While perhaps sometimes a good idea, it is also often
+# not a good idea due to other factors impacting
+# readability. For example, if flipping the bodies results
+# in the `if` being an order of magnitude bigger than the
+# `else`, then some might consider that harder to read.
+if_not_else = "allow"
 
 # Diagnostics are not actionable: Enable once https://github.com/rust-lang/rust-clippy/issues/13774 is resolved.
 large_stack_arrays = "allow"
+
 
 [profile.release]
 # Note that we set these explicitly, and these values

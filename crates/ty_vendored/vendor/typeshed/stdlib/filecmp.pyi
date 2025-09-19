@@ -18,7 +18,7 @@ from typing import Any, AnyStr, Final, Generic, Literal
 
 __all__ = ["clear_cache", "cmp", "dircmp", "cmpfiles", "DEFAULT_IGNORES"]
 
-DEFAULT_IGNORES: list[str]
+DEFAULT_IGNORES: Final[list[str]]
 BUFSIZE: Final = 8192
 
 def cmp(f1: StrOrBytesPath, f2: StrOrBytesPath, shallow: bool | Literal[0, 1] = True) -> bool:
@@ -41,6 +41,7 @@ def cmp(f1: StrOrBytesPath, f2: StrOrBytesPath, shallow: bool | Literal[0, 1] = 
     This function uses a cache for past comparisons and the results,
     with cache entries invalidated if their stat information
     changes.  The cache may be cleared by calling clear_cache().
+
     """
 
 def cmpfiles(
@@ -56,6 +57,7 @@ def cmpfiles(
       files that compare equal
       files that are different
       filenames that aren't regular files.
+
     """
 
 class dircmp(Generic[AnyStr]):

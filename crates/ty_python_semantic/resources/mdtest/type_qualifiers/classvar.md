@@ -9,6 +9,7 @@ For more details on the semantics of pure class variables, see [this test](../at
 ## Basic
 
 ```py
+import typing
 from typing import ClassVar, Annotated
 
 class C:
@@ -17,12 +18,14 @@ class C:
     c: ClassVar[Annotated[int, "the annotation for c"]] = 1
     d: ClassVar = 1
     e: "ClassVar[int]" = 1
+    f: typing.ClassVar = 1
 
 reveal_type(C.a)  # revealed: int
 reveal_type(C.b)  # revealed: int
 reveal_type(C.c)  # revealed: int
 reveal_type(C.d)  # revealed: Unknown | Literal[1]
 reveal_type(C.e)  # revealed: int
+reveal_type(C.f)  # revealed: Unknown | Literal[1]
 
 c = C()
 
@@ -36,6 +39,31 @@ c.c = 2
 c.d = 2
 # error: [invalid-attribute-access]
 c.e = 2
+# error: [invalid-attribute-access]
+c.f = 3
+```
+
+## From stubs
+
+This is a regression test for a bug where we did not properly keep track of type qualifiers when
+accessed from stub files.
+
+`module.pyi`:
+
+```pyi
+from typing import ClassVar
+
+class C:
+    a: ClassVar[int]
+```
+
+`main.py`:
+
+```py
+from module import C
+
+c = C()
+c.a = 2  # error: [invalid-attribute-access]
 ```
 
 ## Conflicting type qualifiers

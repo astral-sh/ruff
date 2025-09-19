@@ -465,11 +465,110 @@ To do
 
 ### `kw_only`
 
-To do
+An error is emitted if a dataclass is defined with `kw_only=True` and positional arguments are
+passed to the constructor.
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+from dataclasses import dataclass
+
+@dataclass(kw_only=True)
+class A:
+    x: int
+    y: int
+
+# error: [missing-argument] "No arguments provided for required parameters `x`, `y`"
+# error: [too-many-positional-arguments] "Too many positional arguments: expected 0, got 2"
+a = A(1, 2)
+a = A(x=1, y=2)
+```
+
+The class-level parameter can be overridden per-field.
+
+```py
+from dataclasses import dataclass, field
+
+@dataclass(kw_only=True)
+class A:
+    a: str = field(kw_only=False)
+    b: int = 0
+
+A("hi")
+```
+
+If some fields are `kw_only`, they should appear after all positional fields in the `__init__`
+signature.
+
+```py
+@dataclass
+class A:
+    b: int = field(kw_only=True, default=3)
+    a: str
+
+A("hi")
+```
+
+The field-level `kw_only` value takes precedence over the `KW_ONLY` pseudo-type.
+
+```py
+from dataclasses import field, dataclass, KW_ONLY
+
+@dataclass
+class C:
+    _: KW_ONLY
+    x: int = field(kw_only=False)
+
+C(x=1)
+C(1)
+```
+
+### `kw_only` - Python < 3.10
+
+For Python < 3.10, `kw_only` is not supported.
+
+```toml
+[environment]
+python-version = "3.9"
+```
+
+```py
+from dataclasses import dataclass
+
+@dataclass(kw_only=True)  # TODO: Emit a diagnostic here
+class A:
+    x: int
+    y: int
+```
 
 ### `slots`
 
-To do
+If a dataclass is defined with `slots=True`, the `__slots__` attribute is generated as a tuple. It
+is not present otherwise.
+
+```py
+from dataclasses import dataclass
+from typing import Tuple
+
+@dataclass
+class A:
+    x: int
+    y: int
+
+# revealed: Unknown
+# error: [unresolved-attribute]
+reveal_type(A.__slots__)
+
+@dataclass(slots=True)
+class B:
+    x: int
+    y: int
+
+reveal_type(B.__slots__)  # revealed: tuple[Literal["x"], Literal["y"]]
+```
 
 ### `weakref_slot`
 
@@ -909,6 +1008,28 @@ class D:  # error: [duplicate-kw-only]
         y: str
         _2: KW_ONLY
         z: float
+```
+
+`KW_ONLY` should only affect fields declared after it within the same class, not fields in
+subclasses:
+
+```py
+from dataclasses import dataclass, KW_ONLY
+
+@dataclass
+class D:
+    x: int
+    _: KW_ONLY
+    y: str
+
+@dataclass
+class E(D):
+    z: bytes
+
+# This should work: x=1 (positional), z=b"foo" (positional), y="foo" (keyword-only)
+E(1, b"foo", y="foo")
+
+reveal_type(E.__init__)  # revealed: (self: E, x: int, z: bytes, *, y: str) -> None
 ```
 
 ## Other special cases

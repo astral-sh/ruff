@@ -14,10 +14,11 @@ See module py_compile for details of the actual byte-compilation.
 import sys
 from _typeshed import StrPath
 from py_compile import PycInvalidationMode
-from typing import Any, Protocol
+from typing import Any, Protocol, type_check_only
 
 __all__ = ["compile_dir", "compile_file", "compile_path"]
 
+@type_check_only
 class _SupportsSearch(Protocol):
     def search(self, string: str, /) -> Any: ...
 

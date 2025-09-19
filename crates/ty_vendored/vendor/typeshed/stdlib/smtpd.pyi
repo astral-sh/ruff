@@ -49,7 +49,7 @@ import socket
 import sys
 from collections import defaultdict
 from typing import Any
-from typing_extensions import TypeAlias
+from typing_extensions import TypeAlias, deprecated
 
 if sys.version_info >= (3, 11):
     __all__ = ["SMTPChannel", "SMTPServer", "DebuggingServer", "PureProxy"]
@@ -151,6 +151,7 @@ class SMTPServer(asyncore.dispatcher):
         This function should return None for a normal `250 Ok' response;
         otherwise, it should return the desired response string in RFC 821
         format.
+
         """
 
 class DebuggingServer(SMTPServer): ...
@@ -159,5 +160,6 @@ class PureProxy(SMTPServer):
     def process_message(self, peer: _Address, mailfrom: str, rcpttos: list[str], data: bytes | str) -> str | None: ...  # type: ignore[override]
 
 if sys.version_info < (3, 11):
+    @deprecated("Deprecated since Python 3.9; removed in Python 3.11.")
     class MailmanProxy(PureProxy):
         def process_message(self, peer: _Address, mailfrom: str, rcpttos: list[str], data: bytes | str) -> str | None: ...  # type: ignore[override]

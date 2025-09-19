@@ -15,8 +15,7 @@ reveal_type(get_int())  # revealed: int
 async def get_int_async() -> int:
     return 42
 
-# TODO: we don't yet support `types.CoroutineType`, should be generic `Coroutine[Any, Any, int]`
-reveal_type(get_int_async())  # revealed: @Todo(generic types.CoroutineType)
+reveal_type(get_int_async())  # revealed: CoroutineType[Any, Any, int]
 ```
 
 ## Generic
@@ -67,6 +66,78 @@ def _(flag: bool):
             return 42
     # error: [possibly-unresolved-reference]
     reveal_type(foo())  # revealed: int
+```
+
+## PEP-484 convention for positional-only parameters
+
+PEP 570, introduced in Python 3.8, added dedicated Python syntax for denoting positional-only
+parameters (the `/` in a function signature). However, functions implemented in C were able to have
+positional-only parameters prior to Python 3.8 (there was just no syntax for expressing this at the
+Python level).
+
+Stub files describing functions implemented in C nonetheless needed a way of expressing that certain
+parameters were positional-only. In the absence of dedicated Python syntax, PEP 484 described a
+convention that type checkers were expected to understand:
+
+> Some functions are designed to take their arguments only positionally, and expect their callers
+> never to use the argument’s name to provide that argument by keyword. All arguments with names
+> beginning with `__` are assumed to be positional-only, except if their names also end with `__`.
+
+While this convention is now redundant (following the implementation of PEP 570), many projects
+still continue to use the old convention, so it is supported by ty as well.
+
+```py
+def f(__x: int): ...
+
+f(1)
+# error: [missing-argument]
+# error: [unknown-argument]
+f(__x=1)
+```
+
+But not if they follow a non-positional-only parameter:
+
+```py
+def g(x: int, __y: str): ...
+
+g(x=1, __y="foo")
+```
+
+And also not if they both start and end with `__`:
+
+```py
+def h(__x__: str): ...
+
+h(__x__="foo")
+```
+
+And if *any* parameters use the new PEP-570 convention, the old convention does not apply:
+
+```py
+def i(x: str, /, __y: int): ...
+
+i("foo", __y=42)  # fine
+```
+
+And `self`/`cls` are implicitly positional-only:
+
+```py
+class C:
+    def method(self, __x: int): ...
+    @classmethod
+    def class_method(cls, __x: str): ...
+    # (the name of the first parameter is irrelevant;
+    # a staticmethod works the same as a free function in the global scope)
+    @staticmethod
+    def static_method(self, __x: int): ...
+
+# error: [missing-argument]
+# error: [unknown-argument]
+C().method(__x=1)
+# error: [missing-argument]
+# error: [unknown-argument]
+C.class_method(__x="1")
+C.static_method("x", __x=42)  # fine
 ```
 
 ## Splatted arguments
@@ -165,6 +236,78 @@ def _(args: tuple[int, str]) -> None:
     takes_at_least_two_positional_only(*args)  # error: [invalid-argument-type]
 ```
 
+### Subclass of fixed-length tuple argument
+
+```py
+def takes_zero() -> None: ...
+def takes_one(x: int) -> None: ...
+def takes_two(x: int, y: int) -> None: ...
+def takes_two_positional_only(x: int, y: int, /) -> None: ...
+def takes_two_different(x: int, y: str) -> None: ...
+def takes_two_different_positional_only(x: int, y: str, /) -> None: ...
+def takes_at_least_zero(*args) -> None: ...
+def takes_at_least_one(x: int, *args) -> None: ...
+def takes_at_least_two(x: int, y: int, *args) -> None: ...
+def takes_at_least_two_positional_only(x: int, y: int, /, *args) -> None: ...
+
+# Test all of the above with a number of different splatted argument types
+
+class SingleElementTuple(tuple[int]): ...
+
+def _(args: SingleElementTuple) -> None:
+    takes_zero(*args)  # error: [too-many-positional-arguments]
+
+    takes_one(*args)
+
+    takes_two(*args)  # error: [missing-argument]
+    takes_two_positional_only(*args)  # error: [missing-argument]
+
+    takes_two_different(*args)  # error: [missing-argument]
+    takes_two_different_positional_only(*args)  # error: [missing-argument]
+
+    takes_at_least_zero(*args)
+    takes_at_least_one(*args)
+
+    takes_at_least_two(*args)  # error: [missing-argument]
+    takes_at_least_two_positional_only(*args)  # error: [missing-argument]
+
+class TwoElementIntTuple(tuple[int, int]): ...
+
+def _(args: TwoElementIntTuple) -> None:
+    takes_zero(*args)  # error: [too-many-positional-arguments]
+    takes_one(*args)  # error: [too-many-positional-arguments]
+    takes_two(*args)
+    takes_two_positional_only(*args)
+    takes_two_different(*args)  # error: [invalid-argument-type]
+    takes_two_different_positional_only(*args)  # error: [invalid-argument-type]
+    takes_at_least_zero(*args)
+    takes_at_least_one(*args)
+    takes_at_least_two(*args)
+    takes_at_least_two_positional_only(*args)
+
+class IntStrTuple(tuple[int, str]): ...
+
+def _(args: IntStrTuple) -> None:
+    takes_zero(*args)  # error: [too-many-positional-arguments]
+
+    takes_one(*args)  # error: [too-many-positional-arguments]
+
+    # error: [invalid-argument-type]
+    takes_two(*args)
+    # error: [invalid-argument-type]
+    takes_two_positional_only(*args)
+
+    takes_two_different(*args)
+    takes_two_different_positional_only(*args)
+    takes_at_least_zero(*args)
+    takes_at_least_one(*args)
+
+    # error: [invalid-argument-type]
+    takes_at_least_two(*args)
+    # error: [invalid-argument-type]
+    takes_at_least_two_positional_only(*args)
+```
+
 ### Mixed tuple argument
 
 ```toml
@@ -259,6 +402,142 @@ def _(args: tuple[int, *tuple[str, ...], int]) -> None:
     takes_at_least_two_positional_only(*args)  # error: [invalid-argument-type]
 ```
 
+### Subclass of mixed tuple argument
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+def takes_zero() -> None: ...
+def takes_one(x: int) -> None: ...
+def takes_two(x: int, y: int) -> None: ...
+def takes_two_positional_only(x: int, y: int, /) -> None: ...
+def takes_two_different(x: int, y: str) -> None: ...
+def takes_two_different_positional_only(x: int, y: str, /) -> None: ...
+def takes_at_least_zero(*args) -> None: ...
+def takes_at_least_one(x: int, *args) -> None: ...
+def takes_at_least_two(x: int, y: int, *args) -> None: ...
+def takes_at_least_two_positional_only(x: int, y: int, /, *args) -> None: ...
+
+# Test all of the above with a number of different splatted argument types
+
+class IntStarInt(tuple[int, *tuple[int, ...]]): ...
+
+def _(args: IntStarInt) -> None:
+    takes_zero(*args)  # error: [too-many-positional-arguments]
+    takes_one(*args)
+    takes_two(*args)
+    takes_two_positional_only(*args)
+    takes_two_different(*args)  # error: [invalid-argument-type]
+    takes_two_different_positional_only(*args)  # error: [invalid-argument-type]
+    takes_at_least_zero(*args)
+    takes_at_least_one(*args)
+    takes_at_least_two(*args)
+    takes_at_least_two_positional_only(*args)
+
+class IntStarStr(tuple[int, *tuple[str, ...]]): ...
+
+def _(args: IntStarStr) -> None:
+    takes_zero(*args)  # error: [too-many-positional-arguments]
+
+    takes_one(*args)
+
+    # error: [invalid-argument-type]
+    takes_two(*args)
+    # error: [invalid-argument-type]
+    takes_two_positional_only(*args)
+
+    takes_two_different(*args)
+    takes_two_different_positional_only(*args)
+
+    takes_at_least_zero(*args)
+
+    takes_at_least_one(*args)
+
+    # error: [invalid-argument-type]
+    takes_at_least_two(*args)
+    # error: [invalid-argument-type]
+    takes_at_least_two_positional_only(*args)
+
+class IntIntStarInt(tuple[int, int, *tuple[int, ...]]): ...
+
+def _(args: IntIntStarInt) -> None:
+    takes_zero(*args)  # error: [too-many-positional-arguments]
+    takes_one(*args)  # error: [too-many-positional-arguments]
+    takes_two(*args)
+    takes_two_positional_only(*args)
+    takes_two_different(*args)  # error: [invalid-argument-type]
+    takes_two_different_positional_only(*args)  # error: [invalid-argument-type]
+    takes_at_least_zero(*args)
+    takes_at_least_one(*args)
+    takes_at_least_two(*args)
+    takes_at_least_two_positional_only(*args)
+
+class IntIntStarStr(tuple[int, int, *tuple[str, ...]]): ...
+
+def _(args: IntIntStarStr) -> None:
+    takes_zero(*args)  # error: [too-many-positional-arguments]
+
+    takes_one(*args)  # error: [too-many-positional-arguments]
+
+    takes_two(*args)
+    takes_two_positional_only(*args)
+
+    # error: [invalid-argument-type]
+    takes_two_different(*args)
+    # error: [invalid-argument-type]
+    takes_two_different_positional_only(*args)
+
+    takes_at_least_zero(*args)
+
+    takes_at_least_one(*args)
+
+    takes_at_least_two(*args)
+
+    takes_at_least_two_positional_only(*args)
+
+class IntStarIntInt(tuple[int, *tuple[int, ...], int]): ...
+
+def _(args: IntStarIntInt) -> None:
+    takes_zero(*args)  # error: [too-many-positional-arguments]
+    takes_one(*args)  # error: [too-many-positional-arguments]
+    takes_two(*args)
+    takes_two_positional_only(*args)
+    takes_two_different(*args)  # error: [invalid-argument-type]
+    takes_two_different_positional_only(*args)  # error: [invalid-argument-type]
+    takes_at_least_zero(*args)
+    takes_at_least_one(*args)
+    takes_at_least_two(*args)
+    takes_at_least_two_positional_only(*args)
+
+class IntStarStrInt(tuple[int, *tuple[str, ...], int]): ...
+
+def _(args: IntStarStrInt) -> None:
+    takes_zero(*args)  # error: [too-many-positional-arguments]
+
+    takes_one(*args)  # error: [too-many-positional-arguments]
+
+    # error: [invalid-argument-type]
+    takes_two(*args)
+    # error: [invalid-argument-type]
+    takes_two_positional_only(*args)
+
+    takes_two_different(*args)
+    takes_two_different_positional_only(*args)
+
+    takes_at_least_zero(*args)
+
+    takes_at_least_one(*args)
+
+    # error: [invalid-argument-type]
+    takes_at_least_two(*args)
+
+    # error: [invalid-argument-type]
+    takes_at_least_two_positional_only(*args)
+```
+
 ### String argument
 
 ```py
@@ -332,56 +611,6 @@ def _(args: str) -> None:
     takes_at_least_one(*args)
     takes_at_least_two(*args)
     takes_at_least_two_positional_only(*args)
-```
-
-### Argument expansion regression
-
-This is a regression that was highlighted by the ecosystem check, which shows that we might need to
-rethink how we perform argument expansion during overload resolution. In particular, we might need
-to retry both `match_parameters` _and_ `check_types` for each expansion. Currently we only retry
-`check_types`.
-
-The issue is that argument expansion might produce a splatted value with a different arity than what
-we originally inferred for the unexpanded value, and that in turn can affect which parameters the
-splatted value is matched with.
-
-The first example correctly produces an error. The `tuple[int, str]` union element has a precise
-arity of two, and so parameter matching chooses the first overload. The second element of the tuple
-does not match the second parameter type, which yielding an `invalid-argument-type` error.
-
-The third example should produce the same error. However, because we have a union, we do not see the
-precise arity of each union element during parameter matching. Instead, we infer an arity of "zero
-or more" for the union as a whole, and use that less precise arity when matching parameters. We
-therefore consider the second overload to still be a potential candidate for the `tuple[int, str]`
-union element. During type checking, we have to force the arity of each union element to match the
-inferred arity of the union as a whole (turning `tuple[int, str]` into `tuple[int | str, ...]`).
-That less precise tuple type-checks successfully against the second overload, making us incorrectly
-think that `tuple[int, str]` is a valid splatted call.
-
-If we update argument expansion to retry parameter matching with the precise arity of each union
-element, we will correctly rule out the second overload for `tuple[int, str]`, just like we do when
-splatting that tuple directly (instead of as part of a union).
-
-```py
-from typing import overload
-
-@overload
-def f(x: int, y: int) -> None: ...
-@overload
-def f(x: int, y: str, z: int) -> None: ...
-def f(*args): ...
-
-# Test all of the above with a number of different splatted argument types
-
-def _(t: tuple[int, str]) -> None:
-    f(*t)  # error: [invalid-argument-type]
-
-def _(t: tuple[int, str, int]) -> None:
-    f(*t)
-
-def _(t: tuple[int, str] | tuple[int, str, int]) -> None:
-    # TODO: error: [invalid-argument-type]
-    f(*t)
 ```
 
 ## Wrong argument type

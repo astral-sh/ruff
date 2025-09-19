@@ -75,7 +75,7 @@ from email.message import Message
 from http.client import HTTPConnection, HTTPMessage, HTTPResponse
 from http.cookiejar import CookieJar
 from re import Pattern
-from typing import IO, Any, ClassVar, NoReturn, Protocol, TypeVar, overload
+from typing import IO, Any, ClassVar, NoReturn, Protocol, TypeVar, overload, type_check_only
 from typing_extensions import TypeAlias, deprecated
 from urllib.error import HTTPError as HTTPError
 from urllib.response import addclosehook, addinfourl
@@ -163,6 +163,7 @@ if sys.version_info >= (3, 13):
         In addition, if proxy settings are detected (for example, when a *_proxy
         environment variable like http_proxy is set), ProxyHandler is default
         installed and makes sure the requests are handled through the proxy.
+
         """
 
 else:
@@ -223,6 +224,7 @@ else:
         In addition, if proxy settings are detected (for example, when a *_proxy
         environment variable like http_proxy is set), ProxyHandler is default
         installed and makes sure the requests are handled through the proxy.
+
         """
 
 def install_opener(opener: OpenerDirector) -> None: ...
@@ -301,6 +303,7 @@ if sys.platform == "win32" or sys.platform == "darwin":
 
         Checks proxy settings gathered from the environment, if specified,
         or the registry.
+
         """
 
 else:
@@ -309,6 +312,7 @@ else:
 
         Checks the proxy dict for the value of no_proxy, which should
         be a list of comma separated DNS suffixes, or '*' for all hosts.
+
         """
 
 class Request:
@@ -478,6 +482,7 @@ class ProxyDigestAuthHandler(BaseHandler, AbstractDigestAuthHandler):
     auth_header: ClassVar[str]  # undocumented
     def http_error_407(self, req: Request, fp: IO[bytes], code: int, msg: str, headers: HTTPMessage) -> _UrlopenRet | None: ...
 
+@type_check_only
 class _HTTPConnectionProtocol(Protocol):
     def __call__(
         self,
@@ -570,7 +575,8 @@ def urlretrieve(
     reporthook: Callable[[int, int, int], object] | None = None,
     data: _DataType = None,
 ) -> tuple[str, HTTPMessage]:
-    """Retrieve a URL into a temporary location on disk.
+    """
+    Retrieve a URL into a temporary location on disk.
 
     Requires a URL argument. If a filename is passed, it is used as
     the temporary file location. The reporthook argument should be
@@ -589,7 +595,7 @@ def urlcleanup() -> None:
     """Clean up temporary files from urlretrieve calls."""
 
 if sys.version_info < (3, 14):
-    @deprecated("Deprecated since Python 3.3; Removed in 3.14; Use newer urlopen functions and methods.")
+    @deprecated("Deprecated since Python 3.3; removed in Python 3.14. Use newer `urlopen` functions and methods.")
     class URLopener:
         """Class to open URLs.
         This is a class rather than just a subroutine because we may need
@@ -662,7 +668,7 @@ if sys.version_info < (3, 14):
 
         def __del__(self) -> None: ...
 
-    @deprecated("Deprecated since Python 3.3; Removed in 3.14; Use newer urlopen functions and methods.")
+    @deprecated("Deprecated since Python 3.3; removed in Python 3.14. Use newer `urlopen` functions and methods.")
     class FancyURLopener(URLopener):
         """Derived class with handlers for errors we can handle (perhaps)."""
 

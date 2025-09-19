@@ -1,5 +1,4 @@
 use crate::Db;
-use crate::combine::Combine;
 use crate::glob::{ExcludeFilter, IncludeExcludeFilter, IncludeFilter, PortableGlobKind};
 use crate::metadata::settings::{OverrideSettings, SrcSettings};
 
@@ -28,6 +27,7 @@ use std::hash::BuildHasherDefault;
 use std::ops::Deref;
 use std::sync::Arc;
 use thiserror::Error;
+use ty_combine::Combine;
 use ty_python_semantic::lint::{GetLintError, Level, LintSource, RuleSelection};
 use ty_python_semantic::{
     ProgramSettings, PythonEnvironment, PythonPlatform, PythonVersionFileSource,
@@ -36,7 +36,16 @@ use ty_python_semantic::{
 };
 
 #[derive(
-    Debug, Default, Clone, PartialEq, Eq, Combine, Serialize, Deserialize, OptionsMetadata,
+    Debug,
+    Default,
+    Clone,
+    PartialEq,
+    Eq,
+    Combine,
+    Serialize,
+    Deserialize,
+    OptionsMetadata,
+    get_size2::GetSize,
 )]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -166,6 +175,13 @@ impl Options {
             SitePackagesPaths::default()
         };
 
+        let real_stdlib_path = python_environment.as_ref().and_then(|python_environment| {
+            // For now this is considered non-fatal, we don't Need this for anything.
+            python_environment.real_stdlib_path(system).map_err(|err| {
+                tracing::info!("No real stdlib found, stdlib goto-definition may have degraded quality: {err}");
+            }).ok()
+        });
+
         let python_version = options_python_version
             .or_else(|| {
                 python_environment
@@ -180,6 +196,7 @@ impl Options {
             project_root,
             project_name,
             site_packages_paths,
+            real_stdlib_path,
             system,
             vendored,
         )?;
@@ -201,6 +218,7 @@ impl Options {
         project_root: &SystemPath,
         project_name: &str,
         site_packages_paths: SitePackagesPaths,
+        real_stdlib_path: Option<SystemPathBuf>,
         system: &dyn System,
         vendored: &VendoredFileSystem,
     ) -> Result<SearchPaths, SearchPathValidationError> {
@@ -241,11 +259,29 @@ impl Options {
                 vec![project_root.to_path_buf()]
             };
 
+            let python = project_root.join("python");
+            if system.is_directory(&python)
+                && !system.is_file(&python.join("__init__.py"))
+                && !system.is_file(&python.join("__init__.pyi"))
+                && !roots.contains(&python)
+            {
+                // If a `./python` directory exists, include it as a source root. This is the recommended layout
+                // for maturin-based rust/python projects [1].
+                //
+                // https://github.com/PyO3/maturin/blob/979fe1db42bb9e58bc150fa6fc45360b377288bf/README.md?plain=1#L88-L99
+                tracing::debug!(
+                    "Including `./python` in `environment.root` because a `./python` directory exists"
+                );
+
+                roots.push(python);
+            }
+
             // Considering pytest test discovery conventions,
             // we also include the `tests` directory if it exists and is not a package.
             let tests_dir = project_root.join("tests");
             if system.is_directory(&tests_dir)
                 && !system.is_file(&tests_dir.join("__init__.py"))
+                && !system.is_file(&tests_dir.join("__init__.pyi"))
                 && !roots.contains(&tests_dir)
             {
                 // If the `tests` directory exists and is not a package, include it as a source root.
@@ -273,6 +309,7 @@ impl Options {
                 .as_ref()
                 .map(|path| path.absolute(project_root, system)),
             site_packages_paths: site_packages_paths.into_vec(),
+            real_stdlib_path,
         };
 
         settings.to_search_paths(system, vendored)
@@ -385,7 +422,16 @@ impl Options {
 }
 
 #[derive(
-    Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize, OptionsMetadata,
+    Debug,
+    Default,
+    Clone,
+    Eq,
+    PartialEq,
+    Combine,
+    Serialize,
+    Deserialize,
+    OptionsMetadata,
+    get_size2::GetSize,
 )]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -400,7 +446,7 @@ pub struct EnvironmentOptions {
     /// * if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path
     /// * otherwise, default to `.` (flat layout)
     ///
-    /// Besides, if a `./tests` directory exists and is not a package (i.e. it does not contain an `__init__.py` file),
+    /// Besides, if a `./python` or `./tests` directory exists and is not a package (i.e. it does not contain an `__init__.py` or `__init__.pyi` file),
     /// it will also be included in the first party search path.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
@@ -470,7 +516,7 @@ pub struct EnvironmentOptions {
         default = r#"[]"#,
         value_type = "list[str]",
         example = r#"
-            extra-paths = ["~/shared/my-search-path"]
+            extra-paths = ["./shared/my-search-path"]
         "#
     )]
     pub extra_paths: Option<Vec<RelativePathBuf>>,
@@ -506,7 +552,16 @@ pub struct EnvironmentOptions {
 }
 
 #[derive(
-    Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize, OptionsMetadata,
+    Debug,
+    Default,
+    Clone,
+    Eq,
+    PartialEq,
+    Combine,
+    Serialize,
+    Deserialize,
+    OptionsMetadata,
+    get_size2::GetSize,
 )]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -669,11 +724,14 @@ impl SrcOptions {
     }
 }
 
-#[derive(Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize, Hash)]
+#[derive(
+    Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize, Hash, get_size2::GetSize,
+)]
 #[serde(rename_all = "kebab-case", transparent)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Rules {
     #[cfg_attr(feature = "schemars", schemars(with = "schema::Rules"))]
+    #[get_size(ignore)] // TODO: Add `GetSize` support for `OrderMap`.
     inner: OrderMap<RangedValue<String>, RangedValue<Level>, BuildHasherDefault<FxHasher>>,
 }
 
@@ -992,7 +1050,9 @@ impl GlobFilterContext {
 }
 
 /// The diagnostic output format.
-#[derive(Debug, Default, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(
+    Debug, Default, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, get_size2::GetSize,
+)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum OutputFormat {
@@ -1013,6 +1073,25 @@ pub enum OutputFormat {
     ///
     /// This may use color when printing to a `tty`.
     Concise,
+    /// Print diagnostics in the JSON format expected by GitLab [Code Quality] reports.
+    ///
+    /// [Code Quality]: https://docs.gitlab.com/ci/testing/code_quality/#code-quality-report-format
+    Gitlab,
+    /// Print diagnostics in the format used by [GitHub Actions] workflow error annotations.
+    ///
+    /// [GitHub Actions]: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#setting-an-error-message
+    Github,
+}
+
+impl OutputFormat {
+    /// Returns `true` if this format is intended for users to read directly, in contrast to
+    /// machine-readable or structured formats.
+    ///
+    /// This can be used to check whether information beyond the diagnostics, such as a header or
+    /// `Found N diagnostics` footer, should be included.
+    pub const fn is_human_readable(&self) -> bool {
+        matches!(self, OutputFormat::Full | OutputFormat::Concise)
+    }
 }
 
 impl From<OutputFormat> for DiagnosticFormat {
@@ -1020,12 +1099,23 @@ impl From<OutputFormat> for DiagnosticFormat {
         match value {
             OutputFormat::Full => Self::Full,
             OutputFormat::Concise => Self::Concise,
+            OutputFormat::Gitlab => Self::Gitlab,
+            OutputFormat::Github => Self::Github,
         }
     }
 }
 
 #[derive(
-    Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize, OptionsMetadata,
+    Debug,
+    Default,
+    Clone,
+    Eq,
+    PartialEq,
+    Combine,
+    Serialize,
+    Deserialize,
+    OptionsMetadata,
+    get_size2::GetSize,
 )]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -1085,7 +1175,18 @@ pub struct TerminalOptions {
 /// [tool.ty.overrides.rules]
 /// possibly-unresolved-reference = "ignore"
 /// ```
-#[derive(Debug, Default, Clone, PartialEq, Eq, Combine, Serialize, Deserialize, RustDoc)]
+#[derive(
+    Debug,
+    Default,
+    Clone,
+    PartialEq,
+    Eq,
+    Combine,
+    Serialize,
+    Deserialize,
+    RustDoc,
+    get_size2::GetSize,
+)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[serde(transparent)]
 pub struct OverridesOptions(Vec<RangedValue<OverrideOptions>>);
@@ -1109,7 +1210,16 @@ impl Deref for OverridesOptions {
 }
 
 #[derive(
-    Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize, OptionsMetadata,
+    Debug,
+    Default,
+    Clone,
+    Eq,
+    PartialEq,
+    Combine,
+    Serialize,
+    Deserialize,
+    OptionsMetadata,
+    get_size2::GetSize,
 )]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -1329,7 +1439,7 @@ impl RangedValue<OverrideOptions> {
 }
 
 /// The options for an override but without the include/exclude patterns.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Combine)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Combine, get_size2::GetSize)]
 pub(super) struct InnerOverrideOptions {
     /// Raw rule options as specified in the configuration.
     /// Used when multiple overrides match a file and need to be merged.
@@ -1386,7 +1496,6 @@ impl std::error::Error for ToSettingsError {}
 
 #[cfg(feature = "schemars")]
 mod schema {
-    use crate::DEFAULT_LINT_REGISTRY;
     use schemars::JsonSchema;
     use schemars::r#gen::SchemaGenerator;
     use schemars::schema::{
@@ -1402,7 +1511,7 @@ mod schema {
         }
 
         fn json_schema(generator: &mut SchemaGenerator) -> Schema {
-            let registry = &*DEFAULT_LINT_REGISTRY;
+            let registry = ty_python_semantic::default_lint_registry();
 
             let level_schema = generator.subschema_for::<Level>();
 
@@ -1453,7 +1562,7 @@ pub enum TyTomlError {
     TomlSyntax(#[from] toml::de::Error),
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, get_size2::GetSize)]
 pub struct OptionDiagnostic {
     id: DiagnosticId,
     message: String,

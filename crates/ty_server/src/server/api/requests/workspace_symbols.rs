@@ -1,5 +1,3 @@
-use std::panic::AssertUnwindSafe;
-
 use lsp_types::request::WorkspaceSymbolRequest;
 use lsp_types::{WorkspaceSymbolParams, WorkspaceSymbolResponse};
 use ty_ide::{WorkspaceSymbolInfo, workspace_symbols};
@@ -21,26 +19,23 @@ impl RequestHandler for WorkspaceSymbolRequestHandler {
 
 impl BackgroundRequestHandler for WorkspaceSymbolRequestHandler {
     fn run(
-        snapshot: AssertUnwindSafe<SessionSnapshot>,
+        snapshot: &SessionSnapshot,
         _client: &Client,
         params: WorkspaceSymbolParams,
     ) -> crate::server::Result<Option<WorkspaceSymbolResponse>> {
-        // Check if language services are disabled
-        if snapshot
-            .index()
-            .global_settings()
-            .is_language_services_disabled()
-        {
-            return Ok(None);
-        }
-
         let query = &params.query;
         let mut all_symbols = Vec::new();
 
         // Iterate through all projects in the session
         for db in snapshot.projects() {
             // Get workspace symbols matching the query
+            let start = std::time::Instant::now();
             let workspace_symbol_infos = workspace_symbols(db, query);
+            tracing::debug!(
+                "Found {len} workspace symbols in {elapsed:?}",
+                len = workspace_symbol_infos.len(),
+                elapsed = std::time::Instant::now().duration_since(start)
+            );
 
             // Convert to LSP SymbolInformation
             for workspace_symbol_info in workspace_symbol_infos {

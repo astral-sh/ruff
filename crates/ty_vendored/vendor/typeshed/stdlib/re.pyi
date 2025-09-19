@@ -114,7 +114,7 @@ from _typeshed import MaybeNone, ReadableBuffer
 from collections.abc import Callable, Iterator, Mapping
 from types import GenericAlias
 from typing import Any, AnyStr, Final, Generic, Literal, TypeVar, final, overload
-from typing_extensions import TypeAlias
+from typing_extensions import TypeAlias, deprecated
 
 __all__ = [
     "match",
@@ -435,9 +435,7 @@ if sys.version_info < (3, 13):
     T: Final = RegexFlag.T
     TEMPLATE: Final = RegexFlag.TEMPLATE
 if sys.version_info >= (3, 11):
-    # pytype chokes on `NOFLAG: Final = RegexFlag.NOFLAG` with `LiteralValueError`
-    # mypy chokes on `NOFLAG: Final[Literal[RegexFlag.NOFLAG]]` with `Literal[...] is invalid`
-    NOFLAG = RegexFlag.NOFLAG
+    NOFLAG: Final = RegexFlag.NOFLAG
 _FlagsType: TypeAlias = int | RegexFlag
 
 # Type-wise the compile() overloads are unnecessary, they could also be modeled using
@@ -558,11 +556,18 @@ def subn(
     flags: _FlagsType = 0,
 ) -> tuple[bytes, int]: ...
 def escape(pattern: AnyStr) -> AnyStr:
-    """Escape special characters in a string."""
+    """
+    Escape special characters in a string.
+    """
 
 def purge() -> None:
     """Clear the regular expression caches"""
 
 if sys.version_info < (3, 13):
-    def template(pattern: AnyStr | Pattern[AnyStr], flags: _FlagsType = 0) -> Pattern[AnyStr]:
-        """Compile a template pattern, returning a Pattern object, deprecated"""
+    if sys.version_info >= (3, 11):
+        @deprecated("Deprecated since Python 3.11; removed in Python 3.13. Use `re.compile()` instead.")
+        def template(pattern: AnyStr | Pattern[AnyStr], flags: _FlagsType = 0) -> Pattern[AnyStr]:  # undocumented
+            """Compile a template pattern, returning a Pattern object, deprecated"""
+    else:
+        def template(pattern: AnyStr | Pattern[AnyStr], flags: _FlagsType = 0) -> Pattern[AnyStr]:  # undocumented
+            """Compile a template pattern, returning a Pattern object"""

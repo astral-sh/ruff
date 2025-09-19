@@ -11,7 +11,7 @@ def _(flag: bool) -> None:
         abs = 1
         chr: int = 1
 
-    reveal_type(abs)  # revealed: Literal[1] | (def abs(x: SupportsAbs[_T], /) -> _T)
+    reveal_type(abs)  # revealed: Literal[1] | (def abs[_T](x: SupportsAbs[_T@abs], /) -> _T@abs)
     reveal_type(chr)  # revealed: Literal[1] | (def chr(i: SupportsIndex, /) -> str)
 ```
 

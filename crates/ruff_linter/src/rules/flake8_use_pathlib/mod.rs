@@ -59,6 +59,7 @@ mod tests {
 
     #[test_case(Rule::PyPath, Path::new("py_path_1.py"))]
     #[test_case(Rule::PyPath, Path::new("py_path_2.py"))]
+    #[test_case(Rule::BuiltinOpen, Path::new("PTH123.py"))]
     #[test_case(Rule::PathConstructorCurrentDirectory, Path::new("PTH201.py"))]
     #[test_case(Rule::OsPathGetsize, Path::new("PTH202.py"))]
     #[test_case(Rule::OsPathGetsize, Path::new("PTH202_2.py"))]
@@ -123,6 +124,8 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::BuiltinOpen, Path::new("PTH123.py"))]
+    #[test_case(Rule::PathConstructorCurrentDirectory, Path::new("PTH201.py"))]
     #[test_case(Rule::OsPathGetsize, Path::new("PTH202.py"))]
     #[test_case(Rule::OsPathGetsize, Path::new("PTH202_2.py"))]
     #[test_case(Rule::OsPathGetatime, Path::new("PTH203.py"))]

@@ -26,6 +26,9 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 ///
 /// ## Example
 /// ```python
+/// from decimal import Decimal
+/// from fractions import Fraction
+///
 /// Decimal.from_float(4.2)
 /// Decimal.from_float(float("inf"))
 /// Fraction.from_float(4.2)
@@ -34,10 +37,13 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 ///
 /// Use instead:
 /// ```python
+/// from decimal import Decimal
+/// from fractions import Fraction
+///
 /// Decimal(4.2)
 /// Decimal("inf")
 /// Fraction(4.2)
-/// Fraction(Decimal(4.2))
+/// Fraction(Decimal("4.2"))
 /// ```
 ///
 /// ## Fix safety
@@ -180,18 +186,18 @@ fn is_valid_argument_type(
                     typing::is_float(binding, semantic),
                 )
             })
-            .unwrap_or_default()
+            .unwrap_or((false, false))
     } else {
         (false, false)
     };
 
     match (method_name, constructor) {
-        // Decimal.from_float accepts int, bool, float
+        // Decimal.from_float: Only int or bool are safe (float is unsafe due to FloatOperation trap)
         (MethodName::FromFloat, Constructor::Decimal) => match resolved_type {
             ResolvedPythonType::Atom(PythonType::Number(
-                NumberLike::Integer | NumberLike::Bool | NumberLike::Float,
+                NumberLike::Integer | NumberLike::Bool,
             )) => true,
-            ResolvedPythonType::Unknown => is_int || is_float,
+            ResolvedPythonType::Unknown => is_int,
             _ => false,
         },
         // Fraction.from_float accepts int, bool, float
@@ -286,10 +292,8 @@ fn handle_non_finite_float_special_case(
     let [float_arg] = arguments.args.as_ref() else {
         return None;
     };
-    as_non_finite_float_string_literal(float_arg)?;
-
-    let replacement_arg = checker.locator().slice(float_arg).to_string();
-    let replacement_text = format!("{constructor_name}({replacement_arg})");
+    let normalized = as_non_finite_float_string_literal(float_arg)?;
+    let replacement_text = format!(r#"{constructor_name}("{normalized}")"#);
     Some(Edit::range_replacement(replacement_text, call.range()))
 }
 

@@ -25,9 +25,9 @@ Typeshed supports Python versions 3.9 to 3.14.
 
 ## Using
 
-If you're just using a type checker ([mypy](https://github.com/python/mypy/),
-[pyright](https://github.com/microsoft/pyright),
-[pytype](https://github.com/google/pytype/), PyCharm, ...), as opposed to
+If you're just using a type checker (e.g. [mypy](https://github.com/python/mypy/),
+[pyright](https://github.com/microsoft/pyright), or PyCharm's built-in type
+checker), as opposed to
 developing it, you don't need to interact with the typeshed repo at
 all: a copy of standard library part of typeshed is bundled with type checkers.
 And type stubs for third party packages and modules you are using can

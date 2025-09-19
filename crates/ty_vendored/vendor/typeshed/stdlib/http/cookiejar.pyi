@@ -66,6 +66,7 @@ class CookieJar:
         """Add correct Cookie: header to request (urllib.request.Request object).
 
         The Cookie2 header is also added unless policy.hide_cookie2 is true.
+
         """
 
     def extract_cookies(self, response: HTTPResponse, request: Request) -> None:
@@ -91,6 +92,7 @@ class CookieJar:
         the cookie with the specified name, path and domain is removed.
 
         Raises KeyError if no matching cookie exists.
+
         """
 
     def clear_session_cookies(self) -> None:
@@ -98,6 +100,7 @@ class CookieJar:
 
         Note that the .save() method won't save session cookies anyway, unless
         you ask otherwise by passing a true ignore_discard argument.
+
         """
 
     def clear_expired_cookies(self) -> None:  # undocumented
@@ -108,6 +111,7 @@ class CookieJar:
         this method is called by CookieJar itself every so often, and the
         .save() method won't save expired cookies anyway (unless you ask
         otherwise by passing a true ignore_expires argument).
+
         """
 
     def __iter__(self) -> Iterator[Cookie]: ...
@@ -120,8 +124,10 @@ class FileCookieJar(CookieJar):
     filename: str | None
     delayload: bool
     def __init__(self, filename: StrPath | None = None, delayload: bool = False, policy: CookiePolicy | None = None) -> None:
-        """Cookies are NOT loaded from the named file until either the .load() or
+        """
+        Cookies are NOT loaded from the named file until either the .load() or
         .revert() method is called.
+
         """
 
     def save(self, filename: str | None = None, ignore_discard: bool = False, ignore_expires: bool = False) -> None:
@@ -135,10 +141,13 @@ class FileCookieJar(CookieJar):
 
         Raises LoadError (or OSError) if reversion is not successful; the
         object's state will not be altered if this happens.
+
         """
 
 class MozillaCookieJar(FileCookieJar):
-    """WARNING: you may want to backup your browser's cookies file if you use
+    """
+
+    WARNING: you may want to backup your browser's cookies file if you use
     this class to save cookies.  I *think* it works, but there have been
     bugs in the past!
 
@@ -164,13 +173,15 @@ class MozillaCookieJar(FileCookieJar):
     Note that though Mozilla and Netscape use the same format, they use
     slightly different headers.  The class saves cookies using the Netscape
     header by default (Mozilla can cope with that).
+
     """
 
     if sys.version_info < (3, 10):
         header: ClassVar[str]  # undocumented
 
 class LWPCookieJar(FileCookieJar):
-    """The LWPCookieJar saves a sequence of "Set-Cookie3" lines.
+    """
+    The LWPCookieJar saves a sequence of "Set-Cookie3" lines.
     "Set-Cookie3" is the format used by the libwww-perl library, not known
     to be compatible with any browser, but which is easy to read and
     doesn't lose information about RFC 2965 cookies.
@@ -178,12 +189,14 @@ class LWPCookieJar(FileCookieJar):
     Additional methods
 
     as_lwp_str(ignore_discard=True, ignore_expired=True)
+
     """
 
     def as_lwp_str(self, ignore_discard: bool = True, ignore_expires: bool = True) -> str:  # undocumented
         """Return cookies as a string of "\\n"-separated "Set-Cookie3" headers.
 
         ignore_discard and ignore_expires: see docstring for FileCookieJar.save
+
         """
 
 class CookiePolicy:
@@ -193,6 +206,7 @@ class CookiePolicy:
 
     The subclass DefaultCookiePolicy defines the standard rules for Netscape
     and RFC 2965 cookies -- override that if you want a customized policy.
+
     """
 
     netscape: bool
@@ -203,6 +217,7 @@ class CookiePolicy:
 
         Currently, pre-expired cookies never get this far -- the CookieJar
         class deletes such cookies itself.
+
         """
 
     def return_ok(self, cookie: Cookie, request: Request) -> bool:
@@ -289,6 +304,7 @@ class Cookie:
 
     Note that the port may be present in the headers, but unspecified ("Port"
     rather than"Port=80", for example); if this is the case, port is None.
+
     """
 
     version: int | None

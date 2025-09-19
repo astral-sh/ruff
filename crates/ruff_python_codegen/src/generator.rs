@@ -3,6 +3,7 @@
 use std::fmt::Write;
 use std::ops::Deref;
 
+use ruff_python_ast::str::Quote;
 use ruff_python_ast::{
     self as ast, Alias, AnyStringFlags, ArgOrKeyword, BoolOp, BytesLiteralFlags, CmpOp,
     Comprehension, ConversionFlag, DebugText, ExceptHandler, Expr, Identifier, MatchCase, Operator,
@@ -67,6 +68,8 @@ pub struct Generator<'a> {
     indent: &'a Indentation,
     /// The line ending to use.
     line_ending: LineEnding,
+    /// Preferred quote style to use. For more info see [`Generator::with_preferred_quote`].
+    preferred_quote: Option<Quote>,
     buffer: String,
     indent_depth: usize,
     num_newlines: usize,
@@ -78,6 +81,7 @@ impl<'a> From<&'a Stylist<'a>> for Generator<'a> {
         Self {
             indent: stylist.indentation(),
             line_ending: stylist.line_ending(),
+            preferred_quote: None,
             buffer: String::new(),
             indent_depth: 0,
             num_newlines: 0,
@@ -92,12 +96,23 @@ impl<'a> Generator<'a> {
             // Style preferences.
             indent,
             line_ending,
+            preferred_quote: None,
             // Internal state.
             buffer: String::new(),
             indent_depth: 0,
             num_newlines: 0,
             initial: true,
         }
+    }
+
+    /// Set a preferred quote style for generated source code.
+    ///
+    /// - If [`None`], the generator will attempt to preserve the existing quote style whenever possible.
+    /// - If [`Some`], the generator will prefer the specified quote style, ignoring the one found in the source.
+    #[must_use]
+    pub fn with_preferred_quote(mut self, quote: Option<Quote>) -> Self {
+        self.preferred_quote = quote;
+        self
     }
 
     /// Generate source code from a [`Stmt`].
@@ -158,7 +173,8 @@ impl<'a> Generator<'a> {
                 return;
             }
         }
-        let escape = AsciiEscape::with_preferred_quote(s, flags.quote_style());
+        let quote_style = self.preferred_quote.unwrap_or_else(|| flags.quote_style());
+        let escape = AsciiEscape::with_preferred_quote(s, quote_style);
         if let Some(len) = escape.layout().len {
             self.buffer.reserve(len);
         }
@@ -176,7 +192,9 @@ impl<'a> Generator<'a> {
             return;
         }
         self.p(flags.prefix().as_str());
-        let escape = UnicodeEscape::with_preferred_quote(s, flags.quote_style());
+
+        let quote_style = self.preferred_quote.unwrap_or_else(|| flags.quote_style());
+        let escape = UnicodeEscape::with_preferred_quote(s, quote_style);
         if let Some(len) = escape.layout().len {
             self.buffer.reserve(len);
         }
@@ -1506,7 +1524,9 @@ impl<'a> Generator<'a> {
             self.buffer += &s;
             return;
         }
-        let escape = UnicodeEscape::with_preferred_quote(&s, flags.quote_style());
+
+        let quote_style = self.preferred_quote.unwrap_or_else(|| flags.quote_style());
+        let escape = UnicodeEscape::with_preferred_quote(&s, quote_style);
         if let Some(len) = escape.layout().len {
             self.buffer.reserve(len);
         }
@@ -1531,6 +1551,9 @@ impl<'a> Generator<'a> {
         flags: AnyStringFlags,
     ) {
         self.p(flags.prefix().as_str());
+
+        let flags =
+            flags.with_quote_style(self.preferred_quote.unwrap_or_else(|| flags.quote_style()));
         self.p(flags.quote_str());
         self.unparse_interpolated_string_body(values, flags);
         self.p(flags.quote_str());
@@ -1538,19 +1561,9 @@ impl<'a> Generator<'a> {
 
     fn unparse_t_string_value(&mut self, value: &ast::TStringValue) {
         let mut first = true;
-        for t_string_part in value {
+        for t_string in value {
             self.p_delim(&mut first, " ");
-            match t_string_part {
-                ast::TStringPart::Literal(string_literal) => {
-                    self.unparse_string_literal(string_literal);
-                }
-                ast::TStringPart::FString(f_string) => {
-                    self.unparse_interpolated_string(&f_string.elements, f_string.flags.into());
-                }
-                ast::TStringPart::TString(t_string) => {
-                    self.unparse_interpolated_string(&t_string.elements, t_string.flags.into());
-                }
-            }
+            self.unparse_interpolated_string(&t_string.elements, t_string.flags.into());
         }
     }
 
@@ -1573,6 +1586,7 @@ impl<'a> Generator<'a> {
 
 #[cfg(test)]
 mod tests {
+    use ruff_python_ast::str::Quote;
     use ruff_python_ast::{Mod, ModModule};
     use ruff_python_parser::{self, Mode, ParseOptions, parse_module};
     use ruff_source_file::LineEnding;
@@ -1590,15 +1604,17 @@ mod tests {
         generator.generate()
     }
 
-    /// Like [`round_trip`] but configure the [`Generator`] with the requested `indentation` and
-    /// `line_ending` settings.
+    /// Like [`round_trip`] but configure the [`Generator`] with the requested
+    /// `indentation`, `line_ending` and `preferred_quote` settings.
     fn round_trip_with(
         indentation: &Indentation,
         line_ending: LineEnding,
+        preferred_quote: Option<Quote>,
         contents: &str,
     ) -> String {
         let module = parse_module(contents).unwrap();
-        let mut generator = Generator::new(indentation, line_ending);
+        let mut generator =
+            Generator::new(indentation, line_ending).with_preferred_quote(preferred_quote);
         generator.unparse_suite(module.suite());
         generator.generate()
     }
@@ -1881,10 +1897,10 @@ class Foo:
     }
 
     /// test all of the valid string literal prefix and quote combinations from
-    /// https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals
+    /// <https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals>
     ///
     /// Note that the numeric ids on the input/output and quote fields prevent name conflicts from
-    /// the test_matrix but are otherwise unnecessary
+    /// the `test_matrix` but are otherwise unnecessary
     #[test_case::test_matrix(
         [
             ("r", "r", 0),
@@ -1984,6 +2000,7 @@ if True:
             round_trip_with(
                 &Indentation::new("    ".to_string()),
                 LineEnding::default(),
+                None,
                 r"
 if True:
   pass
@@ -2001,6 +2018,7 @@ if True:
             round_trip_with(
                 &Indentation::new("  ".to_string()),
                 LineEnding::default(),
+                None,
                 r"
 if True:
   pass
@@ -2018,6 +2036,7 @@ if True:
             round_trip_with(
                 &Indentation::new("\t".to_string()),
                 LineEnding::default(),
+                None,
                 r"
 if True:
   pass
@@ -2039,6 +2058,7 @@ if True:
             round_trip_with(
                 &Indentation::default(),
                 LineEnding::Lf,
+                None,
                 "if True:\n    print(42)",
             ),
             "if True:\n    print(42)",
@@ -2048,6 +2068,7 @@ if True:
             round_trip_with(
                 &Indentation::default(),
                 LineEnding::CrLf,
+                None,
                 "if True:\n    print(42)",
             ),
             "if True:\r\n    print(42)",
@@ -2057,9 +2078,32 @@ if True:
             round_trip_with(
                 &Indentation::default(),
                 LineEnding::Cr,
+                None,
                 "if True:\n    print(42)",
             ),
             "if True:\r    print(42)",
         );
+    }
+
+    #[test_case::test_case(r#""'hello'""#, r#""'hello'""#, Quote::Single ; "basic str ignored")]
+    #[test_case::test_case(r#"b"'hello'""#, r#"b"'hello'""#, Quote::Single ; "basic bytes ignored")]
+    #[test_case::test_case("'hello'", r#""hello""#, Quote::Double ; "basic str double")]
+    #[test_case::test_case(r#""hello""#, "'hello'", Quote::Single ; "basic str single")]
+    #[test_case::test_case("b'hello'", r#"b"hello""#, Quote::Double ; "basic bytes double")]
+    #[test_case::test_case(r#"b"hello""#, "b'hello'", Quote::Single ; "basic bytes single")]
+    #[test_case::test_case(r#""hello""#,  r#""hello""#, Quote::Double ; "remain str double")]
+    #[test_case::test_case("'hello'", "'hello'", Quote::Single ; "remain str single")]
+    #[test_case::test_case("x: list['str']", r#"x: list["str"]"#, Quote::Double ; "type ann double")]
+    #[test_case::test_case(r#"x: list["str"]"#, "x: list['str']", Quote::Single ; "type ann single")]
+    #[test_case::test_case("f'hello'", r#"f"hello""#, Quote::Double ; "basic fstring double")]
+    #[test_case::test_case(r#"f"hello""#, "f'hello'", Quote::Single ; "basic fstring single")]
+    fn preferred_quote(inp: &str, out: &str, quote: Quote) {
+        let got = round_trip_with(
+            &Indentation::default(),
+            LineEnding::default(),
+            Some(quote),
+            inp,
+        );
+        assert_eq!(got, out);
     }
 }

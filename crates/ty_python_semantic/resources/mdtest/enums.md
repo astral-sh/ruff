@@ -4,6 +4,7 @@
 
 ```py
 from enum import Enum
+from typing import Literal
 
 class Color(Enum):
     RED = 1
@@ -11,8 +12,8 @@ class Color(Enum):
     BLUE = 3
 
 reveal_type(Color.RED)  # revealed: Literal[Color.RED]
-# TODO: This could be `Literal[1]`
-reveal_type(Color.RED.value)  # revealed: Any
+reveal_type(Color.RED.name)  # revealed: Literal["RED"]
+reveal_type(Color.RED.value)  # revealed: Literal[1]
 
 # TODO: Should be `Color` or `Literal[Color.RED]`
 reveal_type(Color["RED"])  # revealed: Unknown
@@ -155,6 +156,7 @@ python-version = "3.11"
 
 ```py
 from enum import Enum, property as enum_property
+from typing import Any
 from ty_extensions import enum_members
 
 class Answer(Enum):
@@ -167,6 +169,22 @@ class Answer(Enum):
 
 # revealed: tuple[Literal["YES"], Literal["NO"]]
 reveal_type(enum_members(Answer))
+```
+
+Enum attributes defined using `enum.property` take precedence over generated attributes.
+
+```py
+from enum import Enum, property as enum_property
+
+class Choices(Enum):
+    A = 1
+    B = 2
+
+    @enum_property
+    def value(self) -> Any: ...
+
+# TODO: This should be `Any` - overridden by `@enum_property`
+reveal_type(Choices.A.value)  # revealed: Literal[1]
 ```
 
 ### `types.DynamicClassAttribute`
@@ -481,6 +499,62 @@ callable = Printer.STDERR
 callable("Another error!")
 ```
 
+## Special attributes on enum members
+
+### `name` and `_name_`
+
+```py
+from enum import Enum
+from typing import Literal
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
+
+reveal_type(Color.RED._name_)  # revealed: Literal["RED"]
+
+def _(red_or_blue: Literal[Color.RED, Color.BLUE]):
+    reveal_type(red_or_blue.name)  # revealed: Literal["RED", "BLUE"]
+
+def _(any_color: Color):
+    # TODO: Literal["RED", "GREEN", "BLUE"]
+    reveal_type(any_color.name)  # revealed: Any
+```
+
+### `value` and `_value_`
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from enum import Enum, StrEnum
+from typing import Literal
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
+
+reveal_type(Color.RED.value)  # revealed: Literal[1]
+reveal_type(Color.RED._value_)  # revealed: Literal[1]
+
+reveal_type(Color.GREEN.value)  # revealed: Literal[2]
+reveal_type(Color.GREEN._value_)  # revealed: Literal[2]
+
+class Answer(StrEnum):
+    YES = "yes"
+    NO = "no"
+
+reveal_type(Answer.YES.value)  # revealed: Literal["yes"]
+reveal_type(Answer.YES._value_)  # revealed: Literal["yes"]
+
+reveal_type(Answer.NO.value)  # revealed: Literal["no"]
+reveal_type(Answer.NO._value_)  # revealed: Literal["no"]
+```
+
 ## Properties of enum types
 
 ### Implicitly final
@@ -609,6 +683,12 @@ reveal_type(EnumWithSubclassOfEnumMetaMetaclass.NO)  # revealed: Literal[EnumWit
 # Attributes like `.value` can *not* be accessed on members of these enums:
 # error: [unresolved-attribute]
 EnumWithSubclassOfEnumMetaMetaclass.NO.value
+# error: [unresolved-attribute]
+EnumWithSubclassOfEnumMetaMetaclass.NO._value_
+# error: [unresolved-attribute]
+EnumWithSubclassOfEnumMetaMetaclass.NO.name
+# error: [unresolved-attribute]
+EnumWithSubclassOfEnumMetaMetaclass.NO._name_
 ```
 
 ### Enums with (subclasses of) `EnumType` as metaclass
@@ -747,6 +827,51 @@ def singleton_check(value: Singleton) -> str:
             return "Singleton value"
         case _:
             assert_never(value)
+```
+
+## `__eq__` and `__ne__`
+
+### No `__eq__` or `__ne__` overrides
+
+```py
+from enum import Enum
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+
+reveal_type(Color.RED == Color.RED)  # revealed: Literal[True]
+reveal_type(Color.RED != Color.RED)  # revealed: Literal[False]
+```
+
+### Overridden `__eq__`
+
+```py
+from enum import Enum
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+
+    def __eq__(self, other: object) -> bool:
+        return False
+
+reveal_type(Color.RED == Color.RED)  # revealed: bool
+```
+
+### Overridden `__ne__`
+
+```py
+from enum import Enum
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+
+    def __ne__(self, other: object) -> bool:
+        return False
+
+reveal_type(Color.RED != Color.RED)  # revealed: bool
 ```
 
 ## References

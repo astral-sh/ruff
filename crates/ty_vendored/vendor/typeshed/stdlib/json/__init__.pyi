@@ -157,6 +157,7 @@ def dumps(
     To use a custom ``JSONEncoder`` subclass (e.g. one that overrides the
     ``.default()`` method to serialize additional types), specify it with
     the ``cls`` kwarg; otherwise ``JSONEncoder`` is used.
+
     """
 
 def dump(
@@ -213,6 +214,7 @@ def dump(
     To use a custom ``JSONEncoder`` subclass (e.g. one that overrides the
     ``.default()`` method to serialize additional types), specify it with
     the ``cls`` kwarg; otherwise ``JSONEncoder`` is used.
+
     """
 
 def loads(

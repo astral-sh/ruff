@@ -32,7 +32,7 @@ use crate::{
 /// ## Consuming
 /// It's important that the context is explicitly consumed before dropping by calling
 /// [`InferContext::finish`] and the returned diagnostics must be stored
-/// on the current [`TypeInferenceBuilder`](super::infer::TypeInferenceBuilder) result.
+/// on the current inference result.
 pub(crate) struct InferContext<'db, 'ast> {
     db: &'db dyn Db,
     scope: ScopeId<'db>,
@@ -172,7 +172,7 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
                 // Inspect all ancestor function scopes by walking bottom up and infer the function's type.
                 let mut function_scope_tys = index
                     .ancestor_scopes(scope_id)
-                    .filter_map(|(_, scope)| scope.node().as_function(self.module()))
+                    .filter_map(|(_, scope)| scope.node().as_function())
                     .map(|node| binding_type(self.db, index.expect_single_definition(node)))
                     .filter_map(Type::into_function_literal);
 

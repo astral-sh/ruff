@@ -53,8 +53,8 @@ from types import (
     TracebackType,
     WrapperDescriptorType,
 )
-from typing import Any, ClassVar, Final, Literal, NamedTuple, Protocol, TypeVar, overload
-from typing_extensions import ParamSpec, Self, TypeAlias, TypeGuard, TypeIs
+from typing import Any, ClassVar, Final, Literal, NamedTuple, Protocol, TypeVar, overload, type_check_only
+from typing_extensions import ParamSpec, Self, TypeAlias, TypeGuard, TypeIs, deprecated, disjoint_base
 
 if sys.version_info >= (3, 14):
     from annotationlib import Format
@@ -286,7 +286,9 @@ def isfunction(object: object) -> TypeIs[FunctionType]:
 
 if sys.version_info >= (3, 12):
     def markcoroutinefunction(func: _F) -> _F:
-        """Decorator to ensure callable is recognised as a coroutine function."""
+        """
+        Decorator to ensure callable is recognised as a coroutine function.
+        """
 
 @overload
 def isgeneratorfunction(obj: Callable[..., Generator[Any, Any, Any]]) -> bool:
@@ -350,10 +352,11 @@ def isasyncgenfunction(obj: Callable[..., AsyncGenerator[Any, Any]]) -> bool:
 def isasyncgenfunction(obj: Callable[_P, Any]) -> TypeGuard[Callable[_P, AsyncGeneratorType[Any, Any]]]: ...
 @overload
 def isasyncgenfunction(obj: object) -> TypeGuard[Callable[..., AsyncGeneratorType[Any, Any]]]: ...
-
+@type_check_only
 class _SupportsSet(Protocol[_T_contra, _V_contra]):
     def __set__(self, instance: _T_contra, value: _V_contra, /) -> None: ...
 
+@type_check_only
 class _SupportsDelete(Protocol[_T_contra]):
     def __delete__(self, instance: _T_contra, /) -> None: ...
 
@@ -637,6 +640,7 @@ class Signature:
         to parameters (simulating 'functools.partial' behavior.)
     """
 
+    __slots__ = ("_return_annotation", "_parameters")
     def __init__(
         self, parameters: Sequence[Parameter] | None = None, *, return_annotation: Any = ..., __validate_parameters__: bool = True
     ) -> None:
@@ -809,7 +813,8 @@ if sys.version_info >= (3, 12):
         """
 
     def getasyncgenlocals(agen: AsyncGeneratorType[Any, Any]) -> dict[str, Any]:
-        """Get the mapping of asynchronous generator local variables to their current
+        """
+        Get the mapping of asynchronous generator local variables to their current
         values.
 
         A dict is returned, with the keys the local variable names and values the
@@ -838,6 +843,7 @@ class Parameter:
         `Parameter.KEYWORD_ONLY`, `Parameter.VAR_KEYWORD`.
     """
 
+    __slots__ = ("_name", "_kind", "_default", "_annotation")
     def __init__(self, name: str, kind: _ParameterKind, *, default: Any = ..., annotation: Any = ...) -> None: ...
     empty = _empty
 
@@ -886,6 +892,7 @@ class BoundArguments:
         Dict of keyword arguments values.
     """
 
+    __slots__ = ("arguments", "_signature", "__weakref__")
     arguments: OrderedDict[str, Any]
     @property
     def args(self) -> tuple[Any, ...]: ...
@@ -944,6 +951,7 @@ def getargs(co: CodeType) -> Arguments:
     """
 
 if sys.version_info < (3, 11):
+    @deprecated("Deprecated since Python 3.0; removed in Python 3.11.")
     class ArgSpec(NamedTuple):
         """ArgSpec(args, varargs, keywords, defaults)"""
 
@@ -952,6 +960,7 @@ if sys.version_info < (3, 11):
         keywords: str | None
         defaults: tuple[Any, ...]
 
+    @deprecated("Deprecated since Python 3.0; removed in Python 3.11. Use `inspect.signature()` instead.")
     def getargspec(func: object) -> ArgSpec:
         """Get the names and default values of a function's parameters.
 
@@ -1027,6 +1036,9 @@ else:
 def formatannotationrelativeto(object: object) -> Callable[[object], str]: ...
 
 if sys.version_info < (3, 11):
+    @deprecated(
+        "Deprecated since Python 3.5; removed in Python 3.11. Use `inspect.signature()` and the `Signature` class instead."
+    )
     def formatargspec(
         args: list[str],
         varargs: str | None = None,
@@ -1092,7 +1104,8 @@ class ClosureVars(NamedTuple):
     unbound: AbstractSet[str]
 
 def getclosurevars(func: _IntrospectableCallable) -> ClosureVars:
-    """Get the mapping of free variables to their current values.
+    """
+    Get the mapping of free variables to their current values.
 
     Returns a named tuple of dicts mapping the current nonlocal, global
     and builtin references as seen by the body of the function. A final
@@ -1130,19 +1143,6 @@ if sys.version_info >= (3, 11):
         code_context: list[str] | None
         index: int | None  # type: ignore[assignment]
 
-    class Traceback(_Traceback):
-        positions: dis.Positions | None
-        def __new__(
-            cls,
-            filename: str,
-            lineno: int,
-            function: str,
-            code_context: list[str] | None,
-            index: int | None,
-            *,
-            positions: dis.Positions | None = None,
-        ) -> Self: ...
-
     class _FrameInfo(NamedTuple):
         """_FrameInfo(frame, filename, lineno, function, code_context, index)"""
 
@@ -1153,19 +1153,63 @@ if sys.version_info >= (3, 11):
         code_context: list[str] | None
         index: int | None  # type: ignore[assignment]
 
-    class FrameInfo(_FrameInfo):
-        positions: dis.Positions | None
-        def __new__(
-            cls,
-            frame: FrameType,
-            filename: str,
-            lineno: int,
-            function: str,
-            code_context: list[str] | None,
-            index: int | None,
-            *,
-            positions: dis.Positions | None = None,
-        ) -> Self: ...
+    if sys.version_info >= (3, 12):
+        class Traceback(_Traceback):
+            positions: dis.Positions | None
+            def __new__(
+                cls,
+                filename: str,
+                lineno: int,
+                function: str,
+                code_context: list[str] | None,
+                index: int | None,
+                *,
+                positions: dis.Positions | None = None,
+            ) -> Self: ...
+
+        class FrameInfo(_FrameInfo):
+            positions: dis.Positions | None
+            def __new__(
+                cls,
+                frame: FrameType,
+                filename: str,
+                lineno: int,
+                function: str,
+                code_context: list[str] | None,
+                index: int | None,
+                *,
+                positions: dis.Positions | None = None,
+            ) -> Self: ...
+
+    else:
+        @disjoint_base
+        class Traceback(_Traceback):
+            positions: dis.Positions | None
+            def __new__(
+                cls,
+                filename: str,
+                lineno: int,
+                function: str,
+                code_context: list[str] | None,
+                index: int | None,
+                *,
+                positions: dis.Positions | None = None,
+            ) -> Self: ...
+
+        @disjoint_base
+        class FrameInfo(_FrameInfo):
+            positions: dis.Positions | None
+            def __new__(
+                cls,
+                frame: FrameType,
+                filename: str,
+                lineno: int,
+                function: str,
+                code_context: list[str] | None,
+                index: int | None,
+                *,
+                positions: dis.Positions | None = None,
+            ) -> Self: ...
 
 else:
     class Traceback(NamedTuple):
@@ -1278,14 +1322,16 @@ def getcoroutinestate(
     """
 
 def getgeneratorlocals(generator: Generator[Any, Any, Any]) -> dict[str, Any]:
-    """Get the mapping of generator local variables to their current values.
+    """
+    Get the mapping of generator local variables to their current values.
 
     A dict is returned, with the keys the local variable names and values the
     bound values.
     """
 
 def getcoroutinelocals(coroutine: Coroutine[Any, Any, Any]) -> dict[str, Any]:
-    """Get the mapping of coroutine local variables to their current values.
+    """
+    Get the mapping of coroutine local variables to their current values.
 
     A dict is returned, with the keys the local variable names and values the
     bound values.

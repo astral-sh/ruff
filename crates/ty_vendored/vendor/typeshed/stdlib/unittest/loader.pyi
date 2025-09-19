@@ -15,7 +15,8 @@ _SuiteClass: TypeAlias = Callable[[list[unittest.case.TestCase]], unittest.suite
 VALID_MODULE_NAME: Final[Pattern[str]]
 
 class TestLoader:
-    """This class is responsible for loading tests according to various criteria
+    """
+    This class is responsible for loading tests according to various criteria
     and returning them wrapped in a TestSuite
     """
 
@@ -85,21 +86,38 @@ class TestLoader:
 defaultTestLoader: TestLoader
 
 if sys.version_info < (3, 13):
-    @deprecated("Deprecated in Python 3.11; removal scheduled for Python 3.13")
-    def getTestCaseNames(
-        testCaseClass: type[unittest.case.TestCase],
-        prefix: str,
-        sortUsing: _SortComparisonMethod = ...,
-        testNamePatterns: list[str] | None = None,
-    ) -> Sequence[str]: ...
-    @deprecated("Deprecated in Python 3.11; removal scheduled for Python 3.13")
-    def makeSuite(
-        testCaseClass: type[unittest.case.TestCase],
-        prefix: str = "test",
-        sortUsing: _SortComparisonMethod = ...,
-        suiteClass: _SuiteClass = ...,
-    ) -> unittest.suite.TestSuite: ...
-    @deprecated("Deprecated in Python 3.11; removal scheduled for Python 3.13")
-    def findTestCases(
-        module: ModuleType, prefix: str = "test", sortUsing: _SortComparisonMethod = ..., suiteClass: _SuiteClass = ...
-    ) -> unittest.suite.TestSuite: ...
+    if sys.version_info >= (3, 11):
+        @deprecated("Deprecated since Python 3.11; removed in Python 3.13.")
+        def getTestCaseNames(
+            testCaseClass: type[unittest.case.TestCase],
+            prefix: str,
+            sortUsing: _SortComparisonMethod = ...,
+            testNamePatterns: list[str] | None = None,
+        ) -> Sequence[str]: ...
+        @deprecated("Deprecated since Python 3.11; removed in Python 3.13.")
+        def makeSuite(
+            testCaseClass: type[unittest.case.TestCase],
+            prefix: str = "test",
+            sortUsing: _SortComparisonMethod = ...,
+            suiteClass: _SuiteClass = ...,
+        ) -> unittest.suite.TestSuite: ...
+        @deprecated("Deprecated since Python 3.11; removed in Python 3.13.")
+        def findTestCases(
+            module: ModuleType, prefix: str = "test", sortUsing: _SortComparisonMethod = ..., suiteClass: _SuiteClass = ...
+        ) -> unittest.suite.TestSuite: ...
+    else:
+        def getTestCaseNames(
+            testCaseClass: type[unittest.case.TestCase],
+            prefix: str,
+            sortUsing: _SortComparisonMethod = ...,
+            testNamePatterns: list[str] | None = None,
+        ) -> Sequence[str]: ...
+        def makeSuite(
+            testCaseClass: type[unittest.case.TestCase],
+            prefix: str = "test",
+            sortUsing: _SortComparisonMethod = ...,
+            suiteClass: _SuiteClass = ...,
+        ) -> unittest.suite.TestSuite: ...
+        def findTestCases(
+            module: ModuleType, prefix: str = "test", sortUsing: _SortComparisonMethod = ..., suiteClass: _SuiteClass = ...
+        ) -> unittest.suite.TestSuite: ...
