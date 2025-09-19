@@ -461,25 +461,8 @@ impl File {
 
     /// Returns `true` if the file is an `__init__.py(i)`
     pub fn is_init(self, db: &dyn Db) -> bool {
-        let (name, extension) = match self.path(db) {
-            FilePath::System(path) => (
-                path.file_stem(),
-                path.extension().and_then(PySourceType::try_from_extension),
-            ),
-            FilePath::Vendored(path) => (
-                path.file_stem(),
-                path.extension().and_then(PySourceType::try_from_extension),
-            ),
-            FilePath::SystemVirtual(path) => (
-                path.file_stem(),
-                path.extension().and_then(PySourceType::try_from_extension),
-            ),
-        };
-        name == Some("__init__")
-            && matches!(
-                extension,
-                Some(PySourceType::Python) | Some(PySourceType::Stub)
-            )
+        let path = self.path(db).as_str();
+        path.ends_with("__init__.py") || path.ends_with("__init__.pyi")
     }
 
     pub fn source_type(self, db: &dyn Db) -> PySourceType {
