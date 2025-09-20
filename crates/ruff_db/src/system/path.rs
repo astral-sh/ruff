@@ -504,8 +504,8 @@ impl ToOwned for SystemPath {
 pub struct SystemPathBuf(#[cfg_attr(feature = "schemars", schemars(with = "String"))] Utf8PathBuf);
 
 impl get_size2::GetSize for SystemPathBuf {
-    fn get_heap_size(&self) -> usize {
-        self.0.capacity()
+    fn get_heap_size_with_tracker<T: get_size2::GetSizeTracker>(&self, tracker: T) -> (usize, T) {
+        (self.0.capacity(), tracker)
     }
 }
 

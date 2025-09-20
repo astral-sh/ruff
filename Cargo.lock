@@ -1169,8 +1169,7 @@ dependencies = [
 [[package]]
 name = "get-size-derive2"
 version = "0.6.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b5a443e77201a230c25f0c11574e9b20e5705f749520e0f30ab0d0974fb1a794"
+source = "git+https://github.com/ibraheemdev/get-size2?rev=151290fa6feaa5c6dbf795f17d19a00b22f955e5#151290fa6feaa5c6dbf795f17d19a00b22f955e5"
 dependencies = [
  "attribute-derive",
  "quote",
@@ -1180,8 +1179,7 @@ dependencies = [
 [[package]]
 name = "get-size2"
 version = "0.6.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0594e2a78d082f2f8b1615c728391c6a5277f6c017474a7249934fc735945d55"
+source = "git+https://github.com/ibraheemdev/get-size2?rev=151290fa6feaa5c6dbf795f17d19a00b22f955e5#151290fa6feaa5c6dbf795f17d19a00b22f955e5"
 dependencies = [
  "compact_str",
  "get-size-derive2",
