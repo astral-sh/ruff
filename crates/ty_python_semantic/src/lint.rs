@@ -545,10 +545,12 @@ impl RuleSelection {
 // This is way too verbose.
 impl fmt::Debug for RuleSelection {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let lints = self.lints.iter().sorted_by_key(|(lint, _)| lint.name);
+
         if f.alternate() {
             let mut f = f.debug_map();
 
-            for (lint, (severity, source)) in self.lints.iter() {
+            for (lint, (severity, source)) in lints {
                 f.entry(
                     &lint.name().as_str(),
                     &format_args!("{severity:?} ({source:?})"),
@@ -559,7 +561,7 @@ impl fmt::Debug for RuleSelection {
         } else {
             let mut f = f.debug_set();
 
-            for lint in self.lints.keys() {
+            for (lint, _) in lints {
                 f.entry(&lint.name());
             }
 
