@@ -4858,7 +4858,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
         let scope = self.scope();
         let file_scope_id = scope.file_scope_id(db);
-        let current_file = self.file();
+
         'names: for name in names {
             // Walk up parent scopes looking for a possible enclosing scope that may have a
             // definition of this name visible to us. Note that we skip the scope containing the
@@ -4866,8 +4866,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             for (enclosing_scope_file_id, _) in self.index.ancestor_scopes(file_scope_id).skip(1) {
                 // Class scopes are not visible to nested scopes, and `nonlocal` cannot refer to
                 // globals, so check only function-like scopes.
-                let enclosing_scope_id = enclosing_scope_file_id.to_scope_id(db, current_file);
-                if !enclosing_scope_id.is_function_like(db) {
+                let enclosing_scope = self.index.scope(enclosing_scope_file_id);
+                if !enclosing_scope.kind().is_function_like() {
                     continue;
                 }
                 let enclosing_place_table = self.index.place_table(enclosing_scope_file_id);
@@ -6348,7 +6348,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let place = PlaceAndQualifiers::from(local_scope_place).or_fall_back_to(db, || {
-            let current_file = self.file();
             let mut symbol_resolves_locally = false;
             if let Some(symbol) = place_expr.as_symbol() {
                 if let Some(symbol_id) = place_table.symbol_id(symbol.name()) {
@@ -6414,7 +6413,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // check only function-like scopes.
                 // There is one exception to this rule: annotation scopes can see
                 // names defined in an immediately-enclosing class scope.
-                let enclosing_scope_id = enclosing_scope_file_id.to_scope_id(db, current_file);
+                let enclosing_scope = self.index.scope(enclosing_scope_file_id);
 
                 let is_immediately_enclosing_scope = scope.is_annotation(db)
                     && scope
@@ -6481,7 +6480,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
 
-                if !enclosing_scope_id.is_function_like(db) && !is_immediately_enclosing_scope {
+                if !enclosing_scope.kind().is_function_like() && !is_immediately_enclosing_scope {
                     continue;
                 }
 
@@ -6501,6 +6500,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if enclosing_place.as_symbol().is_some_and(Symbol::is_global) {
                     break;
                 }
+
+                let enclosing_scope_id = enclosing_scope_file_id.to_scope_id(db, self.file());
 
                 // If the name is declared or bound in this scope, figure out its type. This might
                 // resolve the name and end the walk. But if the name is declared `nonlocal` in
