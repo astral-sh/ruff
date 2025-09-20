@@ -331,7 +331,11 @@ pub(crate) fn imported_symbol<'db>(
 ) -> PlaceAndQualifiers<'db> {
     let requires_explicit_reexport = requires_explicit_reexport.unwrap_or_else(|| {
         if file.is_stub(db) {
-            RequiresExplicitReExport::Yes
+            if file.is_init(db) {
+                RequiresExplicitReExport::YesButInitIdiomAllowed
+            } else {
+                RequiresExplicitReExport::Yes
+            }
         } else {
             RequiresExplicitReExport::No
         }
@@ -932,7 +936,8 @@ fn place_from_bindings_impl<'db>(
     let mut bindings_with_constraints = bindings_with_constraints.peekable();
 
     let is_non_exported = |binding: Definition<'db>| {
-        requires_explicit_reexport.is_yes() && !is_reexported(db, binding)
+        requires_explicit_reexport.is_yes()
+            && !requires_explicit_reexport.is_satisfied(is_reexported(db, binding))
     };
 
     let unbound_reachability_constraint = match bindings_with_constraints.peek() {
@@ -1209,7 +1214,8 @@ fn place_from_declarations_impl<'db>(
     let mut exactly_one_declaration = false;
 
     let is_non_exported = |declaration: Definition<'db>| {
-        requires_explicit_reexport.is_yes() && !is_reexported(db, declaration)
+        requires_explicit_reexport.is_yes()
+            && !requires_explicit_reexport.is_satisfied(is_reexported(db, declaration))
     };
 
     let undeclared_reachability = match declarations.peek() {
@@ -1320,21 +1326,26 @@ fn place_from_declarations_impl<'db>(
 // This will first check if the definition is using the "redundant alias" pattern like `import foo
 // as foo` or `from foo import bar as bar`. If it's not, it will check whether the symbol is being
 // exported via `__all__`.
-fn is_reexported(db: &dyn Db, definition: Definition<'_>) -> bool {
+fn is_reexported(db: &dyn Db, definition: Definition<'_>) -> ReExportKind {
     // This information is computed by the semantic index builder.
-    if definition.is_reexported(db) {
-        return true;
+    let reexported = definition.is_reexported(db);
+    if reexported != ReExportKind::No {
+        return reexported;
     }
     // At this point, the definition should either be an `import` or `from ... import` statement.
     // This is because the default value of `is_reexported` is `true` for any other kind of
     // definition.
     let Some(all_names) = dunder_all_names(db, definition.file(db)) else {
-        return false;
+        return ReExportKind::No;
     };
     let table = place_table(db, definition.scope(db));
     let symbol_id = definition.place(db).expect_symbol();
     let symbol_name = table.symbol(symbol_id).name();
-    all_names.contains(symbol_name)
+    if all_names.contains(symbol_name) {
+        ReExportKind::Yes
+    } else {
+        ReExportKind::No
+    }
 }
 
 mod implicit_globals {
@@ -1500,13 +1511,35 @@ mod implicit_globals {
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum RequiresExplicitReExport {
-    Yes,
     No,
+    /// This is an `__init__.pyi` and `from . import b` is considered a re-export
+    YesButInitIdiomAllowed,
+    Yes,
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub enum ReExportKind {
+    No,
+    /// `b` in `from . import b`
+    InitIdiom,
+    Yes,
+}
+
+impl get_size2::GetSize for ReExportKind {}
+
 impl RequiresExplicitReExport {
+    /// Whether re-exports are necessary at all (this is really "is not No")
     const fn is_yes(self) -> bool {
-        matches!(self, RequiresExplicitReExport::Yes)
+        !matches!(self, RequiresExplicitReExport::No)
+    }
+
+    /// Whether the style of re-export is sufficient for the context
+    fn is_satisfied(self, reexport: ReExportKind) -> bool {
+        match self {
+            RequiresExplicitReExport::No => true,
+            RequiresExplicitReExport::YesButInitIdiomAllowed => reexport != ReExportKind::No,
+            RequiresExplicitReExport::Yes => reexport == ReExportKind::Yes,
+        }
     }
 }
 

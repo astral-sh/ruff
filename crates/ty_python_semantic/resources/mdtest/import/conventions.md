@@ -74,25 +74,52 @@ from typing import Any as Any, Literal as Literal
 
 Here, none of the symbols are being re-exported in the stub file.
 
+In this case the symbols shouldn't be available as imports or attributes.
+
 ```py
-# error: 15 [unresolved-import] "Module `b` has no member `foo`"
-# error: 20 [unresolved-import] "Module `b` has no member `Any`"
-# error: 25 [unresolved-import] "Module `b` has no member `Literal`"
-from b import foo, Any, Literal
+from a import b
+
+# error: [unresolved-attribute] "no attribute `Any`"
+reveal_type(b.Any)  # revealed: Unknown
+# error: [unresolved-attribute] "no attribute `Literal`"
+reveal_type(b.Literal)  # revealed: Unknown
+# error: [unresolved-attribute] "no attribute `foo`"
+reveal_type(b.foo)  # revealed: Unknown
+# error: [unresolved-attribute] "no attribute `bar`"
+reveal_type(b.bar)  # revealed: Unknown
+
+# error: [unresolved-import] "Module `a.b` has no member `foo`"
+# error: [unresolved-import] "Module `a.b` has no member `bar`"
+# error: [unresolved-import] "Module `a.b` has no member `Any`"
+# error: [unresolved-import] "Module `a.b` has no member `Literal`"
+from a.b import foo, bar, Any, Literal
 
 reveal_type(Any)  # revealed: Unknown
 reveal_type(Literal)  # revealed: Unknown
 reveal_type(foo)  # revealed: Unknown
+reveal_type(bar)  # revealed: Unknown
 ```
 
-`b.pyi`:
+`a/__init__.pyi`:
 
 ```pyi
-import foo
+```
+
+`a/b.pyi`:
+
+```pyi
+import a.foo
+from . import bar
 from typing import Any, Literal
 ```
 
-`foo.pyi`:
+`a/foo.pyi`:
+
+```pyi
+
+```
+
+`a/bar.pyi`:
 
 ```pyi
 
@@ -261,39 +288,93 @@ reveal_type(Foo)  # revealed: Unknown
 
 ## Re-exports in `__init__.pyi`
 
-Similarly, for an `__init__.pyi` (stub) file, importing a non-exported name should raise an error
-but the inference would be `Unknown`.
+Within `__init__.pyi` relative imports (`from . import xyz` or `from .pub import xyz`) are also
+treated as a re-exports.
+
+We check the both the members of the module and the imports of the module as you _should_ be able to
+do `from a import priv` but the attribute `a.priv` _should not_ exist.
+
+The most subtle detail here is whether `from .semipriv import Pub` should make the `a.semipriv`
+attribute exist or not. We do not currently do this, although perhaps we should.
 
 ```py
-# error: 15 "Module `a` has no member `Foo`"
-# error: 20 "Module `a` has no member `c`"
-from a import Foo, c, foo
+import a
 
-reveal_type(Foo)  # revealed: Unknown
-reveal_type(c)  # revealed: Unknown
-reveal_type(foo)  # revealed: <module 'a.foo'>
+reveal_type(a.Pub)  # revealed: <class 'Pub'>
+# error: [unresolved-attribute]
+reveal_type(a.Priv)  # revealed: Unknown
+reveal_type(a.pub)  # revealed: <module 'a.pub'>
+# error: [unresolved-attribute]
+reveal_type(a.priv)  # revealed: Unknown
+# error: [unresolved-attribute]
+reveal_type(a.semipriv)  # revealed: Unknown
+# error: [unresolved-attribute]
+reveal_type(a.sub)  # revealed: Unknown
+reveal_type(a.subpub)  # revealed: <module 'a.sub.subpub'>
+# error: [unresolved-attribute]
+reveal_type(a.subpriv)  # revealed: Unknown
+
+# error: [unresolved-import] "Priv"
+from a import Pub, Priv
+
+# error: [unresolved-import] "subpriv"
+from a import pub, priv, semipriv, sub, subpub, subpriv
+
+reveal_type(Pub)  # revealed: <class 'Pub'>
+reveal_type(Priv)  # revealed: Unknown
+reveal_type(pub)  # revealed: <module 'a.pub'>
+reveal_type(priv)  # revealed: <module 'a.priv'>
+reveal_type(semipriv)  # revealed: <module 'a.semipriv'>
+reveal_type(sub)  # revealed: <module 'a.sub'>
+reveal_type(subpub)  # revealed: <module 'a.sub.subpub'>
+reveal_type(subpriv)  # revealed: Unknown
 ```
 
 `a/__init__.pyi`:
 
 ```pyi
-from .b import c
-from .foo import Foo
+# re-exported because they're relative
+from .sub import subpub
+from .semipriv import Pub
+from . import pub
+
+# not re-exported because they're absolute
+from a.sub import subpriv
+from a.semipriv import Priv
+from a import priv
 ```
 
-`a/foo.pyi`:
+`a/pub.pyi`:
 
 ```pyi
-class Foo: ...
 ```
 
-`a/b/__init__.pyi`:
+`a/priv.pyi`:
+
+```pyi
+```
+
+`a/semipriv.pyi`:
+
+```pyi
+class Pub: ...
+
+class Priv: ...
+```
+
+`a/sub/__init__.pyi`:
 
 ```pyi
 
 ```
 
-`a/b/c.pyi`:
+`a/sub/subpub.pyi`:
+
+```pyi
+
+```
+
+`a/sub/subpriv.pyi`:
 
 ```pyi
 
