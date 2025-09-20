@@ -26,11 +26,6 @@ pub struct ScopeId<'db> {
 impl get_size2::GetSize for ScopeId<'_> {}
 
 impl<'db> ScopeId<'db> {
-    #[expect(unused)]
-    pub(crate) fn is_function_like(self, db: &'db dyn Db) -> bool {
-        self.node(db).scope_kind().is_function_like()
-    }
-
     pub(crate) fn is_annotation(self, db: &'db dyn Db) -> bool {
         self.node(db).scope_kind().is_annotation()
     }
