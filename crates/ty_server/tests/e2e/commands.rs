@@ -37,7 +37,17 @@ return 42
 
     let response = execute_command(&mut server, "ty.printDebugInformation".to_string(), vec![])?;
 
-    insta::assert_debug_snapshot!(response);
+    if let Some(response) = response {
+        let pretty_output = serde_json::to_string_pretty(&response).unwrap();
+        let pretty_output = pretty_output.replace("\\n", "\n");
+        insta::with_settings!({filters =>vec![
+            (r"\b[0-9]+.[0-9]+MB\b","[X.XXMB]"),
+            (r"Workspace .+\)","Workspace XXX"),
+            (r"Project at .+","Project at XXX"),
+            (r"(?s)--Settings(.*?)--","--Settings: XXX--"),
+        ]},{
+        insta::assert_snapshot!(pretty_output);});
+    }
 
     Ok(())
 }

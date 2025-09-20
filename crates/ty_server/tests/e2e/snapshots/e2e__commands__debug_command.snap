@@ -1,8 +1,60 @@
 ---
 source: crates/ty_server/tests/e2e/commands.rs
-assertion_line: 40
-expression: response
+assertion_line: 49
+expression: pretty_output
 ---
-Some(
-    String("=======SALSA STRUCTS=======\n`Program`                                          metadata=0.00MB   fields=0.02MB   count=1\n`Project`                                          metadata=0.00MB   fields=0.00MB   count=1\n`FileRoot`                                         metadata=0.00MB   fields=0.00MB   count=1\n=======SALSA QUERIES=======\n=======SALSA SUMMARY=======/nTOTAL MEMORY USAGE: 0.02MB\n    struct metadata = 0.00MB\n    struct fields = 0.02MB\n    memo metadata = 0.00MB\n    memo fields = 0.00MB\n\n"),
+"Client capabilities: ResolvedClientCapabilities(
+    WORKSPACE_CONFIGURATION,
 )
+
+
+Position encoding: UTF16
+
+
+Global settings: GlobalSettings {
+    diagnostic_mode: OpenFilesOnly,
+    experimental: ExperimentalSettings {
+        rename: false,
+        auto_import: false,
+    },
+}
+
+
+Open text documents: 0
+
+
+Workspace XXX
+Settings:
+
+WorkspaceSettings {
+    disable_language_services: false,
+    inlay_hints: InlayHintSettings {
+        variable_types: true,
+        call_argument_names: true,
+    },
+    overrides: None,
+}
+
+
+Project at XXX
+
+
+--Settings: XXX--
+
+
+Memory report:
+=======SALSA STRUCTS=======
+`Program`                                          metadata=[X.XXMB]   fields=[X.XXMB]   count=1
+`Project`                                          metadata=[X.XXMB]   fields=[X.XXMB]   count=1
+`FileRoot`                                         metadata=[X.XXMB]   fields=[X.XXMB]   count=1
+=======SALSA QUERIES=======
+=======SALSA SUMMARY=======
+TOTAL MEMORY USAGE: [X.XXMB]
+    struct metadata = [X.XXMB]
+    struct fields = [X.XXMB]
+    memo metadata = [X.XXMB]
+    memo fields = [X.XXMB]
+
+
+
+"
