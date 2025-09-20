@@ -3694,6 +3694,7 @@ pub enum KnownClass {
     ParamSpec,
     ParamSpecArgs,
     ParamSpecKwargs,
+    ProtocolMeta,
     TypeVarTuple,
     TypeAliasType,
     NoDefaultType,
@@ -3821,6 +3822,7 @@ impl KnownClass {
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
             | Self::ConstraintSet
+            | Self::ProtocolMeta
             | Self::TypedDictFallback => Some(Truthiness::Ambiguous),
 
             Self::Tuple => None,
@@ -3903,6 +3905,7 @@ impl KnownClass {
             | KnownClass::ConstraintSet
             | KnownClass::TypedDictFallback
             | KnownClass::BuiltinFunctionType
+            | KnownClass::ProtocolMeta
             | KnownClass::Template => false,
         }
     }
@@ -3982,6 +3985,7 @@ impl KnownClass {
             | KnownClass::ConstraintSet
             | KnownClass::TypedDictFallback
             | KnownClass::BuiltinFunctionType
+            | KnownClass::ProtocolMeta
             | KnownClass::Template => false,
         }
     }
@@ -4060,6 +4064,7 @@ impl KnownClass {
             | KnownClass::NamedTupleFallback
             | KnownClass::ConstraintSet
             | KnownClass::BuiltinFunctionType
+            | KnownClass::ProtocolMeta
             | KnownClass::Template => false,
         }
     }
@@ -4151,6 +4156,7 @@ impl KnownClass {
             | Self::ConstraintSet
             | Self::TypedDictFallback
             | Self::BuiltinFunctionType
+            | Self::ProtocolMeta
             | Self::Template => false,
         }
     }
@@ -4250,6 +4256,7 @@ impl KnownClass {
             Self::ConstraintSet => "ConstraintSet",
             Self::TypedDictFallback => "TypedDictFallback",
             Self::Template => "Template",
+            Self::ProtocolMeta => "_ProtocolMeta",
         }
     }
 
@@ -4477,6 +4484,7 @@ impl KnownClass {
             | Self::StdlibAlias
             | Self::Iterable
             | Self::Iterator
+            | Self::ProtocolMeta
             | Self::SupportsIndex => KnownModule::Typing,
             Self::TypeAliasType
             | Self::TypeVarTuple
@@ -4596,6 +4604,7 @@ impl KnownClass {
             | Self::ConstraintSet
             | Self::TypedDictFallback
             | Self::BuiltinFunctionType
+            | Self::ProtocolMeta
             | Self::Template => Some(false),
 
             Self::Tuple => None,
@@ -4680,6 +4689,7 @@ impl KnownClass {
             | Self::ConstraintSet
             | Self::TypedDictFallback
             | Self::BuiltinFunctionType
+            | Self::ProtocolMeta
             | Self::Template => false,
         }
     }
@@ -4773,6 +4783,7 @@ impl KnownClass {
             "ConstraintSet" => Self::ConstraintSet,
             "TypedDictFallback" => Self::TypedDictFallback,
             "Template" => Self::Template,
+            "_ProtocolMeta" => Self::ProtocolMeta,
             _ => return None,
         };
 
@@ -4855,9 +4866,9 @@ impl KnownClass {
             | Self::TypeVarTuple
             | Self::Iterable
             | Self::Iterator
+            | Self::ProtocolMeta
             | Self::NewType => matches!(module, KnownModule::Typing | KnownModule::TypingExtensions),
             Self::Deprecated => matches!(module, KnownModule::Warnings | KnownModule::TypingExtensions),
-
         }
     }
 

@@ -160,8 +160,12 @@ impl SpecialFormType {
             | Self::Bottom
             | Self::Intersection
             | Self::CallableTypeOf
-            | Self::Protocol  // actually `_ProtocolMeta` at runtime but this is what typeshed says
             | Self::ReadOnly => KnownClass::SpecialForm,
+
+            // Typeshed says it's an instance of `_SpecialForm`,
+            // but then we wouldn't recognise things like `issubclass(`X, Protocol)`
+            // as being valid.
+            Self::Protocol => KnownClass::ProtocolMeta,
 
             Self::Generic | Self::Any => KnownClass::Type,
 

@@ -264,9 +264,21 @@ def f(
 # fmt: on
 ```
 
-Nonetheless, `Protocol` can still be used as the second argument to `issubclass()` at runtime:
+Nonetheless, `Protocol` is an instance of `type` at runtime, and therefore can still be used as the
+second argument to `issubclass()` at runtime:
 
 ```py
+import abc
+import typing
+from ty_extensions import TypeOf
+
+reveal_type(type(Protocol))  # revealed: <class '_ProtocolMeta'>
+# revealed: tuple[<class '_ProtocolMeta'>, <class 'ABCMeta'>, <class 'type'>, <class 'object'>]
+reveal_type(type(Protocol).__mro__)
+static_assert(is_subtype_of(TypeOf[Protocol], type))
+static_assert(is_subtype_of(TypeOf[Protocol], abc.ABCMeta))
+static_assert(is_subtype_of(TypeOf[Protocol], typing._ProtocolMeta))
+
 # Could also be `Literal[True]`, but `bool` is fine:
 reveal_type(issubclass(MyProtocol, Protocol))  # revealed: bool
 ```
