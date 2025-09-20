@@ -304,7 +304,9 @@ impl Options {
         // as they should be checked before site-packages just like python
         // interpreter does
         if let Ok(python_path) = system.env_var(EnvVars::PYTHONPATH) {
-            for path in python_path.split(':') {
+            const SEP: &str = if cfg!(windows) { ";" } else { ":" };
+
+            for path in python_path.split(SEP) {
                 let possible_path = SystemPath::absolute(path, system.current_directory());
 
                 if system.is_directory(&possible_path) {
