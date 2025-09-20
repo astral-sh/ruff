@@ -2482,6 +2482,319 @@ requires-python = ">= 3.11"
 /// └── test.py
 /// ```
 #[test]
+fn requires_python_no_tool_preview_enabled() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let project_dir = dunce::canonicalize(tempdir.path())?;
+    let ruff_toml = tempdir.path().join("pyproject.toml");
+    fs::write(
+        &ruff_toml,
+        r#"[project]
+requires-python = ">= 3.11"
+"#,
+    )?;
+
+    let testpy = tempdir.path().join("test.py");
+    fs::write(
+        &testpy,
+        r#"from typing import Union;foo: Union[int, str] = 1"#,
+    )?;
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&project_dir).as_str(), "[TMP]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--preview")
+            .arg("--show-settings")
+            .args(["--select","UP007"])
+            .arg("test.py")
+            .arg("-")
+            .current_dir(project_dir)
+            , @r#"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        Resolved settings for: "[TMP]/test.py"
+
+        # General Settings
+        cache_dir = "[TMP]/.ruff_cache"
+        fix = false
+        fix_only = false
+        output_format = concise
+        show_fixes = false
+        unsafe_fixes = hint
+
+        # File Resolver Settings
+        file_resolver.exclude = [
+        	".bzr",
+        	".direnv",
+        	".eggs",
+        	".git",
+        	".git-rewrite",
+        	".hg",
+        	".ipynb_checkpoints",
+        	".mypy_cache",
+        	".nox",
+        	".pants.d",
+        	".pyenv",
+        	".pytest_cache",
+        	".pytype",
+        	".ruff_cache",
+        	".svn",
+        	".tox",
+        	".venv",
+        	".vscode",
+        	"__pypackages__",
+        	"_build",
+        	"buck-out",
+        	"dist",
+        	"node_modules",
+        	"site-packages",
+        	"venv",
+        ]
+        file_resolver.extend_exclude = []
+        file_resolver.force_exclude = false
+        file_resolver.include = [
+        	"*.py",
+        	"*.pyi",
+        	"*.pyw",
+        	"*.ipynb",
+        	"**/pyproject.toml",
+        ]
+        file_resolver.extend_include = []
+        file_resolver.respect_gitignore = true
+        file_resolver.project_root = "[TMP]/"
+
+        # Linter Settings
+        linter.exclude = []
+        linter.project_root = "[TMP]/"
+        linter.rules.enabled = [
+        	non-pep604-annotation-union (UP007),
+        ]
+        linter.rules.should_fix = [
+        	non-pep604-annotation-union (UP007),
+        ]
+        linter.per_file_ignores = {}
+        linter.safety_table.forced_safe = []
+        linter.safety_table.forced_unsafe = []
+        linter.unresolved_target_version = 3.11
+        linter.per_file_target_version = {}
+        linter.preview = enabled
+        linter.explicit_preview_rules = false
+        linter.extension = ExtensionMapping({})
+        linter.allowed_confusables = []
+        linter.builtins = []
+        linter.dummy_variable_rgx = ^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$
+        linter.external = []
+        linter.ignore_init_module_imports = true
+        linter.logger_objects = []
+        linter.namespace_packages = []
+        linter.src = [
+        	"[TMP]/",
+        	"[TMP]/src",
+        ]
+        linter.tab_size = 4
+        linter.line_length = 88
+        linter.task_tags = [
+        	TODO,
+        	FIXME,
+        	XXX,
+        ]
+        linter.typing_modules = []
+        linter.typing_extensions = true
+
+        # Linter Plugins
+        linter.flake8_annotations.mypy_init_return = false
+        linter.flake8_annotations.suppress_dummy_args = false
+        linter.flake8_annotations.suppress_none_returning = false
+        linter.flake8_annotations.allow_star_arg_any = false
+        linter.flake8_annotations.ignore_fully_untyped = false
+        linter.flake8_bandit.hardcoded_tmp_directory = [
+        	/tmp,
+        	/var/tmp,
+        	/dev/shm,
+        ]
+        linter.flake8_bandit.check_typed_exception = false
+        linter.flake8_bandit.extend_markup_names = []
+        linter.flake8_bandit.allowed_markup_calls = []
+        linter.flake8_bugbear.extend_immutable_calls = []
+        linter.flake8_builtins.allowed_modules = []
+        linter.flake8_builtins.ignorelist = []
+        linter.flake8_builtins.strict_checking = false
+        linter.flake8_comprehensions.allow_dict_calls_with_keyword_arguments = false
+        linter.flake8_copyright.notice_rgx = (?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}((-|,\s)\d{4})*
+        linter.flake8_copyright.author = none
+        linter.flake8_copyright.min_file_size = 0
+        linter.flake8_errmsg.max_string_length = 0
+        linter.flake8_gettext.functions_names = [
+        	_,
+        	gettext,
+        	ngettext,
+        ]
+        linter.flake8_implicit_str_concat.allow_multiline = true
+        linter.flake8_import_conventions.aliases = {
+        	altair = alt,
+        	holoviews = hv,
+        	matplotlib = mpl,
+        	matplotlib.pyplot = plt,
+        	networkx = nx,
+        	numpy = np,
+        	numpy.typing = npt,
+        	pandas = pd,
+        	panel = pn,
+        	plotly.express = px,
+        	polars = pl,
+        	pyarrow = pa,
+        	seaborn = sns,
+        	tensorflow = tf,
+        	tkinter = tk,
+        	xml.etree.ElementTree = ET,
+        }
+        linter.flake8_import_conventions.banned_aliases = {}
+        linter.flake8_import_conventions.banned_from = []
+        linter.flake8_pytest_style.fixture_parentheses = false
+        linter.flake8_pytest_style.parametrize_names_type = tuple
+        linter.flake8_pytest_style.parametrize_values_type = list
+        linter.flake8_pytest_style.parametrize_values_row_type = tuple
+        linter.flake8_pytest_style.raises_require_match_for = [
+        	BaseException,
+        	Exception,
+        	ValueError,
+        	OSError,
+        	IOError,
+        	EnvironmentError,
+        	socket.error,
+        ]
+        linter.flake8_pytest_style.raises_extend_require_match_for = []
+        linter.flake8_pytest_style.mark_parentheses = false
+        linter.flake8_quotes.inline_quotes = double
+        linter.flake8_quotes.multiline_quotes = double
+        linter.flake8_quotes.docstring_quotes = double
+        linter.flake8_quotes.avoid_escape = true
+        linter.flake8_self.ignore_names = [
+        	_make,
+        	_asdict,
+        	_replace,
+        	_fields,
+        	_field_defaults,
+        	_name_,
+        	_value_,
+        ]
+        linter.flake8_tidy_imports.ban_relative_imports = "parents"
+        linter.flake8_tidy_imports.banned_api = {}
+        linter.flake8_tidy_imports.banned_module_level_imports = []
+        linter.flake8_type_checking.strict = false
+        linter.flake8_type_checking.exempt_modules = [
+        	typing,
+        	typing_extensions,
+        ]
+        linter.flake8_type_checking.runtime_required_base_classes = []
+        linter.flake8_type_checking.runtime_required_decorators = []
+        linter.flake8_type_checking.quote_annotations = false
+        linter.flake8_unused_arguments.ignore_variadic_names = false
+        linter.isort.required_imports = []
+        linter.isort.combine_as_imports = false
+        linter.isort.force_single_line = false
+        linter.isort.force_sort_within_sections = false
+        linter.isort.detect_same_package = true
+        linter.isort.case_sensitive = false
+        linter.isort.force_wrap_aliases = false
+        linter.isort.force_to_top = []
+        linter.isort.known_modules = {}
+        linter.isort.order_by_type = true
+        linter.isort.relative_imports_order = furthest_to_closest
+        linter.isort.single_line_exclusions = []
+        linter.isort.split_on_trailing_comma = true
+        linter.isort.classes = []
+        linter.isort.constants = []
+        linter.isort.variables = []
+        linter.isort.no_lines_before = []
+        linter.isort.lines_after_imports = -1
+        linter.isort.lines_between_types = 0
+        linter.isort.forced_separate = []
+        linter.isort.section_order = [
+        	known { type = future },
+        	known { type = standard_library },
+        	known { type = third_party },
+        	known { type = first_party },
+        	known { type = local_folder },
+        ]
+        linter.isort.default_section = known { type = third_party }
+        linter.isort.no_sections = false
+        linter.isort.from_first = false
+        linter.isort.length_sort = false
+        linter.isort.length_sort_straight = false
+        linter.mccabe.max_complexity = 10
+        linter.pep8_naming.ignore_names = [
+        	setUp,
+        	tearDown,
+        	setUpClass,
+        	tearDownClass,
+        	setUpModule,
+        	tearDownModule,
+        	asyncSetUp,
+        	asyncTearDown,
+        	setUpTestData,
+        	failureException,
+        	longMessage,
+        	maxDiff,
+        ]
+        linter.pep8_naming.classmethod_decorators = []
+        linter.pep8_naming.staticmethod_decorators = []
+        linter.pycodestyle.max_line_length = 88
+        linter.pycodestyle.max_doc_length = none
+        linter.pycodestyle.ignore_overlong_task_comments = false
+        linter.pyflakes.extend_generics = []
+        linter.pyflakes.allowed_unused_imports = []
+        linter.pylint.allow_magic_value_types = [
+        	str,
+        	bytes,
+        ]
+        linter.pylint.allow_dunder_method_names = []
+        linter.pylint.max_args = 5
+        linter.pylint.max_positional_args = 5
+        linter.pylint.max_returns = 6
+        linter.pylint.max_bool_expr = 5
+        linter.pylint.max_branches = 12
+        linter.pylint.max_statements = 50
+        linter.pylint.max_public_methods = 20
+        linter.pylint.max_locals = 15
+        linter.pyupgrade.keep_runtime_typing = false
+        linter.ruff.parenthesize_tuple_in_subscript = false
+
+        # Formatter Settings
+        formatter.exclude = []
+        formatter.unresolved_target_version = 3.11
+        formatter.per_file_target_version = {}
+        formatter.preview = enabled
+        formatter.line_width = 88
+        formatter.line_ending = auto
+        formatter.indent_style = space
+        formatter.indent_width = 4
+        formatter.quote_style = double
+        formatter.magic_trailing_comma = respect
+        formatter.docstring_code_format = disabled
+        formatter.docstring_code_line_width = dynamic
+
+        # Analyze Settings
+        analyze.exclude = []
+        analyze.preview = enabled
+        analyze.target_version = 3.11
+        analyze.string_imports = disabled
+        analyze.extension = ExtensionMapping({})
+        analyze.include_dependencies = {}
+
+        ----- stderr -----
+        "#);
+    });
+    Ok(())
+}
+
+/// ```
+/// tmp
+/// ├── pyproject.toml #<--- no `[tool.ruff]`
+/// └── test.py
+/// ```
+#[test]
 fn requires_python_no_tool_target_version_override() -> Result<()> {
     let tempdir = TempDir::new()?;
     let project_dir = dunce::canonicalize(tempdir.path())?;
@@ -6041,6 +6354,203 @@ fn rule_panic_mixed_results_full() -> Result<()> {
     https://github.com/astral-sh/ruff/issues/new?title=%5BLinter%20panic%5D
 
     ...with the relevant file contents, the `pyproject.toml` settings, and the stack trace above, we'd be very appreciative!
+    ");
+    });
+    Ok(())
+}
+
+/// Test that the same rule fires across all supported extensions, but not on unsupported files
+#[test]
+fn supported_file_extensions() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let inner_dir = tempdir.path().join("src");
+    fs::create_dir(&inner_dir)?;
+
+    // Create files of various types
+    // text file
+    fs::write(inner_dir.join("thing.txt"), b"hello world\n")?;
+    // regular python
+    fs::write(
+        inner_dir.join("thing.py"),
+        b"import os\nprint('hello world')\n",
+    )?;
+    // python typestub
+    fs::write(
+        inner_dir.join("thing.pyi"),
+        b"import os\nclass foo:\n  ...\n",
+    )?;
+    // windows gui
+    fs::write(
+        inner_dir.join("thing.pyw"),
+        b"import os\nprint('hello world')\n",
+    )?;
+    // cython
+    fs::write(
+        inner_dir.join("thing.pyx"),
+        b"import os\ncdef int add(int a, int b):\n  return a + b\n",
+    )?;
+    // notebook
+    fs::write(
+        inner_dir.join("thing.ipynb"),
+        r#"
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "ad6f36d9-4b7d-4562-8d00-f15a0f1fbb6d",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import os"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3 (ipykernel)",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.12.0"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![
+            (tempdir_filter(&tempdir).as_str(), "[TMP]/"),
+            (r"\\", r"/"),
+        ]
+    }, {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args(["check", "--select", "F401", "--output-format=concise", "--no-cache"])
+            .args([inner_dir]),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    [TMP]/src/thing.ipynb:cell 1:1:8: F401 [*] `os` imported but unused
+    [TMP]/src/thing.py:1:8: F401 [*] `os` imported but unused
+    [TMP]/src/thing.pyi:1:8: F401 [*] `os` imported but unused
+    Found 3 errors.
+    [*] 3 fixable with the `--fix` option.
+
+    ----- stderr -----
+    ");
+    });
+    Ok(())
+}
+
+/// Test that the same rule fires across all supported extensions, but not on unsupported files
+#[test]
+fn supported_file_extensions_preview_enabled() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let inner_dir = tempdir.path().join("src");
+    fs::create_dir(&inner_dir)?;
+
+    // Create files of various types
+    // text file
+    fs::write(inner_dir.join("thing.txt"), b"hello world\n")?;
+    // regular python
+    fs::write(
+        inner_dir.join("thing.py"),
+        b"import os\nprint('hello world')\n",
+    )?;
+    // python typestub
+    fs::write(
+        inner_dir.join("thing.pyi"),
+        b"import os\nclass foo:\n  ...\n",
+    )?;
+    // windows gui
+    fs::write(
+        inner_dir.join("thing.pyw"),
+        b"import os\nprint('hello world')\n",
+    )?;
+    // cython
+    fs::write(
+        inner_dir.join("thing.pyx"),
+        b"import os\ncdef int add(int a, int b):\n  return a + b\n",
+    )?;
+    // notebook
+    fs::write(
+        inner_dir.join("thing.ipynb"),
+        r#"
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "ad6f36d9-4b7d-4562-8d00-f15a0f1fbb6d",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import os"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3 (ipykernel)",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.12.0"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![
+            (tempdir_filter(&tempdir).as_str(), "[TMP]/"),
+            (r"\\", r"/"),
+        ]
+    }, {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args(["check", "--select", "F401", "--preview", "--output-format=concise", "--no-cache"])
+            .args([inner_dir]),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    [TMP]/src/thing.ipynb:cell 1:1:8: F401 [*] `os` imported but unused
+    [TMP]/src/thing.py:1:8: F401 [*] `os` imported but unused
+    [TMP]/src/thing.pyi:1:8: F401 [*] `os` imported but unused
+    [TMP]/src/thing.pyw:1:8: F401 [*] `os` imported but unused
+    Found 4 errors.
+    [*] 4 fixable with the `--fix` option.
+
+    ----- stderr -----
     ");
     });
     Ok(())
