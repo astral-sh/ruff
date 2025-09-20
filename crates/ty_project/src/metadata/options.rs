@@ -34,6 +34,7 @@ use ty_python_semantic::{
     PythonVersionSource, PythonVersionWithSource, SearchPathSettings, SearchPathValidationError,
     SearchPaths, SitePackagesPaths, SysPrefixPathOrigin,
 };
+use ty_static::EnvVars;
 
 #[derive(
     Debug,
@@ -302,7 +303,7 @@ impl Options {
         // they exist as a directory, and add them to the vec of extra_paths
         // as they should be checked before site-packages just like python
         // interpreter does
-        if let Ok(python_path) = system.env_var("PYTHONPATH") {
+        if let Ok(python_path) = system.env_var(EnvVars::PYTHONPATH) {
             for path in python_path.split(':') {
                 let possible_path = SystemPath::absolute(path, system.current_directory());
 

@@ -4291,6 +4291,7 @@ dependencies = [
  "tracing",
  "ty_combine",
  "ty_python_semantic",
+ "ty_static",
  "ty_vendored",
 ]
 
