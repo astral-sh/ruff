@@ -1901,6 +1901,10 @@ fn pythonpath_is_respected() -> anyhow::Result<()> {
       |        ^^^
     3 | print(f"{baz.it}")
       |
+    info: Searched in the following paths during module resolution:
+    info:   1. <temp_dir>/ (first-party code)
+    info:   2. <temp_dir>/src (first-party code)
+    info:   3. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
 
