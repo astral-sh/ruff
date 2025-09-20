@@ -463,7 +463,7 @@ impl From<&'static LintMetadata> for LintEntry {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, get_size2::GetSize)]
+#[derive(Clone, Default, PartialEq, Eq, get_size2::GetSize)]
 pub struct RuleSelection {
     /// Map with the severity for each enabled lint rule.
     ///
@@ -538,6 +538,33 @@ impl RuleSelection {
     /// Disables `lint` if it was previously enabled.
     pub fn disable(&mut self, lint: LintId) {
         self.lints.remove(&lint);
+    }
+}
+
+// The default `LintId` debug implementation prints the entire lint metadata.
+// This is way too verbose.
+impl fmt::Debug for RuleSelection {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        if f.alternate() {
+            let mut f = f.debug_map();
+
+            for (lint, (severity, source)) in self.lints.iter() {
+                f.entry(
+                    &lint.name().as_str(),
+                    &format_args!("{severity:?} ({source:?})"),
+                );
+            }
+
+            f.finish()
+        } else {
+            let mut f = f.debug_set();
+
+            for lint in self.lints.keys() {
+                f.entry(&lint.name());
+            }
+
+            f.finish()
+        }
     }
 }
 

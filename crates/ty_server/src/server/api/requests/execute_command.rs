@@ -26,12 +26,11 @@ impl SyncRequestHandler for ExecuteCommand {
         let command = SupportedCommand::from_str(&params.command)
             .with_failure_code(ErrorCode::InvalidParams)?;
 
-        if command == SupportedCommand::Debug {
-            return Ok(Some(serde_json::Value::String(
+        match command {
+            SupportedCommand::Debug => Ok(Some(serde_json::Value::String(
                 debug_information(session).with_failure_code(ErrorCode::InternalError)?,
-            )));
+            ))),
         }
-        Ok(None)
     }
 }
 
@@ -44,39 +43,34 @@ fn debug_information(session: &Session) -> crate::Result<String> {
         "Client capabilities: {:#?}",
         session.client_capabilities()
     )?;
-    writeln!(buffer, "\n")?;
     writeln!(
         buffer,
         "Position encoding: {:#?}",
         session.position_encoding()
     )?;
-    writeln!(buffer, "\n")?;
     writeln!(buffer, "Global settings: {:#?}", session.global_settings())?;
-    writeln!(buffer, "\n")?;
     writeln!(
         buffer,
         "Open text documents: {}",
         session.text_document_keys().count()
     )?;
-    writeln!(buffer, "\n")?;
+    writeln!(buffer, "")?;
 
     for (root, workspace) in session.workspaces() {
         writeln!(buffer, "Workspace {root} ({})", workspace.url())?;
-        writeln!(buffer, "Settings:\n\n{:#?}", workspace.settings())?;
-        writeln!(buffer, "\n")?;
+        writeln!(buffer, "Settings: {:#?}", workspace.settings())?;
+        writeln!(buffer, "")?;
     }
 
     for db in session.project_dbs() {
         writeln!(buffer, "Project at {}", db.project().root(db))?;
-        writeln!(buffer, "\n")?;
-        writeln!(buffer, "--Settings:\n{:#?}--", db.project().settings(db))?;
-        writeln!(buffer, "\n")?;
+        writeln!(buffer, "Settings: {:#?}", db.project().settings(db))?;
+        writeln!(buffer, "")?;
         writeln!(
             buffer,
             "Memory report:\n{}",
             db.salsa_memory_dump().display_full()
         )?;
-        writeln!(buffer, "\n")?;
     }
     Ok(buffer)
 }
