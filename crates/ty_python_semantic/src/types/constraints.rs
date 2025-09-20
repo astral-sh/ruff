@@ -751,10 +751,14 @@ enum SatisfiedConstraint<'db> {
 }
 
 impl SatisfiedConstraint<'_> {
-    fn flip(self) -> Self {
+    fn flip(&mut self) {
         match self {
-            SatisfiedConstraint::Positive(constraint) => SatisfiedConstraint::Negative(constraint),
-            SatisfiedConstraint::Negative(constraint) => SatisfiedConstraint::Positive(constraint),
+            SatisfiedConstraint::Positive(constraint) => {
+                *self = SatisfiedConstraint::Negative(*constraint);
+            }
+            SatisfiedConstraint::Negative(constraint) => {
+                *self = SatisfiedConstraint::Positive(*constraint);
+            }
         }
     }
 }
@@ -772,11 +776,6 @@ impl<'db> SatisfiedClause<'db> {
         }
     }
 
-    fn remove(&mut self, to_remove: SatisfiedConstraint<'db>) {
-        self.constraints
-            .retain(|constraint| *constraint != to_remove);
-    }
-
     fn push(&mut self, constraint: SatisfiedConstraint<'db>) {
         self.constraints.push(constraint);
     }
@@ -785,6 +784,22 @@ impl<'db> SatisfiedClause<'db> {
         self.constraints
             .pop()
             .expect("clause vector should not be empty");
+    }
+
+    fn with_flipped_last_constraint(&mut self, f: impl for<'a> FnOnce(&'a Self)) {
+        if self.constraints.is_empty() {
+            return;
+        }
+        let last_index = self.constraints.len() - 1;
+        self.constraints[last_index].flip();
+        f(self);
+        self.constraints[last_index].flip();
+    }
+
+    fn remove_prefix(&mut self, prefix: &SatisfiedClause<'db>) {
+        if self.constraints.starts_with(&prefix.constraints) {
+            self.constraints.drain(0..prefix.constraints.len());
+        }
     }
 
     fn render(&self, db: &'db dyn Db, result: &mut String) {
@@ -823,18 +838,17 @@ impl<'db> SatisfiedClauses<'db> {
     fn simplify(&mut self) {
         let mut existing_clauses = std::mem::take(&mut self.clauses);
         self.clauses.reserve_exact(existing_clauses.len());
-        while let Some((i, constraint)) = (existing_clauses.iter().enumerate())
-            .find_map(|(i, clause)| clause.to_singleton().map(|constraint| (i, constraint)))
+        while let Some((i, _)) =
+            (existing_clauses.iter().enumerate()).min_by_key(|(_, clause)| clause.constraints.len())
         {
-            let clause = existing_clauses.swap_remove(i);
+            let mut clause = existing_clauses.swap_remove(i);
+            clause.with_flipped_last_constraint(|clause| {
+                for other_clause in &mut existing_clauses {
+                    other_clause.remove_prefix(&clause);
+                }
+            });
             self.clauses.push(clause);
-
-            let redundant_constraint = constraint.flip();
-            for other_clause in &mut existing_clauses {
-                other_clause.remove(redundant_constraint);
-            }
         }
-        self.clauses.extend(existing_clauses);
     }
 
     fn render(&self, db: &'db dyn Db) -> String {
