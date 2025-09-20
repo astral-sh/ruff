@@ -54,18 +54,18 @@ fn debug_information(session: &Session) -> crate::Result<String> {
         "Open text documents: {}",
         session.text_document_keys().count()
     )?;
-    writeln!(buffer, "")?;
+    writeln!(buffer)?;
 
     for (root, workspace) in session.workspaces() {
         writeln!(buffer, "Workspace {root} ({})", workspace.url())?;
         writeln!(buffer, "Settings: {:#?}", workspace.settings())?;
-        writeln!(buffer, "")?;
+        writeln!(buffer)?;
     }
 
     for db in session.project_dbs() {
         writeln!(buffer, "Project at {}", db.project().root(db))?;
         writeln!(buffer, "Settings: {:#?}", db.project().settings(db))?;
-        writeln!(buffer, "")?;
+        writeln!(buffer)?;
         writeln!(
             buffer,
             "Memory report:\n{}",
