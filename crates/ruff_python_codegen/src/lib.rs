@@ -1,6 +1,6 @@
 pub use generator::Generator;
 use ruff_python_parser::{ParseError, parse_module};
-pub use stylist::Stylist;
+pub use stylist::{Indentation, Stylist};
 
 mod generator;
 mod stylist;

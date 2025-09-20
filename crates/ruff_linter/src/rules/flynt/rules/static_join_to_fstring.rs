@@ -2,7 +2,7 @@ use ast::FStringFlags;
 use itertools::Itertools;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Arguments, Expr};
+use ruff_python_ast::{self as ast, Arguments, Expr, StringFlags};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -72,26 +72,44 @@ fn is_static_length(elts: &[Expr]) -> bool {
 fn build_fstring(joiner: &str, joinees: &[Expr], flags: FStringFlags) -> Option<Expr> {
     // If all elements are string constants, join them into a single string.
     if joinees.iter().all(Expr::is_string_literal_expr) {
-        let mut flags = None;
-        let node = ast::StringLiteral {
-            value: joinees
-                .iter()
-                .filter_map(|expr| {
-                    if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = expr {
-                        if flags.is_none() {
-                            // take the flags from the first Expr
-                            flags = Some(value.first_literal_flags());
-                        }
-                        Some(value.to_str())
-                    } else {
-                        None
+        let mut flags: Option<ast::StringLiteralFlags> = None;
+        let content = joinees
+            .iter()
+            .filter_map(|expr| {
+                if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = expr {
+                    if flags.is_none() {
+                        // Take the flags from the first Expr
+                        flags = Some(value.first_literal_flags());
                     }
-                })
-                .join(joiner)
-                .into_boxed_str(),
-            flags: flags?,
+                    Some(value.to_str())
+                } else {
+                    None
+                }
+            })
+            .join(joiner);
+
+        let mut flags = flags?;
+
+        // If the result is a raw string and contains a newline, use triple quotes.
+        if flags.prefix().is_raw() && content.contains(['\n', '\r']) {
+            flags = flags.with_triple_quotes(ruff_python_ast::str::TripleQuotes::Yes);
+
+            // Prefer a delimiter that doesn't occur in the content; if both occur, bail.
+            if content.contains(flags.quote_str()) {
+                flags = flags.with_quote_style(flags.quote_style().opposite());
+                if content.contains(flags.quote_str()) {
+                    // Both "'''" and "\"\"\"" are present in content; avoid emitting
+                    // an invalid raw triple-quoted literal (or escaping). Bail on the fix.
+                    return None;
+                }
+            }
+        }
+
+        let node = ast::StringLiteral {
+            value: content.into_boxed_str(),
+            flags,
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         };
         return Some(node.into());
     }
@@ -114,7 +132,7 @@ fn build_fstring(joiner: &str, joinees: &[Expr], flags: FStringFlags) -> Option<
     let node = ast::FString {
         elements: f_string_elements.into(),
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         flags,
     };
     Some(node.into())

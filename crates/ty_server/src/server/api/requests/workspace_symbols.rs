@@ -29,7 +29,13 @@ impl BackgroundRequestHandler for WorkspaceSymbolRequestHandler {
         // Iterate through all projects in the session
         for db in snapshot.projects() {
             // Get workspace symbols matching the query
+            let start = std::time::Instant::now();
             let workspace_symbol_infos = workspace_symbols(db, query);
+            tracing::debug!(
+                "Found {len} workspace symbols in {elapsed:?}",
+                len = workspace_symbol_infos.len(),
+                elapsed = std::time::Instant::now().duration_since(start)
+            );
 
             // Convert to LSP SymbolInformation
             for workspace_symbol_info in workspace_symbol_infos {

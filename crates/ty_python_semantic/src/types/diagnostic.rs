@@ -6,11 +6,11 @@ use super::{
     add_inferred_python_version_hint_to_diagnostic,
 };
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
-use crate::semantic_index::SemanticIndex;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::place::{PlaceTable, ScopedPlaceId};
 use crate::suppression::FileSuppressionId;
-use crate::types::class::{Field, SolidBase, SolidBaseKind};
+use crate::types::call::CallError;
+use crate::types::class::{DisjointBase, DisjointBaseKind, Field};
 use crate::types::function::KnownFunction;
 use crate::types::string_annotation::{
     BYTE_STRING_TYPE_ANNOTATION, ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION, FSTRING_TYPE_ANNOTATION,
@@ -18,13 +18,16 @@ use crate::types::string_annotation::{
     RAW_STRING_TYPE_ANNOTATION,
 };
 use crate::types::{
-    DynamicType, LintDiagnosticGuard, Protocol, ProtocolInstanceType, SubclassOfInner, binding_type,
+    ClassType, DynamicType, LintDiagnosticGuard, Protocol, ProtocolInstanceType, SubclassOfInner,
+    binding_type,
 };
-use crate::types::{SpecialFormType, Type, protocol_class::ProtocolClassLiteral};
+use crate::types::{SpecialFormType, Type, protocol_class::ProtocolClass};
 use crate::util::diagnostics::format_enumeration;
-use crate::{Db, FxIndexMap, FxOrderMap, Module, ModuleName, Program, declare_lint};
+use crate::{
+    Db, DisplaySettings, FxIndexMap, FxOrderMap, Module, ModuleName, Program, declare_lint,
+};
 use itertools::Itertools;
-use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
+use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange};
@@ -96,6 +99,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_ATTRIBUTE_ACCESS);
     registry.register_lint(&REDUNDANT_CAST);
     registry.register_lint(&UNRESOLVED_GLOBAL);
+    registry.register_lint(&MISSING_TYPED_DICT_KEY);
 
     // String annotations
     registry.register_lint(&BYTE_STRING_TYPE_ANNOTATION);
@@ -404,7 +408,7 @@ declare_lint! {
     ///
     /// ## Known problems
     /// Classes that have "dynamic" definitions of `__slots__` (definitions do not consist
-    /// of string literals, or tuples of string literals) are not currently considered solid
+    /// of string literals, or tuples of string literals) are not currently considered disjoint
     /// bases by ty.
     ///
     /// Additionally, this check is not exhaustive: many C extensions (including several in
@@ -1758,6 +1762,33 @@ declare_lint! {
     }
 }
 
+declare_lint! {
+    /// ## What it does
+    /// Detects missing required keys in `TypedDict` constructor calls.
+    ///
+    /// ## Why is this bad?
+    /// `TypedDict` requires all non-optional keys to be provided during construction.
+    /// Missing items can lead to a `KeyError` at runtime.
+    ///
+    /// ## Example
+    /// ```python
+    /// from typing import TypedDict
+    ///
+    /// class Person(TypedDict):
+    ///     name: str
+    ///     age: int
+    ///
+    /// alice: Person = {"name": "Alice"}  # missing required key 'age'
+    ///
+    /// alice["age"]  # KeyError
+    /// ```
+    pub(crate) static MISSING_TYPED_DICT_KEY = {
+        summary: "detects missing required keys in `TypedDict` constructors",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
 /// A collection of type check diagnostics.
 #[derive(Default, Eq, PartialEq, get_size2::GetSize)]
 pub struct TypeCheckDiagnostics {
@@ -1915,14 +1946,17 @@ pub(super) fn report_invalid_assignment(
     target_ty: Type,
     source_ty: Type,
 ) {
+    let settings =
+        DisplaySettings::from_possibly_ambiguous_type_pair(context.db(), target_ty, source_ty);
+
     report_invalid_assignment_with_message(
         context,
         node,
         target_ty,
         format_args!(
             "Object of type `{}` is not assignable to `{}`",
-            source_ty.display(context.db()),
-            target_ty.display(context.db()),
+            source_ty.display_with(context.db(), settings),
+            target_ty.display_with(context.db(), settings)
         ),
     );
 }
@@ -1946,6 +1980,45 @@ pub(super) fn report_invalid_attribute_assignment(
     );
 }
 
+pub(super) fn report_bad_dunder_set_call<'db>(
+    context: &InferContext<'db, '_>,
+    dunder_set_failure: &CallError<'db>,
+    attribute: &str,
+    object_type: Type<'db>,
+    target: &ast::ExprAttribute,
+) {
+    let Some(builder) = context.report_lint(&INVALID_ASSIGNMENT, target) else {
+        return;
+    };
+    let db = context.db();
+    if let Some(property) = dunder_set_failure.as_attempt_to_set_property_with_no_setter() {
+        let object_type = object_type.display(db);
+        let mut diagnostic = builder.into_diagnostic(format_args!(
+            "Cannot assign to read-only property `{attribute}` on object of type `{object_type}`",
+        ));
+        if let Some(file_range) = property
+            .getter(db)
+            .and_then(|getter| getter.definition(db))
+            .and_then(|definition| definition.focus_range(db))
+        {
+            diagnostic.annotate(Annotation::secondary(Span::from(file_range)).message(
+                format_args!("Property `{object_type}.{attribute}` defined here with no setter"),
+            ));
+            diagnostic.set_primary_message(format_args!(
+                "Attempted assignment to `{object_type}.{attribute}` here"
+            ));
+        }
+    } else {
+        // TODO: Here, it would be nice to emit an additional diagnostic
+        // that explains why the call failed
+        builder.into_diagnostic(format_args!(
+            "Invalid assignment to data descriptor attribute \
+            `{attribute}` on type `{}` with custom `__set__` method",
+            object_type.display(db)
+        ));
+    }
+}
+
 pub(super) fn report_invalid_return_type(
     context: &InferContext,
     object_range: impl Ranged,
@@ -1957,18 +2030,20 @@ pub(super) fn report_invalid_return_type(
         return;
     };
 
+    let settings =
+        DisplaySettings::from_possibly_ambiguous_type_pair(context.db(), expected_ty, actual_ty);
     let return_type_span = context.span(return_type_range);
 
     let mut diag = builder.into_diagnostic("Return type does not match returned value");
     diag.set_primary_message(format_args!(
         "expected `{expected_ty}`, found `{actual_ty}`",
-        expected_ty = expected_ty.display(context.db()),
-        actual_ty = actual_ty.display(context.db()),
+        expected_ty = expected_ty.display_with(context.db(), settings),
+        actual_ty = actual_ty.display_with(context.db(), settings),
     ));
     diag.annotate(
         Annotation::secondary(return_type_span).message(format_args!(
             "Expected `{expected_ty}` because of return type",
-            expected_ty = expected_ty.display(context.db()),
+            expected_ty = expected_ty.display_with(context.db(), settings),
         )),
     );
 }
@@ -2013,7 +2088,7 @@ pub(super) fn report_implicit_return_type(
     range: impl Ranged,
     expected_ty: Type,
     has_empty_body: bool,
-    enclosing_class_of_method: Option<ClassLiteral>,
+    enclosing_class_of_method: Option<ClassType>,
     no_return: bool,
 ) {
     let Some(builder) = context.report_lint(&INVALID_RETURN_TYPE, range) else {
@@ -2047,7 +2122,7 @@ pub(super) fn report_implicit_return_type(
     let Some(class) = enclosing_class_of_method else {
         return;
     };
-    if class.iter_mro(db, None).contains(&ClassBase::Protocol) {
+    if class.iter_mro(db).contains(&ClassBase::Protocol) {
         diagnostic.info(format_args!(
             "Class `{}` has `typing.Protocol` in its MRO, but it is not a protocol class",
             class.name(db)
@@ -2142,9 +2217,9 @@ pub(crate) fn report_instance_layout_conflict(
     context: &InferContext,
     class: ClassLiteral,
     node: &ast::StmtClassDef,
-    solid_bases: &IncompatibleBases,
+    disjoint_bases: &IncompatibleBases,
 ) {
-    debug_assert!(solid_bases.len() > 1);
+    debug_assert!(disjoint_bases.len() > 1);
 
     let db = context.db();
 
@@ -2158,7 +2233,7 @@ pub(crate) fn report_instance_layout_conflict(
 
     diagnostic.set_primary_message(format_args!(
         "Bases {} cannot be combined in multiple inheritance",
-        solid_bases.describe_problematic_class_bases(db)
+        disjoint_bases.describe_problematic_class_bases(db)
     ));
 
     let mut subdiagnostic = SubDiagnostic::new(
@@ -2167,23 +2242,23 @@ pub(crate) fn report_instance_layout_conflict(
         have incompatible memory layouts",
     );
 
-    for (solid_base, solid_base_info) in solid_bases {
+    for (disjoint_base, disjoint_base_info) in disjoint_bases {
         let IncompatibleBaseInfo {
             node_index,
             originating_base,
-        } = solid_base_info;
+        } = disjoint_base_info;
 
         let span = context.span(&node.bases()[*node_index]);
         let mut annotation = Annotation::secondary(span.clone());
-        if solid_base.class == *originating_base {
-            match solid_base.kind {
-                SolidBaseKind::DefinesSlots => {
+        if disjoint_base.class == *originating_base {
+            match disjoint_base.kind {
+                DisjointBaseKind::DefinesSlots => {
                     annotation = annotation.message(format_args!(
                         "`{base}` instances have a distinct memory layout because `{base}` defines non-empty `__slots__`",
                         base = originating_base.name(db)
                     ));
                 }
-                SolidBaseKind::HardCoded => {
+                DisjointBaseKind::DisjointBaseDecorator => {
                     annotation = annotation.message(format_args!(
                         "`{base}` instances have a distinct memory layout because of the way `{base}` \
                         is implemented in a C extension",
@@ -2195,26 +2270,28 @@ pub(crate) fn report_instance_layout_conflict(
         } else {
             annotation = annotation.message(format_args!(
                 "`{base}` instances have a distinct memory layout \
-                because `{base}` inherits from `{solid_base}`",
+                because `{base}` inherits from `{disjoint_base}`",
                 base = originating_base.name(db),
-                solid_base = solid_base.class.name(db)
+                disjoint_base = disjoint_base.class.name(db)
             ));
             subdiagnostic.annotate(annotation);
 
             let mut additional_annotation = Annotation::secondary(span);
 
-            additional_annotation = match solid_base.kind {
-                SolidBaseKind::DefinesSlots => additional_annotation.message(format_args!(
-                    "`{solid_base}` instances have a distinct memory layout because `{solid_base}` \
+            additional_annotation = match disjoint_base.kind {
+                DisjointBaseKind::DefinesSlots => additional_annotation.message(format_args!(
+                    "`{disjoint_base}` instances have a distinct memory layout because `{disjoint_base}` \
                         defines non-empty `__slots__`",
-                    solid_base = solid_base.class.name(db),
+                    disjoint_base = disjoint_base.class.name(db),
                 )),
 
-                SolidBaseKind::HardCoded => additional_annotation.message(format_args!(
-                    "`{solid_base}` instances have a distinct memory layout \
-                        because of the way `{solid_base}` is implemented in a C extension",
-                    solid_base = solid_base.class.name(db),
-                )),
+                DisjointBaseKind::DisjointBaseDecorator => {
+                    additional_annotation.message(format_args!(
+                        "`{disjoint_base}` instances have a distinct memory layout \
+                        because of the way `{disjoint_base}` is implemented in a C extension",
+                        disjoint_base = disjoint_base.class.name(db),
+                    ))
+                }
             };
 
             subdiagnostic.annotate(additional_annotation);
@@ -2224,20 +2301,20 @@ pub(crate) fn report_instance_layout_conflict(
     diagnostic.sub(subdiagnostic);
 }
 
-/// Information regarding the conflicting solid bases a class is inferred to have in its MRO.
+/// Information regarding the conflicting disjoint bases a class is inferred to have in its MRO.
 ///
-/// For each solid base, we record information about which element in the class's bases list
-/// caused the solid base to be included in the class's MRO.
+/// For each disjoint base, we record information about which element in the class's bases list
+/// caused the disjoint base to be included in the class's MRO.
 ///
-/// The inner data is an `IndexMap` to ensure that diagnostics regarding conflicting solid bases
+/// The inner data is an `IndexMap` to ensure that diagnostics regarding conflicting disjoint bases
 /// are reported in a stable order.
 #[derive(Debug, Default)]
-pub(super) struct IncompatibleBases<'db>(FxIndexMap<SolidBase<'db>, IncompatibleBaseInfo<'db>>);
+pub(super) struct IncompatibleBases<'db>(FxIndexMap<DisjointBase<'db>, IncompatibleBaseInfo<'db>>);
 
 impl<'db> IncompatibleBases<'db> {
     pub(super) fn insert(
         &mut self,
-        base: SolidBase<'db>,
+        base: DisjointBase<'db>,
         node_index: usize,
         class: ClassLiteral<'db>,
     ) {
@@ -2259,19 +2336,19 @@ impl<'db> IncompatibleBases<'db> {
         self.0.len()
     }
 
-    /// Two solid bases are allowed to coexist in an MRO if one is a subclass of the other.
+    /// Two disjoint bases are allowed to coexist in an MRO if one is a subclass of the other.
     /// This method therefore removes any entry in `self` that is a subclass of one or more
     /// other entries also contained in `self`.
     pub(super) fn remove_redundant_entries(&mut self, db: &'db dyn Db) {
         self.0 = self
             .0
             .iter()
-            .filter(|(solid_base, _)| {
+            .filter(|(disjoint_base, _)| {
                 self.0
                     .keys()
-                    .filter(|other_base| other_base != solid_base)
+                    .filter(|other_base| other_base != disjoint_base)
                     .all(|other_base| {
-                        !solid_base.class.is_subclass_of(
+                        !disjoint_base.class.is_subclass_of(
                             db,
                             None,
                             other_base.class.default_specialization(db),
@@ -2284,25 +2361,25 @@ impl<'db> IncompatibleBases<'db> {
 }
 
 impl<'a, 'db> IntoIterator for &'a IncompatibleBases<'db> {
-    type Item = (&'a SolidBase<'db>, &'a IncompatibleBaseInfo<'db>);
-    type IntoIter = indexmap::map::Iter<'a, SolidBase<'db>, IncompatibleBaseInfo<'db>>;
+    type Item = (&'a DisjointBase<'db>, &'a IncompatibleBaseInfo<'db>);
+    type IntoIter = indexmap::map::Iter<'a, DisjointBase<'db>, IncompatibleBaseInfo<'db>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.iter()
     }
 }
 
-/// Information about which class base the "solid base" stems from
+/// Information about which class base the "disjoint base" stems from
 #[derive(Debug, Copy, Clone)]
 pub(super) struct IncompatibleBaseInfo<'db> {
     /// The index of the problematic base in the [`ast::StmtClassDef`]'s bases list.
     node_index: usize,
 
     /// The base class in the [`ast::StmtClassDef`]'s bases list that caused
-    /// the solid base to be included in the class's MRO.
+    /// the disjoint base to be included in the class's MRO.
     ///
-    /// This won't necessarily be the same class as the `SolidBase`'s class,
-    /// as the `SolidBase` may have found its way into the class's MRO by dint of it being a
+    /// This won't necessarily be the same class as the `DisjointBase`'s class,
+    /// as the `DisjointBase` may have found its way into the class's MRO by dint of it being a
     /// superclass of one of the classes in the class definition's bases list.
     originating_base: ClassLiteral<'db>,
 }
@@ -2437,7 +2514,7 @@ pub(crate) fn add_type_expression_reference_link<'db, 'ctx>(
 pub(crate) fn report_runtime_check_against_non_runtime_checkable_protocol(
     context: &InferContext,
     call: &ast::ExprCall,
-    protocol: ProtocolClassLiteral,
+    protocol: ProtocolClass,
     function: KnownFunction,
 ) {
     let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, call) else {
@@ -2474,7 +2551,7 @@ pub(crate) fn report_runtime_check_against_non_runtime_checkable_protocol(
 pub(crate) fn report_attempted_protocol_instantiation(
     context: &InferContext,
     call: &ast::ExprCall,
-    protocol: ProtocolClassLiteral,
+    protocol: ProtocolClass,
 ) {
     let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, call) else {
         return;
@@ -2499,7 +2576,7 @@ pub(crate) fn report_attempted_protocol_instantiation(
 pub(crate) fn report_undeclared_protocol_member(
     context: &InferContext,
     definition: Definition,
-    protocol_class: ProtocolClassLiteral,
+    protocol_class: ProtocolClass,
     class_symbol_table: &PlaceTable,
 ) {
     /// We want to avoid suggesting an annotation for e.g. `x = None`,
@@ -2549,7 +2626,7 @@ pub(crate) fn report_undeclared_protocol_member(
         let binding_type = binding_type(db, definition);
 
         let suggestion = binding_type
-            .literal_fallback_instance(db)
+            .literal_promotion_type(db)
             .unwrap_or(binding_type);
 
         if should_give_hint(db, suggestion) {
@@ -2761,18 +2838,18 @@ fn report_invalid_base<'ctx, 'db>(
 
 pub(crate) fn report_invalid_key_on_typed_dict<'db>(
     context: &InferContext<'db, '_>,
-    value_node: AnyNodeRef,
-    slice_node: AnyNodeRef,
-    value_ty: Type<'db>,
-    slice_ty: Type<'db>,
+    typed_dict_node: AnyNodeRef,
+    key_node: AnyNodeRef,
+    typed_dict_ty: Type<'db>,
+    key_ty: Type<'db>,
     items: &FxOrderMap<Name, Field<'db>>,
 ) {
     let db = context.db();
-    if let Some(builder) = context.report_lint(&INVALID_KEY, slice_node) {
-        match slice_ty {
+    if let Some(builder) = context.report_lint(&INVALID_KEY, key_node) {
+        match key_ty {
             Type::StringLiteral(key) => {
                 let key = key.value(db);
-                let typed_dict_name = value_ty.display(db);
+                let typed_dict_name = typed_dict_ty.display(db);
 
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "Invalid key access on TypedDict `{typed_dict_name}`",
@@ -2780,7 +2857,7 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
 
                 diagnostic.annotate(
                     context
-                        .secondary(value_node)
+                        .secondary(typed_dict_node)
                         .message(format_args!("TypedDict `{typed_dict_name}`")),
                 );
 
@@ -2799,8 +2876,8 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
             }
             _ => builder.into_diagnostic(format_args!(
                 "TypedDict `{}` cannot be indexed with a key of type `{}`",
-                value_ty.display(db),
-                slice_ty.display(db),
+                typed_dict_ty.display(db),
+                key_ty.display(db),
             )),
         };
     }
@@ -2809,16 +2886,13 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
 pub(super) fn report_namedtuple_field_without_default_after_field_with_default<'db>(
     context: &InferContext<'db, '_>,
     class: ClassLiteral<'db>,
-    index: &'db SemanticIndex<'db>,
-    field_name: &str,
-    field_with_default: &str,
+    (field, field_def): &(Name, Option<Definition<'db>>),
+    (field_with_default, field_with_default_def): &(Name, Option<Definition<'db>>),
 ) {
     let db = context.db();
     let module = context.module();
 
-    let diagnostic_range = class
-        .first_declaration_of_name(db, field_name, index)
-        .and_then(|definition| definition.declaration.definition())
+    let diagnostic_range = field_def
         .map(|definition| definition.kind(db).full_range(module))
         .unwrap_or_else(|| class.header_range(db));
 
@@ -2830,13 +2904,11 @@ pub(super) fn report_namedtuple_field_without_default_after_field_with_default<'
     ));
 
     diagnostic.set_primary_message(format_args!(
-        "Field `{field_name}` defined here without a default value"
+        "Field `{field}` defined here without a default value",
     ));
 
-    let Some(field_with_default_range) = class
-        .first_binding_of_name(db, field_with_default, index)
-        .and_then(|definition| definition.binding.definition())
-        .map(|definition| definition.kind(db).full_range(module))
+    let Some(field_with_default_range) =
+        field_with_default_def.map(|definition| definition.kind(db).full_range(module))
     else {
         return;
     };
@@ -2855,7 +2927,37 @@ pub(super) fn report_namedtuple_field_without_default_after_field_with_default<'
         );
     } else {
         diagnostic.info(format_args!(
-            "Earlier field `{field_with_default}` was defined with a default value"
+            "Earlier field `{field_with_default}` was defined with a default value",
+        ));
+    }
+}
+
+pub(crate) fn report_missing_typed_dict_key<'db>(
+    context: &InferContext<'db, '_>,
+    constructor_node: AnyNodeRef,
+    typed_dict_ty: Type<'db>,
+    missing_field: &str,
+) {
+    let db = context.db();
+    if let Some(builder) = context.report_lint(&MISSING_TYPED_DICT_KEY, constructor_node) {
+        let typed_dict_name = typed_dict_ty.display(db);
+        builder.into_diagnostic(format_args!(
+            "Missing required key '{missing_field}' in TypedDict `{typed_dict_name}` constructor",
+        ));
+    }
+}
+
+pub(crate) fn report_cannot_pop_required_field_on_typed_dict<'db>(
+    context: &InferContext<'db, '_>,
+    key_node: AnyNodeRef,
+    typed_dict_ty: Type<'db>,
+    field_name: &str,
+) {
+    let db = context.db();
+    if let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, key_node) {
+        let typed_dict_name = typed_dict_ty.display(db);
+        builder.into_diagnostic(format_args!(
+            "Cannot pop required field '{field_name}' from TypedDict `{typed_dict_name}`",
         ));
     }
 }

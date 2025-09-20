@@ -213,9 +213,8 @@ reveal_type(d)  # revealed: Literal[2]
 
 ```py
 a, b = [1, 2]
-# TODO: should be `int` for both `a` and `b`
-reveal_type(a)  # revealed: Unknown
-reveal_type(b)  # revealed: Unknown
+reveal_type(a)  # revealed: Unknown | int
+reveal_type(b)  # revealed: Unknown | int
 ```
 
 ### Simple unpacking
@@ -523,8 +522,8 @@ def f(x: MixedTupleSubclass):
 
 ```py
 a, b = "ab"
-reveal_type(a)  # revealed: LiteralString
-reveal_type(b)  # revealed: LiteralString
+reveal_type(a)  # revealed: Literal["a"]
+reveal_type(b)  # revealed: Literal["b"]
 ```
 
 ### Uneven unpacking (1)
@@ -570,37 +569,37 @@ reveal_type(d)  # revealed: Unknown
 
 ```py
 (a, *b, c) = "ab"
-reveal_type(a)  # revealed: LiteralString
+reveal_type(a)  # revealed: Literal["a"]
 reveal_type(b)  # revealed: list[Never]
-reveal_type(c)  # revealed: LiteralString
+reveal_type(c)  # revealed: Literal["b"]
 ```
 
 ### Starred expression (3)
 
 ```py
 (a, *b, c) = "abc"
-reveal_type(a)  # revealed: LiteralString
-reveal_type(b)  # revealed: list[LiteralString]
-reveal_type(c)  # revealed: LiteralString
+reveal_type(a)  # revealed: Literal["a"]
+reveal_type(b)  # revealed: list[Literal["b"]]
+reveal_type(c)  # revealed: Literal["c"]
 ```
 
 ### Starred expression (4)
 
 ```py
 (a, *b, c, d) = "abcdef"
-reveal_type(a)  # revealed: LiteralString
-reveal_type(b)  # revealed: list[LiteralString]
-reveal_type(c)  # revealed: LiteralString
-reveal_type(d)  # revealed: LiteralString
+reveal_type(a)  # revealed: Literal["a"]
+reveal_type(b)  # revealed: list[Literal["b", "c", "d"]]
+reveal_type(c)  # revealed: Literal["e"]
+reveal_type(d)  # revealed: Literal["f"]
 ```
 
 ### Starred expression (5)
 
 ```py
 (a, b, *c) = "abcd"
-reveal_type(a)  # revealed: LiteralString
-reveal_type(b)  # revealed: LiteralString
-reveal_type(c)  # revealed: list[LiteralString]
+reveal_type(a)  # revealed: Literal["a"]
+reveal_type(b)  # revealed: Literal["b"]
+reveal_type(c)  # revealed: list[Literal["c", "d"]]
 ```
 
 ### Starred expression (6)
@@ -650,8 +649,114 @@ reveal_type(b)  # revealed: Unknown
 ```py
 (a, b) = "\ud800\udfff"
 
+reveal_type(a)  # revealed: Literal["�"]
+reveal_type(b)  # revealed: Literal["�"]
+```
+
+### Very long literal
+
+```py
+string = "very long stringgggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg"
+
+a, *b = string
 reveal_type(a)  # revealed: LiteralString
-reveal_type(b)  # revealed: LiteralString
+reveal_type(b)  # revealed: list[LiteralString]
+```
+
+## Bytes
+
+### Simple unpacking
+
+```py
+a, b = b"ab"
+reveal_type(a)  # revealed: Literal[97]
+reveal_type(b)  # revealed: Literal[98]
+```
+
+### Uneven unpacking (1)
+
+```py
+# error: [invalid-assignment] "Not enough values to unpack: Expected 3"
+a, b, c = b"ab"
+reveal_type(a)  # revealed: Unknown
+reveal_type(b)  # revealed: Unknown
+reveal_type(c)  # revealed: Unknown
+```
+
+### Uneven unpacking (2)
+
+```py
+# error: [invalid-assignment] "Too many values to unpack: Expected 2"
+a, b = b"abc"
+reveal_type(a)  # revealed: Unknown
+reveal_type(b)  # revealed: Unknown
+```
+
+### Starred expression (1)
+
+```py
+# error: [invalid-assignment] "Not enough values to unpack: Expected at least 3"
+(a, *b, c, d) = b"ab"
+reveal_type(a)  # revealed: Unknown
+reveal_type(b)  # revealed: list[Unknown]
+reveal_type(c)  # revealed: Unknown
+reveal_type(d)  # revealed: Unknown
+```
+
+```py
+# error: [invalid-assignment] "Not enough values to unpack: Expected at least 3"
+(a, b, *c, d) = b"a"
+reveal_type(a)  # revealed: Unknown
+reveal_type(b)  # revealed: Unknown
+reveal_type(c)  # revealed: list[Unknown]
+reveal_type(d)  # revealed: Unknown
+```
+
+### Starred expression (2)
+
+```py
+(a, *b, c) = b"ab"
+reveal_type(a)  # revealed: Literal[97]
+reveal_type(b)  # revealed: list[Never]
+reveal_type(c)  # revealed: Literal[98]
+```
+
+### Starred expression (3)
+
+```py
+(a, *b, c) = b"abc"
+reveal_type(a)  # revealed: Literal[97]
+reveal_type(b)  # revealed: list[Literal[98]]
+reveal_type(c)  # revealed: Literal[99]
+```
+
+### Starred expression (4)
+
+```py
+(a, *b, c, d) = b"abcdef"
+reveal_type(a)  # revealed: Literal[97]
+reveal_type(b)  # revealed: list[Literal[98, 99, 100]]
+reveal_type(c)  # revealed: Literal[101]
+reveal_type(d)  # revealed: Literal[102]
+```
+
+### Starred expression (5)
+
+```py
+(a, b, *c) = b"abcd"
+reveal_type(a)  # revealed: Literal[97]
+reveal_type(b)  # revealed: Literal[98]
+reveal_type(c)  # revealed: list[Literal[99, 100]]
+```
+
+### Very long literal
+
+```py
+too_long = b"very long bytes stringggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg"
+
+a, *b = too_long
+reveal_type(a)  # revealed: int
+reveal_type(b)  # revealed: list[int]
 ```
 
 ## Union
@@ -714,7 +819,7 @@ def _(arg: tuple[int, tuple[str, bytes]] | tuple[tuple[int, bytes], Literal["ab"
     a, (b, c) = arg
     reveal_type(a)  # revealed: int | tuple[int, bytes]
     reveal_type(b)  # revealed: str
-    reveal_type(c)  # revealed: bytes | LiteralString
+    reveal_type(c)  # revealed: bytes | Literal["b"]
 ```
 
 ### Starred expression
@@ -785,8 +890,8 @@ from typing import Literal
 
 def _(arg: tuple[int, int] | Literal["ab"]):
     a, b = arg
-    reveal_type(a)  # revealed: int | LiteralString
-    reveal_type(b)  # revealed: int | LiteralString
+    reveal_type(a)  # revealed: int | Literal["a"]
+    reveal_type(b)  # revealed: int | Literal["b"]
 ```
 
 ### Custom iterator (1)

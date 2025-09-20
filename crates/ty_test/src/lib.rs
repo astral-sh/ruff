@@ -78,7 +78,7 @@ pub fn run(
             println!("\n{}\n", test.name().bold().underline());
         }
 
-        if let Err(failures) = run_test(&mut db, relative_fixture_path, snapshot_path, &test) {
+        if let Err(failures) = failures {
             let md_index = LineIndex::from_source_text(&source);
 
             for test_failures in failures {
@@ -105,7 +105,7 @@ pub fn run(
                 }
             }
         }
-        if let Err(inconsistencies) = run_module_resolution_consistency_test(&db) {
+        if let Err(inconsistencies) = inconsistencies {
             any_failures = true;
             for inconsistency in inconsistencies {
                 match output_format {
@@ -241,7 +241,9 @@ fn run_test(
 
             db.write_file(&full_path, &embedded.code).unwrap();
 
-            if !(full_path.starts_with(&src_path) && matches!(embedded.lang, "py" | "pyi")) {
+            if !(full_path.starts_with(&src_path)
+                && matches!(embedded.lang, "py" | "python" | "pyi"))
+            {
                 // These files need to be written to the file system (above), but we don't run any checks on them.
                 return None;
             }

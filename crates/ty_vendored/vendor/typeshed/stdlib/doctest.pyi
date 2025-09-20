@@ -42,7 +42,7 @@ import types
 import unittest
 from _typeshed import ExcInfo
 from collections.abc import Callable
-from typing import Any, NamedTuple, type_check_only
+from typing import Any, Final, NamedTuple, type_check_only
 from typing_extensions import Self, TypeAlias
 
 __all__ = [
@@ -98,29 +98,29 @@ else:
         failed: int
         attempted: int
 
-OPTIONFLAGS_BY_NAME: dict[str, int]
+OPTIONFLAGS_BY_NAME: Final[dict[str, int]]
 
 def register_optionflag(name: str) -> int: ...
 
-DONT_ACCEPT_TRUE_FOR_1: int
-DONT_ACCEPT_BLANKLINE: int
-NORMALIZE_WHITESPACE: int
-ELLIPSIS: int
-SKIP: int
-IGNORE_EXCEPTION_DETAIL: int
+DONT_ACCEPT_TRUE_FOR_1: Final = 1
+DONT_ACCEPT_BLANKLINE: Final = 2
+NORMALIZE_WHITESPACE: Final = 4
+ELLIPSIS: Final = 8
+SKIP: Final = 16
+IGNORE_EXCEPTION_DETAIL: Final = 32
 
-COMPARISON_FLAGS: int
+COMPARISON_FLAGS: Final = 63
 
-REPORT_UDIFF: int
-REPORT_CDIFF: int
-REPORT_NDIFF: int
-REPORT_ONLY_FIRST_FAILURE: int
-FAIL_FAST: int
+REPORT_UDIFF: Final = 64
+REPORT_CDIFF: Final = 128
+REPORT_NDIFF: Final = 256
+REPORT_ONLY_FIRST_FAILURE: Final = 512
+FAIL_FAST: Final = 1024
 
-REPORTING_FLAGS: int
+REPORTING_FLAGS: Final = 1984
 
-BLANKLINE_MARKER: str
-ELLIPSIS_MARKER: str
+BLANKLINE_MARKER: Final = "<BLANKLINE>"
+ELLIPSIS_MARKER: Final = "..."
 
 class Example:
     """

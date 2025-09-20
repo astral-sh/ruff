@@ -76,9 +76,9 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::BoundMethod(_), _) => Ordering::Less,
         (_, Type::BoundMethod(_)) => Ordering::Greater,
 
-        (Type::MethodWrapper(left), Type::MethodWrapper(right)) => left.cmp(right),
-        (Type::MethodWrapper(_), _) => Ordering::Less,
-        (_, Type::MethodWrapper(_)) => Ordering::Greater,
+        (Type::KnownBoundMethod(left), Type::KnownBoundMethod(right)) => left.cmp(right),
+        (Type::KnownBoundMethod(_), _) => Ordering::Less,
+        (_, Type::KnownBoundMethod(_)) => Ordering::Greater,
 
         (Type::WrapperDescriptor(left), Type::WrapperDescriptor(right)) => left.cmp(right),
         (Type::WrapperDescriptor(_), _) => Ordering::Less,
@@ -212,6 +212,12 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::TypeAlias(_), _) => Ordering::Less,
         (_, Type::TypeAlias(_)) => Ordering::Greater,
 
+        (Type::TypedDict(left), Type::TypedDict(right)) => {
+            left.defining_class().cmp(&right.defining_class())
+        }
+        (Type::TypedDict(_), _) => Ordering::Less,
+        (_, Type::TypedDict(_)) => Ordering::Greater,
+
         (Type::Union(_), _) | (_, Type::Union(_)) => {
             unreachable!("our type representation does not permit nested unions");
         }
@@ -243,12 +249,6 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
 
             unreachable!("Two equal, normalized intersections should share the same Salsa ID")
         }
-
-        (Type::TypedDict(left), Type::TypedDict(right)) => {
-            left.defining_class.cmp(&right.defining_class)
-        }
-        (Type::TypedDict(_), _) => Ordering::Less,
-        (_, Type::TypedDict(_)) => Ordering::Greater,
     }
 }
 
@@ -275,6 +275,12 @@ fn dynamic_elements_ordering(left: DynamicType, right: DynamicType) -> Ordering 
 
         (DynamicType::TodoTypeAlias, _) => Ordering::Less,
         (_, DynamicType::TodoTypeAlias) => Ordering::Greater,
+
+        (DynamicType::Divergent(left), DynamicType::Divergent(right)) => {
+            left.scope.cmp(&right.scope)
+        }
+        (DynamicType::Divergent(_), _) => Ordering::Less,
+        (_, DynamicType::Divergent(_)) => Ordering::Greater,
     }
 }
 

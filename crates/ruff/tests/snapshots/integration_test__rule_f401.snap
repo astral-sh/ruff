@@ -55,6 +55,10 @@ either a redundant alias or, if already present in the file, an `__all__` entry.
 to remove third-party and standard library imports -- the fix is unsafe because the module's
 interface changes.
 
+See [this FAQ section](https://docs.astral.sh/ruff/faq/#how-does-ruff-determine-which-of-my-imports-are-first-party-third-party-etc)
+for more details on how Ruff
+determines whether an import is first or third-party.
+
 ## Example
 
 ```python
@@ -82,11 +86,6 @@ if find_spec("numpy") is not None:
 else:
     print("numpy is not installed")
 ```
-
-## Preview
-When [preview](https://docs.astral.sh/ruff/preview/) is enabled,
-the criterion for determining whether an import is first-party
-is stricter, which could affect the suggested fix. See [this FAQ section](https://docs.astral.sh/ruff/faq/#how-does-ruff-determine-which-of-my-imports-are-first-party-third-party-etc) for more details.
 
 ## Options
 - `lint.ignore-init-module-imports`

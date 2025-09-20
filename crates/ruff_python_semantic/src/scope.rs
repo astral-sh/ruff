@@ -166,9 +166,49 @@ bitflags! {
     }
 }
 
-#[derive(Debug, is_macro::Is)]
+#[derive(Clone, Copy, Debug, is_macro::Is)]
 pub enum ScopeKind<'a> {
     Class(&'a ast::StmtClassDef),
+    /// The implicit `__class__` scope surrounding a method which allows code in the
+    ///  method to access `__class__` at runtime. The closure sits in between the class
+    ///  scope and the function scope.
+    ///
+    /// Parameter defaults in methods cannot access `__class__`:
+    ///
+    /// ```pycon
+    /// >>> class Bar:
+    /// ...     def method(self, x=__class__): ...
+    /// ...
+    /// Traceback (most recent call last):
+    /// File "<python-input-6>", line 1, in <module>
+    ///     class Bar:
+    ///         def method(self, x=__class__): ...
+    /// File "<python-input-6>", line 2, in Bar
+    ///     def method(self, x=__class__): ...
+    ///                     ^^^^^^^^^
+    /// NameError: name '__class__' is not defined
+    /// ```
+    ///
+    /// However, type parameters in methods *can* access `__class__`:
+    ///
+    /// ```pycon
+    /// >>> class Foo:
+    /// ...     def bar[T: __class__](): ...
+    /// ...
+    /// >>> Foo.bar.__type_params__[0].__bound__
+    /// <class '__main__.Foo'>
+    /// ```
+    ///
+    /// Note that this is still not 100% accurate! At runtime, the implicit `__class__`
+    /// closure is only added if the name `super` (has to be a name -- `builtins.super`
+    /// and similar don't count!) or the name `__class__` is used in any method of the
+    /// class. However, accurately emulating that would be both complex and probably
+    /// quite expensive unless we moved to a double-traversal of each scope similar to
+    /// ty. It would also only matter in extreme and unlikely edge cases. So we ignore
+    /// that subtlety for now.
+    ///
+    /// See <https://docs.python.org/3/reference/datamodel.html#creating-the-class-object>.
+    DunderClassCell,
     Function(&'a ast::StmtFunctionDef),
     Generator {
         kind: GeneratorKind,

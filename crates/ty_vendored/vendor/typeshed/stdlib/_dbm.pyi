@@ -1,7 +1,7 @@
 import sys
 from _typeshed import ReadOnlyBuffer, StrOrBytesPath
 from types import TracebackType
-from typing import TypeVar, final, overload, type_check_only
+from typing import Final, TypeVar, final, overload, type_check_only
 from typing_extensions import Self, TypeAlias
 
 if sys.platform != "win32":
@@ -10,7 +10,7 @@ if sys.platform != "win32":
     _ValueType: TypeAlias = str | ReadOnlyBuffer
 
     class error(OSError): ...
-    library: str
+    library: Final[str]
 
     # Actual typename dbm, not exposed by the implementation
     @final
@@ -33,7 +33,7 @@ if sys.platform != "win32":
         @overload
         def get(self, k: _KeyType, default: _T, /) -> bytes | _T: ...
         def keys(self) -> list[bytes]: ...
-        def setdefault(self, k: _KeyType, default: _ValueType = ..., /) -> bytes: ...
+        def setdefault(self, k: _KeyType, default: _ValueType = b"", /) -> bytes: ...
         # This isn't true, but the class can't be instantiated. See #13024
         __new__: None  # type: ignore[assignment]
         __init__: None  # type: ignore[assignment]

@@ -7,16 +7,16 @@ input_file: crates/ruff_python_parser/resources/inline/err/ann_assign_stmt_type_
 ```
 Module(
     ModModule {
-        node_index: AtomicNodeIndex(..),
+        node_index: NodeIndex(None),
         range: 0..37,
         body: [
             AnnAssign(
                 StmtAnnAssign {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 0..7,
                     target: Name(
                         ExprName {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 0..1,
                             id: Name("a"),
                             ctx: Store,
@@ -24,7 +24,7 @@ Module(
                     ),
                     annotation: Name(
                         ExprName {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 3..7,
                             id: Name("type"),
                             ctx: Load,
@@ -36,12 +36,12 @@ Module(
             ),
             Assign(
                 StmtAssign {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 8..15,
                     targets: [
                         Name(
                             ExprName {
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 range: 8..9,
                                 id: Name("X"),
                                 ctx: Store,
@@ -50,7 +50,7 @@ Module(
                     ],
                     value: Name(
                         ExprName {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 12..15,
                             id: Name("int"),
                             ctx: Load,
@@ -60,16 +60,16 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 16..28,
                     value: Lambda(
                         ExprLambda {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 16..28,
                             parameters: None,
                             body: Name(
                                 ExprName {
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     range: 24..28,
                                     id: Name("type"),
                                     ctx: Load,
@@ -81,12 +81,12 @@ Module(
             ),
             Assign(
                 StmtAssign {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 29..36,
                     targets: [
                         Name(
                             ExprName {
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 range: 29..30,
                                 id: Name("X"),
                                 ctx: Store,
@@ -95,7 +95,7 @@ Module(
                     ],
                     value: Name(
                         ExprName {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 33..36,
                             id: Name("int"),
                             ctx: Load,

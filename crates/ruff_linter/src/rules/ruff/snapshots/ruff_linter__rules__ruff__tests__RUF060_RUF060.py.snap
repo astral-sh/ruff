@@ -251,3 +251,12 @@ RUF060 Unnecessary membership test on empty collection
 25 |
 26 | # OK
    |
+
+RUF060 Unnecessary membership test on empty collection
+  --> RUF060.py:47:1
+   |
+46 | # https://github.com/astral-sh/ruff/issues/20238
+47 | "b" in f"" "" # Error
+   | ^^^^^^^^^^^^^
+48 | "b" in f"" "x" # OK
+   |

@@ -43,7 +43,7 @@ use crate::Violation;
 /// - [Python documentation: `Path.owner`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.owner)
 /// - [Python documentation: `os.stat`](https://docs.python.org/3/library/os.html#os.stat)
 /// - [PEP 428 – The pathlib module – object-oriented filesystem paths](https://peps.python.org/pep-0428/)
-/// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#correspondence-to-tools-in-the-os-module)
+/// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#corresponding-tools)
 /// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
 /// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
 #[derive(ViolationMetadata)]
@@ -89,7 +89,7 @@ impl Violation for OsStat {
 /// - [Python documentation: `PurePath.joinpath`](https://docs.python.org/3/library/pathlib.html#pathlib.PurePath.joinpath)
 /// - [Python documentation: `os.path.join`](https://docs.python.org/3/library/os.path.html#os.path.join)
 /// - [PEP 428 – The pathlib module – object-oriented filesystem paths](https://peps.python.org/pep-0428/)
-/// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#correspondence-to-tools-in-the-os-module)
+/// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#corresponding-tools)
 /// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
 /// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
 #[derive(ViolationMetadata)]
@@ -160,7 +160,7 @@ pub(crate) enum Joiner {
 /// - [Python documentation: `Path.suffixes`](https://docs.python.org/3/library/pathlib.html#pathlib.PurePath.suffixes)
 /// - [Python documentation: `os.path.splitext`](https://docs.python.org/3/library/os.path.html#os.path.splitext)
 /// - [PEP 428 – The pathlib module – object-oriented filesystem paths](https://peps.python.org/pep-0428/)
-/// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#correspondence-to-tools-in-the-os-module)
+/// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#corresponding-tools)
 /// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
 /// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
 #[derive(ViolationMetadata)]
@@ -171,50 +171,6 @@ impl Violation for OsPathSplitext {
     fn message(&self) -> String {
         "`os.path.splitext()` should be replaced by `Path.suffix`, `Path.stem`, and `Path.parent`"
             .to_string()
-    }
-}
-
-/// ## What it does
-/// Checks for uses of the `open()` builtin.
-///
-/// ## Why is this bad?
-/// `pathlib` offers a high-level API for path manipulation. When possible,
-/// using `Path` object methods such as `Path.open()` can improve readability
-/// over the `open` builtin.
-///
-/// ## Examples
-/// ```python
-/// with open("f1.py", "wb") as fp:
-///     ...
-/// ```
-///
-/// Use instead:
-/// ```python
-/// from pathlib import Path
-///
-/// with Path("f1.py").open("wb") as fp:
-///     ...
-/// ```
-///
-/// ## Known issues
-/// While using `pathlib` can improve the readability and type safety of your code,
-/// it can be less performant than working directly with strings,
-/// especially on older versions of Python.
-///
-/// ## References
-/// - [Python documentation: `Path.open`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.open)
-/// - [Python documentation: `open`](https://docs.python.org/3/library/functions.html#open)
-/// - [PEP 428 – The pathlib module – object-oriented filesystem paths](https://peps.python.org/pep-0428/)
-/// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#correspondence-to-tools-in-the-os-module)
-/// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
-/// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
-#[derive(ViolationMetadata)]
-pub(crate) struct BuiltinOpen;
-
-impl Violation for BuiltinOpen {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        "`open()` should be replaced by `Path.open()`".to_string()
     }
 }
 
@@ -298,7 +254,7 @@ impl Violation for PyPath {
 /// - [Python documentation: `Path.iterdir`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.iterdir)
 /// - [Python documentation: `os.listdir`](https://docs.python.org/3/library/os.html#os.listdir)
 /// - [PEP 428 – The pathlib module – object-oriented filesystem paths](https://peps.python.org/pep-0428/)
-/// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#correspondence-to-tools-in-the-os-module)
+/// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#corresponding-tools)
 /// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
 /// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
 #[derive(ViolationMetadata)]
@@ -308,47 +264,5 @@ impl Violation for OsListdir {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Use `pathlib.Path.iterdir()` instead.".to_string()
-    }
-}
-
-/// ## What it does
-/// Checks for uses of `os.symlink`.
-///
-/// ## Why is this bad?
-/// `pathlib` offers a high-level API for path manipulation, as compared to
-/// the lower-level API offered by `os.symlink`.
-///
-/// ## Example
-/// ```python
-/// import os
-///
-/// os.symlink("usr/bin/python", "tmp/python", target_is_directory=False)
-/// ```
-///
-/// Use instead:
-/// ```python
-/// from pathlib import Path
-///
-/// Path("tmp/python").symlink_to("usr/bin/python")
-/// ```
-///
-/// ## Known issues
-/// While using `pathlib` can improve the readability and type safety of your code,
-/// it can be less performant than the lower-level alternatives that work directly with strings,
-/// especially on older versions of Python.
-///
-/// ## References
-/// - [Python documentation: `Path.symlink_to`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.symlink_to)
-/// - [PEP 428 – The pathlib module – object-oriented filesystem paths](https://peps.python.org/pep-0428/)
-/// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#correspondence-to-tools-in-the-os-module)
-/// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
-/// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
-#[derive(ViolationMetadata)]
-pub(crate) struct OsSymlink;
-
-impl Violation for OsSymlink {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        "`os.symlink` should be replaced by `Path.symlink_to`".to_string()
     }
 }

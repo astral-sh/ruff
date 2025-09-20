@@ -15,6 +15,7 @@ use crate::{
 
 /// A cross-module identifier of a scope that can be used as a salsa query parameter.
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
+#[derive(PartialOrd, Ord)]
 pub struct ScopeId<'db> {
     pub file: File,
 
@@ -194,6 +195,10 @@ pub(crate) enum ScopeLaziness {
 impl ScopeLaziness {
     pub(crate) const fn is_eager(self) -> bool {
         matches!(self, ScopeLaziness::Eager)
+    }
+
+    pub(crate) const fn is_lazy(self) -> bool {
+        matches!(self, ScopeLaziness::Lazy)
     }
 }
 
@@ -397,51 +402,37 @@ impl NodeWithScopeKind {
         }
     }
 
-    pub(crate) fn expect_class<'ast>(
-        &self,
-        module: &'ast ParsedModuleRef,
-    ) -> &'ast ast::StmtClassDef {
+    pub(crate) fn as_class(&self) -> Option<&AstNodeRef<ast::StmtClassDef>> {
         match self {
-            Self::Class(class) => class.node(module),
-            _ => panic!("expected class"),
-        }
-    }
-
-    pub(crate) fn as_class<'ast>(
-        &self,
-        module: &'ast ParsedModuleRef,
-    ) -> Option<&'ast ast::StmtClassDef> {
-        match self {
-            Self::Class(class) => Some(class.node(module)),
+            Self::Class(class) => Some(class),
             _ => None,
         }
     }
 
-    pub(crate) fn expect_function<'ast>(
-        &self,
-        module: &'ast ParsedModuleRef,
-    ) -> &'ast ast::StmtFunctionDef {
-        self.as_function(module).expect("expected function")
+    pub(crate) fn expect_class(&self) -> &AstNodeRef<ast::StmtClassDef> {
+        self.as_class().expect("expected class")
     }
 
-    pub(crate) fn expect_type_alias<'ast>(
-        &self,
-        module: &'ast ParsedModuleRef,
-    ) -> &'ast ast::StmtTypeAlias {
+    pub(crate) fn as_function(&self) -> Option<&AstNodeRef<ast::StmtFunctionDef>> {
         match self {
-            Self::TypeAlias(type_alias) => type_alias.node(module),
-            _ => panic!("expected type alias"),
-        }
-    }
-
-    pub(crate) fn as_function<'ast>(
-        &self,
-        module: &'ast ParsedModuleRef,
-    ) -> Option<&'ast ast::StmtFunctionDef> {
-        match self {
-            Self::Function(function) => Some(function.node(module)),
+            Self::Function(function) => Some(function),
             _ => None,
         }
+    }
+
+    pub(crate) fn expect_function(&self) -> &AstNodeRef<ast::StmtFunctionDef> {
+        self.as_function().expect("expected function")
+    }
+
+    pub(crate) fn as_type_alias(&self) -> Option<&AstNodeRef<ast::StmtTypeAlias>> {
+        match self {
+            Self::TypeAlias(type_alias) => Some(type_alias),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn expect_type_alias(&self) -> &AstNodeRef<ast::StmtTypeAlias> {
+        self.as_type_alias().expect("expected type alias")
     }
 }
 

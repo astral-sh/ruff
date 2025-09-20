@@ -11,16 +11,14 @@ RUF058 [*] `itertools.starmap` called on `zip` iterable
 7 | starmap(func, zip(a, b, c, strict=strict))
   |
 help: Use `map` instead
-
-ℹ Safe fix
-2 2 | import itertools
-3 3 | 
-4 4 | # Errors in Python 3.14+
-5   |-starmap(func, zip(a, b, c, strict=True))
-  5 |+map(func, a, b, c, strict=True)
-6 6 | starmap(func, zip(a, b, c, strict=False))
-7 7 | starmap(func, zip(a, b, c, strict=strict))
-8 8 | 
+2 | import itertools
+3 | 
+4 | # Errors in Python 3.14+
+  - starmap(func, zip(a, b, c, strict=True))
+5 + map(func, a, b, c, strict=True)
+6 | starmap(func, zip(a, b, c, strict=False))
+7 | starmap(func, zip(a, b, c, strict=strict))
+8 | 
 
 RUF058 [*] `itertools.starmap` called on `zip` iterable
  --> RUF058_2.py:6:1
@@ -32,16 +30,14 @@ RUF058 [*] `itertools.starmap` called on `zip` iterable
 7 | starmap(func, zip(a, b, c, strict=strict))
   |
 help: Use `map` instead
-
-ℹ Safe fix
-3 3 | 
-4 4 | # Errors in Python 3.14+
-5 5 | starmap(func, zip(a, b, c, strict=True))
-6   |-starmap(func, zip(a, b, c, strict=False))
-  6 |+map(func, a, b, c, strict=False)
-7 7 | starmap(func, zip(a, b, c, strict=strict))
-8 8 | 
-9 9 | 
+3 | 
+4 | # Errors in Python 3.14+
+5 | starmap(func, zip(a, b, c, strict=True))
+  - starmap(func, zip(a, b, c, strict=False))
+6 + map(func, a, b, c, strict=False)
+7 | starmap(func, zip(a, b, c, strict=strict))
+8 | 
+9 | 
 
 RUF058 [*] `itertools.starmap` called on `zip` iterable
  --> RUF058_2.py:7:1
@@ -52,13 +48,11 @@ RUF058 [*] `itertools.starmap` called on `zip` iterable
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   |
 help: Use `map` instead
-
-ℹ Safe fix
-4 4 | # Errors in Python 3.14+
-5 5 | starmap(func, zip(a, b, c, strict=True))
-6 6 | starmap(func, zip(a, b, c, strict=False))
-7   |-starmap(func, zip(a, b, c, strict=strict))
-  7 |+map(func, a, b, c, strict=strict)
-8 8 | 
-9 9 | 
-10 10 | # No errors
+4  | # Errors in Python 3.14+
+5  | starmap(func, zip(a, b, c, strict=True))
+6  | starmap(func, zip(a, b, c, strict=False))
+   - starmap(func, zip(a, b, c, strict=strict))
+7  + map(func, a, b, c, strict=strict)
+8  | 
+9  | 
+10 | # No errors

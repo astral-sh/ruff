@@ -81,14 +81,19 @@ impl IndentStyle {
     pub const fn is_space(&self) -> bool {
         matches!(self, IndentStyle::Space)
     }
+
+    /// Returns the string representation of the indent style.
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            IndentStyle::Tab => "tab",
+            IndentStyle::Space => "space",
+        }
+    }
 }
 
 impl std::fmt::Display for IndentStyle {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            IndentStyle::Tab => std::write!(f, "tab"),
-            IndentStyle::Space => std::write!(f, "space"),
-        }
+        f.write_str(self.as_str())
     }
 }
 

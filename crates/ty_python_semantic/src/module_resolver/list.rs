@@ -12,6 +12,20 @@ use super::resolver::{
     ModuleResolveMode, ResolverContext, is_non_shadowable, resolve_file_module, search_paths,
 };
 
+/// List all available modules, including all sub-modules, sorted in lexicographic order.
+pub fn all_modules(db: &dyn Db) -> Vec<Module<'_>> {
+    let mut modules = list_modules(db);
+    let mut stack = modules.clone();
+    while let Some(module) = stack.pop() {
+        for &submodule in module.all_submodules(db) {
+            modules.push(submodule);
+            stack.push(submodule);
+        }
+    }
+    modules.sort_by_key(|module| module.name(db));
+    modules
+}
+
 /// List all available top-level modules.
 #[salsa::tracked]
 pub fn list_modules(db: &dyn Db) -> Vec<Module<'_>> {
@@ -363,6 +377,11 @@ fn is_python_extension(ext: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    #![expect(
+        clippy::disallowed_methods,
+        reason = "These are tests, so it's fine to do I/O by-passing System."
+    )]
+
     use camino::{Utf8Component, Utf8Path};
     use ruff_db::Db as _;
     use ruff_db::files::{File, FilePath, FileRootKind};

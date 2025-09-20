@@ -308,3 +308,88 @@ def i[T: Intersection[type[Bar], type[Baz | Spam]], U: (type[Eggs], type[Ham])](
 
     return (y, z)
 ```
+
+## Narrowing with generics
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+Narrowing to a generic class using `isinstance()` uses the top materialization of the generic. With
+a covariant generic, this is equivalent to using the upper bound of the type parameter (by default,
+`object`):
+
+```py
+class Covariant[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+def _(x: object):
+    if isinstance(x, Covariant):
+        reveal_type(x)  # revealed: Covariant[object]
+        reveal_type(x.get())  # revealed: object
+```
+
+Similarly, contravariant type parameters use their lower bound of `Never`:
+
+```py
+class Contravariant[T]:
+    def push(self, x: T) -> None: ...
+
+def _(x: object):
+    if isinstance(x, Contravariant):
+        reveal_type(x)  # revealed: Contravariant[Never]
+        # error: [invalid-argument-type] "Argument to bound method `push` is incorrect: Expected `Never`, found `Literal[42]`"
+        x.push(42)
+```
+
+Invariant generics are trickiest. The top materialization, conceptually the type that includes all
+instances of the generic class regardless of the type parameter, cannot be represented directly in
+the type system, so we represent it with the internal `Top[]` special form.
+
+```py
+class Invariant[T]:
+    def push(self, x: T) -> None: ...
+    def get(self) -> T:
+        raise NotImplementedError
+
+def _(x: object):
+    if isinstance(x, Invariant):
+        reveal_type(x)  # revealed: Top[Invariant[Unknown]]
+        reveal_type(x.get())  # revealed: object
+        # error: [invalid-argument-type] "Argument to bound method `push` is incorrect: Expected `Never`, found `Literal[42]`"
+        x.push(42)
+```
+
+When more complex types are involved, the `Top[]` type may get simplified away.
+
+```py
+def _(x: list[int] | set[str]):
+    if isinstance(x, list):
+        reveal_type(x)  # revealed: list[int]
+    else:
+        reveal_type(x)  # revealed: set[str]
+```
+
+Though if the types involved are not disjoint bases, we necessarily keep a more complex type.
+
+```py
+def _(x: Invariant[int] | Covariant[str]):
+    if isinstance(x, Invariant):
+        reveal_type(x)  # revealed: Invariant[int] | (Covariant[str] & Top[Invariant[Unknown]])
+    else:
+        reveal_type(x)  # revealed: Covariant[str] & ~Top[Invariant[Unknown]]
+```
+
+The behavior of `issubclass()` is similar.
+
+```py
+def _(x: type[object], y: type[object], z: type[object]):
+    if issubclass(x, Covariant):
+        reveal_type(x)  # revealed: type[Covariant[object]]
+    if issubclass(y, Contravariant):
+        reveal_type(y)  # revealed: type[Contravariant[Never]]
+    if issubclass(z, Invariant):
+        reveal_type(z)  # revealed: type[Top[Invariant[Unknown]]]
+```

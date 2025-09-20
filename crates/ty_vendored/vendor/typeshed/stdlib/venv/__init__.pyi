@@ -9,10 +9,11 @@ import sys
 from _typeshed import StrOrBytesPath
 from collections.abc import Iterable, Sequence
 from types import SimpleNamespace
+from typing import Final
 
 logger: logging.Logger
 
-CORE_VENV_DEPS: tuple[str, ...]
+CORE_VENV_DEPS: Final[tuple[str, ...]]
 
 class EnvBuilder:
     """

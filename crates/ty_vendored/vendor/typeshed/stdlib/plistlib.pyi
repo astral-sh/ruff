@@ -60,7 +60,7 @@ from _typeshed import ReadableBuffer
 from collections.abc import Mapping, MutableMapping
 from datetime import datetime
 from enum import Enum
-from typing import IO, Any
+from typing import IO, Any, Final
 from typing_extensions import Self
 
 __all__ = ["InvalidFileException", "FMT_XML", "FMT_BINARY", "load", "dump", "loads", "dumps", "UID"]
@@ -71,8 +71,8 @@ class PlistFormat(Enum):
     FMT_XML = 1
     FMT_BINARY = 2
 
-FMT_XML = PlistFormat.FMT_XML
-FMT_BINARY = PlistFormat.FMT_BINARY
+FMT_XML: Final = PlistFormat.FMT_XML
+FMT_BINARY: Final = PlistFormat.FMT_BINARY
 if sys.version_info >= (3, 13):
     def load(
         fp: IO[bytes],

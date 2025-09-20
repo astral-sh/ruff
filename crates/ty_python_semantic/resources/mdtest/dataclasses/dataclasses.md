@@ -546,7 +546,29 @@ class A:
 
 ### `slots`
 
-To do
+If a dataclass is defined with `slots=True`, the `__slots__` attribute is generated as a tuple. It
+is not present otherwise.
+
+```py
+from dataclasses import dataclass
+from typing import Tuple
+
+@dataclass
+class A:
+    x: int
+    y: int
+
+# revealed: Unknown
+# error: [unresolved-attribute]
+reveal_type(A.__slots__)
+
+@dataclass(slots=True)
+class B:
+    x: int
+    y: int
+
+reveal_type(B.__slots__)  # revealed: tuple[Literal["x"], Literal["y"]]
+```
 
 ### `weakref_slot`
 

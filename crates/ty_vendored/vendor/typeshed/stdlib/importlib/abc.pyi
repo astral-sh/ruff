@@ -81,7 +81,7 @@ if sys.version_info < (3, 12):
         Deprecated since Python 3.3
         """
 
-@deprecated("Deprecated as of Python 3.7: Use importlib.resources.abc.TraversableResources instead.")
+@deprecated("Deprecated since Python 3.7. Use `importlib.resources.abc.TraversableResources` instead.")
 class ResourceLoader(Loader):
     """Abstract base class for loaders which can return data from their
     back-end storage to facilitate reading data to perform an import.
@@ -176,7 +176,7 @@ class SourceLoader(_bootstrap_external.SourceLoader, ResourceLoader, ExecutionLo
 
     """
 
-    @deprecated("Deprecated as of Python 3.3: Use importlib.resources.abc.SourceLoader.path_stats instead.")
+    @deprecated("Deprecated since Python 3.3. Use `importlib.resources.abc.SourceLoader.path_stats` instead.")
     def path_mtime(self, path: str) -> float:
         """Return the (int) modification time for the path (str)."""
 

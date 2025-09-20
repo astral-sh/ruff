@@ -74,6 +74,22 @@ def match_non_exhaustive(x: Literal[0, 1, "a"]):
 
             # this diagnostic is correct: the inferred type of `x` is `Literal[1]`
             assert_never(x)  # error: [type-assertion-failure]
+
+# This is based on real-world code:
+# https://github.com/scipy/scipy/blob/99c0ef6af161a4d8157cae5276a20c30b7677c6f/scipy/linalg/tests/test_lapack.py#L147-L171
+def exhaustiveness_using_containment_checks():
+    for norm_str in "Mm1OoIiFfEe":
+        if norm_str in "FfEe":
+            return
+        else:
+            if norm_str in "Mm":
+                return
+            elif norm_str in "1Oo":
+                return
+            elif norm_str in "Ii":
+                return
+
+        assert_never(norm_str)
 ```
 
 ## Checks on enum literals
@@ -265,12 +281,10 @@ def if_else_exhaustive(x: A[D] | B[E] | C[F]):
     elif isinstance(x, C):
         pass
     else:
-        # TODO: both of these are false positives (https://github.com/astral-sh/ty/issues/456)
-        no_diagnostic_here  # error: [unresolved-reference]
-        assert_never(x)  # error: [type-assertion-failure]
+        no_diagnostic_here
+        assert_never(x)
 
-# TODO: false-positive diagnostic (https://github.com/astral-sh/ty/issues/456)
-def if_else_exhaustive_no_assertion(x: A[D] | B[E] | C[F]) -> int:  # error: [invalid-return-type]
+def if_else_exhaustive_no_assertion(x: A[D] | B[E] | C[F]) -> int:
     if isinstance(x, A):
         return 0
     elif isinstance(x, B):

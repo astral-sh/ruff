@@ -68,7 +68,7 @@ macro_rules! type_property_test {
 
 mod stable {
     use super::union;
-    use crate::types::{CallableType, Type};
+    use crate::types::{CallableType, KnownClass, Type};
 
     // Reflexivity: `T` is equivalent to itself.
     type_property_test!(
@@ -133,13 +133,13 @@ mod stable {
     // All types should be assignable to `object`
     type_property_test!(
         all_types_assignable_to_object, db,
-        forall types t. t.is_assignable_to(db, Type::object(db))
+        forall types t. t.is_assignable_to(db, Type::object())
     );
 
     // And all types should be subtypes of `object`
     type_property_test!(
         all_types_subtype_of_object, db,
-        forall types t. t.is_subtype_of(db, Type::object(db))
+        forall types t. t.is_subtype_of(db, Type::object())
     );
 
     // Never should be assignable to every type
@@ -158,7 +158,7 @@ mod stable {
     type_property_test!(
         bottom_callable_is_subtype_of_all_callable, db,
         forall types t. t.is_callable_type()
-            => CallableType::bottom(db).is_subtype_of(db, t)
+            => Type::Callable(CallableType::bottom(db)).is_subtype_of(db, t)
     );
 
     // `T` can be assigned to itself.
@@ -182,7 +182,7 @@ mod stable {
     // Only `object` is a supertype of `Any`.
     type_property_test!(
         only_object_is_supertype_of_any, db,
-        forall types t. !t.is_equivalent_to(db, Type::object(db)) => !Type::any().is_subtype_of(db, t)
+        forall types t. !t.is_equivalent_to(db, Type::object()) => !Type::any().is_subtype_of(db, t)
     );
 
     // Equivalence is commutative.
@@ -205,6 +205,25 @@ mod stable {
         all_fully_static_type_pairs_are_subtype_of_their_union, db,
         forall fully_static_types s, t. s.is_subtype_of(db, union(db, [s, t])) && t.is_subtype_of(db, union(db, [s, t]))
     );
+
+    // Any type assignable to `Iterable[object]` should be considered iterable.
+    //
+    // Note that the inverse is not true, due to the fact that we recognize the old-style
+    // iteration protocol as well as the new-style iteration protocol: not all objects that
+    // we consider iterable are assignable to `Iterable[object]`.
+    //
+    // Note also that (like other property tests in this module),
+    // this invariant will only hold true for Liskov-compliant types assignable to `Iterable`.
+    // Since protocols can participate in nominal assignability/subtyping as well as
+    // structural assignability/subtyping, it is possible to construct types that a type
+    // checker must consider to be subtypes of `Iterable` even though they are not in fact
+    // iterable (as long as the user `type: ignore`s any type-checker errors stemming from
+    // the Liskov violation). All you need to do is to create a class that subclasses
+    // `Iterable` but assigns `__iter__ = None` in the class body (or similar).
+    type_property_test!(
+        all_type_assignable_to_iterable_are_iterable, db,
+        forall types t. t.is_assignable_to(db, KnownClass::Iterable.to_specialized_instance(db, [Type::object()])) => t.try_iterate(db).is_ok()
+    );
 }
 
 /// This module contains property tests that currently lead to many false positives.
@@ -216,8 +235,6 @@ mod stable {
 /// tests (using [`types::property_tests::flaky`]), to see if there are any new obvious bugs.
 mod flaky {
     use itertools::Itertools;
-
-    use crate::types::{KnownClass, Type};
 
     use super::{intersection, union};
 
@@ -312,17 +329,5 @@ mod flaky {
     type_property_test!(
         bottom_materialization_of_type_is_assigneble_to_type, db,
         forall types t. t.bottom_materialization(db).is_assignable_to(db, t)
-    );
-
-    // Any type assignable to `Iterable[object]` should be considered iterable.
-    //
-    // Note that the inverse is not true, due to the fact that we recognize the old-style
-    // iteration protocol as well as the new-style iteration protocol: not all objects that
-    // we consider iterable are assignable to `Iterable[object]`.
-    //
-    // Currently flaky due to <https://github.com/astral-sh/ty/issues/889>
-    type_property_test!(
-        all_type_assignable_to_iterable_are_iterable, db,
-        forall types t. t.is_assignable_to(db, KnownClass::Iterable.to_specialized_instance(db, [Type::object(db)])) => t.try_iterate(db).is_ok()
     );
 }
