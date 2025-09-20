@@ -22,26 +22,29 @@ impl Display for ApiBan {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey, Default)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-pub enum Strictness {
+pub enum ImportStyle {
+    /// Force imports to be relative.
+    AlwaysRelative,
     /// Ban imports that extend into the parent module or beyond.
     #[default]
-    Parents,
+    ParentsAbsolute,
     /// Ban all relative imports.
-    All,
+    AlwaysAbsolute,
 }
 
-impl Display for Strictness {
+impl Display for ImportStyle {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Parents => write!(f, "\"parents\""),
-            Self::All => write!(f, "\"all\""),
+            Self::AlwaysRelative => write!(f, "\"always-relative\""),
+            Self::ParentsAbsolute => write!(f, "\"parents-absolute\""),
+            Self::AlwaysAbsolute => write!(f, "\"always-absolute\""),
         }
     }
 }
 
 #[derive(Debug, Clone, CacheKey, Default)]
 pub struct Settings {
-    pub ban_relative_imports: Strictness,
+    pub relative_import_style: ImportStyle,
     pub banned_api: FxHashMap<String, ApiBan>,
     pub banned_module_level_imports: Vec<String>,
 }
@@ -58,7 +61,7 @@ impl Display for Settings {
             formatter = f,
             namespace = "linter.flake8_tidy_imports",
             fields = [
-                self.ban_relative_imports,
+                self.relative_import_style,
                 self.banned_api | map,
                 self.banned_module_level_imports | array,
             ]
