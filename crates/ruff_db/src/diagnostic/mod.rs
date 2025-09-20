@@ -432,14 +432,21 @@ impl Diagnostic {
 
     /// Returns the URL for the rule documentation, if it exists.
     pub fn to_ruff_url(&self) -> Option<String> {
-        if self.is_invalid_syntax() {
-            None
-        } else {
-            Some(format!(
-                "{}/rules/{}",
-                env!("CARGO_PKG_HOMEPAGE"),
-                self.name()
-            ))
+        match self.id() {
+            DiagnosticId::Panic
+            | DiagnosticId::Io
+            | DiagnosticId::InvalidSyntax
+            | DiagnosticId::RevealedType
+            | DiagnosticId::UnknownRule
+            | DiagnosticId::InvalidGlob
+            | DiagnosticId::EmptyInclude
+            | DiagnosticId::UnnecessaryOverridesSection
+            | DiagnosticId::UselessOverridesSection
+            | DiagnosticId::DeprecatedSetting
+            | DiagnosticId::Unformatted => None,
+            DiagnosticId::Lint(lint_name) => {
+                Some(format!("{}/rules/{lint_name}", env!("CARGO_PKG_HOMEPAGE")))
+            }
         }
     }
 
@@ -1016,6 +1023,9 @@ pub enum DiagnosticId {
 
     /// Use of a deprecated setting.
     DeprecatedSetting,
+
+    /// The code needs to be formatted.
+    Unformatted,
 }
 
 impl DiagnosticId {
@@ -1055,6 +1065,7 @@ impl DiagnosticId {
             DiagnosticId::UnnecessaryOverridesSection => "unnecessary-overrides-section",
             DiagnosticId::UselessOverridesSection => "useless-overrides-section",
             DiagnosticId::DeprecatedSetting => "deprecated-setting",
+            DiagnosticId::Unformatted => "unformatted",
         }
     }
 

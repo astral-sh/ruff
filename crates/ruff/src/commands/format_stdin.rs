@@ -109,7 +109,7 @@ fn format_source_code(
     let formatted = format_source(&source_kind, source_type, path, settings, range)?;
 
     match &formatted {
-        FormattedSource::Formatted(formatted) => match mode {
+        FormattedSource::Formatted { formatted, .. } => match mode {
             FormatMode::Write => {
                 let mut writer = stdout().lock();
                 formatted

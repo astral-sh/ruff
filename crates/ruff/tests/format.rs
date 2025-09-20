@@ -12,8 +12,8 @@ use tempfile::TempDir;
 
 const BIN_NAME: &str = "ruff";
 
-fn tempdir_filter(tempdir: &TempDir) -> String {
-    format!(r"{}\\?/?", escape(tempdir.path().to_str().unwrap()))
+fn tempdir_filter(path: impl AsRef<Path>) -> String {
+    format!(r"{}\\?/?", escape(path.as_ref().to_str().unwrap()))
 }
 
 #[test]
@@ -65,12 +65,13 @@ bar =     "needs formatting"
     )?;
 
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--isolated", "--no-cache", "--check"]).current_dir(tempdir.path()), @r"
+        .args(["format", "--isolated", "--no-cache", "--check", "--output-format=concise"])
+        .current_dir(tempdir.path()), @r"
     success: false
     exit_code: 1
     ----- stdout -----
-    Would reformat: bar.py
-    Would reformat: foo.py
+    bar.py: unformatted: File would be reformatted
+    foo.py: unformatted: File would be reformatted
     2 files would be reformatted
 
     ----- stderr -----
@@ -482,7 +483,7 @@ OTHER = "OTHER"
 
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .current_dir(tempdir.path())
-        .args(["format", "--no-cache", "--check", "--config"])
+        .args(["format", "--no-cache", "--check", "--output-format=concise", "--config"])
         .arg(ruff_toml.file_name().unwrap())
         // Explicitly pass test.py, should be formatted regardless of it being excluded by format.exclude
         .arg(test_path.file_name().unwrap())
@@ -491,8 +492,8 @@ OTHER = "OTHER"
     success: false
     exit_code: 1
     ----- stdout -----
-    Would reformat: main.py
-    Would reformat: test.py
+    main.py: unformatted: File would be reformatted
+    test.py: unformatted: File would be reformatted
     2 files would be reformatted
 
     ----- stderr -----
@@ -571,12 +572,12 @@ if __name__ == "__main__":
 
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .current_dir(tempdir.path())
-        .args(["format", "--no-cache", "--isolated", "--check"])
+        .args(["format", "--no-cache", "--isolated", "--check", "--output-format=concise"])
         .arg("main.py"), @r"
     success: false
     exit_code: 1
     ----- stdout -----
-    Would reformat: main.py
+    main.py: unformatted: File would be reformatted
     1 file would be reformatted
 
     ----- stderr -----
@@ -605,6 +606,60 @@ if __name__ == "__main__":
 
     ----- stderr -----
     ");
+
+    Ok(())
+}
+
+#[test_case::test_case("concise")]
+#[test_case::test_case("full")]
+#[test_case::test_case("json")]
+#[test_case::test_case("json-lines")]
+#[test_case::test_case("junit")]
+#[test_case::test_case("grouped")]
+#[test_case::test_case("github")]
+#[test_case::test_case("gitlab")]
+#[test_case::test_case("pylint")]
+#[test_case::test_case("rdjson")]
+#[test_case::test_case("azure")]
+#[test_case::test_case("sarif")]
+fn output_format(output_format: &str) -> Result<()> {
+    const CONTENT: &str = r#"\
+from test import say_hy
+
+if __name__ == "__main__":
+    say_hy("dear Ruff contributor")
+"#;
+
+    let tempdir = TempDir::new()?;
+    let input = tempdir.path().join("input.py");
+    fs::write(&input, CONTENT)?;
+
+    let snapshot = format!("output_format_{output_format}");
+
+    let project_dir = dunce::canonicalize(tempdir.path())?;
+
+    insta::with_settings!({
+        filters => vec![
+            (tempdir_filter(&project_dir).as_str(), "[TMP]/"),
+            (tempdir_filter(&tempdir).as_str(), "[TMP]/"),
+            (r#""[^"]+\\?/?input.py"#, r#""[TMP]/input.py"#),
+            (ruff_linter::VERSION, "[VERSION]"),
+        ]
+    }, {
+        assert_cmd_snapshot!(
+            snapshot,
+            Command::new(get_cargo_bin(BIN_NAME))
+                .args([
+                    "format",
+                    "--no-cache",
+                    "--output-format",
+                    output_format,
+                    "--check",
+                    "input.py",
+                ])
+                .current_dir(&tempdir),
+        );
+    });
 
     Ok(())
 }
@@ -738,7 +793,7 @@ OTHER = "OTHER"
 
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .current_dir(tempdir.path())
-        .args(["format", "--no-cache", "--force-exclude", "--check", "--config"])
+        .args(["format", "--no-cache", "--force-exclude", "--check", "--output-format=concise", "--config"])
         .arg(ruff_toml.file_name().unwrap())
         // Explicitly pass test.py, should be respect the `format.exclude` when `--force-exclude` is present
         .arg(test_path.file_name().unwrap())
@@ -747,7 +802,7 @@ OTHER = "OTHER"
     success: false
     exit_code: 1
     ----- stdout -----
-    Would reformat: main.py
+    main.py: unformatted: File would be reformatted
     1 file would be reformatted
 
     ----- stderr -----
