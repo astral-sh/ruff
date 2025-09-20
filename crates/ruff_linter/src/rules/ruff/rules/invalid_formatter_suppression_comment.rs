@@ -165,6 +165,55 @@ impl<'src, 'loc> UselessSuppressionComments<'src, 'loc> {
             }
         }
 
+        // Check if fmt: off/on comments are around class signatures
+        if comment.kind == SuppressionKind::Off || comment.kind == SuppressionKind::On {
+            // Check if the comment is before a class definition (enclosing is None, following is class)
+            if comment.enclosing.is_none() {
+                if let Some(AnyNodeRef::StmtClassDef(StmtClassDef {
+                    name: _,
+                    decorator_list,
+                    ..
+                })) = comment.following
+                {
+                    // The comment is before a class definition
+                    if comment.line_position.is_own_line() {
+                        // Check if the comment is after any decorators
+                        if let Some(last_decorator) = decorator_list.last() {
+                            if comment.range.start() > last_decorator.end() {
+                                return Err(IgnoredReason::AroundClassSignature);
+                            }
+                        }
+                        // No decorators, so any comment before the class is invalid
+                        return Err(IgnoredReason::AroundClassSignature);
+                    }
+                }
+            }
+
+            // Check if the comment is directly after a class definition line (as a trailing comment)
+            if let Some(AnyNodeRef::StmtClassDef(StmtClassDef {
+                name,
+                decorator_list,
+                ..
+            })) = comment.enclosing
+            {
+                // Only flag if the comment is on the same line as the class definition
+                // or immediately after the class name/colon
+                if !comment.line_position.is_own_line() {
+                    // Check if it's a trailing comment on the class definition line
+                    let class_end = if let Some(last_decorator) = decorator_list.last() {
+                        last_decorator.end()
+                    } else {
+                        name.end()
+                    };
+
+                    // Only flag if the comment is very close to the class signature
+                    if comment.range.start() > class_end {
+                        return Err(IgnoredReason::AroundClassSignature);
+                    }
+                }
+            }
+        }
+
         if comment.kind == SuppressionKind::Off && comment.line_position.is_own_line() {
             if let (Some(enclosing), Some(preceding), Some(following)) =
                 (comment.enclosing, comment.preceding, comment.following)
@@ -225,6 +274,7 @@ enum IgnoredReason {
     SkipHasToBeTrailing,
     FmtOnCannotBeTrailing,
     FmtOffAboveBlock,
+    AroundClassSignature,
 }
 
 impl Display for IgnoredReason {
@@ -245,6 +295,9 @@ impl Display for IgnoredReason {
             }
             Self::FmtOffAboveBlock => {
                 write!(f, "it cannot be directly above an alternate body")
+            }
+            Self::AroundClassSignature => {
+                write!(f, "it cannot be around a class signature")
             }
         }
     }
