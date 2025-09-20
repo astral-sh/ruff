@@ -1104,7 +1104,14 @@ impl<'db> SpecializationBuilder<'db> {
             (Type::TypeVar(bound_typevar), ty) | (ty, Type::TypeVar(bound_typevar)) => {
                 match bound_typevar.typevar(self.db).bound_or_constraints(self.db) {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        if !ty.is_assignable_to(self.db, bound) {
+                        let skip_assignability_check =
+                            if bound_typevar.typevar(self.db).is_self(self.db) {
+                                self.infer(ty, bound).is_ok()
+                            } else {
+                                false
+                            };
+
+                        if !(skip_assignability_check || ty.is_assignable_to(self.db, bound)) {
                             return Err(SpecializationError::MismatchedBound {
                                 bound_typevar,
                                 argument: ty,
@@ -1125,7 +1132,9 @@ impl<'db> SpecializationBuilder<'db> {
                         });
                     }
                     _ => {
-                        self.add_type_mapping(bound_typevar, ty);
+                        if !matches!(ty, Type::TypeVar(_)) {
+                            self.add_type_mapping(bound_typevar, ty);
+                        }
                     }
                 }
             }
