@@ -459,6 +459,13 @@ impl<'db> Node<'db> {
         matches!(self, Node::AlwaysFalse)
     }
 
+    fn interior_node_count(self, db: &'db dyn Db) -> usize {
+        match self {
+            Node::AlwaysTrue | Node::AlwaysFalse => 0,
+            Node::Interior(interior) => interior.interior_node_count(db),
+        }
+    }
+
     fn negate(self, db: &'db dyn Db) -> Self {
         match self {
             Node::AlwaysTrue => Node::AlwaysFalse,
@@ -502,20 +509,39 @@ impl<'db> Node<'db> {
         }
     }
 
-    // Andersen2011, figure 17, where d == other and u == self
     fn simplify_relative_to(self, db: &'db dyn Db, relative_to: Self) -> Self {
-        match (self, relative_to) {
-            (_, Node::AlwaysFalse) => Node::AlwaysFalse,
-            (Node::AlwaysTrue | Node::AlwaysFalse, _) => self,
-            (Node::Interior(self_interior), Node::AlwaysTrue) => Node::new(
-                db,
-                self_interior.atom(db),
-                (self_interior.if_true(db)).simplify_relative_to(db, relative_to),
-                (self_interior.if_false(db)).simplify_relative_to(db, relative_to),
-            ),
-            (Node::Interior(self_interior), Node::Interior(relative_to)) => {
-                self_interior.simplify_relative_to(db, relative_to)
-            }
+        // relative_to should describe variable combinations that are impossible (for instance
+        // `x ∧ ¬y` if `x → y`). For those variable assignments, we don't care what value the BDD
+        // resolves to. We can try to simplify the BDD by seeing if mapping those variables to 0 or
+        // to 1 give a smaller BDD. Given `x → y`, that would simplify `x ∧ y` to `x`. (That might
+        // require mapping `x ∧ ¬y` to 0 or to 1, depending on how `x` and `y` relate to each other
+        // in the variable ordering.)
+
+        // First try forcing the don't-care assignments to 0. `relative_to` already encodes this,
+        // since it maps everything we care about to 1, and everything we don't care about to 0. So
+        // we can just AND the two BDDs together.
+        let mapped_to_zero = self.and(db, relative_to);
+
+        // And then we try forcing them to 1. To that, we negate `relative_to`, so that things we
+        // care about map to 0, and things we don't care about map to 1. And then we OR that with
+        // the original BDD.
+        let mapped_to_one = self.or(db, relative_to.negate(db));
+
+        // Then we keep the result that has the fewest interior nodes, using that as a proxy for
+        // the complexity of the underlying function.
+        let mapped_to_zero_size = mapped_to_zero.interior_node_count(db);
+        let mapped_to_one_size = mapped_to_one.interior_node_count(db);
+        let (smaller_size, smaller_updated) = if mapped_to_zero_size < mapped_to_one_size {
+            (mapped_to_zero_size, mapped_to_zero)
+        } else {
+            (mapped_to_one_size, mapped_to_one)
+        };
+
+        let original_size = self.interior_node_count(db);
+        if smaller_size < original_size {
+            smaller_updated
+        } else {
+            self
         }
     }
 
@@ -629,6 +655,11 @@ impl get_size2::GetSize for InteriorNode<'_> {}
 
 #[salsa::tracked]
 impl<'db> InteriorNode<'db> {
+    #[salsa::tracked]
+    fn interior_node_count(self, db: &'db dyn Db) -> usize {
+        self.if_true(db).interior_node_count(db) + self.if_false(db).interior_node_count(db) + 1
+    }
+
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     fn negate(self, db: &'db dyn Db) -> Node<'db> {
         Node::new(
@@ -713,44 +744,6 @@ impl<'db> InteriorNode<'db> {
                 other_atom,
                 Node::Interior(self).implies(db, other.if_true(db)),
                 Node::Interior(self).implies(db, other.if_false(db)),
-            ),
-        }
-    }
-
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-    fn simplify_relative_to(self, db: &'db dyn Db, relative_to: Self) -> Node<'db> {
-        let self_atom = self.atom(db);
-        let relative_to_atom = relative_to.atom(db);
-        match self_atom.cmp(&relative_to_atom) {
-            Ordering::Equal => {
-                let relative_false = relative_to.if_false(db);
-                let relative_true = relative_to.if_true(db);
-                if relative_false.is_never_satisfied() {
-                    self.if_true(db).simplify_relative_to(db, relative_true)
-                } else if relative_true.is_never_satisfied() {
-                    self.if_false(db).simplify_relative_to(db, relative_false)
-                } else {
-                    Node::new(
-                        db,
-                        self_atom,
-                        self.if_true(db).simplify_relative_to(db, relative_true),
-                        self.if_false(db).simplify_relative_to(db, relative_false),
-                    )
-                }
-            }
-
-            Ordering::Less => Node::new(
-                db,
-                self_atom,
-                (self.if_true(db)).simplify_relative_to(db, Node::Interior(relative_to)),
-                (self.if_false(db)).simplify_relative_to(db, Node::Interior(relative_to)),
-            ),
-
-            Ordering::Greater => Node::new(
-                db,
-                relative_to_atom,
-                Node::Interior(self).simplify_relative_to(db, relative_to.if_true(db)),
-                Node::Interior(self).simplify_relative_to(db, relative_to.if_false(db)),
             ),
         }
     }
