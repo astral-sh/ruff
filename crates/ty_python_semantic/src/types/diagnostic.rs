@@ -89,6 +89,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS);
     registry.register_lint(&UNDEFINED_REVEAL);
     registry.register_lint(&UNKNOWN_ARGUMENT);
+    registry.register_lint(&POSITIONAL_ONLY_PARAMETER_AS_KWARG);
     registry.register_lint(&UNRESOLVED_ATTRIBUTE);
     registry.register_lint(&UNRESOLVED_IMPORT);
     registry.register_lint(&UNRESOLVED_REFERENCE);
@@ -1533,6 +1534,27 @@ declare_lint! {
     /// ```
     pub(crate) static UNKNOWN_ARGUMENT = {
         summary: "detects unknown keyword arguments in calls",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for keyword arguments in calls that match positional-only parameters of the callable.
+    ///
+    /// ## Why is this bad?
+    /// Providing a positional-only parameter as a keyword argument will raise `TypeError` at runtime.
+    ///
+    /// ## Example
+    ///
+    /// ```python
+    /// def f(x: int, /) -> int: ...
+    ///
+    /// f(x=1)  # Error raised here
+    /// ```
+    pub(crate) static POSITIONAL_ONLY_PARAMETER_AS_KWARG = {
+        summary: "detects positional-only parameters passed as keyword arguments",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
